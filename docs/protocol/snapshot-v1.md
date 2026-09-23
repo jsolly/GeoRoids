@@ -44,9 +44,9 @@ excessive cable separation. An explicit null target clears the client's cached
 latch. Reconnection uses authoritative attachment state and never replays an
 ability request.
 
-Surveyor snapshots include optional `surveyorUtility` (`mineral_scan` or
+Scout snapshots include optional `scoutUtility` (`mineral_scan` or
 `survey_probe`; missing means mineral scan). Retired wire token `build_furnace`
-still decodes and readers map it to mineral scan; `setSurveyorUtility` rejects
+still decodes and readers map it to mineral scan; `setScoutUtility` rejects
 it. Near a dark street lot within approach range, `useAbility` builds that
 street instead of launching the equipped scan or probe. Clients never submit a
 probe pose, target, health, or expiry.

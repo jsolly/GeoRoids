@@ -4,8 +4,8 @@ import { activateAbilityOnHost, tickAbilityHost } from '../../../src/entities/sh
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { scannedMaterial } from '../../../src/entities/ship/surveyScan';
 
-test('Surveyor scan identifies nearby minerals then expires without changing motion', () => {
-  const ship = new Ship({ kitId: 'surveyor' });
+test('Scout scan identifies nearby minerals then expires without changing motion', () => {
+  const ship = new Ship({ kitId: 'scout' });
   ship.position = { x: 0, y: 0 };
   ship.velocity = { x: 1, y: 0.25 };
   const rock = {
@@ -38,7 +38,7 @@ test('Hauler and destroyed ships cannot classify asteroids using an active timer
   ship.position = { x: 0, y: 0 };
   ship.abilityActiveFrames = SHIP_ABILITY.SCAN_FRAMES;
   expect(scannedMaterial(ship, rock)).toBeUndefined();
-  ship.kitId = 'surveyor';
+  ship.kitId = 'scout';
   ship.exploding = true;
   expect(scannedMaterial(ship, rock)).toBeUndefined();
   ship.exploding = false;

@@ -49,6 +49,9 @@ describe('Hauler ship schematic overlay', () => {
     );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     document.body.classList.add('in-play');
+    const flightCanvas = document.createElement('canvas');
+    flightCanvas.id = 'gameCanvas';
+    document.body.append(flightCanvas);
     PlayerManager.getInstance().createLocalPlayer('hauler');
     bindPlayerNetworkPort({
       getAllPlayers: () => [],
@@ -94,6 +97,7 @@ describe('Hauler ship schematic overlay', () => {
     expect(ret).toBeInstanceOf(HTMLButtonElement);
     ret?.click();
     expect(isShipSchematicOpen()).toBe(false);
+    expect(document.activeElement?.id).toBe('gameCanvas');
     window.removeEventListener('gameSchematicOpen', opened);
   });
 
@@ -122,7 +126,35 @@ describe('Hauler ship schematic overlay', () => {
     expect(ship.blinkCount).toBeGreaterThan(0);
   });
 
+  test('uncollected tools stay locked and unlock while inventory is open', () => {
+    const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    if (!ship) {
+      throw new Error('Missing local ship');
+    }
+    ship.equipment = [];
+    expect(openShipSchematic()).toBe(true);
+    const tap = document.querySelector<HTMLButtonElement>('[data-utility-id="resource_tap"]');
+    expect(tap?.disabled).toBe(true);
+    expect(tap?.textContent).toContain('Find in spider nests');
+    equipUtility('resource_tap');
+    expect(
+      document.querySelector('[data-utility-id="tow_cable"]')?.classList.contains('is-active')
+    ).toBe(true);
+    ship.equipment = ['resource_tap'];
+    const render = vi.mocked(requestAnimationFrame).mock.lastCall?.[0];
+    render?.(0);
+    expect(tap?.disabled).toBe(false);
+    equipUtility('resource_tap');
+    expect(tap?.classList.contains('is-active')).toBe(true);
+    closeShipSchematic();
+  });
+
   test('selecting Tow Cable then Resource Tap updates the ACTIVE card', () => {
+    const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    if (!ship) {
+      throw new Error('Missing local ship');
+    }
+    ship.equipment = ['resource_tap'];
     expect(openShipSchematic()).toBe(true);
     equipUtility('tow_cable');
     const tow = document.querySelector('[data-utility-id="tow_cable"]');
@@ -180,6 +212,38 @@ describe('Hauler ship schematic overlay', () => {
     toggle?.click();
     expect(isShipSchematicOpen()).toBe(true);
     closeShipSchematic();
+  });
+
+  test('a pilot cannot open inventory or change tools during a furnace ride', () => {
+    const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    if (!ship) {
+      throw new Error('Missing pilot');
+    }
+    closeShipSchematic();
+    const utility = ship.haulerUtility;
+    const equipment = ship.equipment;
+    ship.haulerUtility = 'tow_cable';
+    ship.equipment = ['resource_tap'];
+    ship.furnaceTransit = {
+      sourceId: 'town-square',
+      destinationId: 'street-1-0',
+      startedAt: 0,
+      durationMs: 1000,
+    };
+    try {
+      openShipSchematic();
+      expect(isShipSchematicOpen()).toBe(false);
+      equipUtility('resource_tap');
+      expect(ship.haulerUtility).toBe('tow_cable');
+    } finally {
+      ship.furnaceTransit = null;
+      if (utility === undefined) {
+        delete ship.haulerUtility;
+      } else {
+        ship.haulerUtility = utility;
+      }
+      ship.equipment = equipment;
+    }
   });
 
   test('touch chrome keeps the Inventory button and hides its keyboard badge', () => {

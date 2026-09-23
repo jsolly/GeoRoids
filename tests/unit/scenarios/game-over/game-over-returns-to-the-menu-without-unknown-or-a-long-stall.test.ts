@@ -152,7 +152,7 @@ describe('Last life on the server', () => {
       world.engine.getGameState().entities.find((entity) => entity.id === ace.id)
     ).toMatchObject({ deathCause: 'boundary', lives: 0 });
     expect(world.entity(ace).respawnTimer).toBeUndefined();
-    expect(GAME.START_LIVES).toBe(3);
+    expect(GAME.START_LIVES).toBe(5);
   });
 
   test('an asteroid kill stays on the snapshot until respawn', () => {

@@ -248,7 +248,7 @@ describe('painted HUD composition', () => {
     const { drawLivesIndicator } = await import('../../../src/rendering/hud/lives');
     const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
 
     const ctx = canvasContext();
     const { strokes, texts } = recordCanvas(ctx);
@@ -256,7 +256,7 @@ describe('painted HUD composition', () => {
 
     drawLivesIndicator(ctx, layout, 3, PALETTE.LOCAL, player.ship.kitId);
     const hulls = strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#5EEAD4'));
-    const silhouette = getKitHullOutline('surveyor').hull;
+    const silhouette = getKitHullOutline('scout').hull;
     expect(strokes).toHaveLength(6);
     expect(hulls).toHaveLength(3);
     for (const [index, hull] of hulls.entries()) {
@@ -282,7 +282,7 @@ describe('painted HUD composition', () => {
         align: 'left',
       },
       {
-        text: 'Surveyor',
+        text: 'Scout',
         x: 16,
         y: 38,
         style: normalizedCanvasColor(ctx, 'rgba(100,116,139,0.85)'),
@@ -298,7 +298,7 @@ describe('painted HUD composition', () => {
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { ExplorationMap } = await import('../../../shared/exploration');
     const { setWorldExploration } = await import('../../../src/network/worldExploration');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
     player.ship.position = { x: 0, y: 0 };
     const exploration = new ExplorationMap();
     exploration.reveal({ x: 40_000, y: 0 }, 100);
@@ -332,7 +332,7 @@ describe('painted HUD composition', () => {
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { ExplorationMap } = await import('../../../shared/exploration');
     const { setWorldExploration } = await import('../../../src/network/worldExploration');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
     player.ship.position = { x: 0, y: 0 };
     player.ship.abilityActiveFrames = 1;
     const roids = (['ice', 'metal', 'rubble'] as const).map((material, index) => {
@@ -411,7 +411,7 @@ describe('painted HUD composition', () => {
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { ExplorationMap } = await import('../../../shared/exploration');
     const { setWorldExploration } = await import('../../../src/network/worldExploration');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
     player.ship.position = { x: 0, y: 0 };
     player.ship.angle = Math.PI / 2;
     const visible = new Roid({ x: WORLD.minimapRadius / 2, y: 0 }, 20, 'radar-visible');
@@ -582,13 +582,13 @@ describe('painted HUD composition', () => {
       [713.2, 531.6],
       [718, 536],
     ]);
-    const surveyorOutline = getKitHullOutline('surveyor');
+    const scoutOutline = getKitHullOutline('scout');
     const haulerOutline = getKitHullOutline('hauler');
-    const surveyorMarks = 1 + surveyorOutline.extras.length;
+    const scoutMarks = 1 + scoutOutline.extras.length;
     const haulerMarks = 1 + haulerOutline.extras.length;
     // One arena ring, four world layers, nearby street foundations, then kit hulls.
     expect(strokes).toHaveLength(
-      1 + 4 + darkLotsInRadar.length + surveyorMarks * 2 * 3 + haulerMarks * 2
+      1 + 4 + darkLotsInRadar.length + scoutMarks * 2 * 3 + haulerMarks * 2
     );
     const radarX = layout.miniMap.x + layout.miniMap.size / 2;
     const radarY = layout.miniMap.y + layout.miniMap.size / 2;
@@ -606,40 +606,32 @@ describe('painted HUD composition', () => {
       radarY,
       VISUAL.MINIMAP_LOCAL_SIZE,
       Math.PI / 2,
-      'surveyor'
+      'scout'
     );
-    expect(crispKitStrokes(strokes, localColor)).toHaveLength(surveyorMarks);
+    expect(crispKitStrokes(strokes, localColor)).toHaveLength(scoutMarks);
     expectRadarKitMark(strokes, remoteColor, peerX, radarY, VISUAL.MINIMAP_DOT, 0, 'hauler');
-    expectRadarKitMark(strokes, remoteColor, crewX, radarY, VISUAL.MINIMAP_DOT, 0, 'surveyor');
+    expectRadarKitMark(strokes, remoteColor, crewX, radarY, VISUAL.MINIMAP_DOT, 0, 'scout');
     const rimHeading = Math.PI / 2;
     const canvasInwardHeading = -Math.PI / 2;
     const rimHull = crispKitStrokes(strokes, remoteColor).find(
       (call) =>
         call.closed &&
-        call.points.length === surveyorOutline.hull.points.length &&
+        call.points.length === scoutOutline.hull.points.length &&
         call.points[0]?.[1] ===
-          radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'surveyor')[0]?.[1]
+          radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'scout')[0]?.[1]
     );
     expect(rimHull?.points.length).toBeGreaterThan(3);
     expect(rimHull?.points).toEqual(
-      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'surveyor')
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'scout')
     );
     expect(rimHull?.points).not.toEqual(
-      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, canvasInwardHeading, 'surveyor')
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, canvasInwardHeading, 'scout')
     );
     expect(rimHull?.points).not.toEqual(
-      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, 0, 'surveyor')
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, 0, 'scout')
     );
-    expectRadarKitMark(
-      strokes,
-      remoteColor,
-      rimX,
-      rimY,
-      VISUAL.MINIMAP_DOT,
-      rimHeading,
-      'surveyor'
-    );
-    expect(crispKitStrokes(strokes, remoteColor)).toHaveLength(surveyorMarks * 2 + haulerMarks);
+    expectRadarKitMark(strokes, remoteColor, rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'scout');
+    expect(crispKitStrokes(strokes, remoteColor)).toHaveLength(scoutMarks * 2 + haulerMarks);
 
     strokes.length = 0;
     outlinedRectangles.length = 0;

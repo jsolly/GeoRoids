@@ -15,7 +15,7 @@ media: []
 ## Probe beacons
 
 A pulsing cyan ring around a rock's minimap mark identifies a live
-[Survey Probe](/wiki/#surveyor). Follow that rock to survey more of the field.
+[Survey Probe](/wiki/#scout). Follow that rock to survey more of the field.
 On the playfield the small diamond has a green health bar and emits expanding
 scan rings. Amber pulses warn that its battery is nearly empty.
 
@@ -175,10 +175,10 @@ your nickname on the title screen before Enter Game.
 The playfield stays on the title screen until the server acknowledges join and
 sends the first world snapshot.
 
-## Surveyor scan
+## Scout scan
 
 The local minimap and full-screen universe map use one persistent shared
-exploration chart. Passive Surveyor reveal reaches 650 world units and passive
+exploration chart. Passive Scout reveal reaches 650 world units and passive
 Hauler reveal reaches 260; every crew member contributes to the same
 explored area. Pilots stay readable. Dark street lots remain marked on the
 universe map, and a lit street shows its right-angle fire trail back to Town
@@ -191,9 +191,9 @@ the Close control.
 On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's
-radar. An active scan reaches 1,200 world units around its Surveyor. All asteroid types keep the same rock outline: ice is pale cyan with a crack,
+radar. An active scan reaches 1,200 world units around its Scout. All asteroid types keep the same rock outline: ice is pale cyan with a crack,
 metal is gold with parallel seams, and rubble is orange with chipped details.
 The classification remains visible for that rock while it is in the nearby
 radar, even after the active scan ends. Unscanned rocks keep a smaller slate rock outline.
-The Surveyor's scan also records its player ID on the rock for a later furnace
+The Scout's scan also records its player ID on the rock for a later furnace
 delivery.

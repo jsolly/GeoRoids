@@ -51,9 +51,15 @@ feedback, with no terrain reflection or extra damage.
 
 ## Terrain spiders
 
-Spiders mostly live in widely spaced territories around stationary deposits,
-loose loot, and unclaimed pickups. More valuable resources attract larger guard
-groups; some sites have a whole horde. Most resources remain unguarded. A red spiderweb on both maps marks each
+Spiders guard resource nests throughout the explored field. Each nest starts
+with **10 guards**, with at most one nest in each 5,000-unit grid cell.
+Some resources remain unguarded; only nearby territories wake, within a bounded
+active population. Nest salvage includes shards, wreckage, Tap canisters, silk,
+laser cores, and recoverable satellite hardware while supply remains. A nest
+also has a 65% chance to contain one rare tool: Resource Tap, Boost Coupling, or
+Survey Probe. Look for large glowing, floating hardware among the defenders.
+Cache loot lasts up to 30 minutes, subject to the shared pickup limit; leaving
+and returning does not refill a cache. A red spiderweb on both maps marks each
 discovered nest at its guarded resource, not the moving spiders. The web
 remains after the guards die while the original resource stays in place. It
 disappears after the resource is collected or moved. Guards patrol close to their home instead of following
@@ -68,10 +74,11 @@ quiet interval after spider combat. Towing a living spider overrides that quiet
 interval with more frequent rescue arrivals. There is no immediate roaming ambush when
 a flight starts. The starter area and furnaces remain safe
 from roaming spiders; a Hauler can drag a captured spider into a furnace.
-Surveyors cannot build a street furnace when an existing nest home would sit inside
-the hearth's spider occupancy — the same keep-away that hides a web under a
-standing furnace. That rejected construction does not clear the nest. Furnaces
-that are already standing still scare spiders that enter that occupancy.
+Scouts can light a street foundation during a chase, including one covered by a
+nest. Building works while a tool is cooling down, provided the inward furnace
+is lit and the Scout can pay the construction cost. The new fire immediately
+breaks nearby hunts and drives the living spiders away. Guards whose home is
+covered leave their nest and become roaming spiders.
 
 Their feet touch the existing iso-lines as they move. Nearby contour segments
 turn red under their influence. They add no new web strands or pits, and the
@@ -104,7 +111,7 @@ Towing asteroids and using Resource Tap do not summon rescue arrivals.
 Boost Coupling cannot target spiders. See
 [Hauler utilities](/wiki/#hauler).
 
-An active [Mineral Scan](/wiki/#surveyor) drives spiders away within its scan
+An active [Mineral Scan](/wiki/#scout) drives spiders away within its scan
 range and stops their bites while they remain inside it. They can hunt again
 after the scan ends or they leave its range. Survey Probes do not repel them.
 A built street furnace provides the same spider safe area as Town Square.

@@ -72,14 +72,14 @@ test('harpoon latches the nearer rock even if a farther rock is ahead', () => {
 });
 
 test('non-Hauler kits never latch or haul', () => {
-  const surveyor = host('surveyor');
+  const scout = host('scout');
   const rock = { id: 'rock', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } };
-  expect(activateAbilityOnHost(surveyor, { asteroids: [rock] }).abilityId).toBe('surveyScan');
-  expect(surveyor.harpoonTargetId).toBeNull();
-  surveyor.harpoonTargetId = 'rock';
-  pullHarpoonTarget(surveyor, [rock]);
+  expect(activateAbilityOnHost(scout, { asteroids: [rock] }).abilityId).toBe('surveyScan');
+  expect(scout.harpoonTargetId).toBeNull();
+  scout.harpoonTargetId = 'rock';
+  pullHarpoonTarget(scout, [rock]);
   expect(rock.velocity.x).toBe(0);
-  expect(surveyor.harpoonTargetId).toBeNull();
+  expect(scout.harpoonTargetId).toBeNull();
 });
 
 test('physical reach keeps an intake-bound rock near enough to tow', () => {
@@ -190,11 +190,11 @@ test('an omitted server latch field leaves the previous persistent latch alone',
 });
 
 test('ability cooldown ticks down', () => {
-  const surveyor = host('surveyor');
-  activateAbilityOnHost(surveyor);
-  const start = surveyor.abilityCooldownFrames;
-  tickAbilityHost(surveyor);
-  expect(surveyor.abilityCooldownFrames).toBe(start - 1);
+  const scout = host('scout');
+  activateAbilityOnHost(scout);
+  const start = scout.abilityCooldownFrames;
+  tickAbilityHost(scout);
+  expect(scout.abilityCooldownFrames).toBe(start - 1);
 });
 
 test('a rock beyond physical reach stays untowable regardless of zoom', () => {
@@ -233,13 +233,13 @@ test('an overlapping Tow Cable rest length uses the Hauler barge hull, not a 20-
     velocity: { x: 0, y: 0 },
     size: 10,
   };
-  const stretchPastSurveyorFloor = 20 + 10 + 16 + 1;
+  const stretchPastScoutFloor = 20 + 10 + 16 + 1;
 
-  const surveyor = host('surveyor');
-  surveyor.harpoonTargetId = rock.id;
-  attachTowCable(surveyor, rock);
-  surveyor.position.x = stretchPastSurveyorFloor;
-  tickTowCable(surveyor, rock);
+  const scout = host('scout');
+  scout.harpoonTargetId = rock.id;
+  attachTowCable(scout, rock);
+  scout.position.x = stretchPastScoutFloor;
+  tickTowCable(scout, rock);
   expect(rock.velocity.x).toBeGreaterThan(0);
 
   rock.velocity.x = 0;
@@ -247,7 +247,7 @@ test('an overlapping Tow Cable rest length uses the Hauler barge hull, not a 20-
   const hauler = host('hauler');
   hauler.harpoonTargetId = rock.id;
   attachTowCable(hauler, rock);
-  hauler.position.x = stretchPastSurveyorFloor;
+  hauler.position.x = stretchPastScoutFloor;
   tickTowCable(hauler, rock);
   expect(rock.velocity.x).toBe(0);
 });

@@ -305,7 +305,7 @@ test('offline delivery credit restamps the server score without copying the last
   const engine = engineWithStore(store);
   const scoutSocket = new RecordingSocket();
   const haulerSocket = new RecordingSocket();
-  const scout = engine.addPlayer('scout', 'Scout', scoutSocket, { x: 0, y: 0 }, 'surveyor');
+  const scout = engine.addPlayer('scout', 'Scout', scoutSocket, { x: 0, y: 0 }, 'scout');
   const hauler = engine.addPlayer('hauler', 'Hauler', haulerSocket, { x: 80, y: 0 }, 'hauler');
   scout.asteroidInteractions = 1;
   hauler.asteroidInteractions = 1;

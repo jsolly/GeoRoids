@@ -18,19 +18,21 @@ media:
 ## Utility slot
 
 Hauler is the U-shaped cargo yoke with twin forward towers and two engine
-bells. On the playfield it is about twice Surveyor's linear hull size, so the
+bells. On the playfield it is about twice Scout's linear hull size, so the
 barge reads as a real tug next to the scout. Draw scale, collision, and
 utility latch range share that hull. It has one utility slot. Open the ship view with V or the Inventory button
-to swap **Resource Tap**, **Tow
-Cable**, and **Boost Coupling**. Equip is immediate. E still fires the equipped tool; there is no
+to swap tools you have collected: **Resource Tap**, **Tow
+Cable**, and **Boost Coupling**. Owned tools equip immediately. E still fires the equipped tool; there is no
 second ability key. Other pilots cannot open your schematic.
 
 All three tools use the same central mount. The schematic and flying hull show the
 equipped hardware: a cable winch and hook, an extraction probe, or a boost nozzle. The animation
 preview uses that same Hauler design.
 
-New flights start on Resource Tap. A host that never reports a slot keeps the
-legacy Tow Cable so older sessions still haul.
+New flights start with **Tow Cable**. Resource Tap and Boost Coupling are rare
+equipment drops, most often found among spider-nest salvage. Locked cards cannot
+be equipped until you collect that tool. Collected tools stay with your pilot
+between deaths, reconnects, and server restarts, until your last life is lost.
 
 ## Resource Tap E
 
@@ -63,7 +65,7 @@ On entering a furnace's intake, the rock's outline flashes danger-red as it
 shatters, a short smoke poof rises up the grate, and the rock is consumed
 exactly once.
 The pilots who armed the coupling receive its full delivery value, as do its
-recorded Surveyors. Ordinary rocks need one coupling. A colossal deposit stays
+recorded Scouts. Ordinary rocks need one coupling. A colossal deposit stays
 armed until two Haulers have coupled; E or IGNITE before that crew is ready
 leaves the couplings latched. The owners do not need to stay nearby or connected, and still earn this
 delivery if their last life is lost before intake.
@@ -76,7 +78,7 @@ to an ordinary armed or burning rock. A second Boost Coupling can join an
 armed colossal deposit until the crew is complete. Ignition starts a new three-second ability cooldown.
 Once ignited, the rock passes through ships, other asteroids, and satellites.
 Weapons and blast impulses do not affect it, and it
-cannot be scanned, tapped, towed, or coupled again. Existing Surveyor tags still
+cannot be scanned, tapped, towed, or coupled again. Existing Scout tags still
 receive credit. Only furnace intake consumes the self-guided cargo.
 
 Guidance follows the simulation, which pauses when nobody is playing. A saved
@@ -90,8 +92,8 @@ hull gap. The rock briefly shudders when the cable catches. The ability never
 targets a ship, and it cannot deal ship damage.
 
 The asteroid keeps its existing motion and trails behind the Hauler as the
-Hauler flies under normal thrust and steering. Surveyor and Hauler share the
-same cruise speed; Hauler Boost is weaker than Surveyor Boost. Both use the same
+Hauler flies under normal thrust and steering. Scout and Hauler share the
+same cruise speed; Hauler Boost is weaker than Scout Boost. Both use the same
 limited [boost tank](/wiki/#controls), which refills while inactive. Any available
 charge can start another burst, interrupting the refill. The cable only
 applies a small correction when it is stretched; it never reels a rock into the
@@ -123,12 +125,12 @@ until that street is burning. A lit street shows a fire trail from its grate to
 Town Square, turning at right angles through each inward lot on its parent chain. A delivery sends
 a brighter head along that trail from the grate that took the rock back to Town
 Square. Delivery shatters the rock
-in a red outline with a short smoke poof and awards the Hauler. If a Surveyor
-scanned the rock, the Hauler and each Surveyor contributor receive identical
+in a red outline with a short smoke poof and awards the Hauler. If a Scout
+scanned the rock, the Hauler and each Scout contributor receive identical
 delivery points.
 
 Hauler passive exploration reaches 260 world units and contributes to the same
-persistent crew chart as Surveyor. Use the shared chart to follow discovered
+persistent crew chart as Scout. Use the shared chart to follow discovered
 amber furnace markers; the local radar shows a discovered campfire while it is within
 the nearby radar view, and the universe map keeps that landmark on the same zoom
 scale as the other chart marks. Zoomed out it is a flame pin; the nearby view
@@ -141,7 +143,7 @@ whimper as it disappears.
 
 Towing a living spider draws nearby spiders and more frequent rescue arrivals.
 Rescuers chase the tow cable and can bite it through to free their companion.
-A Surveyor's active Mineral Scan repels them, and lit furnaces remain safe.
+A Scout's active Mineral Scan repels them, and lit furnaces remain safe.
 Releasing the spider ends the rescue call; towing an asteroid does not trigger it.
 
 ## Mining lasers

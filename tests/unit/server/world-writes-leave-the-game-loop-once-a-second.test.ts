@@ -279,9 +279,10 @@ test('a persistence flush never parks a custom diagnostic belt in dormant region
     frame();
   }
   expect(engine.getAllAsteroids()).toContainEqual(target);
-  expect(engine.getSpiderField().nests).toContainEqual({
-    id: '1,0',
-    resourceId: target.id,
-    position: target.position,
-  });
+  expect(engine.getSpiderField().nests).toContainEqual(
+    expect.objectContaining({
+      resourceId: target.id,
+      position: target.position,
+    })
+  );
 });

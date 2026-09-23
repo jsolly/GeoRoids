@@ -22,6 +22,9 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
   let rock: AsteroidData;
 
   function equip(pilot: Pilot, utilityId: HaulerUtilityId): void {
+    if (utilityId !== 'tow_cable') {
+      world.entity(pilot).equipment = [utilityId];
+    }
     world.send(pilot, { type: 'setHaulerUtility', id: pilot.id, data: { utilityId } });
   }
   function activate(pilot: Pilot): void {

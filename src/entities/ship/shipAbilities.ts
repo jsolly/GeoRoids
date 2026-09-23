@@ -12,8 +12,8 @@ import type {
   AsteroidBoost,
   HaulerUtilityId,
   Position,
+  ScoutUtilityId,
   ShipKitId,
-  SurveyorUtilityId,
   Velocity,
 } from '../../../shared-types';
 import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
@@ -23,8 +23,8 @@ import {
   isResourceTapUtility,
   isTowCableUtility,
 } from './haulerUtility';
+import { isScoutUtilityId, scoutUtilityOf } from './scoutUtility';
 import { getShipKit, hullRadiusForKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
-import { isSurveyorUtilityId, surveyorUtilityOf } from './surveyorUtility';
 import { attachTowCable, tickTowCable } from './towCable';
 
 export interface AbilityHost {
@@ -41,7 +41,7 @@ export interface AbilityHost {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
-  surveyorUtility?: SurveyorUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   mass?: number;
@@ -97,14 +97,11 @@ export function canActivateAbility(host: AbilityHost): boolean {
   );
 }
 
-export function abilityCooldownFramesFor(host: {
-  kitId: unknown;
-  surveyorUtility?: unknown;
-}): number {
+export function abilityCooldownFramesFor(host: { kitId: unknown; scoutUtility?: unknown }): number {
   const kitId = getShipKit(host.kitId).id;
   if (
-    kitId === 'surveyor' &&
-    surveyorUtilityOf({ kitId, surveyorUtility: host.surveyorUtility }) === 'survey_probe'
+    kitId === 'scout' &&
+    scoutUtilityOf({ kitId, scoutUtility: host.scoutUtility }) === 'survey_probe'
   ) {
     return SURVEY_PROBE.COOLDOWN_FRAMES;
   }
@@ -155,15 +152,15 @@ export function setHaulerUtilityOnHost(
   return true;
 }
 
-export function setSurveyorUtilityOnHost(
-  host: Pick<AbilityHost, 'kitId' | 'surveyorUtility' | 'abilityActiveFrames'>,
+export function setScoutUtilityOnHost(
+  host: Pick<AbilityHost, 'kitId' | 'scoutUtility' | 'abilityActiveFrames'>,
   utilityId: unknown
 ): boolean {
-  if (host.kitId !== 'surveyor' || !isSurveyorUtilityId(utilityId)) {
+  if (host.kitId !== 'scout' || !isScoutUtilityId(utilityId)) {
     return false;
   }
-  const changed = surveyorUtilityOf(host) !== utilityId;
-  host.surveyorUtility = utilityId;
+  const changed = scoutUtilityOf(host) !== utilityId;
+  host.scoutUtility = utilityId;
   if (changed) {
     // A tool swap cannot leave a predicted Mineral Scan pulse running while
     // another tool is equipped. The authoritative cooldown is preserved.
@@ -448,7 +445,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
   if (kit.abilityId === 'surveyScan') {
     host.abilityCooldownFrames = abilityCooldownFramesFor(host);
     host.abilityActiveFrames =
-      surveyorUtilityOf(host) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
+      scoutUtilityOf(host) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
     return { activated: true, abilityId: kit.abilityId };
   }
   if (!world) {

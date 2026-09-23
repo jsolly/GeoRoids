@@ -6,7 +6,7 @@ summary: Every player shares one crew. Scan, tow, and deliver together.
   become ricochets. Harvested ground stays open for later expeditions.
 order: 140
 related:
-  - content/wiki/surveyor.md
+  - content/wiki/scout.md
   - content/wiki/hauler.md
   - content/wiki/asteroids.md
   - content/wiki/hud-network.md
@@ -30,17 +30,17 @@ blasts only push nearby small rocks and leave crew hulls safe.
 
 ## Scan, tow, deliver
 
-A Surveyor can equip [Survey Probe](/wiki/#surveyor) to attach a beacon to a
+A Scout can equip [Survey Probe](/wiki/#scout) to attach a beacon to a
 moving rock. Anyone nearby can follow its pulsing minimap marker and benefit
 from the materials it identifies. Probes have limited batteries and can be
 shot off their hosts; revealed mineral classifications and delivery credit
 remain after a beacon is gone.
 
-An active Surveyor scan classifies minerals on every teammate's radar within
-the scan's range around that Surveyor. The shapes identify ice, metal, and
+An active Scout scan classifies minerals on every teammate's radar within
+the scan's range around that Scout. The shapes identify ice, metal, and
 rubble, and the classification stays with a scanned rock until the rock is
 delivered or removed. A qualifying scan also tags the asteroid with that
-Surveyor's player ID, so several Surveyors can contribute to one delivery.
+Scout's player ID, so several Scouts can contribute to one delivery.
 An equipped satellite on either ship performs shorter-range identification and
 records its owner for the same shared rewards.
 
@@ -63,7 +63,7 @@ Boost Coupling aims a rock at its nearest furnace on the first E and launches
 self-guided delivery on the second. A colossal deposit needs two armed
 couplings before ignition, and both owners are paid at intake. At intake the
 rock shatters in a red outline with a short smoke poof and pays
-the pilots who armed it plus every recorded Surveyor. Ordinary rocks stay
+the pilots who armed it plus every recorded Scout. Ordinary rocks stay
 reserved while armed or burning, so another Hauler
 cannot take them over. A second Boost Coupling can join an armed colossal
 deposit. After ignition it passes through ships and objects, ignores
@@ -80,21 +80,30 @@ marked. When a hearth moves beyond the local radar, use the universe map to
 find it. Dark lots stay marked on that map. A fire trail appears there only after the street is lit, turning at right angles back to Town Square. Zoomed out, a lit
 mark is an amber flame pin at the same size as the other chart landmarks; the
 nearby view and closer restore the three-tongue campfire. A delivery consumes
-the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
+the towed or self-guided rock and pays the Hauler and every recorded Scout.
 Streets a pilot built raise only that pilot's payout. Town Square also holds a
-store: spend 1,000 of your own score there on one extra life, up to 6 lives.
+store: spend 250 of your own score there on one extra life, up to 6 lives.
 The pipeline stays hidden until that street is burning. A lit street shows a
 fire trail from its grate to Town Square, turning at right angles through each
 inward lot on its parent chain. Dragging a rock or a spider into a street furnace sends a brighter
 head along that trail from the source grate back to Town Square.
+
+## Rocket travel
+
+Inside the visible footprint of any lit furnace, follow the **Press E to travel** prompt (or tap **TRAVEL**
+on mobile). Choose another furnace on the destination map to ride its piping
+there at rocket speed. Town Square is always available as a destination from
+other furnaces. Building more streets adds shared travel stops for the crew.
+Travel is free and takes at most two seconds; the rocket ride is protected from
+combat and ignores steering and firing. Boarding releases towed cargo.
 
 ## Shared chart
 
 The local minimap follows the ship's nearby radar. The full-screen universe map
 opens with M or the Map button and shows the crew's shared overview of the
 world. Every pilot adds the area around its ship, and explored cells remain
-revealed for the crew after that ship moves away. Surveyor passive reveal
-reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
+revealed for the crew after that ship moves away. Scout passive reveal
+reaches 650 world units; Hauler passive reveal reaches 260. An active Scout
 scan reaches 1,200 world units and also classifies minerals in that range on
 every teammate's radar. Uncharted asteroid and loot positions stay
 hidden until a crew member reveals their area. Dark street lots stay marked on
@@ -112,11 +121,12 @@ on the ring around Town Square. A brief return keeps the same ship, and death
 respawns beside the nearest lit hearth. The local radar and universe map keep explored
 cells visible, and the universe map still draws its alignment grid.
 
-Surveyors light a [street foundation](/wiki/#surveyor) by standing near a dark
+Scouts light a [street foundation](/wiki/#scout) by standing near a dark
 lot so E becomes Build, then standing inside the grate and pressing E.
 The inward lot on that road must already be burning, and that
-Surveyor's own score must cover the cost. The furnace takes their name. They
-cannot build a hearth whose spider occupancy covers an existing nest. Every
+Scout's own score must cover the cost. The furnace takes their name. Building
+works during tool cooldown and on nest-covered foundations. Lighting the fire
+immediately breaks nearby hunts and drives the living spiders away. Every
 crew member can use the sites. Built furnaces survive reconnects and server
 restarts until the world resets. Active Mineral Scan also drives nearby spiders
 away from the crew.

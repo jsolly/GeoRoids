@@ -4,7 +4,7 @@ import { WORLD } from './world';
 const CELLS_PER_SECTOR = 16;
 const CELL_SIZE = WORLD.sectorSize / CELLS_PER_SECTOR;
 const EXPLORATION_GRID_SIZE = (WORLD.radius * 2) / CELL_SIZE;
-export const EXPLORATION_RANGE = { surveyor: 650, hauler: 260 };
+export const EXPLORATION_RANGE = { scout: 650, hauler: 260 };
 export const EMPTY_EXPLORATION: ExplorationTile[] = [];
 const EMPTY_BITS = '00'.repeat(CELLS_PER_SECTOR ** 2 / 8);
 const EXPLORATION_TILE_ID_PATTERN = /^\d+,\d+$/u;

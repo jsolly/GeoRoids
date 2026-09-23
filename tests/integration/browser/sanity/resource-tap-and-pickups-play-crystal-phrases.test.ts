@@ -40,9 +40,9 @@ for (const viewport of [
     const game = new GameInteractions(page);
     await game.bootGame({
       kitId: 'hauler',
-      haulerUtility: 'resource_tap',
       waitForCombatReady: false,
     });
+    await game.collectEquipment(['resource_tap'], 'resource_tap');
     const id = await game.getLocalPlayerId();
     await arrangeCrewField([id], 'tow');
     await game.waitForAnimationFrames(10);

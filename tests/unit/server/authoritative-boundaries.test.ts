@@ -50,7 +50,7 @@ describe('server authority boundaries', () => {
         data: {
           id: 'pilot',
           name: 'Pilot',
-          kitId: 'surveyor',
+          kitId: 'scout',
           position: { x: 0, y: 0 },
           snapshotVersion: 1,
           asteroidInteractions: 1,
@@ -72,7 +72,7 @@ describe('server authority boundaries', () => {
       ws
     );
 
-    expect(pilot.kitId).toBe('surveyor');
+    expect(pilot.kitId).toBe('scout');
     expect(pilot.maxHealth).toBe(maxHealth);
     expect(engine.useAbility('pilot', 'hauler')).toBe(false);
     expect(pilot.abilityCooldownFrames).toBe(0);
@@ -81,11 +81,11 @@ describe('server authority boundaries', () => {
       {
         type: 'useAbility',
         id: 'pilot',
-        data: { kitId: 'surveyor', abilityId: 'surveyScan' },
+        data: { kitId: 'scout', abilityId: 'surveyScan' },
       },
       ws
     );
-    expect(pilot.kitId).toBe('surveyor');
+    expect(pilot.kitId).toBe('scout');
     expect(pilot.abilityCooldownFrames).toBeGreaterThan(0);
   });
 

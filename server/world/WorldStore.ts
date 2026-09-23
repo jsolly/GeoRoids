@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { epochField } from '../../shared/epochField';
+import { validEquipment } from '../../shared/equipment';
 import { validExploration } from '../../shared/exploration';
 import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
@@ -13,6 +14,7 @@ import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
   CivicModule,
+  EquipmentId,
   ExplorationTile,
   Position,
   ShipBoostState,
@@ -51,6 +53,7 @@ function validWorldPosition(position: Position): boolean {
 /** Browser credential plus the saved score and optional recent flight. */
 export interface PersistentPilot {
   silk?: number;
+  equipment?: EquipmentId[];
   id: string;
   tokenHash: string;
   name: string;
@@ -94,7 +97,7 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
-  /** Street furnaces a Surveyor paid for. Absent on older rows. */
+  /** Street furnaces a Scout paid for. Absent on older rows. */
   civicModules?: CivicModule[];
   seed: number;
   startedAt: number;
@@ -199,6 +202,10 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   const name = pilot['name'];
   const tokenHash = pilot['tokenHash'];
   const score = pilot['score'];
+  const equipment = pilot['equipment'];
+  if (equipment !== undefined && !validEquipment(equipment)) {
+    return undefined;
+  }
   const silk = pilot['silk'];
   if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
     return undefined;
@@ -222,6 +229,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     tokenHash,
     name,
     score,
+    ...(equipment !== undefined ? { equipment: [...equipment] } : {}),
     ...(typeof silk === 'number' ? { silk } : {}),
     ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
@@ -296,6 +304,9 @@ export class WorldStore {
         CREATE TABLE IF NOT EXISTS world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS pilots (id TEXT PRIMARY KEY, json TEXT NOT NULL);`);
+      // Persist the retired kit name once at startup, before validating saved flights.
+      this.db.exec(`UPDATE pilots SET json = json_set(json, '$.kitId', 'scout')
+        WHERE json_extract(json, '$.kitId') = 'surveyor'`);
       this.openedSectors = this.indexPersistedSectors();
     } catch (error) {
       this.db.close();

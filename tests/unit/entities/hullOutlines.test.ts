@@ -34,7 +34,7 @@ test('each kit bakes a unique hangar topology', () => {
   expect(outlines.map((outline) => outline.kitId)).toEqual([...SHIP_KIT_IDS]);
   expect(new Set(outlines.map((outline) => outline.topology)).size).toBe(2);
   expect(SHIP_HULL_TOPOLOGY).toEqual({
-    surveyor: 'delta-wing',
+    scout: 'delta-wing',
     hauler: 'cargo-yoke',
   });
   const fingerprints = outlines.map((outline) =>
@@ -43,21 +43,21 @@ test('each kit bakes a unique hangar topology', () => {
   expect(new Set(fingerprints).size).toBe(2);
 });
 
-test('Surveyor delta-wing keeps a forward dish, wide wings, and one aft nozzle', () => {
-  const surveyor = getKitHullOutline('surveyor');
-  expect(surveyor.topology).toBe('delta-wing');
-  expect(surveyor.nozzles).toHaveLength(1);
-  const hullF = surveyor.hull.points.map((point) => point.f);
-  const hullP = surveyor.hull.points.map((point) => point.p);
+test('Scout delta-wing keeps a forward dish, wide wings, and one aft nozzle', () => {
+  const scout = getKitHullOutline('scout');
+  expect(scout.topology).toBe('delta-wing');
+  expect(scout.nozzles).toHaveLength(1);
+  const hullF = scout.hull.points.map((point) => point.f);
+  const hullP = scout.hull.points.map((point) => point.p);
   const maxF = Math.max(...hullF);
   const minF = Math.min(...hullF);
   const spanP = Math.max(...hullP) - Math.min(...hullP);
   expect(spanP).toBeGreaterThan(maxF - minF);
-  const nose = surveyor.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
+  const nose = scout.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
   expect(Math.abs(nose.p)).toBeLessThan(0.05);
-  const wings = surveyor.hull.points.filter((point) => Math.abs(point.p) > 1);
+  const wings = scout.hull.points.filter((point) => Math.abs(point.p) > 1);
   expect(wings.length).toBeGreaterThan(4);
-  expect(surveyor.extras.length).toBeGreaterThan(3);
+  expect(scout.extras.length).toBeGreaterThan(3);
 });
 
 test('Hauler yoke keeps twin forward towers, a cargo bay, and two aft engine bells', () => {

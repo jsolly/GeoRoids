@@ -103,9 +103,9 @@ test('an acknowledged Hauler tow releases during cooldown while a detached hull 
   expect(mockSendAbility).toHaveBeenCalledOnce();
 });
 
-test('Surveyor does not send a failed ability request', () => {
+test('Scout does not send a failed ability request', () => {
   bindTestCombatNetwork();
-  const ship = new Ship({ kitId: 'surveyor', isLocalPlayer: true });
+  const ship = new Ship({ kitId: 'scout', isLocalPlayer: true });
   ship.abilityCooldownFrames = 40;
   expect(ship.activateAbility()).toBe(false);
   expect(mockSendAbility).not.toHaveBeenCalled();

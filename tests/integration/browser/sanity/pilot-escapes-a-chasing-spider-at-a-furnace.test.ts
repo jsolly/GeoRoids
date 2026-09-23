@@ -22,7 +22,7 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const id = await game.getLocalPlayerId();
     await arrangeCrewField([id], 'spider-tools');
     await expect.poll(async () => (await field(page)).spiders[0]?.targetId).toBe(id);

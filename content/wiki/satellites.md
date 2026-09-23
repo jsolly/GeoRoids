@@ -35,7 +35,7 @@ grant a combat ability or spawn protection.
 
 ## Inventory
 
-Collected hardware enters the collecting ship's inventory. Both Surveyors and
+Collected hardware enters the collecting ship's inventory. Both Scouts and
 Haulers open that list with V or the Inventory button. The same view draws the
 hull beside the list. Stored satellites do not orbit or lose health. A brief notification names the
 satellite you acquired. A short label above the ship says the equipment is in
@@ -53,9 +53,9 @@ does not replace your ship's E ability or the Hauler's selected utility.
 The equipped satellite automatically identifies nearby asteroids for the crew.
 Their mineral markers remain identified after the satellite is gone. Scanning
 also contributes to the shared exploration chart and records the pilot for
-shared asteroid rewards. Satellite range is shorter than the Surveyor's core
-scan, so a Hauler gains local identification without the Surveyor's long-range
-ability. A Surveyor can use a satellite between its own scan pulses.
+shared asteroid rewards. Satellite range is shorter than the Scout's core
+scan, so a Hauler gains local identification without the Scout's long-range
+ability. A Scout can use a satellite between its own scan pulses.
 
 Health and remaining lifetime are the same resource. A full-health satellite
 lasts two minutes while equipped. Its health drains steadily with time, and

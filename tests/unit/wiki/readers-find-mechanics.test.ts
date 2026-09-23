@@ -8,13 +8,13 @@ import { searchArticles } from '../../../src/wiki/search';
 describe('readers find mechanics in the field manual', () => {
   test('finds rules in article bodies even when they are absent from the title', () => {
     const results = searchArticles(articles, 'classification');
-    expect(results.some((article) => article.id === 'surveyor')).toBe(true);
+    expect(results.some((article) => article.id === 'scout')).toBe(true);
   });
 
   test.each([
-    ['Surveyor', 'surveyor'],
+    ['Scout', 'scout'],
     ['Systems', 'hud-network'],
-    ['nimble', 'surveyor'],
+    ['nimble', 'scout'],
     ['materials', 'asteroids'],
   ])('finds %s in the published reference', (query, id) => {
     expect(searchArticles(articles, query).some((article) => article.id === id)).toBe(true);

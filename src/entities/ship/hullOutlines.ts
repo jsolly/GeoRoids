@@ -176,11 +176,11 @@ export function getHaulerEquipment(utility: HaulerUtilityId): readonly HullPolyl
   return HAULER_EQUIPMENT[utility];
 }
 
-const SURVEYOR_LEFT_WING_PANEL = path(false, [0.2, -0.95, 0.0, -0.4, -0.22, -0.48]);
+const SCOUT_LEFT_WING_PANEL = path(false, [0.2, -0.95, 0.0, -0.4, -0.22, -0.48]);
 
 /** Forward dish, delta wings, and a single aft bell. Traced from the hangar sheet. */
-const SURVEYOR_DELTA_WING: HullOutline = kitOutline(
-  'surveyor',
+const SCOUT_DELTA_WING: HullOutline = kitOutline(
+  'scout',
   'delta-wing',
   path(
     true,
@@ -202,15 +202,15 @@ const SURVEYOR_DELTA_WING: HullOutline = kitOutline(
     oval(0.02, 0, 0.16, 0.08, 10),
     oval(-0.02, 0, 0.09, 0.045, 8),
     path(true, [-0.14, -0.04, -0.14, 0.04, -0.18, 0.04, -0.18, -0.04]),
-    SURVEYOR_LEFT_WING_PANEL,
-    flipP(SURVEYOR_LEFT_WING_PANEL),
+    SCOUT_LEFT_WING_PANEL,
+    flipP(SCOUT_LEFT_WING_PANEL),
     oval(-0.46, 0, 0.05, 0.045, 8),
   ],
   [{ f: -0.56, p: 0 }]
 );
 
 const V2_HULL_OUTLINES: Record<ShipKitId, HullOutline> = {
-  surveyor: SURVEYOR_DELTA_WING,
+  scout: SCOUT_DELTA_WING,
   hauler: HAULER_CARGO_YOKE,
 };
 

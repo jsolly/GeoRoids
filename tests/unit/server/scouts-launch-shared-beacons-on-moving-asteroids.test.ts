@@ -36,7 +36,7 @@ function clearAsteroids(engine: GameEngine): void {
 
 function launchWorld(): {
   engine: GameEngine;
-  surveyor: ReturnType<GameEngine['getPlayer']>;
+  scout: ReturnType<GameEngine['getPlayer']>;
   now: { value: number };
 } {
   const now = { value: Date.now() };
@@ -45,13 +45,14 @@ function launchWorld(): {
     monotonicNow: () => now.value,
   });
   const engine = new GameEngine(42, clock);
-  const pilot = engine.addPlayer('surveyor', 'Surveyor', new RecordingSocket(), { x: 0, y: 0 });
+  const pilot = engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
   pilot.position = { x: 0, y: 0 };
   pilot.angle = 0;
   clearAsteroids(engine);
-  engine.setSurveyorUtility(pilot.id, 'survey_probe');
+  pilot.equipment = ['survey_probe'];
+  engine.setScoutUtility(pilot.id, 'survey_probe');
   vi.spyOn(engine, 'getServerTime').mockImplementation(() => now.value);
-  return { engine, surveyor: engine.getPlayer(pilot.id), now };
+  return { engine, scout: engine.getPlayer(pilot.id), now };
 }
 
 function probePilot(position: { x: number; y: number }) {
@@ -59,33 +60,33 @@ function probePilot(position: { x: number; y: number }) {
     id: 'pilot',
     position,
     angle: 0,
-    kitId: 'surveyor' as const,
+    kitId: 'scout' as const,
     exploding: false,
     health: 100,
     abilityCooldownFrames: 0,
   };
 }
 
-describe('authoritative Surveyor probes', () => {
+describe('authoritative Scout probes', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   test('a forward launch attaches to the first polygon face and credits its host', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const host = asteroidAt('first-host', { x: 200, y: 0 });
     const fartherHost = asteroidAt('farther-host', { x: 400, y: 0 });
     engine.addAsteroid(host);
     engine.addAsteroid(fartherHost);
 
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     assert.ok(host.probe);
-    expect(host.probe.ownerId).toBe(surveyor.id);
+    expect(host.probe.ownerId).toBe(scout.id);
     expect(host.probe.health).toBe(SURVEY_PROBE.MAX_HEALTH);
     expect(host.probe.attachedAt).toBe(now.value);
     expect(host.probe.expiresAt).toBe(now.value + SURVEY_PROBE.LIFETIME_MS);
-    expect(host.surveyedBy).toEqual([surveyor.id]);
+    expect(host.surveyedBy).toEqual([scout.id]);
     expect(fartherHost.probe).toBeUndefined();
     expect(probePosition(host, host.probe).x).toBeLessThan(host.position.x);
     expect(
@@ -94,11 +95,11 @@ describe('authoritative Surveyor probes', () => {
   });
 
   test('a beacon follows host motion and pulses a nearby deposit at its world position', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const host = asteroidAt('moving-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     assert.ok(host.probe);
     const before = probePosition(host, host.probe);
 
@@ -120,7 +121,7 @@ describe('authoritative Surveyor probes', () => {
     expect(outside.surveyedBy).toBeUndefined();
     now.value += 1;
     engine.advanceOneFrame(now.value);
-    expect(nearby.surveyedBy).toContain(surveyor.id);
+    expect(nearby.surveyedBy).toContain(scout.id);
     expect(outside.surveyedBy).toBeUndefined();
   });
 
@@ -166,55 +167,55 @@ describe('authoritative Surveyor probes', () => {
   });
 
   test('a large host is identified immediately even when its center is outside pulse range', () => {
-    const { engine, surveyor } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout } = launchWorld();
+    assert.ok(scout);
     const largeHost = asteroidAt('large-host', { x: 1_200, y: 0 });
     largeHost.size = 1_000;
     engine.addAsteroid(largeHost);
 
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     assert.ok(largeHost.probe);
     const beacon = probePosition(largeHost, largeHost.probe);
     expect(
       Math.hypot(beacon.x - largeHost.position.x, beacon.y - largeHost.position.y)
     ).toBeGreaterThan(SURVEY_PROBE.RANGE);
-    expect(largeHost.surveyedBy).toContain(surveyor.id);
+    expect(largeHost.surveyedBy).toContain(scout.id);
   });
 
   test('the fourth successful launch replaces the oldest beacon while a miss preserves it', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const hosts = [0, 1, 2, 3].map((index) =>
       asteroidAt(`host-${index}`, { x: 200, y: index * 120 })
     );
     for (const [index, host] of hosts.entries()) {
       engine.addAsteroid(host);
-      surveyor.position = { x: 0, y: host.position.y };
-      surveyor.abilityCooldownFrames = 0;
+      scout.position = { x: 0, y: host.position.y };
+      scout.abilityCooldownFrames = 0;
       now.value += 1_000;
-      expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+      expect(engine.useAbility(scout.id, 'scout')).toBe(true);
       if (index < 3) {
         expect(host.probe).toBeDefined();
       }
     }
     expect(hosts[0]?.probe).toBeNull();
-    expect(hosts.slice(1).every((host) => host.probe?.ownerId === surveyor.id)).toBe(true);
+    expect(hosts.slice(1).every((host) => host.probe?.ownerId === scout.id)).toBe(true);
 
-    surveyor.position = { x: 0, y: -400 };
-    surveyor.abilityCooldownFrames = 0;
+    scout.position = { x: 0, y: -400 };
+    scout.abilityCooldownFrames = 0;
     now.value += 1_000;
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(false);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(false);
     expect(hosts[1]?.probe).toBeDefined();
     expect(hosts[2]?.probe).toBeDefined();
     expect(hosts[3]?.probe).toBeDefined();
   });
 
   test('an unbounced authoritative laser damages a beacon before its asteroid', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const host = asteroidAt('projectile-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     assert.ok(host.probe);
 
     engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 }, now.value);
@@ -229,33 +230,33 @@ describe('authoritative Surveyor probes', () => {
   });
 
   test('expiry and host removal clear the embedded beacon metadata', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const host = asteroidAt('expiring-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     now.value += SURVEY_PROBE.LIFETIME_MS;
-    surveyor.lastUpdate = now.value;
+    scout.lastUpdate = now.value;
     engine.advanceOneFrame(now.value);
     expect(host.probe).toBeNull();
 
-    surveyor.abilityCooldownFrames = 0;
+    scout.abilityCooldownFrames = 0;
     now.value += 1;
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     engine.removeAsteroid(host.id);
     expect(engine.getAsteroid(host.id)).toBeUndefined();
   });
 
   test('a beacon survives owner departure and keeps its distant sector active for a follower', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const host = asteroidAt('distant-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     assert.ok(host.probe);
 
     host.position = { x: 5_000, y: 0 };
-    engine.removePlayer(surveyor.id);
+    engine.removePlayer(scout.id);
     expect(host.probe).toBeDefined();
 
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 100 });
@@ -266,7 +267,7 @@ describe('authoritative Surveyor probes', () => {
     engine.addAsteroid(target);
     now.value += SURVEY_PROBE.PULSE_MS;
     engine.advanceOneFrame(now.value);
-    expect(target.surveyedBy).toContain(surveyor.id);
+    expect(target.surveyedBy).toContain(scout.id);
   });
 
   test('regional checkpoints and restored fields strip transient beacon metadata', () => {
@@ -296,8 +297,8 @@ describe('authoritative Surveyor probes', () => {
   });
 
   test('split fragments never inherit the destroyed host beacon', () => {
-    const { engine, surveyor, now } = launchWorld();
-    assert.ok(surveyor);
+    const { engine, scout, now } = launchWorld();
+    assert.ok(scout);
     const secondShooter = engine.addPlayer('second-shooter', 'Second', new RecordingSocket(), {
       x: 0,
       y: 100,
@@ -306,7 +307,7 @@ describe('authoritative Surveyor probes', () => {
     host.size = 100;
     host.probe = {
       id: 'split-probe',
-      ownerId: surveyor.id,
+      ownerId: scout.id,
       health: SURVEY_PROBE.MAX_HEALTH,
       maxHealth: SURVEY_PROBE.MAX_HEALTH,
       attachedAt: now.value,
@@ -316,7 +317,7 @@ describe('authoritative Surveyor probes', () => {
     };
     engine.addAsteroid(host);
 
-    expect(engine.applyLaserAsteroidHit(host.id, surveyor.id, 'laser', now.value).outcome).toBe(
+    expect(engine.applyLaserAsteroidHit(host.id, scout.id, 'laser', now.value).outcome).toBe(
       'tagged'
     );
     const destroyed = engine.applyLaserAsteroidHit(
@@ -330,7 +331,7 @@ describe('authoritative Surveyor probes', () => {
     expect(destroyed.newAsteroids.every((fragment) => fragment.probe === undefined)).toBe(true);
   });
 
-  test('a socket cannot equip or activate a Surveyor utility for another pilot', () => {
+  test('a socket cannot equip or activate a Scout utility for another pilot', () => {
     const engine = new GameEngine(42);
     const core = new WebSocketCore(engine);
     const ownerSocket = new RecordingSocket();
@@ -357,17 +358,18 @@ describe('authoritative Surveyor probes', () => {
     const host = asteroidAt('spoof-host', { x: 200, y: owner.position.y });
     engine.addAsteroid(host);
     owner.angle = 0;
+    owner.equipment = ['survey_probe'];
 
     core.handleClientMessage(
-      { type: 'setSurveyorUtility', id: owner.id, data: { utilityId: 'survey_probe' } },
+      { type: 'setScoutUtility', id: owner.id, data: { utilityId: 'survey_probe' } },
       attackerSocket
     );
     core.handleClientMessage(
-      { type: 'useAbility', id: owner.id, data: { kitId: 'surveyor' } },
+      { type: 'useAbility', id: owner.id, data: { kitId: 'scout' } },
       attackerSocket
     );
 
-    expect(owner.surveyorUtility).toBeUndefined();
+    expect(owner.scoutUtility).toBeUndefined();
     expect(host.probe).toBeUndefined();
   });
 });

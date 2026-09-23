@@ -403,7 +403,7 @@ export function civicLotAt(position: Position): CivicLot | undefined {
   return found;
 }
 
-/** Display name of a street furnace paid for by one Surveyor. */
+/** Display name of a street furnace paid for by one Scout. */
 export function civicModuleName(builderName: string, streetName: string): string {
   const builder = builderName.trim().replace(/\s+/gu, ' ');
   if (!builder) {

@@ -52,8 +52,8 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
   };
 }
 
-function surveyor(engine: GameEngine, id = 'scout', socket = new RecordingSocket()) {
-  const actor = engine.addPlayer(id, id, socket, { ...street.position }, 'surveyor');
+function addScout(engine: GameEngine, id = 'scout', socket = new RecordingSocket()) {
+  const actor = engine.addPlayer(id, id, socket, { ...street.position }, 'scout');
   actor.position = { ...street.position };
   actor.asteroidInteractions = 1;
   const pilot = engine.registerPilot(actor, socket);
@@ -84,7 +84,7 @@ test('a furnace delivery pays each contributor and does not bank a shared purse'
     { x: 0, y: 0 },
     'hauler'
   );
-  const scout = surveyor(engine);
+  const scout = addScout(engine);
   clearRocks(engine);
   const rock = cargo('shared', { x: 0, y: 0 });
   rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
@@ -101,9 +101,9 @@ test('a furnace delivery pays each contributor and does not bank a shared purse'
   expect(hauler.score).toBe(reward);
 });
 
-test('a Surveyor builds only the street foundation they are standing in and pays with their own score', () => {
+test('a Scout builds only the street foundation they are standing in and pays with their own score', () => {
   const engine = new GameEngine(42);
-  const scout = surveyor(engine);
+  const scout = addScout(engine);
   const bystander = engine.addPlayer(
     'rich',
     'Rich',
@@ -142,7 +142,7 @@ test('a Surveyor builds only the street foundation they are standing in and pays
     kind: 'furnace',
     position: street.position,
   });
-  expect(scout.actor.abilityCooldownFrames).toBeGreaterThan(0);
+  expect(scout.actor.abilityCooldownFrames).toBe(0);
   scout.actor.abilityCooldownFrames = 0;
   // Lit lot: E returns to Mineral Scan; Build is no longer offered here.
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
@@ -152,22 +152,19 @@ test('a Surveyor builds only the street foundation they are standing in and pays
   validateSnapshotDto({ ...engine.getGameState(), collabTags: [], playerProjectiles: [] });
 });
 
-test('a dead ship, a cooldown, and the wrong kit spend neither score nor a street', () => {
+test('a dead ship and the wrong kit spend neither score nor a street', () => {
   const engine = new GameEngine(42);
-  const { actor } = surveyor(engine);
+  const { actor } = addScout(engine);
   actor.score = street.cost;
   actor.health = 0;
   expect(engine.useAbility(actor.id)).toBe(false);
   expect(engine.furnaceBuildIssue(actor.id)).toBe(FURNACE_BUILD.ISSUE.READY);
   actor.health = 100;
-  actor.abilityCooldownFrames = 1;
-  expect(engine.useAbility(actor.id)).toBe(false);
-  actor.abilityCooldownFrames = 0;
   expect(engine.useAbility(actor.id, 'hauler')).toBe(false);
   expect(engine.getGameState().civicModules).toEqual([]);
   expect(actor.score).toBe(street.cost);
   const hauler = engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), undefined, 'hauler');
-  expect(engine.setSurveyorUtility(hauler.id, 'mineral_scan')).toBe(false);
+  expect(engine.setScoutUtility(hauler.id, 'mineral_scan')).toBe(false);
 });
 
 test('a named street and the builder leftover score survive a SQLite restart', () => {
@@ -176,7 +173,7 @@ test('a named street and the builder leftover score survive a SQLite restart', (
   const firstStore = new WorldStore(path);
   try {
     const engine = new GameEngine(42, undefined, new InlineWorldPersistence(firstStore));
-    const { actor, token } = surveyor(engine);
+    const { actor, token } = addScout(engine);
     const leftover = 40;
     actor.score = street.cost + leftover;
     expect(engine.useAbility(actor.id)).toBe(true);
@@ -193,7 +190,7 @@ test('a named street and the builder leftover score survive a SQLite restart', (
     const secondStore = new WorldStore(path);
     try {
       const restarted = new GameEngine(99, undefined, new InlineWorldPersistence(secondStore));
-      const resumed = restarted.resumePilot(token, new RecordingSocket(), 'surveyor', 'New name');
+      const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout', 'New name');
       assert(resumed.ok);
       expect(resumed.actor.score).toBe(leftover);
       expect(restarted.getGameState().civicModules).toEqual(lit);
@@ -320,28 +317,41 @@ test('boost guidance prefers a lit street over the square, and dark lots are not
   expect(field.nearby(street.position, 1).some((site) => site.id === street.id)).toBe(true);
 });
 
-test('raising a street removes a spider already inside its safe radius', () => {
+test('raising a street during a chase repels the living spider despite tool cooldown', () => {
   const engine = new GameEngine(42);
-  const { actor } = surveyor(engine);
+  const { actor } = addScout(engine);
   actor.score = street.cost;
   const spider = engine.spawnTerrainSpider({
     x: street.position.x + 200,
     y: street.position.y,
   });
   assert(spider);
-  expect(engine.useAbility(actor.id)).toBe(true);
   engine.advanceOneFrame();
-  expect(engine.getSpiderField().spiders.some((body) => body.id === spider.id)).toBe(false);
+  expect(engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.targetId).toBe(
+    actor.id
+  );
+  actor.abilityCooldownFrames = 300;
+  const health = actor.health;
+  expect(engine.useAbility(actor.id)).toBe(true);
+  expect(actor.abilityCooldownFrames).toBe(300);
+  expect(
+    engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.targetId
+  ).toBeNull();
+  engine.advanceOneFrame();
+  const escaped = engine.getSpiderField().spiders.find((body) => body.id === spider.id);
+  expect(escaped?.health).toBe(spider.health);
+  expect(escaped?.position.x).toBeGreaterThan(spider.position.x);
+  expect(actor.health).toBe(health);
 });
 
-test('a raised street toasts the Surveyor with the lot name', () => {
+test('a raised street toasts the Scout with the lot name', () => {
   const engine = new GameEngine(42);
   const socket = new RecordingSocket();
-  const scout = surveyor(engine, 'scout', socket);
+  const scout = addScout(engine, 'scout', socket);
   scout.actor.score = street.cost;
   const broadcaster = new GameStateBroadcaster(engine);
   const handler = new MessageHandler(engine, broadcaster);
-  handler.handleMessage({ type: 'useAbility', id: scout.actor.id, kitId: 'surveyor' }, socket);
+  handler.handleMessage({ type: 'useAbility', id: scout.actor.id, kitId: 'scout' }, socket);
   expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(
     `${civicModuleName('scout', street.name)} is burning`
   );
@@ -368,7 +378,9 @@ test('a lit street matches Town Square for spider occupancy', () => {
       exploding: false,
     };
     manager.advance({ players: [witness], nowFrame: 1 });
-    expect(manager.snapshot().spiders.some((body) => body.id === inside.id)).toBe(false);
+    const retreating = manager.snapshot().spiders.find((body) => body.id === inside.id);
+    expect(retreating?.health).toBe(inside.health);
+    expect(retreating?.position.x).toBeGreaterThan(inside.position.x);
     const hunter = manager.spawnSpider({
       x:
         origin.x +
@@ -386,5 +398,45 @@ test('a lit street matches Town Square for spider occupancy', () => {
     };
     manager.advance({ players: [sheltered], nowFrame: 2 });
     expect(manager.snapshot().spiders.find((body) => body.id === hunter.id)?.targetId).toBeNull();
+  }
+});
+
+test('a Scout can light a nest-covered foundation and all its guards flee alive', () => {
+  const engine = new GameEngine(42);
+  const { actor } = addScout(engine);
+  engine.prepareDiagnosticWorld('traversal');
+  clearRocks(engine);
+  engine.parkSatellitePickups();
+  actor.position = { x: street.position.x + 2000, y: street.position.y };
+  engine.addAsteroid(cargo('nest-ore', street.position));
+  engine.advanceCombatFrame();
+  const guards = engine.getSpiderField().spiders;
+  expect(guards).toHaveLength(10);
+  expect(engine.getSpiderField().nests).toHaveLength(1);
+  actor.position = { ...street.position };
+  actor.score = street.cost;
+  actor.abilityCooldownFrames = 300;
+  engine.advanceCombatFrame();
+  const health = actor.health;
+  expect(engine.furnaceBuildIssue(actor.id)).toBeUndefined();
+  expect(engine.useAbility(actor.id)).toBe(true);
+  const repelled = engine.getSpiderField().spiders;
+  expect(repelled.map(({ id }) => id)).toEqual(guards.map(({ id }) => id));
+  expect(repelled.every(({ targetId }) => targetId === null)).toBe(true);
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceCombatFrame();
+  }
+  const fled = engine.getSpiderField().spiders;
+  expect(fled).toHaveLength(10);
+  expect(actor.health).toBeGreaterThanOrEqual(health);
+  for (const before of guards) {
+    const after = fled.find(({ id }) => id === before.id);
+    assert(after);
+    expect(after.health).toBe(before.health);
+    expect(
+      Math.hypot(after.position.x - street.position.x, after.position.y - street.position.y)
+    ).toBeGreaterThan(
+      Math.hypot(before.position.x - street.position.x, before.position.y - street.position.y)
+    );
   }
 });

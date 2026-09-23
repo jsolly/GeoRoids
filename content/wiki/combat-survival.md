@@ -52,11 +52,11 @@ While the universe map or ship schematic is open, asteroid impacts, ricochets,
 and the boundary pass through the held hull. Closing the overlay grants the same
 blink window as a respawn.
 
-Terrain spiders mostly guard resource territories, with larger groups around more valuable finds. Guards chase briefly before returning home; rare roaming hunters pursue farther. Both kill with one bite on contact, regardless of remaining health. Their bites obey spawn protection, overlay immunity, and life-loss rules. See [terrain spiders](/wiki/#terrain) for warnings, escape behavior, and how to fight them.
+Terrain spiders mostly guard resource territories, with ten guards at each new nest. Guards chase briefly before returning home; rare roaming hunters pursue farther. Both kill with one bite on contact, regardless of remaining health. Their bites obey spawn protection, overlay immunity, and life-loss rules. See [terrain spiders](/wiki/#terrain) for warnings, escape behavior, and how to fight them.
 
 ## Lives and respawn
 
-A player starts with lives and score. A death decrements one life; the last life
+A new flight starts with five lives and zero score. A death decrements one life; the last life
 reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
@@ -64,7 +64,9 @@ spawn protection. Closing the universe map or ship schematic grants that same
 blink window, because rocks can occupy the hull while it is held. Respawns use the nearest lit hearth to the death location, 180
 world units from its center at a random angle. Dark street foundations are not respawn sites.
 
-After game over, a fresh flight starts with 3 lives and score 0. A brief
+Ordinary deaths keep salvaged tools, silk, score, and purchased paint. Losing
+your last life clears them all. After game over, a fresh flight starts with
+5 lives, starter tools, and score 0. A brief
 disconnect still returns you to the same ship; a long absence does not.
 The persistent universe, shared exploration chart, and delivered
 progress stay until the expedition is reset.
@@ -78,5 +80,5 @@ and the final-life state shows the game-over overlay.
 
 Asteroid breaks, shard pickups, satellite pickups, and furnace deliveries each
 award their own score value. A furnace delivery pays the Hauler and every
-Surveyor recorded on the rock. A pilot who built streets receives more on their
+Scout recorded on the rock. A pilot who built streets receives more on their
 own payout.

@@ -43,7 +43,7 @@ test.each([1280, 390])(
     const listener = new GameInteractions(listenerPage);
     const shooter = new GameInteractions(shooterPage);
     await listener.bootGame({ waitForCombatReady: false });
-    await shooter.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await shooter.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const ids = await Promise.all([listener.getLocalPlayerId(), shooter.getLocalPlayerId()]);
     await arrangeCrewField(ids, 'empty');
     await Promise.all([listener.waitForCombatReady(), shooter.waitForCombatReady()]);

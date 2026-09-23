@@ -28,6 +28,7 @@ interface SpiderAdvanceOptions {
   releaseTow?: (ownerId: string, spiderId: string) => void;
   resources?: () => readonly SpiderResource[];
   dormantResource?: (id: string, home: Position) => SpiderResource | undefined;
+  onNestCreated?: (nest: SpiderFieldState['nests'][number]) => void;
 }
 
 export interface SpiderAttack {
@@ -75,13 +76,10 @@ interface SpiderNest {
   guards: RuntimeSpider[];
 }
 
-function nestCell(position: Position): { id: string; center: Position } {
+function nestCell(position: Position): string {
   const x = Math.floor(position.x / SPIDER.NEST_SPACING);
   const y = Math.floor(position.y / SPIDER.NEST_SPACING);
-  return {
-    id: `${x},${y}`,
-    center: { x: (x + 0.5) * SPIDER.NEST_SPACING, y: (y + 0.5) * SPIDER.NEST_SPACING },
-  };
+  return `${x},${y}`;
 }
 
 const SPAWN_ATTEMPTS = 32;
@@ -164,18 +162,6 @@ export class TerrainSpiderManager {
         position: copyPosition(event.position),
       })),
     };
-  }
-
-  /**
-   * True when a furnace at `position` would occupy a known nest home the same
-   * way standing hearths hide webs and cull guards: dist < FURNACE_SAFE_RADIUS
-   * + HIT_RADIUS. Cleared deposits (web gone) are not keep-out.
-   */
-  public furnaceWouldCoverNest(position: Position): boolean {
-    return this.nestMarkers.some(
-      (nest) =>
-        distanceBetween(position, nest.position) < SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
-    );
   }
 
   public isAttackActive(attack: SpiderAttack): boolean {
@@ -303,10 +289,15 @@ export class TerrainSpiderManager {
         spider.displaced = true;
       }
     }
-    this.removeBlockedBodies();
+    this.repelProtectedSpiders();
     this.removeDistantBodies(players);
     if (players.length > 0 && nowFrame >= this.nextNestFrame) {
-      this.updateNests(options.resources?.() ?? [], players, options.dormantResource);
+      this.updateNests(
+        options.resources?.() ?? [],
+        players,
+        options.dormantResource,
+        options.onNestCreated
+      );
       this.nextNestFrame = nowFrame + 60;
     }
     if (this.nextSpawnFrame === null) {
@@ -425,14 +416,23 @@ export class TerrainSpiderManager {
     return hit;
   }
 
-  private removeBlockedBodies(): void {
-    for (const spider of [...this.spiders.values()]) {
+  /** A newly lit hearth breaks nearby hunts; living spiders walk out instead of vanishing. */
+  public repelProtectedSpiders(): void {
+    for (const spider of this.spiders.values()) {
       if (
-        (!spider.displaced && !this.canOccupy(spider.position, SPIDER.HIT_RADIUS)) ||
-        (spider.territory.kind === 'guard' &&
-          !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS))
+        spider.territory.kind === 'guard' &&
+        !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS)
       ) {
-        this.removeSpider(spider.id);
+        const nest = this.nests.get(spider.territory.nestId);
+        if (nest) {
+          nest.guards = nest.guards.filter((guard) => guard.id !== spider.id);
+        }
+        spider.territory = { kind: 'roaming' };
+        spider.targetId = null;
+        spider.phase = 'scuttling';
+      }
+      if (!spider.displaced && !this.canOccupy(spider.position, SPIDER.HIT_RADIUS)) {
+        this.retreatFromProtection(spider, false);
       }
     }
   }
@@ -471,14 +471,14 @@ export class TerrainSpiderManager {
   private updateNests(
     resources: readonly SpiderResource[],
     players: readonly SpiderActor[],
-    dormantResource: SpiderAdvanceOptions['dormantResource']
+    dormantResource: SpiderAdvanceOptions['dormantResource'],
+    onNestCreated: SpiderAdvanceOptions['onNestCreated']
   ): void {
     const candidates = new Map<string, SpiderResource>();
     for (const resource of resources) {
       const cell = nestCell(resource.position);
       if (
-        this.nests.has(cell.id) ||
-        distanceBetween(resource.position, cell.center) > SPIDER.NEST_SITE_RADIUS ||
+        this.nests.has(cell) ||
         !this.canOccupy(resource.position, SPIDER.NEST_PATROL_RADIUS + SPIDER.HIT_RADIUS) ||
         !players.some(
           (player) =>
@@ -491,17 +491,17 @@ export class TerrainSpiderManager {
       ) {
         continue;
       }
-      const previous = candidates.get(cell.id);
+      const previous = candidates.get(cell);
       if (
         !previous ||
         resource.value > previous.value ||
         (resource.value === previous.value && resource.id.localeCompare(previous.id) < 0)
       ) {
-        candidates.set(cell.id, resource);
+        candidates.set(cell, resource);
       }
     }
     for (const [id, resource] of candidates) {
-      const count = SPIDER.NEST_GUARDS[resource.value];
+      const count = SPIDER.NEST_GUARDS;
       if (this.spiders.size + count > SPIDER.MAX_ACTIVE) {
         continue;
       }
@@ -532,10 +532,11 @@ export class TerrainSpiderManager {
           nest.guards.push(guard);
         }
       }
+      onNestCreated?.({ id, resourceId: resource.id, position: copyPosition(home) });
     }
     const available = new Map(resources.map((resource) => [resource.id, resource]));
     const markers: SpiderFieldState['nests'] = [];
-    // At most one nest per 10,000-unit cell (144 cells across this world).
+    // At most one nest per 5,000-unit cell (576 cells across this world).
     // Check only those known homes once a second, never scan dormant sectors.
     for (const [id, nest] of this.nests) {
       const resource =
@@ -807,7 +808,7 @@ export class TerrainSpiderManager {
   }
 
   /** Released cargo walks out of safe areas instead of freezing or attacking inside them. */
-  private retreatFromProtection(spider: RuntimeSpider): boolean {
+  private retreatFromProtection(spider: RuntimeSpider, consume = true): boolean {
     const furnace = this.furnaces
       .nearby(spider.position, SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS)
       .find(
@@ -832,7 +833,9 @@ export class TerrainSpiderManager {
     spider.angle = angle;
     const start = spider.position;
     spider.position = next;
-    this.consumeAtFurnace(spider, start);
+    if (consume) {
+      this.consumeAtFurnace(spider, start);
+    }
     return true;
   }
 

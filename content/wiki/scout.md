@@ -1,5 +1,5 @@
 ---
-title: Surveyor
+title: Scout
 category: Ships
 summary: A nimble scout with shared mineral scans, mobile probe beacons, and furnace construction.
 order: 30
@@ -10,12 +10,16 @@ related:
   - content/wiki/hauler.md
 media:
   - heading: Mineral scan
-    demo: surveyor
+    demo: scout
 ---
+
+Scout starts with **Mineral Scan**. **Survey Probe** must be found as a rare
+equipment drop, usually in a spider nest. Its inventory card stays locked until
+collected. Owned tools survive ordinary deaths, reconnects, and server restarts. Losing your last life clears your inventory.
 
 ## Mineral scan
 
-Surveyor is the winged scout with a dish on the nose. It is the smaller hull
+Scout is the winged scout with a dish on the nose. It is the smaller hull
 next to Hauler's barge. It turns more quickly than
 Hauler and cruises automatically at the same speed. Press Shift or tap Boost for
 a stronger burst than Hauler's boost; tap or press again to return to cruise.
@@ -24,25 +28,25 @@ Running it empty stops boost. Activate it again as soon as some charge returns;
 boosting interrupts the refill.
 Choose Mineral Scan in the ship schematic, then press E or
 tap Scan to run a range-limited mineral scan on every teammate's radar for a
-limited time. The range is centered on the active Surveyor. Teammates see the
+limited time. The range is centered on the active Scout. Teammates see the
 shared classification when the rock is inside their own local radar. All minerals keep the same rock silhouette: pale cyan with a crack for ice,
 gold with parallel seams for metal, and orange with chipped details for rubble. Once a rock is identified, its
 classification remains with that rock; unscanned rocks keep a small slate rock outline.
 While the scan is active, a thin cyan radar sweep pulses from the hull to the
 edge of the viewport. The sweep is a visual cue and does not expand the scan
 range.
-While Mineral Scan is active, spiders within its range flee from the Surveyor
+While Mineral Scan is active, spiders within its range flee from the Scout
 and stop biting, including spiders chasing a teammate. They can resume hunting
 when the scan ends or they leave its range. Survey Probes do not repel spiders.
 The ability has a cooldown and costs no resource.
 
-Surveyor also reveals a 650-unit radius around its hull for the shared
+Scout also reveals a 650-unit radius around its hull for the shared
 exploration chart. Those cells stay revealed for the match, so the crew can
-return to a route or furnace that any Surveyor has charted.
+return to a route or furnace that any Scout has charted.
 
 Scan does not push rocks or damage ships. A qualifying scan tags the asteroid
-with the Surveyor's ID. If a Hauler later delivers that rock to a furnace, the
-Hauler and every Surveyor recorded on the tag receive that delivery. A pilot
+with the Scout's ID. If a Hauler later delivers that rock to a furnace, the
+Hauler and every Scout recorded on the tag receive that delivery. A pilot
 who has built streets receives a higher personal payout; everyone else receives
 the base reward.
 The mineral classification stays with the rock until it is delivered or
@@ -61,13 +65,13 @@ The probe moves and rotates with its host. It identifies a host asteroid immedia
 then periodically identifies nearby asteroid materials for everyone. A thin
 expanding ring shows the scan radius, and a pulsing minimap marker lets Haulers
 follow the host through the field. Discovered materials remain identified after
-the beacon stops. Probe discoveries also record the launching Surveyor for
+the beacon stops. Probe discoveries also record the launching Scout for
 furnace delivery credit, just like Mineral Scan.
 
 Attach a probe to a guarding spider, then retreat and let it return to its nest.
 The beacon scans along its route and identifies nearby guarded asteroid resources
 when it reaches home. Spider probes share the same battery, durability, and
-per-Surveyor limit as asteroid probes.
+per-Scout limit as asteroid probes.
 
 A green health bar above the probe shows its durability. Any pilot can shoot
 the exposed beacon off the surface without first destroying its host. Aim at
@@ -75,7 +79,7 @@ the small diamond; a shot that hits the host first still damages the host.
 Destroying or delivering the host removes its probe too.
 
 The battery expires after a limited time. An amber warning pulse signals that
-it is nearly empty. Each Surveyor can keep a limited number of probes active;
+it is nearly empty. Each Scout can keep a limited number of probes active;
 a successful attachment beyond that limit replaces their oldest probe.
 Switching tools does not remove existing beacons. Probes are temporary equipment
 and do not survive a server restart.
@@ -91,10 +95,11 @@ Each street you build raises your own later furnace deliveries. The same score
 buys an extra life at the Town Square store. The bonus stays with the pilot who
 paid, so a later nickname change leaves both the furnace name and the bonus
 where they were. Other pilots keep the base reward. Deliveries still pay the
-Hauler and each recorded Surveyor personally. A failed build spends neither
-score nor cooldown; the HUD explains why it failed. A nest whose home would sit
-inside the new furnace's spider occupancy is an illegal site; that miss does not
-wipe the nest. Standing furnaces still scare spiders that enter that occupancy.
+Hauler and each recorded Scout personally. A failed build spends neither
+score nor cooldown; the HUD explains why it failed. You can build during a chase
+even while a tool is cooling down. Lighting the furnace immediately breaks
+nearby hunts and sends the living spiders fleeing. Nest-covered foundations
+are valid; guards whose home is covered become roaming spiders.
 While Build is offered, scan and probe stay unavailable until you leave the
 street approach.
 

@@ -39,7 +39,7 @@ test('the last pilot disconnecting preserves a wounded resource guard and its sl
     engine.advanceLasersAndResolveHits();
   }
   const before = engine.getSpiderField().spiders.map(({ id, health }) => ({ id, health }));
-  expect(before).toHaveLength(3);
+  expect(before).toHaveLength(SPIDER.NEST_GUARDS - 1);
   expect(before.find(({ id }) => id === wounded.id)?.health).toBe(
     SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT
   );

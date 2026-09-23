@@ -1,10 +1,10 @@
 import type { Page } from 'playwright';
 import { WORLD } from '../../../shared/world';
-import type { HaulerUtilityId } from '../../../shared-types';
+import type { EquipmentId, HaulerUtilityId } from '../../../shared-types';
 import { HAULER_UTILITY_STORAGE_KEY } from '../../../src/entities/ship/haulerUtility';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
-import { getWorldDiagnostics, placePlayer } from './test-server-control';
+import { arrangeCrewField, getWorldDiagnostics, placePlayer } from './test-server-control';
 
 type CrashAsteroidCandidate = {
   x: number;
@@ -1273,10 +1273,82 @@ export class GameInteractions {
     );
   }
 
+  /** Collect real server drops before scenarios that exercise salvaged hardware. */
+  async collectEquipment(equipment: readonly EquipmentId[], selected?: EquipmentId): Promise<void> {
+    const playerId = await this.getLocalPlayerId();
+    const epochs = await arrangeCrewField([playerId], 'equipment');
+    await this.waitForFixtureMotionEpoch(epochs.get(playerId));
+    for (const equipmentId of equipment) {
+      const owned = await this.page.evaluate(
+        (id) => window.gameController?.getCurrPlayer()?.ship.equipment.includes(id),
+        equipmentId
+      );
+      if (owned) {
+        continue;
+      }
+      await this.page.waitForFunction(
+        (id) => window.gameController?.getLoot().some((drop) => drop.kind === id),
+        equipmentId,
+        { timeout: 5000 }
+      );
+      const position = await this.page.evaluate((id) => {
+        const drop = window.gameController?.getLoot().find((item) => item.kind === id);
+        if (!drop) {
+          throw new Error(`Missing equipment fixture drop: ${id}`);
+        }
+        return { ...drop.position };
+      }, equipmentId);
+      await this.placeShipAt(position.x, position.y);
+      try {
+        await this.page.waitForFunction(
+          (id) => window.gameController?.getCurrPlayer()?.ship.equipment.includes(id),
+          equipmentId,
+          { timeout: 5000 }
+        );
+      } catch (error) {
+        const state = await this.page.evaluate(() => {
+          const gc = window.gameController;
+          const ship = gc?.getCurrPlayer()?.ship;
+          return {
+            ship: ship
+              ? {
+                  position: ship.position,
+                  health: ship.health,
+                  exploding: ship.exploding,
+                  equipment: ship.equipment,
+                  movementLocked: ship.movementLocked,
+                  motion: ship.playerMotion,
+                  transit: ship.furnaceTransit,
+                }
+              : null,
+            loot: gc?.getLoot(),
+          };
+        });
+        throw new Error(`Equipment ${equipmentId} was not collected: ${JSON.stringify(state)}`, {
+          cause: error,
+        });
+      }
+    }
+    if (selected) {
+      await this.page.locator('#ship-schematic-toggle').click();
+      await this.page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+      await this.page.locator(`[data-utility-id="${selected}"]`).click();
+      await this.page.waitForFunction(
+        (id) => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          return ship?.haulerUtility === id || ship?.scoutUtility === id;
+        },
+        selected,
+        { timeout: 5000 }
+      );
+      await this.page.locator('#ship-schematic-return').click();
+    }
+  }
+
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
     waitForCombatReady?: boolean;
-    kitId?: 'surveyor' | 'hauler';
+    kitId?: 'scout' | 'hauler';
     haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
     await this.navigateToGame();

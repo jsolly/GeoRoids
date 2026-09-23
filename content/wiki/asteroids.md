@@ -51,7 +51,7 @@ pilots leave. Self-guided cargo passes through ships, rocks, and satellites.
 It ignores weapons and blast impulses, and cannot be
 scanned, tapped, towed, or coupled again. At intake it shatters in a red outline
 with a short smoke poof and awards its
-launchers and previously recorded Surveyors the delivery points.
+launchers and previously recorded Scouts the delivery points.
 
 ## Cooperative splits and score
 
@@ -73,7 +73,7 @@ normal hits and does not break just from waiting; rubble uses its own fragment
 rule. Medium and small rocks do not use the collaboration rule.
 
 Asteroid score is based on the rock size at the break. Every miner who damaged
-that rock and every Surveyor who identified it receives the full mining reward,
+that rock and every Scout who identified it receives the full mining reward,
 including contributors who disconnected before the final hit. Chipped deposits
 retain their contributor history with the saved world. A collision break does
 not produce the collaboration split behavior. Towed ordinary cargo that hits

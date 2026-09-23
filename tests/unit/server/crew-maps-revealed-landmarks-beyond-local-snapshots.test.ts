@@ -25,7 +25,7 @@ test('the global map shares the street plan while each pilot receives only nearb
   const nearSocket = new RecordingSocket();
   const farSocket = new RecordingSocket();
   engine.addPlayer('near', 'Near', nearSocket, { x: 0, y: 0 }, 'hauler');
-  const scout = engine.addPlayer('far', 'Far', farSocket, distant, 'surveyor');
+  const scout = engine.addPlayer('far', 'Far', farSocket, distant, 'scout');
   broadcaster.negotiateSnapshot(nearSocket);
   broadcaster.negotiateSnapshot(farSocket);
   expect(engine.getGameState().mapAssets).toContainEqual({

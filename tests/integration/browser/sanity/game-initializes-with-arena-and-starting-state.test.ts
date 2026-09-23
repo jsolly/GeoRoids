@@ -35,9 +35,7 @@ test(
       }))
     );
     expect(pilots.every((pilot) => pilot.id.length > 0 && pilot.name.length > 0)).toBe(true);
-    expect(pilots.every((pilot) => pilot.kitId === 'surveyor' || pilot.kitId === 'hauler')).toBe(
-      true
-    );
+    expect(pilots.every((pilot) => pilot.kitId === 'scout' || pilot.kitId === 'hauler')).toBe(true);
     expect(pilots.every((pilot) => pilot.hasLegacyTeamField === false)).toBe(true);
     expect(pilots.every((pilot) => pilot.type === 'local' || pilot.type === 'remote')).toBe(true);
   },

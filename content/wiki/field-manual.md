@@ -6,7 +6,7 @@ summary: Learn the two ships, read the hazards, and understand what happens
 order: 10
 related:
   - content/wiki/controls.md
-  - content/wiki/surveyor.md
+  - content/wiki/scout.md
   - content/wiki/asteroids.md
   - content/wiki/teamwork.md
   - content/wiki/hud-network.md
@@ -26,7 +26,7 @@ the shared world about once a second while a crew is aboard and when the last
 pilot leaves, so a sudden server crash can lose only about the last second of
 mining, deliveries, and score.
 
-Choose Surveyor for nimble exploration and shared mineral scanning, or Hauler
+Choose Scout for nimble exploration and shared mineral scanning, or Hauler
 for Resource Tap, Tow Cable, Boost Coupling, and stronger mining lasers. Rare
 colossal deposits need a crew of Haulers or many laser hits before they break
 up. Their
@@ -42,9 +42,11 @@ for support after you enter, plus live FPS and connection health on the
 playfield; this browser remembers that preference. Scan minerals, tow asteroids to a furnace, collect
 rewards, and protect your lives. Your score carries across respawns, brief
 disconnects, and server restarts, but the mass and upgrades gathered during
-a life do not. After game over, start a fresh flight with 3 lives and score 0.
+a life do not. Salvaged tools, silk, and purchased paint last until your final
+life is lost. After game over, start a fresh flight with 5 lives, starter tools,
+and score 0.
 A brief disconnect or a quick return to Enter Game puts you back on the same
-ship. After about 30 seconds away, start a fresh flight with 3 lives and the
+ship. After about 30 seconds away, start a fresh flight with 5 lives and the
 score you still have. The persistent universe, chart, and streets stay until
 the expedition is reset. A title-screen
 nickname can include spaces. The playfield waits for the server to place your

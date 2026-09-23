@@ -10,11 +10,11 @@ interface WikiMediaEntry {
  * gameplay change has an obvious media review surface.
  */
 export const media: Record<string, WikiMediaEntry> = {
-  surveyor: {
-    title: 'Surveyor shared mineral scan',
-    alt: 'A Surveyor activates a range-limited scan while a teammate radar receives ice, metal, and rubble marks for the same rocks.',
+  scout: {
+    title: 'Scout shared mineral scan',
+    alt: 'A Scout activates a range-limited scan while a teammate radar receives ice, metal, and rubble marks for the same rocks.',
     caption:
-      'Press E to classify nearby rocks on every teammate radar. The scan also records the Surveyor as a contributor for a later furnace delivery.',
+      'Press E to classify nearby rocks on every teammate radar. The scan also records the Scout as a contributor for a later furnace delivery.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/surveyScan.ts',
@@ -28,9 +28,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   hauler: {
     title: 'Hauler tow cable and furnace delivery',
-    alt: 'A Hauler tows a spinning asteroid behind its hull toward a furnace while a Surveyor watches the shared delivery score.',
+    alt: 'A Hauler tows a spinning asteroid behind its hull toward a furnace while a Scout watches the shared delivery score.',
     caption:
-      'Controlled demonstration: E attaches a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Surveyor credit.',
+      'Controlled demonstration: E attaches a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Scout credit.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
@@ -45,7 +45,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   movement: {
     title: 'Automatic thrust and steering',
-    alt: 'A Surveyor accelerates automatically, turns its nose, and keeps flying after steering is released.',
+    alt: 'A Scout accelerates automatically, turns its nose, and keeps flying after steering is released.',
     caption:
       'Controlled demonstration: thrust stays on while steering turns the ship; releasing steering keeps it flying.',
     sources: [
@@ -56,7 +56,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   terrain: {
     title: 'Terrain contours and slope travel',
-    alt: 'A Surveyor rides contour lines, then turns downhill while an arrow shows the descent.',
+    alt: 'A Scout rides contour lines, then turns downhill while an arrow shows the descent.',
     caption:
       'Controlled demonstration: automatic thrust follows a contour, then the nose turns downhill so speed more than doubles; an arrow marks the downhill direction.',
     sources: [
@@ -71,7 +71,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   loot: {
     title: 'Loot blast and collect',
-    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Surveyor and is collected without changing the hull size.',
+    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Scout and is collected without changing the hull size.',
     caption:
       'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and is collected.',
     sources: [
@@ -135,9 +135,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   survival: {
     title: 'Surviving an asteroid impact',
-    alt: 'A Surveyor clips an environmental asteroid, loses 25 health, and keeps flying with a visible 75 out of 100 health capsule.',
+    alt: 'A Scout clips an environmental asteroid, loses 25 health, and keeps flying with a visible 75 out of 100 health capsule.',
     caption:
-      'Controlled demonstration: one server-sized asteroid impact removes 25 health, leaves the Surveyor alive, and lets it continue flying clear of the hazard.',
+      'Controlled demonstration: one server-sized asteroid impact removes 25 health, leaves the Scout alive, and lets it continue flying clear of the hazard.',
     sources: [
       'src/entities/ship/Ship.ts',
       'src/entities/ship/shipUtils.ts',

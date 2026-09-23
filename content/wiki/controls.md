@@ -6,7 +6,7 @@ summary: Automatic thrust on every device, with keyboard or pointer steering,
 order: 20
 related:
   - content/wiki/field-manual.md
-  - content/wiki/surveyor.md
+  - content/wiki/scout.md
   - content/wiki/hauler.md
 media:
   - heading: Keyboard
@@ -20,10 +20,10 @@ turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
 on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
 does not repeatedly activate it. E uses the equipped tool from
-the ship view. Near Town Square, E becomes Enter store instead of the kit
-ability, except a hooked Hauler keeps Release or Ignite. V opens or closes that
-view, and the Inventory button opens it. B also opens or closes the Town
-Square store while you are inside it and not hooked.
+the ship view. Inside a lit furnace’s visible footprint, E opens Furnace travel instead of the kit
+ability, including while towing. Choosing a destination releases the cargo.
+V opens or closes the ship view, and the Inventory button opens it. B also
+opens or closes Furnace travel while you are inside a lit furnace’s footprint.
 Escape, the X control, or Return to flight also close an open menu. Firing and E
 are blocked while the schematic or store is open.
 The map, schematic, and town store hold your ship stationary, including its momentum and
@@ -36,9 +36,9 @@ pickups and loot stay on the field until you return to flight. You cannot lose a
 life from world hazards until you return to flight and blink protection ends.
 F is unbound.
 
-Your kit, mass, and terrain affect acceleration and speed. Surveyor and Hauler
+Your kit, mass, and terrain affect acceleration and speed. Scout and Hauler
 share the same cruise speed. Boost multiplies that cruise and thrust, and
-Surveyor's multiplier is stronger than Hauler's. Each kit page lists its
+Scout's multiplier is stronger than Hauler's. Each kit page lists its
 handling values. Turns have a capped rate; the arrow ahead of the hull shows
 the current heading. Releasing steering keeps the attained heading and automatic
 thrust. On slopes, following a contour keeps nearly full cruise with a light
@@ -84,29 +84,37 @@ equip. Collecting another satellite shows the label again. Opening Inventory
 clears it. The view draws your hull beside your
 satellite inventory, with the tool cards underneath. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
-lifetime, derived from health. Surveyor offers Mineral Scan and Survey Probe;
+lifetime, derived from health. Scout starts with Mineral Scan and can find Survey Probe;
 near a dark street foundation, E becomes Build instead of the equipped tool.
 The probe fires along your heading and attaches a shared scanning beacon to a rock.
 Hauler has three utility cards and a looping tool animation;
-selecting a utility card equips that tool immediately. Boost Coupling uses E to arm
+Tow Cable is available from the start. Resource Tap and Boost Coupling stay
+locked until collected as rare drops. Selecting an owned utility card equips
+that tool immediately. Boost Coupling uses E to arm
 and lock the asteroid thrust heading, then E again to ignite an ordinary rock.
 A colossal deposit stays latched until two couplings are armed; E before that
 crew is ready does not ignite. Its touch button
 changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 
-## Town store
+## Furnace travel and extra lives
 
-Near Town Square, E and the ability button become Enter store while you are
-alive and inside its radius. Kit scan, probe, and idle Hauler tools stay
-unavailable until you leave. A Hauler that is already hooked keeps Release or
-Ignite on E and the ability button so tow chrome wins over Enter store; B also
-stays closed while hooked. B otherwise opens or closes the store on a keyboard.
-Opening the store closes the map and schematic, holds the ship, and blocks
-firing. An extra life costs 1,000 score, up to 6 lives including the three a
-flight starts with. Buying another life at that cap spends nothing. A purchase
-outside the radius, while the ship is destroyed, or without enough score spends
-nothing and explains why. The store also shows how much your own built streets
-add to your furnace deliveries.
+Inside any lit furnace’s visible footprint, press E or the ability button to open **Furnace travel**.
+An on-site prompt says **Press E to travel** on desktop or **Tap TRAVEL to open map**
+on touch screens. Click or tap another lit furnace on the destination map,
+including Town Square. Your current furnace is marked **You are here**.
+Travel is free: your ship
+rides a fast rocket along the existing right-angle piping, taking roughly one
+or two seconds. During the ride you cannot steer, fire, use tools, collect loot,
+or take damage. You arrive at the destination furnace ready to fly again.
+Dark foundations are not destinations. With no other furnaces built, the menu
+explains that there is nowhere to travel yet.
+
+Town Square's menu also sells extra lives for **250 score**, up to **6 lives**.
+A new flight starts with **5 lives**. A purchase at the cap, away from Town
+Square, while destroyed, or without enough score spends nothing. The menu
+shows how much your own built streets add to furnace deliveries. B opens or
+closes the same menu on a keyboard. Opening it closes the map and schematic,
+holds the ship, and blocks firing. Boarding releases any towed cargo.
 
 ## Map
 
@@ -137,7 +145,7 @@ Taps and holds on the playfield, HUD, and action buttons do not highlight text
 or open copy-paste banners; those gestures steer, fire, or activate the button.
 Nickname and other form fields on the title screen still accept typing and
 selection.
-Use the ability button for the same action as E, including Enter store at Town
+Use the ability button for the same action as E, including Furnace travel at Town
 Square. Use the Inventory button for the same ship view as V. Collecting a
 satellite shows a short label above the ship that says the equipment is in
 your inventory and to tap Inventory to equip, then the label fades. Use the

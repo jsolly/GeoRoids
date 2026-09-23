@@ -117,7 +117,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
     world.clearAsteroids();
     addRock();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
-    const bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor' });
+    const bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'scout' });
     world.send(alice, {
       type: 'useAbility',
       id: alice.id,
@@ -137,13 +137,13 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
     expect(world.engine.getAsteroid('haul-rock')).toBeUndefined();
   });
 
-  test('a Surveyor cannot attach the Hauler tow to the same asteroid', () => {
+  test('a Scout cannot attach the Hauler tow to the same asteroid', () => {
     addRock();
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'surveyor' });
+    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'scout' });
     world.send(alice, {
       type: 'useAbility',
       id: alice.id,
-      data: { kitId: 'surveyor', abilityId: 'harpoon' },
+      data: { kitId: 'scout', abilityId: 'harpoon' },
     });
 
     expect(world.entity(alice).harpoonTargetId).toBeNull();

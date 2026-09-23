@@ -7,9 +7,9 @@ export const TOWN_STORE_RADIUS = 400;
 export const TOWN_YIELD_PER_MODULE = 0.1;
 
 /** Score spent at Town Square for one extra life. */
-export const EXTRA_LIFE_COST = 1_000;
+export const EXTRA_LIFE_COST = 250;
 
-/** Lives the store will sell up to, including the three a flight starts with. */
+/** Lives the store will sell up to, including the five a flight starts with. */
 export const MAX_LIVES = 6;
 
 const SHIP_PAINTS = [

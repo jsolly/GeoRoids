@@ -1,10 +1,13 @@
+import { canEquipUtility } from '../../../shared/equipment';
 import { purchasedHullColor } from '../../../shared/townStore';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
   Position,
+  ScoutUtilityId,
   ShipBoostState,
   ShipKitId,
-  SurveyorUtilityId,
 } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
@@ -21,7 +24,6 @@ import {
   applySharedShipRespawnCue,
   applyShipSpawnProtection,
   isServerRespawnActive,
-  isSilentHudReset,
   resolveCombatDeathCause,
 } from '../ship/shipUtils';
 
@@ -100,6 +102,8 @@ export class Player {
     lives?: number;
     score?: number;
     silk?: number;
+    equipment?: EquipmentId[];
+    furnaceTransit?: FurnaceTransit | null;
     exploding?: boolean;
     thrusting?: boolean;
     boost?: ShipBoostState;
@@ -118,13 +122,26 @@ export class Player {
     harpoonTargetId?: string | null;
     harpoonLatchPos?: { x: number; y: number };
     haulerUtility?: HaulerUtilityId;
-    surveyorUtility?: SurveyorUtilityId;
+    scoutUtility?: ScoutUtilityId;
   }): void {
+    const wasInTransit = this.ship.furnaceTransit !== null;
+    if (data.furnaceTransit !== undefined) {
+      this.ship.furnaceTransit = data.furnaceTransit;
+    }
     // Local selection is established at join. Preserve it during runtime reconciliation.
     if (data.kitId && data.kitId !== this.ship.kitId && this.type !== 'local') {
       const color = this.ship.color;
       applyShipKitToShip(this.ship, data.kitId);
       this.ship.color = color;
+    }
+    if (data.equipment !== undefined) {
+      this.ship.equipment = [...data.equipment];
+      if (!canEquipUtility(this.ship, this.ship.haulerUtility)) {
+        this.ship.haulerUtility = 'tow_cable';
+      }
+      if (!canEquipUtility(this.ship, this.ship.scoutUtility)) {
+        this.ship.scoutUtility = 'mineral_scan';
+      }
     }
     if (data.silk !== undefined) {
       this.silk = data.silk;
@@ -154,7 +171,8 @@ export class Player {
         this.adoptServerPosition = true;
       }
     }
-    const acceptServerTransform = !isLocal || this.adoptServerPosition;
+    const acceptServerTransform =
+      !isLocal || this.adoptServerPosition || wasInTransit || this.ship.furnaceTransit !== null;
 
     // Infer wall from the pre-echo pose. Adopting a lagged inside position
     // first is what turned last-life wall GO into a generic overlay.
@@ -192,7 +210,6 @@ export class Player {
       this.deathCause = preferDeathCause(explodeCause, this.deathCause) ?? explodeCause;
     }
 
-    const skipHudReset = isSilentHudReset(this.lives, this.score, data.lives, data.score);
     const snapshotDeathCause = this.deathCause ?? data.deathCause;
     const staleSnapshot =
       isLocal &&
@@ -204,7 +221,7 @@ export class Player {
         health: data.health ?? this.ship.health,
         exploding: data.exploding ?? this.ship.exploding,
       });
-    if (data.lives !== undefined && !skipHudReset && !staleSnapshot) {
+    if (data.lives !== undefined && !staleSnapshot) {
       const prevLives = this.lives;
       this.lives = data.lives;
       if (isLocal && prevLives > this.lives) {
@@ -222,7 +239,7 @@ export class Player {
         );
       }
     }
-    if (data.score !== undefined && !skipHudReset) {
+    if (data.score !== undefined && !staleSnapshot) {
       this.score = data.score;
     }
     // Thrusting is client-owned for the local player (keyboard/mouse input).
@@ -233,9 +250,13 @@ export class Player {
     if (data.boost !== undefined && this.type !== 'local') {
       this.ship.boost = { ...data.boost };
     }
-    if (data.color !== undefined && (this.type !== 'local' || purchasedHullColor(data.color))) {
-      this.color = data.color;
-      this.ship.color = data.color;
+    if (data.color !== undefined && !staleSnapshot) {
+      const color =
+        this.type === 'local' && !purchasedHullColor(data.color)
+          ? getPlayerColor('local')
+          : data.color;
+      this.color = color;
+      this.ship.color = color;
     }
     if (data.health !== undefined) {
       if (isLocal && this.lives <= 0) {
@@ -336,10 +357,10 @@ export class Player {
     if (data.haulerUtility !== undefined && this.type !== 'local') {
       this.ship.haulerUtility = data.haulerUtility;
     }
-    // A local tool choice survives stale snapshots while a remote Surveyor
+    // A local tool choice survives stale snapshots while a remote Scout
     // follows the authoritative utility row.
-    if (data.surveyorUtility !== undefined && this.type !== 'local') {
-      this.ship.surveyorUtility = data.surveyorUtility;
+    if (data.scoutUtility !== undefined && this.type !== 'local') {
+      this.ship.scoutUtility = data.scoutUtility;
     }
     // Handle respawn timer from server
     if (data.respawnTimer !== undefined) {

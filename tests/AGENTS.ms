@@ -10,7 +10,7 @@ Name the player or system event and its outcome. Good examples:
 
 - An asteroid impact removes health while unbounced crew lasers pass through ships.
 - Both pilots see the same shot, then remove it when it expires.
-- A furnace delivery gives the Surveyor and Hauler the same points.
+- A furnace delivery gives the Scout and Hauler the same points.
 - An asteroid collision costs one life, then the ship respawns inside the arena.
 - A failed connection returns to the menu and a retry joins successfully.
 

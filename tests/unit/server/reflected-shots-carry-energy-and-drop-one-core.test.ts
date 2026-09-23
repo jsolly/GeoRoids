@@ -16,7 +16,7 @@ import { RecordingSocket } from '../../support/recordingSocket';
 function arena() {
   const engine = new GameEngine(419);
   const ws = new RecordingSocket();
-  const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, 'surveyor');
+  const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, 'scout');
   delete pilot.spawnProtectionTimer;
   engine.enableAsteroidInteractions(pilot);
   for (const rock of engine.getAllAsteroids()) {

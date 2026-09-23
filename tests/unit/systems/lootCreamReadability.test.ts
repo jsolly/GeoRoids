@@ -109,3 +109,31 @@ test('silk snapshots draw three looped filaments instead of mineral diamonds', (
   expect(ctx.lineToCount).toBe(0);
   expect(ctx.strokeStyle).toBe(PALETTE.LOOT);
 });
+
+test('rare equipment retains its identity and floats with a large labeled silhouette', () => {
+  const ctx = traceContext();
+  ctx.moveTo = vi.fn();
+  ctx.fillText = vi.fn();
+  vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
+  vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
+    (position) => new Point(position.x, position.y)
+  );
+  vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList);
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+  const field = LootField.getInstance();
+  field.applySnapshot([
+    { id: 'equipment-1', position: { x: 0, y: 0 }, mass: 0, radius: 22, kind: 'boost_coupling' },
+  ]);
+  drawLootRelative(new Ship(), field.getAll());
+  expect(field.getAll()[0]?.kind).toBe('boost_coupling');
+  expect(ctx.fillText).toHaveBeenCalledWith('BOOST COUPLING', 0, expect.any(Number));
+  const firstY = vi.mocked(ctx.moveTo).mock.calls[0]?.[1];
+  vi.mocked(ctx.moveTo).mockClear();
+  vi.mocked(performance.now).mockReturnValue((450 * Math.PI) / 2);
+  drawLootRelative(new Ship(), field.getAll());
+  expect(vi.mocked(ctx.moveTo).mock.calls[0]?.[1]).toBeGreaterThan(firstY ?? 0);
+  vi.mocked(window.matchMedia).mockReturnValue({ matches: true } as MediaQueryList);
+  vi.mocked(ctx.moveTo).mockClear();
+  drawLootRelative(new Ship(), field.getAll());
+  expect(vi.mocked(ctx.moveTo).mock.calls[0]?.[1]).toBe(firstY);
+});

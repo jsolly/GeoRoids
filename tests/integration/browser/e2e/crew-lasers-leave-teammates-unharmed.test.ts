@@ -24,7 +24,7 @@ test(
     const shooter = new GameInteractions(shooterPage);
     const teammate = new GameInteractions(teammatePage);
 
-    await shooter.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await shooter.bootGame({ kitId: 'scout', waitForCombatReady: false });
     await teammate.bootGame({ kitId: 'hauler', waitForCombatReady: false });
     const shooterId = await shooter.getLocalPlayerId();
     const teammateId = await teammate.getLocalPlayerId();

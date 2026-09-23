@@ -121,7 +121,7 @@ function captureHudFrame(
       local.name = 'HUD pilot';
       local.score = capture.score;
       local.lives = 3;
-      local.ship.kitId = 'surveyor';
+      local.ship.kitId = 'scout';
 
       for (const player of players) {
         if (player.id === local.id) {
@@ -261,8 +261,8 @@ test(
 
       const portraitScore = textDrawn(portrait, '2468', true);
       const shiftedScore = textDrawn(shiftedPortrait, '2468', true);
-      const portraitKit = textDrawn(portrait, 'Surveyor');
-      const shiftedKit = textDrawn(shiftedPortrait, 'Surveyor');
+      const portraitKit = textDrawn(portrait, 'Scout');
+      const shiftedKit = textDrawn(shiftedPortrait, 'Scout');
       expect(portraitScore).toBeDefined();
       expect(shiftedScore).toBeDefined();
       expect(portraitKit).toBeDefined();

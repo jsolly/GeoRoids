@@ -233,6 +233,8 @@ describe('current pilots share the production handler and broadcaster', () => {
   });
 
   test('late joins, exclusions, backpressure, rejoin and reconnect have independent baselines', () => {
+    // Hold snapshot time steady while comparing independently reconstructed world baselines.
+    vi.spyOn(engine, 'getServerTime').mockReturnValue(engine.getServerTime());
     const expectedWorld = (id = 'a') => {
       const viewer = engine.getPlayer(id);
       assert(viewer);

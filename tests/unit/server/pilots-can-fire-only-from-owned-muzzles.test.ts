@@ -26,7 +26,7 @@ describe('server-authoritative player shooting', () => {
     broadcaster = new GameStateBroadcaster(engine);
     handler = new MessageHandler(engine, broadcaster);
     socket = new RecordingSocket();
-    engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'surveyor');
+    engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'scout');
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
     }
@@ -147,17 +147,17 @@ describe('server-authoritative player shooting', () => {
     expect(engine.getServerLasers()).toHaveLength(1);
   });
 
-  test('normal Surveyor firing stays bounded by the regular shot cadence', () => {
+  test('normal Scout firing stays bounded by the regular shot cadence', () => {
     const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     const player = engine.getPlayer('pilot');
-    assert.ok(player, 'surveyor pilot');
-    player.kitId = 'surveyor';
+    assert.ok(player, 'scout pilot');
+    player.kitId = 'scout';
     for (let i = 0; i < SHIP.MAX_LASERS; i++) {
       shoot();
     }
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS);
-    clock.mockReturnValue(1000 + getShipKit('surveyor').shotCooldown);
+    clock.mockReturnValue(1000 + getShipKit('scout').shotCooldown);
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS + 1);
   });

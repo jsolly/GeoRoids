@@ -19,7 +19,7 @@ Growth uses the same base health curve for every kit. When a pickup raises
 maximum health, it adds the same amount to current health; it does not fully
 repair existing damage. For a heavy kit such as Hauler, the first small mass
 pickup can lower its starting maximum health to the shared growth value.
-Laser cores do not add mass. Hull draw size and collision radius stay at the
+Laser cores and equipment do not add mass. Hull draw size and collision radius stay at the
 kit base; collecting does not enlarge the silhouette.
 
 Asteroid breaks can release shards, and an environmental ship death releases
@@ -47,9 +47,25 @@ Spider silk comes from using Resource Tap on a spider. Collect it as a separate
 material in your inventory; it has no crafting use yet and does not grant ore,
 mass, or score. The tapped spider shudders and becomes hostile.
 
+## Salvaged equipment
+
+Hauler starts with Tow Cable; Scout starts with Mineral Scan. Resource Tap,
+Boost Coupling, and Survey Probe must be collected before their inventory cards
+unlock. Spider nests are the best source: 65% contain one tool. Laser-mined
+asteroids have a 1.5% chance to drop one. The three tools are equally likely.
+
+Rare tools are large, labeled, glowing pickups that float above the terrain.
+Reduced-motion settings stop the floating animation. Either ship can recover
+any tool, but only its matching ship can equip it. Tools stay in your pilot's
+saved inventory between deaths, reconnects, and server restarts. Losing your
+last life clears your equipment, silk, score, and personal paint. A duplicate
+stays in the world for a teammate who does not already own it. Shooting cannot
+destroy equipment. Nest caches also contain ordinary salvage, silk, cores, and
+satellite hardware.
+
 ## Shoot a drop
 
-A laser can detonate a nearby loot drop when the shooter is within its arm
+A laser can detonate a nearby non-equipment loot drop when the shooter is within its arm
 range. The drop is removed and its shot-triggered blast is safe for every crew
 hull, including the shooter and teammates. It adds an outward velocity impulse
 to small asteroids. A rock is affected when its edge reaches the blast radius;

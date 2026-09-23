@@ -53,6 +53,7 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`inventory-button-${viewport.width}.png`),
     });
     await game.waitForNetworkAsteroids(1);
+    await game.collectEquipment(['resource_tap', 'boost_coupling']);
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
     if (viewport.touch) {
       await schematicToggle.tap();

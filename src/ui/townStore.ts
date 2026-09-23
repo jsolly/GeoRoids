@@ -1,3 +1,5 @@
+import { TOWN_HEARTH } from '../../shared/furnaces';
+import { litTravelDestinations, nearestTravelFurnace } from '../../shared/furnaceTravel';
 import {
   EXTRA_LIFE_COST,
   insideTownStore,
@@ -10,6 +12,7 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import { NetworkManager } from '../network/networkManager';
 import { worldFurnaces } from '../network/worldExploration';
 import { logger } from '../utils/Logger';
+import { renderFurnaceTravelMap } from './furnaceTravelMap';
 import { closeShipSchematic } from './shipSchematic';
 import { isShipSchematicOpen } from './shipSchematicState';
 import { bindTownStoreClose, isTownStoreOpen, setTownStoreOpen } from './townStoreState';
@@ -24,6 +27,7 @@ export const TOWN_STORE_IDS = {
   price: 'town-store-life-price',
   status: 'town-store-status',
   return: 'town-store-return',
+  destinations: 'town-store-destinations',
 } as const;
 
 const BLOCKED_GAMEPLAY_KEYS = new Set([
@@ -43,6 +47,7 @@ type StoreElements = {
   yieldLine: HTMLElement;
   score: HTMLElement;
   offer: HTMLElement;
+  destinations: HTMLElement;
   status: HTMLElement;
   return: HTMLButtonElement;
 };
@@ -61,11 +66,10 @@ export function canEnterTownStore(): boolean {
   if (!player || player.lives <= 0 || player.ship.exploding || player.ship.health <= 0) {
     return false;
   }
-  // Tow/ignite chrome wins while hooked — match ability button, not Enter store.
-  if (player.ship.harpoonTargetId) {
+  if (player.ship.furnaceTransit) {
     return false;
   }
-  return insideTownStore(player.ship.position);
+  return nearestTravelFurnace(player.ship.position, worldFurnaces) !== undefined;
 }
 
 function streetsBuiltByLocal() {
@@ -114,11 +118,49 @@ function lifeButton(): HTMLButtonElement | null {
   return buy;
 }
 
+function requestFurnaceTravel(destinationId: string): void {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (!player || !canEnterTownStore()) {
+    return;
+  }
+  NetworkManager.getInstance().sendMessage({
+    type: 'travelFurnace',
+    id: player.id,
+    data: { destinationId },
+  });
+  if (elements) {
+    elements.status.textContent = 'Preparing rocket…';
+  }
+}
+
 function refreshStoreCopy(): void {
   if (!elements) {
     return;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
+  const source = player ? nearestTravelFurnace(player.ship.position, worldFurnaces) : undefined;
+  const town = source?.id === TOWN_HEARTH.id;
+  elements.offer.hidden = !town;
+  const heading = elements.dialog.querySelector('#town-store-title');
+  const eyebrow = elements.dialog.querySelector('.town-store-eyebrow');
+  if (heading) {
+    heading.textContent = 'Furnace travel';
+  }
+  if (eyebrow) {
+    eyebrow.textContent = source?.name ?? 'FURNACE';
+  }
+  const destinations = source ? litTravelDestinations(source.id, worldFurnaces) : [];
+  const signature = `${source?.id ?? ''}|${destinations
+    .map((destination) => `${destination.id}:${destination.name}`)
+    .join('|')}`;
+  if (elements.destinations.dataset['destinations'] !== signature) {
+    elements.destinations.dataset['destinations'] = signature;
+    if (source) {
+      renderFurnaceTravelMap(elements.destinations, source, destinations, requestFurnaceTravel);
+    } else {
+      elements.destinations.replaceChildren();
+    }
+  }
   const built = streetsBuiltByLocal();
   const bonus = townDeliveryBonusPercent(built);
   const perStreet = Math.round(TOWN_YIELD_PER_MODULE * 100);
@@ -165,6 +207,9 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
     <p id="${TOWN_STORE_IDS.yield}"></p>
     <p id="${TOWN_STORE_IDS.score}"></p>
     <div id="${TOWN_STORE_IDS.offer}"></div>
+    <h3>Destination map</h3>
+    <p>Ride a rocket along the pipes to any lit furnace. Travel is free.</p>
+    <div id="${TOWN_STORE_IDS.destinations}" class="furnace-destinations"></div>
     <p id="${TOWN_STORE_IDS.status}" role="status" aria-live="polite"></p>
     <button id="${TOWN_STORE_IDS.return}" type="button">Return to flight</button>
   `;
@@ -185,17 +230,18 @@ function ensureElements(): StoreElements | null {
   const yieldLine = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.yield}`);
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
   const offer = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`);
+  const destinations = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.destinations}`);
   const status = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.status}`);
   const returnButton = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.return}`);
-  if (!close || !yieldLine || !score || !offer || !status || !returnButton) {
+  if (!close || !yieldLine || !score || !offer || !destinations || !status || !returnButton) {
     return null;
   }
-  return { dialog, close, yieldLine, score, offer, status, return: returnButton };
+  return { dialog, close, yieldLine, score, offer, destinations, status, return: returnButton };
 }
 
 function purchaseExtraLife(): void {
   const player = PlayerManager.getInstance().getLocalPlayer();
-  if (!player || !isTownStoreOpen()) {
+  if (!player || !isTownStoreOpen() || !insideTownStore(player.ship.position)) {
     return;
   }
   NetworkManager.getInstance().sendMessage({
@@ -341,6 +387,14 @@ function handleStoreKeydown(ev: KeyboardEvent): void {
 }
 
 if (typeof window !== 'undefined') {
+  window.addEventListener('furnaceTravelResult', (ev: Event) => {
+    const data: unknown = (ev as CustomEvent<unknown>).detail;
+    if (data && typeof data === 'object' && 'ok' in data && data.ok === true) {
+      closeTownStore();
+    } else {
+      applyTownStoreResult(data);
+    }
+  });
   window.addEventListener('townStoreResult', (ev: Event) => {
     applyTownStoreResult((ev as CustomEvent<unknown>).detail);
   });
@@ -362,6 +416,12 @@ export function initializeTownStore(options?: { onOpen?: () => void }): void {
   });
   elements.return.addEventListener('click', () => {
     closeTownStore();
+    // Return to flight restores gameplay focus; native Space must not reopen the HUD button.
+    const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+    if (canvas) {
+      canvas.tabIndex = -1;
+      canvas.focus({ preventScroll: true });
+    }
   });
   elements.dialog.addEventListener('close', handleDialogClosed);
   elements.dialog.addEventListener('cancel', (ev) => {

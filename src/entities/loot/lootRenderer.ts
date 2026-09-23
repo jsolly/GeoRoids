@@ -1,3 +1,4 @@
+import { EQUIPMENT, isEquipmentId } from '../../../shared/equipment';
 import type { LootData, LootKind } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
@@ -97,26 +98,39 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     return;
   }
 
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
   for (const drop of loot) {
-    const screen = canvasManager.worldToScreen(drop.position, ship.position);
-    const r = lootScreenRadius(drop.radius, scale);
+    const projected = canvasManager.worldToScreen(drop.position, ship.position);
+    const screen = { x: projected.x, y: projected.y };
+    const equipment = isEquipmentId(drop.kind) ? drop.kind : null;
+    const prominent = equipment !== null || drop.kind === 'tap';
+    const r = lootScreenRadius(prominent ? Math.max(22, drop.radius) : drop.radius, scale);
     if (!Number.isFinite(screen.x) || !Number.isFinite(screen.y) || r === null) {
       continue;
     }
 
+    if (prominent && !reducedMotion) {
+      screen.y += Math.sin(now / 450 + drop.position.x * 0.01) * 6 * scale;
+    }
     const isCore = drop.kind === 'laserCore';
     const isShard = drop.kind === 'shard';
     const isTap = drop.kind === 'tap';
     const isDenseShard = isShard && Number.isFinite(drop.mass) && drop.mass >= 0.5;
     const color = lootStrokeColor(drop.kind);
     const pulse =
-      isTap && typeof performance !== 'undefined'
-        ? 1 + 0.08 * Math.sin((performance.now() / VISUAL.TAP_LOOT_PULSE_MS) * Math.PI * 2)
+      prominent && !reducedMotion
+        ? 1 + 0.08 * Math.sin((now / VISUAL.TAP_LOOT_PULSE_MS) * Math.PI * 2)
         : 1;
     const drawR = r * pulse;
-    const glow = isTap ? VISUAL.TAP_LOOT_GLOW : VISUAL.LOOT_GLOW;
+    const glow = prominent ? VISUAL.TAP_LOOT_GLOW : VISUAL.LOOT_GLOW;
     const trace = (): void => {
       ctx.beginPath();
+      if (equipment) {
+        addResourceMapPath(ctx, equipment, screen.x, screen.y, drawR);
+        return;
+      }
       if (drop.kind === 'silk') {
         addResourceMapPath(ctx, 'silk', screen.x, screen.y, r);
         return;
@@ -158,6 +172,19 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     ctx.strokeStyle = color;
     trace();
     ctx.stroke();
+    if (prominent) {
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = color;
+      ctx.shadowColor = PALETTE.BG;
+      ctx.shadowBlur = 4;
+      ctx.fillText(
+        equipment ? EQUIPMENT[equipment].name.toUpperCase() : 'TAP CANISTER',
+        screen.x,
+        screen.y + drawR + 7
+      );
+    }
     if (isTap) {
       ctx.strokeStyle = PALETTE.LASER_LOCAL;
       ctx.shadowColor = PALETTE.LASER_LOCAL;

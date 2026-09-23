@@ -9,7 +9,7 @@ A Hauler presses **E** to attach to a nearby asteroid and tows it at the cable's
 original length. Press **E** again to release it. Attached cargo cannot damage its
 Hauler or be destroyed by crew lasers. Other asteroids remain dangerous; crew
 ships can overlap safely. Tow surveyed cargo into a furnace to award the Hauler
-and each contributing Surveyor. A pilot who built streets receives a higher
+and each contributing Scout. A pilot who built streets receives a higher
 personal payout.
 
 ## Reflective clusters and laser cores

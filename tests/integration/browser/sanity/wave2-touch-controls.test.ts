@@ -18,7 +18,7 @@ import {
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const KITS = [
-  { kitId: 'surveyor' as const, label: 'SCAN', name: 'Mineral scan' },
+  { kitId: 'scout' as const, label: 'SCAN', name: 'Mineral scan' },
   { kitId: 'hauler' as const, label: 'TAP', name: 'Harpoon' },
 ];
 
@@ -118,7 +118,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
     let touchActive = false;
@@ -162,7 +162,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     // Spawn ring (180) is inside TOWN_STORE_RADIUS (400); leave so E stays SCAN.
     await game.placeShipAt(0, -500);
     await page.waitForFunction(
@@ -219,7 +219,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     const steer = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
@@ -330,7 +330,7 @@ test.each(KITS)(
       y: ability.y,
       id: 13,
     });
-    if (kitId === 'surveyor') {
+    if (kitId === 'scout') {
       await expect
         .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
         .toBeGreaterThan(0);
@@ -545,7 +545,7 @@ test(
     const consoleState = watchBrowserDiagnostics(page);
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     // Stay outside Town Square so E stays SCAN instead of Enter store.
     await game.placeShipAt(0, -500);
     await page.waitForFunction(

@@ -17,13 +17,14 @@ function field(page: Page): Promise<SpiderFieldState> {
   );
 }
 for (const width of [1280, 390]) {
-  test(`a Surveyor tags a moving spider and reads the tool rules at ${width}px`, async () => {
+  test(`a Scout tags a moving spider and reads the tool rules at ${width}px`, async () => {
     const mobile = width === 390;
     const page = await browserManager.recreatePage({ hasTouch: mobile });
     await page.setViewportSize({ width, height: mobile ? 844 : 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    await game.collectEquipment(['survey_probe']);
     if (mobile) {
       await page.locator('#ship-schematic-toggle').tap();
     } else {
@@ -44,7 +45,7 @@ for (const width of [1280, 390]) {
     await page.evaluate(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
       if (!ship) {
-        throw new Error('Missing Surveyor');
+        throw new Error('Missing Scout');
       }
       ship.angle = 0;
       ship.angularVelocity = 0;
@@ -86,12 +87,11 @@ for (const width of [1280, 390]) {
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`spider-probe-${width}.png`),
     });
-    for (const route of ['hauler', 'surveyor', 'terrain']) {
+    for (const route of ['hauler', 'scout', 'terrain']) {
       await page.goto(new URL(`/wiki/#${route}`, page.url()).href);
       const heading = page
         .getByRole('heading', {
-          name:
-            route === 'hauler' ? 'Hauler' : route === 'surveyor' ? 'Surveyor' : 'Terrain spiders',
+          name: route === 'hauler' ? 'Hauler' : route === 'scout' ? 'Scout' : 'Terrain spiders',
           exact: true,
         })
         .first();
@@ -102,7 +102,7 @@ for (const width of [1280, 390]) {
           hasText:
             route === 'hauler'
               ? 'Tapping a spider extracts'
-              : route === 'surveyor'
+              : route === 'scout'
                 ? 'Attach a probe to a guarding spider'
                 : "Hauler's Resource Tap extracts collectible silk",
         })

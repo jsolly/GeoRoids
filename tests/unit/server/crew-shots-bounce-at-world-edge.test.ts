@@ -111,7 +111,7 @@ test('an asteroid before the wall absorbs the shot before any boundary reflectio
   expect(shot.bounces).toBe(0);
 });
 
-test.each(['surveyor', 'hauler'] as const)(
+test.each(['scout', 'hauler'] as const)(
   'a full-health grown %s loses exactly one life on the boundary',
   (kitId) => {
     const { engine, shooter } = crew();

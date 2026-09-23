@@ -54,7 +54,7 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
 export const DESKTOP_CONTROLS_HINT =
   'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V inventory · B furnace travel · M map';
 export const TOUCH_CONTROLS_HINT =
-  'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Inventory button · Tap Travel over a lit furnace · Map button';
+  'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Inventory button · Enter Town Square or tap Travel over a lit furnace · Map button';
 
 export function controlsHintFor(
   query: ViewportQuery = queryViewport()

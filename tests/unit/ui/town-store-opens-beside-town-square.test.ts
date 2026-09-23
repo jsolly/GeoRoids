@@ -79,6 +79,10 @@ test('the store opens at Town Square via E and buys a placeholder without an upg
   document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
   expect(isTownStoreOpen()).toBe(true);
   const dialog = document.querySelector(`#${TOWN_STORE_IDS.dialog}`);
+  expect(dialog?.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`)?.hidden).toBe(true);
+  expect(dialog?.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.travel}`)?.hidden).toBe(true);
+  dialog?.querySelector<HTMLButtonElement>('[data-town-view="store"]')?.click();
+  expect(dialog?.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`)?.hidden).toBe(false);
   expect(dialog?.textContent).toContain('Placeholder A');
   expect(dialog?.textContent).toContain('100');
   expect(dialog?.textContent).not.toMatch(/deliveries|bonus|10%/iu);
@@ -224,6 +228,7 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   if (!ability) {
     throw new Error('Missing furnace prompt');
   }
+  expect(ability.textContent).toBe('Enter');
   ability.setPointerCapture = vi.fn();
   ability.hasPointerCapture = vi.fn().mockReturnValue(true);
   ability.releasePointerCapture = vi.fn();

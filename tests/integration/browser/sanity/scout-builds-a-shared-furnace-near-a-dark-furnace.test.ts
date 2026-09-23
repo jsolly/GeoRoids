@@ -24,16 +24,15 @@ for (const viewport of [
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
+    await game.placeShipAt(0, 0);
     const store = page.locator('#town-store-dialog');
     if (viewport.touch) {
-      await page.waitForFunction(
-        () => document.querySelector('#touch-ability')?.textContent?.includes('ENTER') === true
-      );
-      await page.locator('#touch-ability').tap();
+      await page.getByRole('button', { name: 'Enter', exact: true }).tap();
     } else {
       await page.keyboard.press('KeyE');
     }
     await store.waitFor({ state: 'visible' });
+    await store.getByRole('button', { name: 'Store', exact: true }).click();
     expect(await store.textContent()).toContain('Placeholder A');
     expect(await store.textContent()).not.toMatch(/street|deliveries|bonus|10%/iu);
     await page.screenshot({

@@ -615,8 +615,8 @@ export function drawLasers(
   drawLaserBolts(ship.lasers, color ?? PALETTE.LASER_LOCAL, viewerShipPosition ?? ship.position);
 }
 
-/** Transit replaces the hull with a bright pipe rocket. */
-function drawFurnaceRocket(
+/** Fast travel adds a flame behind the equipped hull. */
+function drawFurnaceTravelFlame(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -639,18 +639,6 @@ function drawFurnaceRocket(
   ctx.moveTo(-radius * 0.65, -radius * 0.3);
   ctx.lineTo(-radius * flame, 0);
   ctx.lineTo(-radius * 0.65, radius * 0.3);
-  ctx.stroke();
-  ctx.strokeStyle = PALETTE.LOCAL;
-  ctx.shadowColor = PALETTE.LOCAL;
-  ctx.beginPath();
-  ctx.moveTo(radius * 1.35, 0);
-  ctx.lineTo(radius * 0.35, -radius * 0.45);
-  ctx.lineTo(-radius * 0.6, -radius * 0.45);
-  ctx.lineTo(-radius * 0.85, -radius * 0.8);
-  ctx.lineTo(-radius * 0.85, radius * 0.8);
-  ctx.lineTo(-radius * 0.6, radius * 0.45);
-  ctx.lineTo(radius * 0.35, radius * 0.45);
-  ctx.closePath();
   ctx.stroke();
   ctx.restore();
 }
@@ -707,7 +695,17 @@ export function drawShipAtPosition(
     }
     ctx.stroke();
     ctx.restore();
-    drawFurnaceRocket(ctx, screenX, screenY, shipR, ship.angle);
+    drawFurnaceTravelFlame(ctx, screenX, screenY, shipR, ship.angle);
+    strokeKitHullOutline(
+      ctx,
+      screenX,
+      screenY,
+      shipR,
+      ship.angle,
+      color ?? ship.color,
+      ship.kitId,
+      haulerUtilityOf(ship)
+    );
     return;
   }
   if (ship.blinkCount > 0 && !ship.blinkOn) {

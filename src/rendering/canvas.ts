@@ -36,6 +36,7 @@ import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
+import { drawRicochetCourt } from './ricochetCourtRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield } from './starfield';
@@ -68,6 +69,7 @@ export function drawGame(
 
   drawStarfield(currShip.position);
   drawIsoContours(currShip.position);
+  drawRicochetCourt(currShip.position);
   drawTerrainSpiders(currShip.position, currPlayer.id, currShip.health > 0 && !currShip.exploding);
 
   const localId = currPlayer.id;

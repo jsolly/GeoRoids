@@ -5,6 +5,7 @@ import {
   isCellExplored,
 } from '../../../shared/exploration';
 import { CIVIC_LOTS, pipeHopToParent } from '../../../shared/furnaces';
+import { RICOCHET_COURT } from '../../../shared/ricochetCourt';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { WORLD } from '../../../shared/world';
 import type {
@@ -29,6 +30,7 @@ import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { strokeFurnaceFireTrail } from '../furnaceRenderer';
 import { resolveGlow } from '../renderQuality';
+import { drawCourtMapMark } from '../ricochetCourtRenderer';
 import {
   drawFoundationMapMark,
   drawFurnaceMapMark,
@@ -737,6 +739,9 @@ export function drawMiniMap(
       roids
     );
     drawFurnaceMarks(ctx, geometry);
+    if (projectPosition(geometry, RICOCHET_COURT.center)) {
+      drawCourtMapMark(ctx, geometry.projection.x, geometry.projection.y, 7);
+    }
     const spiderField = getSpiderField();
     for (const spider of spiderField.spiders) {
       if (

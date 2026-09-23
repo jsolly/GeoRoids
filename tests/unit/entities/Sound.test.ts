@@ -1,6 +1,12 @@
 import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+// Audio diagnostics use the real logger, but must not open sockets to a running dev server.
+vi.mock('../../../src/utils/logForwarder', () => ({
+  startClientLogForwarder: vi.fn(),
+  forwardLogToServer: vi.fn(),
+}));
+
 class FakeHowl {
   static instances: FakeHowl[] = [];
   readonly voices = new Map<number, { volume: number; rate: number }>();

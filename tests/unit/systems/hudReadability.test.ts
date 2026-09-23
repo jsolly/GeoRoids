@@ -502,6 +502,7 @@ describe('painted HUD composition', () => {
     const ctx = canvasContext();
     const { strokes, rectangles, filledPaths, outlinedRectangles } = recordCanvas(ctx);
     const arc = vi.spyOn(ctx, 'arc');
+    const translate = vi.spyOn(ctx, 'translate');
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const draw = (): void => {
       drawMiniMap(
@@ -586,10 +587,27 @@ describe('painted HUD composition', () => {
     const haulerOutline = getKitHullOutline('hauler');
     const surveyorMarks = 1 + surveyorOutline.extras.length;
     const haulerMarks = 1 + haulerOutline.extras.length;
-    // One arena ring, four world layers, nearby street foundations, then kit hulls.
+    // One arena ring, four world layers, street foundations, the court, then kit hulls.
     expect(strokes).toHaveLength(
-      1 + 4 + darkLotsInRadar.length + surveyorMarks * 2 * 3 + haulerMarks * 2
+      1 + 4 + darkLotsInRadar.length + 1 + surveyorMarks * 2 * 3 + haulerMarks * 2
     );
+    const court = strokes[5 + darkLotsInRadar.length];
+    expect(court).toMatchObject({
+      closed: false,
+      style: normalizedCanvasColor(ctx, PALETTE.REMOTE),
+      width: 1.4,
+    });
+    expect(court?.points).toHaveLength(8);
+    // Four open corner panels, painted before the pilot hulls, at the fixed public landmark.
+    expect(court?.points[0]?.[0]).toBeCloseTo(2.139, 3);
+    expect(court?.points[0]?.[1]).toBeCloseTo(-6.028, 3);
+    expect(court?.points[7]?.[0]).toBeCloseTo(-2.139, 3);
+    expect(court?.points[7]?.[1]).toBeCloseTo(-6.028, 3);
+    expect(
+      translate.mock.calls.some(
+        ([x, y]) => Math.abs(x - 757.3333) < 0.001 && Math.abs(y - 518.6667) < 0.001
+      )
+    ).toBe(true);
     const radarX = layout.miniMap.x + layout.miniMap.size / 2;
     const radarY = layout.miniMap.y + layout.miniMap.size / 2;
     const peerX = radarX + layout.miniMap.size / 4;
@@ -639,7 +657,9 @@ describe('painted HUD composition', () => {
       rimHeading,
       'surveyor'
     );
-    expect(crispKitStrokes(strokes, remoteColor)).toHaveLength(surveyorMarks * 2 + haulerMarks);
+    expect(crispKitStrokes(strokes.slice(6 + darkLotsInRadar.length), remoteColor)).toHaveLength(
+      surveyorMarks * 2 + haulerMarks
+    );
 
     strokes.length = 0;
     outlinedRectangles.length = 0;

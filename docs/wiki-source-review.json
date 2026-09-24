@@ -1,5 +1,5 @@
 {
-  "note": "Merged current main. Contours are a muted red ramp from light easy routes to very dark climbs, colored ahead of the ship. Downhill still accelerates and Boost stacks with it. A passage keeps only the open share of the height pull.",
+  "note": "Merged current main. The terrain demonstration colors the heading cone on a muted red ramp. Downhill still accelerates and Boost stacks with it.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -43,7 +43,7 @@
     "public/wiki/media/hauler.png": "sha256:d921b1e434ac6a285f917bdb95d9e5308ac26df97960316647934b64f871ed1b",
     "public/wiki/media/loot.gif": "sha256:5e757e802b29ceba0b89c1deb56edee5eb06d35793d8782cda98e83b9b1a5b82",
     "public/wiki/media/loot.png": "sha256:9e829538fb64515ddeeea0d67517eaafcc1a299abfa0faeedb848ef97ddd2083",
-    "public/wiki/media/manifest.json": "sha256:9b0c07f3a2829099f4f821678ef4f26c3e905e5fcab96d26233c057f98f868b1",
+    "public/wiki/media/manifest.json": "sha256:fa69bfb50225fe8d621ed9691ea0ee2e85a5cca8f4ea619a04d23ad3b25a14e9",
     "public/wiki/media/movement.gif": "sha256:56346263b780ecc8bb2e5b28ffdaa983ec5685c9507eac1c875a81a5f05e2b54",
     "public/wiki/media/movement.png": "sha256:de1bc210e501193d6457be1d9d97a76236da47700c2221e88cbc2997b64a40dc",
     "public/wiki/media/pickups.gif": "sha256:d5a9d993dd49732e374c1c21d9ccfeb913eee00aef43fa05f1af7843634b7008",
@@ -58,8 +58,8 @@
     "public/wiki/media/split.png": "sha256:56e150dc0e4a56c0f9b8ddabb4ff0ad950705a19f99f31e6ea4280027ed2fb1c",
     "public/wiki/media/survival.gif": "sha256:070ba3bf2181f903b228b8be003f4326158946bdab88dc15501804ed4b5b745a",
     "public/wiki/media/survival.png": "sha256:b3c28da426ca94ff585cf653aee10287028e1ff3166c0b84ddb7e02c905e96a5",
-    "public/wiki/media/terrain.gif": "sha256:e4e098dc154373e3387d27f43e2165933504ca5d5e2e9e3f7fbe972e71f014a5",
-    "public/wiki/media/terrain.png": "sha256:f701d7f5dc6535b2bd5c9cc0ae251fbdb33a744fc0e80b7fe2ad146306601a27",
+    "public/wiki/media/terrain.gif": "sha256:57e0cdb1ba140c6ab6997671ee30dfe144f8fd292db897a1f78379883c7bfbfc",
+    "public/wiki/media/terrain.png": "sha256:106b994b9be5e1610f72ec1718d3026249ae57bc7fe61df09328907c2d99b3dc",
     "scripts/generate-sounds.ts": "sha256:5e982ac36bc11a3836c8f3ce22a6722238de2523578b968e039ad6d23d1f03b2",
     "scripts/wiki-check.ts": "sha256:58ca41a24d4844983fe5b0cfc4b5a608aa731246e6bb6dd2727f9e62ff5fb11a",
     "scripts/wiki-content.ts": "sha256:d7006a811d3fee2b623e6b3fdbc921ef3142d968e58bd5aaed89c21b8f40ee1d",

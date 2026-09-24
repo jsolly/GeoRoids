@@ -152,7 +152,9 @@ function captureHudFrame(
 
 function textDrawn(frame: HudFrame, text: string, leftHalf = false): DrawnText | undefined {
   return frame.texts.find(
-    (draw) => draw.text === text && (!leftHalf || draw.x < frame.canvas.width / 2)
+    (draw) =>
+      (draw.text === text || draw.text.startsWith(`${text} · `)) &&
+      (!leftHalf || draw.x < frame.canvas.width / 2)
   );
 }
 

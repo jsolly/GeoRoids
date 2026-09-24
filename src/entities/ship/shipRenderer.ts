@@ -824,7 +824,7 @@ export function drawHaulerHarpoonVfx(
   ctx.restore();
 }
 
-const SCOUT_SCAN_PULSE_COUNT = 3;
+const SCOUT_SCAN_PULSE_COUNT = SHIP_ABILITY.SCAN_PULSES;
 const SCOUT_SCAN_PULSE_FRAMES = SHIP_ABILITY.SCAN_FRAMES / SCOUT_SCAN_PULSE_COUNT;
 const SCOUT_SCAN_EDGE_OVERSHOOT = 1.1;
 const SCOUT_SCAN_FADE_START = 0.75;
@@ -842,7 +842,7 @@ interface ScoutScanPulse {
   readonly alpha: number;
 }
 
-/** One of three expanding radar pulses, measured in viewport pixels. */
+/** The single expanding radar pulse, measured in viewport pixels. */
 export function scoutScanPulseGeometry(
   pulseIndex: number,
   screenX: number,

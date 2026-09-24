@@ -31,6 +31,10 @@ for (const viewport of [
     const button = page.locator('#touch-boost');
     await button.waitFor({ state: 'visible' });
     await expect.poll(() => button.isEnabled()).toBe(true);
+    await expect.poll(() => button.textContent()).toBe('BOOST');
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`boost-ready-${viewport.name}.png`),
+    });
     const activate = () => (viewport.touch ? button.tap() : button.click());
     await activate();
     await page.waitForFunction(() => {

@@ -91,10 +91,13 @@ for (const viewport of [
           throw new Error('Missing inventory copy');
         }
         const copyBox = copy.getBoundingClientRect();
+        const copyStyle = getComputedStyle(copy);
+        const copyPadX =
+          Number.parseFloat(copyStyle.paddingLeft) + Number.parseFloat(copyStyle.paddingRight);
         return {
           inventoryBesideHull: inventoryBox.left >= canvasBox.right - 2,
           inventoryBelowHull: inventoryBox.top >= canvasBox.bottom - 4,
-          copyUsesPanel: copyBox.width >= modalBox.width * 0.72,
+          copyContentWidth: copyBox.width - copyPadX,
           inventoryInView: inventoryBox.top < modalBox.bottom && inventoryBox.bottom > modalBox.top,
           cardsBelow:
             cardsBox.top >= canvasBox.bottom - 2 && cardsBox.top >= inventoryBox.bottom - 2,
@@ -106,8 +109,9 @@ for (const viewport of [
         };
       });
       if (viewport.touch) {
+        expect(layout.inventoryBesideHull).toBe(false);
         expect(layout.inventoryBelowHull).toBe(true);
-        expect(layout.copyUsesPanel).toBe(true);
+        expect(layout.copyContentWidth).toBeGreaterThanOrEqual(layout.width - 40);
       } else {
         expect(layout.inventoryBesideHull).toBe(true);
       }
@@ -146,7 +150,7 @@ for (const viewport of [
   }, 40000);
 }
 
-test('a short touch screen keeps all action buttons at the top', async () => {
+test('a short touch screen keeps tools at the top and Boost at bottom center', async () => {
   const width = 844;
   const height = 390;
   const page = await browserManager.recreatePage({ hasTouch: true });
@@ -158,12 +162,7 @@ test('a short touch screen keeps all action buttons at the top', async () => {
   await game.waitForGameReady();
   const toggle = page.locator('#ship-schematic-toggle');
   await toggle.waitFor({ state: 'visible' });
-  for (const id of [
-    'ship-schematic-toggle',
-    'universe-map-toggle',
-    'touch-boost',
-    'touch-ability',
-  ]) {
+  for (const id of ['ship-schematic-toggle', 'universe-map-toggle', 'touch-ability']) {
     const box = await page.locator(`#${id}`).boundingBox();
     if (!box) {
       throw new Error(`Missing ${id}`);
@@ -173,6 +172,15 @@ test('a short touch screen keeps all action buttons at the top', async () => {
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThan(height / 2);
   }
+  const boost = await page.locator('#touch-boost').boundingBox();
+  if (!boost) {
+    throw new Error('Missing bottom Boost button');
+  }
+  expect(boost.x).toBeGreaterThanOrEqual(0);
+  expect(boost.x + boost.width).toBeLessThanOrEqual(width);
+  expect(boost.x + boost.width / 2).toBe(width / 2);
+  expect(boost.y).toBeGreaterThan(height / 2);
+  expect(boost.y + boost.height).toBe(height - 20);
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('inventory-button-short-touch.png'),
   });

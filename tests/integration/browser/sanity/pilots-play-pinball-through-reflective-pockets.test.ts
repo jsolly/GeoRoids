@@ -52,7 +52,21 @@ test.each([
         y: group.reduce((sum, rock) => sum + rock.position.y, 0) / 3,
       };
     });
-    await game.placeShipAt(pocket.x + 150 / Math.SQRT2, pocket.y + 150 / Math.SQRT2);
+    // Match the external inward-facet lane covered by the cluster physics test.
+    // Face down that lane before placement so automatic cruise cannot shift the
+    // launch sideways while the fixture snapshot arrives.
+    const approachAngle = (Math.PI * 3) / 10;
+    await page.evaluate((angle) => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Local pilot missing');
+      }
+      ship.angle = Math.PI - angle;
+    }, approachAngle);
+    await game.placeShipAt(
+      pocket.x + Math.cos(approachAngle) * 300,
+      pocket.y + Math.sin(approachAngle) * 300
+    );
     await game.armSpawnProtection();
     const field = await page.evaluateHandle<AuthoritativeProjectileField>(
       "import('/src/entities/laser/AuthoritativeProjectileField.ts').then(({ AuthoritativeProjectileField }) => AuthoritativeProjectileField.getInstance())"

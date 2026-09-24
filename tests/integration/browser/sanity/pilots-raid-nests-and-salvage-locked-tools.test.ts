@@ -40,8 +40,21 @@ for (const width of [1280, 390]) {
       );
     await expect.poll(async () => (await field()).spiders.length).toBe(10);
     await expect
-      .poll(async () => page.evaluate(() => window.gameController?.getLoot().length ?? 0))
-      .toBeGreaterThanOrEqual(7);
+      .poll(() =>
+        page.evaluate(() => {
+          const loot = window.gameController?.getLoot() ?? [];
+          return ['wreckage', 'shard', 'tap', 'silk'].map((kind) => ({
+            kind,
+            count: loot.filter((drop) => drop.kind === kind).length,
+          }));
+        })
+      )
+      .toEqual([
+        { kind: 'wreckage', count: 1 },
+        { kind: 'shard', count: 3 },
+        { kind: 'tap', count: 1 },
+        { kind: 'silk', count: 1 },
+      ]);
     await game.placeShipAt(5000, 4750);
     await game.waitForAnimationFrames(3);
     await page.screenshot({

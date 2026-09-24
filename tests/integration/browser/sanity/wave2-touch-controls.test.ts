@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import type { CDPSession } from 'playwright';
 import { expect, test } from 'vitest';
 
+import { GAME } from '../../../../src/constants';
+import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
 import { watchBrowserDiagnostics } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
@@ -566,8 +568,13 @@ test(
       .toBeGreaterThan(0);
     // Wait for the real cooldown. Resetting only the client can make the next
     // snapshot look like a successful second activation even if no click is sent.
+    // Mineral Scan's cooldown is longer than the default poll, so size the wait
+    // from the live duration and leave slack for a slightly slow browser loop.
+    const scoutCooldownMs = (SHIP_ABILITY.COOLDOWN_FRAMES.scout / GAME.FPS) * 1000;
     await expect
-      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames, { timeout: 15000 })
+      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames, {
+        timeout: scoutCooldownMs + 8000,
+      })
       .toBe(0);
     await ability.evaluate((element) => (element as HTMLButtonElement).click());
     await expect
@@ -578,5 +585,5 @@ test(
     expect(consoleState.errors).toEqual([]);
     expect(consoleState.warnings).toEqual([]);
   },
-  TestConfig.DEFAULT_TIMEOUT
+  TestConfig.DEFAULT_TIMEOUT * 2
 );

@@ -9,6 +9,7 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
@@ -31,7 +32,13 @@ test.each(['Shift', 'right-click'])(
     };
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
-    await game.placeShipAt(-2200, 650);
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    // This seeded route descends a steep east-facing slope, outside passages.
+    const slope = await page.evaluate(() =>
+      window.gameController?.getTerrainProbe({ x: 3090, y: 1150 })
+    );
+    expect(slope?.gradient.x).toBeGreaterThan(TERRAIN.TRAVEL_STEEP_GRADIENT);
+    await game.placeShipAt(3090, 1150);
     await game.armSpawnProtection();
     await page.evaluate(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;

@@ -1,6 +1,7 @@
 import { createLogRecord, stringifyLogRecord } from '../../shared/logRecords';
 import { LOGGING } from '../constants';
 import { getClientLogContext } from './clientLogContext';
+import { shouldForwardClientLog } from './logForwardPolicy';
 import { LogLevel, shouldEmitLog } from './logLevel';
 
 function describeForwardingFailure(error: unknown): string {
@@ -15,12 +16,18 @@ function levelName(level: LogLevel): 'debug' | 'info' | 'warn' | 'error' {
   return LogLevel[level].toLowerCase() as 'debug' | 'info' | 'warn' | 'error';
 }
 
+type LogForwarderModule = {
+  forwardLogToServer: (line: string) => void;
+  startClientLogForwarder: () => void;
+};
+
 class Logger {
   private static forwardingFailureReported = false;
   private static instance: Logger;
   private currentLevel: LogLevel;
   private readonly recentDiagnostics: string[] = [];
   private static isForwarderInitialized = false;
+  private static forwarderLoad: Promise<LogForwarderModule> | null = null;
 
   private constructor() {
     this.currentLevel = LogLevel.INFO;
@@ -109,18 +116,24 @@ class Logger {
       this.writeToConsole(level, line);
     }
 
-    const forwardState = level === LogLevel.INFO && category === 'STATE';
     if (
       LOGGING.FORWARD_TO_SERVER &&
-      (level <= LogLevel.WARN || forwardState) &&
-      category !== 'LOG_FORWARD'
+      shouldForwardClientLog(levelName(level), category, import.meta.env.PROD, message)
     ) {
       this.forwardToServer(line);
     }
   }
 
+  private loadForwarder(): Promise<LogForwarderModule> {
+    Logger.forwarderLoad ??= import('./logForwarder').catch((error: unknown) => {
+      Logger.forwarderLoad = null;
+      throw error;
+    });
+    return Logger.forwarderLoad;
+  }
+
   private forwardToServer(line: string): void {
-    import('./logForwarder')
+    this.loadForwarder()
       .then(({ forwardLogToServer, startClientLogForwarder }) => {
         if (!Logger.isForwarderInitialized) {
           startClientLogForwarder();

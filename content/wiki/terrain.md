@@ -40,7 +40,7 @@ Guards chase briefly and return home, while rare roaming hunters pursue farther.
 
 ## Survive a hunt
 
-One bite kills, so shoot the spider, escape its range, or reach a lit furnace's safe area. Mineral Scan repels spiders while they remain in range; probes and dark foundations offer no protection. A Scout can also [build a refuge during a chase](/wiki/#scout), even during tool cooldown or over a nest, to send living spiders fleeing.
+One bite kills, and one ordinary laser hit kills the spider; otherwise escape its range or reach a lit furnace's safe area. Mineral Scan repels spiders while they remain in range; probes and dark foundations offer no protection. A Scout can also [build a refuge during a chase](/wiki/#scout), even during tool cooldown or over a nest, to send living spiders fleeing.
 
 ## Spider tools
 

@@ -85,6 +85,10 @@ test.each([1280, 390])(
 
     await arrangeCrewField(ids, 'mining');
     await listener.placeShipAt(120, -460);
+    // The fixture response does not wait for the shooter's next snapshot.
+    await expect
+      .poll(async () => (await shooter.getAsteroidPositions()).map((asteroid) => asteroid.id))
+      .toContain('crew-fixture-ore');
     const rock = (await shooter.getAsteroidPositions()).find(
       (asteroid) => asteroid.id === 'crew-fixture-ore'
     );

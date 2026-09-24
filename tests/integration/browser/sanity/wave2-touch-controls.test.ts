@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import type { CDPSession } from 'playwright';
+import type { CDPSession, Page } from 'playwright';
 import { expect, test } from 'vitest';
 
 import { GAME } from '../../../../src/constants';
@@ -23,6 +23,64 @@ const KITS = [
   { kitId: 'scout' as const, label: 'SCAN', name: 'Mineral scan' },
   { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
 ];
+
+/** Observe real steering against the camera presented before each simulation step. */
+async function expectPointerSteering(page: Page, heading = Math.PI / 2): Promise<void> {
+  const camera = await page.evaluateHandle<
+    typeof import('../../../../src/rendering/canvasSurface').canvasManager
+  >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
+  try {
+    const steps = await camera.evaluate(
+      async (surface, { fps, heading: screenHeading }) => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        if (!ship) {
+          throw new Error('Missing ship while observing steering');
+        }
+        const original = ship.update;
+        const samples: Array<{ before: number; after: number; turn: number; budget: number }> = [];
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await new Promise<typeof samples>((resolve, reject) => {
+            deadline = setTimeout(() => reject(new Error('Steering steps stopped')), 3000);
+            ship.update = () => {
+              const desired = surface.getCameraRotation() + screenHeading;
+              const angle = ship.angle;
+              original.call(ship);
+              samples.push({
+                before: Math.atan2(Math.sin(angle - desired), Math.cos(angle - desired)),
+                after: Math.atan2(Math.sin(ship.angle - desired), Math.cos(ship.angle - desired)),
+                turn: Math.atan2(Math.sin(ship.angle - angle), Math.cos(ship.angle - angle)),
+                budget: (ship.turnSpeed * Math.PI) / (180 * fps),
+              });
+              if (samples.length === 8) {
+                ship.update = original;
+                resolve(samples);
+              }
+            };
+          });
+        } finally {
+          clearTimeout(deadline);
+          ship.update = original;
+        }
+      },
+      { fps: GAME.FPS, heading }
+    );
+    expect(steps).toHaveLength(8);
+    if (heading !== Math.PI / 2) {
+      expect(steps.some((step) => Math.abs(step.before) > 1e-9)).toBe(true);
+    }
+    for (const step of steps) {
+      expect(Math.abs(step.turn)).toBeLessThanOrEqual(step.budget + 1e-9);
+      if (Math.abs(step.before) <= step.budget) {
+        expect(step.after).toBeCloseTo(0, 9);
+      } else {
+        expect(Math.abs(step.after)).toBeLessThan(Math.abs(step.before));
+      }
+    }
+  } finally {
+    await camera.dispose();
+  }
+}
 
 async function tapTouchPoint(
   session: CDPSession,
@@ -81,6 +139,7 @@ test(
             );
           })
           .toBeGreaterThan(0.1);
+        await expectPointerSteering(page, point.turn < 0 ? 0 : Math.PI);
         expect((await readLocalTouchState(page)).thrusting).toBe(true);
         const afterTurn = await game.getShipAngle();
         const turned = Math.atan2(
@@ -90,14 +149,11 @@ test(
         expect(turned * point.turn).toBeGreaterThan(0.1);
       }
       await dispatchTouch(session, 'touchMove', [{ x: center.x, y: center.y - 100, id: 1 }]);
-      await game.waitForAnimationFrames(3);
-      const forwardAngle = await game.getShipAngle();
-      await game.waitForAnimationFrames(8);
-      expect(await game.getShipAngle()).toBeCloseTo(forwardAngle, 3);
+      await expectPointerSteering(page);
       const beforeRelease = await game.getShipPosition();
-      const releaseAngle = await game.getShipAngle();
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
+      const releaseAngle = await game.getShipAngle();
       await game.waitForAnimationFrames(12);
       const afterRelease = await game.getShipPosition();
       expect(
@@ -513,13 +569,12 @@ test(
     expect(Math.hypot(afterMove.x - beforeMove.x, afterMove.y - beforeMove.y)).toBeGreaterThan(5);
     const center = await centerOf(page, '#gameCanvas');
     await page.mouse.move(center.x, center.y - 120);
-    await game.waitForAnimationFrames(3);
+    await expectPointerSteering(page);
     const forwardAngle = await game.getShipAngle();
-    await game.waitForAnimationFrames(8);
-    expect(await game.getShipAngle()).toBeCloseTo(forwardAngle, 3);
     await page.keyboard.down('ArrowRight');
     await game.waitForAnimationFrames(8);
     await page.keyboard.up('ArrowRight');
+    await page.mouse.move(center.x, center.y);
     const keyboardAngle = await game.getShipAngle();
     expect(Math.abs(keyboardAngle - forwardAngle)).toBeGreaterThan(0.1);
     await page.mouse.down({ button: 'right' });

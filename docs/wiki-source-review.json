@@ -1,5 +1,5 @@
 {
-  "note": "Travel-up controls/maps and current terrain/laser rules reviewed. Focused desktop/mobile GPS, terrain, maps and pinball scenarios passed. Respawn setup uses the existing isolated real asteroid-impact fixture and requires the authoritative death event, captured death location, nearest-furnace placement and restored health; removed obsolete roaming collision setup. No gameplay rules or demonstrations changed by this fixture repair.",
+  "note": "Reviewed touch steering and universe-map observer test changes. Controls and HUD already describe travel-up camera, screen-relative steering, stopped course, and map crew coordinates. No gameplay or illustration changes; existing desktop/mobile Wiki verification remains applicable. Type and lint checks pass; browser map cases pass; touch correction has independent test review and awaits focused execution.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -323,7 +323,7 @@
     "src/wiki/wiki.css": "sha256:d47f0c7fb925815758b7578ba53df525f58aa0d6da11a8f08992fae3c55edf58",
     "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts": "sha256:8c313209bb56ae2925811a5c6e7b57e3dbc4d701f3ad58fd831a0566b9dab12e",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts": "sha256:f59c33b77ae06e973130ea52cdd9c67178b7a9ca7fd6dc3769a3590a42ff944f",
-    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:0bc8cfa79fd49d971e05635d72f972608c0a56c7c40bb627a7b90f1900f31f30",
+    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:fc4ae564e41042142dfd8078e198433752dc56110e0735fe6730fad41b49a4d5",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts": "sha256:34656068a72756ad516a7caa35762ed70ae32e2c60e35776b3c54812f06b1fc2",
     "tests/integration/browser/e2e/hauler-extracts-silk-and-tows-spiders-into-furnaces.test.ts": "sha256:1bcb9c236a071757228f07ed30327b85f7a07978c09f5d24155b01ab9c8c0f5e",
     "tests/integration/browser/e2e/menus-hold-the-ship-still-and-protect-it.test.ts": "sha256:9389833bd033dacf3c6b2624aaa45f160ad58778060b0121028ccdd01a2a3934",
@@ -352,7 +352,7 @@
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:1c6991fb8f632d71bdad1e812b206c96a6e23eaf1cb3c77b60c60bfd378a94f4",
     "tests/integration/browser/sanity/terrain-colors-explain-the-slope.test.ts": "sha256:929fe85660f212aa76c93c968c9b6773c322bd53ef2cb8084ce62c0eb80baa16",
     "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:b22eba8d0cef3cc85d1e199df52bf20117b0b9957aef2bfa4680db84c31c9c3b",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:69b96be7cab788f254ceff218281e9aea4aadec0ea1d634050ef5e01a0ca4676",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:2d708174c8909ad4f23dd0ce17a2dc6fcef21f5fce679de1bba9eb543333e558",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:d7c87bc468f141449e4b4765b2cf497e9613f3d720928126aaae31b096cf74ab",
     "tests/integration/entities/input/mouse.test.ts": "sha256:13cdacd658260eb109b4cdb8a7f133aa3ff40a849a045c9716745619195340ee",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:363eba19780882950818c5a68647315713ac938321eca197641eb642f7ff07c2",

@@ -69,6 +69,8 @@ test.each([
       path: screenshotManager.getScreenshotPath(`satellite-loose-${capture}.png`),
     });
     const scoreBefore = await game.getScore();
+    const cargoBefore = await page.evaluate(() => window.gameController?.getCurrPlayer()?.cargo);
+    assert.ok(cargoBefore !== undefined);
     const pickupSound = await page.evaluate(async () => {
       const context = new OfflineAudioContext(1, 1, 48000);
       const response = await fetch('/sounds/orbital-pickup.m4a');
@@ -221,11 +223,12 @@ test.each([
     await page.getByRole('button', { name: 'Return to flight', exact: true }).click();
 
     await expect
-      .poll(async () => game.getScore(), {
+      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.cargo), {
         timeout: 8000,
-        message: 'collecting a satellite pickup should award points',
+        message: 'collecting a satellite pickup should fill point cargo',
       })
-      .toBeGreaterThanOrEqual(scoreBefore + SATELLITE_PICKUP.SCORE_BONUS);
+      .toBe(cargoBefore + SATELLITE_PICKUP.SCORE_BONUS);
+    expect(await game.getScore()).toBe(scoreBefore);
     const attached = (await game.getSatellitePickups()).find((pickup) => pickup.id === target.id);
     assert.ok(attached);
     expect(attached.health).toBeGreaterThan(0);

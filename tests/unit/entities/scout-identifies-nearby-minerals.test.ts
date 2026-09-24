@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { GAME } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { activateAbilityOnHost, tickAbilityHost } from '../../../src/entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
@@ -15,6 +16,10 @@ test('Scout scan identifies nearby minerals then expires without changing motion
   };
   expect(scannedMaterial(ship, rock)).toBeUndefined();
   expect(activateAbilityOnHost(ship).activated).toBe(true);
+  expect(SHIP_ABILITY.SCAN_FRAMES).toBe(2 * GAME.FPS);
+  expect(SHIP_ABILITY.COOLDOWN_FRAMES.scout).toBe(20 * GAME.FPS);
+  expect(ship.abilityActiveFrames).toBe(2 * GAME.FPS);
+  expect(ship.abilityCooldownFrames).toBe(20 * GAME.FPS);
   expect(ship.velocity).toEqual({ x: 1, y: 0.25 });
   expect(scannedMaterial(ship, rock)).toBe('metal');
   expect(
@@ -25,6 +30,7 @@ test('Scout scan identifies nearby minerals then expires without changing motion
     tickAbilityHost(ship);
   }
   expect(scannedMaterial(ship, rock)).toBeUndefined();
+  expect(ship.abilityCooldownFrames).toBe(20 * GAME.FPS - 2 * GAME.FPS);
   expect(activateAbilityOnHost(ship).activated).toBe(false);
   while (ship.abilityCooldownFrames > 0) {
     tickAbilityHost(ship);

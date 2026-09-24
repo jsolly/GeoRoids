@@ -111,4 +111,10 @@ test('boost chrome exposes active drain, empty tank, and interruptible recharge 
   expect(boost?.getAttribute('aria-disabled')).toBe('false');
   expect(boost?.disabled).toBe(false);
   expect(boost?.dataset['boostPhase']).toBe('idle');
+
+  player.ship.boost = { phase: 'idle', charge: 1 };
+  tickTouchControls(player);
+  expect(boost?.textContent).toBe('BOOST');
+  expect(boost?.getAttribute('aria-label')).toBe('Start boost, fully charged');
+  expect(boost?.disabled).toBe(false);
 });

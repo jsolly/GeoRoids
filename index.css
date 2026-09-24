@@ -529,6 +529,7 @@
     width: 28px;
     justify-items: center;
     gap: 3px;
+    transform-origin: center;
     color: var(--palette-hud, #e2e8f0);
     font-family: "Courier New", ui-monospace, monospace;
     font-size: 0.6rem;

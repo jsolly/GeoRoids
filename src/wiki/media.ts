@@ -12,9 +12,9 @@ interface WikiMediaEntry {
 export const media: Record<string, WikiMediaEntry> = {
   scout: {
     title: 'Scout shared mineral scan',
-    alt: 'A Scout activates a range-limited scan while a teammate radar receives ice, metal, and rubble marks for the same rocks.',
+    alt: 'A Scout sends one mineral-scan pulse. A teammate radar receives ice, metal, and rubble marks, and those marks remain after the pulse ends.',
     caption:
-      'Press E to classify nearby rocks on every teammate radar. The scan also records the Scout as a contributor for a later furnace delivery.',
+      'Press E to send one pulse that classifies nearby rocks on every teammate radar. The tag stays after the pulse ends and records the Scout for a later furnace delivery.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/surveyScan.ts',

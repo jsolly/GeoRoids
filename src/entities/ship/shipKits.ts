@@ -46,10 +46,14 @@ export const SHIP_ABILITY = {
   TAP_EXTRACT_FRAMES: 90,
   TAP_EXTRACT_BURSTS: 4,
   SCAN_RANGE: 1200,
-  SCAN_FRAMES: 6 * GAME.FPS,
+  /** Mineral Scan fires this many radar pulses, then ends. */
+  SCAN_PULSES: 1,
+  /** Active classification window: one pulse at the previous per-pulse speed. */
+  SCAN_FRAMES: 2 * GAME.FPS,
   ASTEROID_DAMAGE_MULTIPLIER: 2,
   COOLDOWN_FRAMES: {
-    scout: 10 * GAME.FPS,
+    /** Time from activation until Mineral Scan can fire again. */
+    scout: 20 * GAME.FPS,
     hauler: 180,
   },
 } as const;

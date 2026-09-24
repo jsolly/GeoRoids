@@ -1,6 +1,6 @@
 # Varied isoline terrain
 
-The arena retains broad nearly level plains between seeded hills and valleys. Elevation combines smooth multi-scale noise with Gaussian landmarks. A flat spawn at the center keeps arriving pilots stable. Contours retain the original density while shallow winding cuts reshape narrow passages. Their labels use compressed relative elevations. Plains retain 1% of the original height variation; their contours remain visible but have trivial differences. Intervals are nonuniform, so contour spacing alone no longer measures steepness. Gameplay displays the original full contour density with one-pixel strokes and faint slate opacity. A 75-degree cone centered on steering heading colors local straight-line routes from the ship toward each segment: amber uphill, blue downhill, neutral flat/cross-slope. The cone fades over its outer five degrees; contours outside remain slate. Each segment projects its local gradient onto the direction from the ship, so colors can reverse beyond a crest; the preview does not simulate cross-slope drift. Contours have no travel text, arrow, or echo animation. Elevation labels retain their original spacing.
+The arena retains broad nearly level plains between seeded hills and valleys. Elevation combines smooth multi-scale noise with Gaussian landmarks. A flat spawn at the center keeps arriving pilots stable. Contours retain the original density while shallow winding cuts reshape narrow passages. Their labels use compressed relative elevations. Plains retain 1% of the original height variation; their contours remain visible but have trivial differences. Intervals are nonuniform, so contour spacing alone no longer measures steepness. Gameplay displays the original full contour density with one-pixel strokes and faint slate opacity. A 75-degree cone centered on steering heading shifts local straight-line routes along one slate gradient: darker uphill, lighter downhill, neutral flat/cross-slope. The cone fades over its outer five degrees; contours outside remain slate. Each segment projects its local gradient onto the direction from the ship, so colors can reverse beyond a crest; the preview does not simulate cross-slope drift. Contours have no travel text, arrow, or echo animation. Elevation labels retain their original spacing.
 
 The generator smoothly compresses a low-relief band while retaining tiny variations. Existing world seed, saved progress and world generation remain unchanged.
 
@@ -11,8 +11,7 @@ height mapping, preserving the landscape outside the cuts. Alignment in either
 direction blends normal terrain travel toward 1.5× cruise using the fourth power
 of the tangent dot product. The advantage fades across each edge and when
 turning across the route. Intersections take the larger alignment rather than
-summing bonuses. A bright violet tint and faint glow on passage contours remains visible in every direction;
-meaningful amber/blue slope previews take priority in the forward cone. Passage
+summing bonuses. Passage contours use the light end of that same slate gradient in every direction, including where the cut climbs. Passage
 strength is cached with each contour gradient. No route membership, wind, or
 auto-steering is stored. The
 starter area and world edge smoothly disable passages. Local speed validation

@@ -8,14 +8,19 @@ import {
 } from '../../../src/rendering/contourAppearance';
 import { contourSlope } from '../../../src/rendering/contourDisplay';
 
-test('climbing is amber, descending blue, and near-flat travel stays neutral', () => {
-  expect(contourSlopeColor(0, 0.75, 1)).toBe('rgba(179, 136, 255, 0.75)');
-  expect(contourSlopeColor(1, 0.55, 1)).toBe(contourSlopeColor(1, 0.55));
-  expect(contourSlopeColor(-1, 0.55, 1)).toBe(contourSlopeColor(-1, 0.55));
-  expect(contourSlopeColor(1, 0.55)).toBe('rgba(220, 164, 91, 0.55)');
-  expect(contourSlopeColor(-1, 0.55)).toBe('rgba(103, 168, 223, 0.55)');
+test('climbs use the dark end of one slate ramp and shortcuts stay on the light end', () => {
+  const climb = contourSlopeColor(TERRAIN.TRAVEL_STEEP_GRADIENT, 0.55);
+  const descent = contourSlopeColor(-TERRAIN.TRAVEL_STEEP_GRADIENT, 0.55);
+  expect(climb).toBe('rgba(78, 91, 106, 0.55)');
+  expect(descent).toBe('rgba(173, 183, 194, 0.55)');
+  expect(contourSlopeColor(1, 0.55)).toBe(climb);
+  expect(contourSlopeColor(-1, 0.55)).toBe(descent);
+  expect(contourSlopeColor(0, 0.75, 1)).toBe('rgba(173, 183, 194, 0.75)');
+  expect(contourSlopeColor(TERRAIN.TRAVEL_STEEP_GRADIENT, 0.55, 1)).toBe(descent);
+  expect(contourSlopeColor(-TERRAIN.TRAVEL_STEEP_GRADIENT, 0.55, 1)).toBe(descent);
+  expect(contourSlopeColor(TERRAIN.TRAVEL_STEEP_GRADIENT, 0.55, 0.5)).not.toBe(climb);
   expect(contourSlopeColor(0.0001, 0.55)).toBe(contourSlopeColor(-0.0001, 0.55));
-  expect(contourSlopeColor(0.001, 0.55)).not.toBe(contourSlopeColor(1, 0.55));
+  expect(contourSlopeColor(0.001, 0.55)).not.toBe(climb);
   expect(contourSlopeColor(0.00020001, 0.55)).toBe(contourSlopeColor(0, 0.55));
 });
 

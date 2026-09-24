@@ -5,7 +5,7 @@ import type { ContourLevel } from '../physics/terrain/contours';
 import { getTerrainContours, getTerrainField } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
-import { contourSlopeColor, previewConeWeight, radialSlope } from './contourAppearance';
+import { contourSlopeHex, previewConeWeight, radialSlope } from './contourAppearance';
 import { contourSlope } from './contourDisplay';
 import { drawContourLabels } from './contourLabels';
 import { contourCandidates } from './contourSpatialIndex';
@@ -95,10 +95,9 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
       ctx.beginPath();
       ctx.moveTo(ax, ay);
       ctx.lineTo(bx, by);
-      ctx.strokeStyle = contourSlopeColor(
-        weight > 0 ? climb : 0,
-        Math.max(0.62 * weight, 0.7 * slope.passage),
-        slope.passage
+      ctx.strokeStyle = hexToRgba(
+        contourSlopeHex(weight > 0 ? climb : 0, slope.passage),
+        Math.max(0.92 * weight, 0.95 * slope.passage)
       );
       ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH;
       ctx.stroke();

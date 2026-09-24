@@ -9,7 +9,7 @@ New hex roles only. **Do not rename** locked playfield hexes in `style-guide.md`
 | Role | Hex | Use |
 | ------ | ----- | ----- |
 | `loot` | `#E8D5A3` | Tiny outline loot diamonds / chips (cream–muted gold) |
-| `terrain_contour` | `#5A6B7D` | Muted iso-contour lines (hud_muted / stars family) |
+| `terrain_contour` | `#4A1016` | Quiet dark-red iso-contour ink; the slope ramp runs lighter and darker |
 
 ## Locked playfield (unchanged — reference)
 

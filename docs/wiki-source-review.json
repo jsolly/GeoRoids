@@ -1,5 +1,5 @@
 {
-  "note": "Scout Mineral Scan is one two-second radar pulse, then a 20-second cooldown. Reviewed the Scout article, generated reference, and scout demonstration: one cyan pulse classifies ice, metal, and rubble, and the marks remain after the pulse ends.",
+  "note": "A full Boost button now reads BOOST instead of READY. The field manual already describes the Boost button and its charge without naming that caption, so no article text changed.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -215,7 +215,7 @@
     "src/input/playfieldSelection.ts": "sha256:d9407d0b91d5e8e33a1446799e928e06111d031ff74ce69e1bbb5581e19db03f",
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:f5808b60d276a089abc0f5484e3c2bbdf0d1e6c1d78843ea8dea88a945f8fcf6",
-    "src/input/touchControls.ts": "sha256:28cbeeeb502aeca54553c6c2ccc5da3dfafced2a19c2da45e24c9fb4e9a258f9",
+    "src/input/touchControls.ts": "sha256:7f4ddbebf13dfa01403a281277c19ce94b63f69762f68dd2f445c51b767046a9",
     "src/network/networkManager.ts": "sha256:c14f58186a878ca92fd1796aaee3b412f71ca908f22c6276dc097bdbd9f6d6ed",
     "src/network/services/ConnectionManager.ts": "sha256:2a3f8e4d65ab765c20e1197141329a7718d59eef318fb472945d062a12105b95",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:6b295647a937231f7fd8f982536ab6d515439514249f2127c243a164dca15fe7",
@@ -332,7 +332,7 @@
     "tests/integration/browser/e2e/ship-respawns-near-furnace-after-asteroid-death.test.ts": "sha256:6829e7101a0502523498777b221f6675453b0ed2c474e79896b4a040a8a7a204",
     "tests/integration/browser/e2e/ship-respawns-near-furnace-after-boundary-death.test.ts": "sha256:6e11f0a59b1a78516db1d4d5853006b6da9e40b14bcd198f91f42d2d3baafc84",
     "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts": "sha256:0346a3576543626db5b530f3daf3cd8a2d61e69669dbf6cbcf57a823af30251d",
-    "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts": "sha256:e131bd68740859270695f7e3dcca51fdd486bb04930876606499cd1c1f3c8b50",
+    "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts": "sha256:2a790caa8e1e2be564839672364c3a386821b099ff0b0bf13cf67da784293c3b",
     "tests/integration/browser/sanity/boost-stacks-with-downhill-speed-and-toggles-off.test.ts": "sha256:5c684fc1430aefaaaa1ffef9aba332c4ae9184ffd2df698a0a8b58156bed320d",
     "tests/integration/browser/sanity/crew-scoreboard-lists-pilots.test.ts": "sha256:6984b580d480e64fc884ef39ef3f65f64f7dc23d9c8668e2bc01dd4484c17933",
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:2e0d0d0f52719ed039b0891cc7d145cc0d3195291c539e85f25f9ea21511b36c",

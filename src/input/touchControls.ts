@@ -314,7 +314,7 @@ function syncBoostChrome(player: Player): void {
   }
   lastBoostChromeKey = key;
   const ready = state.phase === 'idle' && charge >= 1;
-  let text = ready ? 'READY' : `RECHARGING ${percent}%`;
+  let text = ready ? 'BOOST' : `RECHARGING ${percent}%`;
   let label = active
     ? `Stop boost, ${percent}% charge remaining`
     : ready

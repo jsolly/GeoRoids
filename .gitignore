@@ -50,3 +50,6 @@ dist/*
 
 # Local persistent world (SQLite database and journals)
 /.data/
+
+# Production smoke diagnostics
+production-smoke-artifacts/

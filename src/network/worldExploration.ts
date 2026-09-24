@@ -1,9 +1,20 @@
+import { emptySettlement } from '../../shared/economy';
 import { EMPTY_EXPLORATION } from '../../shared/exploration';
-import type { ExplorationTile, MapAsset } from '../../shared-types';
+import { FurnaceField } from '../../shared/furnaceField';
+import type { ExplorationTile, MapAsset, SettlementState } from '../../shared-types';
+
+export const worldFurnaces = new FurnaceField();
+
+let settlement = emptySettlement();
+export function getSettlement(): SettlementState {
+  return settlement;
+}
+export function setSettlement(value: SettlementState): void {
+  settlement = value;
+}
 
 let exploration: ExplorationTile[] = EMPTY_EXPLORATION;
 let mapAssets: MapAsset[] = [];
-let completedSectors = new Set<string>();
 
 export function getWorldMapAssets(): readonly MapAsset[] {
   return mapAssets;
@@ -36,16 +47,9 @@ export function setWorldExploration(value: ExplorationTile[]): void {
   exploration = value;
 }
 
-export function getCompletedSectors(): ReadonlySet<string> {
-  return completedSectors;
-}
-
-export function setCompletedSectors(ids: readonly string[]): void {
-  completedSectors = new Set(ids);
-}
-
 export function resetWorldExploration(): void {
+  worldFurnaces.replaceLit([]);
+  settlement = emptySettlement();
   mapAssets = [];
   exploration = EMPTY_EXPLORATION;
-  completedSectors = new Set();
 }

@@ -1,16 +1,14 @@
 import type { ShipKitId } from '../../../shared-types';
-import { NetworkManager } from '../../network/networkManager';
 import { logger } from '../../utils/Logger';
 import { entityFactory } from '../EntityFactory';
 import type { Player } from './Player';
+import { requirePlayerNetworkPort } from './playerNetworkPort';
 
 class PlayerManager {
   private static instance: PlayerManager;
-  private networkManager: NetworkManager;
+  private localPlayer: Player | null = null;
 
-  private constructor() {
-    this.networkManager = NetworkManager.getInstance();
-  }
+  private constructor() {}
 
   public static getInstance(): PlayerManager {
     if (!PlayerManager.instance) {
@@ -20,16 +18,11 @@ class PlayerManager {
   }
 
   public getNonLocalPlayers(): Player[] {
-    // Return all players except the local player
-    const allPlayers = this.networkManager.getAllPlayers();
+    const allPlayers = requirePlayerNetworkPort().getAllPlayers();
     return allPlayers.filter((p) => p.type !== 'local');
   }
 
-  // Local player management
-  private localPlayer: Player | null = null;
-
   public createLocalPlayer(kitId?: ShipKitId): Player {
-    // Use EntityFactory to ensure proper positioning based on DEBUG settings
     const player = entityFactory.createLocalPlayer('Player', undefined, kitId);
     this.localPlayer = player;
     return player;
@@ -51,12 +44,12 @@ class PlayerManager {
     } else {
       logger.warn('PLAYER', 'Cannot set player name - no local player exists');
     }
-    this.networkManager.setLocalPlayerName(name);
+    requirePlayerNetworkPort().setLocalPlayerName(name);
   }
 
   public updateNetworkState(): void {
     if (this.localPlayer) {
-      this.networkManager.updatePlayerState(this.localPlayer.getStateForNetwork());
+      requirePlayerNetworkPort().updatePlayerState(this.localPlayer.getStateForNetwork());
     }
   }
 }

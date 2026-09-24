@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { drawStarfield } from '../../../src/rendering/starfield';
 
 const view = vi.hoisted(() => ({ width: 1920, height: 1080, scale: 1, points: [] as number[][] }));
-vi.mock('../../../src/rendering/canvas', () => ({
+vi.mock('../../../src/rendering/canvasSurface', () => ({
   canvasManager: {
     getCanvas: () => ({}),
     getContext: () => ({

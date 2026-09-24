@@ -1,6 +1,12 @@
 import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+// Audio unit tests must not connect to a developer's running game server.
+vi.mock('../../../src/utils/logForwarder', () => ({
+  startClientLogForwarder: vi.fn(),
+  forwardLogToServer: vi.fn(),
+}));
+
 class FakeHowl {
   static instances: FakeHowl[] = [];
   readonly voices = new Map<number, { volume: number; rate: number }>();
@@ -34,6 +40,12 @@ class FakeHowl {
       voice.rate = value;
     }
   }
+  pos = vi.fn();
+  off = vi.fn();
+  unload = vi.fn(() => {
+    this.voices.clear();
+    this.loaded = false;
+  });
   end(id: number) {
     if (!this.options.loop) {
       this.voices.delete(id);
@@ -48,11 +60,17 @@ class FakeContext extends EventTarget {
   currentTime = 0;
   sampleRate = 48000;
   destination = {};
-  resume = vi.fn(async () => {
+  resume = vi.fn((): Promise<void> => {
     this.changeState('running');
+    return Promise.resolve();
   });
-  suspend = vi.fn(async () => {
+  suspend = vi.fn((): Promise<void> => {
     this.changeState('suspended');
+    return Promise.resolve();
+  });
+  close = vi.fn((): Promise<void> => {
+    this.changeState('closed');
+    return Promise.resolve();
   });
   constructor() {
     super();
@@ -63,7 +81,7 @@ class FakeContext extends EventTarget {
     this.dispatchEvent(new Event('statechange'));
   }
   createGain() {
-    return { connect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
+    return { connect: vi.fn(), disconnect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
   }
   createBuffer() {
     return {};
@@ -76,6 +94,8 @@ class FakeContext extends EventTarget {
 let Sound: typeof import('../../../src/audio/Sound').Sound;
 let setSound: typeof import('../../../src/audio/Sound').setSound;
 let activateAudio: typeof import('../../../src/audio/audioRuntime').activateAudio;
+let readAudioDiagnostics: typeof import('../../../src/audio/audioRuntime').readAudioDiagnostics;
+let logger: typeof import('../../../src/utils/Logger').logger;
 let loadLibrary = vi.fn();
 let globalAudio: { state: string; mute: ReturnType<typeof vi.fn> };
 let removeListeners: Array<() => void> = [];
@@ -93,6 +113,31 @@ function context() {
   }
   return ctx;
 }
+
+// Invoke the registered listener with a trusted-event double. Browser coverage
+// separately verifies that native gestures recover a frozen AudioContext.
+function trustedPointerDown(): void {
+  const listener = vi
+    .mocked(document.addEventListener)
+    .mock.calls.filter(([type]) => type === 'pointerdown')
+    .at(-1)?.[1];
+  if (typeof listener !== 'function') {
+    throw new Error('Expected audio gesture listener');
+  }
+  listener.call(
+    document,
+    new Proxy(new Event('pointerdown'), {
+      get(target, property, receiver) {
+        return property === 'isTrusted' ? true : Reflect.get(target, property, receiver);
+      },
+    })
+  );
+}
+
+function audioDeviceError(): DOMException {
+  return new DOMException('Failed to start the audio device', 'InvalidStateError');
+}
+
 function howl() {
   const sound = FakeHowl.instances[0];
   if (!sound) {
@@ -117,7 +162,8 @@ beforeEach(async () => {
   loadLibrary = vi.fn(() => ({ Howl: FakeHowl, Howler: globalAudio }));
   vi.doMock('howler', () => loadLibrary());
   ({ Sound, setSound } = await import('../../../src/audio/Sound'));
-  ({ activateAudio } = await import('../../../src/audio/audioRuntime'));
+  ({ activateAudio, readAudioDiagnostics } = await import('../../../src/audio/audioRuntime'));
+  ({ logger } = await import('../../../src/utils/Logger'));
 });
 
 afterEach(() => {
@@ -129,6 +175,89 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.doUnmock('howler');
+  vi.useRealTimers();
+});
+
+test('a stalled clock ignores synthetic input and trusted recovery drops old shots', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  sound.play();
+  const oldContext = context();
+  const oldHowl = howl();
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  // Reading diagnostics and waiting do not create a context outside a gesture.
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(FakeContext.instances).toHaveLength(1);
+  document.dispatchEvent(new Event('pointerdown'));
+  await settle();
+  expect(FakeContext.instances).toHaveLength(1);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  trustedPointerDown();
+  await settle();
+  expect(oldContext.close).toHaveBeenCalledOnce();
+  expect(oldHowl.unload).toHaveBeenCalledOnce();
+  expect(oldHowl.voices.size).toBe(0);
+  expect(FakeContext.instances).toHaveLength(2);
+  const nextHowl = FakeHowl.instances[1];
+  expect(nextHowl?.play).not.toHaveBeenCalled();
+  sound.play();
+  expect(nextHowl?.play).toHaveBeenCalledOnce();
+  expect(readAudioDiagnostics()).toMatchObject({
+    contextState: 'running',
+    contextRestarts: 1,
+    lastRestartReason: 'stalled-clock',
+  });
+});
+
+test('an advancing clock and a hidden tab never trigger audio reconstruction', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  setSound(true);
+  await settle();
+  context().currentTime = 1;
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(readAudioDiagnostics().clockProgress).toBe('advancing');
+  document.dispatchEvent(new Event('pointerdown'));
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(readAudioDiagnostics().clockProgress).toBe('not-observed');
+  trustedPointerDown();
+  expect(FakeContext.instances).toHaveLength(1);
+  hidden.mockReturnValue(false);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  document.dispatchEvent(new Event('pointerdown'));
+  expect(FakeContext.instances).toHaveLength(1);
+});
+
+test('a discarded pending resume cannot change the replacement audio session', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  setSound(true);
+  await settle();
+  const previous = context();
+  previous.changeState('suspended');
+  let rejectOldResume: (error: Error) => void = () => {};
+  previous.resume.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectOldResume = reject;
+      })
+  );
+  activateAudio();
+  expect(readAudioDiagnostics().resumePending).toBe(true);
+  previous.changeState('running');
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  trustedPointerDown();
+  await settle();
+  const before = readAudioDiagnostics();
+  rejectOldResume(audioDeviceError());
+  await settle();
+  expect(readAudioDiagnostics()).toEqual(before);
+  expect(readAudioDiagnostics()).toMatchObject({ contextState: 'running', resumePending: false });
 });
 
 test('cold muted construction and simulation allocate no library, context or media', async () => {
@@ -146,7 +275,7 @@ test('cold muted construction and simulation allocate no library, context or med
 });
 
 test('enabled gesture synchronously creates one context shared with lazy Howler', async () => {
-  new Sound('sounds/laser.m4a', 8);
+  void new Sound('sounds/laser.m4a', 8);
   setSound(true);
   expect(FakeContext.instances).toHaveLength(1);
   expect(context().resume).toHaveBeenCalledTimes(1);
@@ -176,16 +305,18 @@ test('active voice cap drops overflow and releases capacity when a shot ends', a
   expect(howl().voices.size).toBe(2);
 });
 
-test('overlapping shots vary pitch and volume independently', async () => {
+test('overlapping cues preserve tuning and per-voice volume; melody uses exact intervals', async () => {
   const sound = new Sound('sounds/laser.m4a', 2, 0.1);
   setSound(true);
   await settle();
-  vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
   await sound.play(1);
-  await sound.play(0.5);
-  expect(howl().voices.get(1)).toEqual({ volume: 0.1, rate: 0.9 });
+  expect(sound.playNote(0.5, 7)).toBe(true);
+  expect(howl().voices.get(1)).toEqual({ volume: 0.1, rate: 1 });
   expect(howl().voices.get(2)?.volume).toBe(0.05);
-  expect(howl().voices.get(2)?.rate).toBeCloseTo(1.1);
+  expect(howl().voices.get(2)?.rate).toBeCloseTo(2 ** (7 / 12));
+  expect(sound.playNote(1, 12)).toBe(false);
+  setSound(false);
+  expect(sound.playNote(1, 4)).toBe(false);
 });
 
 test('unloaded and interrupted shots are dropped without replay or hot-loop resumes', async () => {
@@ -213,7 +344,7 @@ test('unloaded and interrupted shots are dropped without replay or hot-loop resu
 });
 
 test('muting before lazy initialization completes prevents sample loads', async () => {
-  new Sound('sounds/laser.m4a', 2);
+  void new Sound('sounds/laser.m4a', 2);
   setSound(true);
   setSound(false);
   await settle();
@@ -234,6 +365,41 @@ test('late load completion after mute never replays old cues', async () => {
   await settle();
   expect(howl().play).not.toHaveBeenCalled();
   expect(context().state).toBe('suspended');
+});
+
+test('an interrupted tab does not resume until a gesture, and a failed lifecycle resume retries', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  const errors = vi.spyOn(logger, 'error');
+  const warnings = vi.spyOn(logger, 'warn');
+  setSound(true);
+  await settle();
+  await sound.play();
+  context().changeState('interrupted');
+  const resumesAfterInterrupt = context().resume.mock.calls.length;
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt);
+  expect(sound.isPlaying()).toBe(false);
+
+  context().changeState('suspended');
+  let rejectResume: (error: DOMException) => void = () => {};
+  context().resume.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectResume = reject;
+      })
+  );
+  document.dispatchEvent(new Event('visibilitychange'));
+  document.dispatchEvent(new Event('pointerdown'));
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 2);
+  rejectResume(audioDeviceError());
+  await settle();
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 2);
+  expect(context().state).toBe('running');
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(2);
+  expect(errors.mock.calls.some((call) => call[1] === 'Audio initialization failed')).toBe(false);
+  expect(warnings.mock.calls.some((call) => call[1] === 'Audio device start deferred')).toBe(true);
 });
 
 test('a pending resume that finishes after mute is suspended again', async () => {
@@ -303,4 +469,36 @@ test('a Howler transport fallback never starts HTML media playback', async () =>
   howl()._webAudio = false;
   await sound.play();
   expect(howl().play).not.toHaveBeenCalled();
+});
+
+test('simultaneous remote shots retain independent directions and local reuse recenters', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  expect(howl().options).toMatchObject({ pos: [0, 0, -1], panningModel: 'HRTF', rolloffFactor: 0 });
+  sound.play(1, { x: -200, y: 100 });
+  sound.play(1, { x: 200, y: -100 });
+  expect(howl().pos.mock.calls).toEqual([
+    [-2, 0, 1, 1],
+    [2, 0, -1, 2],
+  ]);
+  howl().end(1);
+  sound.play();
+  expect(howl().pos).toHaveBeenLastCalledWith(0, 0, -1, 3);
+});
+
+test('lifting a finger unlocks audio while an earlier resume never settles', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  context().changeState('suspended');
+  context().resume.mockImplementationOnce(() => new Promise<void>(() => {}));
+  document.dispatchEvent(new Event('visibilitychange'));
+  const attempts = context().resume.mock.calls.length;
+  document.dispatchEvent(new Event('touchend'));
+  expect(context().resume).toHaveBeenCalledTimes(attempts + 1);
+  expect(context().state).toBe('running');
+  await settle();
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(1);
 });

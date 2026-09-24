@@ -1,14 +1,30 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { Player } from '../../../src/entities/player/Player';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import {
+  FURNACE_MAP_CAMPFIRE_ZOOM,
+  FURNACE_MAP_FAR_ZOOM,
+} from '../../../src/rendering/hud/furnaceMapMark';
 import {
   clampUniverseMapZoom,
   closeUniverseMap,
+  DESKTOP_MAP_HELP,
   initializeUniverseMap,
   isUniverseMapOpen,
+  mapScreenDeltaToWorld,
   mapWorldToCanvas,
+  TOUCH_MAP_HELP,
   UNIVERSE_MAP_IDS,
+  UNIVERSE_MAP_LOCATE_LABEL,
   UNIVERSE_MAP_ZOOM,
+  universeMapHeadingRotation,
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
+
+const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
 
 describe('universe map play chrome', () => {
   const releaseInput = vi.fn();
@@ -49,9 +65,9 @@ describe('universe map play chrome', () => {
   });
 
   test('exposes an accessible native dialog and map toggle', () => {
-    const dialog = document.getElementById(UNIVERSE_MAP_IDS.dialog);
-    const toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle);
-    const mapCanvas = document.getElementById(UNIVERSE_MAP_IDS.canvas);
+    const dialog = document.querySelector(`#${UNIVERSE_MAP_IDS.dialog}`);
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`);
+    const mapCanvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`);
 
     expect(dialog?.tagName).toBe('DIALOG');
     expect(dialog?.getAttribute('aria-labelledby')).toBe('universe-map-title');
@@ -61,8 +77,8 @@ describe('universe map play chrome', () => {
   });
 
   test('opens from the map button, releases gameplay input, and closes with M or Escape', () => {
-    const toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement;
-    const dialog = document.getElementById(UNIVERSE_MAP_IDS.dialog) as HTMLDialogElement;
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
+    const dialog = document.querySelector(`#${UNIVERSE_MAP_IDS.dialog}`) as HTMLDialogElement;
     const opened = vi.fn();
     const closed = vi.fn();
     window.addEventListener('gameMapOpen', opened);
@@ -114,7 +130,7 @@ describe('universe map play chrome', () => {
   });
 
   test('holding M does not toggle repeatedly or capture name entry outside play', () => {
-    const toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement;
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
     toggle.click();
     document.dispatchEvent(
       new KeyboardEvent('keydown', { code: 'KeyM', repeat: true, bubbles: true })
@@ -139,7 +155,7 @@ describe('universe map play chrome', () => {
     });
     const report = vi.spyOn(logger, 'error').mockImplementation(() => {});
     const releasedBefore = releaseInput.mock.calls.length;
-    (document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement).click();
+    (document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement).click();
     expect(isUniverseMapOpen()).toBe(false);
     expect(releaseInput.mock.calls.length).toBe(releasedBefore);
     expect(report).toHaveBeenCalledWith('UI', 'Could not open the universe map', error);
@@ -149,8 +165,168 @@ describe('universe map play chrome', () => {
   test('keeps map zoom bounded and projects world coordinates from the active view', () => {
     expect(clampUniverseMapZoom(0)).toBe(UNIVERSE_MAP_ZOOM.min);
     expect(clampUniverseMapZoom(Number.POSITIVE_INFINITY)).toBe(UNIVERSE_MAP_ZOOM.max);
+    expect(FURNACE_MAP_CAMPFIRE_ZOOM).toBe(UNIVERSE_MAP_ZOOM.initial);
+    expect(FURNACE_MAP_FAR_ZOOM).toBe(UNIVERSE_MAP_ZOOM.min);
     expect(
       mapWorldToCanvas({ x: 100, y: -50 }, { x: 0, y: 0 }, { x: 20, y: 30, size: 400, scale: 2 })
     ).toEqual({ x: 420, y: 130 });
+  });
+
+  test('the chart keeps the ship nose up and slides north onto the compass', () => {
+    const frame = { x: 20, y: 30, size: 400, scale: 2 };
+    const center = { x: 0, y: 0 };
+    expect(universeMapHeadingRotation(Math.PI / 2)).toBe(0);
+    expect(universeMapHeadingRotation(undefined)).toBe(0);
+    expect(universeMapHeadingRotation(Number.NaN)).toBe(0);
+
+    const facingEast = universeMapHeadingRotation(0);
+    expect(facingEast).toBeCloseTo(-Math.PI / 2);
+    const ahead = mapWorldToCanvas({ x: 100, y: 0 }, center, frame, facingEast);
+    expect(ahead).toEqual({ x: 220, y: 30 });
+    const north = mapWorldToCanvas({ x: 0, y: -100 }, center, frame, facingEast);
+    expect(north.x).toBeCloseTo(20);
+    expect(north.y).toBeCloseTo(230);
+    const aheadPan = mapScreenDeltaToWorld(0, -40, 2, facingEast);
+    expect(aheadPan.x).toBeCloseTo(20);
+    expect(aheadPan.y).toBeCloseTo(0);
+
+    const pilot = new Player({
+      id: 'heading-pilot',
+      name: 'Heading Pilot',
+      type: 'local',
+      input: new MockPlayerInput(),
+    });
+    pilot.ship.angle = 0;
+    const localPlayer = vi
+      .spyOn(PlayerManager.getInstance(), 'getLocalPlayer')
+      .mockReturnValue(pilot);
+    try {
+      closeUniverseMap();
+      (document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement).click();
+      const compass = document.querySelector<HTMLElement>('.universe-map-compass');
+      expect(compass?.style.transform).toBe(`rotate(${-Math.PI / 2}rad)`);
+      closeUniverseMap();
+    } finally {
+      localPlayer.mockRestore();
+    }
+  });
+
+  test('the map compass is a North arrow only', () => {
+    const compass = document.querySelector('.universe-map-compass');
+    expect(compass).not.toBeNull();
+    expect(compass?.querySelectorAll('span')).toHaveLength(1);
+    expect(compass?.querySelector('i')).not.toBeNull();
+    expect(compass?.textContent?.trim()).toBe('N');
+    expect(compass?.textContent).not.toMatch(/E/u);
+
+    // Production HTML keeps the dialog in the page; createDialogMarkup early-returns.
+    const productionMatch = productionHtml.match(
+      /<div class="universe-map-compass"[^>]*>([\s\S]*?)<\/div>/u
+    );
+    expect(productionMatch?.[1]).toMatch(/<span>N<\/span>\s*<i><\/i>/u);
+    expect(productionMatch?.[1]).not.toMatch(/>E</u);
+  });
+
+  test('zoom and locate controls sit on the map and restore the nearby ship view', () => {
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
+    const locate = document.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement;
+    const zoomIn = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement;
+    const zoomOut = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement;
+    const zoomControls = document.querySelector('.universe-map-zoom') as HTMLElement;
+    const stage = document.querySelector('.universe-map-stage');
+    const headerActions = document.querySelector('.universe-map-actions');
+
+    expect(locate.parentElement).toBe(stage);
+    expect(zoomControls.parentElement).toBe(stage);
+    expect(zoomControls.contains(zoomIn)).toBe(true);
+    expect(zoomControls.contains(zoomOut)).toBe(true);
+    expect(headerActions?.contains(locate)).toBe(false);
+    expect(headerActions?.contains(zoomIn)).toBe(false);
+    expect(document.querySelector('#universe-map-zoom')).toBeNull();
+    expect(locate.getAttribute('aria-label')).toBe(UNIVERSE_MAP_LOCATE_LABEL);
+    expect(locate.querySelector('svg')).not.toBeNull();
+
+    const pilot = new Player({
+      id: 'map-pilot',
+      name: 'Map Pilot',
+      type: 'local',
+      input: new MockPlayerInput(),
+    });
+    pilot.ship.position.x = 4000;
+    pilot.ship.position.y = 0;
+    const localPlayer = vi
+      .spyOn(PlayerManager.getInstance(), 'getLocalPlayer')
+      .mockReturnValue(pilot);
+    try {
+      toggle.click();
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+      expect(locate.style.left).toMatch(/px$/u);
+      expect(locate.style.top).toMatch(/px$/u);
+      expect(zoomControls.style.left).toMatch(/px$/u);
+      expect(zoomControls.style.top).toMatch(/px$/u);
+
+      zoomIn.click();
+      expect(locate.getAttribute('aria-pressed')).toBe('false');
+
+      locate.click();
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+
+      zoomIn.click();
+      zoomOut.click();
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+
+      const mapCanvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement;
+      mapCanvas.focus();
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true, cancelable: true })
+      );
+      expect(locate.getAttribute('aria-pressed')).toBe('false');
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'Home', bubbles: true, cancelable: true })
+      );
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+      mapCanvas.focus();
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true, cancelable: true })
+      );
+      expect(locate.getAttribute('aria-pressed')).toBe('false');
+      locate.click();
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+      closeUniverseMap();
+    } finally {
+      localPlayer.mockRestore();
+    }
+  });
+
+  test('touch chrome hides keyboard badges and keeps Close as a button', () => {
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
+    const close = document.querySelector(`#${UNIVERSE_MAP_IDS.close}`) as HTMLButtonElement;
+    const dialog = document.querySelector(`#${UNIVERSE_MAP_IDS.dialog}`) as HTMLDialogElement;
+    const help = document.querySelector('.universe-map-help') as HTMLElement;
+    const innerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    try {
+      window.dispatchEvent(new Event('resize'));
+      expect(toggle.classList.contains('universe-map-touch')).toBe(true);
+      expect(dialog.classList.contains('universe-map-touch')).toBe(true);
+      expect(toggle.getAttribute('aria-label')).toBe('Open universe map');
+      expect(toggle.getAttribute('aria-keyshortcuts')).toBeNull();
+      expect(close.getAttribute('aria-label')).toBe('Close');
+      expect(help.textContent).toBe(TOUCH_MAP_HELP);
+      expect(help.textContent).not.toMatch(/Esc|Home/u);
+    } finally {
+      if (innerWidth) {
+        Object.defineProperty(window, 'innerWidth', innerWidth);
+      }
+      if (innerHeight) {
+        Object.defineProperty(window, 'innerHeight', innerHeight);
+      }
+      window.dispatchEvent(new Event('resize'));
+    }
+    expect(toggle.classList.contains('universe-map-touch')).toBe(false);
+    expect(toggle.getAttribute('aria-keyshortcuts')).toBe('M');
+    expect(help.textContent).toBe(DESKTOP_MAP_HELP);
   });
 });

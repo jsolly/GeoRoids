@@ -17,6 +17,9 @@ dist/*
 # Vercel local project metadata
 .vercel
 
+# Codex local environment metadata
+/.codex/
+
 # Railway CLI local link metadata; keep the tracked IaC source and README.
 .railway/*.json
 
@@ -48,3 +51,6 @@ dist/*
 
 # Local persistent world (SQLite database and journals)
 /.data/
+
+# Production smoke diagnostics
+production-smoke-artifacts/

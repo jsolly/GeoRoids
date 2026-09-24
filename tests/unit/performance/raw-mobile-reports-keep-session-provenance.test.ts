@@ -4,12 +4,14 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 
 const script = fileURLToPath(
   new URL('../../../scripts/compare-mobile-sessions.ts', import.meta.url)
 );
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fixtureManifest = { seed: 42, scenario: 'combat' };
 const fixtureHash = hash(fixtureManifest);
@@ -47,7 +49,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           osRelease: '1',
           arch: 'arm64',
           cpuModel: 'fixture',
-          browser: { name: 'chromium', version: '1', launchFlags: [] },
+          browser: { name: 'chromium', version: '1', launchFlags: [], headed: false },
           physicalDevice: false,
           measurementSource: 'emulated-touch',
           gpu: { supported: true },
@@ -61,6 +63,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           seed: 42,
           cpuSlowdown: 1,
           network: 'clean',
+          headed: false,
         },
       },
       details: {
@@ -192,7 +195,7 @@ test.each(['quality', 'product'] as const)(
       expect(result.sources).toHaveLength(12);
       expect(result.sources[0]).toMatchObject({
         path: join(directory, 'session-0.json'),
-        sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        sha256: expect.stringMatching(SHA256_HEX_PATTERN),
         workload: { fixtureHash, distributions: expect.any(Object) },
       });
       const path = join(directory, 'session-7.json');
@@ -237,6 +240,13 @@ test.each(['quality', 'product'] as const)(
         [
           (r: typeof original) => {
             r.metadata.environment.gpu = { supported: false };
+          },
+          'Device, viewport',
+        ],
+        [
+          (r: typeof original) => {
+            r.measurement.parameters.headed = true;
+            r.metadata.environment.browser.headed = true;
           },
           'Device, viewport',
         ],

@@ -8,15 +8,15 @@ export const SNAPSHOT_KEYFRAME_INTERVAL = 90;
 // Keep that keyframe admissible while bounding each socket's projected queue.
 export const SNAPSHOT_BACKPRESSURE_BYTES = 1024 * 1024;
 
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-type Row = { [key: string]: Json };
+type Json = null | boolean | number | string | Json[] | { [propertyKey: string]: Json };
+type Row = { [propertyKey: string]: Json };
 type ImmutableJson =
   | null
   | boolean
   | number
   | string
   | readonly ImmutableJson[]
-  | { readonly [key: string]: ImmutableJson };
+  | { readonly [propertyKey: string]: ImmutableJson };
 type Immutable<Value> = Json extends Value
   ? ImmutableJson
   : Value extends object
@@ -501,7 +501,12 @@ export class SnapshotDecoder {
     } catch (error) {
       return {
         kind: 'snapshot-rejected',
-        error: error instanceof Error ? error : new Error(String(error)),
+        error:
+          error instanceof Error
+            ? error
+            : new Error(typeof error === 'string' ? error : JSON.stringify(error), {
+                cause: error,
+              }),
         ...(metadata ? { metadata } : {}),
         ...(collectTimings
           ? { timings: { parseMs, decodeMs: performance.now() - decodeStarted } }

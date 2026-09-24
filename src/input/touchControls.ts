@@ -1,12 +1,10 @@
+import type { ShipBoostState } from '../../shared-types';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
-import { canvasManager } from '../rendering/canvas';
-import {
-  isPointerOnLocalHauler,
-  isShipSchematicOpen,
-  openShipSchematic,
-  SHIP_SCHEMATIC_LONG_PRESS_MS,
-} from '../ui/shipSchematic';
+import { canvasManager } from '../rendering/canvasSurface';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { isTownStoreOpen } from '../ui/townStoreState';
+import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
@@ -23,15 +21,105 @@ const TAP_MAX_MS = 220;
 const TAP_SLOP_PX = 12;
 let steerPointerId: number | null = null;
 let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
-let schematicHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
 let boostPointerId: number | null = null;
-let abilityButton: HTMLElement | null = null;
-let boostButton: HTMLElement | null = null;
+let abilityButton: HTMLButtonElement | null = null;
+let boostButton: HTMLButtonElement | null = null;
 let lastAbilityChromeKey = '';
 let lastBoostChromeKey = '';
+const TOUCH_BIND_SLOP_PX = 40;
+let touchListObserved = false;
+const liveTouchPoints = new Map<number, { x: number; y: number }>();
+let steerTouchId: number | null = null;
+let steerClientX = 0;
+let steerClientY = 0;
+
+export type TouchControlDiagnostics = {
+  pointerHeading: number | null;
+  touchFire: boolean;
+  steerPointerHeld: boolean;
+  liveTouches: number | null;
+};
+
+function liveTouchCount(): number | null {
+  return touchListObserved ? liveTouchPoints.size : null;
+}
+
+function resetTouchListTracking(): void {
+  touchListObserved = false;
+  liveTouchPoints.clear();
+}
+
+function touchIdNear(x: number, y: number): number | null {
+  let best: number | null = null;
+  let bestDist = TOUCH_BIND_SLOP_PX;
+  for (const [id, point] of liveTouchPoints) {
+    const dist = Math.hypot(point.x - x, point.y - y);
+    if (dist <= bestDist) {
+      best = id;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+function bindSteerTouch(): void {
+  if (steerPointerId === null) {
+    steerTouchId = null;
+    return;
+  }
+  if (steerTouchId !== null) {
+    // First bind wins. A missing id stays reserved so a nearby second finger
+    // or a returning thumb cannot steal steer until the next pointerdown.
+    return;
+  }
+  const nearby = touchIdNear(steerClientX, steerClientY);
+  if (nearby !== null) {
+    steerTouchId = nearby;
+    return;
+  }
+  if (liveTouchPoints.has(steerPointerId)) {
+    steerTouchId = steerPointerId;
+  }
+}
+
+function syncLiveTouches(ev: TouchEvent): void {
+  const touches = ev.touches;
+  if (!touches || typeof touches.length !== 'number') {
+    return;
+  }
+  touchListObserved = true;
+  liveTouchPoints.clear();
+  for (let i = 0; i < touches.length; i++) {
+    const touch =
+      typeof touches.item === 'function' ? touches.item(i) : (touches as unknown as Touch[])[i];
+    if (touch) {
+      liveTouchPoints.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
+    }
+  }
+  bindSteerTouch();
+}
+
+/** iOS can drop pointerup after capture while the live touch list still tells the truth. */
+function onTouchListChange(ev: TouchEvent): void {
+  syncLiveTouches(ev);
+  if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
+    resetTouchInteraction(requireLocalPlayer(), {
+      forgetTouches: false,
+    });
+  }
+}
+
+export function readTouchControlDiagnostics(): TouchControlDiagnostics {
+  return {
+    pointerHeading: controlSources.pointerHeading,
+    touchFire: controlSources.touchFire,
+    steerPointerHeld: steerPointerId !== null,
+    liveTouches: liveTouchCount(),
+  };
+}
 
 export function setTouchHeading(player: Player, heading: number | null): void {
   controlSources.pointerHeading = heading;
@@ -39,7 +127,7 @@ export function setTouchHeading(player: Player, heading: number | null): void {
 }
 
 export function setTouchFire(player: Player, held: boolean): void {
-  if (isShipSchematicOpen()) {
+  if (isShipSchematicOpen() || isTownStoreOpen()) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
     return;
@@ -50,7 +138,7 @@ export function setTouchFire(player: Player, held: boolean): void {
     return;
   }
 
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
     return;
@@ -61,26 +149,35 @@ export function setTouchFire(player: Player, held: boolean): void {
 }
 
 export function triggerTouchAbility(player: Player): boolean {
-  if (isShipSchematicOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (
+    isShipSchematicOpen() ||
+    isTownStoreOpen() ||
+    player.ship.health <= 0 ||
+    player.ship.exploding
+  ) {
     return false;
   }
   return player.ship.activateAbility();
 }
 
 function triggerTouchBoost(player: Player): boolean {
-  if (player.lives <= 0 || player.ship.exploding) {
-    player.ship.boosting = false;
+  if (!isInPlay() || isBoostMenuOpen() || player.ship.health <= 0 || player.ship.exploding) {
+    syncBoostChrome(player);
     return false;
   }
-  return player.ship.toggleBoost();
+  const active = player.ship.toggleBoost();
+  syncBoostChrome(player);
+  return active;
 }
 
 export function tickTouchControls(player: Player): void {
-  if (isTouchChromeVisible()) {
-    syncAbilityChrome(player);
+  if (isInPlay()) {
     syncBoostChrome(player);
+    if (isTouchChromeVisible()) {
+      syncAbilityChrome(player);
+    }
   }
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     resetTouchInteraction(player);
     return;
   }
@@ -94,6 +191,14 @@ function isTouchChromeVisible(): boolean {
   return typeof document !== 'undefined' && document.body.classList.contains('touch-play');
 }
 
+function isInPlay(): boolean {
+  return typeof document !== 'undefined' && document.body.classList.contains('in-play');
+}
+
+function isBoostMenuOpen(): boolean {
+  return isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
+}
+
 export function syncTouchChrome(
   inPlay = typeof document !== 'undefined' && document.body.classList.contains('in-play')
 ): void {
@@ -103,22 +208,32 @@ export function syncTouchChrome(
 
   const use = inPlay && shouldUseTouchControls();
   document.body.classList.toggle('touch-play', use);
-  const root = document.getElementById(ROOT_ID);
+  const root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
   if (root) {
-    root.hidden = !use;
-    root.setAttribute('aria-hidden', use ? 'false' : 'true');
+    root.hidden = !inPlay;
+    root.setAttribute('aria-hidden', inPlay ? 'false' : 'true');
+    root.classList.toggle('is-touch', use);
+    root.classList.toggle('is-desktop', inPlay && !use);
   }
-  if (!use) {
+  if (!inPlay) {
     resetTouchInteraction(requireLocalPlayer());
     lastAbilityChromeKey = '';
     lastBoostChromeKey = '';
     return;
   }
 
+  if (!use) {
+    // The desktop boost button shares this overlay, while touch steering and
+    // firing must release their pointer sources as soon as touch chrome hides.
+    resetTouchInteraction(requireLocalPlayer());
+  }
+
   const player = requireLocalPlayer();
   if (player) {
     reconcilePlayerInput(player);
-    syncAbilityChrome(player);
+    if (use) {
+      syncAbilityChrome(player);
+    }
     syncBoostChrome(player);
   } else {
     lastAbilityChromeKey = '';
@@ -127,16 +242,16 @@ export function syncTouchChrome(
 }
 
 function setAbilityPressed(pressed: boolean): void {
-  document.getElementById(ABILITY_ID)?.classList.toggle('is-pressed', pressed);
+  document.querySelector(`#${ABILITY_ID}`)?.classList.toggle('is-pressed', pressed);
 }
 
 function setBoostPressed(pressed: boolean): void {
-  document.getElementById(BOOST_ID)?.classList.toggle('is-pressed', pressed);
+  document.querySelector(`#${BOOST_ID}`)?.classList.toggle('is-pressed', pressed);
 }
 
-function getAbilityButton(): HTMLElement | null {
+function getAbilityButton(): HTMLButtonElement | null {
   if (!abilityButton?.isConnected) {
-    const next = document.getElementById(ABILITY_ID);
+    const next = document.querySelector<HTMLButtonElement>(`#${ABILITY_ID}`);
     if (next !== abilityButton) {
       abilityButton = next;
       lastAbilityChromeKey = '';
@@ -145,9 +260,9 @@ function getAbilityButton(): HTMLElement | null {
   return abilityButton;
 }
 
-function getBoostButton(): HTMLElement | null {
+function getBoostButton(): HTMLButtonElement | null {
   if (!boostButton?.isConnected) {
-    const next = document.getElementById(BOOST_ID);
+    const next = document.querySelector<HTMLButtonElement>(`#${BOOST_ID}`);
     if (next !== boostButton) {
       boostButton = next;
       lastBoostChromeKey = '';
@@ -169,6 +284,7 @@ function syncAbilityChrome(player: Player): void {
   lastAbilityChromeKey = key;
   button.textContent = state.label;
   button.setAttribute('aria-label', state.name);
+  button.title = state.name;
   button.setAttribute('aria-disabled', state.ready ? 'false' : 'true');
   button.classList.toggle('is-ready', state.ready);
   button.classList.toggle('is-cooling', state.cooling && !state.active);
@@ -182,19 +298,53 @@ function syncBoostChrome(player: Player): void {
   if (!button) {
     return;
   }
-  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
-  const active = alive && player.ship.boosting;
-  const key = `${alive}|${active}`;
+  const state: ShipBoostState = player.ship.boost;
+  const charge = state.charge;
+  const percent = Math.round(charge * 100);
+  const inPlay = isInPlay();
+  const alive = player.ship.health > 0 && !player.ship.exploding;
+  const menuOpen = isBoostMenuOpen();
+  const active = alive && state.phase === 'active' && player.ship.boosting;
+  const empty = charge <= 0;
+  const recharging = !active && charge < 1;
+  const disabled = !inPlay || !alive || menuOpen || empty;
+  const key = `${inPlay}|${alive}|${menuOpen}|${state.phase}|${charge.toFixed(3)}|${active}`;
   if (key === lastBoostChromeKey) {
     return;
   }
   lastBoostChromeKey = key;
-  button.textContent = 'BOOST';
-  button.setAttribute('aria-label', active ? 'Stop boost' : 'Boost');
+  const ready = state.phase === 'idle' && charge >= 1;
+  let text = ready ? 'BOOST' : `RECHARGING ${percent}%`;
+  let label = active
+    ? `Stop boost, ${percent}% charge remaining`
+    : ready
+      ? 'Start boost, fully charged'
+      : `Start boost, ${percent}% charge`;
+  if (active) {
+    text = `BOOSTING ${percent}%`;
+  }
+  if (!alive) {
+    text = 'BOOST OFF';
+    label = 'Boost unavailable while the ship is destroyed';
+  } else if (empty) {
+    label = 'Boost empty, recharging';
+  } else if (menuOpen) {
+    label = `Boost unavailable while a menu is open, ${percent}% charge`;
+  }
+  button.textContent = text;
+  button.setAttribute('aria-label', label);
   button.setAttribute('aria-pressed', active ? 'true' : 'false');
-  button.setAttribute('aria-disabled', alive ? 'false' : 'true');
+  button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+  button.disabled = disabled;
+  button.title = label;
+  button.dataset['boostPhase'] = state.phase;
+  button.dataset['boostCharge'] = charge.toFixed(3);
+  button.style.setProperty('--boost-charge', charge.toFixed(3));
   button.classList.toggle('is-active', active);
-  button.classList.toggle('is-unavailable', !alive);
+  button.classList.toggle('is-idle', state.phase === 'idle' && alive);
+  button.classList.toggle('is-recharging', recharging);
+  button.classList.toggle('is-exhausted', empty);
+  button.classList.toggle('is-unavailable', !alive || menuOpen);
 }
 
 function releasePointerCapture(element: HTMLElement | null, pointerId: number | null): void {
@@ -210,25 +360,18 @@ function clearSteerHoldTimer(): void {
   }
 }
 
-function clearSchematicHoldTimer(): void {
-  if (schematicHoldTimer !== null) {
-    clearTimeout(schematicHoldTimer);
-    schematicHoldTimer = null;
-  }
-}
-
 /** Clear every pointer source when the browser takes the gesture away. */
-function resetTouchInteraction(player: Player | null): void {
+function resetTouchInteraction(player: Player | null, options?: { forgetTouches?: boolean }): void {
   const canvas = canvasManager.getCanvas();
-  const ability = document.getElementById(ABILITY_ID);
-  const boost = document.getElementById(BOOST_ID);
+  const ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
+  const boost = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
   const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
   const activeBoostPointerId = boostPointerId;
   steerPointerId = null;
+  steerTouchId = null;
   clearSteerHoldTimer();
-  clearSchematicHoldTimer();
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
@@ -245,6 +388,9 @@ function resetTouchInteraction(player: Player | null): void {
   }
   setAbilityPressed(false);
   setBoostPressed(false);
+  if (options?.forgetTouches !== false) {
+    resetTouchListTracking();
+  }
 }
 
 function requireLocalPlayer(): Player | null {
@@ -253,10 +399,10 @@ function requireLocalPlayer(): Player | null {
 
 function ensureTouchDom(): {
   root: HTMLElement;
-  ability: HTMLElement;
-  boost: HTMLElement;
+  ability: HTMLButtonElement;
+  boost: HTMLButtonElement;
 } {
-  let root = document.getElementById(ROOT_ID);
+  let root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
   if (!root) {
     root = document.createElement('div');
     root.id = ROOT_ID;
@@ -266,7 +412,7 @@ function ensureTouchDom(): {
     document.body.appendChild(root);
   }
 
-  let ability = document.getElementById(ABILITY_ID);
+  let ability = document.querySelector<HTMLButtonElement>(`#${ABILITY_ID}`);
   if (!ability) {
     ability = document.createElement('button');
     ability.id = ABILITY_ID;
@@ -282,7 +428,7 @@ function ensureTouchDom(): {
     ability.setAttribute('aria-label', 'Ability');
   }
 
-  let boost = document.getElementById(BOOST_ID);
+  let boost = document.querySelector<HTMLButtonElement>(`#${BOOST_ID}`);
   if (!boost) {
     boost = document.createElement('button');
     boost.id = BOOST_ID;
@@ -291,15 +437,61 @@ function ensureTouchDom(): {
     boost.setAttribute('aria-label', 'Boost');
     boost.setAttribute('aria-pressed', 'false');
     boost.setAttribute('aria-disabled', 'true');
+    boost.disabled = true;
     boost.textContent = 'BOOST';
     root.appendChild(boost);
   }
   boost.setAttribute('type', 'button');
+  boost.disabled = true;
+  if (!boost.getAttribute('aria-disabled')) {
+    boost.setAttribute('aria-disabled', 'true');
+  }
   if (!boost.getAttribute('aria-label')) {
     boost.setAttribute('aria-label', 'Boost');
   }
 
   return { root, ability, boost };
+}
+
+function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): void {
+  const previous = steerPointerId;
+  steerPointerId = null;
+  steerTouchId = null;
+  clearSteerHoldTimer();
+  steerTap = null;
+  releasePointerCapture(canvas, previous);
+  setTouchHeading(player, null);
+}
+
+function beginSteerPointer(ev: PointerEvent): void {
+  steerPointerId = ev.pointerId;
+  steerClientX = ev.clientX;
+  steerClientY = ev.clientY;
+  bindSteerTouch();
+  steerTap =
+    firePointerId === null
+      ? { x: ev.clientX, y: ev.clientY, startedAt: ev.timeStamp, canFire: true }
+      : null;
+  if (steerTap) {
+    steerHoldTimer = setTimeout(() => {
+      steerHoldTimer = null;
+      steerTap = null;
+      moveSteering(ev);
+    }, TAP_MAX_MS);
+  } else {
+    moveSteering(ev);
+  }
+}
+
+function reservedSteerHasNoLiveFinger(): boolean {
+  if (steerPointerId === null || !touchListObserved) {
+    return false;
+  }
+  bindSteerTouch();
+  if (steerTouchId !== null) {
+    return !liveTouchPoints.has(steerTouchId);
+  }
+  return liveTouchPoints.size > 0 && touchIdNear(steerClientX, steerClientY) === null;
 }
 
 function onPlayfieldPointerDown(ev: PointerEvent): void {
@@ -308,46 +500,24 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
     return;
   }
   const player = requireLocalPlayer();
-  if (!player || player.lives <= 0 || player.ship.exploding) {
+  if (!player || player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
   ev.preventDefault();
   reconcilePlayerInput(player);
+  if (reservedSteerHasNoLiveFinger()) {
+    abandonSteerPointer(player, canvas);
+  }
   if (steerPointerId !== null) {
     if (steerTap) {
       moveSteering({ clientX: steerTap.x, clientY: steerTap.y });
     }
     clearSteerHoldTimer();
     steerTap = null;
-    onFirePointerDown(ev, canvas);
+    onFirePointerDown(ev);
     return;
   }
-  steerPointerId = ev.pointerId;
-  steerTap =
-    firePointerId === null
-      ? { x: ev.clientX, y: ev.clientY, startedAt: ev.timeStamp, canFire: true }
-      : null;
-  canvas.setPointerCapture(ev.pointerId);
-  if (steerTap) {
-    steerHoldTimer = setTimeout(() => {
-      steerHoldTimer = null;
-      steerTap = null;
-      moveSteering(ev);
-    }, TAP_MAX_MS);
-    if (isPointerOnLocalHauler(ev.clientX, ev.clientY)) {
-      schematicHoldTimer = setTimeout(() => {
-        schematicHoldTimer = null;
-        if (steerTap) {
-          steerTap.canFire = false;
-        }
-        if (openShipSchematic()) {
-          resetTouchInteraction(player);
-        }
-      }, SHIP_SCHEMATIC_LONG_PRESS_MS);
-    }
-  } else {
-    moveSteering(ev);
-  }
+  beginSteerPointer(ev);
 }
 
 function onSteerPointerMove(ev: PointerEvent): void {
@@ -359,14 +529,24 @@ function onSteerPointerMove(ev: PointerEvent): void {
     return;
   }
   clearSteerHoldTimer();
-  clearSchematicHoldTimer();
   steerTap = null;
   moveSteering(ev);
+}
+
+function shouldIgnoreLostCapture(ev: PointerEvent): boolean {
+  if (ev.type !== 'lostpointercapture') {
+    return false;
+  }
+  const touches = liveTouchCount();
+  return touches !== null && touches > 0;
 }
 
 function onPlayfieldPointerUp(ev: PointerEvent): void {
   if (ev.pointerId === firePointerId) {
     onFirePointerUp(ev);
+    return;
+  }
+  if (shouldIgnoreLostCapture(ev) && ev.pointerId === steerPointerId) {
     return;
   }
   if (ev.pointerId !== steerPointerId) {
@@ -380,8 +560,8 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
     ev.timeStamp - steerTap.startedAt <= TAP_MAX_MS &&
     Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX;
   steerPointerId = null;
+  steerTouchId = null;
   clearSteerHoldTimer();
-  clearSchematicHoldTimer();
   steerTap = null;
   releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
   const player = requireLocalPlayer();
@@ -402,6 +582,9 @@ function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
   if (!player || !canvas) {
     return;
   }
+  steerClientX = ev.clientX;
+  steerClientY = ev.clientY;
+  bindSteerTouch();
   const rect = canvas.getBoundingClientRect();
   // CSS pixels keep the resting zone the same physical size at every device DPR.
   const dx = ev.clientX - rect.left - rect.width / 2;
@@ -409,13 +592,12 @@ function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
   setTouchHeading(player, pointerHeadingFromCenter(dx, dy, player.ship.r));
 }
 
-function onFirePointerDown(ev: PointerEvent, canvas: HTMLCanvasElement): void {
+function onFirePointerDown(ev: PointerEvent): void {
   if (firePointerId !== null) {
     return;
   }
   ev.preventDefault();
   firePointerId = ev.pointerId;
-  canvas.setPointerCapture(ev.pointerId);
   const player = requireLocalPlayer();
   if (player) {
     setTouchFire(player, true);
@@ -444,6 +626,7 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
     return;
   }
   ev.preventDefault();
+  ev.stopPropagation();
   if (steerTap) {
     steerTap.canFire = false;
   }
@@ -462,6 +645,7 @@ function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
     return;
   }
   ev.preventDefault();
+  ev.stopPropagation();
   abilityPointerId = null;
   releasePointerCapture(ability, ev.pointerId);
   setAbilityPressed(false);
@@ -473,19 +657,21 @@ function onAbilityClick(ev: MouseEvent): void {
   if (ev.detail !== 0) {
     return;
   }
+  ev.preventDefault();
+  ev.stopPropagation();
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchAbility(player);
     syncAbilityChrome(player);
   }
-  ev.stopPropagation();
 }
 
 function onBoostPointerDown(ev: PointerEvent, boost: HTMLElement): void {
-  if (boostPointerId !== null) {
+  if (boostPointerId !== null || boost.matches(':disabled')) {
     return;
   }
   ev.preventDefault();
+  ev.stopPropagation();
   if (steerTap) {
     steerTap.canFire = false;
   }
@@ -504,6 +690,7 @@ function onBoostPointerUp(ev: PointerEvent, boost: HTMLElement): void {
     return;
   }
   ev.preventDefault();
+  ev.stopPropagation();
   boostPointerId = null;
   releasePointerCapture(boost, ev.pointerId);
   setBoostPressed(false);
@@ -513,6 +700,8 @@ function onBoostClick(ev: MouseEvent): void {
   if (ev.detail !== 0) {
     return;
   }
+  ev.preventDefault();
+  ev.stopPropagation();
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchBoost(player);
@@ -544,6 +733,9 @@ export function initializeTouchControls(): void {
   document.addEventListener('pointerup', onPlayfieldPointerUp);
   document.addEventListener('pointercancel', onPlayfieldPointerUp);
   document.addEventListener('lostpointercapture', onPlayfieldPointerUp);
+  document.addEventListener('touchstart', onTouchListChange, { capture: true, passive: true });
+  document.addEventListener('touchend', onTouchListChange, { capture: true, passive: true });
+  document.addEventListener('touchcancel', onTouchListChange, { capture: true, passive: true });
 
   ability.addEventListener('pointerdown', (ev) => onAbilityPointerDown(ev, ability));
   ability.addEventListener('pointerup', (ev) => onAbilityPointerUp(ev, ability));
@@ -569,8 +761,32 @@ export function initializeTouchControls(): void {
   window.addEventListener('playViewOff', () => syncTouchChrome(false));
   // A modal universe map can cover the playfield while the game keeps cruising.
   // Drop any active touch gesture before the dialog takes pointer ownership.
-  window.addEventListener('gameMapOpen', () => resetTouchInteraction(requireLocalPlayer()));
-  window.addEventListener('gameSchematicOpen', () => resetTouchInteraction(requireLocalPlayer()));
+  window.addEventListener('gameMapOpen', () => {
+    resetTouchInteraction(requireLocalPlayer());
+    const player = requireLocalPlayer();
+    if (player) {
+      syncBoostChrome(player);
+    }
+  });
+  window.addEventListener('gameMapClose', () => {
+    const player = requireLocalPlayer();
+    if (player) {
+      syncBoostChrome(player);
+    }
+  });
+  window.addEventListener('gameSchematicOpen', () => {
+    resetTouchInteraction(requireLocalPlayer());
+    const player = requireLocalPlayer();
+    if (player) {
+      syncBoostChrome(player);
+    }
+  });
+  window.addEventListener('gameSchematicClose', () => {
+    const player = requireLocalPlayer();
+    if (player) {
+      syncBoostChrome(player);
+    }
+  });
   window.addEventListener('resize', () => syncTouchChrome());
   window.addEventListener('orientationchange', () => {
     resetTouchInteraction(requireLocalPlayer());

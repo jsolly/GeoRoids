@@ -7,13 +7,16 @@ import { afterEach, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
-import { nearbyWorldRows, utcScoreSeason, WORLD } from '../../../shared/world';
+import { nearbyWorldRows, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
+
+const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
 const directories: string[] = [];
 const stores: WorldStore[] = [];
@@ -31,12 +34,7 @@ function database(path: string): WorldStore {
   stores.push(store);
   return store;
 }
-function pilot(
-  engine: GameEngine,
-  id: string,
-  kit: 'surveyor' | 'hauler',
-  position = { x: 0, y: 0 }
-) {
+function pilot(engine: GameEngine, id: string, kit: 'scout' | 'hauler', position = { x: 0, y: 0 }) {
   const socket = new RecordingSocket();
   const actor = engine.addPlayer(id, id, socket, position, kit);
   actor.asteroidInteractions = 1;
@@ -51,6 +49,7 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
     velocity: { x: 0, y: 0 },
     size: 25,
     material: 'metal',
+    ore: 'metal',
     health: 75,
     maxHealth: 75,
     rotation: 0,
@@ -61,13 +60,13 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
   };
 }
 
-test('a restart preserves mined sectors, shared discoveries and offline Surveyor delivery credit', () => {
+test('a restart preserves mined sectors, shared discoveries and offline Scout delivery credit', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-world-'));
   directories.push(directory);
   const path = join(directory, 'world.sqlite');
   const firstStore = database(path);
-  const first = new GameEngine(82, undefined, firstStore);
-  const scout = pilot(first, 'scout', 'surveyor');
+  const first = new GameEngine(82, undefined, new InlineWorldPersistence(firstStore));
+  const scout = pilot(first, 'scout', 'scout');
   const hauler = pilot(first, 'hauler', 'hauler', { x: 80, y: 0 });
   for (const rock of first.getAllAsteroids()) {
     first.removeAsteroid(rock.id);
@@ -93,14 +92,13 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
   firstStore.close();
   stores.splice(stores.indexOf(firstStore), 1);
 
-  const second = new GameEngine(999, undefined, database(path));
+  const second = new GameEngine(999, undefined, new InlineWorldPersistence(database(path)));
   expect(second.getTerrainSeed()).toBe(82);
   const resumed = second.resumePilot(scout.token, new RecordingSocket(), undefined, 'Bob');
   assert(resumed.ok);
   expect(resumed.actor.id).toBe('scout');
   expect(resumed.actor.name).toBe('Bob');
   expect(resumed.actor.score).toBe(points);
-  expect(resumed.actor.lives).toBe(3);
   expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
   expect(second.getAsteroid('delivery')).toBeUndefined();
   const cell = explorationCellAt({ x: 900, y: 0 });
@@ -112,7 +110,7 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
 
 test('travelling far across the world loads local ore and returning does not replenish mined deposits', () => {
   const engine = new GameEngine(82);
-  const traveller = pilot(engine, 'traveller', 'surveyor');
+  const traveller = pilot(engine, 'traveller', 'scout');
   const original = engine
     .getAllAsteroids()
     .find((rock) => Math.abs(rock.position.x) < 1_000 && Math.abs(rock.position.y) < 1_000);
@@ -139,9 +137,9 @@ test('travelling far across the world loads local ore and returning does not rep
 
 test('a drifting deposit crosses into a sleeping sector once and preserves that sector’s native ore', () => {
   const store = database(':memory:');
-  const field = new RegionalAsteroidField(82, store);
+  const field = new RegionalAsteroidField(82, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(82));
-  field.update(manager, [{ x: 0, y: 0 }], new Set());
+  field.update(manager, [{ x: 0, y: 0 }]);
   const drift = manager.getAllAsteroids()[0];
   assert(drift);
   const originalPosition = { ...drift.position };
@@ -152,9 +150,7 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(1),
         exploration: [],
-        completedSectors: [],
       },
       field.checkpoint(manager),
       []
@@ -167,23 +163,22 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
   const sleeping = store.loadSector('4,0');
   assert(sleeping);
   expect(sleeping.filter((rock) => rock.id === drift.id)).toHaveLength(1);
-  expect(sleeping).toHaveLength(25);
+  expect(sleeping).toHaveLength(WORLD.depositsPerSector + 1);
 
-  field.update(manager, [{ x: 8_200, y: 200 }], new Set());
+  field.update(manager, [{ x: 8_200, y: 200 }]);
   const arrived = manager.getAsteroid(drift.id);
   assert(arrived);
   arrived.position = { x: 16_200, y: 200 };
   save();
   expect(store.loadSector('4,0')?.some((rock) => rock.id === drift.id)).toBe(false);
   expect(store.loadSector('8,0')?.filter((rock) => rock.id === drift.id)).toHaveLength(1);
-  field.update(manager, [originalPosition], new Set());
+  field.update(manager, [originalPosition]);
   expect(manager.getAsteroid(drift.id)).toBeUndefined();
 });
 
 test('a private-token reconnect preserves progress while selecting the Hauler kit', () => {
   const engine = new GameEngine(82);
-  const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
-  original.actor.lives = 2;
+  const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
   original.actor.score = 450;
   const replacement = new RecordingSocket();
   const resumed = engine.resumePilot(original.token, replacement, 'hauler', 'Bob');
@@ -193,7 +188,8 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
     id: 'scout',
     name: 'Bob',
     kitId: 'hauler',
-    lives: 2,
+    cargo: 0,
+    purchases: [],
     score: 450,
     ws: replacement,
     position: { x: 200, y: 300 },
@@ -202,10 +198,9 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
   engine.stopGameLoop();
 });
 
-test('leaving then entering again returns to the same ship with monthly score', () => {
+test('leaving then entering again returns to the same ship with the saved score', () => {
   const engine = new GameEngine(82);
-  const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
-  original.actor.lives = 2;
+  const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
   original.actor.score = 450;
   original.actor.health = 40;
   original.actor.angle = 1.25;
@@ -216,7 +211,8 @@ test('leaving then entering again returns to the same ship with monthly score', 
     id: 'scout',
     name: 'Bob',
     kitId: 'hauler',
-    lives: 2,
+    cargo: 0,
+    purchases: [],
     score: 450,
     position: { x: 200, y: 300 },
     angle: 1.25,
@@ -226,12 +222,11 @@ test('leaving then entering again returns to the same ship with monthly score', 
   engine.stopGameLoop();
 });
 
-test('checkpoints store monthly score and a recent flight', () => {
+test('checkpoints store the saved score and a recent flight', () => {
   const store = database(':memory:');
-  const engine = new GameEngine(82, undefined, store);
-  const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
+  const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
   original.actor.score = 450;
-  original.actor.lives = 2;
   engine.checkpointWorld();
   const saved = store.loadPilots()[0];
   assert(saved);
@@ -239,18 +234,19 @@ test('checkpoints store monthly score and a recent flight', () => {
     id: 'scout',
     name: 'scout',
     score: 450,
-    kitId: 'surveyor',
+    kitId: 'scout',
     position: { x: 200, y: 300 },
-    lives: 2,
+    cargo: 0,
+    purchases: [],
   });
-  expect(saved.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+  expect(saved.tokenHash).toMatch(PILOT_TOKEN_HASH_PATTERN);
   expect(saved.lastSeenAt).toEqual(expect.any(Number));
   engine.stopGameLoop();
 });
 
-test('resuming during an explosion keeps the pending life loss until the server respawns', () => {
+test('resuming during an explosion keeps the pending respawn until the server respawns', () => {
   const engine = new GameEngine(82);
-  const original = pilot(engine, 'scout', 'surveyor');
+  const original = pilot(engine, 'scout', 'scout');
   original.actor.spawnProtectionTimer = 0;
   original.actor.score = 210;
   expect(engine.handleShipDamage('scout', 'asteroid', original.actor.health).isDestroyed).toBe(
@@ -262,7 +258,8 @@ test('resuming during an explosion keeps the pending life loss until the server 
   expect(resumed.actor).toBe(original.actor);
   expect(resumed.actor).toMatchObject({
     health: 0,
-    lives: 2,
+    cargo: 0,
+    purchases: [],
     score: 210,
     exploding: true,
     respawnTimer: remaining,
@@ -272,7 +269,6 @@ test('resuming during an explosion keeps the pending life loss until the server 
     engine.advanceCombatFrame();
   }
   expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
-  expect(resumed.actor.lives).toBe(2);
   expect(resumed.actor.score).toBe(210);
   expect(resumed.actor.exploding).toBe(false);
   expect(resumed.actor.spawnProtectionTimer).toBeGreaterThan(0);

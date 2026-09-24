@@ -10,8 +10,7 @@ import { getStoredItem } from '../utils/safeStorage';
 // GAME CONFIGURATION
 // ============================================================================
 export const GAME = {
-  // Lives and scoring
-  START_LIVES: 3,
+  // Bank starting balance and simulation timing
   STARTING_SCORE: 0,
 
   // Physics
@@ -21,14 +20,6 @@ export const GAME = {
   /** Extra multiplier applied only to player cruise, not world projectiles. */
   PLAYER_SPEED_SCALE: 1.25,
   FRICTION: 0.6,
-} as const;
-
-// ============================================================================
-// SPAWN CONFIGURATION
-// ============================================================================
-export const SPAWN = {
-  // Radius (px) around a living ally or open-sector center for new pilots.
-  NEAR_CENTER_RADIUS: WORLD.spawnClusterRadius,
 } as const;
 
 // ============================================================================
@@ -88,16 +79,19 @@ export const TITLE = {
 export const VISUAL = {
   SHIP_STROKE_WIDTH: 1.25,
   SHIP_GLOW: 1.25,
-  // Thicker short cream dash plus a faint heading ghost — still a shot, never a beam.
-  LASER_STROKE_WIDTH: 3.5,
-  LASER_LENGTH: 24,
-  LASER_TRAIL_LENGTH: 13,
+  // Broad glowing bolts with a bright core and a short trailing streak.
+  LASER_STROKE_WIDTH: 7,
+  LASER_CORE_WIDTH: 2.5,
+  LASER_CORE_COLOR: '#FFF8E1',
+  LASER_LENGTH: 34,
+  LASER_TRAIL_LENGTH: 20,
   LASER_EXPLODE_RADIUS: 16,
-  LASER_GLOW: 6,
+  LASER_GLOW: 14,
   LASER_HIT_TICKS: 4,
   HEALTH_CAPSULE_HEIGHT: 1.5,
   BOUNDARY_STROKE_WIDTH: 1.25,
   BOUNDARY_GLOW: 1.25,
+  ROID_STROKE_COLOSSAL: 2.5,
   ROID_STROKE_LARGE: 2,
   ROID_STROKE_MEDIUM: 1.5,
   ROID_STROKE_SMALL: 1.25,
@@ -105,6 +99,8 @@ export const VISUAL = {
   ROID_INNER_SCALE: 0.46,
   ROID_SHATTER_MS: 280,
   ROID_SHATTER_SPREAD: 1.8,
+  /** Short furnace-intake smoke; same budget as a laser shatter's hit ticks. */
+  ROID_FURNACE_SMOKE_WISPS: 4,
   // Open-V thruster with a shorter inner core; flickers between two lengths.
   THRUSTER_STROKE_WIDTH: 1.25,
   THRUSTER_GLOW: 2.25,
@@ -144,14 +140,11 @@ export const VISUAL = {
   MINIMAP_VOID_ALPHA: 0.5,
   MINIMAP_RING_ALPHA: 0.85,
   HUD_INSET: 16,
-  HUD_LIFE_SIZE: 14,
-  HUD_LIFE_HEADING: Math.PI / 2,
-  HUD_LIFE_GAP: 6,
-  HUD_SCORE_GAP: 10,
+  HUD_BALANCE_HEIGHT: 14,
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,
-  // Iso-contours: hairline slate, no glow. Index lines are only slightly stronger.
+  // Hairline contours. The steering cone walks one slate ramp from dark climbs to light descents.
   CONTOUR_STROKE_WIDTH: 1,
   CONTOUR_ALPHA: 0.16,
   CONTOUR_INDEX_ALPHA: 0.24,
@@ -189,7 +182,7 @@ export const SHIP = {
   TURN_SPEED: 450, // degrees per second
   THRUST: 5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   MAX_VELOCITY: 2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
-  SIZE: 30, // height in pixels
+  SIZE: 30, // Scout / classic hull height in pixels. Hauler uses kit size.
 
   // Combat
   MAX_LASERS: 5, // maximum lasers a ship can have at once
@@ -238,14 +231,27 @@ export const ROID = {
   SPEED: 50 * GAME.MOTION_SCALE, // starting speed in pixels per second
   /** Server asteroid velocity uses pixels per 60 Hz tick, unlike SPEED. */
   SERVER_VELOCITY_MAX: 4 * GAME.MOTION_SCALE,
+  STATIONARY_FRACTION: 0.2,
+  DRIFT_SPEED_MIN: 0.3 * GAME.MOTION_SCALE,
+  DRIFT_SPEED_MAX: 3 * GAME.MOTION_SCALE,
   SIZE: 50, // starting size in pixels
   VERTICES: 10, // average number of vertices
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged
 
   // Scoring
+  POINTS_COLOSSAL: 200,
   POINTS_LARGE: 20,
   POINTS_MEDIUM: 50,
   POINTS_SMALL: 100,
+
+  // Rare crew-scale rocks: too heavy for one tow or one coupling, and they
+  // ignore the one-second collab window until many laser hits land.
+  COLOSSAL_MIN_SIZE: 90,
+  COLOSSAL_SIZE: 120,
+  COLOSSAL_LASER_HITS: 16,
+  COLOSSAL_CREW: 2,
+  COLOSSAL_SECTOR_PERIOD: 5,
+  COLOSSAL_CORE_EXCLUSION: 2,
 
   // Collaborative split: only the biggest asteroids, and only when two
   // distinct ships land laser hits within this window.
@@ -269,17 +275,16 @@ export const SATELLITE_PICKUP = {
   SIZE: 24,
   ORBIT_RADIUS: 48,
   ORBIT_SPEED: 0.08 * GAME.MOTION_SCALE,
-  DRIFT_SPEED: 0.28 * GAME.MOTION_SCALE,
-  LOOSE_ORBIT_RADIUS: 70,
   SCORE_BONUS: 50,
   HEALTH: 50,
   AUTO_COLLECT_RANGE: 140,
+  LIFETIME_FRAMES: 120 * GAME.FPS,
+  SCAN_RANGE: 600,
   RESPAWN_FRAMES: 180,
   ORBIT_GAP: 8,
   MAX_COUNT: 6,
   SPAWN_RING_MIN: 380,
   SPAWN_RING_MAX: 480,
-  FIELD_RADIUS: 700,
 } as const;
 
 // ============================================================================
@@ -323,8 +328,8 @@ export const AUDIO = {
   HARPOON_RELEASE: ['/sounds/harpoon-release.m4a', 3, 0.035],
   ORBITAL_FIRE: ['/sounds/orbital-fire.m4a', 6, 0.032],
   ORBITAL_PICKUP: ['/sounds/orbital-pickup.m4a', 4, 0.04],
-  LOOT_PICKUP: ['/sounds/loot-pickup.m4a', 4, 0.04],
-  CORE_PICKUP: ['/sounds/core-pickup.m4a', 4, 0.04],
+  TAP_EJECT: ['/sounds/tap-eject.m4a', 4, 0.055],
+  LOOT_PICKUP: ['/sounds/loot-pickup.m4a', 8, 0.065],
   SURVEY_SCAN: ['/sounds/survey-scan.m4a', 3, 0.035],
   RESPAWN: ['/sounds/respawn.m4a', 3, 0.035],
   ASTEROID_EXPLODE: ['/sounds/asteroid-explode.m4a', 5, 0.045],
@@ -340,6 +345,14 @@ export const AUDIO = {
   EXPLOSION_VOLUME: 0.055,
   LASER_VOLUME: 0.04,
   HIT_VOLUME: 0.035,
+  // Soft looping beds sit under cues; never drown crystalline SFX.
+  MENU_BED_VOLUME: 0.014,
+  IN_GAME_BED_VOLUME: 0.012,
+  DANGER_BED_VOLUME: 0.016,
+  // Missing danger-bed files keep Playfield Drift, slightly more present.
+  DANGER_FALLBACK_VOLUME: 0.018,
+  DANGER_FALLBACK_RATE: 1.07,
+  BED_CROSSFADE_MS: 1600,
   // Used when the canvas size is unknown (matches PlayerNetwork nearby radius).
   FALLBACK_MAX_DISTANCE: 1200,
   // Floor so an on-screen source at the viewport edge stays a soft blush, not silent.
@@ -356,7 +369,6 @@ export const DEBUG = {
 
   SATELLITE_PICKUP: {
     COUNT: 6,
-    MOVEMENT: true,
   },
 
   // Roid settings (overrides ROID.INITIAL_ROID_COUNT when in debug mode)
@@ -368,7 +380,6 @@ export const DEBUG = {
   },
 
   // Player positioning settings (Affects local and remote players)
-  PLACE_PLAYERS_NEAR_CENTER: false,
   PLACE_PLAYERS_NEAR_BOUNDARY: false,
 } as const;
 
@@ -405,7 +416,7 @@ const isSoundEnabled = (): boolean =>
 
 // Initialize sound preference checkbox after DOM is ready
 function initializeSoundPreference() {
-  const soundCheckbox = document.getElementById('soundPref') as HTMLInputElement;
+  const soundCheckbox = document.querySelector('#soundPref') as HTMLInputElement;
   if (soundCheckbox) {
     soundCheckbox.checked = isSoundEnabled();
   }

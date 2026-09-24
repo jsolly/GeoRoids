@@ -4,7 +4,7 @@ import { Laser } from '../../../src/entities/laser/Laser';
 import { Player } from '../../../src/entities/player/Player';
 import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 function makePlayer(type: 'local' | 'remote'): Player {
   return new Player({ id: type, name: type, type, input: new MockPlayerInput() });
@@ -28,7 +28,7 @@ test('ticks lifecycle and lasers only for remote players', () => {
 test("a remote player's laser travels instead of freezing at the muzzle", () => {
   // Play canvas is #gameCanvas (title starfield is a second canvas).
   const canvas =
-    (document.getElementById('gameCanvas') as HTMLCanvasElement | null) ??
+    (document.querySelector('#gameCanvas') as HTMLCanvasElement | null) ??
     Object.assign(document.createElement('canvas'), { id: 'gameCanvas' });
   if (!canvas.isConnected) {
     document.body.appendChild(canvas);

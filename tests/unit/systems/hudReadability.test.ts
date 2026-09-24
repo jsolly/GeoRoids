@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { CIVIC_LOTS } from '../../../shared/furnaces';
 import { WORLD } from '../../../shared/world';
-import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
-import { getKitHullOutline } from '../../../src/entities/ship/hullOutlines';
-import { layoutHudCluster } from '../../../src/rendering/hud/cluster';
+import type { ShipKitId } from '../../../shared-types';
+import { PALETTE, TITLE, VISUAL } from '../../../src/constants';
+import { getKitHullOutline, projectHullPolyline } from '../../../src/entities/ship/hullOutlines';
+import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
+import {
+  FURNACE_MAP_INK,
+  MINIMAP_FURNACE_MARK_SIZE,
+} from '../../../src/rendering/hud/furnaceMapMark';
 
 function recordCanvas(ctx: CanvasRenderingContext2D) {
   let points: Array<[number, number]> = [];
@@ -31,6 +37,10 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
   const filledPaths: Array<{
     rectangles: Array<{ x: number; y: number; width: number; height: number }>;
     style: typeof ctx.fillStyle;
+  }> = [];
+  const outlinedRectangles: Array<{
+    rectangles: Array<{ x: number; y: number; width: number; height: number }>;
+    style: typeof ctx.strokeStyle;
   }> = [];
   let pathRectangles: Array<{ x: number; y: number; width: number; height: number }> = [];
   const beginPath = ctx.beginPath.bind(ctx);
@@ -61,6 +71,7 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     closePath();
   });
   vi.spyOn(ctx, 'stroke').mockImplementation(() => {
+    outlinedRectangles.push({ rectangles: [...pathRectangles], style: ctx.strokeStyle });
     strokes.push({ points: [...points], closed, style: ctx.strokeStyle, width: ctx.lineWidth });
     stroke();
   });
@@ -81,7 +92,28 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     rectangles.push({ x, y, width, height, style: ctx.fillStyle });
     fillRect(x, y, width, height);
   });
-  return { strokes, texts, rectangles, filledPaths };
+  return { strokes, texts, rectangles, filledPaths, outlinedRectangles };
+}
+
+function asteroidSilhouette(x: number, y: number, size: number) {
+  return [
+    [-0.95, -0.25],
+    [-0.5, -0.9],
+    [0.15, -1],
+    [0.8, -0.55],
+    [1, 0.15],
+    [0.5, 0.85],
+    [-0.25, 1],
+    [-0.85, 0.5],
+  ].map(([dx = 0, dy = 0]) => [x + dx * size, y + dy * size]);
+}
+
+function satellitePanels(x: number, y: number) {
+  return [
+    { x: x - 0.88, y: y - 1.6, width: 1.76, height: 3.2 },
+    { x: x - 4, y: y - 2.6, width: 2.2, height: 5.2 },
+    { x: x + 1.8, y: y - 2.6, width: 2.2, height: 5.2 },
+  ];
 }
 
 function canvasContext(): CanvasRenderingContext2D {
@@ -101,6 +133,73 @@ function normalizedCanvasColor(ctx: CanvasRenderingContext2D, color: string) {
   const normalized = ctx.fillStyle;
   ctx.restore();
   return normalized;
+}
+
+function radarPolylinePoints(
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  line: Parameters<typeof projectHullPolyline>[4]
+): Array<[number, number]> {
+  return projectHullPolyline(x, y, size, heading, line).map((point) => [point.x, point.y]);
+}
+
+function radarHullPoints(
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  kitId: ShipKitId
+): Array<[number, number]> {
+  return radarPolylinePoints(x, y, size, heading, getKitHullOutline(kitId).hull);
+}
+
+function radarKitPolylines(
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  kitId: ShipKitId
+): Array<{ points: Array<[number, number]>; closed: boolean }> {
+  const outline = getKitHullOutline(kitId);
+  return [
+    { points: radarPolylinePoints(x, y, size, heading, outline.hull), closed: outline.hull.closed },
+    ...outline.extras.map((extra) => ({
+      points: radarPolylinePoints(x, y, size, heading, extra),
+      closed: extra.closed,
+    })),
+  ];
+}
+
+function expectRadarKitMark(
+  strokes: Array<{
+    points: Array<[number, number]>;
+    closed: boolean;
+    style: string | CanvasGradient | CanvasPattern;
+  }>,
+  color: string,
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  kitId: ShipKitId
+): void {
+  const painted = crispKitStrokes(strokes, color);
+  for (const expected of radarKitPolylines(x, y, size, heading, kitId)) {
+    expect(painted).toEqual(expect.arrayContaining([expect.objectContaining(expected)]));
+  }
+}
+
+function crispKitStrokes(
+  strokes: Array<{
+    points: Array<[number, number]>;
+    closed: boolean;
+    style: string | CanvasGradient | CanvasPattern;
+  }>,
+  color: string
+) {
+  return strokes.filter((call) => call.style === color);
 }
 
 describe('painted HUD composition', () => {
@@ -138,58 +237,37 @@ describe('painted HUD composition', () => {
     vi.resetModules();
   });
 
-  test('three upright life hulls accompany the score and kit', async () => {
-    expect(VISUAL.HUD_LIFE_SIZE).toBe(14);
-    expect(VISUAL.HUD_LIFE_SIZE).toBeLessThan(SHIP.SIZE / 2);
-    expect(VISUAL.HUD_INSET).toBe(16);
-    expect(VISUAL.SCORE_FONT).toBe('14px Arial');
-
+  test('the HUD shows bank, finite cargo, and shared settlement requirements', async () => {
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
-    const { drawLivesIndicator } = await import('../../../src/rendering/hud/lives');
     const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
-
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
+    player.cargo = 123;
     const ctx = canvasContext();
-    const { strokes, texts } = recordCanvas(ctx);
-    const layout = computeHudLayout(ctx.canvas, { touchControls: false });
+    const { texts } = recordCanvas(ctx);
+    drawScoreOverlay(ctx, computeHudLayout(ctx.canvas, { touchControls: false }), ctx.canvas, 4321);
+    expect(texts.some((row) => row.text === 'Bank 4,321')).toBe(true);
+    expect(texts.some((row) => row.text.includes('Cargo 123/500'))).toBe(true);
+    expect(texts.some((row) => row.text.includes('Settlement 1'))).toBe(true);
+    expect(texts.some((row) => row.text.includes('crystal 0/20'))).toBe(true);
+  });
 
-    drawLivesIndicator(ctx, layout, 3, PALETTE.LOCAL, player.ship.kitId);
-    const hulls = strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#5EEAD4'));
-    const silhouette = getKitHullOutline('surveyor').hull;
-    expect(strokes).toHaveLength(6);
-    expect(hulls).toHaveLength(3);
-    for (const [index, hull] of hulls.entries()) {
-      expect(hull.closed).toBe(true);
-      expect(hull.points).toHaveLength(silhouette.points.length);
-      const xs = hull.points.map(([x]) => x);
-      const ys = hull.points.map(([, y]) => y);
-      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(10);
-      expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(6);
-      expect(Math.min(...ys)).toBeLessThan(23);
-      const centerX = 23 + index * 20;
-      expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(centerX, 0);
-    }
-
-    drawScoreOverlay(ctx, layout, ctx.canvas, 4321, 3);
-    expect(texts).toEqual([
-      {
-        text: '4321',
-        x: 80,
-        y: 23,
-        style: normalizedCanvasColor(ctx, '#E2E8F0'),
-        font: '14px Arial',
-        align: 'left',
-      },
-      {
-        text: 'Surveyor',
-        x: 16,
-        y: 38,
-        style: normalizedCanvasColor(ctx, 'rgba(100,116,139,0.85)'),
-        font: '11px Arial',
-        align: 'left',
-      },
+  test('phone status fits two lines and leaves room for the action row', async () => {
+    const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
+    const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
+    const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
+    const player = PlayerManager.getInstance().createLocalPlayer('hauler');
+    player.cargo = 123;
+    const ctx = canvasContext();
+    const { texts } = recordCanvas(ctx);
+    const viewport = { width: 390, height: 844 };
+    const layout = computeHudLayout(viewport, { touchControls: true });
+    drawScoreOverlay(ctx, layout, viewport, 12385);
+    expect(texts.map((row) => row.text)).toEqual([
+      'Bank 12,385 · Cargo 123/1500',
+      'Hauler · Settlement 1 → 2 · 0%',
     ]);
+    expect(layout.economyBottomY - layout.balance.y).toBeLessThanOrEqual(40);
   });
 
   test('the local radar marks only nearby revealed furnaces, leaving distant discoveries to the universe map', async () => {
@@ -198,48 +276,41 @@ describe('painted HUD composition', () => {
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { ExplorationMap } = await import('../../../shared/exploration');
     const { setWorldExploration } = await import('../../../src/network/worldExploration');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
     player.ship.position = { x: 0, y: 0 };
     const exploration = new ExplorationMap();
-    exploration.reveal({ x: 4000, y: 0 }, 100);
+    exploration.reveal({ x: 40_000, y: 0 }, 100);
     setWorldExploration(exploration.snapshot());
     const ctx = canvasContext();
-    const { filledPaths } = recordCanvas(ctx);
+    const { strokes, filledPaths } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
-    const stationFill = normalizedCanvasColor(ctx, 'rgba(196,181,253,0.2)');
-    const stationInk = normalizedCanvasColor(ctx, PALETTE.SATELLITE);
-    drawMiniMap(ctx, layout, player.ship, [], [], []);
-    expect(
-      filledPaths.filter(({ style }) => style === stationFill || style === stationInk)
-    ).toEqual([]);
-    exploration.reveal({ x: 0, y: -660 }, 100);
+    const stationInk = normalizedCanvasColor(ctx, FURNACE_MAP_INK);
+    drawMiniMap(ctx, layout, player.ship, [], [], [], []);
+    expect(strokes.filter(({ style, closed }) => style === stationInk && closed)).toEqual([]);
+    exploration.reveal({ x: 0, y: 0 }, 100);
     setWorldExploration(exploration.snapshot());
+    strokes.length = 0;
     filledPaths.length = 0;
-    drawMiniMap(ctx, layout, player.ship, [], [], []);
-    const stations = filledPaths.filter(({ style }) => style === stationFill);
+    drawMiniMap(ctx, layout, player.ship, [], [], [], []);
+    const stations = strokes.filter(({ style, closed }) => style === stationInk && closed);
     expect(stations).toHaveLength(1);
-    expect(stations[0]?.rectangles).toEqual([
-      {
-        x: layout.miniMap.x + layout.miniMap.size / 2 - 3,
-        y:
-          layout.miniMap.y +
-          layout.miniMap.size / 2 -
-          ((660 / WORLD.minimapRadius) * layout.miniMap.size) / 2 -
-          3,
-        width: 6,
-        height: 6,
-      },
-    ]);
+    const tip = stations[0]?.points[0];
+    expect(tip?.[0]).toBeCloseTo(layout.miniMap.x + layout.miniMap.size / 2, 5);
+    expect(tip?.[1]).toBeCloseTo(
+      layout.miniMap.y + layout.miniMap.size / 2 - MINIMAP_FURNACE_MARK_SIZE,
+      5
+    );
+    expect(filledPaths.every(({ rectangles }) => rectangles.length === 0)).toBe(true);
   });
 
-  test('Surveyor radar classifies minerals during a scan and restores generic marks on expiry', async () => {
+  test('An unconfirmed local scan previews minerals and restores generic marks on expiry', async () => {
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { Roid } = await import('../../../src/entities/roid/Roid');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { ExplorationMap } = await import('../../../shared/exploration');
     const { setWorldExploration } = await import('../../../src/network/worldExploration');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
     player.ship.position = { x: 0, y: 0 };
     player.ship.abilityActiveFrames = 1;
     const roids = (['ice', 'metal', 'rubble'] as const).map((material, index) => {
@@ -248,9 +319,7 @@ describe('painted HUD composition', () => {
       return rock;
     });
     const ctx = canvasContext();
-    const { texts, filledPaths } = recordCanvas(ctx);
-    const arc = vi.spyOn(ctx, 'arc');
-    const line = vi.spyOn(ctx, 'lineTo');
+    const { texts, strokes } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const centers = [-800, 0, 800].map((x) => ({
       x:
@@ -268,35 +337,37 @@ describe('painted HUD composition', () => {
       exploration.reveal(rock.position, 100);
     }
     setWorldExploration(exploration.snapshot());
-    drawMiniMap(ctx, layout, player.ship, roids, [], []);
-    expect(texts.map(({ text }) => text)).toEqual([
-      '○ Ice',
-      '□ Metal',
-      '△ Rubble',
-      'X +0',
-      'Y +0 · S0,0',
-    ]);
-    expect(arc).toHaveBeenCalledWith(ice.x, ice.y, 3, 0, Math.PI * 2);
-    expect(
-      filledPaths.find(({ style }) => style === normalizedCanvasColor(ctx, '#FDE68A'))?.rectangles
-    ).toEqual([{ x: metal.x - 3, y: metal.y - 3, width: 6, height: 6 }]);
-    expect(line).toHaveBeenCalledWith(rubble.x + 3.5, rubble.y + 3);
-    expect(line).toHaveBeenCalledWith(rubble.x - 3.5, rubble.y + 3);
-    expect(filledPaths.some(({ style }) => style === normalizedCanvasColor(ctx, '#FDBA74'))).toBe(
-      true
-    );
+    drawMiniMap(ctx, layout, player.ship, roids, [], [], []);
+    expect(texts.map(({ text }) => text)).toEqual(['ice', 'metal', 'rubble', 'X +0', 'Y +0']);
+    for (const [index, color] of ['#A5F3FC', '#FDE68A', '#FDBA74'].entries()) {
+      const center = centers[index];
+      if (!center) {
+        throw new Error('Missing mineral projection');
+      }
+      const mineral = strokes.find(
+        (stroke) =>
+          stroke.style === normalizedCanvasColor(ctx, color) &&
+          stroke.points[0]?.[0] === center.x - 3.8
+      );
+      expect(mineral?.closed).toBe(true);
+      expect(mineral?.points.slice(0, 8)).toEqual(asteroidSilhouette(center.x, center.y, 4));
+      expect(mineral?.points.length).toBeGreaterThan(8);
+    }
     player.ship.abilityActiveFrames = 0;
     texts.length = 0;
-    filledPaths.length = 0;
-    arc.mockClear();
-    drawMiniMap(ctx, layout, player.ship, roids, [], []);
-    expect(texts.map(({ text }) => text)).toEqual(['X +0', 'Y +0 · S0,0']);
-    expect(arc.mock.calls.every((call) => call[2] !== 3)).toBe(true);
-    expect(filledPaths).toHaveLength(2);
-    expect(filledPaths[1]?.rectangles).toHaveLength(3);
+    strokes.length = 0;
+    drawMiniMap(ctx, layout, player.ship, roids, [], [], []);
+    expect(texts.map(({ text }) => text)).toEqual(['X +0', 'Y +0']);
+    const generic = strokes.find(
+      ({ style }) => style === normalizedCanvasColor(ctx, 'rgba(148,163,184,0.65)')
+    );
+    expect(generic?.closed).toBe(true);
+    expect(generic?.points).toEqual(centers.flatMap(({ x, y }) => asteroidSilhouette(x, y, 2.5)));
     expect(
-      filledPaths[1]?.rectangles.every(({ width, height }) => width === 1.5 && height === 1.5)
-    ).toBe(true);
+      strokes.some(
+        ({ style, points }) => style === normalizedCanvasColor(ctx, '#FDE68A') && points.length > 8
+      )
+    ).toBe(false);
   });
 
   test('radar paints moving world marks and keeps pilots above live objects', async () => {
@@ -309,7 +380,6 @@ describe('painted HUD composition', () => {
 
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { entityFactory } = await import('../../../src/entities/EntityFactory');
-    const { NetworkManager } = await import('../../../src/network/networkManager');
     const { LootField } = await import('../../../src/entities/loot/LootField');
     const { Roid } = await import('../../../src/entities/roid/Roid');
     const { SatellitePickupManager } = await import(
@@ -319,7 +389,7 @@ describe('painted HUD composition', () => {
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { ExplorationMap } = await import('../../../shared/exploration');
     const { setWorldExploration } = await import('../../../src/network/worldExploration');
-    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
     player.ship.position = { x: 0, y: 0 };
     player.ship.angle = Math.PI / 2;
     const visible = new Roid({ x: WORLD.minimapRadius / 2, y: 0 }, 20, 'radar-visible');
@@ -345,7 +415,12 @@ describe('painted HUD composition', () => {
       y: 0,
     });
     peer.ship.angle = 0;
-    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, peer]);
+    applyShipKitToShip(peer.ship, 'hauler');
+    const far = entityFactory.createRemotePlayer('radar-far', 'Radar Far', {
+      x: 0,
+      y: -WORLD.minimapRadius * 2,
+    });
+    far.ship.angle = 0;
     SatellitePickupManager.getInstance().syncFromServer([
       {
         id: 'radar-pickup',
@@ -403,8 +478,9 @@ describe('painted HUD composition', () => {
       },
     ]);
     const ctx = canvasContext();
-    const { strokes, rectangles, filledPaths } = recordCanvas(ctx);
+    const { strokes, rectangles, filledPaths, outlinedRectangles } = recordCanvas(ctx);
     const arc = vi.spyOn(ctx, 'arc');
+    const translate = vi.spyOn(ctx, 'translate');
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const draw = (): void => {
       drawMiniMap(
@@ -413,105 +489,150 @@ describe('painted HUD composition', () => {
         player.ship,
         roids,
         LootField.getInstance().getAll(),
-        SatellitePickupManager.getInstance().getAll()
+        SatellitePickupManager.getInstance().getAll(),
+        [remote, peer, far]
       );
     };
 
     draw();
 
-    expect(arc.mock.calls).toEqual([
-      [736, 536, 48, 0, Math.PI * 2],
-      [736, 560, 2.5, 0, Math.PI * 2],
-      [748, 560, 2.5, 0, Math.PI * 2],
-    ]);
+    const darkLotsInRadar = CIVIC_LOTS.filter(
+      (lot) => Math.hypot(lot.position.x, lot.position.y) <= WORLD.minimapRadius
+    );
+    expect(arc.mock.calls[0]).toEqual([736, 536, 48, 0, Math.PI * 2]);
+    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(darkLotsInRadar.length);
     expect(strokes[0]).toEqual({
       points: [],
       closed: true,
       style: normalizedCanvasColor(ctx, 'rgba(100,116,139,0.85)'),
       width: 1,
     });
-    expect(
-      rectangles.some(({ style }) => style === normalizedCanvasColor(ctx, 'rgba(0, 0, 17, 0.78)'))
-    ).toBe(true);
+    expect(rectangles.some(({ style }) => style === normalizedCanvasColor(ctx, PALETTE.BG))).toBe(
+      true
+    );
     expect(
       rectangles.filter(({ style }) => style === normalizedCanvasColor(ctx, 'rgba(0, 0, 17, 0.72)'))
     ).toHaveLength(1);
-    expect(filledPaths).toHaveLength(2);
-    expect(filledPaths[1]).toEqual({
-      rectangles: [{ x: 759.25, y: 535.25, width: 1.5, height: 1.5 }],
-      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
+    expect(filledPaths).toHaveLength(1);
+    expect(strokes[1]).toEqual({
+      points: asteroidSilhouette(760, 536, 2.5),
+      closed: true,
+      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.65)'),
+      width: 0.8,
     });
-    expect(strokes.slice(1, 4)).toEqual([
-      {
-        points: [
-          [736, 522],
-          [738, 524],
-          [736, 526],
-          [734, 524],
-        ],
-        closed: true,
-        style: normalizedCanvasColor(ctx, '#E8D5A3'),
-        width: 1,
-      },
-      {
-        points: [
-          [738.5, 560],
-          [750.5, 560],
-        ],
-        closed: false,
-        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'),
-        width: 1,
-      },
-      {
-        points: [
-          [712, 533],
-          [715, 536],
-          [712, 539],
-          [709, 536],
-        ],
-        closed: true,
-        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'),
-        width: 1,
-      },
+    expect(strokes[2]).toEqual({
+      points: [
+        [733.4, 526.8],
+        [734.8, 522.2],
+        [739.2, 520],
+        [738.4, 525.6],
+        [735.6, 527.6],
+        [735.6, 527.6],
+        [736.8, 523],
+        [739.2, 520],
+      ],
+      closed: true,
+      style: normalizedCanvasColor(ctx, '#E8D5A3'),
+      width: 1,
+    });
+    const satelliteColor = normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)');
+    const panels = outlinedRectangles.filter(({ style }) => style === satelliteColor);
+    expect(panels.map((panel) => panel.rectangles)).toEqual([
+      [...satellitePanels(736, 560), ...satellitePanels(748, 560)],
+      satellitePanels(712, 536),
     ]);
-    // One arena ring, three batched world marks, then three two-pass pilot hulls.
-    expect(strokes).toHaveLength(10);
-    const peerHeading = strokes.filter(
-      (call) => call.style === normalizedCanvasColor(ctx, peer.color) && call.points[0]?.[0] === 765
+    expect(strokes[3]?.points).toEqual([
+      [732, 560],
+      [740, 560],
+      [736, 558.4],
+      [736, 556.4],
+      [737.2, 555.6],
+      [744, 560],
+      [752, 560],
+      [748, 558.4],
+      [748, 556.4],
+      [749.2, 555.6],
+    ]);
+    expect(strokes[4]?.points).toEqual([
+      [708, 536],
+      [716, 536],
+      [712, 534.4],
+      [712, 532.4],
+      [713.2, 531.6],
+      [718, 536],
+    ]);
+    const scoutOutline = getKitHullOutline('scout');
+    const haulerOutline = getKitHullOutline('hauler');
+    const scoutMarks = 1 + scoutOutline.extras.length;
+    const haulerMarks = 1 + haulerOutline.extras.length;
+    // One arena ring, four world layers, nearby furnace foundations, then kit hulls.
+    expect(strokes).toHaveLength(
+      1 + 4 + darkLotsInRadar.length + 1 + scoutMarks * 2 * 3 + haulerMarks * 2
     );
-    expect(peerHeading).toHaveLength(1);
-    expect(peerHeading[0]?.points).toEqual([
-      [765, 536],
-      [756, 538.5],
-      [756, 533.5],
-    ]);
-    const heading = strokes.filter(
+    const court = strokes[5 + darkLotsInRadar.length];
+    expect(court).toMatchObject({
+      closed: false,
+      style: normalizedCanvasColor(ctx, PALETTE.REMOTE),
+      width: 1.4,
+    });
+    expect(court?.points).toHaveLength(8);
+    // Four open corner panels, painted before the pilot hulls, at the fixed public landmark.
+    expect(court?.points[0]?.[0]).toBeCloseTo(2.139, 3);
+    expect(court?.points[0]?.[1]).toBeCloseTo(-6.028, 3);
+    expect(court?.points[7]?.[0]).toBeCloseTo(-2.139, 3);
+    expect(court?.points[7]?.[1]).toBeCloseTo(-6.028, 3);
+    expect(
+      translate.mock.calls.some(
+        ([x, y]) => Math.abs(x - 757.3333) < 0.001 && Math.abs(y - 518.6667) < 0.001
+      )
+    ).toBe(true);
+    const radarX = layout.miniMap.x + layout.miniMap.size / 2;
+    const radarY = layout.miniMap.y + layout.miniMap.size / 2;
+    const peerX = radarX + layout.miniMap.size / 4;
+    const crewX = radarX - layout.miniMap.size / 4;
+    const rimRadius = Math.max(8, layout.miniMap.size / 2 - 8);
+    const rimX = radarX;
+    const rimY = radarY - rimRadius;
+    const localColor = normalizedCanvasColor(ctx, player.color);
+    const remoteColor = normalizedCanvasColor(ctx, PALETTE.REMOTE);
+    expectRadarKitMark(
+      strokes,
+      localColor,
+      radarX,
+      radarY,
+      VISUAL.MINIMAP_LOCAL_SIZE,
+      Math.PI / 2,
+      'scout'
+    );
+    expect(crispKitStrokes(strokes, localColor)).toHaveLength(scoutMarks);
+    expectRadarKitMark(strokes, remoteColor, peerX, radarY, VISUAL.MINIMAP_DOT, 0, 'hauler');
+    expectRadarKitMark(strokes, remoteColor, crewX, radarY, VISUAL.MINIMAP_DOT, 0, 'scout');
+    const rimHeading = Math.PI / 2;
+    const canvasInwardHeading = -Math.PI / 2;
+    const rimHull = crispKitStrokes(strokes, remoteColor).find(
       (call) =>
-        call.style === normalizedCanvasColor(ctx, player.color) && call.points[0]?.[0] === 736
+        call.closed &&
+        call.points.length === scoutOutline.hull.points.length &&
+        call.points[0]?.[1] ===
+          radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'scout')[0]?.[1]
     );
-    expect(heading).toHaveLength(1);
-    const hull = heading[0];
-    if (!hull) {
-      throw new Error('Radar did not draw the local heading');
-    }
-    expect(hull.closed).toBe(true);
-    expect(hull.points).toEqual([
-      [736, 530],
-      [739, 540.8],
-      [733, 540.8],
-    ]);
-    const crewHeading = strokes.filter(
-      (call) =>
-        call.style === normalizedCanvasColor(ctx, remote.color) && call.points[0]?.[0] === 717
+    expect(rimHull?.points.length).toBeGreaterThan(3);
+    expect(rimHull?.points).toEqual(
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'scout')
     );
-    expect(crewHeading).toHaveLength(1);
-    expect(crewHeading[0]?.points).toEqual([
-      [717, 536],
-      [708, 538.5],
-      [708, 533.5],
-    ]);
+    expect(rimHull?.points).not.toEqual(
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, canvasInwardHeading, 'scout')
+    );
+    expect(rimHull?.points).not.toEqual(
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, 0, 'scout')
+    );
+    expectRadarKitMark(strokes, remoteColor, rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'scout');
+    expect(crispKitStrokes(strokes.slice(6 + darkLotsInRadar.length), remoteColor)).toHaveLength(
+      scoutMarks * 2 + haulerMarks
+    );
 
     strokes.length = 0;
+    outlinedRectangles.length = 0;
     filledPaths.length = 0;
     arc.mockClear();
     visible.position = { x: -WORLD.minimapRadius / 4, y: 0 };
@@ -525,21 +646,21 @@ describe('painted HUD composition', () => {
     setWorldExploration(exploration.snapshot());
     draw();
 
-    expect(filledPaths[1]).toEqual({
-      rectangles: [{ x: 723.25, y: 535.25, width: 1.5, height: 1.5 }],
-      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
-    });
-    const movedOrbiter = strokes.find(
-      (call) => call.style === normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)') && call.closed
-    );
-    expect(movedOrbiter?.points).toEqual([
-      [748, 533],
-      [751, 536],
-      [748, 539],
-      [745, 536],
+    expect(strokes[1]?.points).toEqual(asteroidSilhouette(724, 536, 2.5));
+    expect(
+      outlinedRectangles.filter(({ style }) => style === satelliteColor).at(-1)?.rectangles
+    ).toEqual(satellitePanels(748, 536));
+    expect(strokes[4]?.points).toEqual([
+      [744, 536],
+      [752, 536],
+      [748, 534.4],
+      [748, 532.4],
+      [749.2, 531.6],
+      [754, 536],
     ]);
 
     strokes.length = 0;
+    outlinedRectangles.length = 0;
     filledPaths.length = 0;
     arc.mockClear();
     SatellitePickupManager.getInstance().syncFromServer([
@@ -563,7 +684,8 @@ describe('painted HUD composition', () => {
     roids.length = 0;
     draw();
 
-    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
+    expect(arc.mock.calls[0]).toEqual([736, 536, 48, 0, Math.PI * 2]);
+    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(darkLotsInRadar.length);
     expect(filledPaths).toHaveLength(1);
     expect(strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#E8D5A3'))).toEqual(
       []
@@ -592,30 +714,4 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
   });
   expect(TITLE.ACCENT).toBe('#A78BFA');
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');
-});
-
-test('layoutHudCluster keeps three lives and the score in one compact strip', () => {
-  const three = layoutHudCluster(3);
-  expect(three.lifeCenters).toHaveLength(3);
-  expect(three.lifeCenters[0]).toEqual({
-    x: VISUAL.HUD_INSET + VISUAL.HUD_LIFE_SIZE / 2,
-    y: VISUAL.HUD_INSET + VISUAL.HUD_LIFE_SIZE / 2,
-  });
-  const last = three.lifeCenters[2];
-  const first = three.lifeCenters[0];
-  expect(first).toBeDefined();
-  expect(last).toBeDefined();
-  if (!first || !last) {
-    throw new Error('expected three life centers');
-  }
-  expect(three.score.x).toBeGreaterThan(last.x + VISUAL.HUD_LIFE_SIZE / 2);
-  expect(three.score.x).toBeLessThan(120);
-  expect(three.score.y).toBe(first.y);
-
-  const none = layoutHudCluster(0);
-  expect(none.lifeCenters).toEqual([]);
-  expect(none.score).toEqual({
-    x: VISUAL.HUD_INSET,
-    y: VISUAL.HUD_INSET + VISUAL.HUD_LIFE_SIZE / 2,
-  });
 });

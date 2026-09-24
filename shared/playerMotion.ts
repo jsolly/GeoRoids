@@ -7,7 +7,7 @@ export const PLAYER_MOTION = {
   handoffTimeoutMs: 2000,
   /**
    * After the live socket is gone, restore the last ship only inside this
-   * window. Longer gaps start a new flight with the monthly score.
+   * window. Longer gaps start a new flight with the saved score.
    */
   returnToShipMs: 30_000,
   /** Lead credit covers 150ms transport jitter once, not once per packet. */

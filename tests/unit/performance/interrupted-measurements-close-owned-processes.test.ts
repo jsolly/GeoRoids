@@ -2,8 +2,9 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { expect, it } from 'vitest';
+import { expect, it as test } from 'vitest';
 import { commands } from '../../../benchmarks/run';
 
 function running(pid: number): boolean {
@@ -18,7 +19,7 @@ function running(pid: number): boolean {
   }
 }
 
-it('cancelling a measurement stops its uncooperative child and grandchild and retains the failure', async () => {
+test('cancelling a measurement stops its uncooperative child and grandchild and retains the failure', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'georoids-benchmark-cancellation-'));
   const controller = new AbortController();
   const pids: number[] = [];
@@ -86,7 +87,7 @@ it('cancelling a measurement stops its uncooperative child and grandchild and re
   }
 }, 20_000);
 
-it('a failed compiler preserves its exit status and diagnostic output', async () => {
+test('a failed compiler preserves its exit status and diagnostic output', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'georoids-benchmark-compiler-'));
   try {
     const run = commands(directory, new AbortController().signal);

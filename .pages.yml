@@ -76,7 +76,7 @@ content:
             type: select
             required: true
             options:
-              values: [surveyor, hauler, movement, loot, split, reflection, terrain, satellites, pickups, survival]
+              values: [scout, hauler, movement, loot, split, reflection, terrain, satellites, pickups, survival]
           - name: heading
             label: Section heading
             type: string

@@ -13,7 +13,7 @@ import {
 
 test('tether VFX is Hauler-only while latched', () => {
   expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: 'rock-1' })).toBe(true);
-  expect(canDrawHaulerHarpoon({ kitId: 'surveyor', harpoonTargetId: 'rock-1' })).toBe(false);
+  expect(canDrawHaulerHarpoon({ kitId: 'scout', harpoonTargetId: 'rock-1' })).toBe(false);
   expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: null })).toBe(false);
   expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: null })).toBe(false);
 });
@@ -214,8 +214,8 @@ test('non-Hauler draw is a no-op even if a latch is spoofed', () => {
     setLineDash: () => calls.push('setLineDash'),
   } as unknown as CanvasRenderingContext2D;
   publishHarpoonField([{ id: 'rock-1', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
-  const surveyor = new Ship({ kitId: 'surveyor' });
-  surveyor.harpoonTargetId = 'rock-1';
-  drawHaulerHarpoonVfx(ctx, surveyor, 0, 0, { x: 0, y: 0 });
+  const scout = new Ship({ kitId: 'scout' });
+  scout.harpoonTargetId = 'rock-1';
+  drawHaulerHarpoonVfx(ctx, scout, 0, 0, { x: 0, y: 0 });
   expect(calls).toEqual([]);
 });

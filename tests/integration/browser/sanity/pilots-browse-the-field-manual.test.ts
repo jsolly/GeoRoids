@@ -7,6 +7,10 @@ import { media } from '../../../../src/wiki/media';
 import { TestConfig } from '../../utils/test-config';
 
 const articles = readWikiArticles();
+const GIF_SRC_SUFFIX_PATTERN = /\.gif$/u;
+const PNG_SRC_SUFFIX_PATTERN = /\.png$/u;
+const WHITESPACE_COLLAPSE_PATTERN = /\s+/gu;
+const HAULER_LEGACY_TERMS_PATTERN = /Q latches|couple a second/u;
 
 test('pilots find rules and see autoplay demonstrations on desktop and mobile', async () => {
   const browser = await chromium.launch({ headless: true });
@@ -38,6 +42,50 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(await page.locator('.ship-card').count()).toBe(2);
     expect(await page.locator('.demo img[src$=".gif"]').count()).toBe(0);
     await page.screenshot({ path: resolve(output, 'wiki-desktop.png'), fullPage: true });
+    const indexOffset = await page.evaluate(() => {
+      const card = document.querySelector('.topic-card');
+      if (!(card instanceof HTMLElement)) {
+        return 0;
+      }
+      const y = Math.max(0, card.getBoundingClientRect().top + window.scrollY - 240);
+      window.scrollTo(0, y);
+      return window.scrollY;
+    });
+    expect(indexOffset).toBeGreaterThan(200);
+    await expect.poll(() => page.evaluate(() => history.state?.wikiScrollY)).toBe(indexOffset);
+    await page.reload();
+    await page.locator('.topic-card').first().waitFor();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.locator('.topic-card').first().click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    const articleOffset = await page.evaluate(() => {
+      window.scrollTo(0, 480);
+      return window.scrollY;
+    });
+    expect(articleOffset).toBeGreaterThan(200);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.goForward();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, articleOffset))
+      .toBe(true);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.locator('.topic-card').first().click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+    });
     await page.locator('.comparison summary').click();
     expect(await page.locator('tbody tr').count()).toBe(2);
     await page.locator('#wiki-search').fill('furnace');
@@ -65,7 +113,9 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(await page.locator('#wiki-search').inputValue()).toBe('');
     expect(await page.locator('#search-status').textContent()).toBe('');
     expect(await page.locator('.demo button').count()).toBe(0);
-    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
+      GIF_SRC_SUFFIX_PATTERN
+    );
     await page.waitForFunction(() =>
       [...document.querySelectorAll<HTMLImageElement>('.demo img')].every(
         (image) => image.complete && image.naturalWidth > 0
@@ -75,53 +125,85 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(await page.locator('.demo button').count()).toBe(0);
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
-      .toMatch(/\.png$/);
-    await page.goto(`${TestConfig.GAME_URL}/wiki/#surveyor`);
-    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Surveyor');
+      .toMatch(PNG_SRC_SUFFIX_PATTERN);
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#scout`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Scout');
     expect(await page.locator('.demo button').count()).toBe(0);
-    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.png$/);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
+      PNG_SRC_SUFFIX_PATTERN
+    );
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Hauler');
     expect(await page.locator('.demo button').count()).toBe(0);
-    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
+      GIF_SRC_SUFFIX_PATTERN
+    );
     await page.evaluate(() => {
       Object.defineProperty(document, 'hidden', { configurable: true, value: true });
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
-      .toMatch(/\.png$/);
+      .toMatch(PNG_SRC_SUFFIX_PATTERN);
     await page.evaluate(() => {
       Object.defineProperty(document, 'hidden', { configurable: true, value: false });
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
-      .toMatch(/\.gif$/);
+      .toMatch(GIF_SRC_SUFFIX_PATTERN);
     const haulerContent = ((await page.locator('#content').textContent()) ?? '').replace(
-      /\s+/g,
+      WHITESPACE_COLLAPSE_PATTERN,
       ' '
     );
-    expect(haulerContent).toContain('E attaches a tow cable to the nearest living asteroid');
-    expect(haulerContent).toContain('never reels a rock into the hull or throws it');
-    expect(haulerContent).not.toMatch(/Q latches|winch|couple a second/);
+    expect(haulerContent).toContain('Press E near a rock or spider to latch');
+    expect(haulerContent).toContain('Cargo keeps its momentum');
+    expect(haulerContent).not.toMatch(HAULER_LEGACY_TERMS_PATTERN);
+    expect(haulerContent).toContain('Boost Coupling E');
+    expect(haulerContent).toContain('then E again to ignite autonomous delivery');
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
+    const haulerOffset = await page.evaluate(() => {
+      const link = document.querySelector('.related-link');
+      if (!(link instanceof HTMLElement)) {
+        return 0;
+      }
+      const y = Math.max(0, link.getBoundingClientRect().top + window.scrollY - 280);
+      window.scrollTo(0, y);
+      return window.scrollY;
+    });
+    expect(haulerOffset).toBeGreaterThan(200);
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
     await page.screenshot({ path: resolve(output, 'wiki-controls-desktop.png'), fullPage: true });
     await page.goBack();
     await expect.poll(() => page.locator('h1').textContent()).toBe('Hauler');
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, haulerOffset))
+      .toBe(true);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#missing-entry`);
     await expect.poll(() => page.locator('h1').textContent()).toContain('not in the manual');
     for (const article of articles) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
       await expect.poll(() => page.locator('h1').textContent()).toBe(article.title);
+      if (article.id === 'terrain') {
+        await page.screenshot({ path: resolve(output, 'wiki-terrain-desktop.png') });
+      }
+      if (article.id === 'satellites') {
+        await page.screenshot({
+          path: resolve(output, 'wiki-satellite-inventory-desktop.png'),
+          fullPage: true,
+        });
+      }
       const articleMedia = article.media;
       expect(await page.locator('.game-reference section').count()).toBe(article.sections.length);
-      expect((await page.locator('.article-body').textContent())?.replace(/\s+/g, ' ')).toContain(
-        article.searchText.split(' ').slice(0, 2).join(' ')
-      );
+      expect(
+        (await page.locator('.article-body').textContent())?.replace(
+          WHITESPACE_COLLAPSE_PATTERN,
+          ' '
+        )
+      ).toContain(article.searchText.split(' ').slice(0, 2).join(' '));
       expect(
         await page
           .locator('.demo')
@@ -182,13 +264,42 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${TestConfig.GAME_URL}/wiki/`);
     await page.locator('.ship-card').first().waitFor();
+    const mobileOffset = await page.evaluate(() => {
+      const card = document.querySelector('.topic-card');
+      if (!(card instanceof HTMLElement)) {
+        return 0;
+      }
+      const y = Math.max(0, card.getBoundingClientRect().top + window.scrollY - 240);
+      window.scrollTo(0, y);
+      return window.scrollY;
+    });
+    expect(mobileOffset).toBeGreaterThan(200);
+    await page.locator('.topic-card').first().click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    const mobileArticleOffset = await page.evaluate(() => {
+      window.scrollTo(0, 320);
+      return window.scrollY;
+    });
+    expect(mobileArticleOffset).toBeGreaterThan(200);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, mobileOffset))
+      .toBe(true);
+    await page.goForward();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, mobileArticleOffset))
+      .toBe(true);
+    await page.goto(`${TestConfig.GAME_URL}/wiki/`);
+    await page.locator('.ship-card').first().waitFor();
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     await page.locator('#navigation summary').click();
-    await page.locator('#article-nav a[href="#surveyor"]').click();
-    await expect.poll(() => page.locator('h1').textContent()).toBe('Surveyor');
+    await page.locator('#article-nav a[href="#scout"]').click();
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Scout');
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     expect(await page.locator('.demo button').count()).toBe(0);
-    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
+      GIF_SRC_SUFFIX_PATTERN
+    );
     await page.waitForFunction(() =>
       [...document.querySelectorAll<HTMLImageElement>('.demo img')].every(
         (image) => image.complete && image.naturalWidth > 0
@@ -197,7 +308,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
-    await page.screenshot({ path: resolve(output, 'wiki-surveyor-mobile.png'), fullPage: true });
+    await page.screenshot({ path: resolve(output, 'wiki-scout-mobile.png'), fullPage: true });
     await page.locator('.ship-rating-guide summary').click();
     expect(await page.locator('.ship-rating-guide p').isVisible()).toBe(true);
     expect(await page.locator('.ship-rating-guide p').textContent()).toContain('Smaller size');
@@ -219,11 +330,31 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
         })
       )
       .toBeLessThan(1);
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Hauler');
+    expect(await page.locator('#content').textContent()).toContain('Boost Coupling E');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+    await page.screenshot({ path: resolve(output, 'wiki-hauler-mobile.png'), fullPage: true });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#terrain`);
+    await expect
+      .poll(() => page.locator('.article-header h1').textContent())
+      .toBe('Terrain and the boundary');
+    await page
+      .locator('.article-body')
+      .screenshot({ path: resolve(output, 'wiki-terrain-mobile.png') });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
-    expect((await page.locator('#content').textContent())?.replace(/\s+/g, ' ')).toContain(
-      'Touch and hold the playfield to steer'
-    );
+    expect(
+      (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')
+    ).toContain('Hold and drag one finger to steer');
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#satellites`);
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Satellites and pickups');
+    await page.screenshot({
+      path: resolve(output, 'wiki-satellite-inventory-mobile.png'),
+      fullPage: true,
+    });
     await page.locator('.breadcrumb a').click();
     await page.screenshot({ path: resolve(output, 'wiki-mobile.png'), fullPage: true });
     await page.locator('#wiki-search').fill('minerals');

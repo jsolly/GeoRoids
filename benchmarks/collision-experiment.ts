@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import process from 'node:process';
 import { type CombatCircle, circlesOverlap, findShipAsteroidOverlaps } from '../shared/combat';
 import { type Measurement, validateMeasurement } from './results';
 

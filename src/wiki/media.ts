@@ -10,15 +10,17 @@ interface WikiMediaEntry {
  * gameplay change has an obvious media review surface.
  */
 export const media: Record<string, WikiMediaEntry> = {
-  surveyor: {
-    title: 'Surveyor shared mineral scan',
-    alt: 'A Surveyor activates a range-limited scan while a teammate radar receives ice, metal, and rubble marks for the same rocks.',
+  scout: {
+    title: 'Scout shared mineral scan',
+    alt: 'A Scout sends one mineral-scan pulse. A teammate radar receives ice, metal, and rubble marks, and those marks remain after the pulse ends.',
     caption:
-      'Press E to classify nearby rocks on every teammate radar. The scan also records the Surveyor as a contributor for a later furnace delivery.',
+      'Press E to send one pulse that classifies nearby rocks on every teammate radar. The tag stays after the pulse ends and records the Scout for a later furnace delivery.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/surveyScan.ts',
+      'src/entities/ship/shipRenderer.ts',
       'src/rendering/hud/minimap.ts',
+      'src/rendering/hud/resourceMapMark.ts',
       'src/entities/ship/shipKits.ts',
       'server/core/GameEngine.ts',
       'shared/exploration.ts',
@@ -26,9 +28,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   hauler: {
     title: 'Hauler tow cable and furnace delivery',
-    alt: 'A Hauler tows a spinning asteroid behind its hull toward a furnace while a Surveyor watches the shared delivery score.',
+    alt: 'A Hauler tows a spinning asteroid behind its hull toward a furnace while a Scout watches the shared delivery score.',
     caption:
-      'Controlled demonstration: E attaches a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Surveyor credit.',
+      'Controlled demonstration: E attaches a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Scout credit.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
@@ -43,7 +45,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   movement: {
     title: 'Automatic thrust and steering',
-    alt: 'A Surveyor accelerates automatically, turns its nose, and keeps flying after steering is released.',
+    alt: 'A Scout accelerates automatically, turns its nose, and keeps flying after steering is released.',
     caption:
       'Controlled demonstration: thrust stays on while steering turns the ship; releasing steering keeps it flying.',
     sources: [
@@ -53,23 +55,25 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   terrain: {
-    title: 'Terrain slope force',
-    alt: 'A Surveyor thrusts across the contour map while an arrow shows the downhill pull.',
+    title: 'Terrain contours and slope travel',
+    alt: 'A Scout rides contour lines, then turns downhill while an arrow shows the descent.',
     caption:
-      'Controlled demonstration: contour lines show the landscape while an arrow marks the downhill pull on a ship with automatic thrust.',
+      'Controlled demonstration: automatic thrust follows a contour, then the nose turns downhill so speed more than doubles; an arrow marks the downhill direction.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',
       'src/physics/terrain/terrainConfig.ts',
-      'src/physics/terrain/slopeForce.ts',
+      'src/physics/terrain/terrainTravel.ts',
+      'src/entities/ship/cruiseMotion.ts',
       'src/rendering/contourLabels.ts',
+      'src/rendering/contourSpatialIndex.ts',
     ],
   },
   loot: {
-    title: 'Loot blast and growth',
-    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Surveyor and is collected, growing the ship.',
+    title: 'Loot blast and collect',
+    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Scout and is collected without changing the hull size.',
     caption:
-      'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and grows the ship.',
+      'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and is collected.',
     sources: [
       'shared/lootBlast.ts',
       'shared/shipGrowth.ts',
@@ -103,34 +107,37 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   satellites: {
     title: 'EO satellite pickups',
-    alt: 'Six separate satellite views show the Earth-observation hulls drifting as collectible pickups.',
+    alt: 'Six separate satellite views show the Earth-observation hulls glowing as stationary collectible pickups.',
     caption:
-      'Controlled demonstration: six separate views compare the live Earth-observation pickup hulls. They drift as collectible hardware rather than firing.',
+      'Controlled demonstration: six separate views compare the live Earth-observation pickup hulls. They stay stationary and glow until collected and equipped.',
     sources: [
       'shared/eoSatellites.ts',
       'server/core/SatellitePickupManager.ts',
       'scripts/wiki-satellite-demo.ts',
+      'src/entities/satellitePickup/satellitePickupGlow.ts',
       'src/entities/satellite/eoOutlines.ts',
     ],
   },
   pickups: {
     title: 'Satellite pickup orbit',
-    alt: 'A Landsat 7 pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a laser.',
+    alt: 'An equipped Landsat 7 orbits its pilot and shows reduced health after a physical hit.',
     caption:
-      'Controlled demonstration: a nearby Landsat 7 attaches automatically, keeps orbiting while a laser removes 25 health, and remains active after the hit.',
+      'Controlled demonstration: Landsat 7 is collected into inventory and explicitly equipped, then remains in orbit after one physical hit. The green health bar drains with time, and the hit shortens its remaining lifetime.',
     sources: [
       'server/core/SatellitePickupManager.ts',
       'src/constants/index.ts',
       'src/entities/satellitePickup/satellitePickupMath.ts',
       'src/entities/satellitePickup/satellitePickupRenderer.ts',
+      'src/entities/satellitePickup/satellitePickupGlow.ts',
+      'src/entities/satellitePickup/satelliteHealthRenderer.ts',
       'src/entities/satellite/eoOutlines.ts',
     ],
   },
   survival: {
     title: 'Surviving an asteroid impact',
-    alt: 'A Surveyor clips an environmental asteroid, loses 25 health, and keeps flying with a visible 75 out of 100 health capsule.',
+    alt: 'A Scout clips an environmental asteroid, loses 25 health, and keeps flying with a visible 75 out of 100 health capsule.',
     caption:
-      'Controlled demonstration: one server-sized asteroid impact removes 25 health, leaves the Surveyor alive, and lets it continue flying clear of the hazard.',
+      'Controlled demonstration: one server-sized asteroid impact removes 25 health, leaves the Scout alive, and lets it continue flying clear of the hazard.',
     sources: [
       'src/entities/ship/Ship.ts',
       'src/entities/ship/shipUtils.ts',

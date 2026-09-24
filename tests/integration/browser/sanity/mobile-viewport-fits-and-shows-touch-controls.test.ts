@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
+import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
 
+import {
+  assertNoBrowserDiagnostics,
+  watchBrowserDiagnostics,
+} from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -10,6 +15,7 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 test('title and gameplay stay sharp through density changes without a viewport resize', async () => {
   const page = await browserManager.recreatePage();
   await page.setViewportSize({ width: 800, height: 600 });
+  const diagnostics = watchBrowserDiagnostics(page);
   const game = new GameInteractions(page);
   await game.navigateToGame();
   const resizeCount = await page.evaluateHandle(() => {
@@ -55,7 +61,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
     await game.waitForServerJoin();
     expect(
       await page.evaluate(() => {
-        const canvas = document.getElementById('gameCanvas');
+        const canvas = document.querySelector('#gameCanvas');
         if (!(canvas instanceof HTMLCanvasElement)) {
           throw new Error('Game canvas unavailable');
         }
@@ -74,7 +80,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
     );
     expect(
       await page.evaluate(() => {
-        const canvas = document.getElementById('gameCanvas');
+        const canvas = document.querySelector('#gameCanvas');
         if (!(canvas instanceof HTMLCanvasElement)) {
           throw new Error('Game canvas unavailable');
         }
@@ -83,6 +89,12 @@ test('title and gameplay stay sharp through density changes without a viewport r
       })
     ).toEqual({ width: 800, height: 600 });
     expect(await resizeCount.evaluate((count) => count.value)).toBe(0);
+    await session.send('Emulation.clearDeviceMetricsOverride');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('desktop-actions-1280.png'),
+    });
+    assertNoBrowserDiagnostics(diagnostics);
   } finally {
     await session.send('Emulation.clearDeviceMetricsOverride');
     await session.detach();
@@ -99,16 +111,83 @@ test(
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
+    const diagnostics = watchBrowserDiagnostics(page);
 
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
+    // Leave Town Square so the ability button runs Mineral Scan, not Enter store.
+    await game.placeShipAt(0, -500);
 
+    await page.evaluate(
+      "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
+    );
+    const hudToggle = page.locator('#debug-hud-toggle');
+    await hudToggle.waitFor({ state: 'visible' });
+    if ((await hudToggle.getAttribute('aria-expanded')) === 'true') {
+      await hudToggle.tap();
+    }
+    const boxes: NonNullable<Awaited<ReturnType<typeof hudToggle.boundingBox>>>[] = [];
+    for (const id of [
+      'ship-schematic-toggle',
+      'universe-map-toggle',
+      'debug-hud-toggle',
+      'touch-boost',
+      'touch-ability',
+    ]) {
+      const box = await page.locator(`#${id}`).boundingBox();
+      if (!box) {
+        throw new Error(`Missing ${id}`);
+      }
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+      if (id !== 'touch-boost') {
+        expect(box.y + box.height).toBeLessThan(844 / 2);
+      }
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      for (const other of boxes) {
+        expect(
+          box.x >= other.x + other.width ||
+            other.x >= box.x + box.width ||
+            box.y >= other.y + other.height ||
+            other.y >= box.y + box.height
+        ).toBe(true);
+      }
+      boxes.push(box);
+    }
+    const [inventory, map, hud, boostBox, abilityBox] = boxes;
+    if (!inventory || !map || !hud || !boostBox || !abilityBox) {
+      throw new Error('Expected all five action buttons');
+    }
+    const economyBottom = computeHudLayout(
+      { width: 390, height: 844 },
+      { touchControls: true }
+    ).economyBottomY;
+    expect(inventory.y).toBeGreaterThanOrEqual(economyBottom);
+    expect(inventory.y + inventory.height).toBeLessThan(844 / 3);
+    expect([map.y, hud.y, abilityBox.y]).toEqual([inventory.y, inventory.y, inventory.y]);
+    expect(boostBox.y + boostBox.height).toBe(844 - 28);
+    expect(boostBox.x + boostBox.width / 2).toBe(390 / 2);
+    await page.locator('#ship-schematic-toggle').tap();
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+    await page
+      .locator('#ship-schematic-dialog')
+      .getByRole('button', { name: 'Close ship and inventory', exact: true })
+      .tap();
+    await page.locator('#universe-map-toggle').tap();
+    await page.locator('#universe-map-dialog').waitFor({ state: 'visible' });
+    await page.locator('#universe-map-close').tap();
+    await hudToggle.tap();
+    expect(await hudToggle.getAttribute('aria-expanded')).toBe('true');
+    await hudToggle.tap();
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('mobile-top-actions-390.png'),
+    });
     const chrome = await page.evaluate(() => {
-      const root = document.getElementById('touch-controls');
-      const stick = document.getElementById('touch-stick');
-      const ability = document.getElementById('touch-ability');
-      const boost = document.getElementById('touch-boost');
-      const canvas = document.getElementById('gameCanvas');
+      const root = document.querySelector<HTMLElement>('#touch-controls');
+      const stick = document.querySelector('#touch-stick');
+      const ability = document.querySelector('#touch-ability');
+      const boost = document.querySelector('#touch-boost');
+      const canvas = document.querySelector('#gameCanvas');
       const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
       const box = (el: Element | null) => {
         if (!el) {
@@ -170,7 +249,10 @@ test(
       .toBe(false);
 
     const beforeTap = await readTouchControlState(page);
-    const tapPoint = await canvasPoint(page, 0.75, 0.5);
+    const tapPoint = await canvasPoint(page, 0.85, 0.65);
+    expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.id, tapPoint)).toBe(
+      'gameCanvas'
+    );
     await page.touchscreen.tap(tapPoint.x, tapPoint.y);
     await game.waitForAnimationFrames(2);
     expect((await readTouchControlState(page)).lastShotTime).toBeGreaterThan(
@@ -185,15 +267,45 @@ test(
             const ship = window.gameController?.getCurrPlayer()?.ship;
             return Boolean(ship && ship.abilityCooldownFrames > 0 && ship.abilityActiveFrames > 0);
           }),
-        { message: 'Surveyor scan and cooldown should arrive from the server' }
+        { message: 'Scout scan and cooldown should arrive from the server' }
       )
       .toBe(true);
+    for (const viewport of [
+      { width: 320, height: 700 },
+      { width: 844, height: 390 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await game.waitForAnimationFrames(2);
+      await hudToggle.tap();
+      const debugBox = await page.locator('#debug-hud').boundingBox();
+      expect(debugBox?.x).toBeGreaterThanOrEqual(0);
+      expect(debugBox && debugBox.x + debugBox.width).toBeLessThanOrEqual(viewport.width);
+      const rowTops = await Promise.all(
+        ['ship-schematic-toggle', 'universe-map-toggle', 'debug-hud-toggle', 'touch-ability'].map(
+          async (id) => (await page.locator(`#${id}`).boundingBox())?.y
+        )
+      );
+      expect(new Set(rowTops).size).toBe(1);
+      const bottomBoost = await page.locator('#touch-boost').boundingBox();
+      if (!bottomBoost) {
+        throw new Error('Missing bottom Boost button');
+      }
+      expect(bottomBoost.y + bottomBoost.height).toBe(
+        viewport.height - (viewport.width > viewport.height && viewport.height <= 500 ? 20 : 28)
+      );
+      expect(bottomBoost.x + bottomBoost.width / 2).toBe(viewport.width / 2);
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`mobile-actions-${viewport.width}.png`),
+      });
+      await hudToggle.tap();
+    }
+    assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT
 );
 
 test(
-  'mobile menu stays inside the viewport before play and after game over',
+  'mobile menu stays inside the viewport before play and keeps flight active after death',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -224,9 +336,10 @@ test(
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
-    await game.dieUntilGameOver();
-    await expect.poll(() => game.isStartScreenVisible(), { timeout: 10000 }).toBe(true);
-    await assertMenuFits('after-game-over');
+    await game.dieOnceViaBoundary();
+    await game.waitForShipAlive();
+    expect(await game.isGameRunning()).toBe(true);
+    expect(await game.isStartScreenVisible()).toBe(false);
   },
   TestConfig.DEFAULT_TIMEOUT * 3
 );

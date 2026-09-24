@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { expect, test, vi } from 'vitest';
 import { type WebSocket, WebSocketServer } from 'ws';
-import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { Pilot } from '../../../benchmarks/pilot';
 import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { snapshotFixture } from '../network/snapshotFixture';
@@ -83,69 +82,24 @@ test.each([false, true])(
         data: { motionEpoch: 1, motionSequence: 1, thrusting: true },
       });
 
-      const preparedGeneration = pilot.gameJoins;
-      const oldSession = structuredClone(world);
-      const oldPilot = oldSession.entities.find((entity) => entity.id === pilot.id);
-      assert(oldPilot, 'old-session pilot');
-      oldPilot.playerMotion = { epoch: 9, ack: 0, mode: 'free' };
-      oldPilot.lives = 0;
-      const oldReceived = once(pilot.socket, 'message');
+      const generation = pilot.gameJoins;
+      const deadWorld = structuredClone(world);
+      const deadPilot = deadWorld.entities.find((entity) => entity.id === pilot.id);
+      assert(deadPilot);
+      deadPilot.health = 0;
+      deadPilot.exploding = true;
+      const deathReceived = once(pilot.socket, 'message');
       peer.send(
-        JSON.stringify({ type: 'snapshot', data: new SnapshotEncoder(oldSession).encode(2) })
+        JSON.stringify({ type: 'snapshot', data: new SnapshotEncoder(deadWorld).encode(2) })
       );
-      await oldReceived;
+      await deathReceived;
       pilot.drive(2);
-      expect(pilot.gameJoins).toBe(preparedGeneration + 1);
-      expect(pilot.state).toBeUndefined();
-      expect(pilot.lastKeyframeSequence).toBe(0);
-
-      const staleSession = structuredClone(oldSession);
-      const stalePilot = staleSession.entities.find((entity) => entity.id === pilot.id);
-      assert(stalePilot?.playerMotion, 'stale-session pilot motion');
-      stalePilot.lives = 3;
-      expect(
-        observesPreparedFixture(
-          { sequence: 2, gameTime: staleSession.gameTime, motionEpoch: 2 },
-          {
-            lastKeyframeSequence: 3,
-            lastSnapshotGameTime: staleSession.gameTime,
-            motionEpoch: stalePilot.playerMotion.epoch,
-          }
-        )
-      ).toBe(true);
-      const staleReceived = once(pilot.socket, 'message');
-      peer.send(
-        JSON.stringify({ type: 'snapshot', data: new SnapshotEncoder(staleSession).encode(3) })
-      );
-      await staleReceived;
-      expect(pilot.gameJoins).not.toBe(preparedGeneration);
-      expect(pilot.state).toBeUndefined();
-
-      const rejoined = once(pilot.socket, 'message');
-      peer.send(
-        JSON.stringify({
-          type: 'joined',
-          data: {
-            id: pilot.id,
-            snapshotVersion: 1,
-            asteroidInteractions: 1,
-            resumeToken: 'b'.repeat(64),
-          },
-        })
-      );
-      await rejoined;
-      const freshSession = structuredClone(staleSession);
-      const freshPilot = freshSession.entities.find((entity) => entity.id === pilot.id);
-      assert(freshPilot, 'fresh-session pilot');
-      freshPilot.playerMotion = { epoch: 2, ack: 0, mode: 'free' };
-      const freshReceived = once(pilot.socket, 'message');
-      peer.send(
-        JSON.stringify({ type: 'snapshot', data: new SnapshotEncoder(freshSession).encode(1) })
-      );
-      await freshReceived;
-      expect(
-        pilot.state?.entities.find((entity) => entity.id === pilot.id)?.playerMotion?.epoch
-      ).toBe(2);
+      expect(pilot.gameJoins).toBe(generation);
+      expect(pilot.state).toBeDefined();
+      const respawned = once(pilot.socket, 'message');
+      peer.send(JSON.stringify({ type: 'snapshot', data: new SnapshotEncoder(world).encode(3) }));
+      await respawned;
+      expect(pilot.state?.entities.find((entity) => entity.id === pilot.id)?.health).toBe(100);
       expect(failures).toEqual([]);
     } finally {
       try {

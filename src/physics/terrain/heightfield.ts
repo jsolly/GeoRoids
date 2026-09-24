@@ -1,3 +1,4 @@
+import { PASSAGES, passageStrength } from './passages';
 import { TERRAIN } from './terrainConfig';
 
 interface Landmark {
@@ -104,7 +105,7 @@ export function createHeightfield(seed: number, bounds: HeightfieldBounds): Heig
  * Elevation in abstract units. Origin is a flat saddle (zero derivative) so
  * spawn does not slide; landmarks sit in the mid-ring.
  */
-export function sampleHeight(field: Heightfield, x: number, y: number): number {
+export function sampleContourHeight(field: Heightfield, x: number, y: number): number {
   const lx = x - field.cx;
   const ly = y - field.cy;
   const r2 = lx * lx + ly * ly;
@@ -126,7 +127,23 @@ export function sampleHeight(field: Heightfield, x: number, y: number): number {
   const flatten = 1 - Math.exp(-r2 / (2 * TERRAIN.FLATTEN_SIGMA * TERRAIN.FLATTEN_SIGMA));
   // Blend the outer ring to zero so finite differences never see a height cliff at the rim.
   const rim = Math.min(1, Math.max(0, (radius - Math.sqrt(r2)) / TERRAIN.RIM_FADE_WIDTH));
-  return h * flatten * fade(rim);
+  const cut = 1 - (1 - PASSAGES.RELIEF_RETAINED) * passageStrength(field, x, y);
+  return h * flatten * fade(rim) * cut;
+}
+
+/** Strictly increasing elevation mapping: retain tiny relief across broad plains. */
+export function terrainElevation(height: number): number {
+  const relief = Math.max(0, Math.abs(height) - TERRAIN.FLAT_HEIGHT_BAND);
+  return (
+    height * TERRAIN.PLAIN_RELIEF_SCALE +
+    Math.sign(height) *
+      TERRAIN.RELIEF_GAIN *
+      ((relief * relief) / (relief + TERRAIN.FLAT_TRANSITION))
+  );
+}
+
+export function sampleHeight(field: Heightfield, x: number, y: number): number {
+  return terrainElevation(sampleContourHeight(field, x, y)) || 0;
 }
 
 export function sampleGradientInto(

@@ -1,6 +1,6 @@
+import { isEquipmentId } from '../../../shared/equipment';
 import { validExploration } from '../../../shared/exploration';
 import { releaseField } from '../../../shared/releaseId';
-import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import {
   SNAPSHOT_VERSION,
   SnapshotDecoder,
@@ -11,6 +11,7 @@ import {
   shouldSampleSnapshot,
 } from '../../../shared/stateDiagnostics';
 import type {
+  AbilityUsedEvent,
   AsteroidData,
   AsteroidDestroyEvent,
   AsteroidTaggedEvent,
@@ -27,16 +28,24 @@ import type {
   ShockwaveEvent,
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
+import { playFeedback } from '../../audio/feedbackSounds';
 import { playLaserSound } from '../../audio/gameSounds';
 import {
   playAbilityActivation,
   playHarpoonLatch,
   playHarpoonRelease,
-  playLootPickup,
   playOrbitalPickup,
 } from '../../audio/interactionSounds';
+import { playLootPickup, playTapEjection, resetResourceMusic } from '../../audio/resourceMusic';
+import { stopSatelliteOrbit, syncSatelliteOrbit } from '../../audio/satelliteOrbitSound';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
-import { PALETTE, ROID } from '../../constants';
+import { GameStateManager } from '../../core/services/GameStateManager';
+import {
+  noteDebugPingSent,
+  noteDebugPong,
+  noteDebugSnapshot,
+  resetDebugHudSession,
+} from '../../diagnostics/debugHudMetrics';
 import { clientPerformance } from '../../diagnostics/performanceMetrics';
 import { entityFactory } from '../../entities/EntityFactory';
 import { AuthoritativeProjectileField } from '../../entities/laser/AuthoritativeProjectileField';
@@ -44,25 +53,29 @@ import type { Laser } from '../../entities/laser/Laser';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
+import { recordAsteroidLatch } from '../../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
-import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
+import { scoutUtilityOf } from '../../entities/ship/scoutUtility';
+import { setScoutUtilityOnHost } from '../../entities/ship/shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
+import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
+import { setSettlement } from '../../network/worldExploration';
+import { setSpiderField } from '../../physics/terrain/spiderSession';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
+import { setBeltRecovery } from '../../rendering/beltRenderer';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { getClientReleaseId } from '../../utils/buildInfo';
 import { setClientLogContext } from '../../utils/clientLogContext';
-import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage } from '../types';
 import {
-  getCompletedSectors,
   resetWorldExploration,
-  setCompletedSectors,
   setWorldExploration,
   setWorldMapAssets,
+  worldFurnaces,
 } from '../worldExploration';
 import {
   applyAsteroidFieldPartition,
@@ -85,6 +98,7 @@ import {
 } from './connectionHealth';
 import { nextReconnectDelayMs } from './connectionReconnect';
 import { PlayerMotionReconciliation } from './PlayerMotionReconciliation';
+import { publishPlayerIdentity } from './playerIdentityEvents';
 import { PlayerListCache } from './playerListCache';
 import { bindPageHideDisconnect, fillSnapshotEntityIds, isLocalGameEntity } from './playerPresence';
 import {
@@ -134,7 +148,13 @@ function isFinitePosition(value: unknown): value is Position {
 }
 
 function isLootKind(value: unknown): value is LootKind {
-  return value === 'shard' || value === 'wreckage' || value === 'laserCore' || value === 'tap';
+  return (
+    value === 'shard' ||
+    value === 'wreckage' ||
+    value === 'tap' ||
+    value === 'silk' ||
+    isEquipmentId(value)
+  );
 }
 
 function isLootCollectedEvent(value: unknown): value is LootCollected {
@@ -164,7 +184,6 @@ function captureClientPlayerState(player: Player) {
     angle: player.ship.angle,
     health: player.ship.health,
     maxHealth: player.ship.maxHealth,
-    lives: player.lives,
     score: player.score,
     exploding: player.ship.exploding,
     spawnProtectionTimer: player.serverSpawnProtectionTimer,
@@ -178,43 +197,44 @@ export class ConnectionManager {
   // A same-socket rejoin may receive already-queued current snapshots before
   // its new joined acknowledgment. This records the protocol established by
   // the prior acknowledgment without reopening compatibility fallback.
-  private currentProtocolReady = false;
+  private currentProtocolReady: boolean = false;
   private resumeToken?: string;
   private readonly motionReconciliation = new PlayerMotionReconciliation();
-  private snapshotResyncPending = false;
+  private snapshotResyncPending: boolean = false;
 
   private clientId: string;
   private localPlayerName: string = '';
   private localPlayerId: string = '';
   private allPlayers: Map<string, Player> = new Map();
   private seenAsteroidIds: Set<string> = new Set(); // Track asteroids we've already seen
-  private hasInitializedAsteroidsForConnection = false;
+  private hasInitializedAsteroidsForConnection: boolean = false;
   private readonly playerListCache = new PlayerListCache<Player>();
   private readonly snapshotEntityIds = new Set<string>();
   private readonly taggedAsteroidIds = new Set<string>();
   private readonly playedLootCollectionIds = new Set<string>();
+  private readonly playedTapEjectionIds = new Set<string>();
+  private readonly playedLootExplosionIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
-  private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
+  private readonly pingPayload: PingMessage = { type: 'ping' };
   private readonly updateEnvelope: ClientMessage = {
     type: 'update',
     data: {} as PlayerUpdate,
-    timestamp: 0,
   };
 
   // Heartbeat / half-open-socket detection (see connectionHealth.ts).
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastServerMessageAt = 0;
   private joinCompletionTimer: ReturnType<typeof setTimeout> | null = null;
-  private joinCompletionPending = false;
-  private joinAcknowledged = false;
-  private shotAcknowledgements = false;
+  private joinCompletionPending: boolean = false;
+  private joinAcknowledged: boolean = false;
+  private shotAcknowledgements: boolean = false;
   private joinWait?: { resolve: (ok: boolean) => void };
 
   // Only unexpected closes retry; terminal join failures already report an error.
   private disconnectReason: 'requested' | 'join-failed' | null = null;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private hasConnectedOnce = false;
+  private hasConnectedOnce: boolean = false;
   private connectPromise: Promise<void> | null = null;
   private cancelPendingConnect: ((error: Error) => void) | null = null;
   private connectionId = '';
@@ -262,7 +282,7 @@ export class ConnectionManager {
     if (this.state.isConnected) {
       return;
     }
-    if (this.connectPromise) {
+    if (this.connectPromise !== null) {
       return this.connectPromise;
     }
     this.disconnectReason = null;
@@ -377,7 +397,14 @@ export class ConnectionManager {
                   clientPerformance.record('parseMs', result.timings.parseMs);
                 }
               }
-              this.handleServerMessage(result.message);
+              const message = result.message;
+              // Events queued before this pilot joined may precede the baseline.
+              // Apply their state, but do not announce a world not yet received.
+              if (this.lastAcceptedSnapshotSequence === 0 && message.type !== 'error') {
+                withoutWorldAudio(() => this.handleServerMessage(message));
+              } else {
+                this.handleServerMessage(message);
+              }
               return;
             }
             if (clientPerformance.enabled) {
@@ -405,7 +432,11 @@ export class ConnectionManager {
             logger.error(
               'NETWORK',
               'Failed to parse server message',
-              error instanceof Error ? error : new Error(String(error))
+              error instanceof Error
+                ? error
+                : new Error(typeof error === 'string' ? error : JSON.stringify(error), {
+                    cause: error,
+                  })
             );
             clientPerformance.count('messageFailures');
           } finally {
@@ -419,7 +450,11 @@ export class ConnectionManager {
           }
         };
       } catch (cause) {
-        finish(cause instanceof Error ? cause : new Error(String(cause)));
+        finish(
+          cause instanceof Error
+            ? cause
+            : new Error(typeof cause === 'string' ? cause : JSON.stringify(cause), { cause })
+        );
         if (this.state.socket) {
           this.retireSocket(this.state.socket);
         }
@@ -476,7 +511,9 @@ export class ConnectionManager {
       logger.error(
         'NETWORK',
         'Failed to close retired WebSocket',
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error
+          ? error
+          : new Error(typeof error === 'string' ? error : JSON.stringify(error), { cause: error })
       );
     }
   }
@@ -494,7 +531,9 @@ export class ConnectionManager {
       logger.error(
         'NETWORK',
         'Failed to send gameplay message',
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error
+          ? error
+          : new Error(typeof error === 'string' ? error : JSON.stringify(error), { cause: error })
       );
       this.retireSocket(socket);
       return false;
@@ -522,7 +561,7 @@ export class ConnectionManager {
     if (localShip) {
       localShip.serverOwnsMotion = false;
       delete localShip.playerMotion;
-      delete localShip.laserUpgrade;
+      localShip.furnaceTransit = null;
     }
 
     this.resetSnapshotSession();
@@ -531,7 +570,6 @@ export class ConnectionManager {
     this.state.socket = null;
     this.allPlayers.clear();
     this.taggedAsteroidIds.clear();
-    this.playedLootCollectionIds.clear();
     this.playerListCache.invalidate();
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
@@ -683,11 +721,12 @@ export class ConnectionManager {
       return;
     }
 
-    this.pingPayload.timestamp = Date.now();
-    this.pingPayload.probeId = clientPerformance.probe(performance.now());
+    const pingNow = performance.now();
+    this.pingPayload.probeId = clientPerformance.probe(pingNow);
     if (!this.sendPayload(this.pingPayload)) {
       return;
     }
+    noteDebugPingSent(pingNow);
 
     if (isConnectionStale(this.lastServerMessageAt, Date.now())) {
       logger.warn('NETWORK', 'No server traffic within timeout; treating connection as lost', {
@@ -709,16 +748,13 @@ export class ConnectionManager {
     return this.localPlayerName;
   }
 
+  getServerReleaseId(): string | undefined {
+    return this.serverReleaseId;
+  }
+
   getLocalPlayerId(): string {
     // Join uses clientId until the server `joined` echo sets localPlayerId (same value).
     return this.localPlayerId || this.clientId;
-  }
-
-  private getLocalPlayerColor(): string {
-    // Get the local player's color from the player manager
-    const playerManager = PlayerManager.getInstance();
-    const localPlayer = playerManager.getLocalPlayer();
-    return localPlayer?.color || PALETTE.LOCAL;
   }
 
   private getLocalPlayerPosition(): { x: number; y: number } {
@@ -756,12 +792,7 @@ export class ConnectionManager {
   }
 
   // Send player state to server
-  sendPlayerState(
-    playerState: Omit<PlayerUpdate, 'lives' | 'score'> & {
-      lives?: number;
-      score?: number;
-    }
-  ): void {
+  sendPlayerState(playerState: PlayerUpdate): void {
     if (
       !this.state.isConnected ||
       !this.state.socket ||
@@ -774,7 +805,7 @@ export class ConnectionManager {
       return;
     }
     const ship = PlayerManager.getInstance().getLocalShip();
-    if (!ship) {
+    if (!ship || ship.furnaceTransit) {
       return;
     }
     const pose = this.motionReconciliation.buildHandoffPose(ship);
@@ -785,7 +816,6 @@ export class ConnectionManager {
       return;
     }
     this.updateEnvelope.data = playerState;
-    this.updateEnvelope.timestamp = Date.now();
     this.sendPayload(this.updateEnvelope);
   }
 
@@ -815,7 +845,6 @@ export class ConnectionManager {
         laserDirection: laser.velocity,
         ...(requestId ? { requestId } : {}),
       },
-      timestamp: Date.now(),
     };
 
     logger.debug('NETWORK', 'Sending shoot message to server', { playerId: message.id });
@@ -857,7 +886,6 @@ export class ConnectionManager {
       id: this.clientId,
       data: {
         name: this.localPlayerName,
-        color: this.getLocalPlayerColor(),
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         snapshotVersion: SNAPSHOT_VERSION,
@@ -865,12 +893,11 @@ export class ConnectionManager {
         clientReleaseId: getClientReleaseId(),
         ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),
       },
-      timestamp: Date.now(),
     };
 
     logger.debug('NETWORK', 'Sending join message', {
       id: this.clientId,
-      resumable: !!this.resumeToken,
+      resumable: Boolean(this.resumeToken),
       clientReleaseId: getClientReleaseId(),
       ...readStoredResumeProvenance(),
     });
@@ -901,14 +928,12 @@ export class ConnectionManager {
 
     logger.debug('NETWORK', 'Sending initAsteroids message', {
       playerId: this.localPlayerId,
-      asteroidCount: ROID.INITIAL_ROID_COUNT,
     });
 
     const message: ClientMessage = {
       type: 'initAsteroids',
       id: this.localPlayerId,
-      data: { asteroidCount: ROID.INITIAL_ROID_COUNT },
-      timestamp: Date.now(),
+      data: {},
     };
 
     if (!this.sendPayload(message)) {
@@ -935,9 +960,12 @@ export class ConnectionManager {
   private handleServerMessage(message: ServerMessageEnvelope): void {
     const data = 'data' in message ? message.data : undefined;
     switch (message.type) {
-      case 'pong':
-        clientPerformance.pong(message.probeId, performance.now());
+      case 'pong': {
+        const now = performance.now();
+        clientPerformance.pong(message.probeId, now);
+        noteDebugPong(now);
         return;
+      }
       case 'playerShotFired':
         if (
           data &&
@@ -968,6 +996,8 @@ export class ConnectionManager {
         }
         break;
       case 'sessionExpired': {
+        setSpiderField(undefined);
+        setBeltRecovery();
         // Remove the previous map key before initializeAsteroidSync changes
         // the local Player object's id for the replacement session.
         const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1028,7 +1058,6 @@ export class ConnectionManager {
             damage: number;
             remainingHealth: number;
             isDestroyed: boolean;
-            remainingLives?: number;
           }
         );
         break;
@@ -1040,21 +1069,25 @@ export class ConnectionManager {
       case 'lootCollected':
         this.handleLootCollected(data);
         break;
+      case 'tapEjected':
+        this.handleTapEjected(data);
+        break;
+      case 'furnaceBuildResult':
+        if (typeof data === 'string') {
+          GameStateManager.getInstance().setNotice(data);
+        }
+        break;
+      case 'furnaceTravelResult':
+        window.dispatchEvent(new CustomEvent('furnaceTravelResult', { detail: data }));
+        break;
+      case 'townStoreResult':
+        window.dispatchEvent(new CustomEvent('townStoreResult', { detail: data }));
+        break;
       case 'furnaceDelivery':
         this.handleFurnaceDelivery(data as FurnaceDelivery);
         break;
       case 'abilityUsed':
-        this.handleAbilityUsed(
-          data as {
-            id?: string;
-            kitId?: string;
-            abilityId?: string;
-            harpoonTargetId?: string | null;
-            harpoonLatchPos?: Position;
-
-            abilityActiveFrames?: number;
-          }
-        );
+        this.handleAbilityUsed(data as AbilityUsedEvent);
         break;
       case 'error':
         if (this.joinCompletionPending && !this.joinAcknowledged) {
@@ -1072,6 +1105,13 @@ export class ConnectionManager {
   }
 
   private resetSnapshotSession(): void {
+    resetResourceMusic();
+    stopSatelliteOrbit();
+    this.playedLootCollectionIds.clear();
+    this.playedTapEjectionIds.clear();
+    this.playedLootExplosionIds.clear();
+    setSpiderField(undefined);
+    setBeltRecovery();
     this.shotAcknowledgements = false;
     AuthoritativeProjectileField.getInstance().clear();
     this.clearJoinCompletionTimer();
@@ -1083,6 +1123,7 @@ export class ConnectionManager {
     this.lastAcceptedSnapshotSequence = 0;
     delete this.serverReleaseId;
     clientPerformance.serverReleaseId = undefined;
+    resetDebugHudSession();
   }
 
   private failCurrentProtocol(error: Error): void {
@@ -1134,7 +1175,7 @@ export class ConnectionManager {
     if (this.snapshotResyncPending) {
       return false;
     }
-    const sent = this.sendMessage({ type: 'snapshotResync', data: {}, timestamp: Date.now() });
+    const sent = this.sendMessage({ type: 'snapshotResync', data: {} });
     if (sent) {
       this.snapshotResyncPending = true;
       clientPerformance.count('resyncs');
@@ -1158,6 +1199,7 @@ export class ConnectionManager {
         this.applyReceivedSnapshot(state);
       }
       this.lastAcceptedSnapshotSequence = metadata.sequence;
+      noteDebugSnapshot(metadata.sequence, performance.now());
       clientPerformance.snapshotApplied({
         sequence: metadata.sequence,
         kind: metadata.kind,
@@ -1232,15 +1274,7 @@ export class ConnectionManager {
     }
   }
 
-  private handleAbilityUsed(data: {
-    id?: string;
-    kitId?: unknown;
-    abilityId?: unknown;
-    harpoonTargetId?: string | null;
-    harpoonLatchPos?: Position;
-
-    abilityActiveFrames?: number;
-  }): void {
+  private handleAbilityUsed(data: AbilityUsedEvent): void {
     if (!data.id) {
       return;
     }
@@ -1252,12 +1286,19 @@ export class ConnectionManager {
     }
     const abilityId = getShipKit(data.kitId ?? entity.ship.kitId).abilityId;
     const isHarpoonRelease = abilityId === 'harpoon' && data.harpoonTargetId === null;
+    const isLocalAbility =
+      data.id === localPlayer?.id || data.id === this.getLocalPlayerId() || entity.type === 'local';
     if (!isHarpoonRelease) {
       playAbilityActivation(abilityId, entity.ship.position);
+      playLocalHaptic(isLocalAbility, 'ability');
     }
     if (abilityId === 'harpoon') {
       if (isHarpoonRelease) {
         playHarpoonRelease(entity.ship.position);
+        if (isFinitePosition(data.boostIgnitionPosition)) {
+          playFeedback('boostIgnite', data.boostIgnitionPosition);
+          playLocalHaptic(isLocalAbility, 'boost');
+        }
       } else {
         const targetPosition = isFinitePosition(data.harpoonLatchPos)
           ? data.harpoonLatchPos
@@ -1265,6 +1306,9 @@ export class ConnectionManager {
             ? findHarpoonFieldBody(data.harpoonTargetId)?.position
             : undefined;
         playHarpoonLatch(targetPosition ?? entity.ship.position);
+        if (typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0) {
+          recordAsteroidLatch(data.harpoonTargetId);
+        }
       }
     }
     const latch = {
@@ -1281,9 +1325,12 @@ export class ConnectionManager {
   }
 
   private handleSnapshotState(data: ServerGameSnapshot): void {
+    setSpiderField(data.spiderField);
+    setBeltRecovery(data.beltRecovery);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
-    setCompletedSectors(data.completedSectors);
+    setSettlement(data.settlement);
+    worldFurnaces.replaceLit(data.civicModules ?? []);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
     }
@@ -1307,7 +1354,7 @@ export class ConnectionManager {
           if (isLocalPlayer) {
             // Adopt the game-loop's local player as the single source of truth
             // for the local ship, so server-authoritative state (health, score,
-            // lives, respawn) flows into the same object the game loop renders,
+            // cargo, respawn) flows into the same object the game loop renders,
             // collides, and attributes damage with. Align its id to the
             // server-assigned id.
             if (localPlayer) {
@@ -1323,16 +1370,14 @@ export class ConnectionManager {
             }
           }
 
-          if (!entity) {
-            entity = entityFactory.createPlayer({
-              id: entityData.id,
-              name: entityData.name,
-              type: 'remote',
-              color: entityData.color,
-              ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
-              position: entityData.position,
-            });
-          }
+          entity ??= entityFactory.createPlayer({
+            id: entityData.id,
+            name: entityData.name,
+            type: 'remote',
+            color: entityData.color,
+            ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
+            position: entityData.position,
+          });
 
           this.rememberPlayer(entityData.id, entity);
         } else if (isLocalPlayer && localPlayer && entity !== localPlayer) {
@@ -1361,16 +1406,34 @@ export class ConnectionManager {
         if (entity.type !== 'local') {
           entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
         }
-        entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
-        entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
-        if (entityData.laserUpgrade) {
-          entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
-        } else {
-          delete entity.ship.laserUpgrade;
+        const snapshotUtility =
+          entity.type === 'local'
+            ? scoutUtilityOf(entity.ship)
+            : (entityData.scoutUtility ?? scoutUtilityOf(entity.ship));
+        const scoutToolSelected =
+          entity.ship.kitId === 'scout' && snapshotUtility !== 'mineral_scan';
+        const serverCooldown = entityData.abilityCooldownFrames ?? 0;
+        // Mineral Scan predicts its cooldown on send. A snapshot that still
+        // reads 0 must not clear that timer before the server echo. Failed
+        // probe launches and furnace builds stay at 0 and remain usable.
+        if (
+          entity.type !== 'local' ||
+          entity.ship.kitId !== 'scout' ||
+          scoutToolSelected ||
+          serverCooldown > 0 ||
+          entity.ship.abilityCooldownFrames <= 0
+        ) {
+          entity.ship.abilityCooldownFrames = serverCooldown;
         }
+        entity.ship.abilityActiveFrames = scoutToolSelected
+          ? 0
+          : (entityData.abilityActiveFrames ?? 0);
 
         if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
           delete entity.deathCause;
+        }
+        if (data.serverTime !== undefined) {
+          entity.ship.furnaceClockOffsetMs = data.serverTime - Date.now();
         }
         entity.updateFromServer(entityData);
         if (isLocalPlayer) {
@@ -1398,17 +1461,17 @@ export class ConnectionManager {
       }
     }
 
-    const localHull = PlayerManager.getInstance().getLocalPlayer()?.ship;
-    if (localHull) {
-      containBodyOutOfCompletedSectors(localHull, getCompletedSectors(), { radius: localHull.r });
-    }
-
     // Apply the authoritative field: create unseen roids, then keep pose in sync
     // so late joiners and every client share the same moving asteroids.
     this.applyAuthoritativeAsteroids(data.asteroids, true);
 
     LootField.getInstance().applySnapshot(data.loot);
     SatellitePickupManager.getInstance().syncFromServer(data.satellitePickups);
+    syncSatelliteOrbit(
+      data.satellitePickups.find(
+        (pickup) => pickup.ownerId === this.localPlayerId && pickup.state === 'orbiting'
+      )
+    );
     const projectileField = AuthoritativeProjectileField.getInstance();
     projectileField.sync(data.playerProjectiles);
     for (const player of this.allPlayers.values()) {
@@ -1437,14 +1500,50 @@ export class ConnectionManager {
     radius: number;
     shooterId: string;
   }): void {
-    if (!data.lootId) {
+    if (
+      !data.lootId ||
+      !isFinitePosition(data.position) ||
+      !Number.isFinite(data.radius) ||
+      this.playedLootExplosionIds.has(data.lootId)
+    ) {
       return;
     }
-    LootField.getInstance().remove(data.lootId);
-    if (isFinitePosition(data.position) && Number.isFinite(data.radius)) {
-      playDestructionSound('loot', data.position);
-      LootField.getInstance().noteBlast(data.position, data.radius);
+    if (this.playedLootExplosionIds.size >= MAX_PLAYED_LOOT_COLLECTION_IDS) {
+      const oldest = this.playedLootExplosionIds.values().next().value;
+      if (oldest !== undefined) {
+        this.playedLootExplosionIds.delete(oldest);
+      }
     }
+    this.playedLootExplosionIds.add(data.lootId);
+    LootField.getInstance().remove(data.lootId);
+    playDestructionSound('loot', data.position);
+    LootField.getInstance().noteBlast(data.position, data.radius);
+  }
+
+  private handleTapEjected(data: unknown): void {
+    if (
+      typeof data !== 'object' ||
+      data === null ||
+      Array.isArray(data) ||
+      !('lootId' in data) ||
+      typeof data.lootId !== 'string' ||
+      !data.lootId ||
+      !('position' in data) ||
+      !isFinitePosition(data.position)
+    ) {
+      return;
+    }
+    if (this.playedTapEjectionIds.has(data.lootId)) {
+      return;
+    }
+    if (this.playedTapEjectionIds.size >= MAX_PLAYED_LOOT_COLLECTION_IDS) {
+      const oldest = this.playedTapEjectionIds.values().next().value;
+      if (oldest !== undefined) {
+        this.playedTapEjectionIds.delete(oldest);
+      }
+    }
+    this.playedTapEjectionIds.add(data.lootId);
+    playTapEjection(data.position);
   }
 
   private handleLootCollected(data: unknown): void {
@@ -1461,7 +1560,8 @@ export class ConnectionManager {
       }
     }
     this.playedLootCollectionIds.add(data.lootId);
-    playLootPickup(data.kind, data.position);
+    playLootPickup(data.position);
+    playLocalHaptic(data.collectorId === this.getLocalPlayerId(), 'pickup');
   }
 
   private handleFurnaceDelivery(data: FurnaceDelivery): void {
@@ -1496,6 +1596,10 @@ export class ConnectionManager {
       );
       return;
     }
+    // A restored pilot keeps its ID but starts a new motion epoch. The joined
+    // acknowledgment is the boundary after which old movement counters expire.
+    this.motionReconciliation.reset();
+    this.motionReconciliation.awaitAuthoritativePose();
     this.joinAcknowledged = true;
     this.shotAcknowledgements = data.shotAcknowledgements === true;
     this.currentProtocolReady = true;
@@ -1514,6 +1618,7 @@ export class ConnectionManager {
     }
     this.lastDamageStateLogAt = 0;
     setClientLogContext({ playerId: data.id, connectionId: this.connectionId });
+    publishPlayerIdentity(data.id);
     logger.info('STATE', 'player_joined', {
       joinedAt: Date.now(),
       playerId: data.id,
@@ -1569,10 +1674,19 @@ export class ConnectionManager {
         applyShipKitToShip(localPlayer.ship, authoritativeKit);
       }
       if (localPlayer.ship.kitId === 'hauler') {
-        const utility = preferredHaulerUtility();
+        const utility = 'tow_cable';
         localPlayer.ship.haulerUtility = utility;
         this.sendMessage({
           type: 'setHaulerUtility',
+          id: localPlayer.id,
+          data: { utilityId: utility },
+        });
+      }
+      if (localPlayer.ship.kitId === 'scout') {
+        const utility = 'mineral_scan';
+        setScoutUtilityOnHost(localPlayer.ship, utility);
+        this.sendMessage({
+          type: 'setScoutUtility',
           id: localPlayer.id,
           data: { utilityId: utility },
         });
@@ -1618,6 +1732,7 @@ export class ConnectionManager {
       asteroidId: data.asteroidId,
       collabSplit: data.collabSplit === true,
       ...(data.origin !== undefined ? { origin: data.origin } : {}),
+      ...(data.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
     });
   }
 
@@ -1650,6 +1765,7 @@ export class ConnectionManager {
     if (isFinitePosition(data.position)) {
       playOrbitalPickup(data.position);
     }
+    playLocalHaptic(data.playerId === this.getLocalPlayerId(), 'pickup');
     window.dispatchEvent(new CustomEvent('satellitePickupCollected', { detail: data }));
   }
 
@@ -1659,7 +1775,6 @@ export class ConnectionManager {
     damage: number;
     remainingHealth: number;
     isDestroyed: boolean;
-    remainingLives?: number;
   }): void {
     logger.debug('NETWORK', 'Player damaged', {
       targetPlayerId: data.targetPlayerId,
@@ -1667,7 +1782,6 @@ export class ConnectionManager {
       damage: data.damage,
       remainingHealth: data.remainingHealth,
       isDestroyed: data.isDestroyed,
-      remainingLives: data.remainingLives,
     });
 
     const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1675,10 +1789,6 @@ export class ConnectionManager {
       localPlayer &&
         (localPlayer.id === data.targetPlayerId || this.getLocalPlayerId() === data.targetPlayerId)
     );
-    const prevLocalLives =
-      isLocalTarget && localPlayer && data.remainingLives !== undefined
-        ? localPlayer.lives
-        : undefined;
     const beforeHealth = isLocalTarget && localPlayer ? localPlayer.ship.health : undefined;
 
     let targetPlayer = this.allPlayers.get(data.targetPlayerId);
@@ -1698,31 +1808,24 @@ export class ConnectionManager {
     if (data.attackerId) {
       targetPlayer.deathCause = data.attackerId;
     }
-    if (data.remainingLives !== undefined) {
-      targetPlayer.lives = data.remainingLives;
-    }
 
+    if (data.isDestroyed) {
+      targetPlayer.reportDeath();
+    }
     this.applyDamageToLocalPlayerIfTarget(data);
 
     this.applyAuthoritativeDamageHealth(targetPlayer, data.remainingHealth, data.isDestroyed);
 
     if (data.remainingHealth > 0 && data.damage > 0) {
       targetPlayer.ship.takeDamage(0, data.attackerId);
+      if (isLocalTarget && beforeHealth !== undefined && data.remainingHealth < beforeHealth) {
+        playFeedback('hullDamage');
+        playLocalHaptic(true, 'hit');
+      }
     }
 
     if (data.isDestroyed && !targetPlayer.ship.exploding) {
       targetPlayer.ship.explode(data.attackerId);
-    }
-
-    if (
-      localPlayer &&
-      prevLocalLives !== undefined &&
-      data.remainingLives !== undefined &&
-      prevLocalLives > data.remainingLives
-    ) {
-      const deathCause = describeDeathCause(data.attackerId);
-      localPlayer.deathCause = deathCause;
-      this.dispatchLocalPlayerDied(localPlayer, data.remainingLives, deathCause);
     }
 
     if (isLocalTarget) {
@@ -1737,36 +1840,16 @@ export class ConnectionManager {
           damage: data.damage,
           ...(beforeHealth !== undefined ? { healthBefore: beforeHealth } : {}),
           healthAfter: data.remainingHealth,
-          ...(prevLocalLives !== undefined ? { livesBefore: prevLocalLives } : {}),
-          ...(data.remainingLives !== undefined ? { livesAfter: data.remainingLives } : {}),
           ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
         });
       }
     }
   }
 
-  /** Fire playerDied when server reports a life loss before game-state sync arrives. */
-  private dispatchLocalPlayerDied(
-    localPlayer: Player,
-    remainingLives: number,
-    deathCause: string
-  ): void {
-    window.dispatchEvent(
-      new CustomEvent('playerDied', {
-        detail: {
-          playerId: localPlayer.id,
-          deathCause,
-          isGameOver: remainingLives <= 0,
-        },
-      })
-    );
-  }
-
   /** Keep PlayerManager's local ship in sync when damage hits a network duplicate. */
   private applyDamageToLocalPlayerIfTarget(data: {
     targetPlayerId: string;
     remainingHealth: number;
-    remainingLives?: number;
     isDestroyed: boolean;
     attackerId: string;
   }): void {
@@ -1783,9 +1866,6 @@ export class ConnectionManager {
     this.applyAuthoritativeDamageHealth(localPlayer, data.remainingHealth, data.isDestroyed);
     if (data.attackerId) {
       localPlayer.deathCause = data.attackerId;
-    }
-    if (data.remainingLives !== undefined) {
-      localPlayer.lives = data.remainingLives;
     }
     if (data.isDestroyed && !localPlayer.ship.exploding) {
       localPlayer.ship.explode(data.attackerId);

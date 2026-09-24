@@ -69,20 +69,20 @@ function angleDistance(left: number, right: number): number {
   return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
 }
 
-async function sampleLocalPosition(page: Page, startAtRest = false): Promise<TimedPosition> {
-  return page.evaluate((startAtRest) => {
+function sampleLocalPosition(page: Page, startAtRest = false): Promise<TimedPosition> {
+  return page.evaluate((shouldStartAtRest) => {
     const ship = window.gameController?.getCurrPlayer()?.ship;
     if (!ship) {
       throw new Error('Local pilot missing during terrain measurement');
     }
-    if (startAtRest) {
+    if (shouldStartAtRest) {
       ship.velocity = { x: 0, y: 0 };
     }
     return { ...ship.position, at: performance.now() };
   }, startAtRest);
 }
 
-async function readTerrain(page: Page): Promise<{
+function readTerrain(page: Page): Promise<{
   peak: { height: number };
   slope: { height: number; gradient: { x: number } };
   rim: { height: number };
@@ -94,7 +94,7 @@ async function readTerrain(page: Page): Promise<{
     }
     return {
       peak: gc.getTerrainProbe({ x: 0, y: 0 }),
-      slope: gc.getTerrainProbe({ x: 2250, y: 0 }),
+      slope: gc.getTerrainProbe({ x: 3090, y: 1150 }),
       rim: gc.getTerrainProbe({ x: rimX + 1, y: 0 }),
     };
   }, WORLD.radius);
@@ -129,7 +129,7 @@ for (const viewport of [
         await page.waitForFunction(
           () =>
             document.body.classList.contains('touch-play') &&
-            !document.getElementById('touch-controls')?.hidden,
+            !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
           { timeout: 5000 }
         );
       }
@@ -140,7 +140,7 @@ for (const viewport of [
       expect(terrain.rim.height).toBe(0);
       expect(terrain.slope.gradient.x).toBeGreaterThan(0.002);
 
-      await game.placeShipAt(2250, 0);
+      await game.placeShipAt(3090, 1150);
       await game.armSpawnProtection();
       await page.evaluate((heading) => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -166,7 +166,9 @@ for (const viewport of [
         .poll(
           () => {
             const position = authoritative.getPosition(localPlayerId);
-            return position ? Math.hypot(position.x - 2250, position.y) : Number.POSITIVE_INFINITY;
+            return position
+              ? Math.hypot(position.x - 3090, position.y - 1150)
+              : Number.POSITIVE_INFINITY;
           },
           { timeout: 5000, interval: 50 }
         )
@@ -239,7 +241,9 @@ for (const viewport of [
         authoritativeDistance / (afterAuthoritative.at - beforeAuthoritative.at)
       );
 
-      await page.screenshot({ path: `/tmp/georoids-varied-terrain-${viewport.name}.png` });
+      await page.screenshot({
+        path: `/tmp/georoids-varied-terrain-${viewport.name}-${angle === 0 ? 'uphill' : 'downhill'}.png`,
+      });
       expect(pageErrors).toEqual([]);
       expect(warnings).toEqual([]);
     }
@@ -248,12 +252,13 @@ for (const viewport of [
     if (downhill === undefined || uphill === undefined) {
       throw new Error('Both local directions must be measured');
     }
-    expect(downhill).toBeGreaterThan(uphill * 1.08);
+    // This real route reaches gentler ground; the unit scenario verifies the full steep-slope ratio.
+    expect(downhill).toBeGreaterThan(uphill * 1.25);
 
     const [authoritativeDownhill, authoritativeUphill] = authoritativeSpeeds;
     if (authoritativeDownhill === undefined || authoritativeUphill === undefined) {
       throw new Error('Both authoritative directions must be measured');
     }
-    expect(authoritativeDownhill).toBeGreaterThan(authoritativeUphill * 1.08);
+    expect(authoritativeDownhill).toBeGreaterThan(authoritativeUphill * 1.25);
   });
 }

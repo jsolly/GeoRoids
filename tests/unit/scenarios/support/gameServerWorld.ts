@@ -108,7 +108,18 @@ export class GameServerWorld {
     const id = `${name.toLowerCase()}-${this.joinCount}`;
     const socket = new RecordingSocket();
     this.sendJoin(socket, id, name, position, options);
-    return this.pilotFromJoin(socket, id, name);
+    const pilot = this.pilotFromJoin(socket, id, name);
+    // The join protocol only keeps a town-ring arrival. Fixture poses are applied after that.
+    if (
+      !this.engine.playerMotion.placeActorForTesting(
+        pilot.id,
+        position,
+        this.engine.getServerTime()
+      )
+    ) {
+      throw new Error(`Join fixture could not place ${pilot.id}`);
+    }
+    return pilot;
   }
 
   joinWithId(

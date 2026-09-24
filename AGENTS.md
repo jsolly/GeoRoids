@@ -17,11 +17,11 @@ deletion are blocked. Human approval and conversation resolution are optional so
 CI-gated auto-merge can run unattended. The local break-glass variable does not
 override these GitHub protections.
 
-Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. See [world operations](docs/persistent-world.md).
+Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. Writes are write-behind through a worker thread (about a one-second loss window on a hard crash); the game loop never waits on the disk. See [world operations](docs/persistent-world.md).
 
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
-Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.
+Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). It includes all unit and integration tests and constrained-client checks. Run it during the review/fix loop and again after final review fixes before pushing. GitHub CI independently runs parallel static validation and a small gameplay/touch/reconnect smoke, then requires both in `CI / ci`. See [CI and local review](docs/ci-and-local-review.md).
 
 ### Post-push verification (`/ship` step 12)
 
@@ -34,14 +34,37 @@ Local gate before push: `npm run gate` (full working-tree checks, including an e
 
 Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDOMAIN). The live client is **georoids.com**.
 
-**Server changes** (`server.ts`, `server/**`, `.railway/**`, or server-facing changes in `shared-types.ts`):
+**Server changes** are classified by `node scripts/server-release-inputs.mjs --changed <base-sha> <merge-sha>` from the merged checkout. The classifier includes the TypeScript dependency graph rooted at `server.ts`, server/shared/setup/Railway paths, and runtime/build manifests. This includes server-consumed modules under `src/`. If it prints `true`:
 
 1. Complete client verification above if the push also touched client files.
-2. Deploy manually on [Railway](https://railway.app) (linked GitHub repo or Railway CLI).
-3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
+2. Deploy manually on [Railway](https://railway.app). **A merge to `main` does not deploy the server**: the Railway API reports the GitHub push-deploy trigger disabled (`NO_INSTALLATION` — no GitHub App on the public repo), and #608's merge produced no deployment until it was triggered by hand. The tracked `.railway/railway.ts` `source: github('jsolly/GeoRoids', { branch: 'main' })` only pins which repo and branch a deploy builds from; it does not by itself enable a push trigger. Deploy the **exact merged commit SHA**: the Railway dashboard's Deploy on that commit, or the Railway MCP agent / API deploy pinned to that `commitSha`. `railway redeploy` re-runs the previous build (its old SHA) and `railway up` uploads your local tree, so **neither** builds the merged commit. Deploy the commit only — do not commit unrelated staged environment patches.
+3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON (`world.persistence.mode` is `worker`, `failed` is `false`, `world.loop` stalls are `0`) and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
 4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
 
 Do not run `vercel deploy` from `/ship` unless Git integration is broken.
+
+### Production smoke workflow
+
+The separate **Production smoke** workflow follows successful trusted `main` CI.
+It checks the intended client release and the minimum required server release,
+then uses the real production UI to join, receive snapshots, move, and fire.
+It fails on stale releases, unhealthy persistence, stalled simulation, broken
+interaction, browser errors, or a deadline. Logs, screenshots, traces, and a
+machine-readable receipt are retained as workflow artifacts.
+
+Run `npm run smoke:production` with `PRODUCTION_SMOKE_SHA` set to the full merged
+SHA and `PRODUCTION_SMOKE_REQUEST_ID` set to a unique request ID. The checkout
+must match that SHA. This production-only runner does not start local servers.
+`PRODUCTION_SMOKE_SERVER_SHA` explicitly identifies a separate Railway release;
+otherwise the classifier computes the last server-affecting commit.
+
+During `/ship`, follow CI, deployment, and the exact smoke request to completion.
+Use the canonical `skills/ship/scripts/follow-production-smoke.mjs` helper from
+dotagents. Missing triggers require explicit dispatch; skipped, cancelled,
+missing, timed-out, or failed smoke is not verified. After a Railway deployment,
+request a fresh smoke run with its exact `server_sha`; an earlier client-only
+success cannot verify that deployment. Fix post-merge failures in a new PR.
+Triggers do not wake idle agents, and no recurring monitor is configured.
 
 ## Project
 
@@ -57,9 +80,10 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | **Project** | `georoids` (`jsollys-projects`) |
 | **Production URLs** | **Canonical:** <https://www.georoids.com>; **apex:** <https://georoids.com> (redirects to www); **Vercel default:** `https://georoids-jsollys-projects.vercel.app` |
-| **Build** | `npm run build` → `dist/` (Vite; framework auto-detected — no `vercel.json` required) |
-| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration |
-| **Local deploy** | None — no `npm run deploy` or CLI deploy step |
+| **Build** | `npm run build` → `dist/` (Vite; framework auto-detected) |
+| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration. Branch pushes do **not** create Preview deployments (`vercel.json` `git.deploymentEnabled`). |
+| **Opt-in Preview** | Comment `/preview` as the first non-empty line on a same-repo PR (owner/member/collaborator User), or run workflow **Vercel Preview** with the PR number. GitHub runs that workflow from `main`. One-shot: new commits do not rebuild until you ask again. Requires GitHub secret `VERCEL_TOKEN`. Agents must not comment `/preview` unless the user asked. |
+| **Local deploy** | None — no `npm run deploy` or CLI deploy step from `/ship` |
 
 **Required Vercel production env vars:**
 
@@ -67,7 +91,7 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://geoasteroids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
 
-`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit comes from `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, or local Git. A missing or invalid commit stops the build because automatic client refresh needs that identity.
+`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit is the first valid 40-character SHA among `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, and `GEOROIDS_COMMIT_SHA`, then local Git. Empty hosted values do not block the later fallbacks. A missing or invalid commit stops the build because automatic client refresh needs that identity.
 
 Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManager` uses same-origin `/ws`. Vite proxies `/ws` and `/logs` to the configured local game-server port. This also supports phones using a public HTTPS tunnel to the Vite port. Direct Vite runs can override the endpoint in `.env.local` (see `.env.example`).
 
@@ -77,7 +101,7 @@ Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManage
 | --- | --- |
 | **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
 | **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
-| **Deploy** | Manual / separate from the Git push flow — Railway dashboard or CLI |
+| **Deploy** | Manual / separate from the Git push flow. Push-deploy auto-trigger is **off** (Railway API `NO_INSTALLATION`; #608's merge did not deploy). Deploy the exact merged commit SHA via the Railway dashboard Deploy-this-commit or the MCP agent/API pinned to that `commitSha` — `railway redeploy`/`up` do not build the merged SHA. Do not commit unrelated staged env patches |
 | **When required** | Changes under `server.ts`, `server/**`, `.railway/**`, or server protocol changes in `shared-types.ts` |
 
 Railpack installs dependencies and runs `npm run build` during the build. The
@@ -105,7 +129,7 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 
 ## CI (local pre-commit gate)
 
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. `npm run gate` also requires full integration + frame-work budget + constrained-client scenarios. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
 ### Actions helper exception
 
@@ -143,6 +167,7 @@ npm run fix                # biome write + tsc + unit tests
 # Tests
 npm run test               # unit only (tests/unit/)
 npm run test:all           # unit, server, and entity integration tests
+npm run test:review        # all integration + frame-work + constrained-client checks (also in gate)
 npm run test:integration:browser   # browser tests via test-runner.sh
 npm run test:integration:server    # server-side integration
 npm run test:integration:entities  # entity integration
@@ -191,7 +216,7 @@ Debug behavior is **constants, not env vars**. To enable debug mode, edit `src/c
 1. `LOGGING.GLOBAL_LOG_LEVEL = 'debug'`
 2. `DEBUG.ENABLED = true`
 
-Notable flags under `DEBUG.*`: `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_LOCAL_PLAYER}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
+Notable flags under `DEBUG.*`: `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_LOCAL_PLAYER}`, `PLACE_PLAYERS_NEAR_BOUNDARY`. Client logs forward over `/logs` to the server; both ends append to:
 
 - `logs/client.log` — client-side (forwarded over WS)
 - `logs/server.log` — server-side
@@ -211,10 +236,14 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 - **Keep the Wiki current when features change.** When adding, changing, or removing a feature, review the in-game Wiki at `/wiki/` and update affected controls, behavior, setup, and troubleshooting pages in the same work. Follow [manual maintenance](docs/wiki-maintenance.md), including its source-review gate. Remove obsolete instructions and verify links. If no Wiki page is affected, record that explicitly in the change verification.
 
+- **Keep the Wiki brief.** Write two or three short sentences per feature: what to do, what happens, and the essential limitation. Put useful gameplay GIFs beside the explanation. Link to the owning topic instead of repeating instructions; keep exact values and detailed rules in the expandable reference. Preserve this field-guide format when adding features.
+
 - **No barrel files / re-exports** — import from the defining module.
 - **Relative paths only** — no `@`-style aliases.
+- **No CDN for app assets** — never load runtime CSS or JS from CDNs. Prefer npm, local files, or same-origin Vite/Railway builds.
 - **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`biome.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. ESLint is gone. Knip and ts-prune check unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
 - **Singletons via `getInstance()`** for the top-level managers (`GameController`, `PlayerManager`, `CollisionManager`, etc.) — wire through these, don't `new` them.
+- **The 60 Hz game loop never touches the disk or does O(world) work.** The saved world is read once at startup and lives in memory; changes leave the loop once a second as a batch through `WorldPersistence` (`server/world/`). Do not add SQLite calls, `fs` calls, or per-saved-sector scans to `advanceOneFrame` or the message handlers; `tests/unit/server/explored-world-keeps-the-simulation-frame-off-the-database.test.ts` and `world-writes-leave-the-game-loop-once-a-second.test.ts` fail if that regresses.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.
 - **Conventional Commits** (`feat`, `fix`, `chore`, `refactor`, `test`, `perf`, `docs`) with a scope (e.g. `feat(network): ...`).
 - **Scenario-style test names** — describe a real user/system event, not the function under test.
@@ -264,3 +293,21 @@ npm run check:ts           # tsc --noEmit — should pass cleanly
 npm run test         # unit tests (~3s)
 npm run build        # tsc -p tsconfig.build.json && vite build — produces dist/
 ```
+
+## Verified-tree CI
+
+PRs run static checks and the bounded behavioral smoke concurrently. The final
+`ci` job requires both lanes to succeed. Full unit/integration/performance checks
+run locally in the review gate. Post-merge CI reuses each successful PR lane only
+when its recorded checkout tree exactly matches the landed tree, using
+`scripts/ci-verified-tree.sh` from dotagents. Missing proof runs that CI lane;
+manual runs always validate. The required `ci` name and deployment triggers stay intact.
+Canonical contract: `~/code/dotagents/templates/github/verified-tree-ci.md`.
+
+## Dependabot CI
+
+Ordinary Dependabot PR events allocate no validation runners. A manually invoked
+`/optimize-workspace` requests full PR checks with `deps:ci:<full-head-SHA>`.
+Deferred checks cannot satisfy the real `ci` requirement. New commits need a new
+request; skipped or absent checks never authorize a dependency merge. See the
+canonical `dotagents/skills/optimize-workspace/references/dependencies.md`.

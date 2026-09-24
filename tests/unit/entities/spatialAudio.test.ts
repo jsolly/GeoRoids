@@ -18,6 +18,17 @@ import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 const listener = { x: 400, y: 300 };
 const viewport = { width: 800, height: 600 };
 
+beforeEach(() => {
+  localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
+  resetGameAudio();
+});
+
+afterEach(() => {
+  resetGameAudio();
+  vi.restoreAllMocks();
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.soundOn);
+});
+
 test('automatic thrust stays silent while firing still plays its sound', () => {
   bindGameAudio({ getListenerPosition: () => listener, getViewport: () => viewport });
   const player = new Player({
@@ -36,17 +47,6 @@ test('automatic thrust stays silent while firing still plays its sound', () => {
   expect(play).not.toHaveBeenCalled();
   player.ship.shoot();
   expect(play).toHaveBeenCalledOnce();
-});
-
-beforeEach(() => {
-  localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
-  resetGameAudio();
-});
-
-afterEach(() => {
-  resetGameAudio();
-  vi.restoreAllMocks();
-  localStorage.removeItem(LOCAL_STORAGE_KEYS.soundOn);
 });
 
 test('sound with no position plays at full volume', () => {
@@ -70,6 +70,7 @@ test('explosion at the local ship is in the viewport at full volume', () => {
   expect(planPositionalPlayback(listener, listener, viewport, { requireViewport: true })).toEqual({
     shouldPlay: true,
     volumeScale: 1,
+    offset: { x: 0, y: 0 },
   });
 });
 
@@ -113,7 +114,7 @@ test('playExplosionSound skips off-viewport explosions and plays near ones', () 
 
   playExplosionSound(listener);
   expect(playSpy).toHaveBeenCalledTimes(1);
-  expect(playSpy).toHaveBeenCalledWith(1);
+  expect(playSpy).toHaveBeenCalledWith(1, { x: 0, y: 0 });
 });
 
 test('one explosion event uses the shared explosion sound instance', () => {
@@ -163,7 +164,7 @@ test('playLaserSound skips off-viewport shots and plays near ones', () => {
 
   playLaserSound(listener);
   expect(playSpy).toHaveBeenCalledTimes(1);
-  expect(playSpy).toHaveBeenCalledWith(1);
+  expect(playSpy).toHaveBeenCalledWith(1, { x: 0, y: 0 });
 });
 
 test('laser and explosion share Sound.play so Sound-off mutes both', () => {
@@ -185,7 +186,7 @@ test('every laser uses the same laser sound instance', () => {
   expect(getLaserSound()).toBeInstanceOf(Sound);
 });
 
-test('server exploding flag plays once for a remote and a second update does not', async () => {
+test('server exploding flag plays once for a remote and a second update does not', () => {
   bindGameAudio({
     getListenerPosition: () => listener,
     getViewport: () => viewport,
@@ -233,4 +234,14 @@ test('muted firing leaves idle media untouched across simulation steps', () => {
     playLaserSound();
   }
   expect(laserPlay).not.toHaveBeenCalled();
+});
+
+test('directions stay relative to the listener as both move across world sectors', () => {
+  const source = { x: 9000, y: -3000 };
+  const pilot = { x: 8800, y: -3100 };
+  const plan = planPositionalPlayback(source, pilot, viewport);
+  expect(plan.offset).toEqual({ x: 200, y: 100 });
+  const moved = planPositionalPlayback(source, { x: 9200, y: -2900 }, viewport);
+  expect(moved.offset).toEqual({ x: -200, y: -100 });
+  expect(moved.volumeScale).toBe(plan.volumeScale);
 });

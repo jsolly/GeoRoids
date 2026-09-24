@@ -25,6 +25,7 @@ const browserApi = await vi.hoisted(async () => {
       page,
       newPage: vi.fn(async () => page),
       close: vi.fn(),
+      addInitScript: vi.fn(),
     };
     contexts.push(context);
     return context;
@@ -32,7 +33,7 @@ const browserApi = await vi.hoisted(async () => {
   const browser = {
     newContext: vi.fn(async () => makeContext()),
     isConnected: () => state.connected,
-    close: vi.fn(async () => {
+    close: vi.fn(() => {
       state.connected = false;
     }),
   };

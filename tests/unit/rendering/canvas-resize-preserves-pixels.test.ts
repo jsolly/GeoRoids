@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 const pending: FrameRequestCallback[] = [];
 let canvas: HTMLCanvasElement | undefined;
@@ -26,7 +26,7 @@ test('repeated viewport notifications keep the current picture until dimensions 
   });
   vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
   vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(844);
-  document.getElementById('gameCanvas')?.remove();
+  document.querySelector('#gameCanvas')?.remove();
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
   document.body.append(canvas);

@@ -8,45 +8,46 @@ import {
   maxHealthFromMass,
   maxVelocityFromMass,
   planKillLoot,
-  radiusFromMass,
-  sizeScaleFromMass,
   thrustScaleFromMass,
 } from '../../../shared/shipGrowth';
 import { SHIP } from '../../../src/constants';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 
 describe('ship growth math', () => {
-  test('base mass matches the stock hull and HP', () => {
-    expect(radiusFromMass(GROWTH.BASE_MASS)).toBe(SHIP.SIZE / 2);
+  test('base mass matches the stock HP and handling', () => {
     expect(maxHealthFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_HEALTH);
-    expect(sizeScaleFromMass(GROWTH.BASE_MASS)).toBe(1);
     expect(thrustScaleFromMass(GROWTH.BASE_MASS)).toBe(1);
     expect(maxVelocityFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_VELOCITY);
+    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
   });
 
-  test('collecting loot grows mass, size, and HP with a slither slowdown', () => {
+  test('collecting loot grows mass and HP with a slither slowdown, not hull size', () => {
     const grown = applyLootMass(GROWTH.BASE_MASS, 2);
     expect(grown).toBeGreaterThan(GROWTH.BASE_MASS);
-    expect(radiusFromMass(grown)).toBeGreaterThan(radiusFromMass(GROWTH.BASE_MASS));
     expect(maxHealthFromMass(grown)).toBeGreaterThan(SHIP.MAX_HEALTH);
     expect(thrustScaleFromMass(grown)).toBeLessThan(1);
     expect(maxVelocityFromMass(grown)).toBeLessThan(SHIP.MAX_VELOCITY);
+    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
+    expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
   });
 
-  test('soft max keeps mass and size readable after many pickups', () => {
+  test('soft max keeps mass readable after many pickups without changing kit radius', () => {
     let mass: number = GROWTH.BASE_MASS;
     for (let i = 0; i < 80; i++) {
       mass = applyLootMass(mass, 1);
     }
     expect(mass).toBeLessThanOrEqual(GROWTH.SOFT_MAX_MASS);
     expect(mass).toBeGreaterThan(GROWTH.SOFT_MAX_MASS - 0.2);
-    expect(sizeScaleFromMass(mass)).toBeLessThanOrEqual(GROWTH.MAX_SIZE_SCALE);
+    expect(maxHealthFromMass(mass)).toBe(Math.round(SHIP.MAX_HEALTH * GROWTH.MAX_HEALTH_SCALE));
     expect(thrustScaleFromMass(mass)).toBeGreaterThanOrEqual(GROWTH.MIN_THRUST_SCALE);
+    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
+    expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
   });
 
   test('a base-mass kill still plans loot pellets', () => {
     const { pelletMasses } = planKillLoot(GROWTH.BASE_MASS);
     expect(pelletMasses.length).toBeGreaterThanOrEqual(1);
-    expect(pelletMasses.reduce((sum, value) => sum + value, 0)).toBeCloseTo(GROWTH.BASE_KILL_MASS);
+    expect(pelletMasses.reduce((sum, value) => value + sum, 0)).toBeCloseTo(GROWTH.BASE_KILL_MASS);
   });
 
   test('heavier ships drop more pellets than a fresh hull', () => {
@@ -63,12 +64,31 @@ describe('ship growth math', () => {
     expect(canCollectLoot({ exploding: false, health: 100, respawnTimer: 10 })).toBe(false);
   });
 
-  test('loot overlap uses mass-scaled ship radius', () => {
+  test('a held overlay cannot collect loot', () => {
+    expect(canCollectLoot({ exploding: false, health: 100, overlayHold: true })).toBe(false);
+  });
+
+  test('loot overlap uses the kit hull radius', () => {
     const origin = { x: 0, y: 0 };
-    const nearby = { x: radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS - 1, y: 0 };
-    const far = { x: radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS + 4, y: 0 };
-    expect(lootOverlap(origin, GROWTH.BASE_MASS, nearby, GROWTH.LOOT_RADIUS)).toBe(true);
-    expect(lootOverlap(origin, GROWTH.BASE_MASS, far, GROWTH.LOOT_RADIUS)).toBe(false);
+    const scoutRadius = hullRadiusForKit('scout');
+    const nearby = { x: scoutRadius + GROWTH.LOOT_RADIUS - 1, y: 0 };
+    const far = { x: scoutRadius + GROWTH.LOOT_RADIUS + 4, y: 0 };
+    expect(lootOverlap(origin, scoutRadius, nearby, GROWTH.LOOT_RADIUS)).toBe(true);
+    expect(lootOverlap(origin, scoutRadius, far, GROWTH.LOOT_RADIUS)).toBe(false);
+  });
+
+  test('a larger kit hull reaches loot that a Scout hull still misses', () => {
+    const origin = { x: 0, y: 0 };
+    const justPastScout = {
+      x: hullRadiusForKit('scout') + GROWTH.LOOT_RADIUS + 4,
+      y: 0,
+    };
+    expect(lootOverlap(origin, hullRadiusForKit('scout'), justPastScout, GROWTH.LOOT_RADIUS)).toBe(
+      false
+    );
+    expect(lootOverlap(origin, hullRadiusForKit('hauler'), justPastScout, GROWTH.LOOT_RADIUS)).toBe(
+      true
+    );
   });
 
   test('loot magnet adds pull toward the nearest ship without replacing velocity', () => {

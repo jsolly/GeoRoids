@@ -52,10 +52,12 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
 }
 
 export const DESKTOP_CONTROLS_HINT =
-  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map';
+  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V inventory · B furnace travel · M map';
 export const TOUCH_CONTROLS_HINT =
-  'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Map button';
+  'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Inventory button · Enter Town Square or tap Travel over a lit furnace · Map button';
 
-export function controlsHintFor(query: ViewportQuery = queryViewport()): string {
+export function controlsHintFor(
+  query: ViewportQuery = queryViewport()
+): typeof DESKTOP_CONTROLS_HINT | typeof TOUCH_CONTROLS_HINT {
   return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;
 }

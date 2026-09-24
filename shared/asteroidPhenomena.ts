@@ -5,16 +5,43 @@ import { previewAsteroidReflections, type ReflectionPreview } from './asteroidRe
 export const ASTEROID_INTERACTIONS = {
   clusterCount: 2,
   rocksPerCluster: 3,
+  clusterRadius: 44,
+  reflectiveSize: 32,
   reflectiveEnergy: 6,
   laserEnergyGain: 1.5,
   maxLaserEnergy: 8,
   maxBounces: 8,
   /** Inverse-scaled age guard keeps reflection travel distance unchanged. */
   maxLaserFrames: Math.ceil(300 / GAME.MOTION_SCALE),
-  coreCharges: 6,
-  coreLifetimeMs: 60_000,
-  coreScore: 150,
 } as const;
+
+/**
+ * Place the three reflective rocks as a compact, stationary pinball pocket.
+ *
+ * The ring leaves a small central lane between the rocks while keeping an
+ * external shot within reach of multiple inward-facing hexagon facets. The
+ * returned poses deliberately contain no mutable asteroid state so callers
+ * can preserve each rock's identity, contour, charge, and health.
+ */
+export function layoutReflectiveCluster(center: Position): Array<{
+  position: Position;
+  rotation: number;
+}> {
+  const placements: Array<{ position: Position; rotation: number }> = [];
+  for (let index = 0; index < ASTEROID_INTERACTIONS.rocksPerCluster; index += 1) {
+    const radialAngle = (index * Math.PI * 2) / ASTEROID_INTERACTIONS.rocksPerCluster;
+    placements.push({
+      position: {
+        x: center.x + Math.cos(radialAngle) * ASTEROID_INTERACTIONS.clusterRadius,
+        y: center.y + Math.sin(radialAngle) * ASTEROID_INTERACTIONS.clusterRadius,
+      },
+      // Polygon edge 0→1 has an outward normal at rotation + π/6. Aim it at
+      // the centroid (radialAngle + π) to make that face point inward.
+      rotation: radialAngle + (5 * Math.PI) / 6,
+    });
+  }
+  return placements;
+}
 
 /** The runtime and aim preview share the exact charge/terminal decision. */
 export function advanceReflectionEnergy(
@@ -76,18 +103,25 @@ export function previewChargedReflections(
 export function seedAsteroidPhenomena(rocks: AsteroidData[]): void {
   const candidates = rocks.filter((rock) => !rock.isCollabTarget && !rock.phenomenon);
   for (let cluster = 0; cluster < ASTEROID_INTERACTIONS.clusterCount; cluster++) {
-    const group = candidates.slice(cluster * 3, cluster * 3 + 3);
+    const group = candidates.slice(
+      cluster * ASTEROID_INTERACTIONS.rocksPerCluster,
+      cluster * ASTEROID_INTERACTIONS.rocksPerCluster + ASTEROID_INTERACTIONS.rocksPerCluster
+    );
     const first = group[0];
-    if (group.length !== 3 || !first) {
+    if (group.length !== ASTEROID_INTERACTIONS.rocksPerCluster || !first) {
       continue;
     }
     const center = { ...first.position };
+    const placements = layoutReflectiveCluster(center);
     for (const [index, rock] of group.entries()) {
-      const angle = (index * Math.PI * 2) / 3;
-      rock.position = { x: center.x + Math.cos(angle) * 105, y: center.y + Math.sin(angle) * 105 };
+      const placement = placements[index];
+      if (!placement) {
+        continue;
+      }
+      rock.position = { ...placement.position };
       rock.velocity = { x: 0, y: 0 };
-      rock.size = 32;
-      rock.rotation = angle;
+      rock.size = ASTEROID_INTERACTIONS.reflectiveSize;
+      rock.rotation = placement.rotation;
       rock.angularVelocity = 0;
       rock.vertices = 6;
       rock.offsets = [1, 0.8, 1, 1, 0.8, 1];

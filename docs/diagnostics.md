@@ -2,9 +2,11 @@
 
 The client and authoritative server use the same versioned JSON log envelope.
 Server records go to `logs/server.log`; forwarded browser records go to
-`logs/client.log`. Both also reach Railway's standard output. Browser warnings,
-errors and selected `STATE` events are forwarded through `/logs`; ordinary
-debug output stays local. Logging must not construct entity dumps every frame.
+`logs/client.log`. Both also reach Railway's standard output. Production
+browsers forward warnings, errors, and `player_died` / `player_respawned`.
+Reconnect and snapshot info stay in the browser (Copy Diagnostics still keeps
+the recent local trail). Development also forwards other `STATE` info. Debug
+output stays in the browser. Logging must not construct entity dumps every frame.
 
 ## Find the same incident on both sides
 
@@ -52,11 +54,24 @@ received or applied the packet.
 
 The corresponding client checkpoint records the accepted packet metadata and
 three observations: `clientBeforeApply`, `authoritativeRow`, and
-`clientAfterApply`. Compare health, lives, position, velocity, motion epoch and
+`clientAfterApply`. Compare health, cargo, position, velocity, motion epoch and
 acknowledged input where available. Position differences can be normal during
 prediction and reconciliation; do not diagnose desynchronization from a single
 unequal coordinate. Rejected snapshots record the baseline/sequence problem
 while preserving the last accepted state and requesting resynchronization.
+
+Copied playfield diagnostics include an `input` object: `pointerHeading`,
+`touchFire`, `steerPointerHeld`, and `liveTouches`. Automatic cruise with a
+frozen heading, `movementLocked: false`, and later fire-only taps is a dropped
+playfield finger, not a locked ship. A reserved steer id that has left the
+live touch list stays dead until the next pointerdown, so putting the finger
+back near the last heading reclaims steering instead of only firing. A second
+finger that is still down keeps firing.
+
+For rendering investigations, copied diagnostics also include the terrain seed,
+ship angle, device pixel ratio, canvas CSS/backing dimensions, and active graphics
+settings. Match these when reproducing low FPS: a large high-DPI canvas can cost
+much more to draw even when the entity counts and network timing are healthy.
 
 Repeated motion rejections and damage reports are sampled; death and respawn
 transitions remain explicit. Browser runtime errors and rejected promises enter
@@ -64,6 +79,27 @@ the same pipeline. A failed game frame stops the affected loop and presents a
 restart notice, retaining the original error for diagnosis.
 
 ## Search production logs
+
+A player can opt in on the title screen: open **Advanced**, enable **Debug**,
+enter the game, and copy the Player ID. That value is the same `playerId`
+already written on `player_joined` and motion `STATE` records. Do not invent a
+second correlator. Filter Railway logs with the pasted value:
+
+```text
+@playerId:PASTE
+@category:STATE AND @playerId:PASTE
+```
+
+The optional page session ID on that same Debug panel is the `sessionId` used
+for forwarded client records:
+
+```text
+@source:client AND @sessionId:PASTE
+```
+
+Debug is stored in this browser only. It does not log player names or resume
+tokens. The playfield Debug overlay (FPS, ping, snapshot age) is on-screen
+only and does not add Railway records.
 
 Railway captures standard output and supports filtering structured JSON fields.
 Start with these queries, substituting the incident's player or release ID:
@@ -99,9 +135,23 @@ must report failure even when the same records reached Railway standard output.
 
 Each file retains its current 10 MiB segment and one rotation. Browser and file
 queues are capped at 256 KiB; the browser also checks socket backpressure.
-Client ingress limits each socket to 120 messages and 256 KiB per minute. Inspect
+Client ingress limits each socket to 120 messages and 256 KiB per minute.
+The socket is terminated once it passes that quota, or on the first malformed
+or invalid frame. Later frames on it are ignored, and a malformed frame warns
+once. A page keeps one log socket and waits five seconds before opening
+another, including after that close. An idle log socket does not reconnect.
+Log upgrades over 6 per minute per address are refused before the handshake,
+so the browser does not treat them as open and drop its queue. Gameplay
+upgrades keep a separate budget of 50 per minute. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
+`logging.gameplayIngress` reports the per-connection `/ws` message budget
+(90 messages/s sustained, 480 burst, 96 KiB/s and 256 KiB burst): `rejected`
+messages refused because a connection outran its token bucket and `disconnected`
+connections closed for it (one per offending socket, terminated on the first
+refusal). The burst covers a full ~6 s reconnect backlog, so honest 60 Hz play
+stays well inside it; it is disabled in test and development like the connection
+rate limiter.
 The writer reports `stdoutDroppedRecords` and `stdoutWriteErrors` separately;
 standard-output and file failures must not mask one another.
 An stdout failure or buffer-limit drop writes a bounded `stdout_write_failed` error, including its
@@ -110,6 +160,16 @@ re-enters stdout; if both sinks fail, the health counters still show degradation
 `clientReportedDroppedRecords` records browser-reported queue loss after a
 connection recovers; it is a reported count, not independently verified delivery.
 The status page labels lifetime losses separately from current queue size.
+
+The game loop reports its own health the same way. `/health` `world.loop`
+counts clock steps that were blocked for 250 ms or more (`stalls`), the longest
+such stretch (`longestStallMs`) and simulation time dropped because a step was
+more than a second late (`discardedDebtMs`); `world.persistence` shows how many
+world batches are waiting on the store worker and when the last one committed.
+Each stall also writes one `game_loop_stalled` warning per five-second window
+with `blockedMs`, `catchupTicks` and the persistence counters, so a blocked
+event loop is searchable in Railway logs without the profiler running. A pose
+that was credited a blocked second logs `motion_blocked_time_credited` once.
 
 Contexts are copied when logged, with bounded depth and text length. Sensitive
 fields are redacted, and page URLs omit query strings and fragments. Do not log

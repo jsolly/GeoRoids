@@ -10,7 +10,7 @@ import {
 import { createHeightfield, sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import {
   drawContourLaserTicks,
   liveLaserPositions,
@@ -160,6 +160,7 @@ describe('contour lasers stay a terrain blush, not a new authority path', () => 
     expect(PALETTE.LOOT).toBe(HAULER_TETHER_COLOR);
     expect(VISUAL.CONTOUR_LASER_LENGTH).toBeLessThanOrEqual(2 * VISUAL.LASER_LENGTH);
     expect(VISUAL.CONTOUR_LASER_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH);
-    expect(VISUAL.CONTOUR_LASER_ALPHA).toBeGreaterThan(VISUAL.CONTOUR_INDEX_ALPHA);
+    expect(VISUAL.CONTOUR_LASER_ALPHA).toBeGreaterThan(0);
+    expect(VISUAL.CONTOUR_LASER_ALPHA).toBeLessThanOrEqual(0.5);
   });
 });

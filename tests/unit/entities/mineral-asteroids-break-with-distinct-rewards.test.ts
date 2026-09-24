@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import process from 'node:process';
 import { describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { ASTEROID_MATERIALS, MATERIAL_OUTLINES } from '../../../shared/asteroidMaterials';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData, AsteroidMaterial } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
 import { serializeAsteroidMaterialSvg } from '../../../src/entities/roid/materialArt';
@@ -31,10 +33,10 @@ function mineral(material: AsteroidMaterial, size = 36): AsteroidData {
 }
 
 describe('mineral asteroids break with distinct rewards', () => {
-  test('a shared field supplies all three readable contours and syncs them to a joining pilot', () => {
+  test('a shared field supplies all four readable contours and syncs them to a joining pilot', () => {
     const rocks = new AsteroidManager(new RNGService(42)).createAsteroids(6);
     expect(new Set(rocks.map((rock) => rock.material))).toEqual(
-      new Set(['ice', 'metal', 'rubble'])
+      new Set(['ice', 'metal', 'rubble', 'crystal'])
     );
     expect(new Set(rocks.map((rock) => rock.size)).size).toBeGreaterThan(1);
     expect(rocks.every((rock) => rock.size >= 18 && rock.size <= 48)).toBe(true);
@@ -90,9 +92,9 @@ describe('mineral asteroids break with distinct rewards', () => {
     expect(manager.getAsteroidCount()).toBe(0);
   });
 
-  test('rubble fragmentation respects the world cap and ship rams create no fragments', () => {
+  test('a crowded local field suppresses rubble fragments and ship rams create none', () => {
     const manager = new AsteroidManager(new RNGService(42));
-    for (let i = 0; i < 198; i++) {
+    for (let i = 0; i < WORLD.depositsPerSector * 6 - 2; i++) {
       manager.addAsteroid({ ...mineral('ice'), id: `ice-${i}` });
     }
     manager.addAsteroid(mineral('rubble'));

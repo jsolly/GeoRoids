@@ -229,7 +229,7 @@ export class Pilot {
       data: {
         name: `測試-${this.index}`,
         position: { x: 100 + this.index * 70, y: 100 },
-        kitId: 'surveyor',
+        kitId: 'scout',
         snapshotVersion: 1,
         asteroidInteractions: 1,
       },
@@ -250,9 +250,7 @@ export class Pilot {
       return;
     }
     assert(entity, 'Pilot has no authoritative entity');
-    if (entity.lives <= 0) {
-      this.send({ type: 'leave', data: {} });
-      this.joinGame();
+    if (entity.health <= 0 || entity.exploding || entity.respawnTimer !== undefined) {
       return;
     }
     this.sequence++;

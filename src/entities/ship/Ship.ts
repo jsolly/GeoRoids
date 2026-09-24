@@ -3,23 +3,34 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
+import { scoutAbilityBuildsAt } from '../../../shared/furnaceField';
+import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
+import {
+  advanceShipBoost,
+  fullShipBoost,
+  startShipBoost,
+  stopShipBoost,
+} from '../../../shared/shipBoost';
 import { cruiseSpeed } from '../../../shared/shipFlight';
-import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   PlayerMotionState,
   Position,
+  ScoutUtilityId,
   ShipKitId,
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
+import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
-import { NetworkManager } from '../../network/networkManager';
-import { getCompletedSectors } from '../../network/worldExploration';
+import { playLocalHaptic } from '../../fx/haptics';
+import { worldFurnaces } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
+import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
@@ -27,13 +38,22 @@ import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileFi
 import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
+import { scoutUtilityOf } from './scoutUtility';
 import {
   type AbilityWorld,
+  abilityCooldownFramesFor,
   activateAbilityOnHost,
   canActivateAbility,
   tickAbilityHost,
 } from './shipAbilities';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
+import { getShipCombatNetwork } from './shipCombatNetwork';
+import {
+  applyShipKitToShip,
+  DEFAULT_SHIP_KIT_ID,
+  getShipKit,
+  hullRadiusForKit,
+  SHIP_ABILITY,
+} from './shipKits';
 import {
   applyShipSpawnProtection,
   applyThrustOrFriction,
@@ -49,23 +69,28 @@ class Ship {
   velocity: Velocity = { x: 0, y: 0 };
   /** Granted only by an authoritative motion rebase after an external impulse. */
   knockbackVelocityLimit = 0;
-  r: number = radiusFromMass(GROWTH.BASE_MASS);
+  r: number = hullRadiusForKit(DEFAULT_SHIP_KIT_ID);
   mass: number = GROWTH.BASE_MASS;
   angle: number = (90 / 180) * Math.PI;
   blinkCount: number = 0;
   spawnProtectionTimer: number = 0;
-  canShoot = true;
+  canShoot: boolean = true;
   /** Constrained/released/handoff transforms are advanced by the negotiated predictor. */
-  serverOwnsMotion = false;
+  serverOwnsMotion: boolean = false;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 
-  exploding = false;
+  exploding: boolean = false;
   lasers: Laser[] = [];
   explodeTime = 0;
   angularVelocity = 0;
-  thrusting = false;
-  boosting = false;
+  thrusting: boolean = false;
+  boost = fullShipBoost();
+  /** Local input revision prevents lagging snapshots from undoing a new toggle. */
+  boostInputVersion = 0;
+
+  get boosting(): boolean {
+    return this.boost.phase === 'active';
+  }
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
 
@@ -77,6 +102,8 @@ class Ship {
   shotCooldown: number = 250;
   color: string = PALETTE.LOCAL;
   frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
+  /** In-flight menus stop navigation without pausing combat or lifecycle timers. */
+  movementLocked = false;
   isLocalPlayer: boolean = false; // Track if this is the local player
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID;
   thrust: number = SHIP.THRUST;
@@ -87,7 +114,11 @@ class Ship {
 
   harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
+  furnaceTransit: FurnaceTransit | null = null;
+  furnaceClockOffsetMs = 0;
+  equipment: EquipmentId[] = [];
   haulerUtility?: HaulerUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Last specific environmental cause (boundary, asteroid, or ricochet). */
@@ -160,9 +191,10 @@ class Ship {
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
-    this.boosting = false;
+    this.stopBoost();
     this.angularVelocity = 0;
     playExplosionSound(this.position);
+    playLocalHaptic(this.isLocalPlayer, 'boom');
 
     // Dispatch event to notify that ship has exploded with cause information
     window.dispatchEvent(
@@ -192,6 +224,9 @@ class Ship {
   }
 
   shoot(): void {
+    if (this.furnaceTransit) {
+      return;
+    }
     logger.debug('SHIP', 'Shoot method called', {
       canShoot: this.canShoot,
       laserCount: this.lasers.length,
@@ -207,9 +242,13 @@ class Ship {
   }
 
   fireLaser(): void {
+    if (this.furnaceTransit) {
+      return;
+    }
     const laser = this.generateLaser();
     this.lasers.push(laser);
     laser.playLaserSound();
+    playLocalHaptic(this.isLocalPlayer, 'shot');
 
     // Set canShoot to false to prevent rapid firing
     this.canShoot = false;
@@ -219,35 +258,71 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  /** Tap or Shift toggles a stronger cruise; a dead hull always drops boost. */
+  /** Record every local stop, including menus and death, as new input intent. */
+  stopBoost(): void {
+    if (this.boosting) {
+      stopShipBoost(this.boost);
+      this.boostInputVersion++;
+    }
+  }
+
+  /** Toggle a stronger cruise using any charge currently available. */
   toggleBoost(): boolean {
-    if (this.exploding || this.health <= 0) {
-      this.boosting = false;
+    if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
+      this.stopBoost();
       return false;
     }
-    this.boosting = !this.boosting;
+    if (this.boosting) {
+      this.stopBoost();
+      if (this.isLocalPlayer) {
+        playFeedback('boostEnd');
+      }
+    } else if (startShipBoost(this.boost)) {
+      this.boostInputVersion++;
+      if (this.isLocalPlayer) {
+        playFeedback('boostStart');
+        playLocalHaptic(true, 'boost');
+      }
+    }
     return this.boosting;
   }
 
   /** Returns request submission when connected, or activation in offline play. */
   activateAbility(world?: AbilityWorld): boolean {
-    if (!canActivateAbility(this)) {
+    const building =
+      this.kitId === 'scout' &&
+      scoutAbilityBuildsAt(this.position, (id) => worldFurnaces.isLit(id));
+    if (
+      this.furnaceTransit ||
+      this.exploding ||
+      this.health <= 0 ||
+      (!building && !canActivateAbility(this))
+    ) {
       return false;
     }
     const kit = getShipKit(this.kitId);
     if (this.isLocalPlayer) {
-      const networkManager = NetworkManager.getInstance();
-      if (networkManager.isConnected) {
+      const network = getShipCombatNetwork();
+      if (network?.isConnected) {
         // The server owns the ability result and cooldown. An optimistic toggle
         // can be undone by an older snapshot or disagree about eligible cargo.
-        return networkManager.sendMessage({
-          type: 'useAbility',
-          id: networkManager.getLocalPlayerId(),
-          data: {
-            kitId: this.kitId,
-            abilityId: kit.abilityId,
-          },
+        const sent = network.sendAbility({
+          kitId: this.kitId,
+          abilityId: kit.abilityId,
         });
+        if (!sent) {
+          return false;
+        }
+        if (this.kitId === 'scout' && !building) {
+          // Scout tools share the same request, but the probe has no local
+          // world effect. Predict only the user-facing timer; asteroid
+          // attachment and mineral classification remain server-owned. Near a
+          // dark furnace the server builds instead, so skip local scan timing.
+          this.abilityCooldownFrames = abilityCooldownFramesFor(this);
+          this.abilityActiveFrames =
+            scoutUtilityOf(this) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
+        }
+        return true;
       }
     }
     return activateAbilityOnHost(this, world).activated;
@@ -274,20 +349,20 @@ class Ship {
   }
 
   private sendShootEvent(laser: Laser): void {
-    const networkManager = NetworkManager.getInstance();
-    if (networkManager.isConnected) {
+    const network = getShipCombatNetwork();
+    if (network?.isConnected) {
       logger.debug('SHIP', 'Sending shoot event', {
         position: laser.position,
         velocity: laser.velocity,
       });
-      networkManager.sendShootEvent(laser);
+      network.sendShoot(laser);
     } else {
       logger.debug('SHIP', 'Network not connected, cannot send shoot event');
     }
   }
 
   takeDamage(amount: number, cause?: string): void {
-    if (this.exploding) {
+    if (this.exploding || this.movementLocked) {
       return;
     }
 
@@ -390,8 +465,31 @@ class Ship {
 
   /** Advance one 60 Hz simulation step, including movement and combat timers. */
   update(): void {
+    if (this.furnaceTransit) {
+      const pose = furnaceTravelPose(this.furnaceTransit, Date.now() + this.furnaceClockOffsetMs);
+      this.position = { ...pose.position };
+      this.angle = pose.angle;
+      this.velocity = { x: 0, y: 0 };
+      this.angularVelocity = 0;
+      this.thrusting = false;
+      this.stopBoost();
+      this.updateShootCooldown();
+      this.moveLasers();
+      return;
+    }
     if (this.isLocalPlayer) {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
+    }
+    if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
+      this.stopBoost();
+    }
+    const wasBoosting = this.boosting;
+    advanceShipBoost(this.boost, 1000 / GAME.FPS);
+    if (wasBoosting && !this.boosting) {
+      this.boostInputVersion++;
+      if (this.isLocalPlayer) {
+        playFeedback('boostEnd');
+      }
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
@@ -407,12 +505,22 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
+    if (this.movementLocked) {
+      this.velocity = { x: 0, y: 0 };
+      this.angularVelocity = 0;
+      this.thrusting = false;
+      this.knockbackVelocityLimit = 0;
+      return;
+    }
     this.angle += this.angularVelocity;
     const boost = this.boosting ? getShipKit(this.kitId).boostMultiplier : 1;
     const speed = cruiseSpeed(this.mass, this.maxVelocity, boost);
-    const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);
+    const velocityLimit = Math.max(
+      terrainSpeedLimit(this.position, speed),
+      this.knockbackVelocityLimit
+    );
     if (this.knockbackVelocityLimit <= speed) {
-      // Steering redirects normal momentum before thrust and terrain forces act.
+      // Terrain sets the cruise direction and speed, including downhill drift.
       // A server-granted blast keeps its motion until the excess speed decays.
       advanceCruiseVelocity(this, speed, boost);
     } else {
@@ -430,7 +538,6 @@ class Ship {
     this.capVelocity(velocityLimit);
     this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;
     this.position = addPositionAndVelocity(this.position, this.velocity);
-    containBodyOutOfCompletedSectors(this, getCompletedSectors(), { radius: this.r });
   }
 
   private capVelocity(maximum: number): void {

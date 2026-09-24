@@ -3,9 +3,12 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, relative, resolve } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { type BrowserServer, chromium } from 'playwright';
 import type { ClientFixtureResult, ClientOptions } from './client-entry';
+
+const WS_OR_LOGS_PATH_PATTERN = /\/(ws|logs)(?:\/|\?|$)/u;
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const VIEWPORTS = {
@@ -170,7 +173,7 @@ export async function runClientSample(options: ClientOptions) {
           if (
             new URL(request.url()).origin !== origin ||
             request.resourceType() === 'media' ||
-            /\/(ws|logs)(?:\/|\?|$)/.test(request.url())
+            WS_OR_LOGS_PATH_PATTERN.test(request.url())
           ) {
             trafficFailures.push(`Unexpected ${request.resourceType()} request: ${request.url()}`);
             return route.abort();
@@ -197,7 +200,7 @@ export async function runClientSample(options: ClientOptions) {
           }
         });
         await page.goto(`${origin}/benchmarks/client.html`, {
-          waitUntil: 'networkidle',
+          waitUntil: 'load',
           timeout: 30_000,
         });
         await page.waitForFunction('typeof window.runClientFixture === "function"', undefined, {

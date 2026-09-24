@@ -7,17 +7,18 @@ if (typeof window !== 'undefined') {
     <canvas id="title-terrain"></canvas>
     <div id="gameWrapper">
       <div id="start-screen" class="screen">
-        <h1 class="text-center">GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map</p>
+        <h1>GeoRoids</h1>
+        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V inventory · B town store · M map</p>
         <div class="game-modes">
-          <div class="mb-3">
-            <label for="playerNameInput" class="form-label">Your Nickname</label>
+          <div>
+            <label for="playerNameInput" class="nickname-label">Your Nickname</label>
             <input
               type="text"
               id="playerNameInput"
               maxlength="20"
               placeholder="Crimson Falcon"
-              class="form-control"
+              class="nickname-input"
+              autocomplete="nickname"
             />
           </div>
           <fieldset class="ship-kit-select">
@@ -25,31 +26,94 @@ if (typeof window !== 'undefined') {
             <div id="ship-kit-grid" class="ship-kit-grid"></div>
             <p class="ship-kit-placeholder-note">AD v2 silhouettes</p>
           </fieldset>
-          <ul class="nav flex-column">
-            <li class="nav-item">
-              <button id="start-game" class="btn btn-lg btn-phosphor">
-                Enter Game
-              </button>
-            </li>
-          </ul>
+          <div class="start-actions">
+            <button id="start-game" type="button" class="enter-game">
+              Enter Game
+            </button>
+          </div>
         </div>
         <div class="settings">
-          <ul class="nav flex-column">
-            <li class="nav-item">
+          <div class="preference-toggles">
+            <div class="sound-toggle-row">
               <input
-                class="form-check-input"
+                class="sound-toggle"
                 type="checkbox"
-                value=""
                 id="soundPref"
                 checked
               />
-              <label class="form-check-label" for="soundPref">Sound</label>
-            </li>
-          </ul>
+              <label class="sound-toggle-label" for="soundPref">Sound Effects</label>
+            </div>
+            <div class="sound-toggle-row">
+              <input
+                class="sound-toggle"
+                type="checkbox"
+                id="musicPref"
+                checked
+              />
+              <label class="sound-toggle-label" for="musicPref">Music</label>
+            </div>
+            <div class="sound-toggle-row">
+              <input class="sound-toggle" type="checkbox" id="hapticsPref" />
+              <label class="sound-toggle-label" for="hapticsPref">Haptics</label>
+            </div>
+          </div>
+          <p id="hapticsHint" class="haptics-hint" hidden></p>
+          <details id="advanced-settings" class="advanced-settings">
+            <summary>Advanced</summary>
+            <div class="debug-toggle-row">
+              <input class="sound-toggle" type="checkbox" id="debugPref" />
+              <label class="sound-toggle-label" for="debugPref">Debug</label>
+            </div>
+            <div id="debug-identity" class="debug-identity" hidden>
+              <div>
+                <label class="debug-id-label" for="debug-player-id">Player ID</label>
+                <div class="debug-id-row">
+                  <input id="debug-player-id" class="debug-id-input" type="text" readonly />
+                  <button id="copy-debug-player-id" type="button" class="debug-copy" disabled>Copy</button>
+                </div>
+              </div>
+              <div>
+                <label class="debug-id-label" for="debug-session-id">Page session</label>
+                <div class="debug-id-row">
+                  <input id="debug-session-id" class="debug-id-input" type="text" readonly />
+                  <button id="copy-debug-session-id" type="button" class="debug-copy">Copy</button>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
-      <div id="gameArea" style="display: none">
+      <div id="gameArea" hidden>
+        <div id="debug-play-stack" class="debug-play-stack">
+          <button id="debug-hud-toggle" type="button" class="debug-copy debug-hud-toggle" aria-controls="debug-hud" aria-expanded="true" hidden>Hide HUD</button>
+          <fieldset id="debug-hud" class="debug-hud" hidden>
+            <legend>Debug health</legend>
+            <dl>
+              <div class="debug-hud-row"><dt>FPS</dt><dd id="debug-hud-fps">—</dd></div>
+              <div class="debug-hud-row"><dt>RTT</dt><dd id="debug-hud-rtt">—</dd></div>
+              <div class="debug-hud-row"><dt>SNAP</dt><dd id="debug-hud-snap">—</dd></div>
+              <div class="debug-hud-row"><dt>MOVE</dt><dd id="debug-hud-move">—</dd></div>
+              <div class="debug-hud-row"><dt>WORLD</dt><dd id="debug-hud-world">—</dd></div>
+              <div class="debug-hud-row"><dt>REL</dt><dd id="debug-hud-rel">—</dd></div>
+            </dl>
+            <button id="copy-debug-diagnostics" type="button" class="debug-copy debug-diagnostics-copy" data-copy-name="diagnostics" data-copy-label="Copy diagnostics" aria-label="Copy diagnostics">Copy diagnostics</button>
+          </fieldset>
+        </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <button
+          id="ship-schematic-toggle"
+          type="button"
+          class="ship-schematic-toggle"
+          aria-label="Open inventory and ship schematic (V)"
+          aria-keyshortcuts="V"
+        >Inventory <kbd>V</kbd></button>
+        <button
+          id="universe-map-toggle"
+          type="button"
+          class="universe-map-toggle"
+          aria-label="Open universe map (M)"
+          aria-keyshortcuts="M"
+        >Map <kbd>M</kbd></button>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
         </div>
       </div>

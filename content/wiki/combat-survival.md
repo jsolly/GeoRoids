@@ -10,6 +10,7 @@ related:
   - content/wiki/loot-growth.md
   - content/wiki/satellites.md
   - content/wiki/hud-network.md
+  - content/wiki/terrain.md
 media:
   - heading: Damage and protection
     demo: survival
@@ -17,54 +18,20 @@ media:
 
 ## Firing while moving
 
-Shots leave the nose and inherit your ship's velocity, so a moving ship
-changes their flight path. Hold fire to repeat shots at your kit's interval.
-The local shot field has a cap for regular shots. The slower movement leaves shots in flight longer while
-firing cadence and this cap stay fixed, so a full rack can remain occupied for
-more real time. A regular shot mines an asteroid or damages an orbiting
-satellite pickup by the configured laser amount; reflected or core-powered
-shots multiply that damage by their energy. Direct lasers never damage a
-crew hull. After a bounce off the arena wall, a completed-sector wall, or a
-reflective asteroid, the shot becomes a ricochet: it damages any live ship
-it then hits, including its owner, and is consumed. Bounced bolts use the
-danger color so a live ricochet is readable. Local shots appear immediately
-and stay visible while the server confirms them; the server still controls
-hits and removal.
+Hold fire to repeat shots, which inherit your ship's motion. Direct crew shots mine rocks and kill spiders without hurting pilots. After a wall, reflective-rock, or court-panel bounce, a shot becomes a dangerous ricochet that can hit anyone.
+
+## Ricochet Court
+
+Meet at the cyan court northeast of Town Square for informal bank-shot duels; it stays marked on both maps before exploration. Its indestructible panels reflect lasers without changing their energy, while ships pass through safely. Banked shots can escape through the gaps and hurt anyone, with normal death and protection rules and no separate duel score.
 
 ## Damage and protection
 
-Normal lasers, asteroid impacts, and boundary impacts use different damage
-rules. A ship-to-asteroid impact removes 25 health. A towed asteroid that hits
-another ship uses that same impact and then breaks, dropping the Hauler cable.
-Unbounced ship lasers, ship-to-ship ramming, the Hauler tow cable, and a
-shot-triggered loot blast never damage a crew hull. A bounced laser deals the
-configured laser hit times its energy and is consumed on the first live hull it
-meets. The boundary destroys a vulnerable ship on contact, even at full health;
-asteroids bounce back into the world. Untowed asteroids pass through each other;
-only towed cargo turns an asteroid-to-asteroid overlap into a collision break.
+Asteroid impacts remove health; the outer wall and a spider bite each kill a vulnerable ship outright. Spawn blinking and open map, schematic, or store menus protect your hull. Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls.
 
 ## Lives and respawn
 
-A player starts with lives and score. A death decrements one life; the last life
-reaching zero enters game over. Explosion stops active thrust and turning; held
-controls resume when the server confirms your respawn. Respawn restores the
-kit's health, resets mass growth, clears upgrade state, and grants temporary
-spawn protection. Respawns use the nearest furnace to the death location, 180
-world units from its center at a random angle, skipping completed sectors.
+Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, silk, and paint remain safe. There are no lives or game over. Growth resets.
 
-After game over, a fresh flight starts with 3 lives and score 0. A brief
-disconnect still returns you to the same ship; a long absence does not.
-The persistent universe, shared exploration chart, and delivered
-progress remain available until the UTC calendar month ends, when scores and
-the shared world both reset.
+## Recovery
 
-Health regenerates after a real-damage delay. Score survives a respawn.
-Wreckage is emitted from a destroyed ship. The visible death message includes
-the recorded environmental cause (an asteroid, the arena wall, or a ricochet),
-and the final-life state shows the game-over overlay.
-
-## Score values
-
-Asteroid breaks, shard pickups, satellite pickups, and furnace deliveries each
-award their own score value. A furnace delivery gives the Hauler and every
-Surveyor recorded on the rock the same delivery points.
+Health regenerates after a delay without damage. Bank cargo at a lit furnace, then spend banked points on placeholders at [Town Square](/wiki/#controls).

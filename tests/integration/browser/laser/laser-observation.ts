@@ -56,7 +56,7 @@ export async function parkLaserClients(games: readonly GameInteractions[]): Prom
   await Promise.all(games.map((game) => game.waitForCombatReady()));
 }
 
-export async function localPlayerId(page: Page): Promise<string> {
+export function localPlayerId(page: Page): Promise<string> {
   return page.evaluate(() => {
     const id = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.id;
     if (!id) {
@@ -74,15 +74,15 @@ export async function observeLaser(
   requireOnCanvas = false
 ): Promise<ObservedLaser> {
   const handle = await page.waitForFunction(
-    ({ ownerId, remote, requireOnCanvas }) => {
+    ({ ownerId: observedOwnerId, remote: isRemote, requireOnCanvas: requireVisibleOnCanvas }) => {
       const gc = window.gameController;
       const local = gc?.getPlayerManager()?.getLocalPlayer?.();
-      const owner = remote
+      const owner = isRemote
         ? gc
             ?.getNetworkManager()
             ?.getAllPlayers()
-            .find((player) => player.id === ownerId && player.type === 'remote')
-        : local?.id === ownerId
+            .find((player) => player.id === observedOwnerId && player.type === 'remote')
+        : local?.id === observedOwnerId
           ? local
           : undefined;
       const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
@@ -104,7 +104,7 @@ export async function observeLaser(
       const onCanvas =
         Math.abs(laser.position.x - local.ship.position.x) < canvas.width / 2 &&
         Math.abs(laser.position.y - local.ship.position.y) < canvas.height / 2;
-      if (requireOnCanvas && !onCanvas) {
+      if (requireVisibleOnCanvas && !onCanvas) {
         return false;
       }
       return {
@@ -120,11 +120,11 @@ export async function observeLaser(
     { timeout: 15000, polling: 'raf' }
   );
   try {
-    const laser = await handle.jsonValue();
-    if (!laser) {
+    const observedLaser = await handle.jsonValue();
+    if (!observedLaser) {
       throw new Error('Laser observation missing');
     }
-    return laser;
+    return observedLaser;
   } finally {
     await handle.dispose();
   }
@@ -136,15 +136,15 @@ export async function waitForLaserCleanup(
   remote: boolean
 ): Promise<void> {
   const handle = await page.waitForFunction(
-    ({ id, remote }) => {
+    ({ id: observedOwnerId, remote: isRemote }) => {
       const gc = window.gameController;
       const local = gc?.getPlayerManager()?.getLocalPlayer?.();
-      const owner = remote
+      const owner = isRemote
         ? gc
             ?.getNetworkManager()
             ?.getAllPlayers()
-            .find((player) => player.id === id && player.type === 'remote')
-        : local?.id === id
+            .find((player) => player.id === observedOwnerId && player.type === 'remote')
+        : local?.id === observedOwnerId
           ? local
           : undefined;
       return owner !== undefined && owner.ship.lasers.length === 0;

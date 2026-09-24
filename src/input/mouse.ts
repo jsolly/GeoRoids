@@ -1,6 +1,7 @@
 import type { Player } from '../entities/player/Player';
-import { canvasManager } from '../rendering/canvas';
-import { isShipSchematicOpen } from '../ui/shipSchematic';
+import { canvasManager } from '../rendering/canvasSurface';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { isTownStoreOpen } from '../ui/townStoreState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
@@ -21,7 +22,7 @@ export function handleMouseMove(ev: MouseEvent, player: Player): void {
   if (isSyntheticTouchMouse(ev)) {
     return;
   }
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
 
@@ -44,18 +45,24 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
   logger.debug('MOUSE', 'Mouse down event', {
     button: ev.button,
     playerId: player.id,
-    lives: player.lives,
     exploding: player.ship.exploding,
   });
-  if (isShipSchematicOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (
+    isShipSchematicOpen() ||
+    isTownStoreOpen() ||
+    player.ship.health <= 0 ||
+    player.ship.exploding
+  ) {
     logger.debug('MOUSE', 'Mouse down ignored - player dead or exploding', { playerId: player.id });
     return;
   }
 
-  // Left mouse fires; cruise needs no throttle button.
+  // Left mouse fires; right mouse toggles boost like Shift.
   if (ev.button === 0) {
     logger.debug('MOUSE', 'Left mouse click - shooting', { playerId: player.id });
     player.ship.shoot();
+  } else if (ev.button === 2) {
+    player.ship.toggleBoost();
   }
 }
 
@@ -64,7 +71,7 @@ export function handleMouseUp(ev: MouseEvent, player: Player): void {
     return;
   }
   // Early return for dead/exploding players
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
 

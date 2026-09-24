@@ -125,8 +125,34 @@ function sleep(ms: number): Promise<void> {
 
 export async function arrangeCrewField(
   playerIds: string[],
-  scenario: 'delivery' | 'empty' | 'boundary' | 'impact' | 'mining' | 'cooperative' | 'reflection'
-): Promise<void> {
+  scenario:
+    | 'delivery'
+    | 'tow'
+    | 'empty'
+    | 'equipment'
+    | 'boundary'
+    | 'impact'
+    | 'mining'
+    | 'cooperative'
+    | 'reflection'
+    | 'satellite'
+    | 'probe'
+    | 'spider-nest'
+    | 'spider-tools'
+    | 'spider-rescue'
+    | 'spider-tow-bite'
+    | 'belt-escape'
+    | 'belt-pursuit'
+    | 'map-icons'
+    | 'furnace'
+    | 'town-store'
+    | 'cargo'
+    | 'full-cargo'
+    | 'settlement-delivery'
+    | 'furnace-build'
+    | 'street-escape'
+    | 'street-travel'
+): Promise<ReadonlyMap<string, number>> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-crew-field`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -140,4 +166,23 @@ export async function arrangeCrewField(
   if (!body || typeof body !== 'object' || !('status' in body) || body.status !== 'arranged') {
     throw new Error('Invalid crew fixture response');
   }
+  if (!('poses' in body) || !Array.isArray(body.poses)) {
+    throw new Error('Missing crew fixture poses');
+  }
+  const epochs = new Map<string, number>();
+  for (const pose of body.poses) {
+    if (
+      !pose ||
+      typeof pose !== 'object' ||
+      !('playerId' in pose) ||
+      typeof pose.playerId !== 'string' ||
+      !('motionEpoch' in pose) ||
+      typeof pose.motionEpoch !== 'number' ||
+      !Number.isSafeInteger(pose.motionEpoch)
+    ) {
+      throw new Error('Invalid crew fixture motion epoch');
+    }
+    epochs.set(pose.playerId, pose.motionEpoch);
+  }
+  return epochs;
 }

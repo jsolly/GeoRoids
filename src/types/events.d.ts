@@ -5,15 +5,18 @@ import type {
   SatellitePickupCollected,
   ShockwaveEvent,
 } from '../../shared-types';
+import type { PlayerIdentityChangedDetail } from '../network/services/playerIdentityEvents';
 
 declare global {
   interface WindowEventMap {
     gameStart: CustomEvent<undefined>;
-    playerDied: CustomEvent<{
-      playerId: string;
-      deathCause: string;
-      isGameOver: boolean;
-    }>;
+    playViewOn: CustomEvent<undefined>;
+    playViewOff: CustomEvent<undefined>;
+    gameSchematicOpen: CustomEvent<undefined>;
+    gameSchematicClose: CustomEvent<undefined>;
+    gameMapOpen: CustomEvent<undefined>;
+    gameMapClose: CustomEvent<undefined>;
+    playerIdentityChanged: CustomEvent<PlayerIdentityChangedDetail>;
     shipExploded: CustomEvent<{
       shipId?: string;
       position?: Position;

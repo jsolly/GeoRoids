@@ -5,6 +5,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { GROWTH } from '../../../shared/shipGrowth';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function collectorAt(position: { x: number; y: number }): GameEntity {
@@ -70,4 +71,79 @@ describe('LootManager destroy-drop shards', () => {
     const after = manager.get(shard.id);
     expect(after?.position.x).toBeCloseTo(80 - GROWTH.LOOT_MAGNET_ACCEL * (2 + GROWTH.LOOT_DRAG));
   });
+
+  test('a Hauler collects a shard that a same-mass Scout still misses', () => {
+    const manager = new LootManager(new RNGService(7));
+    const engine = new GameEngine(7);
+    try {
+      const scout = engine.addPlayer(
+        'scout',
+        'Scout',
+        new RecordingSocket(),
+        { x: 0, y: 0 },
+        'scout'
+      );
+      const hauler = engine.addPlayer(
+        'barge',
+        'Barge',
+        new RecordingSocket(),
+        { x: 0, y: 0 },
+        'hauler'
+      );
+      const justPastScout = hullRadiusForKit('scout') + GROWTH.LOOT_RADIUS + 4;
+      const shard = manager.spawnShard({ x: justPastScout, y: 0 }, 20);
+      const collected = manager.collectOverlaps([scout, hauler]);
+      expect(collected).toEqual([
+        { collector: hauler, loot: expect.objectContaining({ id: shard.id }) },
+      ]);
+    } finally {
+      engine.stopGameLoop();
+    }
+  });
+
+  test('a mass-grown Scout still misses a shard just past the kit hull', () => {
+    const manager = new LootManager(new RNGService(7));
+    const engine = new GameEngine(7);
+    try {
+      const scout = engine.addPlayer(
+        'scout',
+        'Scout',
+        new RecordingSocket(),
+        { x: 0, y: 0 },
+        'scout'
+      );
+      engine.updatePlayer('scout', { mass: GROWTH.SOFT_MAX_MASS });
+      expect(scout.mass).toBe(GROWTH.SOFT_MAX_MASS);
+      const justPastScout = hullRadiusForKit('scout') + GROWTH.LOOT_RADIUS + 4;
+      const shard = manager.spawnShard({ x: justPastScout, y: 0 }, 20);
+      expect(manager.collectOverlaps([scout])).toEqual([]);
+      expect(manager.get(shard.id)?.id).toBe(shard.id);
+    } finally {
+      engine.stopGameLoop();
+    }
+  });
 });
+
+test.each(['tap', 'silk'] as const)(
+  '%s visibly ejects before an overlapping ship can collect it',
+  (kind) => {
+    const manager = new LootManager(new RNGService(7));
+    const drop =
+      kind === 'tap'
+        ? manager.spawnTap({ x: 0, y: 0 }, 0, { x: 3, y: 0 })
+        : manager.spawnSilk({ x: 0, y: 0 }, 0, { x: 3, y: 0 });
+    expect(drop.kind).toBe(kind);
+    expect(drop.mass).toBe(kind === 'silk' ? 0 : GROWTH.TAP_LOOT_MASS);
+    const collector = collectorAt({ x: 0, y: 0 });
+    expect(manager.collectOverlaps([collector])).toEqual([]);
+    for (let frame = 1; frame < GROWTH.TAP_LOOT_EJECT_FRAMES; frame++) {
+      manager.expire(frame, [collector]);
+      const moved = manager.get(drop.id);
+      expect(moved?.position.x).toBeGreaterThan(collector.position.x);
+      collector.position = { ...(moved?.position ?? collector.position) };
+      expect(manager.collectOverlaps([collector])).toEqual([]);
+    }
+    manager.expire(GROWTH.TAP_LOOT_EJECT_FRAMES, [collector]);
+    expect(manager.collectOverlaps([collector]).map((entry) => entry.loot.id)).toEqual([drop.id]);
+  }
+);

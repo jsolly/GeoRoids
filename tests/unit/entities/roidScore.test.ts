@@ -19,6 +19,8 @@ describe('roid score helpers', () => {
     expect(pointsForRoidSize(19.9)).toBe(ROID.POINTS_SMALL);
     expect(pointsForRoidSize(20)).toBe(ROID.POINTS_MEDIUM);
     expect(pointsForRoidSize(39.9)).toBe(ROID.POINTS_MEDIUM);
+    expect(pointsForRoidSize(ROID.COLOSSAL_MIN_SIZE)).toBe(ROID.POINTS_COLOSSAL);
+    expect(pointsForRoidSize(ROID.COLOSSAL_SIZE)).toBe(ROID.POINTS_COLOSSAL);
     expect(pointsForRoidSize(ROID.COLLAB_SPLIT_MIN_SIZE)).toBe(ROID.POINTS_LARGE);
   });
 });

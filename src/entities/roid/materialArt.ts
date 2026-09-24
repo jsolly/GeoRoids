@@ -5,6 +5,19 @@ import type { DrawingContext } from '../../rendering/drawingContext';
 
 type Point = readonly [number, number];
 const DETAILS: Record<AsteroidMaterial, readonly (readonly Point[])[]> = {
+  crystal: [
+    [
+      [0, -0.8],
+      [0.55, 0],
+      [0, 0.8],
+      [-0.55, 0],
+      [0, -0.8],
+    ],
+    [
+      [0, -0.8],
+      [0, 0.8],
+    ],
+  ],
   ice: [
     [
       [-0.72, 0.05],
@@ -101,7 +114,7 @@ export function drawAsteroidMaterialDetails(
 /** Contact-sheet assets use the same mineral contour and facet data as Canvas. */
 export function serializeAsteroidMaterialSvg(material: AsteroidMaterial): string {
   if (!isAsteroidMaterial(material)) {
-    throw new TypeError(`Unknown asteroid material: ${String(material)}`);
+    throw new TypeError(`Unknown asteroid material: ${material}`);
   }
   const offsets = MATERIAL_OUTLINES[material];
   const points = offsets

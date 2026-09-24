@@ -1,12 +1,11 @@
 import { expect, test } from 'vitest';
+import { WORLD } from '../../../../shared/world';
 import { PALETTE } from '../../../../src/constants';
 import { getGameBoundary } from '../../../../src/physics/boundary';
 import {
-  drawingOffsets,
   PLAYFIELD_CLOSE_SCALE,
   projectWorldToScreen,
 } from '../../../../src/rendering/playfieldCamera';
-import { polygonPoints } from '../../../../src/rendering/vectorJuice';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -16,16 +15,27 @@ type Field = Awaited<ReturnType<GameInteractions['getAsteroidPositions']>>;
 
 type BrowserPage = import('playwright').Page;
 
+type FieldObservation = {
+  ship: { x: number; y: number };
+  rocks: Array<Pick<Field[number], 'id' | 'x' | 'y'>>;
+};
+
 type BrowserErrors = {
   consoleErrors: string[];
   pageErrors: string[];
   dispose: () => void;
 };
 
-type CanvasPath = {
-  points: Array<{ x: number; y: number }>;
-  closed: boolean;
-  strokeStyle: string;
+type CanvasImage = {
+  transform: { a: number; b: number; c: number; d: number; e: number; f: number };
+  destination: { x: number; y: number; width: number; height: number };
+  width: number;
+  height: number;
+  alpha: number;
+  outlineSamples: number;
+  matchingOutlineSamples: number;
+  centerAlpha: number;
+  cornerAlpha: number;
 };
 
 type AsteroidDrawCapture = {
@@ -39,15 +49,14 @@ type AsteroidDrawCapture = {
     offsets: number[];
   };
   ship: { x: number; y: number };
-  roidStrokeStyle: string;
-  paths: CanvasPath[];
+  images: CanvasImage[];
 };
 
 type AsteroidDrawEvidence = {
   canvas: { width: number; height: number };
   rockId: string;
   screen: { x: number; y: number };
-  normalSilhouetteCount: number;
+  rasterSilhouetteCount: number;
 };
 
 type PausedGame = { page: BrowserPage; wasRunning: boolean };
@@ -84,7 +93,7 @@ async function setViewportAndWait(page: BrowserPage, width: number, height: numb
   await page.setViewportSize({ width, height });
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       return (
         canvas instanceof HTMLCanvasElement &&
         canvas.width === expectedWidth &&
@@ -96,7 +105,7 @@ async function setViewportAndWait(page: BrowserPage, width: number, height: numb
   );
 }
 
-async function pauseGame(page: BrowserPage): Promise<boolean> {
+function pauseGame(page: BrowserPage): Promise<boolean> {
   return page.evaluate(() => {
     const gameController = window.gameController;
     if (!gameController) {
@@ -119,14 +128,11 @@ async function renderFullFrame(page: BrowserPage): Promise<void> {
   });
 }
 
-async function captureAsteroidDraw(
-  page: BrowserPage,
-  targetId: string
-): Promise<AsteroidDrawCapture> {
+function captureAsteroidDraw(page: BrowserPage, targetId: string): Promise<AsteroidDrawCapture> {
   return page.evaluate(
-    ({ id, roidColor }) => {
+    ({ id, roidColor, scale }) => {
       const gameController = window.gameController;
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       if (!gameController || !(canvas instanceof HTMLCanvasElement)) {
         throw new Error('Asteroid field fixture requires a game controller and canvas');
       }
@@ -144,71 +150,100 @@ async function captureAsteroidDraw(
       if (!styleProbe) {
         throw new Error('Asteroid field fixture requires a style probe context');
       }
-      styleProbe.strokeStyle = roidColor;
-      const roidStrokeStyle = String(styleProbe.strokeStyle).toLowerCase();
+      styleProbe.fillStyle = roidColor;
+      styleProbe.fillRect(0, 0, 1, 1);
+      const expectedColor = styleProbe.getImageData(0, 0, 1, 1).data;
 
-      const paths: CanvasPath[] = [];
-      let activePoints: Array<{ x: number; y: number }> = [];
-      let activeClosed = false;
-      const original = {
-        beginPath: CanvasRenderingContext2D.prototype.beginPath,
-        closePath: CanvasRenderingContext2D.prototype.closePath,
-        moveTo: CanvasRenderingContext2D.prototype.moveTo,
-        lineTo: CanvasRenderingContext2D.prototype.lineTo,
-        stroke: CanvasRenderingContext2D.prototype.stroke,
-      };
-      const isGameCanvas = (candidate: CanvasRenderingContext2D): boolean =>
-        candidate.canvas === canvas;
-
-      CanvasRenderingContext2D.prototype.beginPath = function (
-        this: CanvasRenderingContext2D
-      ): void {
-        if (isGameCanvas(this)) {
-          activePoints = [];
-          activeClosed = false;
-        }
-        original.beginPath.call(this);
-      };
-      CanvasRenderingContext2D.prototype.moveTo = function (
+      const images: CanvasImage[] = [];
+      const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage = function (
         this: CanvasRenderingContext2D,
-        x: number,
-        y: number
+        image: CanvasImageSource,
+        ...coordinates: number[]
       ): void {
-        if (isGameCanvas(this)) {
-          activePoints.push({ x, y });
+        // Forward the real draw before inspecting the bitmap used by this frame.
+        Reflect.apply(originalDrawImage, this, [image, ...coordinates]);
+        if (this.canvas !== canvas || !(image instanceof HTMLCanvasElement)) {
+          return;
         }
-        original.moveTo.call(this, x, y);
-      };
-      CanvasRenderingContext2D.prototype.lineTo = function (
-        this: CanvasRenderingContext2D,
-        x: number,
-        y: number
-      ): void {
-        if (isGameCanvas(this)) {
-          activePoints.push({ x, y });
+        const [x, y, width, height] = coordinates;
+        if (
+          coordinates.length !== 4 ||
+          x === undefined ||
+          y === undefined ||
+          width === undefined ||
+          height === undefined ||
+          width <= 0 ||
+          height <= 0
+        ) {
+          return;
         }
-        original.lineTo.call(this, x, y);
-      };
-      CanvasRenderingContext2D.prototype.closePath = function (
-        this: CanvasRenderingContext2D
-      ): void {
-        if (isGameCanvas(this)) {
-          activeClosed = true;
+        const source = image.getContext('2d');
+        if (!source) {
+          throw new Error('Drawn asteroid image has no readable 2D context');
         }
-        original.closePath.call(this);
-      };
-      CanvasRenderingContext2D.prototype.stroke = function (
-        this: CanvasRenderingContext2D,
-        ...args: [] | [Path2D]
-      ): void {
-        if (isGameCanvas(this)) {
-          paths.push({
-            points: [...activePoints],
-            closed: activeClosed,
-            strokeStyle: String(this.strokeStyle).toLowerCase(),
-          });
-        }
-        Reflect.apply(original.stroke, this, args);
+        const pixels = source.getImageData(0, 0, image.width, image.height).data;
+        const pixelRatio = image.width / width;
+        const offsets = roid.offsets.length > 0 ? roid.offsets : [1];
+        const vertices = Math.max(roid.vertices, 1);
+        const outline = Array.from({ length: vertices }, (_, index) => {
+          const angle = (index * Math.PI * 2) / vertices;
+          const radius = roid.r * scale * (offsets[index] ?? 1) * pixelRatio;
+          return {
+            x: image.width / 2 + radius * Math.cos(angle),
+            y: image.height / 2 + radius * Math.sin(angle),
+          };
+        });
+        // Check the polygon edges as well as its vertices. A blank bitmap, wrong
+        // shape or filled rectangle must not count as a visible asteroid outline.
+        const samples = outline.flatMap((point, index) => {
+          const next = outline[(index + 1) % outline.length];
+          if (!next) {
+            throw new Error('Asteroid outline lost its closing edge');
+          }
+          return [point, { x: (point.x + next.x) / 2, y: (point.y + next.y) / 2 }];
+        });
+        const matchingOutlineSamples = samples.filter((point) => {
+          for (let py = Math.floor(point.y) - 1; py <= Math.floor(point.y) + 1; py++) {
+            for (let px = Math.floor(point.x) - 1; px <= Math.floor(point.x) + 1; px++) {
+              if (px < 0 || py < 0 || px >= image.width || py >= image.height) {
+                continue;
+              }
+              const offset = (py * image.width + px) * 4;
+              if (
+                (pixels[offset + 3] ?? 0) >= 64 &&
+                [0, 1, 2].every(
+                  (channel) =>
+                    Math.abs((pixels[offset + channel] ?? 0) - (expectedColor[channel] ?? 0)) <= 4
+                )
+              ) {
+                return true;
+              }
+            }
+          }
+          return false;
+        }).length;
+        const transform = this.getTransform();
+        const centerOffset =
+          (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
+        images.push({
+          transform: {
+            a: transform.a,
+            b: transform.b,
+            c: transform.c,
+            d: transform.d,
+            e: transform.e,
+            f: transform.f,
+          },
+          destination: { x, y, width, height },
+          width: image.width,
+          height: image.height,
+          alpha: this.globalAlpha,
+          outlineSamples: samples.length,
+          matchingOutlineSamples,
+          centerAlpha: pixels[centerOffset + 3] ?? 255,
+          cornerAlpha: pixels[3] ?? 255,
+        });
       };
 
       try {
@@ -229,21 +264,16 @@ async function captureAsteroidDraw(
               offsets: [...roid.offsets],
             },
             ship: { x: local.ship.position.x, y: local.ship.position.y },
-            roidStrokeStyle,
-            paths,
+            images,
           };
         } finally {
           roidBelt.roids = originalRoids;
         }
       } finally {
-        CanvasRenderingContext2D.prototype.beginPath = original.beginPath;
-        CanvasRenderingContext2D.prototype.closePath = original.closePath;
-        CanvasRenderingContext2D.prototype.moveTo = original.moveTo;
-        CanvasRenderingContext2D.prototype.lineTo = original.lineTo;
-        CanvasRenderingContext2D.prototype.stroke = original.stroke;
+        CanvasRenderingContext2D.prototype.drawImage = originalDrawImage;
       }
     },
-    { id: targetId, roidColor: PALETTE.ROID }
+    { id: targetId, roidColor: PALETTE.ROID, scale: PLAYFIELD_CLOSE_SCALE }
   );
 }
 
@@ -254,39 +284,32 @@ function identifyAsteroidDraw(capture: AsteroidDrawCapture): AsteroidDrawEvidenc
     capture.canvas,
     PLAYFIELD_CLOSE_SCALE
   );
-  const outline = polygonPoints(
-    screen.x,
-    screen.y,
-    capture.rock.r * PLAYFIELD_CLOSE_SCALE,
-    capture.rock.angle,
-    Math.max(capture.rock.vertices, 1),
-    drawingOffsets(capture.rock.offsets)
-  );
-  const expectedStrokeStyle = capture.roidStrokeStyle;
-  const normalSilhouetteCount = capture.paths.filter((path) => {
-    if (
-      !path.closed ||
-      path.points.length !== outline.length ||
-      path.strokeStyle !== expectedStrokeStyle
-    ) {
-      return false;
-    }
-    return path.points.every((point, index) => {
-      const expected = outline[index];
-      return (
-        expected !== undefined &&
-        Number.isFinite(point.x) &&
-        Number.isFinite(point.y) &&
-        Math.hypot(point.x - expected.x, point.y - expected.y) <= 0.001
-      );
-    });
+  const close = (actual: number, expected: number) => Math.abs(actual - expected) <= 0.001;
+  const rasterSilhouetteCount = capture.images.filter((image) => {
+    const { transform, destination } = image;
+    return (
+      close(transform.a, Math.cos(capture.rock.angle)) &&
+      close(transform.b, Math.sin(capture.rock.angle)) &&
+      close(transform.c, -Math.sin(capture.rock.angle)) &&
+      close(transform.d, Math.cos(capture.rock.angle)) &&
+      close(transform.e, screen.x) &&
+      close(transform.f, screen.y) &&
+      close(destination.x, -destination.width / 2) &&
+      close(destination.y, -destination.height / 2) &&
+      image.width === image.height &&
+      close(image.alpha, 1) &&
+      image.outlineSamples >= 6 &&
+      image.matchingOutlineSamples === image.outlineSamples &&
+      image.centerAlpha < 64 &&
+      image.cornerAlpha === 0
+    );
   }).length;
 
   return {
     canvas: capture.canvas,
     rockId: capture.rock.id,
     screen,
-    normalSilhouetteCount,
+    rasterSilhouetteCount,
   };
 }
 
@@ -302,6 +325,56 @@ function survivingRockMoved(before: Field, after: Field): boolean {
   });
 }
 
+function observeField(page: BrowserPage): Promise<FieldObservation> {
+  return page.evaluate(() => {
+    const controller = window.gameController;
+    const local = controller?.getCurrPlayer();
+    if (!controller || !local) {
+      throw new Error('Shared field observation requires a local pilot');
+    }
+    return {
+      ship: { x: local.ship.position.x, y: local.ship.position.y },
+      rocks: controller
+        .getCurrRoidBelt()
+        .getRoids()
+        .map((rock) => ({ id: rock.id, x: rock.position.x, y: rock.position.y })),
+    };
+  });
+}
+
+function compareSharedField(first: FieldObservation, second: FieldObservation) {
+  const poseTolerance = 80;
+  // Each recipient has its own interest square. Stay one pose tolerance inside
+  // both edges so movement between snapshots cannot change expected membership.
+  const insideSharedRegion = (rock: FieldObservation['rocks'][number]) =>
+    [first.ship, second.ship].every(
+      (ship) =>
+        Math.abs(rock.x - ship.x) < WORLD.interestRadius - poseTolerance &&
+        Math.abs(rock.y - ship.y) < WORLD.interestRadius - poseTolerance
+    );
+  const firstShared = first.rocks.filter(insideSharedRegion);
+  const secondShared = second.rocks.filter(insideSharedRegion);
+  const mismatches = (
+    expected: FieldObservation['rocks'],
+    received: FieldObservation['rocks']
+  ): string[] => {
+    const byId = new Map(received.map((rock) => [rock.id, rock]));
+    return expected.flatMap((rock) => {
+      const peer = byId.get(rock.id);
+      return peer &&
+        Math.abs(peer.x - rock.x) < poseTolerance &&
+        Math.abs(peer.y - rock.y) < poseTolerance
+        ? []
+        : [rock.id];
+    });
+  };
+  return {
+    hasSharedField: firstShared.length > 0 && secondShared.length > 0,
+    firstMissingOrDisplaced: mismatches(secondShared, first.rocks),
+    secondMissingOrDisplaced: mismatches(firstShared, second.rocks),
+  };
+}
+
 async function visitSharedSector(game: GameInteractions): Promise<void> {
   // A distant region separates the camera check from the launch area.
   await game.placeShipAt(20_000, 0);
@@ -315,13 +388,12 @@ test(
       throw new Error('Page 1 not available');
     }
     const page1Errors = observeBrowserErrors(page1);
-    let page2: BrowserPage | undefined;
     let page2Errors: BrowserErrors | undefined;
     const pausedGames: PausedGame[] = [];
     let cleanupFailures: unknown[] = [];
 
     try {
-      page2 = await browserManager.createPage();
+      const page2 = await browserManager.createPage();
       page2Errors = observeBrowserErrors(page2);
       const game1 = new GameInteractions(page1);
       const game2 = new GameInteractions(page2);
@@ -332,30 +404,22 @@ test(
       await game2.bootGame({ waitForCombatReady: false });
       await visitSharedSector(game2);
 
-      // Compare contemporary observations. Destruction/splitting may legitimately
-      // change the field while the second browser boots or between network ticks.
+      // Pilots cruise while the second browser boots, so their recipient fields
+      // can differ at the edges. Compare every rock in their shared interior in
+      // both directions, allowing network ticks and destruction to settle.
       await expect
         .poll(
           async () => {
-            const [first, second] = await Promise.all([
-              game1.getAsteroidPositions(),
-              game2.getAsteroidPositions(),
-            ]);
-            if (!first.length || first.length !== second.length) {
-              return false;
-            }
-            return first.every((rock) => {
-              const peer = second.find((other) => other.id === rock.id);
-              return (
-                peer !== undefined &&
-                Math.abs(peer.x - rock.x) < 80 &&
-                Math.abs(peer.y - rock.y) < 80
-              );
-            });
+            const [first, second] = await Promise.all([observeField(page1), observeField(page2)]);
+            return compareSharedField(first, second);
           },
           { timeout: 5000, message: 'both clients should share current asteroid IDs and poses' }
         )
-        .toBe(true);
+        .toEqual({
+          hasSharedField: true,
+          firstMissingOrDisplaced: [],
+          secondMissingOrDisplaced: [],
+        });
 
       const firstField = await game1.getAsteroidPositions();
       await expect
@@ -449,8 +513,8 @@ test(
             viewport.height
           );
           expect(
-            evidence.normalSilhouetteCount,
-            `${label} should issue a closed Canvas silhouette for the identified rock`
+            evidence.rasterSilhouetteCount,
+            `${label} should draw the identified rock's visible outline at its projected pose`
           ).toBeGreaterThan(0);
         }
 

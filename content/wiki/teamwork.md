@@ -3,10 +3,10 @@ title: Teamwork
 category: Systems
 summary: Every player shares one crew. Scan, tow, and deliver together.
   Direct weapons and collisions leave teammates unharmed; bounced lasers
-  become ricochets. Completing a sector walls it off for later expeditions.
+  become ricochets. Harvested ground stays open for later expeditions.
 order: 140
 related:
-  - content/wiki/surveyor.md
+  - content/wiki/scout.md
   - content/wiki/hauler.md
   - content/wiki/asteroids.md
   - content/wiki/hud-network.md
@@ -16,73 +16,24 @@ media: []
 
 ## One crew
 
-Every player is on the same crew. The scoreboard keeps a row for every
-active player so asteroid work and delivery points are visible across the whole
-field. The match has one shared crew.
-
-Direct ship lasers, ship-to-ship ramming, and the Hauler tow cable never
-damage a teammate. After a laser bounces off a wall or reflective asteroid, it
-becomes a ricochet that can hurt you or another pilot. The Hauler ability
-attaches only to asteroids; it cannot select, pull, or throw a ship.
-Asteroids, completed-sector walls, and the arena boundary remain world
-hazards, including a towed rock that hits another ship; shot-triggered loot
-blasts only push nearby small rocks and leave crew hulls safe.
+Everyone flies on the same team, with informal duels at the [Ricochet Court](/wiki/#combat-survival). Direct lasers and ship collisions are safe, but ricochets and towed rocks can hurt teammates.
 
 ## Scan, tow, deliver
 
-An active Surveyor scan classifies minerals on every teammate's radar within
-the scan's range around that Surveyor. The shapes identify ice, metal, and
-rubble, and the classification stays with a scanned rock until the rock is
-delivered or removed. A qualifying scan also tags the asteroid with that
-Surveyor's player ID, so several Surveyors can contribute to one delivery.
-
-The Hauler presses E near an asteroid to attach its equipped tool. Resource
-Tap extracts a canister and leaves the rock in the field. Tow Cable hauls the
-rock: it keeps its motion and trails behind the Hauler; the cable does not
-reel a rock into the hull or launch it at anything. Dragging towed cargo into
-another asteroid breaks both rocks and drops the cable. Dragging it into
-another ship deals an asteroid impact to that hull, then breaks the cargo and
-drops the cable. Bring a towed rock to
-an arena furnace to deliver it. The Hauler and every Surveyor recorded on the
-rock receive the same delivery points. A rock with no Surveyor tag still pays
-the Hauler for the delivery.
-
-Three starter furnace landmarks sit around the field: North Works, Southeast
-Works, and Southwest Works. Regional Works sites then continue on a 4,000-unit
-grid through the open field. On the playfield each Works site is a dashed
-delivery ring around a burning grate, where a column of flame roars up the
-intake and throws embers past it. A furnace appears on the local minimap after the
-crew discovers its area and remains visible there while it is nearby. When it
-moves beyond the local radar, use the universe map to find the exact landmark.
-A delivery consumes the towed rock, so the crew can turn a scan and a haul into
-a shared material score.
+Scan a rock before a Hauler tows or boosts it into a lit furnace. The delivering Haulers and recorded scanning pilots each earn rewards; each contributor receives the same base reward. Bring two Haulers for a colossal deposit.
 
 ## Shared chart
 
-The local minimap follows the ship's nearby radar. The full-screen universe map
-opens with M or the Map button and shows the crew's shared overview of the
-world. Every pilot adds the area around its ship, and explored cells remain
-revealed for the crew after that ship moves away until the UTC calendar month
-ends and the shared world resets. Surveyor passive reveal
-reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
-scan reaches 1,200 world units and also classifies minerals in that range on
-every teammate's radar. Uncharted asteroid, loot, and furnace positions stay
-hidden until a crew member reveals their area. Discovered furnace landmarks and
-other important assets stay marked on the universe map, and pilots stay
-readable on both maps. Close the overview with M, Escape, or the Close control.
+Every pilot reveals part of the persistent crew map, with Scout covering more ground. Discovered resources and furnaces help teammates find work beyond their local radar. Open M or Map to plan a route together.
 
-## Completing sectors
+## Named furnaces
 
-The world is divided into 2,000-unit sectors. A sector completes when the crew
-has visited it, mapped every explorable cell, and removed every asteroid there,
-including rocks that drifted to sleep in that sector. Completed sectors stay
-empty: they do not regenerate deposits, and their walls are lethal to ships the
-same way the outer world boundary is. Lasers bounce off those walls and then
-become ricochets that can damage ships. Anyone already inside when a sector
-completes is moved just outside its walls in the direction they were flying,
-without losing a life. A hull that has already crossed the grid but still
-overlaps the new wall is nudged the rest of the way out the same way, so
-finishing a sector cannot yank a crew backward or spend a life. New spawns
-skip completed sectors. Crossing into a new open sector shows a brief HUD
-notice with that sector's coordinates. The local radar and universe map hatch
-completed sectors so the closed ground stays obvious.
+Town Square starts lit; Scouts spend score to build outward through dark furnace foundations. A lit furnace gains a fire trail back to the square and becomes a shared delivery site, spider refuge, and respawn point. See [furnace travel and store](/wiki/#controls) to ride your ship between lit stops or buy placeholders at Town Square.
+
+## Persistent world
+
+Exploration, built furnaces, and harvested deposits survive server restarts until the expedition resets. Empty ground stays open for travel, so follow the chart toward fresh resources.
+
+## Build the settlement
+
+Everyone shares settlement progress. Reaching the next level requires the current level times 2,000 deposited points, 40 ice, 60 metal, 80 rubble, and 20 crystal. All requirements must be met; the recipe is consumed and surplus carries forward. The central docking station grows as the settlement levels up. Higher levels unlock more store placeholders; these spend banked points but grant no upgrade or gameplay effect.

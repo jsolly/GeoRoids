@@ -1,7 +1,8 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { FURNACES, furnaceReward } from '../../../../shared/furnaces';
+import { furnaceReward, TOWN_HEARTH } from '../../../../shared/furnaces';
 import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -14,7 +15,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const FIXTURE_ASTEROID_ID = 'crew-fixture-ore';
-const DELIVERY_REWARD = furnaceReward({ material: 'metal', size: 25 });
+const DELIVERY_REWARD = furnaceReward({ id: 'test', ore: 'metal', material: 'metal', size: 25 });
 
 type CrewState = {
   score: number;
@@ -35,7 +36,7 @@ type CrewState = {
   };
 };
 
-async function readCrewState(page: Page): Promise<CrewState> {
+function readCrewState(page: Page): Promise<CrewState> {
   return page.evaluate((asteroidId) => {
     const controller = window.gameController;
     const local = controller?.getCurrPlayer();
@@ -71,11 +72,11 @@ async function readCrewState(page: Page): Promise<CrewState> {
 
 async function waitForFixture(
   page: Page,
-  kitId: 'hauler' | 'surveyor',
+  kitId: 'hauler' | 'scout',
   expectedPosition: { x: number; y: number }
 ): Promise<void> {
   await page.waitForFunction(
-    ({ asteroidId, expectedKit, expectedPosition }) => {
+    ({ asteroidId, expectedKit, expectedPosition: targetPosition }) => {
       const controller = window.gameController;
       const local = controller?.getCurrPlayer();
       const asteroid = controller
@@ -87,8 +88,8 @@ async function waitForFixture(
         asteroid?.health === 75 &&
         local !== undefined &&
         Math.hypot(
-          local.ship.position.x - expectedPosition.x,
-          local.ship.position.y - expectedPosition.y
+          local.ship.position.x - targetPosition.x,
+          local.ship.position.y - targetPosition.y
         ) < 20
       );
     },
@@ -107,8 +108,8 @@ async function pointHaulerNorth(page: Page): Promise<void> {
 
 async function assertMapButtonClearOfRadar(page: Page): Promise<void> {
   const actual = await page.evaluate(() => {
-    const gameArea = document.getElementById('gameArea');
-    const mapButton = document.getElementById('universe-map-toggle');
+    const gameArea = document.querySelector('#gameArea');
+    const mapButton = document.querySelector('#universe-map-toggle');
     if (!gameArea || !mapButton) {
       throw new Error('Map button geometry requires the game area and Map button');
     }
@@ -147,72 +148,72 @@ async function assertMapButtonClearOfRadar(page: Page): Promise<void> {
 }
 
 test(
-  'Surveyor scans a rock for the crew, Hauler tows it to North Works, and both score on desktop and mobile',
+  'Scout scans a rock for the crew, Hauler tows it to Town Square, and both score on desktop and mobile',
   async () => {
     const haulerPage = browserManager.getCurrentPage();
     if (!haulerPage) {
       throw new Error('Hauler page unavailable');
     }
-    const surveyorPage = await browserManager.createAdditionalPage({ hasTouch: true });
+    const scoutPage = await browserManager.createAdditionalPage({ hasTouch: true });
     const haulerDiagnostics = watchBrowserDiagnostics(haulerPage);
-    const surveyorDiagnostics = watchBrowserDiagnostics(surveyorPage);
+    const scoutDiagnostics = watchBrowserDiagnostics(scoutPage);
+    await installAudioProbe(haulerPage);
+    await installAudioProbe(scoutPage);
     const hauler = new GameInteractions(haulerPage);
-    const surveyor = new GameInteractions(surveyorPage);
+    const scout = new GameInteractions(scoutPage);
 
     await haulerPage.setViewportSize({ width: 1280, height: 900 });
-    await surveyorPage.setViewportSize({ width: 390, height: 844 });
+    await scoutPage.setViewportSize({ width: 390, height: 844 });
     await hauler.bootGame({
       kitId: 'hauler',
       haulerUtility: 'tow_cable',
       waitForCombatReady: false,
     });
-    await surveyor.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await scout.bootGame({ kitId: 'scout', waitForCombatReady: false });
 
     const haulerId = await hauler.getLocalPlayerId();
-    const surveyorId = await surveyor.getLocalPlayerId();
-    await Promise.all([hauler.waitForRemotePlayers(1), surveyor.waitForRemotePlayers(1)]);
+    const scoutId = await scout.getLocalPlayerId();
+    await Promise.all([hauler.waitForRemotePlayers(1), scout.waitForRemotePlayers(1)]);
 
-    await arrangeCrewField([haulerId, surveyorId], 'delivery');
-    await Promise.all([hauler.placeShipAt(0, -360), surveyor.placeShipAt(220, -460)]);
+    await arrangeCrewField([haulerId, scoutId], 'delivery');
+    await Promise.all([hauler.placeShipAt(0, 550), scout.placeShipAt(220, 460)]);
     await Promise.all([
-      waitForFixture(haulerPage, 'hauler', { x: 0, y: -360 }),
-      waitForFixture(surveyorPage, 'surveyor', { x: 220, y: -460 }),
+      waitForFixture(haulerPage, 'hauler', { x: 0, y: 550 }),
+      waitForFixture(scoutPage, 'scout', { x: 220, y: 460 }),
     ]);
 
-    const northWorks = FURNACES.find((furnace) => furnace.name === 'North Works');
-    expect(northWorks?.position).toEqual({ x: 0, y: -660 });
-    const scoresBefore = await Promise.all([hauler.getScore(), surveyor.getScore()]);
+    expect(TOWN_HEARTH.position).toEqual({ x: 0, y: 0 });
+    const scoresBefore = await Promise.all([hauler.getScore(), scout.getScore()]);
 
-    // The Surveyor's real E input records the tag. The remote Hauler snapshot
+    // The Scout's real E input records the tag. The remote Hauler snapshot
     // must carry the same contributor before the tow begins.
-    await surveyorPage.locator('#touch-ability').tap();
+    await scoutPage.locator('#touch-ability').tap();
     await expect
       .poll(
         async () => {
-          const state = await readCrewState(surveyorPage);
-          return state.asteroid?.surveyedBy.includes(surveyorId) === true;
+          const state = await readCrewState(scoutPage);
+          return state.asteroid?.surveyedBy.includes(scoutId) === true;
         },
-        { timeout: 5000, message: 'Surveyor E should persist its contributor tag' }
+        { timeout: 5000, message: 'Scout E should persist its contributor tag' }
       )
       .toBe(true);
     await expect
       .poll(
         async () => {
           const state = await readCrewState(haulerPage);
-          const remoteSurveyorActiveFrames = await haulerPage.evaluate(
+          const remoteScoutActiveFrames = await haulerPage.evaluate(
             (id) =>
               window.gameController
                 ?.getNetworkManager()
                 .getAllPlayers()
                 .find((player) => player.id === id)?.ship.abilityActiveFrames ?? 0,
-            surveyorId
+            scoutId
           );
           return (
-            state.asteroid?.surveyedBy.includes(surveyorId) === true &&
-            remoteSurveyorActiveFrames > 0
+            state.asteroid?.surveyedBy.includes(scoutId) === true && remoteScoutActiveFrames > 0
           );
         },
-        { timeout: 5000, message: 'Hauler radar should receive the Surveyor scan state' }
+        { timeout: 5000, message: 'Hauler radar should receive the Scout scan state' }
       )
       .toBe(true);
 
@@ -242,7 +243,7 @@ test(
             ? 'towing'
             : 'waiting';
         },
-        { timeout: 15000, message: 'Hauler should tow the rock north into North Works' }
+        { timeout: 15000, message: 'Hauler should tow the rock into Town Square' }
       )
       .toBe('delivered');
 
@@ -253,9 +254,9 @@ test(
       })
       .toBe(scoresBefore[0] + DELIVERY_REWARD);
     await expect
-      .poll(() => surveyor.getScore(), {
+      .poll(() => scout.getScore(), {
         timeout: 5000,
-        message: 'Surveyor contributor should receive the same furnace delivery reward',
+        message: 'Scout contributor should receive the same furnace delivery reward',
       })
       .toBe(scoresBefore[1] + DELIVERY_REWARD);
 
@@ -266,21 +267,23 @@ test(
       })
       .toBe(`Team delivery +${DELIVERY_REWARD} each`);
     await expect
-      .poll(async () => (await readCrewState(surveyorPage)).pickupMessage, {
+      .poll(async () => (await readCrewState(scoutPage)).pickupMessage, {
         timeout: 3000,
-        message: 'Surveyor should show the shared delivery banner',
+        message: 'Scout should show the shared delivery banner',
       })
       .toBe(`Team delivery +${DELIVERY_REWARD} each`);
-    await assertMapButtonClearOfRadar(surveyorPage);
+    await assertMapButtonClearOfRadar(scoutPage);
 
     await haulerPage.screenshot({
       path: screenshotManager.getScreenshotPath('crew-delivery-hauler-desktop.png'),
     });
-    await surveyorPage.screenshot({
-      path: screenshotManager.getScreenshotPath('crew-delivery-surveyor-mobile.png'),
+    await scoutPage.screenshot({
+      path: screenshotManager.getScreenshotPath('crew-delivery-scout-mobile.png'),
     });
+    expect(await readSamplePlaybackRates(haulerPage, 'delivery')).toEqual([1]);
+    expect(await readSamplePlaybackRates(scoutPage, 'delivery')).toEqual([1]);
     assertNoBrowserDiagnostics(haulerDiagnostics);
-    assertNoBrowserDiagnostics(surveyorDiagnostics);
+    assertNoBrowserDiagnostics(scoutDiagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT * 2
 );

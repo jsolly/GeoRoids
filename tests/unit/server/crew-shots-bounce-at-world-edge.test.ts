@@ -22,8 +22,8 @@ function crew() {
   );
   shooter.spawnProtectionTimer = 0;
   teammate.spawnProtectionTimer = 0;
-  for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+  for (const fieldRock of engine.getAllAsteroids()) {
+    engine.removeAsteroid(fieldRock.id);
   }
   return { engine, shooter, teammate };
 }
@@ -67,8 +67,18 @@ test('a muzzle exactly on the wall still fires a reflected shot into the world',
 
 test('a wall ricochet damages the crew hull it meets and is consumed', () => {
   const { engine, shooter, teammate } = crew();
-  const beforeShooter = { health: shooter.health, lives: shooter.lives, score: shooter.score };
-  const beforeTeammate = { health: teammate.health, lives: teammate.lives, score: teammate.score };
+  const beforeShooter = {
+    health: shooter.health,
+    cargo: shooter.cargo,
+    purchases: shooter.purchases,
+    score: shooter.score,
+  };
+  const beforeTeammate = {
+    health: teammate.health,
+    cargo: teammate.cargo,
+    purchases: teammate.purchases,
+    score: teammate.score,
+  };
   const shot = engine.spawnLaser(shooter.id, { x: WORLD.radius - 10, y: 0 }, { x: 100, y: 0 });
   assert(shot);
   expect(engine.advanceLasersAndResolveHits()).toEqual([]);
@@ -77,11 +87,13 @@ test('a wall ricochet damages the crew hull it meets and is consumed', () => {
   expect(shot.hasExploded).toBe(true);
   expect(engine.getServerLasers()).toEqual([]);
   expect(teammate.health).toBe(beforeTeammate.health - DAMAGE.LASER_HIT);
-  expect(teammate.lives).toBe(beforeTeammate.lives);
   expect(teammate.score).toBe(beforeTeammate.score);
-  expect({ health: shooter.health, lives: shooter.lives, score: shooter.score }).toEqual(
-    beforeShooter
-  );
+  expect({
+    health: shooter.health,
+    cargo: shooter.cargo,
+    purchases: shooter.purchases,
+    score: shooter.score,
+  }).toEqual(beforeShooter);
 });
 
 test('a reflected crew shot mines the asteroid on its returning path exactly once', () => {
@@ -96,7 +108,10 @@ test('a reflected crew shot mines the asteroid on its returning path exactly onc
   expect(engine.getAsteroid(target.id)).toBeUndefined();
   expect(engine.getServerLasers()).toHaveLength(0);
   const score = shooter.score;
-  expect(score).toBeGreaterThan(0);
+  expect(score).toBe(0);
+  expect(engine.getLoot().some((drop) => drop.kind === 'points' && (drop.points ?? 0) > 0)).toBe(
+    true
+  );
   expect(engine.advanceLasersAndResolveHits()).toEqual([]);
   expect(shooter.score).toBe(score);
 });
@@ -111,8 +126,8 @@ test('an asteroid before the wall absorbs the shot before any boundary reflectio
   expect(shot.bounces).toBe(0);
 });
 
-test.each(['surveyor', 'hauler'] as const)(
-  'a full-health grown %s loses exactly one life on the boundary',
+test.each(['scout', 'hauler'] as const)(
+  'a full-health grown %s is destroyed on the boundary',
   (kitId) => {
     const { engine, shooter } = crew();
     shooter.kitId = kitId;
@@ -120,14 +135,11 @@ test.each(['surveyor', 'hauler'] as const)(
     shooter.maxHealth = 400;
     shooter.health = 400;
     shooter.position = { x: WORLD.radius - 1, y: 0 };
-    const lives = shooter.lives;
     expect(
       engine.resolveAuthoritativeCombat().find((hit) => hit.targetId === shooter.id)?.isDestroyed
     ).toBe(true);
     expect(shooter.health).toBe(0);
-    expect(shooter.lives).toBe(lives - 1);
     expect(shooter.deathCause).toBe('boundary');
     engine.resolveAuthoritativeCombat();
-    expect(shooter.lives).toBe(lives - 1);
   }
 );

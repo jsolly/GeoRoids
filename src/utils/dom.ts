@@ -20,7 +20,7 @@ export function attachEventListener<T extends HTMLElement>(
 }
 
 export function getElementById<T extends HTMLElement>(id: string): T | null {
-  const element = document.getElementById(id);
+  const element = document.querySelector<HTMLElement>(`#${id}`);
   if (!element) {
     logger.error('UTILS', `Element with id '${id}' not found`);
   }

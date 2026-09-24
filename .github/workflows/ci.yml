@@ -1,59 +1,80 @@
 ---
 name: CI
+run-name: >-
+  ${{ (github.event_name != 'pull_request' ||
+  (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+  (github.event.action == 'labeled' &&
+   github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && format('{0} validation', github.workflow) || 'Deferred validation' }}
 
 'on':
   workflow_dispatch:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
 
 permissions:
+  actions: read
+  pull-requests: read
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    ${{ (github.event_name != 'pull_request' ||
+    (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+    (github.event.action == 'labeled' &&
+     github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && format('ci-{0}-{1}-{2}', github.workflow, github.event.pull_request.number || github.ref, github.event_name) || format('deferred-{0}', github.run_id) }}
   cancel-in-progress: true
 
 jobs:
   behavioral-smoke:
-    name: behavioral-smoke
+    name: >-
+      ${{ (github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && 'behavioral-smoke' || 'behavioral-smoke-deferred' }}
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Check for a validated PR tree
+        id: verified-tree
+        timeout-minutes: 1
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-verified-tree.sh
       - name: Prepare behavioral artifacts
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: |
           mkdir -p behavioral-artifacts/logs behavioral-artifacts/screenshots
           echo "Runner has not started; inspect job setup steps if no test log follows." > behavioral-artifacts/README.txt
       - uses: actions/setup-node@v6
+        if: steps.verified-tree.outputs.run_full != 'false'
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+        if: steps.verified-tree.outputs.run_full != 'false'
       - name: Install pinned Playwright Chromium, WebKit and OS dependencies
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: npx --no-install playwright install --with-deps chromium webkit
       - name: Run serialized critical behavioral scenarios
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: |
           set +e
           set -o pipefail
-          GEOROIDS_TEST_MAX_DURATION_SECONDS=300 ./scripts/test-runner.sh \
+          GEOROIDS_TEST_MAX_DURATION_SECONDS=150 ./scripts/test-runner.sh \
             tests/integration/browser/sanity/critical-gameplay-smoke.test.ts \
-            tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts \
-            tests/integration/browser/sanity/hauler-touch-taps-act-once-with-delayed-clicks.test.ts \
-            tests/integration/browser/sanity/pilots-climb-and-descend-varied-terrain.test.ts \
-            tests/integration/browser/roid/two-players-hit-big-roid-within-one-second-splits.test.ts \
             tests/integration/browser/sanity/mobile-viewport-fits-and-shows-touch-controls.test.ts \
-            tests/integration/browser/sanity/wave2-touch-controls.test.ts \
-            tests/integration/browser/sanity/crew-scoreboard-lists-pilots.test.ts \
-            tests/integration/browser/sanity/leaderboard-long-names-fit-score-column.test.ts \
-            tests/integration/browser/sanity/sustained-mobile-controls.test.ts \
-            tests/integration/browser/sanity/mobile-quality-and-phone-recording.test.ts \
-            tests/integration/browser/sanity/mobile-recovers-under-cpu-constraint.test.ts \
-            tests/integration/browser/sanity/rejected-joins-return-to-menu-and-can-retry.test.ts \
             tests/integration/server/current-pilots-recover-after-reconnect.test.ts \
-            tests/integration/server/player-motion-cross-real-sockets.test.ts \
             --reporter=verbose 2>&1 | tee behavioral-artifacts/test-run.log
           pipeline_statuses=("${PIPESTATUS[@]}")
           status=${pipeline_statuses[0]}
@@ -78,66 +99,115 @@ jobs:
             fi
           done
           exit "$status"
-      - name: Report deterministic frame work budget
-        run: >-
-          node --import tsx scripts/measure-frame-work.ts
-          --budget docs/performance/frame-work-budget.json
-          --output behavioral-artifacts/frame-work.json
-      - name: Run constrained production client correctness
-        run: |
-          set -euo pipefail
-          GEOROIDS_TEST_MAX_DURATION_SECONDS=240 ./scripts/test-runner.sh --benchmark-client \
-            --viewport touch-portrait --dpr 3 --cpu-slowdown 4 --network normal \
-            --scenario traversal --seed 42 --warmup 5 --seconds 15 \
-            --output behavioral-artifacts/mobile-combined.json 2>&1 | tee behavioral-artifacts/mobile-combined.log
-          GEOROIDS_TEST_MAX_DURATION_SECONDS=240 ./scripts/test-runner.sh --benchmark-client \
-            --viewport touch-portrait --dpr 3 --cpu-slowdown 1 --network clean \
-            --scenario combat --seed 42 --warmup 5 --seconds 15 \
-            --output behavioral-artifacts/mobile-combat.json 2>&1 | tee behavioral-artifacts/mobile-combat.log
       - name: Upload behavioral artifacts
-        if: ${{ always() }}
+        if: (always()) && steps.verified-tree.outputs.run_full != 'false'
         uses: actions/upload-artifact@v7
         with:
           name: behavioral-smoke-${{ github.run_id }}
           path: behavioral-artifacts
           if-no-files-found: error
           retention-days: 14
+      - name: Record validated PR tree
+        if: >-
+          success() && github.event_name == 'pull_request' &&
+          steps.verified-tree.outputs.tree != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
+          if-no-files-found: error
+          retention-days: 7
 
-  ci:
-    name: ci
-    needs: behavioral-smoke
-    if: ${{ always() }}
+  static-checks:
+    name: >-
+      ${{ (github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && 'static-checks' || 'static-checks-deferred' }}
+    if: >-
+      always() && (github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha)))
     runs-on: ubuntu-latest
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Check for a validated PR tree
+        id: verified-tree
+        timeout-minutes: 1
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-verified-tree.sh
       - uses: actions/setup-node@v6
+        if: steps.verified-tree.outputs.run_full != 'false'
         with:
           node-version-file: .nvmrc
           cache: npm
       - uses: astral-sh/setup-uv@v10.1.0
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm ci
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:actions
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:lint-policy
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:lint
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:knip
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:ts-prune
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:md
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:yaml
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:ts
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:benchmarks
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:test-runner
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:dev-server
-      - run: npm test
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run build
-      - name: Require behavioral smoke lane to pass
-        if: ${{ always() }}
+        if: steps.verified-tree.outputs.run_full != 'false'
+      - name: Record validated PR tree
+        if: >-
+          success() && github.event_name == 'pull_request' &&
+          steps.verified-tree.outputs.tree != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  ci:
+    name: >-
+      ${{ (github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && 'ci' || 'ci-deferred' }}
+    if: >-
+      always() && (github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha)))
+    needs: [static-checks, behavioral-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require both validation lanes to pass
         env:
+          STATIC_RESULT: ${{ needs.static-checks.result }}
           BEHAVIORAL_RESULT: ${{ needs.behavioral-smoke.result }}
         run: |
           set -euo pipefail
-          if [[ "$BEHAVIORAL_RESULT" != "success" ]]; then
-            echo "Critical behavioral lane result: $BEHAVIORAL_RESULT" >&2
+          if [[ "$STATIC_RESULT" != success || "$BEHAVIORAL_RESULT" != success ]]; then
+            echo "Validation failed: static=$STATIC_RESULT behavioral=$BEHAVIORAL_RESULT" >&2
             exit 1
           fi

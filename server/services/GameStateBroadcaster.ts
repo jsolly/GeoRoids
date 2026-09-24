@@ -128,11 +128,14 @@ export class GameStateBroadcaster {
       for (const reward of delivery.rewards) {
         this.broadcastScoreUpdate(reward.playerId, reward.score);
       }
-      this.broadcastAsteroidDestruction(delivery.asteroidId);
+      this.broadcastAsteroidDestruction(delivery.asteroidId, { consumedBy: 'furnace' });
       this.broadcastToAll({ type: 'furnaceDelivery', data: delivery, timestamp: Date.now() });
     }
     for (const data of this.gameEngine.drainShotSounds()) {
       this.broadcastToAll({ type: 'playerShotFired', data, timestamp: Date.now() }, data.ownerId);
+    }
+    for (const data of this.gameEngine.drainTapEjections()) {
+      this.broadcastToAll({ type: 'tapEjected', data, timestamp: Date.now() });
     }
     for (const data of this.gameEngine.drainLootCollections()) {
       this.broadcastToAll({ type: 'lootCollected', data, timestamp: Date.now() });
@@ -185,7 +188,15 @@ export class GameStateBroadcaster {
           ...gameState,
           asteroids,
           loot: nearbyWorldRows(gameState.loot, player.position),
-          satellitePickups: nearbyWorldRows(gameState.satellitePickups, player.position),
+          satellitePickups: [
+            ...gameState.satellitePickups.filter((pickup) => pickup.ownerId === player.id),
+            ...nearbyWorldRows(
+              gameState.satellitePickups.filter(
+                (pickup) => pickup.ownerId !== player.id && pickup.state !== 'stored'
+              ),
+              player.position
+            ),
+          ],
           playerProjectiles: nearbyWorldRows(
             this.gameEngine.getPlayerProjectiles(),
             player.position
@@ -328,8 +339,7 @@ export class GameStateBroadcaster {
       result.attackerId,
       result.damage,
       result.remainingHealth,
-      result.isDestroyed,
-      result.remainingLives
+      result.isDestroyed
     );
 
     if (result.destroyedAsteroidId) {
@@ -353,8 +363,7 @@ export class GameStateBroadcaster {
     attackerId: string,
     damage: number,
     remainingHealth: number,
-    isDestroyed: boolean,
-    remainingLives?: number
+    isDestroyed: boolean
   ): void {
     const message = {
       type: 'playerDamaged',
@@ -364,7 +373,6 @@ export class GameStateBroadcaster {
         damage,
         remainingHealth,
         isDestroyed,
-        ...(remainingLives !== undefined ? { remainingLives } : {}),
       },
       timestamp: Date.now(),
     };
@@ -434,7 +442,7 @@ export class GameStateBroadcaster {
 
   public broadcastAsteroidDestruction(
     asteroidId: string,
-    extras?: { collabSplit?: boolean; origin?: { x: number; y: number } }
+    extras?: { collabSplit?: boolean; origin?: { x: number; y: number }; consumedBy?: 'furnace' }
   ): void {
     const message = {
       type: 'asteroidDestroy',
@@ -442,6 +450,7 @@ export class GameStateBroadcaster {
         asteroidId,
         collabSplit: extras?.collabSplit === true,
         ...(extras?.origin !== undefined ? { origin: extras.origin } : {}),
+        ...(extras?.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
       },
       timestamp: Date.now(),
     };
@@ -595,7 +604,12 @@ export class GameStateBroadcaster {
       recordOutbound(outboundClass(message), 'failed');
       logger.error('Failed to serialize direct message', {
         type: messageType(message),
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       return;
     }
@@ -632,7 +646,12 @@ export class GameStateBroadcaster {
       // flap every client into the Reconnecting banner (#485 live miss).
       logger.error('Failed to serialize broadcast', {
         type: messageType(message),
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       return;
     }

@@ -9,12 +9,12 @@ function number(value: unknown) {
   return value;
 }
 
-/** Recovery exclusions apply only to scheduled instants inside browser game-over recovery. */
+/** Recovery exclusions apply only to scheduled instants inside browser respawn recovery. */
 export function inspectInputCadence(rawSchedule: unknown, rawRestarts: unknown) {
   assert(Array.isArray(rawSchedule) && Array.isArray(rawRestarts), 'Missing cadence ledger');
   const recoveries = rawRestarts.map(object).map((restart) => {
     assert(
-      restart['kind'] === 'browser-gameover' || restart['kind'] === 'peer-rejoin',
+      restart['kind'] === 'browser-respawn' || restart['kind'] === 'peer-rejoin',
       'Unknown recovery kind'
     );
     const start = number(restart['startedAt']);
@@ -49,7 +49,7 @@ export function inspectInputCadence(rawSchedule: unknown, rawRestarts: unknown) 
       assert(
         recoveries.some(
           (recovery) =>
-            recovery.kind === 'browser-gameover' &&
+            recovery.kind === 'browser-respawn' &&
             instant >= recovery.start &&
             instant < recovery.end
         ),

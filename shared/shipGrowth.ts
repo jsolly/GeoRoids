@@ -2,9 +2,10 @@ import type { Position } from '../shared-types';
 import { GAME, SHIP } from '../src/constants';
 
 /**
- * Slither-style size/mass growth shared by every ship.
- * Soft max keeps multiplayer readable: extra mass still collects, but size
- * and HP approach a cap instead of growing without bound.
+ * Shared loot mass, health, and handling. Hull draw size and collision
+ * radius stay at the kit base; mass does not scale the silhouette.
+ * Soft max keeps multiplayer readable: extra mass still collects, but HP
+ * and speed approach a cap instead of changing without bound.
  */
 export const GROWTH = {
   BASE_MASS: 1,
@@ -21,8 +22,11 @@ export const GROWTH = {
   LOOT_RADIUS: 12,
   /** Outline canister from a Resource Tap extract. ~2.3× normal loot. */
   TAP_LOOT_RADIUS: 28,
-  TAP_LOOT_MASS: 0.4,
-  TAP_LOOT_SCORE: 8,
+  /** Four canisters keep the full extract at 0.4 mass and 8 points. */
+  TAP_LOOT_MASS: 0.1,
+  TAP_LOOT_SCORE: 2,
+  /** Let the ejection read before magnetism or pickup can consume it. */
+  TAP_LOOT_EJECT_FRAMES: 18,
   TAP_LOOT_MAGNET_RANGE: 160,
   TAP_LOOT_MAGNET_ACCEL: 0.4 * GAME.MOTION_SCALE,
   /** Pull loot toward living ships from beyond hull overlap without inflating the hull. */
@@ -31,9 +35,10 @@ export const GROWTH = {
   LOOT_MAGNET_ACCEL: 0.24 * GAME.MOTION_SCALE,
   SCATTER_MIN: 16,
   SCATTER_MAX: 40,
-  MAX_LOOT: 48,
+  MAX_LOOT: 192,
   LOOT_TTL_FRAMES: 20 * 60,
-  MAX_SIZE_SCALE: 2.2,
+  /** Scout-base HP multiplier at SOFT_MAX_MASS. */
+  MAX_HEALTH_SCALE: 2.2,
   MIN_THRUST_SCALE: 0.55,
   MIN_SPEED_SCALE: 0.6,
   MASS_GAIN_K: 0.45,
@@ -68,31 +73,25 @@ export function applyLootMass(current: number, gain: number): number {
   );
 }
 
-export function sizeScaleFromMass(mass: number): number {
+function massProgress(mass: number): number {
   const span = GROWTH.SOFT_MAX_MASS - GROWTH.BASE_MASS;
+  if (span <= 0) {
+    return 0;
+  }
   const t = (clampMass(mass) - GROWTH.BASE_MASS) / span;
-  const u = Math.max(0, Math.min(1, t));
-  return 1 + (GROWTH.MAX_SIZE_SCALE - 1) * u;
-}
-
-export function radiusFromMass(mass: number): number {
-  return (SHIP.SIZE / 2) * sizeScaleFromMass(mass);
+  return Math.max(0, Math.min(1, t));
 }
 
 export function maxHealthFromMass(mass: number): number {
-  return Math.round(SHIP.MAX_HEALTH * sizeScaleFromMass(mass));
+  return Math.round(SHIP.MAX_HEALTH * (1 + (GROWTH.MAX_HEALTH_SCALE - 1) * massProgress(mass)));
 }
 
 export function thrustScaleFromMass(mass: number): number {
-  const span = GROWTH.MAX_SIZE_SCALE - 1;
-  const t = span <= 0 ? 0 : (sizeScaleFromMass(mass) - 1) / span;
-  return 1 - (1 - GROWTH.MIN_THRUST_SCALE) * t;
+  return 1 - (1 - GROWTH.MIN_THRUST_SCALE) * massProgress(mass);
 }
 
 export function maxVelocityFromMass(mass: number): number {
-  const span = GROWTH.MAX_SIZE_SCALE - 1;
-  const t = span <= 0 ? 0 : (sizeScaleFromMass(mass) - 1) / span;
-  return SHIP.MAX_VELOCITY * (1 - (1 - GROWTH.MIN_SPEED_SCALE) * t);
+  return SHIP.MAX_VELOCITY * (1 - (1 - GROWTH.MIN_SPEED_SCALE) * massProgress(mass));
 }
 
 export function applyShipMass(ship: GrowableShip, nextMass: number): void {
@@ -124,17 +123,24 @@ export function canCollectLoot(entity: {
   exploding: boolean;
   health: number;
   respawnTimer?: number;
+  overlayHold?: boolean;
 }): boolean {
-  return !entity.exploding && entity.health > 0 && entity.respawnTimer === undefined;
+  return (
+    !entity.exploding &&
+    entity.health > 0 &&
+    entity.respawnTimer === undefined &&
+    entity.overlayHold !== true
+  );
 }
 
 export function lootOverlap(
   shipPosition: { x: number; y: number },
-  shipMass: number,
+  shipRadius: number,
   lootPosition: { x: number; y: number },
   lootRadius: number
 ): boolean {
-  const reach = radiusFromMass(shipMass) + lootRadius;
+  const hull = Number.isFinite(shipRadius) && shipRadius > 0 ? shipRadius : 0;
+  const reach = hull + lootRadius;
   const dx = shipPosition.x - lootPosition.x;
   const dy = shipPosition.y - lootPosition.y;
   return dx * dx + dy * dy <= reach * reach;

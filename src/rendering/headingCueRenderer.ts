@@ -2,6 +2,11 @@ import { PALETTE, STEERING } from '../constants';
 import type { Ship } from '../entities/ship/Ship';
 import { PLAYFIELD_CLOSE_SCALE, type PlayfieldSize } from './playfieldCamera';
 
+/** Screen-pixel distance from ship center to the heading caret tip. */
+export function headingCueTipDistance(scaledShipRadius: number): number {
+  return Math.max(STEERING.ARROW_DISTANCE_PX, scaledShipRadius + 32);
+}
+
 /** The current travel heading stays visible beyond a finger resting on the hull. */
 export function drawHeadingCue(
   ctx: CanvasRenderingContext2D,
@@ -11,7 +16,7 @@ export function drawHeadingCue(
   if (ship.exploding || ship.health <= 0) {
     return;
   }
-  const tip = Math.max(STEERING.ARROW_DISTANCE_PX, ship.r * PLAYFIELD_CLOSE_SCALE + 32);
+  const tip = headingCueTipDistance(ship.r * PLAYFIELD_CLOSE_SCALE);
   ctx.save();
   ctx.translate(viewport.width / 2, viewport.height / 2);
   ctx.rotate(-ship.angle);

@@ -6,7 +6,7 @@ import { createServerInstance } from '../../../server/createServer';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
-import { GAME, LASER, ROID } from '../../../src/constants';
+import { GAME, LASER } from '../../../src/constants';
 import { WireClient, type WireMessage } from '../../support/wireClient';
 
 type TestServer = ReturnType<typeof createServerInstance>;
@@ -121,8 +121,8 @@ async function startWorld(): Promise<{
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
     server.gameEngine.removeAsteroid(asteroid.id);
   }
-  server.gameEngine.parkSatellitePickups({ x: -2_400, y: -2_400 });
-  expect(server.gameEngine.getLoot()).toEqual([]);
+  server.gameEngine.parkSatellitePickups({ x: -700, y: -700 });
+  expect(server.gameEngine.getLoot().filter((drop) => drop.kind !== 'points')).toEqual([]);
 
   return { server, playerA, playerB, decoderA, decoderB };
 }
@@ -266,9 +266,9 @@ describe('shared destroy-drop shards over WebSocket', () => {
       collabSplit: false,
       origin: target.position,
     });
-    expect(score.data).toEqual({ playerId: 'pilot-a', score: ROID.POINTS_SMALL });
+    expect(score.data).toEqual({ playerId: 'pilot-a', score: 0 });
     expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
-    expect(server.gameEngine.getLoot()).toHaveLength(1);
+    expect(server.gameEngine.getLoot()).toHaveLength(2);
 
     playerA.resetMessages();
     playerB.resetMessages();
@@ -276,8 +276,8 @@ describe('shared destroy-drop shards over WebSocket', () => {
     await Promise.all([playerA.barrier(), playerB.barrier()]);
     const stateA = decodeLatestSnapshot(playerA, decoderA);
     const stateB = decodeLatestSnapshot(playerB, decoderB);
-    const lootA = readLootRows(stateA);
-    const lootB = readLootRows(stateB);
+    const lootA = readLootRows(stateA).filter((drop) => drop.kind === 'shard');
+    const lootB = readLootRows(stateB).filter((drop) => drop.kind === 'shard');
     expect(lootA).toHaveLength(1);
     expect(lootB).toEqual(lootA);
     const shard = lootA[0];
@@ -303,8 +303,8 @@ describe('shared destroy-drop shards over WebSocket', () => {
     expect(explodedA.data).toEqual(explosion);
     expect(explodedB.data).toEqual(explosion);
     expect(countType(playerA, 'lootExploded')).toBe(1);
-    expect(server.gameEngine.getLoot()).toEqual([]);
-    expect(server.gameEngine.getPlayer('pilot-a')?.score).toBe(ROID.POINTS_SMALL);
+    expect(server.gameEngine.getLoot().filter((drop) => drop.kind !== 'points')).toEqual([]);
+    expect(server.gameEngine.getPlayer('pilot-a')?.score).toBe(0);
     expect(playerA.failures).toEqual([]);
     expect(playerB.failures).toEqual([]);
   });

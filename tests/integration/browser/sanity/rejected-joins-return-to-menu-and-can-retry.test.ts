@@ -8,12 +8,17 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const EXPECTED_JOIN_FAILURE_PATTERN =
+  /Failed to complete server join|Current multiplayer protocol is required|Permanently disconnected|Displayed permanent disconnect banner|WebSocket connection closed/u;
 
 for (const { viewport, failure } of [
   { name: 'desktop', width: 1280, height: 900 },
   { name: 'mobile', width: 390, height: 844 },
-].flatMap((viewport) =>
-  (['rejected', 'unsupported'] as const).map((failure) => ({ viewport, failure }))
+].flatMap((viewportConfig) =>
+  (['rejected', 'unsupported'] as const).map((joinFailure) => ({
+    viewport: viewportConfig,
+    failure: joinFailure,
+  }))
 )) {
   test(
     `${failure === 'unsupported' ? 'An' : 'A'} ${failure} join returns to the menu and a pilot can retry on ${viewport.name}`,
@@ -80,11 +85,9 @@ for (const { viewport, failure } of [
           )
         )
       ).toBe(true);
-      const expectedFailure =
-        /Failed to complete server join|Current multiplayer protocol is required|Permanently disconnected|Displayed permanent disconnect banner|WebSocket connection closed/;
       expect(
         [...diagnostics.errors, ...diagnostics.warnings].filter(
-          (message) => !expectedFailure.test(message)
+          (message) => !EXPECTED_JOIN_FAILURE_PATTERN.test(message)
         )
       ).toEqual([]);
       await page.screenshot({

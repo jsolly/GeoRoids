@@ -54,7 +54,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       const { GameController } = await import('../src/core/gameController');
       const { GameStateManager } = await import('../src/core/services/GameStateManager');
       const { NetworkManager } = await import('../src/network/networkManager');
-      const { canvasManager } = await import('../src/rendering/canvas');
+      const { canvasManager } = await import('../src/rendering/canvasSurface');
       const { Roid } = await import('../src/entities/roid/Roid');
       const { LootField } = await import('../src/entities/loot/LootField');
       const { SatellitePickupManager } = await import(
@@ -145,7 +145,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       ensureTerrain(options.seed);
       setPlayView(true);
       syncTouchChrome(true);
-      const probe = document.getElementById('safe-area-probe');
+      const probe = document.querySelector('#safe-area-probe');
       if (!(probe instanceof HTMLElement)) {
         throw new Error('Safe-area probe is missing');
       }
@@ -171,7 +171,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             shipId: local.ship.id,
             position: { ...local.ship.position },
             health: local.ship.health,
-            lives: local.lives,
+            cargo: local.cargo,
+            purchases: local.purchases,
             exploding: local.ship.exploding,
           },
           asteroids: belt.roids.map((roid) => ({
@@ -243,6 +244,22 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             }
           }
         }
+        const instrumentPrototypeMethod = (
+          prefix: string,
+          key: string,
+          original: (...args: unknown[]) => unknown
+        ) =>
+          function (this: object, ...args: unknown[]) {
+            if (record) {
+              const name = `${prefix}.${key}`;
+              countWork(name);
+              canvasCalls[name] = (canvasCalls[name] ?? 0) + 1;
+              if (key === 'fillText' && typeof args[0] === 'string') {
+                textCalls.push(args[0]);
+              }
+            }
+            return Reflect.apply(original, this, args);
+          };
         for (const [prefix, prototype] of [
           ['canvas', CanvasRenderingContext2D.prototype],
           ['path', Path2D.prototype],
@@ -255,17 +272,11 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             }
             Object.defineProperty(prototype, key, {
               ...descriptor,
-              value: function (this: object, ...args: unknown[]) {
-                if (record) {
-                  const name = `${prefix}.${key}`;
-                  countWork(name);
-                  canvasCalls[name] = (canvasCalls[name] ?? 0) + 1;
-                  if (key === 'fillText' && typeof args[0] === 'string') {
-                    textCalls.push(args[0]);
-                  }
-                }
-                return Reflect.apply(original, this, args);
-              },
+              value: instrumentPrototypeMethod(
+                prefix,
+                key,
+                original as (...args: unknown[]) => unknown
+              ),
             });
             restores.push(() => Object.defineProperty(prototype, key, descriptor));
           }
@@ -337,7 +348,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       const after = snapshot();
       if (
         after.local.health !== before.local.health ||
-        after.local.lives !== before.local.lives ||
+        after.local.health !== before.local.health ||
         after.local.exploding ||
         after.local.position.x !== 0 ||
         after.local.position.y !== 0 ||
@@ -387,11 +398,9 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           '../src/rendering/hud/hudLayout'
         );
         const { drawScoreOverlay, drawTextOverlay } = await import('../src/rendering/hud/gameInfo');
-        const { drawLivesIndicator } = await import('../src/rendering/hud/lives');
         const { drawMiniMap } = await import('../src/rendering/hud/minimap');
         const { drawLeaderboard } = await import('../src/rendering/hud/leaderboard');
         const { entityFactory } = await import('../src/entities/EntityFactory');
-        const { PALETTE } = await import('../src/constants/index');
         const { drawFieryBoundary } = await import('../src/rendering/boundaryRenderer');
         const { getGameBoundary } = await import('../src/physics/boundary');
         const reads = { safeAreaStyles: 0, pointerMediaQueries: 0 };
@@ -440,11 +449,11 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           local.ship,
           belt.getRoids(),
           LootField.getInstance().getAll(),
-          SatellitePickupManager.getInstance().getAll()
+          SatellitePickupManager.getInstance().getAll(),
+          []
         );
-        drawScoreOverlay(ctx, layout, canvas, local.score, local.lives);
-        drawLivesIndicator(ctx, layout, local.lives, PALETTE.LOCAL, local.ship.kitId);
-        drawTextOverlay(ctx, layout, canvas, 'Game Over: killed by Benchmark Rival', 1);
+        drawScoreOverlay(ctx, layout, canvas, local.score);
+        drawTextOverlay(ctx, layout, canvas, 'You were killed by an asteroid', 1);
         const rival = entityFactory.createRemotePlayer(
           'benchmark-rival',
           'Benchmark Rival',
@@ -454,7 +463,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         drawLeaderboard(ctx, layout, [local, rival], local.id);
         record = false;
         if (
-          !textCalls.includes('GAME OVER') ||
+          !textCalls.some((text) => text.includes('killed by')) ||
           !textCalls.some((text) => text.includes('Benchmark')) ||
           (canvasCalls['canvas.fillText'] ?? 0) < 2
         ) {

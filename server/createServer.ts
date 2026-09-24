@@ -1,7 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
+import {
+  CONNECTION_ADMISSION_WINDOW_MS,
+  connectionLimitsDisabled,
+  createConnectionAdmission,
+} from './communication/connectionAdmission';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
+import { GameplayMessageBudget } from './communication/messageBudget';
 import { WebSocketCore } from './communication/WebSocketCore';
 import { readServerConfiguration } from './configuration';
 import { GameEngine } from './core/GameEngine';
@@ -22,13 +29,15 @@ import {
   handleTestPlacePlayer,
   handleTestResetWorld,
 } from './testHttpHandlers';
-import { WorldStore } from './world/WorldStore';
+import { openWorldPersistence } from './world/openWorldPersistence';
 
 type CreateServerOptions = {
   port?: number;
   nodeEnv?: string;
   seed?: number;
   worldPath?: string;
+  /** Apply production connection budgets even when test or development would skip them. */
+  enforceConnectionLimits?: boolean;
 };
 
 export function createServerInstance(options: CreateServerOptions = {}) {
@@ -39,6 +48,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const loggingDiagnostics = () => ({
     activeLogClients: logClients.size,
     clientIngress: ClientLogger.getDiagnostics(),
+    gameplayIngress: messageBudget.diagnostics(),
     serverWriter: getServerLogDiagnostics(),
   });
 
@@ -201,6 +211,21 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     res.end('Not Found');
   });
 
+  // More lenient rate limiting for testing and development
+  const isTestEnvironment =
+    NODE_ENV === 'test' || process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test';
+  const isDevelopmentEnvironment =
+    NODE_ENV === 'development' || process.env['NODE_ENV'] === 'development';
+  const shouldDisableRateLimit = isTestEnvironment || isDevelopmentEnvironment;
+  const limitsDisabled = connectionLimitsDisabled({
+    nodeEnv: NODE_ENV,
+    ...(process.env['NODE_ENV'] ? { processNodeEnv: process.env['NODE_ENV'] } : {}),
+    ...(process.env['VITEST'] ? { vitest: process.env['VITEST'] } : {}),
+    ...(options.enforceConnectionLimits ? { enforceConnectionLimits: true } : {}),
+  });
+  const admission = createConnectionAdmission(limitsDisabled);
+  const logQuotaClosed = new WeakSet<WebSocket>();
+
   const wss = new WebSocketServer({
     server: httpServer,
     maxPayload: 64 * 1024,
@@ -218,22 +243,35 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         done(false, 426, 'Client update required; refresh GeoRoids');
         return;
       }
+      const clientIp = info.req.socket.remoteAddress || 'unknown';
+      const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
+      if (!admissionDecision.accepted) {
+        if (admissionDecision.firstRejection) {
+          logger.warn(
+            admissionDecision.lane === 'logs'
+              ? `🚫 Rate limited log connection from ${clientIp} (${admissionDecision.count}/${admissionDecision.limit})`
+              : `🚫 Rate limited connection attempt from ${clientIp} (${admissionDecision.count}/${admissionDecision.limit})`
+          );
+        }
+        done(
+          false,
+          429,
+          admissionDecision.lane === 'logs'
+            ? 'Log connection rate limit exceeded'
+            : 'Rate limit exceeded'
+        );
+        return;
+      }
       done(true);
     },
   });
-
-  // Rate limiting
-  const connectionAttempts = new Map<string, { count: number; lastAttempt: number }>();
-  // More lenient rate limiting for testing and development
-  const isTestEnvironment =
-    NODE_ENV === 'test' || process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test';
-  const isDevelopmentEnvironment =
-    NODE_ENV === 'development' || process.env['NODE_ENV'] === 'development';
-  const shouldDisableRateLimit = isTestEnvironment || isDevelopmentEnvironment;
-  const MAX_CONNECTIONS_PER_MINUTE = shouldDisableRateLimit ? 10000 : 50; // Much higher limit for tests and dev
+  // Per-connection inbound message budget, on the same footing as the
+  // connection limiter: a flood cannot load the single game loop, and honest
+  // 60 Hz clients stay well inside it. Off in test/dev like the IP limiter.
+  const messageBudget = new GameplayMessageBudget();
 
   // Debug logging for environment detection
-  if (shouldDisableRateLimit) {
+  if (limitsDisabled) {
     logger.info('🧪 Development/Test environment detected - rate limiting disabled', {
       NODE_ENV,
       VITEST: process.env['VITEST'],
@@ -242,50 +280,16 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       isDevelopmentEnvironment,
     });
   }
-  const CONNECTION_WINDOW_MS = 60000;
-
-  function isRateLimited(ip: string): boolean {
-    // Skip rate limiting entirely in test or development environment
-    if (shouldDisableRateLimit) {
-      return false;
-    }
-
-    const now = Date.now();
-    const attempts = connectionAttempts.get(ip);
-    if (!attempts) {
-      connectionAttempts.set(ip, { count: 1, lastAttempt: now });
-      return false;
-    }
-    if (now - attempts.lastAttempt > CONNECTION_WINDOW_MS) {
-      connectionAttempts.set(ip, { count: 1, lastAttempt: now });
-      return false;
-    }
-    if (attempts.count >= MAX_CONNECTIONS_PER_MINUTE) {
-      logger.warn(
-        `🚫 Rate limited connection attempt from ${ip} (${attempts.count}/${MAX_CONNECTIONS_PER_MINUTE})`
-      );
-      return true;
-    }
-    attempts.count++;
-    attempts.lastAttempt = now;
-    return false;
-  }
-
   const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, attempts] of connectionAttempts.entries()) {
-      if (now - attempts.lastAttempt > CONNECTION_WINDOW_MS) {
-        connectionAttempts.delete(ip);
-      }
-    }
-  }, CONNECTION_WINDOW_MS);
+    admission.prune(Date.now());
+  }, CONNECTION_ADMISSION_WINDOW_MS);
 
   wss.on('error', (error) => {
     logger.error('❌ WebSocket server error:', error);
   });
 
-  const worldStore = options.worldPath ? new WorldStore(options.worldPath) : undefined;
-  const gameEngine = new GameEngine(options.seed, undefined, worldStore);
+  const persistence = options.worldPath ? openWorldPersistence(options.worldPath) : undefined;
+  const gameEngine = new GameEngine(options.seed, undefined, persistence);
   acquireServerPerformanceMetrics();
   // Ensure the server-side game loop runs
   gameEngine.startGameLoop();
@@ -298,18 +302,20 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url ?? '/', 'http://localhost').pathname;
-    const clientIp = req.socket.remoteAddress || 'unknown';
-
-    if (isRateLimited(clientIp)) {
-      logger.warn(`🚫 Rate limited connection attempt from ${clientIp}`);
-      ws.close(1008, 'Rate limit exceeded');
-      return;
-    }
 
     if (url === '/logs') {
       logClients.add(ws);
-      logger.info('📝 Log client connected');
+      const endLogSocket = (warn: boolean): void => {
+        logQuotaClosed.add(ws);
+        if (warn) {
+          logger.warn('Rejected malformed client log message');
+        }
+        ws.terminate();
+      };
       ws.on('message', (data) => {
+        if (logQuotaClosed.has(ws)) {
+          return;
+        }
         try {
           const message: unknown = JSON.parse(String(data));
           if (
@@ -320,27 +326,23 @@ export function createServerInstance(options: CreateServerOptions = {}) {
             message.type !== 'clientLog'
           ) {
             ClientLogger.recordInvalidMessage();
-            ws.close(1008, 'Invalid client log message');
+            endLogSocket(false);
             return;
           }
           const result = ClientLogger.logClientMessage(
             'data' in message ? message.data : undefined,
             ws
           );
-          if (result === 'invalid') {
-            ws.close(1008, 'Invalid client log payload');
-          } else if (result === 'rate-limited') {
-            ws.close(1008, 'Client log rate limit exceeded');
+          if (result === 'invalid' || result === 'rate-limited') {
+            endLogSocket(false);
           }
         } catch {
           ClientLogger.recordInvalidMessage();
-          logger.warn('Rejected malformed client log message');
-          ws.close(1007, 'Malformed client log message');
+          endLogSocket(true);
         }
       });
       ws.on('close', () => {
         logClients.delete(ws);
-        logger.info('📝 Log client disconnected');
       });
       ws.on('error', (error) => {
         logClients.delete(ws);
@@ -353,6 +355,23 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       logger.info('🔌 New player connected');
       ws.on('message', (data) => {
         const rawData = String(data);
+        if (!shouldDisableRateLimit) {
+          const decision = messageBudget.admit(ws, Buffer.byteLength(rawData, 'utf8'));
+          if (decision !== 'ok') {
+            // Only the first over-budget frame acts: terminate (a flooder need
+            // not be owed the close handshake, which it can ignore for 30 s
+            // while every frame re-logs) and log once. Later frames drop silently.
+            if (decision === 'rate-limited') {
+              const offender = gameEngine.getPlayerBySocket(ws);
+              logger.warn('STATE', 'ws_message_budget_exceeded', {
+                releaseId: SERVER_RELEASE_ID,
+                ...(offender ? { playerId: offender.id } : {}),
+              });
+              ws.terminate();
+            }
+            return;
+          }
+        }
         try {
           const message = JSON.parse(rawData);
           if (shouldLogInboundGameplayMessage(message.type)) {
@@ -383,9 +402,9 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         if (resumable) {
           return;
         }
-        for (const player of wsCore.getAllPlayers()) {
-          if (player.ws === ws) {
-            wsCore.removePlayer(player.id);
+        for (const connectedPlayer of wsCore.getAllPlayers()) {
+          if (connectedPlayer.ws === ws) {
+            wsCore.removePlayer(connectedPlayer.id);
             break;
           }
         }
@@ -420,20 +439,14 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   let closing: Promise<void> | undefined;
   function close(): Promise<void> {
-    if (closing) {
+    if (closing !== undefined) {
       return closing;
     }
     clearInterval(cleanupInterval);
     wsCore.stopPeriodicGameStateBroadcast();
     gameEngine.stopGameLoop();
-    let checkpointError: unknown;
-    try {
-      gameEngine.checkpointWorld();
-    } catch (error) {
-      checkpointError = error;
-    }
     releaseServerPerformanceMetrics();
-    closing = new Promise<void>((resolve, reject) => {
+    const stopTransports = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
         for (const socket of wss.clients) {
           socket.terminate();
@@ -456,27 +469,46 @@ export function createServerInstance(options: CreateServerOptions = {}) {
           }
         });
       });
-      void Promise.all([stopWebSockets, stopHttp])
-        .then(async () => {
-          worldStore?.close();
-          if (!(await ClientLogger.flushPending())) {
-            throw new Error('Timed out flushing forwarded client logs');
-          }
-          if (checkpointError) {
-            throw checkpointError;
-          }
-        })
-        .then(
-          () => {
-            clearTimeout(deadline);
-            resolve();
-          },
-          (error) => {
-            clearTimeout(deadline);
-            reject(error);
-          }
-        );
+      void Promise.all([stopWebSockets, stopHttp]).then(
+        () => {
+          clearTimeout(deadline);
+          resolve();
+        },
+        (error) => {
+          clearTimeout(deadline);
+          reject(error);
+        }
+      );
     });
+    closing = (async () => {
+      // Whether the sockets closed or were terminated at the deadline, the
+      // departing pilots are captured by now; flush the final batch and wait
+      // for its commit before the process can exit. The engine bounds both
+      // its wait for the writer and the writer's close, so a hung writer
+      // cannot hold the process past Railway's SIGTERM window either.
+      const errors: Error[] = [];
+      try {
+        await stopTransports;
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error : new Error('Server shutdown failed', { cause: error })
+        );
+      }
+      try {
+        await gameEngine.shutdownPersistence();
+      } catch (cause) {
+        errors.push(new Error('Persistent world checkpoint failed', { cause }));
+      }
+      if (!(await ClientLogger.flushPending())) {
+        errors.push(new Error('Timed out flushing forwarded client logs'));
+      }
+      if (errors.length === 1) {
+        throw errors[0];
+      }
+      if (errors.length > 1) {
+        throw new AggregateError(errors, 'Server shutdown did not complete cleanly');
+      }
+    })();
     return closing;
   }
 

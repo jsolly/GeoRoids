@@ -1,9 +1,12 @@
+import { cruiseVelocity } from '../../shared/shipFlight';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import type { ContourLevel } from '../physics/terrain/contours';
-import { getTerrainContours } from '../physics/terrain/terrainSession';
+import { getTerrainContours, getTerrainField } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
+import { contourSlopeColor, previewConeWeight, radialSlope } from './contourAppearance';
+import { contourSlope } from './contourDisplay';
 import { drawContourLabels } from './contourLabels';
 import { contourCandidates } from './contourSpatialIndex';
 
@@ -12,10 +15,10 @@ type ContourSegment = ContourLevel['segments'][number];
 const contourPathCache = new WeakMap<readonly ContourSegment[], Path2D>();
 
 /**
- * Muted topo lines in world space. Tight spacing is steep; keep alpha low so
+ * Original-density terrain lines in world space. Keep alpha low so
  * ships, lasers, and roids stay readable on top.
  */
-export function drawIsoContours(shipPosition: Position): void {
+export function drawIsoContours(shipPosition: Position, headingAngle: number): void {
   const ctx = canvasManager.getContext();
   const cvs = canvasManager.getCanvas();
   if (!ctx || !cvs) {
@@ -33,6 +36,8 @@ export function drawIsoContours(shipPosition: Position): void {
     return;
   }
 
+  const field = getTerrainField();
+  const heading = cruiseVelocity(headingAngle, 1);
   const centerX = viewport.width / 2;
   const centerY = viewport.height / 2;
   ctx.save();
@@ -71,6 +76,33 @@ export function drawIsoContours(shipPosition: Position): void {
     ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH / scale;
     ctx.stroke(path);
     ctx.restore();
+
+    for (const segment of candidates) {
+      const offset = {
+        x: ((segment.ax + segment.bx) / 2 - shipPosition.x) * scale,
+        y: ((segment.ay + segment.by) / 2 - shipPosition.y) * scale,
+      };
+      const weight = previewConeWeight(offset, heading);
+      const slope = contourSlope(segment, field);
+      if (weight === 0 && slope.passage === 0) {
+        continue;
+      }
+      const climb = radialSlope(offset, slope.gradient);
+      const ax = centerX + (segment.ax - shipPosition.x) * scale;
+      const ay = centerY + (segment.ay - shipPosition.y) * scale;
+      const bx = centerX + (segment.bx - shipPosition.x) * scale;
+      const by = centerY + (segment.by - shipPosition.y) * scale;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.strokeStyle = contourSlopeColor(
+        weight > 0 ? climb : 0,
+        Math.max(0.62 * weight, 0.7 * slope.passage),
+        slope.passage
+      );
+      ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH;
+      ctx.stroke();
+    }
   }
 
   drawContourLabels(ctx, levels, {

@@ -1,8 +1,6 @@
 import { existsSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
-import { VISUAL } from '../../../../src/constants';
-import { layoutHudCluster } from '../../../../src/rendering/hud/cluster';
 import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
@@ -38,7 +36,7 @@ async function setViewport(
   await page.setViewportSize({ width, height });
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       return (
         canvas instanceof HTMLCanvasElement &&
         canvas.width === expectedWidth &&
@@ -50,13 +48,13 @@ async function setViewport(
   );
 }
 
-async function captureHudFrame(
+function captureHudFrame(
   page: import('playwright').Page,
   options: CaptureOptions
 ): Promise<HudFrame> {
   return page.evaluate((capture) => {
-    const canvasElement = document.getElementById('gameCanvas');
-    const probeElement = document.getElementById('safe-area-probe');
+    const canvasElement = document.querySelector('#gameCanvas');
+    const probeElement = document.querySelector('#safe-area-probe');
     if (!(canvasElement instanceof HTMLCanvasElement) || !(probeElement instanceof HTMLElement)) {
       throw new Error('HUD fixture requires the game canvas and safe-area probe');
     }
@@ -120,8 +118,7 @@ async function captureHudFrame(
 
       local.name = 'HUD pilot';
       local.score = capture.score;
-      local.lives = 3;
-      local.ship.kitId = 'surveyor';
+      local.ship.kitId = 'scout';
 
       for (const player of players) {
         if (player.id === local.id) {
@@ -155,7 +152,9 @@ async function captureHudFrame(
 
 function textDrawn(frame: HudFrame, text: string, leftHalf = false): DrawnText | undefined {
   return frame.texts.find(
-    (draw) => draw.text === text && (!leftHalf || draw.x < frame.canvas.width / 2)
+    (draw) =>
+      (draw.text === text || draw.text.startsWith(`${text} · `)) &&
+      (!leftHalf || draw.x < frame.canvas.width / 2)
   );
 }
 
@@ -175,8 +174,8 @@ function miniMapCenter(layout: ReturnType<typeof computeHudLayout>): { x: number
   };
 }
 
-function scoreOrigin(layout: ReturnType<typeof computeHudLayout>, lives: number): number {
-  return layoutHudCluster(lives).score.x + layout.lives.x - VISUAL.HUD_INSET;
+function scoreOrigin(layout: ReturnType<typeof computeHudLayout>): number {
+  return layout.balance.x;
 }
 
 function saveScreenshot(page: import('playwright').Page, path: string): Promise<void> {
@@ -186,7 +185,7 @@ function saveScreenshot(page: import('playwright').Page, path: string): Promise<
 }
 
 test(
-  'rendered HUD follows safe-area changes and keeps compact game-over composition visible',
+  'rendered HUD follows safe-area changes and keeps compact death-message composition visible',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -227,7 +226,7 @@ test(
       );
       const desktopRadar = miniMapCenter(desktopLayout);
       expect(desktop.canvas).toEqual({ width: 1280, height: 900 });
-      expect(textDrawn(desktop, '2468', true)?.x).toBe(scoreOrigin(desktopLayout, 3));
+      expect(textDrawn(desktop, 'Bank 2,468', true)?.x).toBe(scoreOrigin(desktopLayout));
       expect(
         arcDrawn(desktop, desktopLayout.miniMap.size / 2, desktopRadar.x, desktopRadar.y)
       ).toBeDefined();
@@ -244,7 +243,7 @@ test(
       const shiftedPortrait = await captureHudFrame(page, {
         safeArea: { top: 47, right: 24, bottom: 34, left: 24 },
         score: 2468,
-        overlay: 'Game Over: radar collision',
+        overlay: 'You were killed by an asteroid',
       });
       const portraitLayout = computeHudLayout(
         { width: 390, height: 844 },
@@ -259,10 +258,10 @@ test(
       expect(portrait.canvas).toEqual({ width: 390, height: 844 });
       expect(shiftedPortrait.canvas).toEqual(portrait.canvas);
 
-      const portraitScore = textDrawn(portrait, '2468', true);
-      const shiftedScore = textDrawn(shiftedPortrait, '2468', true);
-      const portraitKit = textDrawn(portrait, 'Surveyor');
-      const shiftedKit = textDrawn(shiftedPortrait, 'Surveyor');
+      const portraitScore = textDrawn(portrait, 'Bank 2,468', true);
+      const shiftedScore = textDrawn(shiftedPortrait, 'Bank 2,468', true);
+      const portraitKit = textDrawn(portrait, 'Scout');
+      const shiftedKit = textDrawn(shiftedPortrait, 'Scout');
       expect(portraitScore).toBeDefined();
       expect(shiftedScore).toBeDefined();
       expect(portraitKit).toBeDefined();
@@ -291,19 +290,13 @@ test(
       expect(shiftedRing?.x).toBe((portraitRing?.x ?? 0) - 20);
       expect(shiftedRing?.y).toBe((portraitRing?.y ?? 0) - 30);
 
-      const gameOver = textDrawn(shiftedPortrait, 'GAME OVER');
-      expect(gameOver).toBeDefined();
-      expect(gameOver?.x).toBe(195);
-      expect(gameOver?.y).toBeCloseTo(422 - 80 * 0.72, 5);
-      expect(gameOver?.font).toBe('bold 35px Arial');
-      expect(gameOver?.textAlign).toBe('center');
-      expect(styleHas(gameOver?.fillStyle ?? '', '#f43f5e', '244, 63, 94')).toBe(true);
+      expect(shiftedPortrait.texts.some((draw) => draw.text.includes('killed by'))).toBe(true);
       expect(shiftedPortrait.texts.some((draw) => draw.text.toLowerCase().includes('server'))).toBe(
         false
       );
       await saveScreenshot(
         page,
-        screenshotManager.getScreenshotPath('hud-composition-portrait-game-over.png')
+        screenshotManager.getScreenshotPath('hud-composition-portrait-death.png')
       );
 
       await setViewport(page, 844, 390);
@@ -324,7 +317,7 @@ test(
         landscapeRadar.y
       );
       expect(radar).toBeDefined();
-      expect(textDrawn(landscape, '2468', true)?.x).toBe(scoreOrigin(landscapeLayout, 3));
+      expect(textDrawn(landscape, 'Bank 2,468', true)?.x).toBe(scoreOrigin(landscapeLayout));
       expect(await page.locator('#asteroid-tools-launcher, #asteroid-tools-overlay').count()).toBe(
         0
       );
@@ -337,7 +330,7 @@ test(
     } finally {
       if (wasRunning !== undefined) {
         await page.evaluate((running) => {
-          document.getElementById('safe-area-probe')?.removeAttribute('style');
+          document.querySelector('#safe-area-probe')?.removeAttribute('style');
           const gameController = window.gameController;
           if (!gameController) {
             return;

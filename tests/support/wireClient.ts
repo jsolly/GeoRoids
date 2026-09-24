@@ -14,8 +14,19 @@ function isRecord(value: unknown): value is WirePayload {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function decodeMessage(raw: string): WireMessage {
-  const parsed: unknown = JSON.parse(String(raw));
+function asWireError(value: unknown): Error {
+  if (value instanceof Error) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return new Error(value);
+  }
+  return new Error(JSON.stringify(value));
+}
+
+function decodeMessage(raw: string | Buffer): WireMessage {
+  const text = typeof raw === 'string' ? raw : raw.toString('utf8');
+  const parsed: unknown = JSON.parse(text);
   if (!isRecord(parsed)) {
     throw new Error('Server message must be an object');
   }
@@ -36,16 +47,16 @@ export class WireClient {
 
   constructor(readonly ws: WebSocket) {
     ws.on('error', (error) => {
-      this.failures.push(error instanceof Error ? error : new Error(String(error)));
+      this.failures.push(asWireError(error));
     });
     ws.on('message', (raw) => {
       try {
-        const text = String(raw);
+        const text = typeof raw === 'string' ? raw : raw.toString('utf8');
         const message = decodeMessage(text);
         this.messages.push(message);
         this.wireMessages.push({ raw: text, message });
       } catch (error) {
-        this.failures.push(error instanceof Error ? error : new Error(String(error)));
+        this.failures.push(asWireError(error));
       }
     });
   }

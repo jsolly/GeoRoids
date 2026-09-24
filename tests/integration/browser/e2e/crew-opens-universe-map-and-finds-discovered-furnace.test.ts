@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { FURNACES } from '../../../../shared/furnaces';
+import { oreResource } from '../../../../shared/economy';
+import { civicLot } from '../../../../shared/furnaces';
 import { WORLD } from '../../../../shared/world';
 import {
   assertNoBrowserDiagnostics,
@@ -11,34 +12,73 @@ import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const REVEALED_ASSETS_STATUS_PATTERN = /\d+ revealed assets/u;
 
 const FAR_FURNACE = (() => {
-  const furnace = FURNACES.find((candidate) => candidate.id === 'works-1-0');
+  const furnace = civicLot('street-2-0');
   if (!furnace) {
-    throw new Error('Universe map fixture requires the first regional Works furnace');
+    throw new Error('Universe map fixture requires an outer furnace foundation');
   }
   return furnace;
 })();
+
+function formatMapCoordinate(value: number): string {
+  return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
+}
+
+const FAR_FURNACE_LOCATION = `X ${formatMapCoordinate(FAR_FURNACE.position.x)}, Y ${formatMapCoordinate(FAR_FURNACE.position.y)}`;
 
 type MapFrame = {
   open: boolean;
   canvas: { width: number; height: number };
   status: string;
   labels: string[];
+  foundationMarkers: { x: number; y: number }[];
 };
 
-async function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
+function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
   return page.evaluate(async () => {
-    const dialog = document.getElementById('universe-map-dialog');
-    const canvas = document.getElementById('universe-map-canvas');
-    const status = document.getElementById('universe-map-status');
+    const dialog = document.querySelector('#universe-map-dialog');
+    const canvas = document.querySelector('#universe-map-canvas');
+    const status = document.querySelector('#universe-map-status');
     if (!(dialog instanceof HTMLDialogElement) || !(canvas instanceof HTMLCanvasElement)) {
       throw new Error('Universe map fixture requires its dialog and canvas');
     }
 
     const labels: string[] = [];
+    const foundationMarkers: { x: number; y: number }[] = [];
+    let translatedPosition = { x: 0, y: 0 };
+    const originalTranslate = CanvasRenderingContext2D.prototype.translate;
+    const originalArc = CanvasRenderingContext2D.prototype.arc;
+    CanvasRenderingContext2D.prototype.translate = function (this: CanvasRenderingContext2D, x, y) {
+      if (this.canvas === canvas) {
+        translatedPosition = { x, y };
+      }
+      originalTranslate.call(this, x, y);
+    };
+    CanvasRenderingContext2D.prototype.arc = function (
+      this: CanvasRenderingContext2D,
+      x,
+      y,
+      radius,
+      start,
+      end,
+      counterclockwise
+    ) {
+      if (
+        this.canvas === canvas &&
+        x === 0 &&
+        y === 0 &&
+        radius > 0 &&
+        this.getLineDash().length > 0
+      ) {
+        foundationMarkers.push({ ...translatedPosition });
+      }
+      originalArc.call(this, x, y, radius, start, end, counterclockwise);
+    };
     const originalFillText = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (
+      this: CanvasRenderingContext2D,
       text: string,
       x: number,
       y: number,
@@ -60,6 +100,8 @@ async function readMapFrame(page: import('playwright').Page): Promise<MapFrame> 
       });
     } finally {
       CanvasRenderingContext2D.prototype.fillText = originalFillText;
+      CanvasRenderingContext2D.prototype.translate = originalTranslate;
+      CanvasRenderingContext2D.prototype.arc = originalArc;
     }
 
     return {
@@ -67,6 +109,7 @@ async function readMapFrame(page: import('playwright').Page): Promise<MapFrame> 
       canvas: { width: canvas.width, height: canvas.height },
       status: status?.textContent ?? '',
       labels,
+      foundationMarkers,
     };
   });
 }
@@ -90,14 +133,13 @@ async function openAndCaptureMap(
     .poll(() => readMapFrame(page), {
       timeout: 5000,
       interval: 100,
-      message: 'the universe map should render the discovered regional furnace label',
+      message: 'the universe map should render its nearby view',
     })
-    .toSatisfy((frame: MapFrame) => frame.open && frame.labels.includes(FAR_FURNACE.name));
+    .toSatisfy((mapFrame: MapFrame) => mapFrame.open && mapFrame.labels.includes('5k across'));
   const frame = await readMapFrame(page);
   expect(frame.canvas.width).toBeGreaterThan(0);
   expect(frame.canvas.height).toBeGreaterThan(0);
-  expect(frame.status).toMatch(/\d+ revealed assets/);
-  expect(frame.labels).toContain(FAR_FURNACE.name);
+  expect(frame.status).toMatch(REVEALED_ASSETS_STATUS_PATTERN);
   return frame;
 }
 
@@ -117,12 +159,12 @@ test.each([
     await page.setViewportSize({ width, height });
 
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const playerId = await game.getLocalPlayerId();
     await arrangeCrewField([playerId], 'empty');
     await game.placeShipAt(FAR_FURNACE.position.x, FAR_FURNACE.position.y);
 
-    // Passive Surveyor exploration reveals the regional cell. The marker must
+    // Passive Scout exploration reveals the regional cell. The marker must
     // survive after the pilot returns home, outside the local minimap radius.
     const assets = await page.evaluateHandle<
       () => readonly import('../../../../shared-types').MapAsset[]
@@ -155,10 +197,31 @@ test.each([
       await page.locator('#universe-map-toggle').focus();
     }
     const frame = await openAndCaptureMap(page, touch);
-    expect(frame.labels).toContain('NORTH');
+    expect(frame.labels).not.toContain('NORTH');
+    expect(frame.labels).toContain('5k across');
+    expect(await page.locator('#universe-map-zoom').count()).toBe(0);
+    expect(await page.locator('.universe-map-stage .universe-map-zoom').isVisible()).toBe(true);
+    expect(await page.locator('.universe-map-actions #universe-map-zoom-in').count()).toBe(0);
+    const locate = page.locator('#universe-map-center');
+    expect(await locate.getAttribute('aria-label')).toBe('Center on you');
+    expect(await page.locator('.universe-map-stage #universe-map-center').isVisible()).toBe(true);
+    expect(await page.locator('.universe-map-actions #universe-map-center').count()).toBe(0);
+    expect(await page.locator('#universe-map-close').getAttribute('aria-label')).toBe('Close');
+    expect(await page.locator('#universe-map-close kbd').isVisible()).toBe(!touch);
+    expect(await page.locator('#universe-map-toggle kbd').isVisible()).toBe(!touch);
+    if (touch) {
+      expect(await page.locator('.universe-map-help').textContent()).not.toMatch(/Esc|Home/u);
+    } else {
+      expect(await page.locator('.universe-map-help').textContent()).toMatch(/Esc/u);
+    }
     const locations = page.getByRole('list', { name: 'Revealed landmarks and crew coordinates' });
     await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(FAR_FURNACE.name);
-    expect(await locations.textContent()).toContain('X +4000, Y +0');
+    expect(await locations.textContent()).toContain(FAR_FURNACE_LOCATION);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(
+        `crew-universe-map-${touch ? 'mobile' : 'desktop'}.png`
+      ),
+    });
     if (!touch) {
       await page.locator('#universe-map-canvas').focus();
       expect(
@@ -169,14 +232,29 @@ test.each([
       await page.locator('#universe-map-zoom-in').focus();
       await page.keyboard.press('Space');
       await expect
-        .poll(() => page.locator('#universe-map-zoom').textContent(), { timeout: 5000 })
-        .toBe('135%');
+        .poll(async () => (await readMapFrame(page)).labels.includes('5k across') === false, {
+          timeout: 5000,
+        })
+        .toBe(true);
+      expect(await locate.getAttribute('aria-pressed')).toBe('false');
     }
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(
-        `crew-universe-map-${touch ? 'mobile' : 'desktop'}.png`
-      ),
-    });
+    const zoomOut = page.locator('#universe-map-zoom-out');
+    for (let index = 0; index < 12; index++) {
+      if (touch) {
+        await zoomOut.tap();
+      } else {
+        await zoomOut.click();
+      }
+    }
+    const wholeWorld = await readMapFrame(page);
+    expect(wholeWorld.labels).toContain('120k across');
+    // Whole-world labels are culled for readability; the dashed foundation
+    // marker must still be drawn at its world position.
+    expect(wholeWorld.foundationMarkers).toContainEqual(FAR_FURNACE.position);
+    expect(await locations.textContent()).toContain(FAR_FURNACE.name);
+    await locate.click();
+    expect((await readMapFrame(page)).labels).toContain('5k across');
+    expect(await locate.getAttribute('aria-pressed')).toBe('true');
 
     if (touch) {
       await page.locator('#universe-map-close').tap();
@@ -189,16 +267,335 @@ test.each([
         message: 'the universe map should close',
       })
       .toBe(false);
+    await game.placeShipAt(FAR_FURNACE.position.x, FAR_FURNACE.position.y);
+    await page.locator('#universe-map-toggle').click();
+    await expect
+      .poll(() => page.locator('#universe-map-status').textContent())
+      .toContain(`X ${formatMapCoordinate(FAR_FURNACE.position.x)}`);
+    expect((await readMapFrame(page)).labels).toContain('5k across');
+    await page.locator('#universe-map-close').click();
     if (!touch) {
       expect(await page.evaluate(() => document.activeElement?.id)).toBe('universe-map-toggle');
-      await page.locator('#universe-map-toggle').click();
-      await page.evaluate(() => window.gameController?.gameOver('boundary'));
-      await expect
-        .poll(() => page.evaluate(() => document.activeElement?.id), { timeout: 5000 })
-        .toBe('playerNameInput');
-      expect(await page.locator('#universe-map-dialog').isVisible()).toBe(false);
     }
 
+    assertNoBrowserDiagnostics(diagnostics);
+  },
+  TestConfig.DEFAULT_TIMEOUT * 2
+);
+
+test(
+  'nearby crew names stay separate and edge labels do not clip the map',
+  async () => {
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Missing map pilot');
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const diagnostics = watchBrowserDiagnostics(page);
+    const game = new GameInteractions(page);
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    const teammatePage = await browserManager.createAdditionalPage();
+    const teammate = new GameInteractions(teammatePage);
+    await teammate.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    const teammateName = await teammatePage.evaluate(
+      () => window.gameController?.getCurrPlayer()?.name
+    );
+    if (!teammateName) {
+      throw new Error('Missing teammate name');
+    }
+    await arrangeCrewField(
+      [await game.getLocalPlayerId(), await teammate.getLocalPlayerId()],
+      'empty'
+    );
+    await teammatePage.keyboard.press('KeyM');
+    await game.placeShipAt(0, 0);
+    await teammate.placeShipAt(0, 0);
+    await page.bringToFront();
+    await page.keyboard.press('KeyM');
+    await expect
+      .poll(() => page.locator('#universe-map-locations').textContent())
+      .toContain(teammateName);
+    expect((await readMapFrame(page)).labels).not.toContain(teammateName);
+    await teammate.placeShipAt(2450, 0);
+    await expect
+      .poll(() => page.locator('#universe-map-locations').textContent())
+      .toContain('X +2450');
+    expect((await readMapFrame(page)).labels).not.toContain(teammateName);
+    assertNoBrowserDiagnostics(diagnostics);
+  },
+  TestConfig.DEFAULT_TIMEOUT * 2
+);
+
+function readMapStrokePaths(page: import('playwright').Page, canvasId: string) {
+  return page.evaluate(async (id) => {
+    const canvas = document.querySelector(`#${id}`);
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error(`Missing map canvas ${id}`);
+    }
+    const paths: { color: string; lines: number; moves: number; firstX: number }[] = [];
+    const original = {
+      beginPath: CanvasRenderingContext2D.prototype.beginPath,
+      moveTo: CanvasRenderingContext2D.prototype.moveTo,
+      lineTo: CanvasRenderingContext2D.prototype.lineTo,
+      stroke: CanvasRenderingContext2D.prototype.stroke,
+    };
+    let lines = 0;
+    let moves = 0;
+    let firstX = 0;
+    CanvasRenderingContext2D.prototype.beginPath = function (this: CanvasRenderingContext2D) {
+      if (this.canvas === canvas) {
+        lines = 0;
+        moves = 0;
+      }
+      original.beginPath.call(this);
+    };
+    CanvasRenderingContext2D.prototype.moveTo = function (this: CanvasRenderingContext2D, x, y) {
+      if (this.canvas === canvas) {
+        if (moves === 0) {
+          firstX = x;
+        }
+        moves++;
+      }
+      original.moveTo.call(this, x, y);
+    };
+    CanvasRenderingContext2D.prototype.lineTo = function (this: CanvasRenderingContext2D, x, y) {
+      if (this.canvas === canvas) {
+        lines++;
+      }
+      original.lineTo.call(this, x, y);
+    };
+    CanvasRenderingContext2D.prototype.stroke = function (this: CanvasRenderingContext2D) {
+      if (this.canvas === canvas && typeof this.strokeStyle === 'string') {
+        paths.push({ color: this.strokeStyle, lines, moves, firstX });
+      }
+      Reflect.apply(original.stroke, this, []);
+    };
+    try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    } finally {
+      Object.assign(CanvasRenderingContext2D.prototype, original);
+    }
+    return paths;
+  }, canvasId);
+}
+
+test.each([
+  { width: 1280, height: 900, touch: false, label: 'desktop' },
+  { width: 390, height: 844, touch: true, label: 'mobile' },
+])(
+  'the $label pilot sees a web at a guarded stationary deposit on both maps',
+  async ({ width, height, touch, label }) => {
+    const page = touch
+      ? await browserManager.recreatePage({ hasTouch: true })
+      : browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Missing nest map pilot');
+    }
+    const diagnostics = watchBrowserDiagnostics(page);
+    await page.setViewportSize({ width, height });
+    const game = new GameInteractions(page);
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    await arrangeCrewField([await game.getLocalPlayerId()], 'map-icons');
+    const field = await page.evaluateHandle<
+      () => import('../../../../shared-types').SpiderFieldState
+    >(
+      "import('/src/physics/terrain/spiderSession.ts').then(({ getSpiderField }) => getSpiderField)"
+    );
+    try {
+      await expect
+        .poll(
+          () =>
+            field.evaluate((read) =>
+              read().nests.some(
+                (nest) =>
+                  nest.resourceId === 'crew-fixture-spider-deposit' &&
+                  nest.position.x === 5000 &&
+                  nest.position.y === 5000
+              )
+            ),
+          { timeout: 5000 }
+        )
+        .toBe(true);
+    } finally {
+      await field.dispose();
+    }
+    await page.keyboard.press('KeyM');
+    await game.placeShipAt(4550, 5000);
+    await expect
+      .poll(
+        async () =>
+          (await readMapStrokePaths(page, 'gameCanvas')).some(
+            (path) => path.color === '#f43f5e' && path.lines >= 8 && path.moves >= 8
+          ),
+        {
+          timeout: 5000,
+          message: 'the minimap draws web spokes for the guarded deposit',
+        }
+      )
+      .toBe(true);
+    // These fixtures contain ice and rubble ore; the metal host has no ore.
+    const mineralColors = ['#a5f3fc', '#fdba74'];
+    const unscanned = await readMapStrokePaths(page, 'universe-map-canvas');
+    expect(
+      unscanned.filter(
+        (path) => [...mineralColors, '#fde68a'].includes(path.color) && path.lines >= 6
+      )
+    ).toHaveLength(0);
+    await page.locator('#universe-map-close').click();
+    await game.placeShipAt(4150, 5000);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`nest-minimap-unscanned-${label}.png`),
+    });
+    if (touch) {
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
+    await page.waitForFunction(
+      () => (window.gameController?.getCurrPlayer()?.ship.abilityActiveFrames ?? 0) > 0
+    );
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const rocks = window.gameController?.getCurrRoidBelt()?.getRoids() ?? [];
+            return [
+              'crew-fixture-spider-deposit',
+              'crew-fixture-map-ice',
+              'crew-fixture-map-rubble',
+            ].map((id) => {
+              const rock = rocks.find((candidate) => candidate.id === id);
+              return { id, present: Boolean(rock), surveyed: (rock?.surveyedBy?.length ?? 0) > 0 };
+            });
+          }),
+        { timeout: 5000 }
+      )
+      .toEqual([
+        { id: 'crew-fixture-spider-deposit', present: true, surveyed: true },
+        { id: 'crew-fixture-map-ice', present: true, surveyed: true },
+        { id: 'crew-fixture-map-rubble', present: true, surveyed: true },
+      ]);
+    const surveyedRocks = await page.evaluate(() =>
+      (window.gameController?.getCurrRoidBelt()?.getRoids() ?? []).map(({ id, material, ore }) => ({
+        id,
+        material,
+        ore,
+      }))
+    );
+    for (const [id, expectedOre] of [
+      ['crew-fixture-spider-deposit', null],
+      ['crew-fixture-map-ice', 'ice'],
+      ['crew-fixture-map-rubble', 'rubble'],
+    ] as const) {
+      const rock = surveyedRocks.find((candidate) => candidate.id === id);
+      if (!rock) {
+        throw new Error(`Missing surveyed fixture ${id}`);
+      }
+      expect(
+        oreResource({
+          id: rock.id,
+          ...(rock.material === undefined ? {} : { material: rock.material }),
+          ...(rock.ore === undefined ? {} : { ore: rock.ore }),
+        })
+      ).toBe(expectedOre);
+    }
+    await expect
+      .poll(
+        async () => {
+          const paths = await readMapStrokePaths(page, 'gameCanvas');
+          return mineralColors.every((color) =>
+            paths.some(
+              (path) =>
+                path.color === color &&
+                path.lines >= 6 &&
+                path.firstX > width - 120 &&
+                path.firstX < width
+            )
+          );
+        },
+        { timeout: 5000, message: 'Scan classifies the ice and rubble ore on the minimap' }
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`nest-minimap-${label}.png`),
+    });
+    await game.placeShipAt(3000, 5000);
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.abilityActiveFrames === 0,
+      undefined,
+      { timeout: 8000 }
+    );
+    await openAndCaptureMap(page, touch);
+    await game.placeShipAt(4550, 5000);
+    await page.locator('#universe-map-center').click();
+    await expect
+      .poll(
+        async () => {
+          const classified = await readMapStrokePaths(page, 'universe-map-canvas');
+          const mineralsVisible = mineralColors.every((color) =>
+            classified.some((path) => path.color === color && path.lines >= 6)
+          );
+          const neutralVisible = classified.some(
+            (path) => path.color === '#94a3b8' && path.lines >= 6
+          );
+          const metalVisible = classified.some(
+            (path) => path.color === '#fde68a' && path.lines >= 6
+          );
+          return mineralsVisible && neutralVisible && !metalVisible;
+        },
+        {
+          timeout: 5000,
+          message: 'classified rocks retain their material details after Scan expires',
+        }
+      )
+      .toBe(true);
+    await expect
+      .poll(
+        async () =>
+          (await readMapStrokePaths(page, 'universe-map-canvas')).some(
+            (path) => path.color === '#f43f5e' && path.lines >= 8 && path.moves >= 8
+          ),
+        { timeout: 5000, message: 'the universe map draws the same nest web' }
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`nest-universe-map-${label}.png`),
+    });
+    const canvas = page.locator('#universe-map-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) {
+      throw new Error('Missing map bounds');
+    }
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    try {
+      await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 30, { steps: 5 });
+    } finally {
+      await page.mouse.up();
+    }
+    expect(await page.locator('#universe-map-center').getAttribute('aria-pressed')).toBe('false');
+    await page.locator('#universe-map-center').click();
+    expect(await page.locator('#universe-map-center').getAttribute('aria-pressed')).toBe('true');
+    await page.locator('#universe-map-close').click();
+    expect(await page.locator('#universe-map-dialog').isVisible()).toBe(false);
+    for (const article of ['hud-network', 'terrain']) {
+      await page.goto(`${TestConfig.GAME_URL}/wiki/#${article}`);
+      await page.locator('#content h1').waitFor({ state: 'visible' });
+      await page
+        .getByText(
+          article === 'terrain' ? 'Red map webs' : 'Discovered furnaces appear as flames',
+          { exact: false }
+        )
+        .scrollIntoViewIfNeeded();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`nest-wiki-${article}-${label}.png`),
+      });
+    }
     assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT * 2

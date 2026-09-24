@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { mkdir, mkdtemp, open, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises';
 import { cpus, hostname, platform, release, totalmem } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -17,6 +18,7 @@ import {
 import { errorRecord, sampleOptions, writeJson } from './sample';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const GIT_COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/u;
 type Command =
   | { mode: 'measure'; revision: string }
   | { mode: 'compare'; baseline: string; candidate: string };
@@ -158,7 +160,7 @@ async function revision(input: string, command: RunCommand) {
   const commit = (
     await command('git', ['rev-parse', '--verify', '--end-of-options', `${input}^{commit}`])
   ).stdout.trim();
-  assert(/^[0-9a-f]{40}$/.test(commit), 'Expected a Git commit SHA');
+  assert(GIT_COMMIT_SHA_PATTERN.test(commit), 'Expected a Git commit SHA');
   const tree = (await command('git', ['rev-parse', '--verify', `${commit}^{tree}`])).stdout.trim();
   return { input, commit, tree };
 }
@@ -508,17 +510,22 @@ async function main(argv: readonly string[] = process.argv.slice(2)) {
       runtimes: 'runtimes.json',
     });
   } catch (error) {
+    let artifactError: unknown;
     try {
       await writeJson(join(directory, 'failure.json'), {
         status: 'failed',
         argv,
         error: errorRecord(error),
       });
-    } catch (artifactError) {
-      throw new AggregateError(
-        [error, artifactError],
-        'Benchmark and failure artifact write failed'
-      );
+    } catch (writeError) {
+      artifactError = writeError;
+    }
+    if (artifactError) {
+      const artifactMessage =
+        artifactError instanceof Error ? artifactError.message : 'unknown artifact failure';
+      throw new Error(`Benchmark and failure artifact write failed (${artifactMessage})`, {
+        cause: error,
+      });
     }
     throw error;
   } finally {

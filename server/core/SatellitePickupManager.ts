@@ -4,10 +4,7 @@ import { satelliteProfileAt } from '../../shared/eoSatellites';
 import type { Position, SatellitePickupData } from '../../shared-types';
 import { DEBUG, PALETTE, SATELLITE_PICKUP } from '../../src/constants';
 import {
-  advanceDriftCenter,
   attachOrbitPosition,
-  clampToRadius,
-  orbitOffset,
   orbitRadiusForOwner,
   spawnRingPosition,
   velocityFromDelta,
@@ -24,10 +21,9 @@ interface PickupOwnerPose {
 
 interface SatellitePickupInternal extends SatellitePickupData {
   rosterIndex: number;
-  orbitCenter: Position;
   orbitPhase: number;
-  driftAngle: number;
   respawnTimer: number;
+  nestSalvage?: true;
 }
 
 export class SatellitePickupManager {
@@ -44,6 +40,12 @@ export class SatellitePickupManager {
 
   public getPickup(id: string): SatellitePickupInternal | undefined {
     return this.pickups.get(id);
+  }
+
+  public getNestResources(): SatellitePickupData[] {
+    return [...this.pickups.values()]
+      .filter((pickup) => !pickup.nestSalvage)
+      .map((pickup) => this.toPublic(pickup));
   }
 
   public getAllPickups(): SatellitePickupData[] {
@@ -73,21 +75,44 @@ export class SatellitePickupManager {
     return created;
   }
 
-  /** Attach a loose pickup to one living player. */
-  public collect(
-    pickupId: string,
-    owner: PickupOwnerPose,
-    orbitPhase: number
-  ): SatellitePickupData | null {
+  /** A bounded supply of recoverable hardware among nest salvage. */
+  public spawnNestPickup(position: { x: number; y: number }): void {
+    if (this.pickups.size >= SATELLITE_PICKUP.MAX_COUNT + 12) {
+      return;
+    }
+    const pickup = this.spawnLoose(this.pickups.size, SATELLITE_PICKUP.MAX_COUNT);
+    pickup.position = { x: position.x - 100, y: position.y - 100 };
+    pickup.nestSalvage = true;
+    this.pickups.set(pickup.id, pickup);
+  }
+
+  /** Store a loose pickup until its owner chooses to deploy it. */
+  public collect(pickupId: string, owner: PickupOwnerPose): SatellitePickupData | null {
     const pickup = this.pickups.get(pickupId);
-    if (pickup?.state !== 'loose' || pickup.health <= 0) {
+    if (pickup?.state !== 'loose' || pickup.health <= 0 || owner.health <= 0 || owner.exploding) {
       return null;
     }
+    pickup.state = 'stored';
+    pickup.ownerId = owner.id;
+    pickup.position = { ...owner.position };
+    pickup.velocity = { x: 0, y: 0 };
+    return this.toPublic(pickup);
+  }
 
+  public equip(pickupId: string, owner: PickupOwnerPose): SatellitePickupData | null {
+    const pickup = this.pickups.get(pickupId);
+    if (
+      pickup?.state !== 'stored' ||
+      pickup.ownerId !== owner.id ||
+      owner.health <= 0 ||
+      owner.exploding ||
+      this.countOrbitingFor(owner.id) > 0
+    ) {
+      return null;
+    }
     pickup.state = 'orbiting';
     pickup.ownerId = owner.id;
-    pickup.orbitPhase = orbitPhase;
-    pickup.orbitCenter = { ...owner.position };
+    pickup.orbitPhase = 0;
     const prev = { ...pickup.position };
     pickup.position = attachOrbitPosition(
       owner.position,
@@ -104,8 +129,7 @@ export class SatellitePickupManager {
   public damage(pickupId: string, damage: number): SatellitePickupData | null {
     const pickup = this.pickups.get(pickupId);
     if (
-      !pickup ||
-      pickup.state === 'broken' ||
+      pickup?.state !== 'orbiting' ||
       pickup.health <= 0 ||
       !Number.isFinite(damage) ||
       damage <= 0
@@ -113,18 +137,25 @@ export class SatellitePickupManager {
       return null;
     }
 
-    pickup.health = Math.max(0, pickup.health - damage);
-    if (pickup.health <= 0) {
-      pickup.state = 'broken';
-      pickup.ownerId = null;
-      pickup.respawnTimer = SATELLITE_PICKUP.RESPAWN_FRAMES;
-      pickup.orbitCenter = { ...pickup.position };
-      pickup.velocity = { x: 0, y: 0 };
-    }
+    this.depleteHealth(pickup, damage);
     return this.toPublic(pickup);
   }
 
-  public countOrbitingFor(ownerId: string): number {
+  /** Time and impacts consume the same resource, with one exhaustion transition. */
+  private depleteHealth(pickup: SatellitePickupInternal, amount: number): void {
+    const remaining = Math.max(0, pickup.health - amount);
+    // Repeated fractional HP subtraction must still expire on the final frame.
+    const roundingTolerance = Number.EPSILON * pickup.maxHealth * SATELLITE_PICKUP.LIFETIME_FRAMES;
+    pickup.health = remaining <= roundingTolerance ? 0 : remaining;
+    if (pickup.health === 0) {
+      pickup.state = 'broken';
+      pickup.ownerId = null;
+      pickup.respawnTimer = SATELLITE_PICKUP.RESPAWN_FRAMES;
+      pickup.velocity = { x: 0, y: 0 };
+    }
+  }
+
+  public countOrbitingFor(ownerId: string) {
     let count = 0;
     for (const pickup of this.pickups.values()) {
       if (pickup.state === 'orbiting' && pickup.ownerId === ownerId) {
@@ -134,15 +165,12 @@ export class SatellitePickupManager {
     return count;
   }
 
-  /** Place the next pickup in the next even orbit slot around the owner. */
-  public nextOrbitPhaseFor(ownerId: string): number {
-    const count = this.countOrbitingFor(ownerId);
-    return (count * Math.PI * 2) / SATELLITE_PICKUP.MAX_COUNT;
-  }
-
   public releaseOwner(ownerId: string): void {
     for (const pickup of this.pickups.values()) {
-      if (pickup.state === 'orbiting' && pickup.ownerId === ownerId) {
+      if (
+        (pickup.state === 'orbiting' || pickup.state === 'stored') &&
+        pickup.ownerId === ownerId
+      ) {
         this.makeLooseAtCurrentPose(pickup);
       }
     }
@@ -151,12 +179,17 @@ export class SatellitePickupManager {
   public update(owners: PickupOwnerPose[]): void {
     const byId = new Map(owners.map((owner) => [owner.id, owner]));
     for (const pickup of this.pickups.values()) {
-      if (pickup.state === 'orbiting') {
+      if (pickup.state === 'stored') {
+        const owner = byId.get(pickup.ownerId ?? '');
+        if (!owner || owner.health <= 0 || owner.exploding) {
+          this.makeLooseAtCurrentPose(pickup);
+        } else {
+          pickup.position = { ...owner.position };
+        }
+      } else if (pickup.state === 'orbiting') {
         this.updateOrbiting(pickup, byId.get(pickup.ownerId ?? ''));
       } else if (pickup.state === 'broken') {
         this.updateBroken(pickup);
-      } else if (!DEBUG.ENABLED || DEBUG.SATELLITE_PICKUP.MOVEMENT) {
-        this.updateLoose(pickup);
       }
     }
   }
@@ -170,6 +203,10 @@ export class SatellitePickupManager {
       return;
     }
 
+    this.depleteHealth(pickup, pickup.maxHealth / SATELLITE_PICKUP.LIFETIME_FRAMES);
+    if (pickup.state === 'broken') {
+      return;
+    }
     const prev = { ...pickup.position };
     pickup.orbitPhase += SATELLITE_PICKUP.ORBIT_SPEED;
     const orbitPosition = attachOrbitPosition(
@@ -183,7 +220,6 @@ export class SatellitePickupManager {
       y: orbitPosition.y,
     };
     pickup.velocity = velocityFromDelta(prev, pickup.position);
-    pickup.orbitCenter = { ...owner.position };
     pickup.angle = pickup.orbitPhase;
   }
 
@@ -194,34 +230,9 @@ export class SatellitePickupManager {
     }
   }
 
-  private updateLoose(pickup: SatellitePickupInternal): void {
-    const prev = { ...pickup.position };
-    const drifted = advanceDriftCenter(
-      pickup.orbitCenter,
-      pickup.driftAngle,
-      SATELLITE_PICKUP.DRIFT_SPEED,
-      SATELLITE_PICKUP.FIELD_RADIUS
-    );
-    pickup.orbitCenter = drifted.center;
-    pickup.driftAngle = drifted.driftAngle;
-    pickup.orbitPhase += SATELLITE_PICKUP.ORBIT_SPEED * 0.45;
-    const offset = orbitOffset(pickup.orbitPhase, SATELLITE_PICKUP.LOOSE_ORBIT_RADIUS);
-
-    pickup.position = clampToRadius(
-      {
-        x: pickup.orbitCenter.x + offset.x,
-        y: pickup.orbitCenter.y + offset.y,
-      },
-      SATELLITE_PICKUP.FIELD_RADIUS
-    );
-    pickup.velocity = velocityFromDelta(prev, pickup.position);
-    pickup.angle = pickup.orbitPhase;
-  }
-
   private makeLooseAtCurrentPose(pickup: SatellitePickupInternal): void {
     pickup.state = 'loose';
     pickup.ownerId = null;
-    pickup.orbitCenter = { ...pickup.position };
     pickup.velocity = { x: 0, y: 0 };
     pickup.respawnTimer = 0;
   }
@@ -237,16 +248,8 @@ export class SatellitePickupManager {
     id = `server-pickup-${randomUUID()}`
   ): SatellitePickupInternal {
     const profile = satelliteProfileAt(index);
-    const orbitCenter = spawnRingPosition(index, count, () => this.rng.random());
+    const position = spawnRingPosition(index, count, () => this.rng.random());
     const orbitPhase = this.rng.random() * Math.PI * 2;
-    const offset = orbitOffset(orbitPhase, SATELLITE_PICKUP.LOOSE_ORBIT_RADIUS);
-    const position = clampToRadius(
-      {
-        x: orbitCenter.x + offset.x,
-        y: orbitCenter.y + offset.y,
-      },
-      SATELLITE_PICKUP.FIELD_RADIUS
-    );
 
     return {
       id,
@@ -262,9 +265,7 @@ export class SatellitePickupManager {
       ownerId: null,
       health: SATELLITE_PICKUP.HEALTH,
       maxHealth: SATELLITE_PICKUP.HEALTH,
-      orbitCenter,
       orbitPhase,
-      driftAngle: this.rng.random() * Math.PI * 2,
       rosterIndex: index,
       respawnTimer: 0,
     };

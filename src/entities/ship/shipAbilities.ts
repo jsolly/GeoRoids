@@ -1,4 +1,21 @@
-import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
+import {
+  addBoostOwner,
+  boostOwnerIds,
+  furnaceHeading,
+  igniteBoost,
+  removeBoostOwner,
+} from '../../../shared/asteroidBoost';
+import { asteroidCrewNeeded, isColossalAsteroid } from '../../../shared/asteroidScale';
+import type { FurnaceField } from '../../../shared/furnaceField';
+import { SURVEY_PROBE } from '../../../shared/surveyProbe';
+import type {
+  AsteroidBoost,
+  HaulerUtilityId,
+  Position,
+  ScoutUtilityId,
+  ShipKitId,
+  Velocity,
+} from '../../../shared-types';
 import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
 import {
   haulerUtilityOf,
@@ -6,7 +23,8 @@ import {
   isResourceTapUtility,
   isTowCableUtility,
 } from './haulerUtility';
-import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
+import { isScoutUtilityId, scoutUtilityOf } from './scoutUtility';
+import { getShipKit, hullRadiusForKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
 import { attachTowCable, tickTowCable } from './towCable';
 
 export interface AbilityHost {
@@ -23,13 +41,16 @@ export interface AbilityHost {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
-  r?: number;
+  mass?: number;
 }
 
 /** Asteroid geometry shared by offline ability simulation and authoritative towing. */
 export interface AbilityBody {
+  kind?: 'spider' | 'asteroid';
+  boost?: AsteroidBoost | null;
   id: string;
   position: Position;
   velocity: Velocity;
@@ -40,6 +61,7 @@ export interface AbilityBody {
 }
 
 export interface AbilityWorld {
+  furnaces?: FurnaceField;
   asteroids: readonly AbilityBody[];
 }
 
@@ -71,8 +93,19 @@ export function canActivateAbility(host: AbilityHost): boolean {
   return (
     !host.exploding &&
     host.health > 0 &&
-    (host.abilityCooldownFrames <= 0 || (host.kitId === 'hauler' && !!host.harpoonTargetId))
+    (host.abilityCooldownFrames <= 0 || (host.kitId === 'hauler' && Boolean(host.harpoonTargetId)))
   );
+}
+
+export function abilityCooldownFramesFor(host: { kitId: unknown; scoutUtility?: unknown }): number {
+  const kitId = getShipKit(host.kitId).id;
+  if (
+    kitId === 'scout' &&
+    scoutUtilityOf({ kitId, scoutUtility: host.scoutUtility }) === 'survey_probe'
+  ) {
+    return SURVEY_PROBE.COOLDOWN_FRAMES;
+  }
+  return SHIP_ABILITY.COOLDOWN_FRAMES[kitId];
 }
 
 export function clearHaulerLatch(
@@ -115,6 +148,23 @@ export function setHaulerUtilityOnHost(
   host.haulerUtility = utilityId;
   if (changed) {
     clearHaulerLatch(host);
+  }
+  return true;
+}
+
+export function setScoutUtilityOnHost(
+  host: Pick<AbilityHost, 'kitId' | 'scoutUtility' | 'abilityActiveFrames'>,
+  utilityId: unknown
+): boolean {
+  if (host.kitId !== 'scout' || !isScoutUtilityId(utilityId)) {
+    return false;
+  }
+  const changed = scoutUtilityOf(host) !== utilityId;
+  host.scoutUtility = utilityId;
+  if (changed) {
+    // A tool swap cannot leave a predicted Mineral Scan pulse running while
+    // another tool is equipped. The authoritative cooldown is preserved.
+    host.abilityActiveFrames = 0;
   }
   return true;
 }
@@ -164,19 +214,23 @@ function bodyRadius(body: Pick<AbilityBody, 'r' | 'size'>): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
+function hostHullRadius(host: Pick<AbilityHost, 'kitId'>): number {
+  return hullRadiusForKit(host.kitId);
+}
+
 /** Gap from hull to hull. Negative means the ship is inside the target. */
 export function harpoonSurfaceGap(
-  host: Pick<AbilityHost, 'position' | 'r'>,
+  host: Pick<AbilityHost, 'position' | 'kitId'>,
   body: AbilityBody
 ): number {
   const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
-  return dist - bodyRadius(host) - bodyRadius(body);
+  return dist - hostHullRadius(host) - bodyRadius(body);
 }
 
 const NEAREST_GAP_TIE_WU = 24;
 
 function pickNearestHarpoonBody(
-  host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
+  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId'>,
   bodies: readonly AbilityBody[],
   range: number
 ): AbilityBody | undefined {
@@ -188,7 +242,7 @@ function pickNearestHarpoonBody(
     const dx = body.position.x - host.position.x;
     const dy = body.position.y - host.position.y;
     const dist = Math.hypot(dx, dy);
-    const gap = dist - bodyRadius(host) - bodyRadius(body);
+    const gap = dist - hostHullRadius(host) - bodyRadius(body);
     if (gap > range) {
       continue;
     }
@@ -208,7 +262,7 @@ function pickNearestHarpoonBody(
 }
 
 export function findHarpoonTarget(
-  host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
+  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId'>,
   bodies: readonly AbilityBody[],
   range: number = SHIP_ABILITY.HARPOON_RANGE
 ): AbilityBody | undefined {
@@ -235,7 +289,7 @@ export function diagnoseHarpoonLatch(host: AbilityHost, world?: AbilityWorld): H
   let nearest: HarpoonDiagnosis['nearest'];
   for (const body of candidates) {
     const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
-    const gap = dist - bodyRadius(host) - bodyRadius(body);
+    const gap = dist - hostHullRadius(host) - bodyRadius(body);
     let reason = 'ok';
     if (!isHarpoonableBody(body)) {
       reason = 'rejected';
@@ -268,8 +322,38 @@ function latchStillValid(
   return harpoonSurfaceGap(host, target) <= range * SHIP_ABILITY.HARPOON_SLACK;
 }
 
+function abilityBodySize(body: Pick<AbilityBody, 'r' | 'size'>): number {
+  const value = body.size ?? body.r;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function canLatchBoostedBody(host: AbilityHost, body: AbilityBody): boolean {
+  if (body.kind === 'spider' && haulerUtilityOf(host) === 'boost_coupling') {
+    return false;
+  }
+  if (!body.boost) {
+    return true;
+  }
+  if (
+    body.boost.phase !== 'armed' ||
+    haulerUtilityOf(host) !== 'boost_coupling' ||
+    !isColossalAsteroid(abilityBodySize(body))
+  ) {
+    return false;
+  }
+  const owners = boostOwnerIds(body.boost);
+  if (host.id && owners.includes(host.id)) {
+    return false;
+  }
+  return owners.length < asteroidCrewNeeded(abilityBodySize(body));
+}
+
 /** Hauler-only: advance the authoritative tow cable. Resource Tap holds without haul. */
-export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBody[]): void {
+export function pullHarpoonTarget(
+  host: AbilityHost,
+  bodies: readonly AbilityBody[],
+  canHaul = true
+): void {
   if (host.kitId !== 'hauler') {
     tickTowCable(host, undefined);
     clearHarpoonLatch(host);
@@ -289,19 +373,20 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBod
     return;
   }
 
-  if (isResourceTapUtility(host)) {
+  if (!isTowCableUtility(host)) {
     tickTowCable(host, undefined);
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
     return;
   }
 
-  tickTowCable(host, target);
+  tickTowCable(host, target, canHaul);
+  host.harpoonLatchPos = { ...target.position };
 }
 
 export function tickTapExtract(
   host: AbilityHost,
   target?: AbilityBody
-): 'complete' | 'latched' | 'idle' {
+): 'complete' | 'burst' | 'latched' | 'idle' {
   if (!isResourceTapUtility(host) || !host.harpoonTargetId || !target) {
     return 'idle';
   }
@@ -313,7 +398,11 @@ export function tickTapExtract(
     host.tapExtractCompleted = true;
     return 'complete';
   }
-  return 'latched';
+  const interval = SHIP_ABILITY.TAP_EXTRACT_FRAMES / SHIP_ABILITY.TAP_EXTRACT_BURSTS;
+  return Math.floor(host.tapExtractFrames / interval) >
+    Math.floor((host.tapExtractFrames - 1) / interval)
+    ? 'burst'
+    : 'latched';
 }
 
 /**
@@ -325,14 +414,38 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     return { activated: false };
   }
   if (host.kitId === 'hauler' && host.harpoonTargetId) {
+    if (haulerUtilityOf(host) === 'boost_coupling') {
+      const target = world?.asteroids.find((body) => body.id === host.harpoonTargetId);
+      const armed = target?.boost?.phase === 'armed' ? target.boost : null;
+      const ownsArmedBoost = Boolean(host.id && armed && boostOwnerIds(armed).includes(host.id));
+      if (
+        ownsArmedBoost &&
+        target &&
+        armed &&
+        latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE * 3)
+      ) {
+        if (boostOwnerIds(armed).length < asteroidCrewNeeded(abilityBodySize(target))) {
+          return { activated: true, abilityId: 'harpoon' };
+        }
+        target.boost = igniteBoost(armed, furnaceHeading(target.position, world?.furnaces));
+        host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
+      } else if (world) {
+        if (ownsArmedBoost && host.id && armed && target) {
+          target.boost = removeBoostOwner(armed, host.id);
+        }
+        clearHarpoonLatch(host);
+        return { activated: false };
+      }
+    }
     clearHarpoonLatch(host);
     return { activated: true, abilityId: 'harpoon' };
   }
 
   const kit = getShipKit(host.kitId);
   if (kit.abilityId === 'surveyScan') {
-    host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
-    host.abilityActiveFrames = SHIP_ABILITY.SCAN_FRAMES;
+    host.abilityCooldownFrames = abilityCooldownFramesFor(host);
+    host.abilityActiveFrames =
+      scoutUtilityOf(host) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
     return { activated: true, abilityId: kit.abilityId };
   }
   if (!world) {
@@ -344,9 +457,26 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       return { activated: false };
     }
     const latchRange = SHIP_ABILITY.HARPOON_RANGE;
-    const target = findHarpoonTarget(host, listHarpoonCandidates(world), latchRange);
+    const target = findHarpoonTarget(
+      host,
+      listHarpoonCandidates(world).filter((body) => canLatchBoostedBody(host, body)),
+      latchRange
+    );
     if (!target) {
       return { activated: false };
+    }
+    if (world && haulerUtilityOf(host) === 'boost_coupling') {
+      if (!host.id) {
+        return { activated: false };
+      }
+      target.boost =
+        target.boost?.phase === 'armed'
+          ? addBoostOwner(target.boost, host.id)
+          : {
+              phase: 'armed',
+              ownerId: host.id,
+              angle: furnaceHeading(target.position, world?.furnaces),
+            };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;

@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest';
-import { GAME } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 
@@ -22,37 +21,13 @@ test('omitting spawnProtectionTimer from a snapshot does not clear it', () => {
   expect(player.serverSpawnProtectionTimer).toBe(180);
 });
 
-test('omitted lives and score do not reset the HUD', () => {
+test('omitted bank and cargo do not reset the HUD', () => {
   const player = localPilot();
-  player.lives = 2;
   player.score = 210;
 
   player.updateFromServer({ position: { x: 10, y: 20 } });
 
-  expect(player.lives).toBe(2);
   expect(player.score).toBe(210);
-});
-
-test('a fresh 3-life / 0-score snapshot does not clobber established HUD progress', () => {
-  const player = localPilot();
-  player.lives = 2;
-  player.score = 210;
-
-  player.updateFromServer({ lives: GAME.START_LIVES, score: GAME.STARTING_SCORE });
-
-  expect(player.lives).toBe(2);
-  expect(player.score).toBe(210);
-});
-
-test('game-over HUD may accept a new 3-life ship', () => {
-  const player = localPilot();
-  player.lives = 0;
-  player.score = 210;
-
-  player.updateFromServer({ lives: GAME.START_LIVES, score: GAME.STARTING_SCORE });
-
-  expect(player.lives).toBe(GAME.START_LIVES);
-  expect(player.score).toBe(GAME.STARTING_SCORE);
 });
 
 test('death to alive without spawnProtectionTimer still arms blink', () => {

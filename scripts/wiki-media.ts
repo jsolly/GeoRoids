@@ -1,4 +1,6 @@
 import type { ShipKitId } from '../shared-types';
+import { drawSatelliteHealth } from '../src/entities/satellitePickup/satelliteHealthRenderer';
+import { drawSatellitePickupGlow } from '../src/entities/satellitePickup/satellitePickupGlow';
 import { scannedMaterial } from '../src/entities/ship/surveyScan';
 import './wiki-media-node-shim';
 import { spawnSync } from 'node:child_process';
@@ -14,6 +16,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import process from 'node:process';
 import { createCanvas } from 'canvas';
 import { AsteroidManager } from '../server/core/AsteroidManager';
 import type { GameEntity } from '../server/core/EntityManager';
@@ -22,6 +25,7 @@ import { RNGService } from '../server/core/RNGService';
 import { SatellitePickupManager } from '../server/core/SatellitePickupManager';
 import {
   ASTEROID_INTERACTIONS,
+  layoutReflectiveCluster,
   previewChargedReflections,
   segmentCircleContact,
 } from '../shared/asteroidPhenomena';
@@ -35,16 +39,11 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../shared/lootBlast';
-import { cruiseSpeed } from '../shared/shipFlight';
-import {
-  applyLootMass,
-  lootOverlap,
-  radiusFromMass,
-  sizeScaleFromMass,
-} from '../shared/shipGrowth';
+import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
+import { applyLootMass, GROWTH, lootOverlap } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
-import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRenderer';
+import { lootScreenRadius } from '../src/entities/loot/lootRenderer';
 import { drawAsteroidMaterialDetails } from '../src/entities/roid/materialArt';
 import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
@@ -58,8 +57,12 @@ import {
   pullHarpoonTarget,
   tickAbilityHost,
 } from '../src/entities/ship/shipAbilities';
-import { getShipKit } from '../src/entities/ship/shipKits';
-import { strokeKitHullOutline, strokePhosphorSegment } from '../src/entities/ship/shipRenderer';
+import { getShipKit, hullRadiusForKit } from '../src/entities/ship/shipKits';
+import {
+  drawScoutScanFx,
+  strokeKitHullOutline,
+  strokePhosphorSegment,
+} from '../src/entities/ship/shipRenderer';
 import { applyShipImpactFlash, tickShipImpactFlash } from '../src/entities/ship/shipUtils';
 import { steeringTurn } from '../src/input/pointerSteering';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
@@ -72,10 +75,12 @@ import {
 } from '../src/physics/shockwave';
 import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield';
+import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
+import { asteroidMapInk, drawResourceMapMark } from '../src/rendering/hud/resourceMapMark';
 import {
   polygonPoints,
   strokePhosphorPolyline,
@@ -86,7 +91,7 @@ import { recordSatelliteDemo, type SatelliteDemoPanel } from './wiki-satellite-d
 
 type RenderContext = DrawingContext;
 type MediaId =
-  | 'surveyor'
+  | 'scout'
   | 'hauler'
   | 'movement'
   | 'terrain'
@@ -98,7 +103,7 @@ type MediaId =
   | 'survival';
 
 const MEDIA_IDS: readonly MediaId[] = [
-  'surveyor',
+  'scout',
   'hauler',
   'movement',
   'terrain',
@@ -159,7 +164,7 @@ function renderPolyline(
 
 function renderMaterial(
   ctx: RenderContext,
-  material: 'ice' | 'metal' | 'rubble',
+  material: 'ice' | 'metal' | 'rubble' | 'crystal',
   x: number,
   y: number,
   radius: number,
@@ -505,7 +510,7 @@ function makeAbilityHost(kitId: ShipKitId, position: Position, angle = 0): Abili
     abilityActiveFrames: 0,
 
     harpoonTargetId: null,
-    r: getShipKit(kitId).size / 2,
+    mass: GROWTH.BASE_MASS,
   };
 }
 
@@ -513,7 +518,7 @@ function makeAsteroid(
   id: string,
   position: Position,
   size: number,
-  material: 'ice' | 'metal' | 'rubble',
+  material: 'ice' | 'metal' | 'rubble' | 'crystal',
   rotation = 0
 ): AsteroidData {
   const offsets =
@@ -538,8 +543,8 @@ function makeAsteroid(
   };
 }
 
-function makeSurveyorDemo(): Demo {
-  const host = makeAbilityHost('surveyor', { x: 0, y: 0 });
+function makeScoutDemo(): Demo {
+  const host = makeAbilityHost('scout', { x: 0, y: 0 });
   const teammate = makeAbilityHost('hauler', { x: 210, y: 35 });
   const rocks = [
     makeAsteroid('scan-ice', { x: -100, y: -50 }, 26, 'ice'),
@@ -549,13 +554,13 @@ function makeSurveyorDemo(): Demo {
   const activated = activateAbilityOnHost(host);
   invariant(
     activated.activated && activated.abilityId === 'surveyScan',
-    'Surveyor scan must activate'
+    'Scout scan must activate'
   );
   let classified = false;
   let sharedClassification = false;
   let tagged = false;
   return {
-    id: 'surveyor',
+    id: 'scout',
     posterFrame: 10,
     verify: () => {
       invariant(
@@ -579,15 +584,19 @@ function makeSurveyorDemo(): Demo {
       }
       drawFrameChrome(
         ctx,
-        'SURVEYOR · MINERAL SCAN',
+        'SCOUT · MINERAL SCAN',
         'E scan → shared crew radar → persistent delivery tag',
         frame
       );
-      drawRing(ctx, host.position, 190, PALETTE.HUD_MUTED, 0.18);
-      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL, 15);
-      drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE, 17);
+      const scoutScreen = screenPoint(host.position);
+      drawScoutScanFx(ctx, host, scoutScreen.x, scoutScreen.y, hullRadiusForKit('scout'), {
+        width: WIDTH,
+        height: HEIGHT,
+      });
+      drawShip(ctx, 'scout', host.position, Math.PI / 2, PALETTE.LOCAL);
+      drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE);
       for (const rock of rocks) {
-        const material = scannedMaterial(host, rock);
+        const material = rock.surveyedBy?.length ? rock.material : scannedMaterial(host, rock);
         classified ||= material !== undefined;
         const teammateMaterial = material;
         sharedClassification ||= teammateMaterial !== undefined;
@@ -599,26 +608,15 @@ function makeSurveyorDemo(): Demo {
           tagged = true;
         }
         const point = screenPoint(rock.position);
-        ctx.fillStyle =
-          material === 'metal'
-            ? '#FDE68A'
-            : material === 'ice'
-              ? '#A5F3FC'
-              : material === 'rubble'
-                ? '#FDBA74'
-                : PALETTE.HUD_MUTED;
-        ctx.beginPath();
-        if (material === 'metal') {
-          ctx.rect(point.x - 5, point.y - 5, 10, 10);
-        } else if (material === 'rubble') {
-          ctx.moveTo(point.x, point.y - 6);
-          ctx.lineTo(point.x + 6, point.y + 5);
-          ctx.lineTo(point.x - 6, point.y + 5);
-          ctx.closePath();
-        } else {
-          ctx.arc(point.x, point.y, material ? 5 : 2, 0, Math.PI * 2);
-        }
-        ctx.fill();
+        drawResourceMapMark(
+          ctx,
+          'asteroid',
+          point.x,
+          point.y,
+          material ? 5 : 2.5,
+          asteroidMapInk(material),
+          material
+        );
         if (material) {
           drawTag(ctx, material, point.x + 15, point.y + 8, PALETTE.HUD);
         }
@@ -629,7 +627,7 @@ function makeSurveyorDemo(): Demo {
         210,
         325
       );
-      drawTag(ctx, 'Surveyor + teammate see the same marks', 330, 110, PALETTE.REMOTE);
+      drawTag(ctx, 'Scout + teammate see the same marks', 330, 110, PALETTE.REMOTE);
     },
   };
 }
@@ -644,15 +642,12 @@ function makeHaulerDemo(): Demo {
   const target = {
     ...makeAsteroid('demo-rock', { x: anchor.x - 220, y: anchor.y }, 34, 'metal'),
     kind: 'asteroid' as const,
-    surveyedBy: ['surveyor-demo'],
+    surveyedBy: ['scout-demo'],
   };
-  const surveyor = makeAbilityHost('surveyor', { x: anchor.x - 235, y: anchor.y - 62 });
-  const scan = activateAbilityOnHost(surveyor);
-  invariant(
-    scan.activated && scan.abilityId === 'surveyScan',
-    'Surveyor scan did not tag the haul'
-  );
-  invariant(scannedMaterial(surveyor, target) === 'metal', 'Surveyor scan missed the hauled metal');
+  const scout = makeAbilityHost('scout', { x: anchor.x - 235, y: anchor.y - 62 });
+  const scan = activateAbilityOnHost(scout);
+  invariant(scan.activated && scan.abilityId === 'surveyScan', 'Scout scan did not tag the haul');
+  invariant(scannedMaterial(scout, target) === 'metal', 'Scout scan missed the hauled metal');
   const world: AbilityWorld = {
     asteroids: [target],
   };
@@ -683,10 +678,7 @@ function makeHaulerDemo(): Demo {
         releasedFrame !== undefined && host.harpoonTargetId === null,
         'E did not release after delivery'
       );
-      invariant(
-        target.surveyedBy?.includes('surveyor-demo') === true,
-        'delivery lost the Surveyor tag'
-      );
+      invariant(target.surveyedBy?.includes('scout-demo') === true, 'delivery lost the Scout tag');
       const recipients = new Set(['hauler-demo', ...(target.surveyedBy ?? [])]);
       const reward = furnaceReward(target);
       invariant(
@@ -741,7 +733,7 @@ function makeHaulerDemo(): Demo {
         y: target.position.y - anchor.y,
       };
       const displayTarget = toScene(target.position);
-      const displaySurveyor = toScene(surveyor.position);
+      const displayScout = toScene(scout.position);
       if (!delivered) {
         drawRoid(ctx, { ...target, position: sceneTarget, rotation: targetRotation }, displayScale);
       }
@@ -754,9 +746,16 @@ function makeHaulerDemo(): Demo {
         displayHost,
         0,
         PALETTE.LOCAL,
-        (getShipKit('hauler').size / 2) * displayScale
+        hullRadiusForKit('hauler') * displayScale
       );
-      drawShip(ctx, 'surveyor', displaySurveyor, Math.PI / 2, PALETTE.REMOTE, 15);
+      drawShip(
+        ctx,
+        'scout',
+        displayScout,
+        Math.PI / 2,
+        PALETTE.REMOTE,
+        hullRadiusForKit('scout') * displayScale
+      );
       const furnaceScreen = screenPoint({ x: 0, y: 0 });
       drawFurnaceArtwork(
         ctx,
@@ -777,19 +776,13 @@ function makeHaulerDemo(): Demo {
         110,
         '#FDE68A'
       );
-      drawTag(
-        ctx,
-        'Surveyor scan → Hauler tow → furnace → both score',
-        400,
-        286,
-        PALETTE.HUD_MUTED
-      );
+      drawTag(ctx, 'Scout scan → Hauler tow → furnace → both score', 400, 286, PALETTE.HUD_MUTED);
     },
   };
 }
 
 function makeMovementDemo(): Demo {
-  const state = {
+  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
     position: { x: -500, y: 160 },
     velocity: { x: 0, y: 0 },
     angle: 0,
@@ -842,11 +835,11 @@ function makeMovementDemo(): Demo {
       renderSegment(ctx, a.x, a.y, b.x, b.y, PALETTE.LOCAL, 1, 2);
       drawShip(
         ctx,
-        'surveyor',
+        'scout',
         { x: position.x * displayScale, y: position.y * displayScale },
         angles[frame + 1] ?? 0,
         PALETTE.LOCAL,
-        getShipKit('surveyor').size / 2,
+        getShipKit('scout').size / 2,
         true
       );
       drawTag(
@@ -865,38 +858,72 @@ function makeMovementDemo(): Demo {
   };
 }
 
+const TERRAIN_DOWNHILL_START_FRAME = 28;
+const TERRAIN_TURN_PER_TICK = (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS);
+
+/** Nose angle whose cruiseVelocity (canvas y-down) points along `(dirX, dirY)`. */
+function headingForDirection(dirX: number, dirY: number): number {
+  return Math.atan2(-dirY, dirX);
+}
+
+function headingAlongContour(gradientX: number, gradientY: number, preferredAngle: number): number {
+  const magnitude = Math.hypot(gradientX, gradientY);
+  if (magnitude <= 0) {
+    return preferredAngle;
+  }
+  const tangentA = headingForDirection(-gradientY, gradientX);
+  const tangentB = headingForDirection(gradientY, -gradientX);
+  const preferred = cruiseVelocity(preferredAngle, 1);
+  const alignment = (angle: number) => {
+    const heading = cruiseVelocity(angle, 1);
+    return heading.x * preferred.x + heading.y * preferred.y;
+  };
+  return alignment(tangentA) >= alignment(tangentB) ? tangentA : tangentB;
+}
+
+function headingDownhill(gradientX: number, gradientY: number, fallback: number): number {
+  return Math.hypot(gradientX, gradientY) <= 0
+    ? fallback
+    : headingForDirection(-gradientX, -gradientY);
+}
+
 function makeTerrainDemo(): Demo {
   const field = getTerrainField();
-  const candidates: Position[] = [
-    { x: 720, y: 410 },
-    { x: -720, y: 410 },
-    { x: 620, y: -520 },
-    { x: -620, y: -520 },
-  ];
-  const start = candidates.find((candidate) => {
-    const gradient = sampleGradient(field, candidate.x, candidate.y);
-    return Math.hypot(gradient.x, gradient.y) > 0.0001;
-  });
-  if (start === undefined) {
-    throw new Error('wiki-media verification failed: terrain field has no measurable slope');
+  let start: Position | undefined;
+  let startSteepness = 0;
+  for (let x = -2400; x <= 2400; x += 80) {
+    for (let y = -2400; y <= 2400; y += 80) {
+      const gradient = sampleGradient(field, x, y);
+      const steepness = Math.hypot(gradient.x, gradient.y);
+      if (steepness > startSteepness) {
+        start = { x, y };
+        startSteepness = steepness;
+      }
+    }
+  }
+  if (start === undefined || startSteepness < TERRAIN.TRAVEL_STEEP_GRADIENT) {
+    throw new Error('wiki-media verification failed: terrain field has no steep contour');
   }
   const contours = extractIsoContours(field);
-  const state = {
+  const cruise = cruiseSpeed(1, SHIP.MAX_VELOCITY);
+  const initialGradient = sampleGradient(field, start.x, start.y);
+  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
     position: copyPosition(start),
     velocity: { x: 0, y: 0 },
-    angle: 0,
+    angle: headingAlongContour(initialGradient.x, initialGradient.y, 0),
     mass: 1,
     thrust: SHIP.THRUST,
   };
-  const initialGradient = sampleGradient(field, state.position.x, state.position.y);
   const gradients: number[] = [Math.hypot(initialGradient.x, initialGradient.y)];
-  let sawSlopeMotion = false;
+  let sawContourFollow = false;
+  let maxDownhillSpeed = 0;
   return {
     id: 'terrain',
     posterFrame: 20,
     verify: () => {
       invariant(contours.length > 0, 'terrain contour extraction returned no levels');
-      invariant(sawSlopeMotion, 'terrain slope force did not move the ship');
+      invariant(sawContourFollow, 'terrain demo did not ride a contour');
+      invariant(maxDownhillSpeed > cruise * 1.5, 'terrain demo downhill was not a rush');
       invariant(
         gradients.some((gradient) => gradient > 0.0001),
         'terrain gradient samples were flat'
@@ -905,18 +932,39 @@ function makeTerrainDemo(): Demo {
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'TERRAIN · SLOPE FORCE',
-        'automatic thrust + downhill force',
+        'TERRAIN · CONTOUR TRAVEL',
+        'ride the lines · downhill is a rush',
         frame,
         PALETTE.CONTOUR
       );
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          advanceCruiseVelocity(state, cruiseSpeed(1, SHIP.MAX_VELOCITY));
+          const gradient = sampleGradient(field, state.position.x, state.position.y);
+          const desired =
+            frame < TERRAIN_DOWNHILL_START_FRAME
+              ? headingAlongContour(gradient.x, gradient.y, state.angle)
+              : headingDownhill(gradient.x, gradient.y, state.angle);
+          state.angle += steeringTurn(state.angle, desired, TERRAIN_TURN_PER_TICK);
+          advanceCruiseVelocity(state, cruise);
           state.position.x += state.velocity.x;
           state.position.y += state.velocity.y;
-          if (Math.hypot(state.velocity.x, state.velocity.y) > 0) {
-            sawSlopeMotion = true;
+          const speed = Math.hypot(state.velocity.x, state.velocity.y);
+          const magnitude = Math.hypot(gradient.x, gradient.y);
+          if (magnitude > TERRAIN.TRAVEL_FLAT_GRADIENT && speed > 0) {
+            const heading = cruiseVelocity(state.angle, 1);
+            const tangentAlignment = Math.abs(
+              heading.x * (-gradient.y / magnitude) + heading.y * (gradient.x / magnitude)
+            );
+            if (
+              frame < TERRAIN_DOWNHILL_START_FRAME &&
+              tangentAlignment > 0.92 &&
+              speed > cruise * 0.95
+            ) {
+              sawContourFollow = true;
+            }
+            if (frame >= TERRAIN_DOWNHILL_START_FRAME) {
+              maxDownhillSpeed = Math.max(maxDownhillSpeed, speed);
+            }
           }
         });
         const gradient = sampleGradient(field, state.position.x, state.position.y);
@@ -970,11 +1018,11 @@ function makeTerrainDemo(): Demo {
       const directionScale = steepness > 0 ? 64 / steepness : 0;
       drawShip(
         ctx,
-        'surveyor',
+        'scout',
         { x: 0, y: 0 },
-        0,
+        state.angle,
         PALETTE.LOCAL,
-        getShipKit('surveyor').size / 2,
+        getShipKit('scout').size / 2,
         true
       );
       drawArrow(
@@ -991,7 +1039,15 @@ function makeTerrainDemo(): Demo {
         112,
         PALETTE.CONTOUR
       );
-      drawTag(ctx, 'arrow shows downhill', 390, 286, PALETTE.HUD_MUTED);
+      drawTag(
+        ctx,
+        frame < TERRAIN_DOWNHILL_START_FRAME
+          ? 'ride the contours · arrow is downhill'
+          : 'downhill rush · arrow is downhill',
+        320,
+        286,
+        PALETTE.HUD_MUTED
+      );
     },
   };
 }
@@ -1083,7 +1139,7 @@ function makeLootDemo(): Demo {
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'LOOT · ARM + GROWTH',
+        'LOOT · ARM + COLLECT',
         'laser hits shard → blast pushes rock → remaining shard magnetizes',
         frame,
         PALETTE.LOOT
@@ -1131,7 +1187,10 @@ function makeLootDemo(): Demo {
         if (liveSecond && liveSecond.position.x < secondDrop.position.x) {
           magnetized = true;
         }
-        if (liveSecond && lootOverlap(shooter, mass, liveSecond.position, liveSecond.radius)) {
+        if (
+          liveSecond &&
+          lootOverlap(shooter, hullRadiusForKit('scout'), liveSecond.position, liveSecond.radius)
+        ) {
           const removed = lootManager.remove(secondDrop.id);
           if (removed !== undefined) {
             collected = true;
@@ -1165,24 +1224,10 @@ function makeLootDemo(): Demo {
         drawLaser(ctx, { x: 0, y: 0 }, { x: 150 * displayScale, y: 0 });
       }
       if (!firstRemoved) {
-        drawLootDiamond(
-          ctx,
-          firstDrop.position,
-          firstDrop.radius,
-          lootStrokeColor(firstDrop.kind),
-          1,
-          displayScale
-        );
+        drawLootDiamond(ctx, firstDrop.position, firstDrop.radius, PALETTE.LOOT, 1, displayScale);
       }
       if (secondVisible && !collected && liveSecond) {
-        drawLootDiamond(
-          ctx,
-          liveSecond.position,
-          liveSecond.radius,
-          lootStrokeColor(liveSecond.kind),
-          1,
-          displayScale
-        );
+        drawLootDiamond(ctx, liveSecond.position, liveSecond.radius, PALETTE.LOOT, 1, displayScale);
       }
       const blastAge = frame - explosionFrame;
       if (detonated && blastAge >= 0 && blastAge <= 12) {
@@ -1194,10 +1239,10 @@ function makeLootDemo(): Demo {
           Math.max(0, 0.8 - blastAge * 0.06)
         );
       }
-      const shipRadius = radiusFromMass(mass);
+      const shipRadius = hullRadiusForKit('scout');
       drawShip(
         ctx,
-        'surveyor',
+        'scout',
         { x: shooter.x * displayScale, y: shooter.y * displayScale },
         0,
         PALETTE.LOCAL,
@@ -1207,7 +1252,7 @@ function makeLootDemo(): Demo {
       drawTag(
         ctx,
         collected
-          ? 'shard collected · ship grew'
+          ? 'shard collected · mass gained'
           : detonated
             ? 'blast pushed the rock'
             : armed
@@ -1219,7 +1264,7 @@ function makeLootDemo(): Demo {
       );
       let growthTag = 'laser removes the first shard';
       if (collected) {
-        growthTag = `ship size ${sizeScaleFromMass(mass).toFixed(2)}×`;
+        growthTag = 'hull size unchanged';
       } else if (magnetized) {
         growthTag = 'shard pulling toward the hull';
       } else if (secondVisible) {
@@ -1231,71 +1276,149 @@ function makeLootDemo(): Demo {
 }
 
 function makeReflectionDemo(): Demo {
-  const rock = makeAsteroid('reflector', { x: 88, y: 0 }, 42, 'metal');
-  rock.phenomenon = {
-    kind: 'reflective',
-    clusterId: 'demo-cluster',
-    energy: 0,
-    maxEnergy: ASTEROID_INTERACTIONS.reflectiveEnergy,
+  const center = { x: 0, y: 0 };
+  const cluster = layoutReflectiveCluster(center).map((placement, index) => {
+    const rock = makeAsteroid(
+      `reflector-${index}`,
+      placement.position,
+      ASTEROID_INTERACTIONS.reflectiveSize,
+      'metal',
+      placement.rotation
+    );
+    rock.vertices = 6;
+    rock.offsets = [1, 0.8, 1, 1, 0.8, 1];
+    rock.phenomenon = {
+      kind: 'reflective',
+      clusterId: 'demo-cluster',
+      energy: 0,
+      maxEnergy: ASTEROID_INTERACTIONS.reflectiveEnergy,
+    };
+    return rock;
+  });
+  const laneAngle = (Math.PI * 3) / 10;
+  const laneRadius = 260;
+  const start = {
+    x: center.x + Math.cos(laneAngle) * laneRadius,
+    y: center.y + Math.sin(laneAngle) * laneRadius,
   };
-  const start = { x: -235, y: 0 };
-  const preview = previewChargedReflections(start, { x: 1, y: 0 }, [rock], 500, 1);
+  const direction = { x: -Math.cos(laneAngle), y: -Math.sin(laneAngle) };
+  const preview = previewChargedReflections(start, direction, cluster, 800, 1);
   invariant(preview.impacts.length >= 1, 'reflection preview found no impact');
+  invariant(preview.impacts.length >= 3, 'reflection preview did not chain three impacts');
   invariant(preview.finalDirection.x < 0, 'reflection did not reverse the laser direction');
+  const displayScale = 0.58;
+  const pathLengths = preview.segments.map((segment) =>
+    Math.hypot(segment.end.x - segment.start.x, segment.end.y - segment.start.y)
+  );
+  const pathAt = (distance: number): { position: Position; direction: Position } => {
+    let remaining = Math.max(0, Math.min(distance, preview.traveledDistance));
+    for (const [index, segment] of preview.segments.entries()) {
+      const length = pathLengths[index] ?? 0;
+      if (length <= 1e-9) {
+        continue;
+      }
+      const dx = segment.end.x - segment.start.x;
+      const dy = segment.end.y - segment.start.y;
+      if (remaining > length && index < preview.segments.length - 1) {
+        remaining -= length;
+        continue;
+      }
+      const fraction = Math.min(1, remaining / length);
+      return {
+        position: {
+          x: segment.start.x + dx * fraction,
+          y: segment.start.y + dy * fraction,
+        },
+        direction: { x: dx / length, y: dy / length },
+      };
+    }
+    return { position: { ...center }, direction: preview.finalDirection };
+  };
   return {
     id: 'reflection',
     posterFrame: 11,
     verify: () =>
-      invariant(preview.segments.length >= 2, 'reflection path lacks a reflected segment'),
+      invariant(preview.segments.length >= 4, 'reflection path lacks a chained segment'),
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'REFLECTIVE ASTEROID',
-        'faceted metal face → bounded specular reflection',
+        'aim through the entry gap → chain three ricochets',
         frame,
         PALETTE.LASER_LOCAL
       );
-      drawRoid(ctx, rock, 1);
+      for (const rock of cluster) {
+        drawRoid(ctx, rock, displayScale);
+      }
       const progress = frame / (FRAME_COUNT - 1);
-      const first = preview.segments[0];
-      const second = preview.segments[1];
-      if (first) {
-        const firstProgress = Math.min(1, progress * 2.2);
-        const position = {
-          x: first.start.x + (first.end.x - first.start.x) * firstProgress,
-          y: first.start.y + (first.end.y - first.start.y) * firstProgress,
-        };
+      const distance = progress * preview.traveledDistance;
+      for (const segment of preview.segments) {
+        const startPoint = screenPoint(segment.start, displayScale);
+        const endPoint = screenPoint(segment.end, displayScale);
+        ctx.save();
+        ctx.globalAlpha = 0.18;
         renderSegment(
           ctx,
-          screenPoint(first.start).x,
-          screenPoint(first.start).y,
-          screenPoint(position).x,
-          screenPoint(position).y,
+          startPoint.x,
+          startPoint.y,
+          endPoint.x,
+          endPoint.y,
+          PALETTE.HUD_MUTED,
+          1.2,
+          0.5
+        );
+        ctx.restore();
+      }
+      let remaining = distance;
+      let impactIndex = 0;
+      for (const [index, segment] of preview.segments.entries()) {
+        const length = pathLengths[index] ?? 0;
+        if (length <= 1e-9 || remaining <= 0) {
+          break;
+        }
+        const fraction = Math.min(1, remaining / length);
+        const endpoint = {
+          x: segment.start.x + (segment.end.x - segment.start.x) * fraction,
+          y: segment.start.y + (segment.end.y - segment.start.y) * fraction,
+        };
+        const startPoint = screenPoint(segment.start, displayScale);
+        const endPoint = screenPoint(endpoint, displayScale);
+        renderSegment(
+          ctx,
+          startPoint.x,
+          startPoint.y,
+          endPoint.x,
+          endPoint.y,
           PALETTE.LASER_LOCAL,
           2,
           3.5
         );
-        if (progress > 0.48 && second) {
-          const secondProgress = Math.min(1, (progress - 0.48) * 1.95);
-          const reflected = {
-            x: second.start.x + (second.end.x - second.start.x) * secondProgress,
-            y: second.start.y + (second.end.y - second.start.y) * secondProgress,
-          };
-          renderSegment(
-            ctx,
-            screenPoint(second.start).x,
-            screenPoint(second.start).y,
-            screenPoint(reflected).x,
-            screenPoint(reflected).y,
-            PALETTE.LASER_LOCAL,
-            2,
-            3.5
-          );
-          drawLaser(ctx, reflected, preview.finalDirection);
+        if (fraction >= 1 && segment.asteroidId) {
+          const impact = preview.impacts[impactIndex];
+          impactIndex += 1;
+          if (impact) {
+            drawRing(
+              ctx,
+              { x: impact.point.x * displayScale, y: impact.point.y * displayScale },
+              8 * displayScale,
+              PALETTE.LASER_LOCAL,
+              0.8
+            );
+          }
+        }
+        remaining -= length;
+        if (fraction < 1) {
+          break;
         }
       }
-      drawTag(ctx, 'laser bounces · energy grows', 340, 112, PALETTE.LASER_LOCAL);
-      drawTag(ctx, 'bounce path stays finite', 370, 286, PALETTE.HUD_MUTED);
+      const head = pathAt(distance);
+      drawLaser(
+        ctx,
+        { x: head.position.x * displayScale, y: head.position.y * displayScale },
+        head.direction
+      );
+      drawTag(ctx, 'entry gap → chain ricochets', 340, 112, PALETTE.LASER_LOCAL);
+      drawTag(ctx, 'each bounce raises shot energy', 370, 286, PALETTE.HUD_MUTED);
     },
   };
 }
@@ -1448,17 +1571,25 @@ function makeSatellitesDemo(): Demo {
         'satellite recording does not keep all profiles visible'
       );
       invariant(
-        recording.some((panels) =>
-          panels.some((panel) => Math.hypot(panel.pickup.position.x, panel.pickup.position.y) > 0)
+        recording.every((panels) =>
+          panels.every((panel, index) => {
+            const first = recording[0]?.[index]?.pickup;
+            return (
+              first &&
+              panel.pickup.position.x === first.position.x &&
+              panel.pickup.position.y === first.position.y &&
+              panel.pickup.angle === first.angle
+            );
+          })
         ),
-        'satellite recording contains no pickup motion'
+        'loose satellite hardware must remain stationary'
       );
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'EO SATELLITES',
-        'six hulls · collectible interceptors',
+        'stationary pickups · equip to deploy',
         frame,
         PALETTE.SATELLITE
       );
@@ -1481,6 +1612,7 @@ function makeSatellitesDemo(): Demo {
           y: panelOrigin.y + pickup.position.y * displayScale,
         };
         const screen = screenPoint(position);
+        drawSatellitePickupGlow(ctx, pickup, screen, 17);
         ctx.save();
         ctx.translate(screen.x, screen.y);
         renderSatellite(ctx, pickup.typeId, 17, pickup.angle, pickup.color);
@@ -1502,7 +1634,7 @@ interface PickupView {
   angle: number;
   radius: number;
   color: string;
-  state: 'loose' | 'orbiting' | 'broken';
+  state: 'loose' | 'stored' | 'orbiting' | 'broken';
   health: number;
   maxHealth: number;
 }
@@ -1510,33 +1642,14 @@ interface PickupView {
 function drawPickup(ctx: RenderContext, pickup: PickupView, scale = 1): void {
   const screen = screenPoint(pickup.position, scale);
   const radius = Math.max(6, pickup.radius * scale);
+  drawSatellitePickupGlow(ctx, pickup, screen, radius);
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.shadowColor = pickup.color;
-  ctx.shadowBlur = 3;
+  ctx.shadowBlur = pickup.state === 'loose' ? 3 : 0;
   renderSatellite(ctx, pickup.typeId, radius, pickup.angle, pickup.color);
   ctx.restore();
-  if (pickup.state === 'broken' || pickup.health >= pickup.maxHealth) {
-    return;
-  }
-  const width = radius * 2.4;
-  const top = screen.y - radius * 1.5 - 6;
-  ctx.save();
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'butt';
-  ctx.strokeStyle = PALETTE.HUD_MUTED;
-  ctx.globalAlpha = 0.45;
-  ctx.beginPath();
-  ctx.moveTo(screen.x - width / 2, top);
-  ctx.lineTo(screen.x + width / 2, top);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = PALETTE.HEALTH;
-  ctx.beginPath();
-  ctx.moveTo(screen.x - width / 2, top);
-  ctx.lineTo(screen.x - width / 2 + width * Math.max(0, pickup.health / pickup.maxHealth), top);
-  ctx.stroke();
-  ctx.restore();
+  drawSatelliteHealth(ctx, pickup, screen, radius);
 }
 
 function drawShipHealthCapsule(ctx: RenderContext, ship: Ship): void {
@@ -1564,7 +1677,7 @@ function drawShipHealthCapsule(ctx: RenderContext, ship: Ship): void {
 }
 
 function makeSurvivalDemo(): Demo {
-  const ship = new Ship({ position: { x: -92, y: 0 }, kitId: 'surveyor' });
+  const ship = new Ship({ position: { x: -92, y: 0 }, kitId: 'scout' });
   ship.angle = 0;
   const rock = makeAsteroid('survival-rock', { x: 130, y: 0 }, 32, 'rubble', 0.35);
   rock.velocity = { x: -1.4, y: 0 };
@@ -1617,7 +1730,7 @@ function makeSurvivalDemo(): Demo {
         }
       });
       drawRoid(ctx, rock);
-      drawShip(ctx, 'surveyor', ship.position, ship.angle, PALETTE.LOCAL, ship.r, impacted);
+      drawShip(ctx, 'scout', ship.position, ship.angle, PALETTE.LOCAL, ship.r, impacted);
       drawShipHealthCapsule(ctx, ship);
       if (ship.impactFlashFrames > 0) {
         const progress = 1 - ship.impactFlashFrames / SHIP.IMPACT_FLASH_FRAMES;
@@ -1656,14 +1769,15 @@ function makePickupsDemo(): Demo {
   const owner = {
     id: 'pilot',
     position: { x: 0, y: 0 },
-    radius: radiusFromMass(100),
+    radius: hullRadiusForKit('scout'),
     health: 100,
     exploding: false,
   };
-  const collected = manager.collect(first.id, owner, manager.nextOrbitPhaseFor(owner.id));
+  manager.collect(first.id, owner);
+  const collected = manager.equip(first.id, owner);
   invariant(
     collected?.state === 'orbiting' && collected.ownerId === 'pilot',
-    'pickup collection did not enter orbiting state'
+    'equipped pickup did not enter orbiting state'
   );
   let sawOrbiting = false;
   let sawDamaged = false;
@@ -1681,7 +1795,14 @@ function makePickupsDemo(): Demo {
         'damaged pickup stopped orbiting'
       );
       invariant(
-        current !== undefined && current.health === current.maxHealth - DAMAGE.LASER_HIT,
+        current !== undefined &&
+          Math.abs(
+            current.health -
+              (current.maxHealth -
+                DAMAGE.LASER_HIT -
+                (FRAME_COUNT * SIM_TICKS_PER_FRAME * current.maxHealth) /
+                  SATELLITE_PICKUP.LIFETIME_FRAMES)
+          ) < 1e-8,
         'pickup health changed by the wrong amount'
       );
     },
@@ -1689,7 +1810,7 @@ function makePickupsDemo(): Demo {
       drawFrameChrome(
         ctx,
         'SATELLITE PICKUPS',
-        'auto-collect nearby Landsat 7 → orbit indefinitely while it intercepts fire',
+        'store nearby Landsat 7 → equip to orbit and scan until health runs out',
         frame,
         PALETTE.SATELLITE
       );
@@ -1738,11 +1859,11 @@ function makePickupsDemo(): Demo {
       if (loose) {
         drawPickup(ctx, loose, 0.35);
       }
-      drawShip(ctx, 'surveyor', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('surveyor').size / 2);
+      drawShip(ctx, 'scout', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('scout').size / 2);
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'
-          ? `${firstPickup.name} orbit · ${firstPickup.health}/${firstPickup.maxHealth} HP`
+          ? `${firstPickup.name} orbit · ${Math.ceil(firstPickup.health)}/${firstPickup.maxHealth} HP`
           : firstPickup?.state === 'loose'
             ? `${firstPickup.name} released`
             : `${firstPickup?.name ?? 'Landsat 7'} collected`,
@@ -1750,14 +1871,20 @@ function makePickupsDemo(): Demo {
         112,
         PALETTE.SATELLITE
       );
-      drawTag(ctx, 'auto-collect ≤ 140 wu · laser removes 25 HP', 320, 286, PALETTE.HUD_MUTED);
+      drawTag(
+        ctx,
+        'equip from inventory · orbiting hardware can be damaged',
+        320,
+        286,
+        PALETTE.HUD_MUTED
+      );
     },
   };
 }
 
 function buildDemos(): Demo[] {
   return [
-    makeSurveyorDemo(),
+    makeScoutDemo(),
     makeHaulerDemo(),
     makeMovementDemo(),
     makeTerrainDemo(),
@@ -1885,7 +2012,10 @@ function verifyExistingOutput(output: string, expectedManifest: MediaManifest): 
       readFileSync(join(output, 'manifest.json'), 'utf8')
     ) as MediaManifest;
   } catch (error) {
-    throw new Error(`wiki-media verification failed: unreadable manifest (${String(error)})`);
+    throw new Error(
+      `wiki-media verification failed: unreadable manifest (${error instanceof Error ? error.message : JSON.stringify(error)})`,
+      { cause: error }
+    );
   }
   invariant(
     actualManifest.version === expectedManifest.version &&

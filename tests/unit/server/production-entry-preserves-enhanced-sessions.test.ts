@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRailwayContext, project, type ServiceNode } from 'railway/iac';
 import { afterEach, expect, test } from 'vitest';
@@ -13,9 +14,11 @@ import railwayConfig from '../../../.railway/railway';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
-import { GAME } from '../../../src/constants';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
+const WHITESPACE_SPLIT_PATTERN = /\s+/u;
+const SERVER_LISTENING_PORT_PATTERN = /Server listening on port (\d+)/u;
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const railwayProject = await railwayConfig(createRailwayContext({ command: 'test' }), project);
 const railwayService = railwayProject.resources
   ?.flat()
@@ -49,7 +52,7 @@ function worldDirectory(): string {
   return directory;
 }
 
-async function start(
+function start(
   port = 0,
   worldPath: string | null = join(worldDirectory(), 'world.sqlite'),
   mountPath: string | null = worldPath === null ? null : dirname(worldPath),
@@ -60,7 +63,7 @@ async function start(
     throw new Error('Railway IaC service start command is missing');
   }
   output = '';
-  const [command, ...args] = railwayStartCommand.split(/\s+/);
+  const [command, ...args] = railwayStartCommand.split(WHITESPACE_SPLIT_PATTERN);
   if (!command) {
     throw new Error('Railway start command is empty');
   }
@@ -95,7 +98,7 @@ async function start(
   });
   return waitFor(
     () => {
-      const match = output.match(/Server listening on port (\d+)/);
+      const match = output.match(SERVER_LISTENING_PORT_PATTERN);
       return match ? Number(match[1]) : undefined;
     },
     'actual production listener',
@@ -244,7 +247,6 @@ test('the production entry restores the same pilot and explored world from its c
   expect(savedWorld?.exploration.length).toBeGreaterThan(0);
   expect(savedPilot?.id).toBe('persisted-pilot');
   expect(savedPilot?.lastSeenAt).toEqual(expect.any(Number));
-  expect(savedPilot?.lives).toBe(GAME.START_LIVES);
 
   const nextPort = await start(0, path);
   const returning = await pilot(nextPort);
@@ -253,7 +255,6 @@ test('the production entry restores the same pilot and explored world from its c
   const restored = (await returning.state()).entities.find(
     (entity) => entity.id === 'persisted-pilot'
   );
-  expect(restored?.lives).toBe(savedPilot?.lives);
   expect(restored?.position).toEqual(savedPilot?.position);
   expect(restored?.score).toBeGreaterThanOrEqual(savedPilot?.score ?? 0);
   await stopProduction();
@@ -343,7 +344,7 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   const original = await pilot(port);
   const joined = await original.join('entry-pilot');
   expect(joined).toMatchObject({ id: 'entry-pilot', snapshotVersion: 1, asteroidInteractions: 1 });
-  expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+  expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
   const before = await observer.state();
   const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch;
   expect(epoch).toBeGreaterThan(0);

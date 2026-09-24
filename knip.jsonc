@@ -4,6 +4,7 @@
   // the shell runners, so package.json alone cannot describe every entrypoint.
   "entry": [
     "server.ts",
+    "server/world/worldStoreWorker.ts",
     ".railway/**/*.ts",
     "vitest.browser.config.ts",
     "scripts/**/*.ts",
@@ -32,6 +33,7 @@
   ],
   // These dependencies are executed by shell scripts, CI, or deployment
   // tooling; Knip cannot infer those non-TypeScript consumers.
-  "ignoreBinaries": ["uvx"],
+  // afconvert is the macOS system encoder used by sounds:generate.
+  "ignoreBinaries": ["uvx", "afconvert"],
   "ignoreDependencies": ["concurrently", "markdownlint-cli2", "jsonc-parser"]
 }

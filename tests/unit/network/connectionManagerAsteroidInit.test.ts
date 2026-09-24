@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import type { PlayerJoin } from '../../../shared-types';
-import { ROID } from '../../../src/constants';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 
 type TestSocket = {
@@ -46,8 +45,7 @@ test('rejoining after a server restart requests asteroids despite a cached belt'
     {
       type: 'initAsteroids',
       id: 'server-player-1',
-      data: { asteroidCount: ROID.INITIAL_ROID_COUNT },
-      timestamp: expect.any(Number),
+      data: {},
     },
   ]);
   expect(manager.hasInitializedAsteroidsForConnection).toBe(true);

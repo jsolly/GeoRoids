@@ -1,44 +1,68 @@
+import { oreResource } from '../../../shared/economy';
 import {
   cellWorldBounds,
   explorationCellAt,
   explorationCellsInView,
   isCellExplored,
 } from '../../../shared/exploration';
-import { FURNACES } from '../../../shared/furnaces';
-import { sectorBounds } from '../../../shared/sectors';
-import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
-import type { ExplorationTile, LootData, LootKind, Position } from '../../../shared-types';
+import { CIVIC_LOTS, pipeHopToParent } from '../../../shared/furnaces';
+import { RICOCHET_COURT } from '../../../shared/ricochetCourt';
+import { SURVEY_PROBE } from '../../../shared/surveyProbe';
+import { WORLD } from '../../../shared/world';
+import type {
+  ExplorationTile,
+  LootData,
+  LootKind,
+  Position,
+  ShipKitId,
+} from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
-import { lootStrokeColor } from '../../entities/loot/lootRenderer';
-import { PlayerNetwork } from '../../entities/player/playerNetwork';
+import type { Player } from '../../entities/player/Player';
 import type { Roid } from '../../entities/roid/Roid';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
+import { getKitHullOutline, projectHullPolyline } from '../../entities/ship/hullOutlines';
 import type { Ship } from '../../entities/ship/Ship';
-import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
+import { strokePhosphorPolyline } from '../../entities/ship/shipRenderer';
 import { activeScanners, scannedMaterial } from '../../entities/ship/surveyScan';
-import { getCompletedSectors, getWorldExploration } from '../../network/worldExploration';
+import { getWorldExploration, worldFurnaces } from '../../network/worldExploration';
+import { getSpiderField } from '../../physics/terrain/spiderSession';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
+import { strokeFurnaceFireTrail } from '../furnaceRenderer';
 import { resolveGlow } from '../renderQuality';
+import { drawCourtMapMark } from '../ricochetCourtRenderer';
+import {
+  drawFoundationMapMark,
+  drawFurnaceMapMark,
+  MINIMAP_FURNACE_MARK_SIZE,
+} from './furnaceMapMark';
 import type { HudLayout } from './hudLayout';
+import { addResourceMapPath, asteroidMapInk, drawResourceMapMark } from './resourceMapMark';
 
-type RadarMark =
-  | { kind: 'local'; x: number; y: number; heading: number; color: string }
-  | {
-      kind: 'other';
-      x: number;
-      y: number;
-      heading: number;
-      color: string;
-    };
+type RadarMark = {
+  kind: 'local' | 'other';
+  x: number;
+  y: number;
+  heading: number;
+  color: string;
+  kitId: ShipKitId;
+};
 
-const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore', 'tap'] satisfies readonly LootKind[];
+const LOOT_MARK_KINDS = [
+  'wreckage',
+  'shard',
+  'tap',
+  'silk',
+  'resource_tap',
+  'boost_coupling',
+  'survey_probe',
+] satisfies readonly LootKind[];
 
 // These marks stay visible at the radar's world scale without borrowing the
 // much larger playfield silhouettes.
-const MINIMAP_ROID_SIZE = 1.5;
-const MINIMAP_LOOT_SIZE = 2;
-const MINIMAP_ORBITER_SIZE = 3;
+const MINIMAP_ROID_SIZE = 2.5;
+const MINIMAP_LOOT_SIZE = 4;
+const MINIMAP_ORBITER_SIZE = 4;
 
 interface MiniMapGeometry {
   readonly center: Position;
@@ -97,6 +121,33 @@ export function projectLocalToMiniMapInto(
   return out;
 }
 
+/** Extra canvas pixels between the local hull and a grate that would otherwise sit under it. */
+export const RADAR_CLOSE_LANDMARK_GAP = 8;
+
+/**
+ * A grate a short way outside the hull still projects inside the ship icon.
+ * Seat that mark just clear of the hull on its true side. A pilot standing
+ * in the grate keeps the mark under the ship.
+ */
+export function seatLandmarkBesideHull(
+  projected: { x: number; y: number },
+  radarCenter: { x: number; y: number },
+  worldDistance: number,
+  siteRadius: number,
+  hullRadius: number,
+  markRadius: number
+): { x: number; y: number } {
+  const dx = projected.x - radarCenter.x;
+  const dy = projected.y - radarCenter.y;
+  const screenDistance = Math.hypot(dx, dy);
+  const clear = hullRadius + markRadius + RADAR_CLOSE_LANDMARK_GAP;
+  if (worldDistance <= siteRadius || screenDistance === 0 || screenDistance >= clear) {
+    return { x: projected.x, y: projected.y };
+  }
+  const scale = clear / screenDistance;
+  return { x: radarCenter.x + dx * scale, y: radarCenter.y + dy * scale };
+}
+
 function isExploredPosition(
   geometry: MiniMapGeometry,
   position: { x: number; y: number }
@@ -105,71 +156,102 @@ function isExploredPosition(
   return cell !== null && isCellExplored(geometry.exploration, cell);
 }
 
+const EXPLORED_RADAR_ALPHA = 0.18;
+
+function hexChannels(hex: string): [number, number, number] {
+  const raw = hex.startsWith('#') ? hex.slice(1) : hex;
+  return [
+    Number.parseInt(raw.slice(0, 2), 16),
+    Number.parseInt(raw.slice(2, 4), 16),
+    Number.parseInt(raw.slice(4, 6), 16),
+  ];
+}
+
+/** One solid color. Translucent tiles double-paint their overlap and read as a grid. */
+function solidRadarInk(tint: string, alpha: number): string {
+  const [backR, backG, backB] = hexChannels(PALETTE.BG);
+  const [tintR, tintG, tintB] = hexChannels(tint);
+  const mix = (back: number, front: number) => Math.round(back + (front - back) * alpha);
+  return `rgb(${mix(backR, tintR)}, ${mix(backG, tintG)}, ${mix(backB, tintB)})`;
+}
+
 /** Draw the shared exploration mask behind known world marks. */
 function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   ctx.save();
-  ctx.fillStyle = hexToRgba(PALETTE.BG, 0.78);
+  // Pale explored ground has to be its own ink: dark fog over a dark void disappears.
+  const exploredInk = solidRadarInk(PALETTE.REMOTE, EXPLORED_RADAR_ALPHA);
   const cellScale = geometry.size / (geometry.radius * 2);
   for (const cell of explorationCellsInView({
     cx: geometry.center.x,
     cy: geometry.center.y,
     radius: geometry.radius,
   })) {
-    if (isCellExplored(geometry.exploration, cell)) {
-      continue;
-    }
+    ctx.fillStyle = isCellExplored(geometry.exploration, cell) ? exploredInk : PALETTE.BG;
     const bounds = cellWorldBounds(cell);
     const x = geometry.x + geometry.size / 2 + (bounds.x - geometry.center.x) * cellScale;
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;
-    const size = bounds.size * cellScale + 0.5;
+    // One extra pixel closes tile gaps. The fill is opaque, so the overlap stays invisible.
+    const size = bounds.size * cellScale + 1;
     ctx.fillRect(x, y, size, size);
   }
   ctx.restore();
 }
 
-function drawCompletedSectors(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
-  const completed = getCompletedSectors();
-  if (completed.size === 0) {
-    return;
+function strokeRadarHull(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  color: string,
+  kitId: ShipKitId
+): void {
+  const outline = getKitHullOutline(kitId);
+  strokePhosphorPolyline(
+    ctx,
+    projectHullPolyline(x, y, size, heading, outline.hull),
+    color,
+    outline.hull.closed
+  );
+  for (const extra of outline.extras) {
+    strokePhosphorPolyline(
+      ctx,
+      projectHullPolyline(x, y, size, heading, extra),
+      color,
+      extra.closed
+    );
   }
-  const cellScale = geometry.size / (geometry.radius * 2);
-  ctx.save();
-  ctx.fillStyle = hexToRgba(PALETTE.DANGER, 0.22);
-  ctx.strokeStyle = hexToRgba(PALETTE.DANGER, 0.7);
-  ctx.lineWidth = 1;
-  for (const id of completed) {
-    const parsed = parseSectorId(id);
-    if (!parsed) {
-      continue;
-    }
-    const bounds = sectorBounds(parsed.x, parsed.y);
-    const x = geometry.x + geometry.size / 2 + (bounds.minX - geometry.center.x) * cellScale;
-    const y = geometry.y + geometry.size / 2 + (bounds.minY - geometry.center.y) * cellScale;
-    const width = WORLD.sectorSize * cellScale;
-    const height = WORLD.sectorSize * cellScale;
-    ctx.fillRect(x, y, width, height);
-    ctx.strokeRect(x, y, width, height);
-  }
-  ctx.restore();
 }
 
 function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
-  switch (mark.kind) {
+  const { kind } = mark;
+  switch (kind) {
     case 'local': {
-      const hull = calculateShipTrianglePoints(
+      strokeRadarHull(
+        ctx,
         mark.x,
         mark.y,
         VISUAL.MINIMAP_LOCAL_SIZE,
-        mark.heading
+        mark.heading,
+        mark.color,
+        mark.kitId
       );
-      strokePhosphorHull(ctx, hull, mark.color);
       return;
     }
     case 'other': {
-      const hull = calculateShipTrianglePoints(mark.x, mark.y, VISUAL.MINIMAP_DOT, mark.heading);
-      strokePhosphorHull(ctx, hull, mark.color);
+      strokeRadarHull(
+        ctx,
+        mark.x,
+        mark.y,
+        VISUAL.MINIMAP_DOT,
+        mark.heading,
+        mark.color,
+        mark.kitId
+      );
       return;
     }
+    default:
+      throw new Error(`Unexpected radar mark kind: ${kind}`);
   }
 }
 
@@ -177,19 +259,21 @@ function drawPilotEdgeMark(
   ctx: CanvasRenderingContext2D,
   geometry: MiniMapGeometry,
   position: Position,
-  color: string
+  color: string,
+  kitId: ShipKitId
 ): void {
   const dx = position.x - geometry.center.x;
   const dy = position.y - geometry.center.y;
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) {
     return;
   }
-  const angle = Math.atan2(dy, dx);
+  // Placement is canvas Y-down; kit projection uses game heading (Y-up).
+  const canvasBearing = Math.atan2(dy, dx);
+  const heading = Math.atan2(-dy, dx);
   const radius = Math.max(8, geometry.size / 2 - 8);
-  const x = geometry.x + geometry.size / 2 + Math.cos(angle) * radius;
-  const y = geometry.y + geometry.size / 2 + Math.sin(angle) * radius;
-  const hull = calculateShipTrianglePoints(x, y, VISUAL.MINIMAP_DOT, angle);
-  strokePhosphorHull(ctx, hull, color);
+  const x = geometry.x + geometry.size / 2 + Math.cos(canvasBearing) * radius;
+  const y = geometry.y + geometry.size / 2 + Math.sin(canvasBearing) * radius;
+  strokeRadarHull(ctx, x, y, VISUAL.MINIMAP_DOT, heading, color, kitId);
 }
 
 function canDrawAsteroidOnMiniMap(roid: Roid): boolean {
@@ -216,24 +300,22 @@ function drawAsteroidMarks(
   const { projection } = geometry;
   ctx.save();
   ctx.beginPath();
-  ctx.fillStyle = hexToRgba(PALETTE.ROID, 0.55);
+  ctx.strokeStyle = hexToRgba(PALETTE.ROID, 0.65);
+  ctx.lineWidth = 0.8;
   for (const roid of roids) {
     if (
       canDrawAsteroidOnMiniMap(roid) &&
+      !(roid.surveyedBy && roid.surveyedBy.length > 0 && roid.material !== undefined) &&
+      !scanners.some((scanner) => scannedMaterial(scanner, roid) !== undefined) &&
       isExploredPosition(geometry, roid.position) &&
       projectPosition(geometry, roid.position)
     ) {
-      ctx.rect(
-        projection.x - MINIMAP_ROID_SIZE / 2,
-        projection.y - MINIMAP_ROID_SIZE / 2,
-        MINIMAP_ROID_SIZE,
-        MINIMAP_ROID_SIZE
-      );
+      addResourceMapPath(ctx, 'asteroid', projection.x, projection.y, MINIMAP_ROID_SIZE);
     }
   }
-  ctx.fill();
+  ctx.stroke();
   const hasSurveyedDeposits = roids.some(
-    (roid) => Array.isArray(roid.surveyedBy) && roid.surveyedBy.length > 0
+    (roid) => (Array.isArray(roid.surveyedBy) && roid.surveyedBy.length > 0) || Boolean(roid.probe)
   );
   if (scanners.length === 0 && !hasSurveyedDeposits) {
     ctx.restore();
@@ -249,79 +331,38 @@ function drawAsteroidMarks(
     }
     const material =
       roid.surveyedBy && roid.surveyedBy.length > 0
-        ? roid.material
+        ? (oreResource(roid) ?? undefined)
         : scanners
             .map((scanner) => scannedMaterial(scanner, roid))
             .find((value) => value !== undefined);
     const x = projection.x,
       y = projection.y;
-    ctx.beginPath();
-    switch (material) {
-      case 'ice':
-        ctx.fillStyle = '#A5F3FC';
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        break;
-      case 'metal':
-        ctx.fillStyle = '#FDE68A';
-        ctx.rect(x - 3, y - 3, 6, 6);
-        break;
-      case 'rubble':
-        ctx.fillStyle = '#FDBA74';
-        ctx.moveTo(x, y - 4);
-        ctx.lineTo(x + 3.5, y + 3);
-        ctx.lineTo(x - 3.5, y + 3);
-        ctx.closePath();
-        break;
-      case undefined:
-        continue;
+    if (material !== undefined) {
+      drawResourceMapMark(ctx, 'asteroid', x, y, 4, asteroidMapInk(material), material);
     }
-    ctx.fill();
+    if (roid.probe && roid.probe.health > 0) {
+      drawProbePulse(ctx, x, y, roid.probe.attachedAt);
+    }
   }
   ctx.restore();
 }
 
-function addDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
-  ctx.moveTo(x, y - radius);
-  ctx.lineTo(x + radius, y);
-  ctx.lineTo(x, y + radius);
-  ctx.lineTo(x - radius, y);
-  ctx.closePath();
-}
-
-function addLootMark(ctx: CanvasRenderingContext2D, drop: LootData, x: number, y: number): void {
-  switch (drop.kind) {
-    case 'laserCore':
-      addDiamond(ctx, x, y, MINIMAP_LOOT_SIZE);
-      ctx.moveTo(x - 1, y + 1);
-      ctx.lineTo(x + 1, y - 1);
-      return;
-    case 'shard':
-      addDiamond(ctx, x, y, MINIMAP_LOOT_SIZE);
-      return;
-    case 'wreckage':
-      ctx.rect(
-        x - MINIMAP_LOOT_SIZE,
-        y - MINIMAP_LOOT_SIZE,
-        MINIMAP_LOOT_SIZE * 2,
-        MINIMAP_LOOT_SIZE * 2
-      );
-      return;
-    case 'tap':
-      ctx.rect(
-        x - MINIMAP_LOOT_SIZE * 0.7,
-        y - MINIMAP_LOOT_SIZE * 1.15,
-        MINIMAP_LOOT_SIZE * 1.4,
-        MINIMAP_LOOT_SIZE * 2.3
-      );
-      ctx.moveTo(x - MINIMAP_LOOT_SIZE * 0.35, y - MINIMAP_LOOT_SIZE * 1.15);
-      ctx.lineTo(x, y - MINIMAP_LOOT_SIZE * 1.7);
-      ctx.lineTo(x + MINIMAP_LOOT_SIZE * 0.35, y - MINIMAP_LOOT_SIZE * 1.15);
-      return;
-    default: {
-      const _exhaustive: never = drop.kind;
-      void _exhaustive;
-    }
-  }
+function drawProbePulse(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  attachedAt: number
+): void {
+  const phase =
+    (Math.max(0, Date.now() - attachedAt) % SURVEY_PROBE.PULSE_MS) / SURVEY_PROBE.PULSE_MS;
+  ctx.save();
+  ctx.strokeStyle = PALETTE.LOCAL;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1 - phase * 0.65;
+  ctx.beginPath();
+  ctx.arc(x, y, 5 + phase * 4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawLootMarks(
@@ -346,13 +387,13 @@ function drawLootMarks(
       }
       if (!painted) {
         ctx.save();
-        ctx.strokeStyle = lootStrokeColor(kind);
+        ctx.strokeStyle = PALETTE.LOOT;
         ctx.lineWidth = 1;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
       }
-      addLootMark(ctx, drop, projection.x, projection.y);
+      addResourceMapPath(ctx, drop.kind, projection.x, projection.y, MINIMAP_LOOT_SIZE);
       painted = true;
     }
     if (painted) {
@@ -387,9 +428,7 @@ function drawLoosePickupMarks(
       ctx.lineWidth = 1;
       ctx.beginPath();
     }
-    const radius = VISUAL.MINIMAP_DOT / 2;
-    ctx.moveTo(projection.x + radius, projection.y);
-    ctx.arc(projection.x, projection.y, radius, 0, Math.PI * 2);
+    addResourceMapPath(ctx, 'satellite', projection.x, projection.y, MINIMAP_ORBITER_SIZE);
     painted = true;
   }
   if (painted) {
@@ -425,7 +464,9 @@ function drawOrbiterMarks(
       ctx.lineJoin = 'round';
       ctx.beginPath();
     }
-    addDiamond(ctx, projection.x, projection.y, MINIMAP_ORBITER_SIZE);
+    addResourceMapPath(ctx, 'satellite', projection.x, projection.y, MINIMAP_ORBITER_SIZE);
+    ctx.moveTo(projection.x + 6, projection.y);
+    ctx.ellipse(projection.x, projection.y, 6, 2, -0.5, 0, Math.PI * 2);
     painted = true;
   }
   if (painted) {
@@ -493,17 +534,88 @@ function drawTowMarkers(
   ctx.restore();
 }
 
+const MINIMAP_PIPE_SCREEN: Array<{ x: number; y: number }> = [];
+
+function polylineHitsRadar(
+  points: readonly { x: number; y: number }[],
+  center: { x: number; y: number },
+  radius: number
+): boolean {
+  const reach = radius * radius;
+  for (const point of points) {
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    if (dx * dx + dy * dy <= reach) {
+      return true;
+    }
+  }
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (!start || !end) {
+      continue;
+    }
+    const abx = end.x - start.x;
+    const aby = end.y - start.y;
+    const lengthSquared = abx * abx + aby * aby;
+    const t =
+      lengthSquared === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1, ((center.x - start.x) * abx + (center.y - start.y) * aby) / lengthSquared)
+          );
+    const dx = center.x - (start.x + abx * t);
+    const dy = center.y - (start.y + aby * t);
+    if (dx * dx + dy * dy <= reach) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Fire only after the furnace is lit, clipped to the radar disc. */
+function drawLitFurnacePipes(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
+  const now = performance.now();
+  for (const lot of CIVIC_LOTS) {
+    if (!worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    const hop = pipeHopToParent(lot.id);
+    if (hop.length < 2 || !polylineHitsRadar(hop, geometry.center, geometry.radius)) {
+      continue;
+    }
+    while (MINIMAP_PIPE_SCREEN.length < hop.length) {
+      MINIMAP_PIPE_SCREEN.push({ x: 0, y: 0 });
+    }
+    for (let index = 0; index < hop.length; index += 1) {
+      const world = hop[index];
+      const screen = MINIMAP_PIPE_SCREEN[index];
+      if (!world || !screen) {
+        continue;
+      }
+      const normalizedX = (world.x - geometry.center.x) / geometry.radius;
+      const normalizedY = (world.y - geometry.center.y) / geometry.radius;
+      screen.x = geometry.x + geometry.size / 2 + normalizedX * (geometry.size / 2);
+      screen.y = geometry.y + geometry.size / 2 + normalizedY * (geometry.size / 2);
+    }
+    strokeFurnaceFireTrail(ctx, MINIMAP_PIPE_SCREEN, hop.length, now, 1.6, resolveGlow(3), 16);
+  }
+}
+
 /** Furnace destinations become useful landmarks only after the crew reveals them. */
 function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   const { projection } = geometry;
+  const radarCenter = {
+    x: geometry.x + geometry.size / 2,
+    y: geometry.y + geometry.size / 2,
+  };
 
   ctx.save();
-  ctx.strokeStyle = PALETTE.SATELLITE;
-  ctx.fillStyle = hexToRgba(PALETTE.SATELLITE, 0.2);
-  ctx.shadowColor = PALETTE.SATELLITE;
-  ctx.shadowBlur = resolveGlow(4);
+  drawLitFurnacePipes(ctx, geometry);
   ctx.lineWidth = 1;
-  for (const furnace of FURNACES) {
+  ctx.shadowBlur = resolveGlow(4);
+  for (const furnace of worldFurnaces.nearby(geometry.center, geometry.radius)) {
     if (!isExploredPosition(geometry, furnace.position)) {
       continue;
     }
@@ -516,18 +628,38 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
     if (!projectPosition(geometry, furnace.position)) {
       continue;
     }
-    const x = projection.x;
-    const y = projection.y;
-    ctx.beginPath();
-    ctx.rect(x - 3, y - 3, 6, 6);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x - 2, y);
-    ctx.lineTo(x + 2, y);
-    ctx.moveTo(x, y - 2);
-    ctx.lineTo(x, y + 2);
-    ctx.stroke();
+    const hearth = seatLandmarkBesideHull(
+      projection,
+      radarCenter,
+      distance,
+      furnace.radius,
+      VISUAL.MINIMAP_LOCAL_SIZE,
+      MINIMAP_FURNACE_MARK_SIZE
+    );
+    drawFurnaceMapMark(ctx, hearth.x, hearth.y, MINIMAP_FURNACE_MARK_SIZE);
+  }
+  for (const lot of CIVIC_LOTS) {
+    if (worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    const dx = lot.position.x - geometry.center.x;
+    const dy = lot.position.y - geometry.center.y;
+    const lotDistance = Math.hypot(dx, dy);
+    if (lotDistance > geometry.radius) {
+      continue;
+    }
+    if (!projectPosition(geometry, lot.position)) {
+      continue;
+    }
+    const foundation = seatLandmarkBesideHull(
+      projection,
+      radarCenter,
+      lotDistance,
+      lot.radius,
+      VISUAL.MINIMAP_LOCAL_SIZE,
+      MINIMAP_FURNACE_MARK_SIZE
+    );
+    drawFoundationMapMark(ctx, foundation.x, foundation.y, MINIMAP_FURNACE_MARK_SIZE);
   }
   ctx.restore();
 }
@@ -538,7 +670,6 @@ function formatCoordinate(value: number): string {
 }
 
 function drawRadarReadout(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
-  const sector = sectorAt(geometry.center);
   const width = Math.min(geometry.size, 112);
   const x = geometry.x + geometry.size / 2;
   const outsideY = geometry.y - 29;
@@ -552,7 +683,7 @@ function drawRadarReadout(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
   ctx.textBaseline = 'top';
   ctx.fillText(`X ${formatCoordinate(geometry.center.x)}`, x, y);
   ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.9);
-  ctx.fillText(`Y ${formatCoordinate(geometry.center.y)} · S${sector.x},${sector.y}`, x, y + 11);
+  ctx.fillText(`Y ${formatCoordinate(geometry.center.y)}`, x, y + 11);
   ctx.restore();
 }
 
@@ -562,7 +693,8 @@ export function drawMiniMap(
   ship: Ship,
   roids: readonly Roid[],
   loot: readonly LootData[],
-  pickups: readonly SatellitePickup[]
+  pickups: readonly SatellitePickup[],
+  otherPlayers: readonly Player[]
 ): void {
   const { x: miniMapX, y: miniMapY, size: miniMapSize } = layout.miniMap;
   const centerX = miniMapX + miniMapSize / 2;
@@ -577,7 +709,6 @@ export function drawMiniMap(
     projection: { x: 0, y: 0 },
   };
 
-  const otherPlayers = PlayerNetwork.getInstance().getOtherPlayers();
   const scanners = activeScanners(
     ship,
     otherPlayers.map((player) => player.ship)
@@ -589,8 +720,17 @@ export function drawMiniMap(
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const legendX = miniMapX >= 70 ? miniMapX - 64 : miniMapX + miniMapSize + 6;
-    for (const [index, label] of ['○ Ice', '□ Metal', '△ Rubble'].entries()) {
-      ctx.fillText(label, legendX, miniMapY + index * 13);
+    for (const [index, material] of (['ice', 'metal', 'rubble'] as const).entries()) {
+      drawResourceMapMark(
+        ctx,
+        'asteroid',
+        legendX + 4,
+        miniMapY + index * 13 + 5,
+        4,
+        asteroidMapInk(material),
+        material
+      );
+      ctx.fillText(material, legendX + 12, miniMapY + index * 13);
     }
     ctx.restore();
   }
@@ -608,7 +748,6 @@ export function drawMiniMap(
 
   try {
     drawExplorationFog(ctx, geometry);
-    drawCompletedSectors(ctx, geometry);
     drawAsteroidMarks(ctx, roids, geometry, scanners);
     drawLootMarks(ctx, loot, geometry);
     drawLoosePickupMarks(ctx, pickups, geometry);
@@ -621,6 +760,33 @@ export function drawMiniMap(
       roids
     );
     drawFurnaceMarks(ctx, geometry);
+    if (projectPosition(geometry, RICOCHET_COURT.center)) {
+      drawCourtMapMark(ctx, geometry.projection.x, geometry.projection.y, 7);
+    }
+    const spiderField = getSpiderField();
+    for (const spider of spiderField.spiders) {
+      if (
+        spider.health > 0 &&
+        spider.probe &&
+        spider.probe.health > 0 &&
+        isExploredPosition(geometry, spider.position) &&
+        projectPosition(geometry, spider.position)
+      ) {
+        drawProbePulse(ctx, geometry.projection.x, geometry.projection.y, spider.probe.attachedAt);
+      }
+    }
+    for (const nest of spiderField.nests) {
+      if (isExploredPosition(geometry, nest.position) && projectPosition(geometry, nest.position)) {
+        drawResourceMapMark(
+          ctx,
+          'nest',
+          geometry.projection.x,
+          geometry.projection.y,
+          8,
+          PALETTE.DANGER
+        );
+      }
+    }
 
     // The pilot hulls are deliberately last: they must remain readable over
     // dense rock, loot, and pickup fields.
@@ -631,7 +797,7 @@ export function drawMiniMap(
       }
       const p = projectPosition(geometry, player.ship.position);
       if (!p) {
-        drawPilotEdgeMark(ctx, geometry, player.ship.position, player.color);
+        drawPilotEdgeMark(ctx, geometry, player.ship.position, player.color, player.ship.kitId);
         continue;
       }
       drawRadarMark(ctx, {
@@ -640,6 +806,7 @@ export function drawMiniMap(
         y: geometry.projection.y,
         heading: player.ship.angle,
         color: player.color,
+        kitId: player.ship.kitId,
       });
     }
 
@@ -652,6 +819,7 @@ export function drawMiniMap(
           y: geometry.projection.y,
           heading: ship.angle,
           color: ship.color,
+          kitId: ship.kitId,
         });
       }
     }

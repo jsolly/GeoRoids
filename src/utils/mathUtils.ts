@@ -10,11 +10,11 @@ export function addPositionAndVelocity(pos: Position, vel: Velocity): Position {
 }
 
 export function getVelocityMagnitude(vel: Velocity): number {
-  return Math.sqrt(vel.x ** 2 + vel.y ** 2);
+  return Math.hypot(vel.x, vel.y);
 }
 
 export function getDistance(pos1: Position, pos2: Position): number {
-  return Math.sqrt((pos1.x - pos2.x) ** 2 + (pos1.y - pos2.y) ** 2);
+  return Math.hypot(pos1.x - pos2.x, pos1.y - pos2.y);
 }
 
 export function createPositionFromAngle(angle: number, magnitude: number): Position {

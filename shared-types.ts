@@ -17,6 +17,33 @@ export type DiagnosticLogRecord = {
   receiverReleaseId?: string;
 };
 
+/** The server-owned predator state rendered by every client. */
+export interface TerrainSpider {
+  id: string;
+  position: Position;
+  angle: number;
+  health: number;
+  maxHealth: number;
+  phase: 'scuttling' | 'hunting';
+  shudderFrames?: number;
+  probe?: AsteroidProbe | null;
+  targetId: string | null;
+  /** Present only on spiders anchored to an asteroid belt deposit. */
+  crawler?: {
+    hostId: string;
+    anchor: Position;
+    phase: 'crawling' | 'winding' | 'lunging' | 'recovering' | 'escaping';
+    progress: number;
+  };
+}
+
+export interface SpiderFieldState {
+  consumed?: { id: string; position: Position; furnaceId: string; frame: number }[];
+  spiders: TerrainSpider[];
+  /** Known nest homes whose original stationary resource is still present. */
+  nests: { id: string; resourceId: string; position: Position }[];
+}
+
 // Common position and velocity types used throughout the system
 export interface Position {
   x: number;
@@ -30,26 +57,35 @@ export interface Velocity {
 
 // Network update interface - only what needs to be synced
 /** Chosen at join. Shared by every player ship. */
-export type ShipKitId = 'surveyor' | 'hauler';
+export type ShipKitId = 'scout' | 'hauler';
 
 /** Hauler v1 utility slot. Same E key; one option active. */
-export type HaulerUtilityId = 'resource_tap' | 'tow_cable';
+export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
+
+/** Scout v1 utility slot. Same E key; one option active. */
+export type ScoutUtilityId = 'mineral_scan' | 'survey_probe';
+
+export interface AbilityUsedEvent {
+  id: string;
+  kitId: ShipKitId;
+  abilityId: 'harpoon' | 'surveyScan';
+  harpoonTargetId?: string | null;
+  harpoonLatchPos?: Position;
+  abilityActiveFrames: number;
+  /** Present only on an accepted ignition, never on a snapshot or ordinary release. */
+  boostIgnitionPosition?: Position;
+}
 
 export interface PlayerUpdate {
   id: string;
-  name: string;
   position: Position;
   velocity: Velocity;
-  r: number;
   angle: number;
-  lives: number;
-  score: number;
-  exploding: boolean;
-  health: number;
-  maxHealth: number;
-
-  kitId?: ShipKitId;
-  mass?: number;
+  thrusting: boolean;
+  boosting?: boolean;
+  boostDepleted?: boolean;
+  /** True while the local map or schematic holds this hull still. */
+  overlayHold?: boolean;
   /** Acknowledges the server's current movement ownership epoch. */
   motionEpoch?: number;
   motionSequence?: number;
@@ -91,7 +127,13 @@ export interface PlayerLeave {
 }
 
 // Game state types that might be shared
-export type AsteroidMaterial = 'ice' | 'metal' | 'rubble';
+export type AsteroidMaterial = 'ice' | 'metal' | 'rubble' | 'crystal';
+
+export interface SettlementState {
+  level: number;
+  points: number;
+  resources: Record<AsteroidMaterial, number>;
+}
 
 export interface AsteroidPhenomenon {
   kind: 'reflective';
@@ -105,11 +147,6 @@ export interface PlayerMotionState {
   mode: 'free' | 'handoff';
   ack: number;
   anchor?: Position;
-}
-
-export interface LaserUpgrade {
-  charges: number;
-  expiresAt: number;
 }
 
 export interface PlayerProjectileState {
@@ -131,6 +168,25 @@ export interface PlayerShotAcknowledgement {
   projectileId: string | null;
 }
 
+/** Server-owned coupling; guidance points at the nearest furnace. */
+export type AsteroidBoost =
+  | { phase: 'armed'; ownerId: string; angle: number; couplings?: string[] }
+  | { phase: 'burning'; ownerId: string; angle: number; couplings?: string[] };
+
+/** Transient Scout hardware attached to one asteroid face. */
+export interface AsteroidProbe {
+  id: string;
+  ownerId: string;
+  health: number;
+  maxHealth: number;
+  attachedAt: number;
+  expiresAt: number;
+  /** Angular offset from the host asteroid's current rotation. */
+  angle: number;
+  /** Radial distance from the host asteroid center in world units. */
+  radialOffset: number;
+}
+
 export interface AsteroidData {
   id: string;
   position: Position;
@@ -143,19 +199,30 @@ export interface AsteroidData {
   maxHealth: number;
   vertices: number;
   offsets: number[];
+  /** Attached belt crawler health; zero remains dead until the deposit regenerates. */
+  beltCrawlerHealth?: number[];
+  /** Stable identities follow crawlers to their new host after an escape. */
+  beltCrawlerIds?: string[];
   /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
-  /** Surveyors who identified this deposit; retained until it leaves the field. */
+  /** Null is barren. Absent old rocks use a stable ID-derived deposit. */
+  ore?: AsteroidMaterial | null;
+  /** Pilots who identified this deposit by scan or satellite; retained until it leaves the field. */
   surveyedBy?: string[];
   /** Pilots who have mined this deposit; persisted until the deposit is destroyed. */
   miningContributors?: string[];
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
   phenomenon?: AsteroidPhenomenon;
+  boost?: AsteroidBoost | null;
+  /** Explicit null clears a previously rendered probe from client state. */
+  probe?: AsteroidProbe | null;
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
-export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap';
+export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
+
+export type LootKind = 'shard' | 'wreckage' | 'tap' | 'silk' | EquipmentId | 'points';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -165,7 +232,21 @@ export interface LootCollected {
   position: Position;
 }
 
+/** One Resource Tap canister leaving the rock, independent of snapshot visibility. */
+export interface TapEjected {
+  lootId: string;
+  position: Position;
+}
+
+export interface SavedPointLoot {
+  id: string;
+  position: Position;
+  points: number;
+  expiresAt: number;
+}
+
 export interface LootData {
+  points?: number;
   id: string;
   position: Position;
   mass: number;
@@ -174,7 +255,7 @@ export interface LootData {
 }
 
 export type SatellitePickupTypeId = import('./shared/eoSatellites').SatelliteTypeId;
-export type SatellitePickupState = 'loose' | 'orbiting' | 'broken';
+export type SatellitePickupState = 'loose' | 'stored' | 'orbiting' | 'broken';
 
 /** Server-owned collectible Earth-observation hardware. */
 export interface SatellitePickupData {
@@ -190,6 +271,7 @@ export interface SatellitePickupData {
   color: string;
   state: SatellitePickupState;
   ownerId: string | null;
+  /** Remaining service life; deployment and impacts both consume health. */
   health: number;
   maxHealth: number;
 }
@@ -215,6 +297,8 @@ export interface AsteroidDestroyEvent {
   asteroidId: string;
   collabSplit?: boolean;
   origin?: Position;
+  /** Furnace intake; clients shatter the outline in danger-red with a smoke poof. */
+  consumedBy?: 'furnace';
 }
 
 export interface ShockwaveEvent {
@@ -222,11 +306,25 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
+/** A furnace a Scout lit with their own score. */
+export interface CivicModule {
+  id: string;
+  builderName: string;
+  /** Public pilot id of the Scout who paid. Absent on older unnamed furnaces. */
+  builderId?: string;
+}
+
 export interface ServerGameState {
+  /** Epoch milliseconds for client animation clocks. */
+  serverTime?: number;
+  settlement: SettlementState;
+  /** Furnaces the crew has lit, named for the Scout who paid. */
+  civicModules?: CivicModule[];
+  /** Server-owned terrain predators, pursuit targets, and remaining health. */
+  spiderField?: SpiderFieldState;
+  beltRecovery?: import('./shared/asteroidBelt').BeltRecoveryWarning[];
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
   exploration: ExplorationTile[];
-  /** Finished world sectors that stay walled off. */
-  completedSectors: string[];
   /** Revealed landmarks and valuable drops, independent of local simulation visibility. */
   mapAssets: MapAsset[];
   entities: ServerEntityData[];
@@ -241,7 +339,7 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  kind: 'furnace' | 'laserCore' | 'wreckage' | 'satellite';
+  kind: 'furnace' | 'foundation' | 'wreckage' | 'satellite';
   position: Position;
   name: string;
 }
@@ -264,7 +362,24 @@ export interface ServerGameSnapshot extends ServerGameState {
   playerProjectiles: PlayerProjectileState[];
 }
 
+export interface ShipBoostState {
+  phase: 'idle' | 'active' | 'exhausted';
+  charge: number;
+}
+
+export interface FurnaceTransit {
+  sourceId: string;
+  destinationId: string;
+  startedAt: number;
+  durationMs: number;
+}
+
 export interface ServerEntityData {
+  furnaceTransit?: FurnaceTransit | null;
+  /** Stored spider silk, retained across flights. */
+  silk?: number;
+  /** Salvaged tools owned by this pilot, retained across flights. */
+  equipment?: EquipmentId[];
   id: string;
   name: string;
   type: 'player';
@@ -273,9 +388,11 @@ export interface ServerEntityData {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
-  boosting?: boolean;
+  /** Omitted only by servers predating the independently deployed boost update. */
+  boost?: ShipBoostState;
   color: string;
-  lives: number;
+  cargo: number;
+  purchases: string[];
   score: number;
   health: number;
   maxHealth: number;
@@ -291,16 +408,16 @@ export interface ServerEntityData {
   harpoonLatchPos?: Position;
   /** Equipped Hauler utility. Omitted on other kits. Missing means tow cable. */
   haulerUtility?: HaulerUtilityId;
+  /** Equipped Scout utility. Omitted on other kits. Missing means mineral scan. */
+  scoutUtility?: ScoutUtilityId;
   /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 }
 
 /** Optional monotonic probe identity; bare heartbeat messages remain supported. */
 export interface PingMessage {
   type: 'ping';
-  timestamp?: number;
   probeId?: number;
 }
 

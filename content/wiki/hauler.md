@@ -1,10 +1,11 @@
 ---
 title: Hauler
 category: Ships
-summary: A heavy hull that swaps Resource Tap and Tow Cable, then mines metal efficiently.
+summary: A heavy hull with Resource Tap, Tow Cable, and Boost Coupling utilities.
 order: 40
 related:
   - content/wiki/controls.md
+  - content/wiki/satellites.md
   - content/wiki/asteroids.md
   - content/wiki/combat-survival.md
   - content/wiki/loot-growth.md
@@ -16,61 +17,32 @@ media:
 
 ## Utility slot
 
-Hauler is the U-shaped cargo yoke with twin forward towers and two engine
-bells. It has one utility slot. Open the ship schematic with V on desktop, or
-press and hold your own hull on touch, to swap **Resource Tap** and **Tow
-Cable**. Equip is immediate. E still fires the equipped tool; there is no
-second ability key. Other pilots cannot open your schematic.
-
-New flights start on Resource Tap. A host that never reports a slot keeps the
-legacy Tow Cable so older sessions still haul.
+Hauler is the larger, slower-turning cargo ship with stronger mining lasers and Tow Cable as its starter tool. Find Resource Tap and Boost Coupling as [rare equipment drops](/wiki/#loot-growth), usually in spider nests, then choose them in Inventory with V or its button. E uses the selected tool.
 
 ## Resource Tap E
 
-E attaches a tap tether to the nearest living asteroid within a fixed 280-unit
-hull gap. The rock stays whole. After a short extract, a large cream canister
-with an amber tip appears beside the rock and the tether releases. The ability
-never targets a ship. E again releases an unfinished tap without spawning loot.
-Furnaces do not consume a tapped rock.
+Press E near a rock to extract collectible canisters without destroying it; E again cancels extraction. Tap a spider for limited silk instead, but expect it to turn on you. Silk stays in your material inventory and has no crafting use yet.
 
 ## Tow cable E
 
-E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
-hull gap. The ability never targets a ship, and it cannot deal ship damage.
+Press E near a rock or spider to latch, fly it into a lit furnace, and press E again to release early. Cargo keeps its momentum, so leave room for it to trail behind you. Delivery pays the Hauler and scanning contributors; the red shatter and smoke mark ore intake.
 
-The asteroid keeps its existing motion and trails behind the Hauler as the
-Hauler flies under normal thrust and steering. Surveyor and Hauler share the
-same cruise speed; Hauler Boost is weaker than Surveyor Boost. The cable only
-applies a small correction when it is stretched; it never reels a rock into the
-hull or throws it toward a target. A successful attachment starts the
-three-second ability cooldown, while pressing E again releases the cable without
-waiting for cooldown.
-The cable and ability display update when the server confirms the action. If no eligible
-rock is in range, the attempt leaves the cable detached and does not start a
-cooldown. While towing, the touch button reads Release and stays available.
-After release, a new attachment waits for any remaining cooldown. A dead or
-removed rock detaches automatically. If the towed asteroid overlaps another
-asteroid, both rocks use the ordinary collision break and the cable detaches.
-If it overlaps another ship, that ship takes a normal asteroid impact, the cargo
-breaks, and the cable detaches. The Hauler stays unharmed by its own cargo,
-including when that cargo is the rock that hits another deposit. Spawn protection
-still prevents the ship impact. Untowed rocks pass through each other.
+## Cargo collisions
 
-Fly the towed asteroid into an arena furnace to deliver it. The furnace is a
-dashed delivery ring around a burning grate with a column of flame roaring up
-its middle. Delivery consumes the rock and awards the Hauler. If a Surveyor
-scanned the rock, the Hauler and each Surveyor contributor receive identical
-delivery points.
+Ordinary towed rocks break when they hit another rock or ship, damaging other ships but sparing their own Hauler. Colossal deposits survive these collisions and need two Haulers towing together to move. Untowed rocks pass through each other.
 
-Hauler passive exploration reaches 260 world units and contributes to the same
-persistent crew chart as Surveyor. Use the shared chart to follow discovered
-furnace markers; the local radar shows a discovered furnace while it is within
-the nearby radar view, and the universe map keeps its exact landmark anywhere
-in the explored world.
+## Boost Coupling E
+
+Press E to arm a rock toward its nearest furnace, then E again to ignite autonomous delivery; colossal deposits need two armed Haulers first. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and tools until delivery pays its launchers and recorded scanning pilots.
+
+## Spider bites
+
+A towed spider can still bite nearby ships, including your Hauler if you double back into it. Only proximity to the spider triggers a bite; crossing the cable is safe. [Mineral Scan and safe areas](/wiki/#terrain) still protect you.
+
+## Spider rescue
+
+Towing a living spider attracts rescuers that can bite through your cable. Bring a Scout to repel them with Mineral Scan, or reach a lit furnace to burn the captive. Releasing the spider ends its rescue call.
 
 ## Mining lasers
 
-Hauler deals double mining damage to metal asteroids and cooperative large rocks.
-Metal takes two hits instead of three. Small ice and rubble already break in
-one hit. The different-pilot requirement for cooperative large-rock splits
-remains unchanged. Lasers mine asteroids only; they cannot damage teammates.
+Hauler hits metal and large deposits harder, but cooperative splits still require different pilots. Direct shots are safe for crew hulls; [ricochets](/wiki/#combat-survival) are dangerous.

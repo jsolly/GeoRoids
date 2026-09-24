@@ -1,8 +1,8 @@
 ---
 title: Satellites and pickups
 category: Arena
-summary: Six Earth-observation satellite pickups drift in the shared field and
-  become durable orbiting interceptors when collected.
+summary: Six Earth-observation satellite pickups glow in the shared field and
+  enter ship inventory for temporary asteroid scanning.
 order: 110
 related:
   - content/wiki/teamwork.md
@@ -12,30 +12,22 @@ related:
 media:
   - heading: Six Earth-observation hulls
     demo: satellites
-  - heading: Orbiting interceptors
+  - heading: Equipped satellites
     demo: pickups
 ---
 
 ## Six Earth-observation hulls
 
-The field uses six collectible Earth-observation satellite hulls. Each has a
-distinct silhouette so you can tell Landsat 7, Terra, Aqua, GOES-16, ENVISAT,
-and WorldView-3 apart at a glance. They are passive hardware pickups: they do
-not fire or damage a ship on contact.
+Glowing Landsat 7, Terra, Aqua, GOES-16, ENVISAT, and WorldView-3 satellites are collectible scanning hardware. Find them loose in the field or among nest salvage while supply remains. Fly close to claim one automatically for your inventory and fill point cargo; loose satellites are invulnerable.
 
-## Shared pickup rules
+## Equipped satellites
 
-The field holds a limited number of loose satellite pickups. They spawn
-separately from asteroid destruction and drift inside the pickup field. The
-nearest living player within collection range claims a loose pickup
-automatically and earns a score bonus. Collection does not grant a combat
-ability or spawn protection.
+Open Inventory with V or its button and choose Equip to deploy one satellite alongside your normal tool. It identifies nearby minerals for the crew and records you for shared rewards. Health drains with time and impacts, so damage shortens its scanning lifetime.
 
-## Orbiting interceptors
+## Storage and loss
 
-Collected hardware orbits its owner indefinitely, staying outside the hull.
-It has its own health and intercepts player laser shots and asteroid
-collisions. Damage reduces its health; at zero it breaks and
-respawns healthy as a loose pickup after its recovery delay. Owner death
-or leaving releases it at its current position without restoring health.
-Collection is shared, so two pilots cannot both claim one pickup.
+Stored satellites preserve health, but an active satellite cannot be stowed or replaced to save it. Death, leaving, or a long disconnect drops your hardware for anyone to collect; a brief disconnect keeps it reserved. Exhausted satellites return later as healthy loose pickups, and inventory does not survive a server restart.
+
+## Orbit sound
+
+With Sound Effects on, your equipped satellite plays a soft directional chime once per orbit. The chime stops when the satellite breaks or leaves orbit.

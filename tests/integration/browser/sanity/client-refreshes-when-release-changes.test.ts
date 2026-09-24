@@ -10,6 +10,7 @@ const browserManager = new BrowserManager();
 const screenshots = new ScreenshotManager();
 const current = 'a9755405dcfd546ace3e92b4dc8c3ff53d9bb598';
 const next = 'b'.repeat(40);
+const PNG_EXTENSION_PATTERN = /\.png$/u;
 
 beforeAll(async () => {
   if (!(await checkViteServer())) {
@@ -170,7 +171,7 @@ for (const viewport of [
         screenshotPath,
       };
       writeFileSync(
-        screenshotPath.replace(/\.png$/, '.json'),
+        screenshotPath.replace(PNG_EXTENSION_PATTERN, '.json'),
         `${JSON.stringify(receipt, null, 2)}\n`
       );
       expect(errors).toEqual([]);

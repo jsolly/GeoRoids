@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { configureRenderQuality } from '../../../src/rendering/renderQuality';
 import { strokePhosphorPolyline } from '../../../src/rendering/vectorJuice';
 

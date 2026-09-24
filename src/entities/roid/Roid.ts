@@ -1,11 +1,15 @@
+import { tickAsteroidBoost } from '../../../shared/asteroidBoost';
 import type {
+  AsteroidBoost,
   AsteroidMaterial,
   AsteroidPhenomenon,
+  AsteroidProbe,
   Position,
   Velocity,
 } from '../../../shared-types';
 import { playHitSound as playHitSoundAt } from '../../audio/gameSounds';
 import { DEBUG, GAME, ROID } from '../../constants';
+import { worldFurnaces } from '../../network/worldExploration';
 import { stepAsteroidMotionInto } from '../../physics/asteroidMotion';
 
 class Roid {
@@ -18,10 +22,13 @@ class Roid {
   health: number;
   maxHealth: number;
   material?: AsteroidMaterial;
+  ore?: AsteroidMaterial | null;
   surveyedBy?: string[];
   miningContributors?: string[];
   /** Optional server-owned reflection metadata. */
   phenomenon?: AsteroidPhenomenon;
+  boost?: AsteroidBoost | null;
+  probe?: AsteroidProbe | null;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
   isCollabTarget: boolean = false;
   taggedUntil?: number; // Server-owned collab window; do not destroy locally while set
@@ -36,7 +43,7 @@ class Roid {
     public r: number,
     id?: string
   ) {
-    this.id = id || crypto.randomUUID();
+    this.id = id ?? crypto.randomUUID();
     this.angle = Math.random() * Math.PI * 2; // in radians
     this.angularVelocity = (Math.random() - 0.5) * 0.01 * GAME.MOTION_SCALE;
     const speed = (Math.random() * ROID.SPEED) / GAME.FPS;
@@ -84,6 +91,7 @@ class RoidBelt {
     }
 
     for (const roid of this.roids) {
+      tickAsteroidBoost(roid, worldFurnaces);
       stepAsteroidMotionInto(roid.position, roid.velocity, 1, roid.position, roid.velocity);
     }
   }

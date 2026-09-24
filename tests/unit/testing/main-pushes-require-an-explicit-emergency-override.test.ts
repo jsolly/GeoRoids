@@ -1,5 +1,6 @@
 /* @vitest-environment node */
 import { spawnSync } from 'node:child_process';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 

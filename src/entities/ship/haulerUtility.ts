@@ -1,32 +1,38 @@
 import type { HaulerUtilityId, ShipKitId } from '../../../shared-types';
 import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
 
-export const HAULER_UTILITY_IDS = ['tow_cable', 'resource_tap'] as const;
+export const HAULER_UTILITY_IDS = ['tow_cable', 'resource_tap', 'boost_coupling'] as const;
 
-/** New Hauler flights start on Resource Tap. */
-export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'resource_tap';
+/** New Hauler flights start with the freely available Tow Cable. */
+export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 /** Missing snapshot / legacy host keeps the existing tow cable. */
 export const UNSET_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 
 export const HAULER_UTILITY_STORAGE_KEY = 'georoids.haulerUtility';
 
 export const HAULER_UTILITY = {
+  boost_coupling: {
+    id: 'boost_coupling',
+    name: 'Boost Coupling',
+    hint: 'Tap to equip',
+    copy: 'E or ARM aims at the nearest furnace. E or IGNITE launches self-guided delivery and earns you points. Swap tools to cancel before ignition.',
+  },
   resource_tap: {
     id: 'resource_tap',
     name: 'Resource Tap',
     hint: 'Tap to equip',
-    copy: 'Harpoon a roid to extract resources. Keeps the asteroid intact.',
+    copy: 'Tap an asteroid for resources or a spider for silk. Spiders shudder and turn hostile.',
   },
   tow_cable: {
     id: 'tow_cable',
     name: 'Tow Cable',
     hint: 'Tap to equip',
-    copy: 'Latch and haul a rock (or wreck).',
+    copy: 'Latch and haul an asteroid, wreck, or spider.',
   },
 } as const;
 
 export function isHaulerUtilityId(value: unknown): value is HaulerUtilityId {
-  return value === 'resource_tap' || value === 'tow_cable';
+  return value === 'resource_tap' || value === 'tow_cable' || value === 'boost_coupling';
 }
 
 export function parseHaulerUtilityId(value: unknown): HaulerUtilityId {

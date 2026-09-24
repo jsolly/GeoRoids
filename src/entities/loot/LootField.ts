@@ -1,13 +1,20 @@
+import { isEquipmentId } from '../../../shared/equipment';
 import type { LootData, LootKind, Position } from '../../../shared-types';
 
 function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
-  if (kind === 'shard' || kind === 'laserCore' || kind === 'tap') {
+  if (
+    kind === 'points' ||
+    kind === 'shard' ||
+    kind === 'tap' ||
+    kind === 'silk' ||
+    isEquipmentId(kind)
+  ) {
     return kind;
   }
   return 'wreckage';
 }
 
-/** Client snapshot of server-authoritative loot (wreckage, shards, laser cores). */
+/** Client snapshot of server-authoritative loot (wreckage, shards, tap canisters, silk). */
 export class LootField {
   private static instance: LootField;
   private loot: LootData[] = [];
@@ -27,6 +34,7 @@ export class LootField {
       mass: drop.mass,
       radius: drop.radius,
       kind: normalizeKind(drop.kind),
+      ...(drop.points !== undefined ? { points: drop.points } : {}),
     }));
   }
 

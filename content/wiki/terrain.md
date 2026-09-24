@@ -14,27 +14,38 @@ media:
     demo: terrain
 ---
 
-## Read the landscape
-
-The open world contains hills, valleys, and saddles, with a flat starter area at
-the center. Pilots in the same world share the same terrain. The server loads
-nearby world sectors as the crew travels, while the minimap keeps the local
-radar readable. Slopes accelerate your ship downhill and resist travel uphill,
-even with automatic thrust. Steering redirects normal momentum toward the nose
-before the slope force acts. Terrain itself does not deal damage.
-
-The world is circular. Asteroids bounce inward at the outer boundary, keeping
-the remaining deposits in the world. Lasers reflect off the wall and can mine
-asteroids on their returning path; after that bounce they damage any live ship
-they hit. Crossing the boundary destroys a vulnerable ship regardless of its
-health or mass and costs one life. Regional terrain and furnace landmarks
-remain available between sessions.
-
 ## Slope and contours
 
-Contour lines are closest together on steep slopes and farther apart on gentle
-ground. Faint numbers mark relative elevations, including negative values in
-valleys. Watch the contours and changes in motion to tell uphill from downhill.
-Normal hull and mass speed limits still apply, and every ship feels the same slope
-force. Laser paths do not interact with terrain; glints where shots cross contours are
-visual feedback, with no terrain reflection or extra damage.
+Broad gentle plains connect hills and valleys. Dense contour lines preserve the terrain texture even where their height differences are tiny. Downhill accelerates you, uphill slows you a little, and following a contour keeps nearly full cruise. Boost stacks with downhill speed, but either ship can climb without it. Ordinary terrain does no damage and does not deflect shots.
+
+The 75° view ahead darkens contour lines on an uphill approach and lightens them downhill, assuming you fly straight toward that point.
+
+Winding shortcuts stay on that light end in every direction. Follow a passage in either direction for up to 50% extra cruise speed; turning across it loses the boost.
+
+## Outer boundary
+
+The circular wall destroys a vulnerable ship on contact. Rocks bounce inward, and reflected lasers become dangerous ricochets.
+
+## Ricochet Court
+
+Northeast of Town Square, cyan court panels reflect lasers but let ships pass through. See [bank-shot duels](/wiki/#combat-survival) for the rules.
+
+## Spider nests
+
+Each new nest has ten guards and mixed salvage, often including [rare equipment](/wiki/#loot-growth). Caches last up to 30 minutes, subject to the shared pickup limit, and do not refill when you return. Red map webs mark discovered guarded resources; the mark disappears when the resource is collected or moved.
+
+## Guard patrols
+
+Guards chase briefly and return home, while rare roaming hunters pursue farther. Red contours and a red screen edge warn of nearby spiders and pursuit. Killing guards clears that nest for the server session, but collecting its resource does not remove surviving guards.
+
+## Survive a hunt
+
+One bite kills, so shoot the spider, escape its range, or reach a lit furnace's safe area. Mineral Scan repels spiders while they remain in range; probes and dark foundations offer no protection. A Scout can also [build a refuge during a chase](/wiki/#scout), even during tool cooldown or over a nest, to send living spiders fleeing.
+
+## Spider tools
+
+Haulers can extract silk or tow a spider into a furnace, but the captive can still bite ships within reach, including its Hauler, and towing calls rescuers that can cut the cable. Scouts can attach a probe to follow a guard home to its resource. See the [Hauler](/wiki/#hauler) and [Scout](/wiki/#scout) tools.
+
+## Belt crawlers
+
+The eastern belt also has spiders that cling to rocks and hop between them. Their attacks and tool limits differ from terrain spiders; see [Belt spiders](/wiki/#asteroids).

@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { PALETTE } from '../../../src/constants';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawFurnaceArtwork } from '../../../src/rendering/furnaceRenderer';
 import { hexToRgba } from '../../../src/utils/colorUtils';
 import { setWindowViewport } from '../../support/viewport';
@@ -34,7 +34,7 @@ function recordingContext() {
   canvasManager.destroy();
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
-  previousCanvas = document.getElementById('gameCanvas');
+  previousCanvas = document.querySelector('#gameCanvas');
   if (previousCanvas) {
     previousCanvas.replaceWith(canvas);
   } else {

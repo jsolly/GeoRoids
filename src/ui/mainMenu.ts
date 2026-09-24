@@ -1,6 +1,8 @@
 import { activateAudio } from '../audio/audioRuntime';
+import { setMusic } from '../audio/musicBeds';
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
+import { hapticsApiAvailable, setHaptics, syncHapticsControl } from '../fx/haptics';
 import { readStoredResumeName } from '../network/services/resumeCredential';
 import { initTitleTerrain } from '../rendering/titleTerrain';
 import { getBuildInfoString } from '../utils/buildInfo';
@@ -8,11 +10,15 @@ import { applyLockedPaletteCss } from '../utils/colorUtils';
 import { attachEventListener, getElementById } from '../utils/dom';
 import { logger } from '../utils/Logger';
 import { sanitizePlayerName } from '../utils/playerName';
+import { mountDebugHud } from './debugHud';
+import { mountDebugIdentity } from './debugIdentity';
 import { getSelectedShipKitId, mountShipKitSelect } from './shipKitSelect';
 import { controlsHintFor } from './viewportChrome';
 
 // UI element references
 const soundCheckBox = getElementById<HTMLInputElement>('soundPref');
+const musicCheckBox = getElementById<HTMLInputElement>('musicPref');
+const hapticsCheckBox = getElementById<HTMLInputElement>('hapticsPref');
 const startGameBtn = getElementById<HTMLButtonElement>('start-game');
 const playerNameInput = getElementById<HTMLInputElement>('playerNameInput');
 
@@ -194,6 +200,21 @@ attachEventListener(soundCheckBox, 'change', (ev) => {
   setSound(target.checked);
 });
 
+attachEventListener(musicCheckBox, 'change', (ev) => {
+  const target = ev.target as HTMLInputElement;
+  setMusic(target.checked);
+});
+
+syncHapticsControl();
+attachEventListener(hapticsCheckBox, 'change', (ev) => {
+  const target = ev.target as HTMLInputElement;
+  if (!hapticsApiAvailable()) {
+    target.checked = false;
+    return;
+  }
+  setHaptics(target.checked);
+});
+
 // Display build info
 function displayBuildInfo(): void {
   const buildInfoElement = getElementById<HTMLElement>('buildInfo');
@@ -207,6 +228,8 @@ displayBuildInfo();
 applyLockedPaletteCss();
 initTitleTerrain();
 mountShipKitSelect();
+mountDebugIdentity();
+mountDebugHud();
 
 function syncControlsHint(): void {
   const hint = getElementById<HTMLElement>('controls-hint');

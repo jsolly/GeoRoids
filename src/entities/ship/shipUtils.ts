@@ -10,6 +10,7 @@ interface ShipCollisionState {
   exploding: boolean;
   health: number;
   blinkCount: number;
+  movementLocked?: boolean;
 }
 
 interface ShipSpawnProtectionState {
@@ -38,26 +39,6 @@ interface ShipLethalHitState extends ShipImpactFlashState {
 /** Only a positive timer is an active respawn countdown. Omitted or 0 is not dead. */
 export function isServerRespawnActive(respawnTimer?: number): boolean {
   return respawnTimer !== undefined && respawnTimer > 0;
-}
-
-/**
- * Established session progress must not snap back to a fresh 3-life / 0-score
- * spawn unless this really is a new local player object.
- */
-export function isSilentHudReset(
-  currentLives: number,
-  currentScore: number,
-  incomingLives?: number,
-  incomingScore?: number
-): boolean {
-  if (incomingLives === undefined && incomingScore === undefined) {
-    return false;
-  }
-  const nextLives = incomingLives ?? currentLives;
-  const nextScore = incomingScore ?? currentScore;
-  // Game-over (0 lives) may start a new ship at 3/0; mid-run progress must not.
-  const established = currentLives > 0 && (currentScore > 0 || currentLives < GAME.START_LIVES);
-  return established && nextLives === GAME.START_LIVES && nextScore === GAME.STARTING_SCORE;
 }
 
 /** Explode / clear the exploding flag. Shared by local and remote ships. */
@@ -132,9 +113,38 @@ export function applyShipBoundaryDeath(ship: ShipLethalHitState): void {
   }
 }
 
+interface OverlayHoldShip extends ShipSpawnProtectionState {
+  exploding: boolean;
+  health: number;
+  movementLocked: boolean;
+  velocity: Velocity;
+  angularVelocity: number;
+  thrusting: boolean;
+  stopBoost(): void;
+}
+
 /** True when a ship must not report or receive collision damage. */
 export function isShipCollisionImmune(ship: ShipCollisionState): boolean {
-  return ship.exploding || ship.health <= 0 || ship.blinkCount > 0;
+  return ship.exploding || ship.health <= 0 || ship.blinkCount > 0 || ship.movementLocked === true;
+}
+
+/**
+ * Freeze the local hull while the map, schematic, or town store is open. Closing arms the
+ * same blink window as a respawn so an overlapping rock cannot kill immediately.
+ * Returns true when the hold state changed.
+ */
+export function applyLocalOverlayHold(ship: OverlayHoldShip, held: boolean): boolean {
+  const wasHeld = ship.movementLocked;
+  ship.movementLocked = held;
+  if (held) {
+    ship.velocity = { x: 0, y: 0 };
+    ship.angularVelocity = 0;
+    ship.thrusting = false;
+    ship.stopBoost();
+  } else if (wasHeld && !ship.exploding && ship.health > 0) {
+    applyShipSpawnProtection(ship);
+  }
+  return wasHeld !== held;
 }
 
 /** Arm the client blink window used after respawn. */
@@ -228,7 +238,7 @@ export function calculateLaserStartPosition(
 /**
  * Thrust / friction step for ships carrying combat knockback.
  * Callers pass their own friction so local and server-owned policies stay explicit.
- * Scalar mass/kit arguments keep loot growth and Hauler thrust on the same
+ * Scalar mass/kit arguments keep loot mass and Hauler thrust on the same
  * formula without allocating an options object on every frame.
  */
 export function applyThrustOrFriction(
@@ -245,7 +255,7 @@ export function applyThrustOrFriction(
     const massMax = maxVelocityFromMass(mass);
     const nextX = velocity.x + (Math.cos(angle) * thrust * thrustScale) / GAME.FPS;
     const nextY = velocity.y - (Math.sin(angle) * thrust * thrustScale) / GAME.FPS;
-    const currentSpeed = Math.sqrt(nextX * nextX + nextY * nextY);
+    const currentSpeed = Math.hypot(nextX, nextY);
     const speedCap = maxVelocity * (massMax / SHIP.MAX_VELOCITY);
     if (currentSpeed > speedCap) {
       const scale = speedCap / currentSpeed;

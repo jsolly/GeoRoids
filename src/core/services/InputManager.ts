@@ -1,4 +1,5 @@
 import { PlayerManager } from '../../entities/player/PlayerManager';
+import { applyLocalOverlayHold } from '../../entities/ship/shipUtils';
 import { resetControlSources } from '../../input/controlSources';
 import {
   getPressedKeysForPlayer,
@@ -13,8 +14,13 @@ import {
   handleMouseUp,
   preventContextMenu,
 } from '../../input/mouse';
+import { initializePlayfieldSelection } from '../../input/playfieldSelection';
 import { initializeTouchControls } from '../../input/touchControls';
-import { initializeShipSchematic, isShipSchematicOpen } from '../../ui/shipSchematic';
+import { initializeSchematicEquipHint } from '../../ui/schematicEquipHint';
+import { initializeShipSchematic } from '../../ui/shipSchematic';
+import { isShipSchematicOpen } from '../../ui/shipSchematicState';
+import { initializeTownStore } from '../../ui/townStore';
+import { isTownStoreOpen } from '../../ui/townStoreState';
 import { initializeUniverseMap, isUniverseMapOpen } from '../../ui/universeMap';
 import { logger } from '../../utils/Logger';
 import { GameStateManager } from './GameStateManager';
@@ -49,7 +55,7 @@ export class InputManager {
       // The universe map owns its keyboard controls while open. This guard is
       // intentionally duplicated with the map's capture listener so a future
       // input source cannot make firing or steering leak through the dialog.
-      if (isUniverseMapOpen() || isShipSchematicOpen()) {
+      if (isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen()) {
         return;
       }
       const localPlayer = getLocalPlayer();
@@ -68,7 +74,7 @@ export class InputManager {
     });
 
     document.addEventListener('keyup', (ev) => {
-      if (isUniverseMapOpen() || isShipSchematicOpen()) {
+      if (isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen()) {
         return;
       }
       const localPlayer = getLocalPlayer();
@@ -84,7 +90,7 @@ export class InputManager {
     });
 
     // Mouse listeners on canvas
-    const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
+    const canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
     if (canvas) {
       canvas.addEventListener('mousemove', (ev) => {
         const localPlayer = getLocalPlayer();
@@ -126,6 +132,7 @@ export class InputManager {
     });
 
     const releaseInput = () => {
+      this.updateMovementLock();
       const localPlayer = getLocalPlayer();
       resetControlSources();
       for (const key of Object.keys(keys)) {
@@ -144,18 +151,47 @@ export class InputManager {
         releaseInput();
       }
     });
+    initializePlayfieldSelection();
     initializeTouchControls();
     initializeUniverseMap({ onOpen: releaseInput });
     initializeShipSchematic({ onOpen: releaseInput });
+    initializeTownStore({ onOpen: releaseInput });
+    initializeSchematicEquipHint();
+    window.addEventListener('gameMapClose', () => {
+      this.updateMovementLock();
+    });
+    window.addEventListener('gameSchematicClose', () => {
+      this.updateMovementLock();
+    });
+    window.addEventListener('gameStoreOpen', () => {
+      this.updateMovementLock();
+    });
+    window.addEventListener('gameStoreClose', () => {
+      this.updateMovementLock();
+    });
 
     this.listenersInitialized = true;
   }
 
+  /** Lock navigation and collisions while a map, schematic, or town store is open. */
+  updateMovementLock(): void {
+    const player = PlayerManager.getInstance().getLocalPlayer();
+    const ship = player?.ship;
+    if (!ship) {
+      return;
+    }
+    const held = isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
+    const changed = applyLocalOverlayHold(ship, held);
+    if (changed) {
+      PlayerManager.getInstance().updateNetworkState();
+    }
+  }
+
   resetButtonText(): void {
-    const gameBtn = document.getElementById('start-game') as HTMLButtonElement;
+    const gameBtn = document.querySelector('#start-game') as HTMLButtonElement;
 
     if (gameBtn) {
-      gameBtn.innerText = 'Enter Game';
+      gameBtn.textContent = 'Enter Game';
     }
   }
 }

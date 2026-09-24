@@ -1,10 +1,16 @@
 import { afterEach, expect, test } from 'vitest';
-import { initializeTouchControls, syncTouchChrome } from '../../../src/input/touchControls';
+import { Player } from '../../../src/entities/player/Player';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import {
+  initializeTouchControls,
+  syncTouchChrome,
+  tickTouchControls,
+} from '../../../src/input/touchControls';
 import { setPlayView } from '../../../src/ui/uiUtils';
 
 afterEach(() => {
   document.body.classList.remove('in-play', 'touch-play');
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   if (root) {
     root.hidden = true;
   }
@@ -38,22 +44,77 @@ test('phone-sized play view unhides the full touch control overlay', () => {
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
   document.body.classList.add('in-play');
   syncTouchChrome(true);
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   expect(document.body.classList.contains('touch-play')).toBe(true);
   expect(root?.hidden).toBe(false);
-  expect(document.getElementById('touch-stick')).toBeNull();
-  expect(document.getElementById('touch-fire')).toBeNull();
-  expect(document.getElementById('touch-ability')).toBeTruthy();
-  expect(document.getElementById('touch-boost')).toBeTruthy();
-  expect(document.getElementById('touch-shield')).toBeNull();
+  expect(document.querySelector('#touch-stick')).toBeNull();
+  expect(document.querySelector('#touch-fire')).toBeNull();
+  expect(document.querySelector('#touch-ability')).toBeTruthy();
+  expect(document.querySelector('#touch-boost')).toBeTruthy();
+  expect(document.querySelector('#touch-shield')).toBeNull();
 });
 
-test('desktop-sized play view keeps the overlay hidden', () => {
+test('desktop-sized play view keeps boost visible while hiding touch-only ability chrome', () => {
   initializeTouchControls();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
   document.body.classList.add('in-play');
   syncTouchChrome(true);
   expect(document.body.classList.contains('touch-play')).toBe(false);
-  expect(document.getElementById('touch-controls')?.hidden).toBe(true);
+  const root = document.querySelector<HTMLElement>('#touch-controls');
+  expect(root?.hidden).toBe(false);
+  expect(root?.classList.contains('is-desktop')).toBe(true);
+  expect(document.querySelector('#touch-boost')).toBeTruthy();
+});
+
+test('boost chrome exposes active drain, empty tank, and interruptible recharge state', () => {
+  initializeTouchControls();
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+  document.body.classList.add('in-play');
+  syncTouchChrome(true);
+
+  const player = new Player({
+    id: 'boost-chrome-player',
+    name: 'Boost Tester',
+    type: 'local',
+    input: new MockPlayerInput(),
+  });
+  const boost = document.querySelector<HTMLButtonElement>('#touch-boost');
+  expect(boost).toBeTruthy();
+
+  player.ship.boost = { phase: 'active', charge: 0.64 };
+  tickTouchControls(player);
+  expect(boost?.textContent).toBe('BOOSTING 64%');
+  expect(boost?.getAttribute('aria-label')).toContain('Stop boost');
+  expect(boost?.disabled).toBe(false);
+  expect(boost?.style.getPropertyValue('--boost-charge')).toBe('0.640');
+  expect(boost?.dataset['boostPhase']).toBe('active');
+
+  player.ship.boost = { phase: 'exhausted', charge: 0.24 };
+  tickTouchControls(player);
+  expect(boost?.textContent).toBe('RECHARGING 24%');
+  expect(boost?.getAttribute('aria-disabled')).toBe('false');
+  expect(boost?.disabled).toBe(false);
+  expect(boost?.classList.contains('is-recharging')).toBe(true);
+  expect(boost?.classList.contains('is-exhausted')).toBe(false);
+  expect(boost?.getAttribute('aria-label')).toBe('Start boost, 24% charge');
+
+  player.ship.boost = { phase: 'exhausted', charge: 0 };
+  tickTouchControls(player);
+  expect(boost?.disabled).toBe(true);
+  expect(boost?.getAttribute('aria-label')).toBe('Boost empty, recharging');
+
+  player.ship.boost = { phase: 'idle', charge: 0.48 };
+  tickTouchControls(player);
+  expect(boost?.textContent).toBe('RECHARGING 48%');
+  expect(boost?.getAttribute('aria-disabled')).toBe('false');
+  expect(boost?.disabled).toBe(false);
+  expect(boost?.dataset['boostPhase']).toBe('idle');
+
+  player.ship.boost = { phase: 'idle', charge: 1 };
+  tickTouchControls(player);
+  expect(boost?.textContent).toBe('BOOST');
+  expect(boost?.getAttribute('aria-label')).toBe('Start boost, fully charged');
+  expect(boost?.disabled).toBe(false);
 });

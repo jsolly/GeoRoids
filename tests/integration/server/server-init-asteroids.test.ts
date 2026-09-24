@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it as test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { nearbyWorldRows } from '../../../shared/world';
@@ -93,16 +93,16 @@ function messageAt(messages: readonly WireMessage[], start: number, type: string
   return message;
 }
 
-function snapshotAsteroid(server: TestServer, id: string): AsteroidData {
-  const asteroid = server.gameEngine.getAsteroid(id);
+function snapshotAsteroid(testServer: TestServer, asteroidId: string): AsteroidData {
+  const asteroid = testServer.gameEngine.getAsteroid(asteroidId);
   if (!asteroid) {
-    throw new Error(`Asteroid ${id} is absent from the authoritative field`);
+    throw new Error(`Asteroid ${asteroidId} is absent from the authoritative field`);
   }
   return structuredClone(asteroid);
 }
 
-function snapshotField(server: TestServer): AsteroidData[] {
-  return structuredClone(server.gameEngine.getAllAsteroids());
+function snapshotField(testServer: TestServer): AsteroidData[] {
+  return structuredClone(testServer.gameEngine.getAllAsteroids());
 }
 
 let server: TestServer | undefined;
@@ -133,6 +133,9 @@ async function join(socket: WireClient, id: string, position: Position): Promise
   await socket.barrier();
   const joined = messageAt(socket.messages, start, 'joined');
   expect(readJoinedId(joined)).toBe(id);
+  // This suite compares field visibility from a shared fixture pose; joins use town-ring spawns.
+  const engine = requireServer().gameEngine;
+  expect(engine.playerMotion.placeActorForTesting(id, position, engine.getServerTime())).toBe(true);
 }
 
 async function requestAsteroids(socket: WireClient, id: string): Promise<FieldRock[]> {
@@ -168,7 +171,7 @@ afterEach(async () => {
 });
 
 describe('Server initAsteroids sync', () => {
-  it('sends the existing asteroid batch to a second player with the broadcast envelope', async () => {
+  test('sends the existing asteroid batch to a second player with the broadcast envelope', async () => {
     const current = requireServer();
     const playerOne = await openGameSocket();
     await join(playerOne, 'player-one', { x: 0, y: 0 });
@@ -189,7 +192,7 @@ describe('Server initAsteroids sync', () => {
     playerTwo.assertHealthy();
   });
 
-  it('moves the live field by explicit ticks and gives a late joiner that exact field', async () => {
+  test('moves the live field by explicit ticks and gives a late joiner that exact field', async () => {
     const current = requireServer();
     const playerOne = await openGameSocket();
     await join(playerOne, 'motion-one', { x: 0, y: 0 });
@@ -229,7 +232,7 @@ describe('Server initAsteroids sync', () => {
     playerTwo.assertHealthy();
   });
 
-  it('keeps the live field and tells the remaining player when a peer leaves', async () => {
+  test('keeps the live field and tells the remaining player when a peer leaves', async () => {
     const current = requireServer();
     const playerOne = await openGameSocket();
     await join(playerOne, 'stay-one', { x: 0, y: 0 });
@@ -251,8 +254,10 @@ describe('Server initAsteroids sync', () => {
     expect(
       nearbyWorldRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 })
         .map((asteroid) => asteroid.id)
-        .sort()
-    ).toEqual(initialBatch.map((asteroid) => asteroid.id).sort());
+        .sort((left, right) => left.localeCompare(right))
+    ).toEqual(
+      initialBatch.map((asteroid) => asteroid.id).sort((left, right) => left.localeCompare(right))
+    );
     playerOne.assertHealthy();
     playerTwo.assertHealthy();
   });

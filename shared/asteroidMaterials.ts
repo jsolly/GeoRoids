@@ -1,7 +1,12 @@
 import type { AsteroidMaterial } from '../shared-types';
 
 /** Neutral minerals retain the same ownership-independent asteroid ink. */
-export const ASTEROID_MATERIALS: readonly AsteroidMaterial[] = ['ice', 'metal', 'rubble'];
+export const ASTEROID_MATERIALS: readonly AsteroidMaterial[] = [
+  'ice',
+  'metal',
+  'rubble',
+  'crystal',
+];
 
 /** Runtime guard for JSON snapshots; TypeScript types do not validate the wire. */
 export function isAsteroidMaterial(value: unknown): value is AsteroidMaterial {
@@ -9,6 +14,7 @@ export function isAsteroidMaterial(value: unknown): value is AsteroidMaterial {
 }
 
 export const MATERIAL_OUTLINES: Record<AsteroidMaterial, readonly number[]> = {
+  crystal: [1, 0.5, 1.15, 0.6, 1, 0.5],
   ice: [1, 0.76, 1.08, 0.84, 1, 0.72],
   metal: [0.94, 1, 0.9, 0.97, 0.93, 1, 0.9, 0.98],
   rubble: [1, 0.58, 0.86, 0.72, 1.1, 0.64, 0.95, 0.56, 1.02, 0.74, 0.88, 0.62],
@@ -18,6 +24,6 @@ export function asteroidMaterialAt(slot: number): AsteroidMaterial {
   return ASTEROID_MATERIALS[slot % ASTEROID_MATERIALS.length] ?? 'ice';
 }
 
-export function asteroidShardMass(material?: AsteroidMaterial): number {
+export function asteroidShardMass(material?: AsteroidMaterial): 0.25 | 0.75 {
   return material === 'metal' ? 0.75 : 0.25;
 }

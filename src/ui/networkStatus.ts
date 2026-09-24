@@ -1,3 +1,4 @@
+import { playFeedback } from '../audio/feedbackSounds';
 import { logger } from '../utils/Logger';
 
 /**
@@ -11,12 +12,13 @@ import { logger } from '../utils/Logger';
 
 const BANNER_ID = 'network-status-banner';
 let initialized = false;
+let lossAnnounced = false;
 
 function getOrCreateBanner(): HTMLElement | null {
   if (typeof document === 'undefined') {
     return null;
   }
-  let el = document.getElementById(BANNER_ID);
+  let el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
   if (!el) {
     el = document.createElement('div');
     el.id = BANNER_ID;
@@ -56,10 +58,11 @@ export function showNetworkBanner(message: string, tone: 'error' | 'reconnect' =
 }
 
 export function hideNetworkBanner(): void {
+  lossAnnounced = false;
   if (typeof document === 'undefined') {
     return;
   }
-  const el = document.getElementById(BANNER_ID);
+  const el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
   if (el) {
     el.style.display = 'none';
   }
@@ -69,7 +72,7 @@ export function isNetworkBannerVisible(): boolean {
   if (typeof document === 'undefined') {
     return false;
   }
-  const el = document.getElementById(BANNER_ID);
+  const el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
   return el !== null && el.style.display !== 'none';
 }
 
@@ -94,6 +97,10 @@ export function initNetworkStatusUI(): void {
     logger.warn('NETWORK', 'Displayed disconnect banner', { reason });
   });
   window.addEventListener('networkPermanentlyDisconnected', (event) => {
+    if (!lossAnnounced) {
+      playFeedback('connectionLost');
+      lossAnnounced = true;
+    }
     const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
     showNetworkBanner(DISCONNECT_BANNER_TEXT);
     logger.warn('NETWORK', 'Displayed permanent disconnect banner', { reason });

@@ -1,4 +1,6 @@
 import type { ShipKitId } from '../../shared-types';
+import { activateAudio } from '../audio/audioRuntime';
+import { playFeedback } from '../audio/feedbackSounds';
 import { kitHullPickerSvg } from '../entities/ship/hullOutlines';
 import { listShipKits, parseShipKitId } from '../entities/ship/shipKits';
 import { attachEventListener, getElementById } from '../utils/dom';
@@ -20,7 +22,7 @@ export function setSelectedShipKitId(kitId: unknown): ShipKitId {
 }
 
 function syncKitButtons(): void {
-  const grid = document.getElementById('ship-kit-grid');
+  const grid = document.querySelector('#ship-kit-grid');
   if (!grid) {
     return;
   }
@@ -47,7 +49,12 @@ export function mountShipKitSelect(): void {
     button.setAttribute('aria-pressed', 'false');
     button.innerHTML = `${kitHullPickerSvg(kit.id)}<span class="ship-kit-name">${kit.name}</span><span class="ship-kit-ability">${kit.abilityName}</span><span class="ship-kit-role">${kit.abilityHint}</span>`;
     attachEventListener(button, 'click', () => {
+      activateAudio();
+      const changed = getSelectedShipKitId() !== kit.id;
       setSelectedShipKitId(kit.id);
+      if (changed) {
+        playFeedback('interface');
+      }
     });
     grid.appendChild(button);
   }

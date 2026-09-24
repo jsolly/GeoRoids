@@ -4,11 +4,11 @@ import {
   playHarpoonLatch,
   playHarpoonLaunch,
   playHarpoonRelease,
-  playLootPickup,
   playOrbitalFire,
   playOrbitalPickup,
   playRespawn,
 } from '../../../src/audio/interactionSounds';
+import { playLootPickup } from '../../../src/audio/resourceMusic';
 import { Sound, setSound } from '../../../src/audio/Sound';
 import { bindGameAudio, resetGameAudio } from '../../../src/audio/spatialAudio';
 import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
@@ -39,18 +39,22 @@ describe('interaction sound cues', () => {
       return Promise.resolve();
     });
 
+    vi.spyOn(Sound.prototype, 'playNote').mockImplementation(function (this: Sound) {
+      played.push(this);
+      return true;
+    });
+
     playHarpoonLaunch(listener);
     playHarpoonLatch(listener);
     playHarpoonRelease(listener);
     playOrbitalFire(listener);
     playOrbitalPickup(listener);
-    playLootPickup('shard', listener);
-    playLootPickup('laserCore', listener);
+    playLootPickup(listener);
     playAbilityActivation('surveyScan', listener);
     playRespawn(listener);
 
-    expect(played).toHaveLength(9);
-    expect(new Set(played).size).toBe(9);
+    expect(played).toHaveLength(8);
+    expect(new Set(played).size).toBe(8);
     expect(played.map((sound) => sound.src.split('/').pop())).toEqual([
       'harpoon-launch.m4a',
       'harpoon-latch.m4a',
@@ -58,14 +62,11 @@ describe('interaction sound cues', () => {
       'orbital-fire.m4a',
       'orbital-pickup.m4a',
       'loot-pickup.m4a',
-      'core-pickup.m4a',
       'survey-scan.m4a',
       'respawn.m4a',
     ]);
-    playLootPickup('wreckage', listener);
-    playLootPickup('tap', listener);
-    expect(played[9]).toBe(played[5]);
-    expect(played[10]).toBe(played[5]);
+    playLootPickup(listener);
+    expect(played[8]).toBe(played[5]);
   });
 
   test('world interaction cues use viewport culling and distance attenuation', () => {

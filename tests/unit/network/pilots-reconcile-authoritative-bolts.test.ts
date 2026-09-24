@@ -5,8 +5,9 @@ import { LASER } from '../../../src/constants';
 import { AuthoritativeProjectileField } from '../../../src/entities/laser/AuthoritativeProjectileField';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { snapshotFixture } from './snapshotFixture';
 
 /** Transport seam only: packets still cross the production onmessage handler,
@@ -66,6 +67,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
 
   beforeEach(() => {
     vi.stubGlobal('WebSocket', Transport);
+    NetworkManager.getInstance();
     manager = ConnectionManager.getInstance();
     manager.disconnect();
   });
@@ -151,7 +153,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('a local muzzle flash stays a moving bolt while older snapshots arrive before its acknowledgement', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
     const empty = frame([]);
     const entity = empty.entities[0];
@@ -192,7 +194,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('rejected, timed-out and disconnected predictions leave no ghost and receipts cannot claim another shot', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
     local.ship.fireLaser();
@@ -228,7 +230,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('a stalled connection expires a stationary prediction without another snapshot or trigger', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(document.createElement('canvas'));
@@ -261,7 +263,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('a client joining a server without shot receipts does not duplicate its authoritative bolt', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
     acknowledge(ws, false);
     local.ship.fireLaser();

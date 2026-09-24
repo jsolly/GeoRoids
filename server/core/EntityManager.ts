@@ -4,24 +4,36 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
-import { FURNACES } from '../../shared/furnaces';
+import { FurnaceField } from '../../shared/furnaceField';
+import { TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
+import { fullShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   PlayerMotionState,
   Position,
+  ScoutUtilityId,
+  ShipBoostState,
   ShipKitId,
   Velocity,
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
-import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../src/entities/ship/shipKits';
+import {
+  applyShipKitStats,
+  DEFAULT_SHIP_KIT_ID,
+  hullRadiusForKit,
+} from '../../src/entities/ship/shipKits';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */
 export interface GameEntity {
+  furnaceTransit?: FurnaceTransit | null;
+  silk?: number;
+  equipment?: EquipmentId[];
   id: string;
   name: string;
   type: 'player';
@@ -31,9 +43,10 @@ export interface GameEntity {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
-  boosting: boolean;
+  boost: ShipBoostState;
   color: string;
-  lives: number;
+  cargo: number;
+  purchases: string[];
   score: number;
   health: number;
   maxHealth: number;
@@ -44,6 +57,8 @@ export interface GameEntity {
   lastUpdate: number;
   respawnTimer?: number;
   spawnProtectionTimer?: number;
+  /** Client map/schematic hold: freeze, skip collisions, then blink on release. */
+  overlayHold?: boolean;
   ws?: WebSocket;
   explodeTime?: number;
   kitId: ShipKitId;
@@ -53,13 +68,13 @@ export interface GameEntity {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Environmental cause of the current death (cleared on respawn). */
   deathCause?: string;
   asteroidInteractions?: 1;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 }
 
 export class EntityManager {
@@ -67,7 +82,11 @@ export class EntityManager {
   private rng: RNGService;
   private readonly now: () => number;
 
-  constructor(rngService: RNGService, now: () => number = () => Date.now()) {
+  constructor(
+    rngService: RNGService,
+    now: () => number = () => Date.now(),
+    private readonly furnaces = new FurnaceField()
+  ) {
     this.rng = rngService;
     this.now = now;
   }
@@ -98,13 +117,21 @@ export class EntityManager {
   /** Kick living ships away from a collab-split origin. Smaller ships move more. */
   public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
     let affected = 0;
-    const shipSize = SHIP.SIZE / 2;
     for (const entity of this.entities.values()) {
-      if (entity.exploding || entity.health <= 0 || entity.respawnTimer !== undefined) {
+      if (
+        entity.exploding ||
+        entity.health <= 0 ||
+        entity.respawnTimer !== undefined ||
+        entity.overlayHold === true
+      ) {
         continue;
       }
       const next = applyShockwaveToBody(
-        { position: entity.position, velocity: entity.velocity, size: shipSize },
+        {
+          position: entity.position,
+          velocity: entity.velocity,
+          size: hullRadiusForKit(entity.kitId),
+        },
         origin,
         { radius, impulse }
       );
@@ -185,14 +212,15 @@ export class EntityManager {
       id,
       name,
       type: 'player',
-      position: position || { x: 0, y: 0 },
+      position: { x: position?.x ?? 0, y: position?.y ?? 0 },
       velocity: { x: 0, y: 0 },
       angle: 0,
       exploding: false,
       thrusting: false,
-      boosting: false,
+      boost: fullShipBoost(),
       color: PALETTE.REMOTE,
-      lives: 3,
+      cargo: 0,
+      purchases: [],
       score: 0,
       health: 100,
       maxHealth: 100,
@@ -220,6 +248,10 @@ export class EntityManager {
       return null;
     }
 
+    if (entity.overlayHold === true) {
+      return null;
+    }
+
     if (entity.spawnProtectionTimer !== undefined && entity.spawnProtectionTimer > 0) {
       return null;
     }
@@ -234,26 +266,19 @@ export class EntityManager {
     if (entity.health <= 0 && wasAlive) {
       entity.exploding = true;
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
-      entity.boosting = false;
+      stopShipBoost(entity.boost);
     }
 
     entity.lastUpdate = this.now();
     return entity;
   }
 
-  private shouldScheduleRespawn(entity: GameEntity): boolean {
-    return entity.lives > 0;
-  }
-
   /**
    * Do not reset an existing countdown (that stacked a second wait and felt
-   * like freeze-stick). Last-life pilots stay dead.
+   * like freeze-stick). Every pilot returns to flight.
    */
   public scheduleShipRespawn(entity: GameEntity): void {
     if (entity.respawnTimer !== undefined) {
-      return;
-    }
-    if (!this.shouldScheduleRespawn(entity)) {
       return;
     }
     entity.respawnTimer = SHIP.RESPAWN_DELAY_FRAMES;
@@ -282,7 +307,7 @@ export class EntityManager {
     return finishedExploding;
   }
 
-  // Shared ship respawn for living pilots.
+  // Shared ship respawn for all pilots.
   public updateRespawns(): string[] {
     const finishedRespawning: string[] = [];
 
@@ -293,12 +318,6 @@ export class EntityManager {
         }
 
         if (entity.respawnTimer === 0) {
-          // A leftover timer must not resurrect a player who already spent their last life.
-          if (!this.shouldScheduleRespawn(entity)) {
-            delete entity.respawnTimer;
-            continue;
-          }
-
           this.respawnShip(entity);
           finishedRespawning.push(entityId);
           logger.debug('ENTITY', 'Entity respawned', {
@@ -365,26 +384,21 @@ export class EntityManager {
     entity.healthRegenTimer = 0;
 
     entity.exploding = false;
-    entity.boosting = false;
+    entity.boost = fullShipBoost();
     delete entity.explodeTime;
     delete entity.deathCause;
 
     this.placeEntityInArena(entity);
+    delete entity.overlayHold;
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
   }
 
   private placeEntityInArena(entity: GameEntity): void {
-    const station = FURNACES.reduce((nearest, site) =>
-      !nearest ||
-      Math.hypot(site.position.x - entity.position.x, site.position.y - entity.position.y) <
-        Math.hypot(nearest.position.x - entity.position.x, nearest.position.y - entity.position.y)
-        ? site
-        : nearest
-    );
+    const station = this.furnaces.nearest(entity.position);
     const angle = this.rng.random() * Math.PI * 2;
     entity.position = {
-      x: (station?.position.x ?? 0) + Math.cos(angle) * 180,
-      y: (station?.position.y ?? 0) + Math.sin(angle) * 180,
+      x: (station?.position.x ?? 0) + Math.cos(angle) * TOWN_SPAWN_RADIUS,
+      y: (station?.position.y ?? 0) + Math.sin(angle) * TOWN_SPAWN_RADIUS,
     };
     entity.angle = this.rng.random() * Math.PI * 2;
     entity.velocity = { x: 0, y: 0 };

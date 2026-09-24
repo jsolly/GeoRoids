@@ -5,7 +5,7 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
-const { browserManager } = createBrowserScenarioHooks();
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 type ReceivedMessage = {
   type?: string;
@@ -33,7 +33,7 @@ test(
     await game.bootGame();
     await arrangeCrewField([await game.getLocalPlayerId()], 'mining');
     await game.waitForCombatReady();
-    await game.placeShipAt(0, -360);
+    await game.placeShipAt(0, -500);
     await page.evaluate(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
       if (!ship) {
@@ -57,15 +57,17 @@ test(
         message: 'server should confirm destruction of the chosen asteroid',
       })
       .toBe(true);
-    await expect
-      .poll(
-        async () => {
-          await game.waitForAnimationFrames(8);
-          return game.getScore();
-        },
-        { timeout: 12000, message: 'destroying an asteroid should award points' }
-      )
-      .toBe(initialScore + pointsForRoidSize(target.radius));
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('asteroid-destruction-debris.png'),
+    });
+    const points = await page.evaluate(() =>
+      window.gameController
+        ?.getLoot()
+        .filter((drop) => drop.kind === 'points')
+        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
+    );
+    expect(points).toBe(pointsForRoidSize(target.radius));
+    expect(await game.getScore()).toBe(initialScore);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

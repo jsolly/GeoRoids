@@ -12,6 +12,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 const FIXTURE_ASTEROID_ID = 'crew-fixture-ore';
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 test.each([
   { width: 1280, height: 900 },
@@ -32,7 +33,7 @@ test.each([
     let snapshot: ServerGameSnapshot | undefined;
     let snapshotCount = 0;
     page.on('websocket', (socket) => {
-      if (!/\/ws(?:\?|$)/.test(socket.url())) {
+      if (!WS_PATH_PATTERN.test(socket.url())) {
         return;
       }
       socket.on('framereceived', ({ payload }) => {
@@ -190,7 +191,7 @@ test.each([
     // Use the actual render loop after a main-thread stall, then verify that a
     // shot survives acknowledgement and subsequent authoritative snapshots.
     await arrangeCrewField([playerId], 'empty');
-    await game.placeShipAt(0, -360);
+    await game.placeShipAt(0, -500);
     await game.waitForCombatReady();
     await page.evaluate(() => {
       const until = performance.now() + 250;

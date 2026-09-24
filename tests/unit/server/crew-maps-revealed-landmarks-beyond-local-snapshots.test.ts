@@ -3,27 +3,43 @@ import { strict as assert } from 'node:assert';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ExplorationMap } from '../../../shared/exploration';
+import { CIVIC_LOTS, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { LootData } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('the global map shares a distant furnace while each pilot receives only nearby asteroid geometry', () => {
+test('the global map shares the furnace plan while each pilot receives only nearby asteroid geometry', () => {
+  const distantLot = CIVIC_LOTS.find((lot) => lot.ring === 3);
+  if (!distantLot) {
+    throw new Error('Expected an outer furnace lot');
+  }
+  const distant = distantLot.position;
   const engine = new GameEngine(82);
   const broadcaster = new GameStateBroadcaster(engine);
   const nearSocket = new RecordingSocket();
   const farSocket = new RecordingSocket();
   engine.addPlayer('near', 'Near', nearSocket, { x: 0, y: 0 }, 'hauler');
-  const scout = engine.addPlayer('far', 'Far', farSocket, { x: 40_000, y: 24_000 }, 'surveyor');
+  const scout = engine.addPlayer('far', 'Far', farSocket, distant, 'scout');
   broadcaster.negotiateSnapshot(nearSocket);
   broadcaster.negotiateSnapshot(farSocket);
-  expect(engine.getGameState().mapAssets.some((asset) => asset.id === 'furnace:works-10-6')).toBe(
-    false
-  );
+  expect(engine.getGameState().mapAssets).toContainEqual({
+    id: `furnace:${TOWN_HEARTH.id}`,
+    name: TOWN_HEARTH.name,
+    kind: 'furnace',
+    position: TOWN_HEARTH.position,
+  });
+  expect(engine.getGameState().mapAssets).toContainEqual({
+    id: `furnace:${distantLot.id}`,
+    name: distantLot.name,
+    kind: 'foundation',
+    position: distant,
+  });
   engine.tickAbilities();
   broadcaster.broadcastGameState();
   const nearRaw = nearSocket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
@@ -33,10 +49,10 @@ test('the global map shares a distant furnace while each pilot receives only nea
   const far = decodeSnapshotMessage(new SnapshotDecoder(), farRaw);
   expect(near.mapAssets).toEqual(far.mapAssets);
   expect(near.mapAssets).toContainEqual({
-    id: 'furnace:works-10-6',
-    name: 'Works 10:6',
-    kind: 'furnace',
-    position: { x: 40_000, y: 24_000 },
+    id: `furnace:${distantLot.id}`,
+    name: distantLot.name,
+    kind: 'foundation',
+    position: distant,
   });
   expect(near.asteroids.length).toBeGreaterThan(0);
   expect(far.asteroids.length).toBeGreaterThan(0);
@@ -48,7 +64,8 @@ test('the global map shares a distant furnace while each pilot receives only nea
   expect(
     far.asteroids.every(
       (rock) =>
-        Math.abs(rock.position.x - 40_000) <= 2800 && Math.abs(rock.position.y - 24_000) <= 2800
+        Math.abs(rock.position.x - distant.x) <= 2800 &&
+        Math.abs(rock.position.y - distant.y) <= 2800
     )
   ).toBe(true);
   expect(
@@ -58,27 +75,29 @@ test('the global map shares a distant furnace while each pilot receives only nea
   ).toBe(0);
   scout.position = { x: 0, y: 0 };
   engine.ensureAsteroidField();
-  expect(engine.getGameState().mapAssets.some((asset) => asset.id === 'furnace:works-10-6')).toBe(
-    true
-  );
+  expect(
+    engine.getGameState().mapAssets.filter((asset) => asset.kind === 'foundation')
+  ).toHaveLength(CIVIC_LOTS.length);
 });
 
 test('valuable drops appear only after exploration and disappear when collected without mapping ordinary shards', () => {
   const assets = new MapAssets();
   const exploration = new ExplorationMap();
   const drops: LootData[] = [
-    { id: 'core', kind: 'laserCore', position: { x: 40_000, y: 24_000 }, radius: 10, mass: 0 },
+    { id: 'salvage', kind: 'wreckage', position: { x: 40_000, y: 24_000 }, radius: 10, mass: 0 },
     { id: 'fragment', kind: 'shard', position: { x: 40_000, y: 24_000 }, radius: 5, mass: 0.25 },
     { id: 'canister', kind: 'tap', position: { x: 40_000, y: 24_000 }, radius: 28, mass: 0.4 },
   ];
-  expect(assets.snapshot(exploration.snapshot(), drops, [])).toEqual([]);
+  const cold = assets.snapshot(exploration.snapshot(), drops, []);
+  expect(cold.every((asset) => asset.kind === 'furnace' || asset.kind === 'foundation')).toBe(true);
+  expect(cold.some((asset) => asset.id === 'loot:salvage')).toBe(false);
   exploration.reveal(drops[0]?.position ?? { x: 0, y: 0 }, 260);
   const revealed = assets.snapshot(exploration.snapshot(), drops, []);
-  expect(revealed.some((asset) => asset.id === 'loot:core')).toBe(true);
+  expect(revealed.some((asset) => asset.id === 'loot:salvage')).toBe(true);
   expect(revealed.some((asset) => asset.id === 'loot:fragment')).toBe(false);
   expect(revealed.some((asset) => asset.id === 'loot:canister')).toBe(false);
   expect(
-    assets.snapshot(exploration.snapshot(), [], []).some((asset) => asset.id === 'loot:core')
+    assets.snapshot(exploration.snapshot(), [], []).some((asset) => asset.id === 'loot:salvage')
   ).toBe(false);
 });
 
@@ -92,14 +111,12 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(Date.now()),
         exploration: exploration.snapshot(),
-        completedSectors: [],
       },
       new Map(),
       []
     );
-    const engine = new GameEngine(82, undefined, store);
+    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     engine.addPlayer('late', 'Late explorer', socket, { x: 0, y: 0 });
     const broadcaster = new GameStateBroadcaster(engine);
@@ -109,7 +126,12 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
     assert(first, 'a complete atlas must fit the snapshot transport');
     const decoded = decodeSnapshotMessage(new SnapshotDecoder(), first);
     expect(decoded.exploration).toEqual(exploration.snapshot());
-    expect(decoded.mapAssets.length).toBeGreaterThan(600);
+    expect(decoded.mapAssets.filter((asset) => asset.kind === 'furnace')).toContainEqual(
+      expect.objectContaining({ id: `furnace:${TOWN_HEARTH.id}` })
+    );
+    expect(decoded.mapAssets.filter((asset) => asset.kind === 'foundation').length).toBe(
+      CIVIC_LOTS.length
+    );
     expect(decoded.asteroids.length).toBeGreaterThan(0);
     expect(socket.readyState).toBe(1);
 

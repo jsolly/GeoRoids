@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
+import { cargoCapacity } from '../shared/economy';
+import { EQUIPMENT_IDS } from '../shared/equipment';
+import { civicLot, TOWN_HEARTH } from '../shared/furnaces';
+import { storeOffer } from '../shared/townStore';
 import { WORLD } from '../shared/world';
 import { DAMAGE } from '../src/constants';
 import type { WebSocketCore } from './communication/WebSocketCore';
@@ -278,12 +283,43 @@ export function handleTestArrangeCrewField(
       !body['playerIds'].every(
         (id: unknown) => typeof id === 'string' && id.length > 0 && id.length < 128
       ) ||
-      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'cooperative', 'reflection'].includes(
-        String(body['scenario'])
-      )
+      ![
+        'delivery',
+        'tow',
+        'empty',
+        'equipment',
+        'boundary',
+        'impact',
+        'mining',
+        'cooperative',
+        'reflection',
+        'satellite',
+        'probe',
+        'spider-nest',
+        'spider-tools',
+        'spider-rescue',
+        'spider-tow-bite',
+        'belt-escape',
+        'belt-pursuit',
+        'map-icons',
+        'furnace',
+        'town-store',
+        'street-build',
+        'street-escape',
+        'street-travel',
+        'furnace-build',
+        'cargo',
+        'full-cargo',
+        'settlement-delivery',
+      ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
       return;
+    }
+    const spiderWorks = TOWN_HEARTH;
+    const furnaceLot = civicLot('street-1-0');
+    if (!furnaceLot) {
+      throw new Error('Furnace build fixture is missing its lot');
     }
     const ids = body['playerIds'] as string[];
     const players = ids.map((id) => gameEngine.getPlayer(id));
@@ -302,15 +338,34 @@ export function handleTestArrangeCrewField(
         throw new Error('Validated crew disappeared');
       }
       const position =
-        body['scenario'] === 'boundary'
-          ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-          : body['scenario'] === 'delivery'
-            ? player.kitId === 'hauler'
-              ? { x: 0, y: -360 }
-              : { x: 220, y: -460 }
-            : body['scenario'] === 'reflection'
-              ? { x: -220, y: -460 }
-              : { x: index * 120, y: -360 };
+        body['scenario'] === 'town-store'
+          ? { x: 0, y: 0 }
+          : ['furnace-build', 'street-escape', 'street-travel'].includes(String(body['scenario']))
+            ? { ...furnaceLot.position }
+            : body['scenario'] === 'spider-tow-bite'
+              ? { x: 4400, y: 2200 + index * 600 }
+              : body['scenario'] === 'spider-rescue'
+                ? { x: 4400 + index * 120, y: 2200 }
+                : body['scenario'] === 'spider-tools'
+                  ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
+                  : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
+                    ? { x: 3000 + index * 120, y: 5000 }
+                    : body['scenario'] === 'boundary'
+                      ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+                      : body['scenario'] === 'delivery'
+                        ? player.kitId === 'hauler'
+                          ? { x: 0, y: 550 }
+                          : { x: 220, y: 460 }
+                        : body['scenario'] === 'tow'
+                          ? player.kitId === 'hauler'
+                            ? { x: 0, y: -500 }
+                            : { x: 220, y: -460 }
+                          : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                            ? {
+                                x: -220,
+                                y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0),
+                              }
+                            : { x: index * 120, y: -500 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -321,14 +376,50 @@ export function handleTestArrangeCrewField(
         respond(409, { error: 'Crew fixture motion unavailable' });
         return;
       }
-      player.angle =
-        body['scenario'] === 'reflection' || body['scenario'] === 'boundary' ? 0 : Math.PI / 2;
-      player.spawnProtectionTimer = body['scenario'] === 'delivery' ? 600 : 0;
+      // Delivery faces screen-up, which decreases world y, from the positive-y
+      // approach into Town Square. Tow uses that same heading from the
+      // negative-y side so the hooked rock moves farther from the hearth.
+      player.angle = ['spider-tools', 'spider-rescue', 'spider-tow-bite'].includes(
+        String(body['scenario'])
+      )
+        ? Math.PI
+        : body['scenario'] === 'reflection' ||
+            body['scenario'] === 'probe' ||
+            body['scenario'] === 'boundary'
+          ? 0
+          : Math.PI / 2;
+      player.spawnProtectionTimer = [
+        'delivery',
+        'tow',
+        'map-icons',
+        'spider-tools',
+        'spider-rescue',
+        'belt-escape',
+        'belt-pursuit',
+        'furnace',
+        'town-store',
+        'furnace-build',
+      ].includes(String(body['scenario']))
+        ? 600
+        : 0;
       if (body['scenario'] === 'impact' && index === 0) {
         player.health = DAMAGE.ASTEROID_COLLISION;
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
       player.abilityCooldownFrames = 0;
+      if (body['scenario'] === 'full-cargo') {
+        player.cargo = cargoCapacity(player.kitId);
+      }
+      if (body['scenario'] === 'cargo') {
+        player.cargo = index === 0 ? 400 : 0;
+        player.score = 300;
+      }
+      if (body['scenario'] === 'furnace-build') {
+        player.score = furnaceLot.cost;
+      }
+      if (['street-escape', 'street-travel'].includes(String(body['scenario']))) {
+        player.score = furnaceLot.cost + (body['scenario'] === 'street-travel' ? 250 : 0);
+      }
       poses.push({
         playerId: player.id,
         position,
@@ -339,9 +430,131 @@ export function handleTestArrangeCrewField(
     for (const rock of gameEngine.getAllAsteroids()) {
       gameEngine.removeAsteroid(rock.id);
     }
-    gameEngine.parkSatellitePickups();
+    if (body['scenario'] !== 'satellite') {
+      gameEngine.parkSatellitePickups();
+    }
     const first = poses[0];
-    if (body['scenario'] === 'reflection') {
+    if (body['scenario'] === 'equipment' && first) {
+      for (const [index, equipment] of EQUIPMENT_IDS.entries()) {
+        gameEngine.dropEquipmentAt(
+          { x: first.position.x + 220 + index * 150, y: first.position.y },
+          equipment
+        );
+      }
+    }
+    if (body['scenario'] === 'street-escape') {
+      gameEngine.clearSpiderField();
+      if (
+        !gameEngine.spawnTerrainSpider({ x: furnaceLot.position.x + 200, y: furnaceLot.position.y })
+      ) {
+        throw new Error('Could not spawn chasing spider');
+      }
+    }
+    if (body['scenario'] === 'spider-tow-bite') {
+      gameEngine.clearSpiderField();
+      if (!gameEngine.spawnTerrainSpider({ x: 4580, y: 2200 })) {
+        throw new Error('Spider bite fixture could not spawn its captive');
+      }
+    } else if (body['scenario'] === 'spider-rescue') {
+      gameEngine.clearSpiderField();
+      if (
+        !gameEngine.spawnTerrainSpider({ x: 4580, y: 2200 }) ||
+        !gameEngine.spawnTerrainSpider({ x: 4490, y: 2600 })
+      ) {
+        throw new Error('Spider rescue fixture could not spawn its spiders');
+      }
+    } else if (body['scenario'] === 'belt-escape' || body['scenario'] === 'belt-pursuit') {
+      gameEngine.clearSpiderField();
+      for (const [id, x, health] of [
+        ['belt-1-0-0', 0, body['scenario'] === 'belt-escape' ? 25 : 150],
+        ['crew-fixture-escape-destination', 180, 150],
+      ] as const) {
+        gameEngine.addAsteroid({
+          id,
+          position: { x, y: -620 },
+          velocity: { x: 0, y: 0 },
+          size: 55,
+          health,
+          maxHealth: 150,
+          material: 'metal',
+          rotation: 0,
+          angularVelocity: 0,
+          jaggedness: 0,
+          vertices: 4,
+          offsets: [1, 1, 1, 1],
+        });
+      }
+      if (body['scenario'] === 'belt-pursuit') {
+        gameEngine.addAsteroid({
+          id: 'crew-fixture-pursuit-destination',
+          position: { x: 360, y: -620 },
+          velocity: { x: 0, y: 0 },
+          size: 55,
+          health: 150,
+          maxHealth: 150,
+          material: 'metal',
+          rotation: 0,
+          angularVelocity: 0,
+          jaggedness: 0,
+          vertices: 4,
+          offsets: [1, 1, 1, 1],
+        });
+      }
+    } else if (body['scenario'] === 'spider-tools') {
+      gameEngine.clearSpiderField();
+      if (
+        !gameEngine.spawnTerrainSpider({
+          x: spiderWorks.position.x + 980,
+          y: spiderWorks.position.y,
+        })
+      ) {
+        throw new Error('Spider tool fixture could not spawn its target');
+      }
+    } else if (['spider-nest', 'map-icons'].includes(String(body['scenario']))) {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-spider-deposit',
+        position: { x: 5000, y: 5000 },
+        velocity: { x: 0, y: 0 },
+        size: 50,
+        health: 500,
+        maxHealth: 500,
+        material: 'metal',
+        rotation: 0,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
+    } else if (body['scenario'] === 'probe') {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-probe-host',
+        position: { x: -20, y: -460 },
+        velocity: { x: 0.12, y: 0 },
+        size: 50,
+        health: 500,
+        maxHealth: 500,
+        material: 'metal',
+        rotation: 0,
+        angularVelocity: 0.001,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-probe-deposit',
+        position: { x: 60, y: -610 },
+        velocity: { x: 0, y: 0 },
+        size: 30,
+        health: 300,
+        maxHealth: 300,
+        material: 'ice',
+        rotation: 0,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
+    } else if (body['scenario'] === 'reflection') {
       gameEngine.addAsteroid({
         id: 'crew-fixture-reflector',
         position: { x: 0, y: -460 },
@@ -362,15 +575,64 @@ export function handleTestArrangeCrewField(
           maxEnergy: 6,
         },
       });
-    } else if (body['scenario'] !== 'empty' && body['scenario'] !== 'boundary' && first) {
+    } else if (body['scenario'] === 'town-store') {
+      const paint = storeOffer('placeholder-1');
+      if (!paint) {
+        throw new Error('Town store fixture is missing Ember paint');
+      }
+      for (const player of players) {
+        if (player) {
+          player.score = paint.cost * 2;
+        }
+      }
+    } else if (body['scenario'] === 'settlement-delivery' && first) {
+      for (const [ore, size] of [
+        ['ice', 50],
+        ['metal', 65],
+        ['rubble', 75],
+        ['crystal', 36],
+      ] as const) {
+        gameEngine.addAsteroid({
+          id: `settlement-${ore}`,
+          material: ore,
+          ore,
+          size,
+          position: { x: 0, y: 0 },
+          velocity: { x: 0, y: 0 },
+          health: 100,
+          maxHealth: 100,
+          rotation: 0,
+          angularVelocity: 0,
+          jaggedness: 0,
+          vertices: 4,
+          offsets: [1, 1, 1, 1],
+          boost: { phase: 'burning', ownerId: first.playerId, angle: 0 },
+        });
+      }
+    } else if (
+      !['empty', 'boundary', 'satellite', 'cargo'].includes(String(body['scenario'])) &&
+      first
+    ) {
       gameEngine.addAsteroid({
         id: 'crew-fixture-ore',
-        position: body['scenario'] === 'impact' ? { ...first.position } : { x: 0, y: -460 },
+        position:
+          body['scenario'] === 'impact'
+            ? { ...first.position }
+            : body['scenario'] === 'tow'
+              ? { x: 0, y: -260 }
+              : body['scenario'] === 'delivery'
+                ? { x: 0, y: 460 }
+                : // Default crew poses sit at y=-500; keep the rock clear of that hull
+                  // and outside TOWN_STORE_RADIUS so ability chrome stays kit-native.
+                  { x: 0, y: -620 },
         velocity: { x: 0, y: 0 },
         size: body['scenario'] === 'cooperative' ? 50 : 25,
-        health: body['scenario'] === 'mining' ? 25 : 75,
-        maxHealth: body['scenario'] === 'mining' ? 25 : 75,
-        material: ['mining', 'cooperative'].includes(String(body['scenario'])) ? 'ice' : 'metal',
+        health: ['mining', 'full-cargo'].includes(String(body['scenario'])) ? 25 : 75,
+        maxHealth: ['mining', 'full-cargo'].includes(String(body['scenario'])) ? 25 : 75,
+        ore: 'metal',
+        material: ['mining', 'full-cargo', 'cooperative'].includes(String(body['scenario']))
+          ? 'ice'
+          : 'metal',
         rotation: 0,
         angularVelocity: 0,
         jaggedness: 0.25,
@@ -378,13 +640,33 @@ export function handleTestArrangeCrewField(
         offsets: [1, 1, 1, 1],
       });
     }
+    if (body['scenario'] === 'map-icons') {
+      for (const [index, material] of (['ice', 'rubble'] as const).entries()) {
+        gameEngine.addAsteroid({
+          id: `crew-fixture-map-${material}`,
+          position: { x: 4350 + index * 450, y: 4650 },
+          velocity: { x: 0, y: 0 },
+          size: 25,
+          health: 500,
+          maxHealth: 500,
+          material,
+          rotation: 0,
+          angularVelocity: 0,
+          jaggedness: 0.25,
+          vertices: 7,
+          offsets: [1, 0.8, 1, 0.75, 1, 0.9, 1],
+        });
+      }
+      gameEngine.parkSatellitePickups({ x: 4300, y: 5300 });
+    }
     wsCore.getBroadcaster().broadcastGameState();
     respond(200, {
       status: 'arranged',
       poses,
-      asteroidId:
-        body['scenario'] === 'empty' || body['scenario'] === 'boundary'
-          ? null
+      asteroidId: ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
+        ? null
+        : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
+          ? 'crew-fixture-spider-deposit'
           : body['scenario'] === 'reflection'
             ? 'crew-fixture-reflector'
             : 'crew-fixture-ore',

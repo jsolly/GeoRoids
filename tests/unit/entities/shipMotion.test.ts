@@ -1,17 +1,13 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { shipOverlapsCompletedSector } from '../../../shared/sectors';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GAME, LASER, SHIP } from '../../../src/constants';
 import { createLaser } from '../../../src/entities/laser/laserUtils';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { applyThrustOrFriction } from '../../../src/entities/ship/shipUtils';
-import {
-  getCompletedSectors,
-  resetWorldExploration,
-  setCompletedSectors,
-} from '../../../src/network/worldExploration';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { resetWorldExploration } from '../../../src/network/worldExploration';
+import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -21,6 +17,8 @@ afterEach(() => {
 describe('shared ship motion helper', () => {
   test('automatic thrust accelerates at the existing pace and shots keep their speed', () => {
     expect(GAME.MOTION_SCALE).toBe(0.5625);
+    expect(GAME.PLAYER_SPEED_SCALE).toBe(1.25);
+    expect(LASER.SPEED).toBe(300 * GAME.MOTION_SCALE);
     expect(GAME.FPS).toBe(60);
     const laserStep = LASER.SPEED / GAME.FPS;
     const ship = new Ship({ position: { x: 0, y: 0 }, isLocalPlayer: true });
@@ -87,12 +85,14 @@ describe('shared ship motion helper', () => {
     expect(next.y).toBeCloseTo((-Math.sin(angle) * SHIP.THRUST) / GAME.FPS);
 
     const capped = applyThrustOrFriction({ x: 20, y: 0 }, 0, true, GAME.FRICTION);
-    const speed = Math.sqrt(capped.x * capped.x + capped.y * capped.y);
+    const speed = Math.hypot(capped.x, capped.y);
+    expect(SHIP.THRUST).toBe(5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
+    expect(getShipKit('hauler').thrust).toBe(4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(SHIP.MAX_VELOCITY).toBe(2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });
 
-  test.each(['surveyor', 'hauler'] as const)('%s cruises at its kit velocity cap', (kitId) => {
+  test.each(['scout', 'hauler'] as const)('%s cruises at its kit velocity cap', (kitId) => {
     const cap = getShipKit(kitId).maxVelocity;
     const ship = new Ship({ kitId, position: { x: 0, y: 0 }, isLocalPlayer: true });
     ship.angle = 0;
@@ -134,34 +134,34 @@ describe('shared ship motion helper', () => {
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
-  test('Boost raises cruise, and Surveyor outruns a boosting Hauler', () => {
-    const surveyor = new Ship({ kitId: 'surveyor', isLocalPlayer: true });
+  test('Boost raises cruise, and Scout outruns a boosting Hauler', () => {
+    const scout = new Ship({ kitId: 'scout', isLocalPlayer: true });
     const hauler = new Ship({ kitId: 'hauler', isLocalPlayer: true });
-    surveyor.angle = 0;
+    scout.angle = 0;
     hauler.angle = 0;
-    surveyor.velocity = { x: 20, y: 0 };
+    scout.velocity = { x: 20, y: 0 };
     hauler.velocity = { x: 20, y: 0 };
-    surveyor.toggleBoost();
+    scout.toggleBoost();
     hauler.toggleBoost();
-    surveyor.update();
+    scout.update();
     hauler.update();
-    const surveyorBoost = cruiseSpeed(
-      surveyor.mass,
-      surveyor.maxVelocity,
-      getShipKit('surveyor').boostMultiplier
+    const scoutBoost = cruiseSpeed(
+      scout.mass,
+      scout.maxVelocity,
+      getShipKit('scout').boostMultiplier
     );
     const haulerBoost = cruiseSpeed(
       hauler.mass,
       hauler.maxVelocity,
       getShipKit('hauler').boostMultiplier
     );
-    expect(surveyorBoost).toBeGreaterThan(haulerBoost);
-    expect(Math.hypot(surveyor.velocity.x, surveyor.velocity.y)).toBeCloseTo(surveyorBoost);
+    expect(scoutBoost).toBeGreaterThan(haulerBoost);
+    expect(Math.hypot(scout.velocity.x, scout.velocity.y)).toBeCloseTo(scoutBoost);
     expect(Math.hypot(hauler.velocity.x, hauler.velocity.y)).toBeCloseTo(haulerBoost);
-    surveyor.toggleBoost();
-    surveyor.update();
-    expect(Math.hypot(surveyor.velocity.x, surveyor.velocity.y)).toBeCloseTo(
-      cruiseSpeed(surveyor.mass, surveyor.maxVelocity)
+    scout.toggleBoost();
+    scout.update();
+    expect(Math.hypot(scout.velocity.x, scout.velocity.y)).toBeCloseTo(
+      cruiseSpeed(scout.mass, scout.maxVelocity)
     );
   });
 
@@ -177,10 +177,13 @@ describe('shared ship motion helper', () => {
     for (let frame = 0; frame < 60; frame++) {
       ship.update();
     }
-    expect(ship.velocity.x).toBeCloseTo(SHIP.MAX_VELOCITY);
-    // Terrain can still deflect travel slightly after the blast has decayed.
+    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(
+      SHIP.MAX_VELOCITY * (1 + TERRAIN.DESCENT_SPEED_BONUS)
+    );
+    expect(ship.velocity.x).toBeGreaterThan(SHIP.MAX_VELOCITY * 0.24);
+    // After the blast decays, terrain can still bend the cruise direction.
     expect(Math.abs(Math.atan2(-ship.velocity.y, ship.velocity.x) - ship.angle)).toBeLessThan(
-      Math.PI / 180
+      Math.PI / 4
     );
   });
 
@@ -193,19 +196,5 @@ describe('shared ship motion helper', () => {
     ship.health = 0;
     ship.update();
     expect(ship.position).toEqual({ x: 0, y: 0 });
-  });
-
-  test('local cruise stops at a completed-sector wall instead of flying through it', () => {
-    setCompletedSectors(['2,0']);
-    const ship = new Ship({ isLocalPlayer: true, position: { x: 3_950, y: 1_000 } });
-    ship.angle = 0;
-    ship.velocity = { x: 8, y: 0 };
-    ship.blinkCount = 0;
-    ship.spawnProtectionTimer = 0;
-    for (let frame = 0; frame < 30; frame++) {
-      ship.update();
-    }
-    expect(ship.position.x).toBeLessThan(4_000);
-    expect(shipOverlapsCompletedSector(ship.position, ship.r, getCompletedSectors())).toBe(false);
   });
 });

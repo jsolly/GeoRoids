@@ -61,7 +61,6 @@ describe('late client death updates after authoritative respawn', () => {
     pilot.score = 17;
     expect(engine.handleShipDamage(pilot.id, 'boundary', pilot.maxHealth).isDestroyed).toBe(true);
     expect(pilot.health).toBe(0);
-    expect(pilot.lives).toBe(2);
     expect(pilot.exploding).toBe(true);
 
     // Drive the real authoritative lifecycle, without resetting its fields in
@@ -130,12 +129,12 @@ describe('late client death updates after authoritative respawn', () => {
     expect(pilot.health).toBe(pilot.maxHealth);
     expect(pilot.exploding).toBe(false);
     expect(pilot.respawnTimer).toBeUndefined();
-    expect(pilot.lives).toBe(2);
     const publicState = engine.getGameState().entities.find((entity) => entity.id === pilot.id);
     expect(publicState).toMatchObject({
       health: pilot.maxHealth,
       exploding: false,
-      lives: 2,
+      cargo: 0,
+      purchases: [],
       score: 17,
     });
   });

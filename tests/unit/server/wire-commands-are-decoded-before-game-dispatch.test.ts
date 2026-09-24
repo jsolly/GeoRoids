@@ -86,14 +86,14 @@ test('shoot request IDs remain optional while malformed correlation values stop 
   }
 });
 
-test('nested current joins keep numeric-string positions and capability offers', () => {
+test('nested joins keep finite positions and capability offers', () => {
   expect(
     decodeClientCommand({
       type: 'join',
       data: {
         id: 'pilot',
         name: 'Pilot',
-        position: { x: '12.5px', y: '-4' },
+        position: { x: 12.5, y: -4 },
         kitId: 'hauler',
         asteroidInteractions: 1,
         snapshotVersion: 1,
@@ -111,6 +111,25 @@ test('nested current joins keep numeric-string positions and capability offers',
       asteroidInteractions: 1,
       resumeRequested: false,
     },
+  });
+});
+
+test('join coordinates must be finite numbers', () => {
+  expect(
+    decodeClientCommand({
+      type: 'join',
+      data: {
+        id: 'pilot',
+        name: 'Pilot',
+        position: { x: '12.5px', y: '-4' },
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+      },
+    })
+  ).toEqual({
+    ok: false,
+    messageType: 'join',
+    error: 'Join position is outside the world or invalid',
   });
 });
 
@@ -173,4 +192,54 @@ test('heartbeat probe identities are echoed only after integer validation while 
   for (const probeId of [0, -1, 1.5, '12', null, Number.MAX_SAFE_INTEGER + 1]) {
     expect(decodeClientCommand({ type: 'ping', probeId }).ok).toBe(false);
   }
+});
+
+test('satellite equipment commands require a player and a bounded pickup identity', () => {
+  expect(
+    decodeClientCommand({ type: 'equipSatellite', id: 'pilot', data: { pickupId: 'landsat' } })
+  ).toEqual({
+    ok: true,
+    command: { type: 'equipSatellite', id: 'pilot', pickupId: 'landsat' },
+  });
+  for (const pickupId of [null, '', 17, 'a'.repeat(129)]) {
+    expect(
+      decodeClientCommand({ type: 'equipSatellite', id: 'pilot', data: { pickupId } }).ok
+    ).toBe(false);
+  }
+  expect(decodeClientCommand({ type: 'equipSatellite', data: { pickupId: 'landsat' } }).ok).toBe(
+    false
+  );
+});
+
+test('pose updates may latch overlay hold without extra pose keys', () => {
+  expect(
+    decodeClientCommand({
+      type: 'update',
+      id: 'pilot',
+      data: {
+        position: { x: 1, y: 2 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: false,
+        overlayHold: true,
+        motionEpoch: 0,
+        motionSequence: 1,
+      },
+    })
+  ).toEqual({
+    ok: true,
+    command: {
+      type: 'update',
+      id: 'pilot',
+      update: {
+        position: { x: 1, y: 2 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: false,
+        overlayHold: true,
+      },
+      motionEpoch: 0,
+      motionSequence: 1,
+    },
+  });
 });

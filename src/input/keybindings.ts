@@ -1,6 +1,7 @@
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
-import { isShipSchematicOpen } from '../ui/shipSchematic';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { isTownStoreOpen } from '../ui/townStoreState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { steeringTurn } from './pointerSteering';
@@ -32,10 +33,10 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 
 /** The live local ship cruises regardless of which controls are held. */
 function updateCruise(player: Player): void {
-  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
-  player.ship.thrusting = alive;
+  const alive = player.ship.health > 0 && !player.ship.exploding;
+  player.ship.thrusting = alive && !player.ship.movementLocked;
   if (!alive) {
-    player.ship.boosting = false;
+    player.ship.stopBoost();
   }
 }
 
@@ -48,7 +49,7 @@ function turnSpeedForShip(player: Player): number {
 }
 
 function updateTurnFromKeys(player: Player): void {
-  if (player.lives <= 0 || player.ship.health <= 0 || player.ship.exploding) {
+  if (player.ship.movementLocked || player.ship.health <= 0 || player.ship.exploding) {
     player.ship.angularVelocity = 0;
     return;
   }
@@ -82,11 +83,10 @@ export function reconcilePlayerInput(player: Player): void {
 export function keyDown(ev: KeyboardEvent, player: Player): void {
   logger.debug('KEYBINDINGS', 'KeyDown called', {
     key: ev.code,
-    playerLives: player.lives,
     shipExploding: player.ship.exploding,
   });
 
-  if (player.lives > 0 && !player.ship.exploding) {
+  if (player.ship.health > 0 && !player.ship.exploding) {
     if (ev.code in keys) {
       keys[ev.code] = true;
     }
@@ -95,12 +95,12 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     switch (ev.code) {
       case 'Space':
         // Space fires while automatic cruise continues.
-        if (!isShipSchematicOpen()) {
+        if (!isShipSchematicOpen() && !isTownStoreOpen()) {
           player.ship.shoot();
         }
         break;
       case 'KeyE':
-        if (!ev.repeat && !isShipSchematicOpen()) {
+        if (!ev.repeat && !isShipSchematicOpen() && !isTownStoreOpen()) {
           player.ship.activateAbility();
         }
         break;
@@ -118,6 +118,8 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
         logger.debug('KEYBINDINGS', 'Updating rotation', { key: ev.code });
         reconcilePlayerInput(player);
         break;
+      default:
+        break;
     }
   }
 }
@@ -125,7 +127,6 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
 export function keyUp(ev: KeyboardEvent, player: Player): void {
   logger.debug('KEYBINDINGS', 'KeyUp called', {
     key: ev.code,
-    playerLives: player.lives,
     shipExploding: player.ship.exploding,
   });
 
@@ -150,7 +151,7 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
   }
 
   // Reconcile cruise/turn from the remaining held keys. Done regardless of
-  // lives/exploding so releasing a key never leaves a dead ship stuck
+  // health/exploding so releasing a key never leaves a dead ship stuck
   // thrusting or spinning. Both arrows and WASD funnel through the same
   // aggregate helpers.
   switch (ev.code) {
@@ -159,6 +160,8 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
     case 'ArrowRight':
     case 'KeyD':
       reconcilePlayerInput(player);
+      break;
+    default:
       break;
   }
 }

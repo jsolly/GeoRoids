@@ -18,10 +18,9 @@ test(
     await game.bootGame();
     await game.waitForCombatReady();
 
-    const initialLives = await game.getLives();
     const deathPosition = await game.dieOnceViaBoundary();
 
-    expect(await game.getLives()).toBeLessThan(initialLives);
+    expect(await game.getShipHealth()).toBe(await game.getShipMaxHealth());
     const respawnPosition = await game.getShipPosition();
     expectFurnaceRespawnPlacement(deathPosition, respawnPosition);
     expect(await game.getShipHealth()).toBeGreaterThan(0);

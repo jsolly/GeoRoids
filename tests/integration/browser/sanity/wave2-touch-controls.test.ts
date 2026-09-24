@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import type { CDPSession } from 'playwright';
 import { expect, test } from 'vitest';
 
+import { GAME } from '../../../../src/constants';
+import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
 import { watchBrowserDiagnostics } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
@@ -18,8 +20,8 @@ import {
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const KITS = [
-  { kitId: 'surveyor' as const, label: 'SCAN', name: 'Mineral scan' },
-  { kitId: 'hauler' as const, label: 'TAP', name: 'Harpoon' },
+  { kitId: 'scout' as const, label: 'SCAN', name: 'Mineral scan' },
+  { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
 ];
 
 async function tapTouchPoint(
@@ -118,36 +120,40 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
-    const session = await page.context().newCDPSession(page);
-    let touchActive = false;
-    try {
-      const beforeTap = await readLocalTouchState(page);
-      await dispatchTouch(session, 'touchStart', [{ ...tapPoint, id: 1 }]);
-      touchActive = true;
-      await game.waitForAnimationFrames(2);
-      const duringTap = await readLocalTouchState(page);
-      expect(duringTap.thrusting).toBe(true);
-      expect(duringTap.lastShotTime).toBe(beforeTap.lastShotTime);
-
-      await dispatchTouch(session, 'touchEnd', []);
-      touchActive = false;
-      await game.waitForAnimationFrames(2);
-      const afterTap = await readLocalTouchState(page);
-      expect(afterTap.lastShotTime).toBeGreaterThan(beforeTap.lastShotTime);
-      expect(afterTap.thrusting).toBe(true);
-      expect(afterTap.canShoot).toBe(true);
-      expect(diagnostics).toEqual({ errors: [], warnings: [] });
-    } finally {
-      try {
-        if (touchActive) {
-          await dispatchTouch(session, 'touchCancel', []);
-        }
-      } finally {
-        await session.detach();
-      }
-    }
+    const beforeTap = await readLocalTouchState(page);
+    // Observe the press inside the browser; runner round trips must not turn
+    // a quick tap into the game's intentional long-hold steering gesture.
+    const press = await page.evaluateHandle(() => {
+      const observed: { lastShotTime: number | null; thrusting: boolean | null } = {
+        lastShotTime: null,
+        thrusting: null,
+      };
+      document.addEventListener(
+        'pointerdown',
+        () => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          if (ship) {
+            observed.lastShotTime = ship.lastShotTime;
+            observed.thrusting = ship.thrusting;
+          }
+        },
+        { once: true }
+      );
+      return observed;
+    });
+    await page.touchscreen.tap(tapPoint.x, tapPoint.y);
+    const duringTap = await press.jsonValue();
+    await press.dispose();
+    expect(duringTap.thrusting).toBe(true);
+    expect(duringTap.lastShotTime).toBe(beforeTap.lastShotTime);
+    await game.waitForAnimationFrames(2);
+    const afterTap = await readLocalTouchState(page);
+    expect(afterTap.lastShotTime).toBeGreaterThan(beforeTap.lastShotTime);
+    expect(afterTap.thrusting).toBe(true);
+    expect(afterTap.canShoot).toBe(true);
+    expect(diagnostics).toEqual({ errors: [], warnings: [] });
   },
   TestConfig.DEFAULT_TIMEOUT
 );
@@ -162,7 +168,15 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
+    // Spawn ring (180) is inside TOWN_STORE_RADIUS (400); leave so E stays SCAN.
+    await game.placeShipAt(0, -500);
+    await page.waitForFunction(
+      () =>
+        document.body.classList.contains('touch-play') &&
+        !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
+      { timeout: 5000 }
+    );
     const steerPoint = await canvasPoint(page, 0.75, 0.5);
     const actionPoint = await centerOf(page, '#touch-ability');
     const session = await page.context().newCDPSession(page);
@@ -211,7 +225,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     const steer = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
@@ -278,10 +292,11 @@ test.each(KITS)(
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId });
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    await game.placeShipAt(0, -500);
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
-        !document.getElementById('touch-controls')?.hidden,
+        !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
       { timeout: 5000 }
     );
 
@@ -321,7 +336,7 @@ test.each(KITS)(
       y: ability.y,
       id: 13,
     });
-    if (kitId === 'surveyor') {
+    if (kitId === 'scout') {
       await expect
         .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
         .toBeGreaterThan(0);
@@ -402,7 +417,6 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame();
-    const livesBefore = await game.getLives();
     const stick = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
@@ -419,7 +433,7 @@ test(
         .waitForFunction(
           () => {
             const player = window.gameController?.getCurrPlayer();
-            const ability = document.getElementById('touch-ability');
+            const ability = document.querySelector('#touch-ability');
             if (!player?.ship.exploding || !ability?.classList.contains('is-unavailable')) {
               return false;
             }
@@ -445,9 +459,9 @@ test(
         canShoot: true,
         abilityDisabled: 'true',
       });
-      // Local death disables controls before the server confirms the lost life.
+      // Local death disables controls before the server confirms destruction.
       // dieOnceViaBoundary waits for that confirmation and the respawn placement.
-      expect(await game.getLives()).toBe(livesBefore - 1);
+      expect(await game.getShipHealth()).toBe(await game.getShipMaxHealth());
       await page.waitForFunction(() => {
         const player = window.gameController?.getCurrPlayer();
         return player && !player.ship.exploding && player.ship.health > 0 && player.ship.thrusting;
@@ -509,7 +523,10 @@ test(
     expect(await game.getShipAngle()).toBeCloseTo(keyboardAngle, 6);
     expect((await readLocalTouchState(page)).thrusting).toBe(true);
 
-    expect(await page.locator('#touch-controls').isHidden()).toBe(true);
+    expect(await page.locator('#touch-controls').isVisible()).toBe(true);
+    expect(await page.locator('#touch-controls').getAttribute('class')).toContain('is-desktop');
+    expect(await page.locator('#touch-boost').isVisible()).toBe(true);
+    expect(await page.locator('#touch-ability').isHidden()).toBe(true);
     expect(await page.locator('#gameCanvas').isVisible()).toBe(true);
     const desktopScreenshot = screenshotManager.getScreenshotPath('wave2-touch-desktop.png');
     await page.screenshot({ path: desktopScreenshot });
@@ -533,11 +550,13 @@ test(
     const consoleState = watchBrowserDiagnostics(page);
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
+    // Stay outside Town Square so E stays SCAN instead of Enter store.
+    await game.placeShipAt(0, -500);
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
-        !document.getElementById('touch-controls')?.hidden,
+        !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
       { timeout: 5000 }
     );
 
@@ -549,8 +568,13 @@ test(
       .toBeGreaterThan(0);
     // Wait for the real cooldown. Resetting only the client can make the next
     // snapshot look like a successful second activation even if no click is sent.
+    // Mineral Scan's cooldown is longer than the default poll, so size the wait
+    // from the live duration and leave slack for a slightly slow browser loop.
+    const scoutCooldownMs = (SHIP_ABILITY.COOLDOWN_FRAMES.scout / GAME.FPS) * 1000;
     await expect
-      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames, { timeout: 15000 })
+      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames, {
+        timeout: scoutCooldownMs + 8000,
+      })
       .toBe(0);
     await ability.evaluate((element) => (element as HTMLButtonElement).click());
     await expect
@@ -561,5 +585,5 @@ test(
     expect(consoleState.errors).toEqual([]);
     expect(consoleState.warnings).toEqual([]);
   },
-  TestConfig.DEFAULT_TIMEOUT
+  TestConfig.DEFAULT_TIMEOUT * 2
 );

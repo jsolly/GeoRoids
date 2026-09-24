@@ -4,9 +4,11 @@ import { WORLD } from './world';
 const CELLS_PER_SECTOR = 16;
 const CELL_SIZE = WORLD.sectorSize / CELLS_PER_SECTOR;
 const EXPLORATION_GRID_SIZE = (WORLD.radius * 2) / CELL_SIZE;
-export const EXPLORATION_RANGE = { surveyor: 650, hauler: 260 };
+export const EXPLORATION_RANGE = { scout: 650, hauler: 260 };
 export const EMPTY_EXPLORATION: ExplorationTile[] = [];
 const EMPTY_BITS = '00'.repeat(CELLS_PER_SECTOR ** 2 / 8);
+const EXPLORATION_TILE_ID_PATTERN = /^\d+,\d+$/u;
+const EXPLORATION_TILE_BITS_PATTERN = /^[0-9a-f]+$/u;
 
 export function explorationCellAt(position: Position): number | null {
   const col = Math.floor((position.x + WORLD.radius) / CELL_SIZE);
@@ -90,9 +92,9 @@ export function validExploration(value: unknown): value is ExplorationTile[] {
       !('bits' in tile) ||
       typeof tile.id !== 'string' ||
       typeof tile.bits !== 'string' ||
-      !/^\d+,\d+$/.test(tile.id) ||
+      !EXPLORATION_TILE_ID_PATTERN.test(tile.id) ||
       tile.bits.length !== EMPTY_BITS.length ||
-      !/^[0-9a-f]+$/.test(tile.bits) ||
+      !EXPLORATION_TILE_BITS_PATTERN.test(tile.bits) ||
       ids.has(tile.id)
     ) {
       return false;

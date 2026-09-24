@@ -4,10 +4,12 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { cpus, platform, release } from 'node:os';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type Measurement, validateMeasurement } from './results';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const TRAILING_SLASH_PATTERN = /\/$/u;
 const GIT_TIMEOUT_MS = 10_000;
 const GIT_PATH_ENVIRONMENT = [
   'GIT_DIR',
@@ -46,6 +48,7 @@ interface LiveReportMetadata {
       readonly name: string;
       readonly version: string;
       readonly launchFlags: readonly string[];
+      readonly headed?: boolean;
     };
     readonly measurementSource: 'host' | 'emulated-touch' | 'physical-device';
     readonly physicalDevice: boolean;
@@ -137,7 +140,9 @@ function liveInputHashes(root = ROOT) {
     ? readdirSync(join(root, 'dist'), { recursive: true, withFileTypes: true })
         .filter((entry) => entry.isFile())
         .map((entry) =>
-          join(entry.parentPath, entry.name).slice(root.replace(/\/$/, '').length + 1)
+          join(entry.parentPath, entry.name).slice(
+            root.replace(TRAILING_SLASH_PATTERN, '').length + 1
+          )
         )
     : [];
   const isHarness = (path: string) =>
@@ -157,7 +162,7 @@ function liveInputHashes(root = ROOT) {
 export function collectLiveReportMetadata(
   options: {
     root?: string;
-    browser?: { name: string; version: string; launchFlags?: readonly string[] };
+    browser?: { name: string; version: string; launchFlags?: readonly string[]; headed?: boolean };
     measurementSource?: LiveReportMetadata['environment']['measurementSource'];
     gpu?: object;
   } = {}
@@ -169,6 +174,7 @@ export function collectLiveReportMetadata(
         name: options.browser.name,
         version: options.browser.version,
         launchFlags: [...(options.browser.launchFlags ?? [])],
+        ...(options.browser.headed !== undefined ? { headed: options.browser.headed } : {}),
       }
     : undefined;
   return {

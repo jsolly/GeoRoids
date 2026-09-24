@@ -1,21 +1,50 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { type BeltSlotState, readBeltState } from '../../shared/asteroidBelt';
+import { emptySettlement, validSettlement } from '../../shared/economy';
 import { epochField } from '../../shared/epochField';
+import { validEquipment } from '../../shared/equipment';
 import { validExploration } from '../../shared/exploration';
+import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
-import { readCompletedSectorIds } from '../../shared/sectors';
+import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { purchasedHullColor } from '../../shared/townStore';
+import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
+  CivicModule,
+  EquipmentId,
   ExplorationTile,
   Position,
+  SavedPointLoot,
+  SettlementState,
+  ShipBoostState,
   ShipKitId,
   Velocity,
 } from '../../shared-types';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
+import type { LoadedWorld } from './worldPersistence';
+
+const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+
+function readCivicModules(value: object): CivicModule[] {
+  if ('civicModules' in value) {
+    if (!validCivicModules(value.civicModules)) {
+      throw new Error('Saved furnaces are invalid; refusing to replace player progress');
+    }
+    return value.civicModules;
+  }
+  if ('litCivicLotIds' in value) {
+    if (!validLitCivicLotIds(value.litCivicLotIds)) {
+      throw new Error('Saved furnaces are invalid; refusing to replace player progress');
+    }
+    return value.litCivicLotIds.map((id) => ({ id, builderName: '' }));
+  }
+  return [];
+}
 
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
@@ -25,20 +54,26 @@ function validWorldPosition(position: Position): boolean {
   return finiteMotionVector(position) && Math.hypot(position.x, position.y) <= WORLD.radius;
 }
 
-/** Browser credential plus this UTC month's score and optional recent flight. */
+/** Browser credential plus the saved score and optional recent flight. */
 export interface PersistentPilot {
+  silk?: number;
+  equipment?: EquipmentId[];
   id: string;
   tokenHash: string;
   name: string;
   score: number;
+  cargo?: number;
+  purchases?: string[];
+  /** Catalog hull color bought at Town Square. */
+  hullColor?: string;
   lastSeenAt?: number;
   kitId?: ShipKitId;
   position?: Position;
   velocity?: Velocity;
   angle?: number;
-  lives?: number;
   mass?: number;
   health?: number;
+  boost?: ShipBoostState;
   /** Server release that issued the current token digest. */
   credentialReleaseId?: string;
   /** Client release present when the current token digest was issued. */
@@ -61,19 +96,27 @@ export interface RestorableFlight extends PersistentPilot {
   kitId: ShipKitId;
   position: Position;
   angle: number;
-  lives: number;
   mass: number;
   health: number;
 }
 
-interface SavedWorld {
+export interface SavedEconomy {
+  settlement: SettlementState;
+  pointLoot: SavedPointLoot[];
+}
+
+export interface SavedWorld {
+  asteroidBelt?: BeltSlotState[];
+  /** Furnaces a Scout paid for. Absent on older rows. */
+  civicModules?: CivicModule[];
   seed: number;
   startedAt: number;
   generation: number;
-  scoreSeason?: string;
+  /** Density schema for additive asteroid slots; absent in pre-migration worlds. */
+  asteroidDensityVersion?: number;
+  asteroidMotionVersion?: number;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
-  completedSectors: string[];
 }
 
 function readVector(value: unknown): Position | undefined {
@@ -98,7 +141,6 @@ function readOptionalFlight(
   const lastSeenAt = pilot['lastSeenAt'];
   const position = readVector(pilot['position']);
   const angle = pilot['angle'];
-  const lives = pilot['lives'];
   const mass = pilot['mass'];
   const health = pilot['health'];
   const kitId = pilot['kitId'];
@@ -110,10 +152,6 @@ function readOptionalFlight(
     !validWorldPosition(position) ||
     typeof angle !== 'number' ||
     !Number.isFinite(angle) ||
-    typeof lives !== 'number' ||
-    !Number.isInteger(lives) ||
-    lives < 0 ||
-    lives > 99 ||
     typeof mass !== 'number' ||
     !Number.isFinite(mass) ||
     mass <= 0 ||
@@ -130,7 +168,6 @@ function readOptionalFlight(
     kitId,
     position,
     angle,
-    lives,
     mass,
     health,
     ...(velocity && finiteMotionVector(velocity) ? { velocity } : {}),
@@ -169,11 +206,37 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   const name = pilot['name'];
   const tokenHash = pilot['tokenHash'];
   const score = pilot['score'];
+  const equipment = pilot['equipment'];
+  if (equipment !== undefined && !validEquipment(equipment)) {
+    return undefined;
+  }
+  const cargo = pilot['cargo'];
+  const purchases = pilot['purchases'];
+  if (
+    cargo !== undefined &&
+    (typeof cargo !== 'number' || !Number.isSafeInteger(cargo) || cargo < 0)
+  ) {
+    return undefined;
+  }
+  if (
+    purchases !== undefined &&
+    (!Array.isArray(purchases) || !purchases.every((offerId) => typeof offerId === 'string'))
+  ) {
+    return undefined;
+  }
+  const silk = pilot['silk'];
+  if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
+    return undefined;
+  }
+  const hullColor = pilot['hullColor'];
+  if (hullColor !== undefined && typeof hullColor !== 'string') {
+    return undefined;
+  }
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
     typeof tokenHash !== 'string' ||
-    !/^[a-f0-9]{64}$/.test(tokenHash) ||
+    !PILOT_TOKEN_HASH_PATTERN.test(tokenHash) ||
     typeof score !== 'number' ||
     !Number.isFinite(score)
   ) {
@@ -184,12 +247,18 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     tokenHash,
     name,
     score,
+    ...(equipment !== undefined ? { equipment: [...equipment] } : {}),
+    cargo: typeof cargo === 'number' ? cargo : 0,
+    purchases: Array.isArray(purchases) ? purchases : [],
+    ...(typeof silk === 'number' ? { silk } : {}),
+    ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
+    ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),
   };
 }
 
-/** Restore pose only when last-seen is present, recent, and the ship still has lives. */
+/** Restore pose only when last-seen is present, recent, and the hull is alive. */
 export function restorableFlight(
   pilot: PersistentPilot,
   now: number
@@ -198,19 +267,17 @@ export function restorableFlight(
   const kitId = pilot.kitId;
   const position = pilot.position;
   const angle = pilot.angle;
-  const lives = pilot.lives;
   const mass = pilot.mass;
   const health = pilot.health;
   if (
     lastSeenAt === undefined ||
-    !flightReturnWindowOpen(lastSeenAt, now) ||
+    (!flightReturnWindowOpen(lastSeenAt, now) && (pilot.cargo ?? 0) === 0) ||
     !isShipKitId(kitId) ||
     position === undefined ||
     angle === undefined ||
-    lives === undefined ||
-    lives <= 0 ||
     mass === undefined ||
-    health === undefined
+    health === undefined ||
+    health <= 0
   ) {
     return undefined;
   }
@@ -220,17 +287,28 @@ export function restorableFlight(
     kitId,
     position,
     angle,
-    lives,
     mass,
     health,
   };
 }
 
-/** Single-writer SQLite transactions keep cargo consumption, shared scores and discoveries together. */
+/**
+ * Single-writer SQLite transactions keep cargo consumption, shared scores and
+ * discoveries together.
+ *
+ * Opening the database parses and validates every saved sector once so the
+ * write path can refuse duplicate asteroids across sectors. The store itself
+ * is synchronous; a `WorldPersistence` adapter decides which thread it runs on.
+ */
 export class WorldStore {
   private readonly db: DatabaseSync;
   private readonly pilotJson = new Map<string, string>();
-  private persistedAsteroidSectors = new Map<string, string>();
+  /** Asteroid id → the sector row it is saved in; the duplicate-deposit guard. */
+  private readonly persistedAsteroidSectors = new Map<string, string>();
+  /** Sector id → the asteroid ids in its saved row, so a rewrite re-indexes only that row. */
+  private readonly persistedSectorRocks = new Map<string, string[]>();
+  /** Rows parsed while opening, handed over once by `loadSectors` and then released. */
+  private openedSectors: Map<string, AsteroidData[]> | undefined;
   private worldJson: string | undefined;
 
   constructor(path: string) {
@@ -242,8 +320,12 @@ export class WorldStore {
       this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
         CREATE TABLE IF NOT EXISTS world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS economy (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS pilots (id TEXT PRIMARY KEY, json TEXT NOT NULL);`);
-      this.indexPersistedSectors();
+      // Persist the retired kit name once at startup, before validating saved flights.
+      this.db.exec(`UPDATE pilots SET json = json_set(json, '$.kitId', 'scout')
+        WHERE json_extract(json, '$.kitId') = 'surveyor'`);
+      this.openedSectors = this.indexPersistedSectors();
     } catch (error) {
       this.db.close();
       throw error;
@@ -256,7 +338,30 @@ export class WorldStore {
     }
     const ids = new Set<string>();
     const rocks: AsteroidData[] = [];
-    for (const [index, candidate] of value.entries()) {
+    for (const [index, saved] of value.entries()) {
+      // Retired finite burns never stored an owner. Preserve the deposit and
+      // momentum, but cancel that uncreditable propulsion at the storage boundary.
+      let candidate = saved;
+      if (typeof saved === 'object' && saved !== null && 'boost' in saved) {
+        const boost = saved.boost;
+        if (
+          typeof boost === 'object' &&
+          boost !== null &&
+          'phase' in boost &&
+          boost.phase === 'burning' &&
+          !('ownerId' in boost) &&
+          'remainingFrames' in boost &&
+          typeof boost.remainingFrames === 'number' &&
+          Number.isInteger(boost.remainingFrames) &&
+          boost.remainingFrames > 0 &&
+          boost.remainingFrames <= 180 &&
+          'angle' in boost &&
+          typeof boost.angle === 'number' &&
+          Number.isFinite(boost.angle)
+        ) {
+          candidate = { ...saved, boost: null };
+        }
+      }
       try {
         validateAsteroidDto(candidate);
       } catch (error) {
@@ -276,22 +381,50 @@ export class WorldStore {
     return rocks;
   }
 
-  private indexSector(
-    index: Map<string, string>,
-    id: string,
-    rocks: readonly AsteroidData[]
-  ): void {
-    for (const rock of rocks) {
-      const previousSector = index.get(rock.id);
-      if (previousSector !== undefined && previousSector !== id) {
-        throw new Error(`Saved asteroid ${rock.id} appears in sectors ${previousSector} and ${id}`);
+  /** Record a sector row in the duplicate-deposit index; the caller has checked for conflicts. */
+  private indexSector(id: string, rocks: readonly AsteroidData[]): void {
+    for (const rockId of this.persistedSectorRocks.get(id) ?? []) {
+      if (this.persistedAsteroidSectors.get(rockId) === id) {
+        this.persistedAsteroidSectors.delete(rockId);
       }
-      index.set(rock.id, id);
+    }
+    this.persistedSectorRocks.set(
+      id,
+      rocks.map((rock) => rock.id)
+    );
+    for (const rock of rocks) {
+      this.persistedAsteroidSectors.set(rock.id, id);
     }
   }
 
-  private indexPersistedSectors(): void {
-    const next = new Map<string, string>();
+  /**
+   * Refuse a batch that would save one asteroid under two sectors, whether
+   * both rows are in the batch or one is already on disk and not being
+   * rewritten. Costs the size of the batch, not of the world.
+   */
+  private assertNoDuplicateDeposits(sectors: ReadonlyArray<[string, AsteroidData[]]>): void {
+    const rewritten = new Set(sectors.map(([id]) => id));
+    const inBatch = new Map<string, string>();
+    for (const [id, rocks] of sectors) {
+      for (const rock of rocks) {
+        const other = inBatch.get(rock.id) ?? this.persistedAsteroidSectors.get(rock.id);
+        if (
+          other !== undefined &&
+          other !== id &&
+          (inBatch.has(rock.id) || !rewritten.has(other))
+        ) {
+          throw new Error(`Saved asteroid ${rock.id} appears in sectors ${other} and ${id}`);
+        }
+        inBatch.set(rock.id, id);
+      }
+    }
+  }
+
+  /** Parse, validate and index every saved sector row. */
+  private indexPersistedSectors(): Map<string, AsteroidData[]> {
+    this.persistedAsteroidSectors.clear();
+    this.persistedSectorRocks.clear();
+    const opened = new Map<string, AsteroidData[]>();
     for (const row of this.db.prepare('SELECT id,json FROM sectors').all()) {
       const id = row['id'];
       if (typeof id !== 'string') {
@@ -304,9 +437,16 @@ export class WorldStore {
         throw new Error(`Saved sector ${id} is not valid JSON`, { cause: error });
       }
       const rocks = this.validateSectorValue(id, value);
-      this.indexSector(next, id, rocks);
+      for (const rock of rocks) {
+        const other = this.persistedAsteroidSectors.get(rock.id);
+        if (other !== undefined && other !== id) {
+          throw new Error(`Saved asteroid ${rock.id} appears in sectors ${other} and ${id}`);
+        }
+      }
+      this.indexSector(id, rocks);
+      opened.set(id, rocks);
     }
-    this.persistedAsteroidSectors = next;
+    return opened;
   }
 
   loadWorld(): SavedWorld | undefined {
@@ -330,8 +470,11 @@ export class WorldStore {
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
+    const asteroidBelt = readBeltState('asteroidBelt' in value ? value.asteroidBelt : undefined);
     return {
       seed: value.seed,
+      ...(asteroidBelt ? { asteroidBelt } : {}),
+      civicModules: readCivicModules(value),
       startedAt: value.startedAt,
       generation:
         'generation' in value &&
@@ -339,16 +482,23 @@ export class WorldStore {
         Number.isSafeInteger(value.generation)
           ? value.generation
           : 0,
-      ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
-        ? { scoreSeason: value.scoreSeason }
+      ...('asteroidDensityVersion' in value &&
+      typeof value.asteroidDensityVersion === 'number' &&
+      Number.isSafeInteger(value.asteroidDensityVersion) &&
+      value.asteroidDensityVersion >= 0
+        ? { asteroidDensityVersion: value.asteroidDensityVersion }
+        : {}),
+      ...('asteroidMotionVersion' in value &&
+      typeof value.asteroidMotionVersion === 'number' &&
+      Number.isSafeInteger(value.asteroidMotionVersion) &&
+      value.asteroidMotionVersion >= 0
+        ? { asteroidMotionVersion: value.asteroidMotionVersion }
         : {}),
       ...releaseField(
         'writtenReleaseId',
         'writtenReleaseId' in value ? value.writtenReleaseId : undefined
       ),
       exploration: value.exploration,
-      completedSectors:
-        'completedSectors' in value ? readCompletedSectorIds(value.completedSectors) : [],
     };
   }
 
@@ -367,19 +517,34 @@ export class WorldStore {
       });
   }
 
-  listSectorIds(): string[] {
-    return this.db
-      .prepare('SELECT id FROM sectors')
-      .all()
-      .map((row) => {
-        const id = row['id'];
-        if (typeof id !== 'string' || !validSectorId(id)) {
-          throw new Error('Saved sector has an invalid identity');
-        }
-        return id;
-      });
+  /**
+   * Every saved sector. The rows parsed while opening are handed over once
+   * and the store drops its copy, so the world lives in memory exactly once.
+   * After that, or after any `checkpoint` or `reset`, the database is read
+   * again, so an in-process restart always sees what is on disk.
+   */
+  loadSectors(): Map<string, AsteroidData[]> {
+    const sectors = this.openedSectors ?? this.indexPersistedSectors();
+    this.openedSectors = undefined;
+    return sectors;
   }
 
+  load(): LoadedWorld {
+    const row = this.db.prepare('SELECT json FROM economy WHERE id=1').get();
+    const saved: unknown = row ? JSON.parse(String(row['json'])) : {};
+    if (!saved || typeof saved !== 'object') {
+      throw new Error('Invalid saved economy');
+    }
+    const economy = { settlement: readSettlement(saved), pointLoot: readPointLoot(saved) };
+    return {
+      economy,
+      world: this.loadWorld(),
+      pilots: this.loadPilots(),
+      sectors: this.loadSectors(),
+    };
+  }
+
+  /** One saved row, for tests and tooling; the server reads the world once through `load`. */
   loadSector(id: string): AsteroidData[] | undefined {
     if (!validSectorId(id)) {
       throw new Error(`Invalid sector identity ${id}`);
@@ -397,65 +562,131 @@ export class WorldStore {
     return this.validateSectorValue(id, value);
   }
 
+  /**
+   * Commit one batch of changed rows. `world` is omitted when the world row
+   * did not change; unchanged pilot rows are skipped by content.
+   */
   checkpoint(
-    world: SavedWorld,
+    world: SavedWorld | undefined,
     sectors: ReadonlyMap<string, AsteroidData[]>,
-    pilots: readonly PersistentPilot[]
+    pilots: readonly PersistentPilot[],
+    economy?: SavedEconomy
   ): void {
-    const sectorEntries = [...sectors.entries()];
-    const validatedSectors = sectorEntries.map(([id, rocks]): [string, AsteroidData[]] => [
+    const validatedSectors = [...sectors].map(([id, rocks]): [string, AsteroidData[]] => [
       id,
       this.validateSectorValue(id, rocks),
     ]);
-    const nextAsteroidSectors = new Map(this.persistedAsteroidSectors);
-    const updatedSectorIds = new Set(validatedSectors.map(([id]) => id));
-    for (const [asteroidId, sectorId] of nextAsteroidSectors) {
-      if (updatedSectorIds.has(sectorId)) {
-        nextAsteroidSectors.delete(asteroidId);
-      }
-    }
-    for (const [id, rocks] of validatedSectors) {
-      this.indexSector(nextAsteroidSectors, id, rocks);
-    }
+    this.assertNoDuplicateDeposits(validatedSectors);
+    const worldJson = world === undefined ? undefined : JSON.stringify(world);
+    const changedPilots = pilots
+      .map((pilot) => ({ id: pilot.id, json: JSON.stringify(pilot) }))
+      .filter((pilot) => this.pilotJson.get(pilot.id) !== pilot.json);
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const worldJson = JSON.stringify(world);
-      if (this.worldJson !== worldJson) {
+      if (worldJson !== undefined && this.worldJson !== worldJson) {
         this.db.prepare('INSERT OR REPLACE INTO world(id,json) VALUES(1,?)').run(worldJson);
+      }
+      if (economy) {
+        this.db
+          .prepare('INSERT OR REPLACE INTO economy(id,json) VALUES(1,?)')
+          .run(JSON.stringify(economy));
       }
       const sectorWrite = this.db.prepare('INSERT OR REPLACE INTO sectors(id,json) VALUES(?,?)');
       for (const [id, rocks] of validatedSectors) {
         sectorWrite.run(id, JSON.stringify(rocks));
       }
       const pilotWrite = this.db.prepare('INSERT OR REPLACE INTO pilots(id,json) VALUES(?,?)');
-      const changedPilots = pilots
-        .map((pilot) => ({ id: pilot.id, json: JSON.stringify(pilot) }))
-        .filter((pilot) => this.pilotJson.get(pilot.id) !== pilot.json);
       for (const pilot of changedPilots) {
         pilotWrite.run(pilot.id, pilot.json);
       }
       this.db.exec('COMMIT');
-      this.worldJson = worldJson;
-      this.persistedAsteroidSectors = nextAsteroidSectors;
-      for (const pilot of changedPilots) {
-        this.pilotJson.set(pilot.id, pilot.json);
-      }
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      this.rollback();
       throw error;
     }
+    if (worldJson !== undefined) {
+      this.worldJson = worldJson;
+    }
+    for (const [id, rocks] of validatedSectors) {
+      this.indexSector(id, rocks);
+    }
+    for (const pilot of changedPilots) {
+      this.pilotJson.set(pilot.id, pilot.json);
+    }
+    // Rows parsed at open time no longer describe the database.
+    this.openedSectors = undefined;
   }
 
   reset(): void {
-    this.db.exec(
-      'BEGIN IMMEDIATE; DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; COMMIT;'
-    );
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec(
+        'DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; DELETE FROM economy;'
+      );
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.rollback();
+      throw error;
+    }
     this.persistedAsteroidSectors.clear();
+    this.persistedSectorRocks.clear();
+    this.openedSectors = undefined;
     this.pilotJson.clear();
     this.worldJson = undefined;
+  }
+
+  /**
+   * SQLite rolls a transaction back by itself on a full disk, an I/O error or
+   * a busy lock; asking again would throw "no transaction is active" from the
+   * catch block and replace the error that explains the failure.
+   */
+  private rollback(): void {
+    if (this.db.isTransaction) {
+      this.db.exec('ROLLBACK');
+    }
   }
 
   close(): void {
     this.db.close();
   }
+}
+
+function readSettlement(value: object): SettlementState {
+  if (!('settlement' in value)) {
+    return emptySettlement();
+  }
+  if (!validSettlement(value.settlement)) {
+    throw new Error('Invalid saved settlement');
+  }
+  return value.settlement;
+}
+function readPointLoot(value: object): SavedPointLoot[] {
+  if (!('pointLoot' in value)) {
+    return [];
+  }
+  if (!Array.isArray(value.pointLoot)) {
+    throw new Error('Invalid saved point loot');
+  }
+  const drops: SavedPointLoot[] = [];
+  for (const row of value.pointLoot) {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      typeof row.id !== 'string' ||
+      !finiteMotionVector(row.position) ||
+      !Number.isSafeInteger(row.points) ||
+      row.points < 0 ||
+      typeof row.expiresAt !== 'number' ||
+      !Number.isFinite(row.expiresAt)
+    ) {
+      throw new Error('Invalid saved point loot');
+    }
+    drops.push({
+      id: row.id,
+      position: { ...row.position },
+      points: row.points,
+      expiresAt: row.expiresAt,
+    });
+  }
+  return drops;
 }

@@ -1,61 +1,199 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 import { initializeTouchControls, syncTouchChrome } from '../../../src/input/touchControls';
 import { setPlayView } from '../../../src/ui/uiUtils';
 
+const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
+const productionCss = readFileSync(resolve(__dirname, '../../../index.css'), 'utf8');
+const productionPackage: { dependencies?: Record<string, string> } = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../package.json'), 'utf8')
+);
+const agentsGuide = readFileSync(resolve(__dirname, '../../../AGENTS.md'), 'utf8');
+
 afterEach(() => {
   setPlayView(false);
   document.body.classList.remove('touch-play');
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   if (root) {
     root.hidden = true;
     root.setAttribute('aria-hidden', 'true');
   }
 });
 
+test('play client ships first-party GeoRoids CSS with no Bootstrap package or CDN', () => {
+  expect(productionHtml).not.toMatch(/bootstrap|jsdelivr|cdn\./iu);
+  expect(productionCss).not.toMatch(/bootstrap/iu);
+  expect(productionCss).toContain('@layer georoids');
+  expect(productionCss).not.toContain('@layer bootstrap');
+  expect(productionPackage.dependencies?.['bootstrap']).toBeUndefined();
+  expect(productionHtml).toContain('class="enter-game"');
+  expect(productionHtml).toContain('class="nickname-input"');
+  expect(productionHtml).toContain('class="sound-toggle"');
+  expect(productionHtml).toContain('id="hapticsPref"');
+  expect(productionHtml).toContain('class="preference-toggles"');
+  expect(productionCss).toMatch(/\.preference-toggles \{[^}]*flex-direction: column;/su);
+  expect(productionCss).not.toMatch(
+    /\.preference-toggles \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/su
+  );
+  expect(productionCss).toContain('.haptics-hint');
+});
+
+test('agents guide forbids CDN runtime CSS and JS', () => {
+  expect(agentsGuide).toMatch(/No CDN for app assets/u);
+  expect(agentsGuide).toMatch(/never load runtime CSS or JS from CDNs/u);
+});
+
 test('title shell exposes a terrain canvas and keeps stock credit empty', () => {
-  expect(document.getElementById('title-terrain')?.tagName).toBe('CANVAS');
-  expect(document.getElementById('attribution')?.textContent?.trim()).toBe('');
+  expect(document.querySelector('#title-terrain')?.tagName).toBe('CANVAS');
+  expect(document.querySelector('#attribution')?.textContent?.trim()).toBe('');
 });
 
 test('Enter Game is an outline phosphor control in the title menu', () => {
-  const start = document.getElementById('start-game');
+  const start = document.querySelector('#start-game');
   expect(start?.tagName).toBe('BUTTON');
-  expect(start?.classList.contains('btn-phosphor')).toBe(true);
+  expect(start?.classList.contains('enter-game')).toBe(true);
+  expect(start?.classList.contains('btn')).toBe(false);
+  expect(start?.classList.contains('btn-phosphor')).toBe(false);
   expect(start?.classList.contains('btn-success')).toBe(false);
 });
 
+test('title menu uses first-party nickname and sound chrome', () => {
+  expect(document.querySelector('.nickname-label')?.getAttribute('for')).toBe('playerNameInput');
+  expect(document.querySelector('#playerNameInput')?.classList.contains('nickname-input')).toBe(
+    true
+  );
+  expect(document.querySelector('#soundPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="soundPref"]')?.textContent).toBe('Sound Effects');
+  expect(document.querySelector('#musicPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="musicPref"]')?.textContent).toBe('Music');
+  expect(document.querySelector('#hapticsPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="hapticsPref"]')?.textContent).toBe('Haptics');
+  expect(document.querySelector('#hapticsHint')?.classList.contains('haptics-hint')).toBe(true);
+  expect(document.querySelector('.form-control')).toBeNull();
+  expect(document.querySelector('.form-label')).toBeNull();
+  expect(document.querySelector('.form-check-input')).toBeNull();
+  expect(document.querySelector('.nav-item')).toBeNull();
+});
+
+test('playfield chrome sizes to the visible box instead of overflowing 100dvw', () => {
+  expect(productionCss).toMatch(/#gameWrapper \{[^}]*width: 100%;/su);
+  expect(productionCss).toMatch(/#gameArea \{[^}]*width: 100%;/su);
+  expect(productionCss).toMatch(/#gameCanvas \{[^}]*width: 100%;/su);
+  expect(productionCss).not.toMatch(/#gameArea \{[^}]*width: 100dvw;/su);
+  expect(productionCss).toContain('max-width: min(calc(100% - 20px), 280px)');
+  expect(productionCss).toMatch(
+    /\.touch-ability \{\s*right: max\(16px, env\(safe-area-inset-right, 0px\)\);/u
+  );
+});
+
+test('title menu stacks Enter Game, preference toggles, and Advanced at one control width', () => {
+  expect(productionCss).toMatch(/#start-screen \{[^}]*--start-control-width: 280px;/su);
+  expect(productionCss).toMatch(
+    /@media \(min-width: 800px\) \{[\s\S]*?#start-screen \{[^}]*--start-control-width: 320px;/u
+  );
+  expect(productionCss).toMatch(
+    /@media \(max-width: 430px\) \{[\s\S]*?#start-screen \{[^}]*--start-control-width: 100%;/u
+  );
+  expect(productionCss).toMatch(
+    /\.start-actions,\s*\.settings \{[^}]*width: min\(100%, var\(--start-control-width, 280px\)\);/su
+  );
+  expect(productionCss).toMatch(
+    /\.enter-game,\s*\.preference-toggles,\s*\.sound-toggle-row,\s*\.haptics-hint,\s*\.advanced-settings \{[^}]*width: 100%;[^}]*max-width: none;/su
+  );
+  expect(productionCss).toMatch(/\.sound-toggle-row \{[^}]*justify-content: flex-start;/su);
+  expect(productionCss).not.toMatch(/\.enter-game \{[^}]*max-width: (?:280px|320px|100%);/su);
+  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*min-width: 2(?:00|20)px;/su);
+  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*justify-content: center;/su);
+  expect(productionCss).not.toMatch(/\.preference-toggles \{[^}]*width: min\(100%, 40rem\);/su);
+  expect(productionCss).not.toMatch(/\.advanced-settings \{[^}]*width: min\(100%, 260px\);/su);
+  expect(productionCss).not.toMatch(/\.haptics-hint \{[^}]*max-width: 260px;/su);
+});
+
+test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
+  const advanced = document.querySelector<HTMLDetailsElement>('#advanced-settings');
+  expect(advanced?.tagName).toBe('DETAILS');
+  expect(advanced?.open).toBe(false);
+  expect(advanced?.querySelector('summary')?.textContent).toBe('Advanced');
+  expect(document.querySelector('#debugPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="debugPref"]')?.textContent).toBe('Debug');
+  expect(document.querySelector('#debug-player-id')?.getAttribute('readonly')).not.toBeNull();
+  expect(document.querySelector('#copy-debug-player-id')?.tagName).toBe('BUTTON');
+  expect(productionHtml).toMatch(/<details id="advanced-settings"[^>]*>/u);
+  expect(productionHtml).not.toMatch(/<details id="advanced-settings"[^>]*\sopen[\s>]/u);
+  expect(productionHtml).toContain('Paste this to an agent. Railway filter: @playerId:');
+  expect(productionHtml).toContain('id="debug-session-id"');
+  expect(productionHtml).toContain('id="copy-debug-diagnostics"');
+  expect(productionHtml).toContain('id="debug-hud"');
+  expect(productionHtml).toContain('id="debug-hud-fps"');
+  expect(productionCss).toContain('.advanced-settings');
+  expect(productionCss).toContain('.debug-hud');
+  expect(productionCss).not.toMatch(/#ff0|#ffff00|yellow/iu);
+});
+
 test('title menu presents the keyboard and ability control hint', () => {
-  const hint = document.getElementById('controls-hint');
+  const hint = document.querySelector('#controls-hint');
   expect(hint?.closest('#start-screen')).toBeTruthy();
   expect(hint?.textContent).toContain('Always thrust');
   expect(hint?.textContent).toContain('Space fires');
-  expect(hint?.textContent).toContain('Shift boost');
+  expect(hint?.textContent).toContain('Shift or right-click boost');
   expect(hint?.textContent).toContain('E ability');
   expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
 });
 
+test('playfield chrome ships an Inventory button with the V shortcut', () => {
+  const toggle = document.querySelector('#ship-schematic-toggle');
+  const map = document.querySelector('#universe-map-toggle');
+  expect(toggle?.tagName).toBe('BUTTON');
+  expect(toggle?.getAttribute('aria-keyshortcuts')).toBe('V');
+  expect(toggle?.querySelector('kbd')?.textContent).toBe('V');
+  expect(toggle && map ? toggle.compareDocumentPosition(map) : 0).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
+  expect(productionHtml).toContain('id="ship-schematic-toggle"');
+  expect(productionHtml).toContain('Inventory <kbd>V</kbd>');
+  expect(productionHtml.indexOf('id="ship-schematic-toggle"')).toBeLessThan(
+    productionHtml.indexOf('id="universe-map-toggle"')
+  );
+  expect(productionCss).toContain('.ship-schematic-toggle');
+  expect(productionCss).toContain('--schematic-toggle-y');
+});
+
 test('title menu exposes the ship kit picker before entering play', () => {
-  const grid = document.getElementById('ship-kit-grid');
+  const grid = document.querySelector('#ship-kit-grid');
   expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Ship kit');
   expect(document.querySelector('.ship-kit-placeholder-note')?.textContent).toContain(
     'AD v2 silhouettes'
   );
 });
 
+test('in-play chrome disables text highlight and copy-paste callouts', () => {
+  expect(productionCss).toMatch(
+    /body\.in-play \{[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*-webkit-touch-callout: none;[^}]*-webkit-user-drag: none;/su
+  );
+  expect(productionCss).toMatch(
+    /body\.in-play \* \{[^}]*user-select: none;[^}]*-webkit-touch-callout: none;/su
+  );
+  expect(productionCss).toMatch(
+    /body\.in-play input,\s*body\.in-play textarea,\s*body\.in-play select,[\s\S]*-webkit-tap-highlight-color: revert;/su
+  );
+  expect(productionCss).toMatch(/#gameCanvas \{[^}]*-webkit-touch-callout: none;/su);
+});
+
 test('play view keeps the controls hint in title chrome and toggles the game area', () => {
-  const hint = document.getElementById('controls-hint');
-  const gameArea = document.getElementById('gameArea');
+  const hint = document.querySelector('#controls-hint');
+  const gameArea = document.querySelector<HTMLElement>('#gameArea');
   expect(hint?.closest('#gameArea')).toBeNull();
 
   setPlayView(true);
   expect(document.body.classList.contains('in-play')).toBe(true);
-  expect(document.getElementById('start-screen')?.style.display).toBe('none');
+  expect(document.querySelector<HTMLElement>('#start-screen')?.style.display).toBe('none');
   expect(gameArea?.style.display).toBe('block');
 
   setPlayView(false);
   expect(document.body.classList.contains('in-play')).toBe(false);
-  expect(document.getElementById('start-screen')?.style.display).toBe('block');
+  expect(document.querySelector<HTMLElement>('#start-screen')?.style.display).toBe('block');
   expect(gameArea?.style.display).toBe('none');
 });
 
@@ -67,14 +205,14 @@ test('play shell creates the touch ability overlay with a semantic action button
   syncTouchChrome(true);
 
   expect(document.body.classList.contains('touch-play')).toBe(true);
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   expect(root?.hidden).toBe(false);
-  const action = document.getElementById('touch-ability');
+  const action = document.querySelector('#touch-ability');
   expect(action?.tagName).toBe('BUTTON');
   expect(action?.getAttribute('type')).toBe('button');
   expect(action?.getAttribute('aria-label')).toBeTruthy();
-  const boost = document.getElementById('touch-boost');
+  const boost = document.querySelector('#touch-boost');
   expect(boost?.tagName).toBe('BUTTON');
   expect(boost?.textContent).toBe('BOOST');
-  expect(document.getElementById('touch-shield')).toBeNull();
+  expect(document.querySelector('#touch-shield')).toBeNull();
 });

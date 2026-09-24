@@ -7,7 +7,7 @@ import {
   getTerrainContours,
   getTerrainField,
 } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { contourCandidates } from '../../../src/rendering/contourSpatialIndex';
 import { TestPath2D, type TestPathCommand } from '../../support/TestPath2D';
@@ -187,9 +187,8 @@ test('renderer reuses world paths until the candidate arrays or terrain change',
     const expectedPaths = firstCandidates.filter((candidates) => candidates.length > 0);
     ctx.setTransform(3, 0, 0, 3, 0, 0);
 
-    drawIsoContours(firstCamera);
+    drawIsoContours(firstCamera, 0);
 
-    expect(beginPath).toHaveBeenCalledTimes(levels.length);
     expect(strokes).toHaveLength(expectedPaths.length);
     for (const [index, candidates] of expectedPaths.entries()) {
       const expectedCommands: TestPathCommand[] = candidates.flatMap((segment) => [
@@ -208,19 +207,17 @@ test('renderer reuses world paths until the candidate arrays or terrain change',
 
     const firstPaths = strokes.splice(0).map(({ path }) => path);
     beginPath.mockClear();
-    drawIsoContours({ x: 33, y: 32 });
-    expect(beginPath).toHaveBeenCalledTimes(levels.length);
+    drawIsoContours({ x: 33, y: 32 }, 0);
     expect(strokes.map(({ path }) => path)).toEqual(firstPaths);
 
     strokes.length = 0;
     beginPath.mockClear();
-    drawIsoContours({ x: 1e9, y: 1e9 });
-    expect(beginPath).toHaveBeenCalledTimes(levels.length);
+    drawIsoContours({ x: 1e9, y: 1e9 }, 0);
     expect(strokes).toEqual([]);
 
     strokes.length = 0;
     ensureTerrain(TERRAIN.DEFAULT_SEED + 1, { cx: 0, cy: 0, radius: 3100 });
-    drawIsoContours(firstCamera);
+    drawIsoContours(firstCamera, 0);
     expect(strokes.length).toBeGreaterThan(0);
     expect(strokes.every(({ path }) => !firstPaths.includes(path))).toBe(true);
   } finally {

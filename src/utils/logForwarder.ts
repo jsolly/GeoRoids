@@ -18,9 +18,10 @@ let isInitialized = false;
 let droppedMessageCount = 0;
 let reportedDroppedMessageCount = 0;
 let transportFailureReported = false;
+let lastSocketAttemptAt = 0;
 
 const MAX_QUEUE_BYTES = 256 * 1024;
-const RECONNECT_DELAY_MS = 5000;
+const MIN_SOCKET_GAP_MS = 5000;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const MAX_SOCKET_BUFFERED_BYTES = 64 * 1024;
 
@@ -108,14 +109,28 @@ export function getLogsWebSocketUrl(): string {
   );
 }
 
+function pendingDelivery(): boolean {
+  return messageQueue.length > 0 || droppedMessageCount !== reportedDroppedMessageCount;
+}
+
+function transportBusy(): boolean {
+  return (
+    ws?.readyState === WebSocket.OPEN ||
+    ws?.readyState === WebSocket.CONNECTING ||
+    ws?.readyState === WebSocket.CLOSING
+  );
+}
+
 function scheduleReconnect(): void {
-  if (!isInitialized || reconnectTimer !== null) {
+  if (!isInitialized || reconnectTimer !== null || transportBusy() || !pendingDelivery()) {
     return;
   }
+  const elapsed = lastSocketAttemptAt === 0 ? MIN_SOCKET_GAP_MS : Date.now() - lastSocketAttemptAt;
+  const delay = Math.max(0, MIN_SOCKET_GAP_MS - elapsed);
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null;
     connectWebSocket();
-  }, RECONNECT_DELAY_MS);
+  }, delay);
 }
 
 function retireSocket(socket: WebSocket): void {
@@ -203,7 +218,10 @@ function sendLossTelemetry(socket: WebSocket): boolean {
 }
 
 function flushQueue(socket: WebSocket): void {
-  while (ws === socket && socket.readyState === WebSocket.OPEN && messageQueue.length > 0) {
+  while (messageQueue.length > 0) {
+    if (ws !== socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
     const item = messageQueue[0];
     if (!item || !trySend(socket, item)) {
       return;
@@ -214,14 +232,17 @@ function flushQueue(socket: WebSocket): void {
 }
 
 function connectWebSocket(): void {
-  if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) {
+  if (!isInitialized || transportBusy() || reconnectTimer !== null) {
     return;
   }
-  if (ws) {
-    retireSocket(ws);
+  if (lastSocketAttemptAt !== 0 && Date.now() - lastSocketAttemptAt < MIN_SOCKET_GAP_MS) {
+    scheduleReconnect();
+    return;
   }
+  ws = null;
 
   try {
+    lastSocketAttemptAt = Date.now();
     const socket = new WebSocket(getLogsWebSocketUrl());
     ws = socket;
     handshakeTimer = window.setTimeout(() => {
@@ -304,12 +325,14 @@ export function stopClientLogForwarder(): void {
   messageQueue = [];
   queuedBytes = 0;
   reportedDroppedMessageCount = droppedMessageCount;
+  lastSocketAttemptAt = 0;
 }
 
 export function forwardLogToServer(line: string): void {
   const item = normalizeLine(line);
-  const socket = ws;
-  if (!socket || socket.readyState !== WebSocket.OPEN || !trySend(socket, item)) {
-    enqueue(item);
+  if (ws?.readyState === WebSocket.OPEN && trySend(ws, item)) {
+    return;
   }
+  enqueue(item);
+  scheduleReconnect();
 }

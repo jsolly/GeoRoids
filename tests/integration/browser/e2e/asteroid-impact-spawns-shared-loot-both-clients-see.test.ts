@@ -12,6 +12,7 @@ import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -46,7 +47,7 @@ test(
     const collector = new GameInteractions(collectorPage);
     const damageMessages: unknown[] = [];
     impactedPilotPage.on('websocket', (socket) => {
-      if (!/\/ws(?:\?|$)/.test(socket.url())) {
+      if (!WS_PATH_PATTERN.test(socket.url())) {
         return;
       }
       socket.on('framereceived', ({ payload }) => {
@@ -63,14 +64,14 @@ test(
     });
 
     await impactedPilot.bootGame({ kitId: 'hauler', waitForCombatReady: false });
-    await collector.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await collector.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const [impactedPilotId, collectorId] = await Promise.all([
       impactedPilot.getLocalPlayerId(),
       collector.getLocalPlayerId(),
     ]);
     await Promise.all([impactedPilot.waitForRemotePlayers(1), collector.waitForRemotePlayers(1)]);
 
-    const livesBefore = await impactedPilot.getLives();
+    const healthBefore = await impactedPilot.getShipHealth();
     const scoreBefore = await collector.getScore();
     const knownLoot = new Set((await collector.getLoot()).map((drop) => drop.id));
     damageMessages.length = 0;
@@ -80,11 +81,11 @@ test(
     await arrangeCrewField([impactedPilotId, collectorId], 'impact');
 
     await expect
-      .poll(() => impactedPilot.getLives(), {
+      .poll(() => impactedPilot.getShipHealth(), {
         timeout: 8000,
         message: 'the fixture asteroid should cost the impacted pilot one life',
       })
-      .toBeLessThan(livesBefore);
+      .toBeLessThan(healthBefore);
 
     await expect
       .poll(
@@ -171,7 +172,7 @@ test(
         message: 'the collector should grow after picking up environmental loot',
       })
       .toBeGreaterThan(startMass);
-    expect(await collector.getShipRadius()).toBeGreaterThan(startRadius);
+    expect(await collector.getShipRadius()).toBe(startRadius);
     expect(await collector.getShipMaxHealth()).toBeGreaterThan(startMaxHealth);
     expect(await collector.getScore()).toBe(scoreBefore);
 

@@ -5,10 +5,11 @@ import { Roid } from '../../../src/entities/roid/Roid';
 import {
   canDrawAsteroid,
   clearAsteroidShatters,
+  drawAsteroidShatterBursts,
   drawRoidsRelative,
   recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import * as vectorJuice from '../../../src/rendering/vectorJuice';
 import { setWindowViewport } from '../../support/viewport';
 
@@ -43,7 +44,7 @@ function asteroidScene() {
   canvasManager.destroy();
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
-  previousCanvas = document.getElementById('gameCanvas');
+  previousCanvas = document.querySelector('#gameCanvas');
   if (previousCanvas) {
     previousCanvas.replaceWith(canvas);
   } else {
@@ -64,9 +65,11 @@ function asteroidScene() {
 function recordStrokes(ctx: CanvasRenderingContext2D) {
   let points: Array<[number, number]> = [];
   let closed = false;
+  let commands: Array<'move' | 'line'> = [];
   const strokes: Array<{
     points: Array<[number, number]>;
     closed: boolean;
+    commands: typeof commands;
     style: typeof ctx.strokeStyle;
     width: number;
     alpha: number;
@@ -79,14 +82,17 @@ function recordStrokes(ctx: CanvasRenderingContext2D) {
   const stroke = ctx.stroke.bind(ctx);
   vi.spyOn(ctx, 'beginPath').mockImplementation(() => {
     points = [];
+    commands = [];
     closed = false;
     beginPath();
   });
   vi.spyOn(ctx, 'moveTo').mockImplementation((x, y) => {
+    commands.push('move');
     points.push([x, y]);
     moveTo(x, y);
   });
   vi.spyOn(ctx, 'lineTo').mockImplementation((x, y) => {
+    commands.push('line');
     points.push([x, y]);
     lineTo(x, y);
   });
@@ -98,6 +104,7 @@ function recordStrokes(ctx: CanvasRenderingContext2D) {
     strokes.push({
       points: [...points],
       closed,
+      commands: [...commands],
       style: ctx.strokeStyle,
       width: ctx.lineWidth,
       alpha: ctx.globalAlpha,
@@ -124,42 +131,50 @@ test('a destroyed asteroid shatters without its silhouette while a nearby empty-
   recordAsteroidShatter(pending, 2000);
 
   const strokes = recordStrokes(ctx);
+  const images = vi.spyOn(ctx, 'drawImage');
+  const placement = vi.spyOn(ctx, 'translate');
 
   drawRoidsRelative(pilot.ship, [normal]);
+  drawAsteroidShatterBursts(pilot.ship);
 
-  const silhouettes = strokes.filter((path) => path.closed);
-  expect(silhouettes).toHaveLength(2); // Glow and crisp passes of the identified normal rock.
-  for (const path of silhouettes) {
-    expect(path.points).toEqual([
-      [290, 210],
-      [280, 220],
-      [270, 210],
-      [280, 200],
-    ]);
+  expect(images).toHaveBeenCalledTimes(1);
+  const sprite = images.mock.calls[0]?.[0];
+  if (!(sprite instanceof HTMLCanvasElement)) {
+    throw new Error('Normal asteroid did not draw its cached silhouette');
   }
+  expect(placement).toHaveBeenCalledWith(280, 210);
+  const origin = sprite.width / 2;
+  expect(outlines.mock.calls[0]).toEqual([origin, origin, 10, 0, 4, [1], 1]);
+  expect(strokes.filter((path) => path.closed)).toEqual([]);
   const shatter = strokes.filter((path) => !path.closed);
-  expect(shatter).toHaveLength(8); // Four separated edges and four impact ticks at the destroyed rock.
-  expect(shatter.slice(0, 4).map((path) => path.points)).toEqual([
-    [
-      [494, 330],
-      [480, 344],
-    ],
-    [
-      [480, 344],
-      [466, 330],
-    ],
-    [
-      [466, 330],
-      [480, 316],
-    ],
-    [
-      [480, 316],
-      [494, 330],
-    ],
+  expect(shatter).toHaveLength(2);
+  expect(shatter[0]?.points).toEqual([
+    [494, 330],
+    [480, 344],
+    [480, 344],
+    [466, 330],
+    [466, 330],
+    [480, 316],
+    [480, 316],
+    [494, 330],
   ]);
+  expect(shatter[1]?.points).toEqual(
+    Array.from({ length: VISUAL.LASER_HIT_TICKS }, (_, index) => {
+      const tick = vectorJuice.burstTick(480, 330, (index * Math.PI) / 2, 14 * 0.25, 14 * 0.55);
+      return [
+        [tick.x1, tick.y1],
+        [tick.x2, tick.y2],
+      ];
+    }).flat()
+  );
+  expect(shatter.map((path) => path.width)).toEqual([VISUAL.ROID_STROKE_SMALL, 1]);
+  ctx.shadowBlur = VISUAL.ROID_GLOW;
+  const canvasGlow = ctx.shadowBlur;
   for (const path of shatter) {
     expect(path.style).toBe('#94a3b8');
-    expect(path.points).toHaveLength(2);
+    expect(path.alpha).toBe(1);
+    expect(path.glow).toBe(canvasGlow);
+    expect(path.commands).toEqual(Array.from({ length: 4 }, () => ['move', 'line']).flat());
     for (const [x, y] of path.points) {
       expect(x).toBeGreaterThanOrEqual(466);
       expect(x).toBeLessThanOrEqual(494);
@@ -173,8 +188,10 @@ test('a destroyed asteroid shatters without its silhouette while a nearby empty-
   outlines.mockClear();
   strokes.length = 0;
   drawRoidsRelative(pilot.ship, [normal]);
-  expect(strokes).toEqual(silhouettes);
-  expect(outlines.mock.calls.map(([x, y]) => [x, y])).toEqual([[280, 210]]);
+  drawAsteroidShatterBursts(pilot.ship);
+  expect(strokes).toEqual([]);
+  expect(outlines).not.toHaveBeenCalled();
+  expect(images.mock.calls[1]?.[0]).toBe(sprite);
 });
 
 test('large plain asteroids keep a jagged inner facet while medium, pebble and material rocks omit it', () => {
@@ -192,64 +209,65 @@ test('large plain asteroids keep a jagged inner facet while medium, pebble and m
   }
   const strokes = recordStrokes(ctx);
   const fill = vi.spyOn(ctx, 'fill');
+  const images = vi.spyOn(ctx, 'drawImage');
+  const phosphor = vi.spyOn(vectorJuice, 'strokePhosphorPolyline');
 
   drawRoidsRelative(pilot.ship, [large, medium, pebble, material]);
 
-  const outer = vectorJuice.polygonPoints(160, 150, ROID.SIZE, 0, offsets.length, offsets);
-  const inner = vectorJuice.polygonPoints(
-    160,
-    150,
-    ROID.SIZE,
-    0,
-    offsets.length,
-    offsets,
-    VISUAL.ROID_INNER_SCALE
-  );
-  const expectedContours = [
-    outer,
-    outer,
-    inner,
-    inner,
-    ...[
-      { rock: medium, x: 320 },
-      { rock: pebble, x: 460 },
-      { rock: material, x: 620 },
-    ].flatMap(({ rock, x }) => {
-      const outline = vectorJuice.polygonPoints(x, 150, rock.r, 0, offsets.length, offsets);
-      return [outline, outline];
-    }),
-  ];
-  const silhouettes = strokes.filter((path) => path.closed);
-  expect(silhouettes.map((path) => path.points)).toEqual(
-    expectedContours.map((points) => points.map(({ x, y }) => [x, y]))
-  );
-  const outerPath = silhouettes[0];
-  const innerPath = silhouettes[2];
-  if (!outerPath || !innerPath) {
-    throw new Error('Large asteroid did not draw both outer and inner contours');
+  expect(images).toHaveBeenCalledTimes(4);
+  const expectedContours = [large, medium, pebble, material].flatMap((rock, index) => {
+    const image = images.mock.calls[index]?.[0];
+    if (!(image instanceof HTMLCanvasElement)) {
+      throw new Error('Asteroid did not draw a cached silhouette');
+    }
+    const origin = image.width / 2;
+    const outer = vectorJuice.polygonPoints(origin, origin, rock.r, 0, offsets.length, offsets);
+    const contours = [outer];
+    if (rock === large) {
+      contours.push(
+        vectorJuice.polygonPoints(
+          origin,
+          origin,
+          rock.r,
+          0,
+          offsets.length,
+          offsets,
+          VISUAL.ROID_INNER_SCALE
+        )
+      );
+    }
+    return contours;
+  });
+  expect(phosphor.mock.calls.map((call) => call[1])).toEqual(expectedContours);
+  const largeSprite = images.mock.calls[0]?.[0];
+  const outer = phosphor.mock.calls[0]?.[1];
+  const inner = phosphor.mock.calls[1]?.[1];
+  const outerFirst = outer?.[0];
+  const innerFirst = inner?.[0];
+  if (!(largeSprite instanceof HTMLCanvasElement) || !outerFirst || !innerFirst) {
+    throw new Error('Large asteroid did not paint both cached contours');
   }
-  expect(outerPath.points).toHaveLength(6);
-  expect(innerPath.points).toHaveLength(6);
-  const outerFirst = outerPath.points[0];
-  const innerFirst = innerPath.points[0];
-  if (!outerFirst || !innerFirst) {
-    throw new Error('Large asteroid contours did not contain their first vertex');
-  }
-  const outerReach = Math.hypot(outerFirst[0] - 160, outerFirst[1] - 150);
-  const innerReach = Math.hypot(innerFirst[0] - 160, innerFirst[1] - 150);
+  expect(outer).toHaveLength(6);
+  expect(inner).toHaveLength(6);
+  const origin = largeSprite.width / 2;
+  const outerReach = Math.hypot(outerFirst.x - origin, outerFirst.y - origin);
+  const innerReach = Math.hypot(innerFirst.x - origin, innerFirst.y - origin);
   expect(outerReach).toBeCloseTo(ROID.SIZE * 1.1);
   expect(innerReach / outerReach).toBeCloseTo(VISUAL.ROID_INNER_SCALE);
-  expect(VISUAL.ROID_INNER_SCALE).toBeGreaterThan(0.3);
-  expect(VISUAL.ROID_INNER_SCALE).toBeLessThan(0.7);
+  expect(innerReach).toBeGreaterThan(outerReach * 0.3);
+  expect(innerReach).toBeLessThan(outerReach * 0.7);
+  expect(
+    phosphor.mock.calls.map((call) => [call[2], call[3], call[4], call[5], call[6] ?? 1])
+  ).toEqual([
+    [PALETTE.ROID, VISUAL.ROID_STROKE_LARGE, VISUAL.ROID_GLOW, true, 1],
+    [PALETTE.ROID, VISUAL.ROID_STROKE_SMALL, VISUAL.ROID_GLOW * 0.45, true, 0.62],
+    [PALETTE.ROID, VISUAL.ROID_STROKE_MEDIUM, VISUAL.ROID_GLOW, true, 1],
+    [PALETTE.ROID, VISUAL.ROID_STROKE_SMALL, VISUAL.ROID_GLOW, true, 1],
+    [PALETTE.ROID, VISUAL.ROID_STROKE_LARGE, VISUAL.ROID_GLOW, true, 1],
+  ]);
+  expect(strokes.filter((path) => path.closed)).toEqual([]);
   ctx.strokeStyle = PALETTE.ROID;
   const solid = ctx.strokeStyle;
-  expect(
-    silhouettes.filter((_, index) => [1, 5, 7, 9].includes(index)).map((path) => path.style)
-  ).toEqual([solid, solid, solid, solid]);
-  expect(silhouettes.slice(2, 4).map((path) => path.width)).toEqual([
-    VISUAL.ROID_STROKE_SMALL,
-    VISUAL.ROID_STROKE_SMALL,
-  ]);
   const details = strokes.filter((path) => !path.closed);
   expect(details.map((path) => path.points)).toEqual([
     [
@@ -268,4 +286,60 @@ test('large plain asteroids keep a jagged inner facet while medium, pebble and m
     { style: solid, alpha: ctx.globalAlpha },
   ]);
   expect(fill).not.toHaveBeenCalled();
+});
+
+test('rubble shatter keeps its drifting wobble and fading ticks halfway through its lifetime', () => {
+  const clock = vi.spyOn(performance, 'now').mockReturnValue(2000 + VISUAL.ROID_SHATTER_MS / 2);
+  const { ctx, pilot } = asteroidScene();
+  const rock = new Roid({ x: 100, y: 60 }, 14, 'rubble-shatter');
+  rock.angle = 0;
+  rock.vertices = 4;
+  rock.offsets = [1, 1, 1, 1];
+  rock.material = 'rubble';
+  recordAsteroidShatter(rock, 2000);
+  const strokes = recordStrokes(ctx);
+  drawAsteroidShatterBursts(pilot.ship);
+  const points = vectorJuice.polygonPoints(480, 330, 14, 0, 4, rock.offsets);
+  const expected = points.flatMap((a, index) => {
+    const b = points[(index + 1) % points.length];
+    if (!b) {
+      throw new Error('Missing shatter endpoint');
+    }
+    const edge = vectorJuice.driftSegment(
+      a,
+      b,
+      { x: 480, y: 330 },
+      0.5,
+      14 * VISUAL.ROID_SHATTER_SPREAD
+    );
+    const wobble = Math.sin(index * 2.4 + 4) * 14 * 0.5 * 0.3;
+    return [
+      [edge.a.x + wobble, edge.a.y - wobble],
+      [edge.b.x - wobble, edge.b.y + wobble],
+    ];
+  });
+  expect(strokes[0]?.points).toEqual(expected);
+  expect(strokes[0]?.commands).toEqual(Array.from({ length: 4 }, () => ['move', 'line']).flat());
+  expect(strokes[0]?.alpha).toBeCloseTo(1 - 0.5 * 0.85, 2);
+  ctx.shadowBlur = VISUAL.ROID_GLOW;
+  expect(strokes[0]?.glow).toBe(ctx.shadowBlur);
+  expect(strokes[1]?.points).toEqual(
+    Array.from({ length: VISUAL.LASER_HIT_TICKS }, (_, index) => {
+      const tick = vectorJuice.burstTick(
+        480,
+        330,
+        0.2 + (index * Math.PI) / 2,
+        14 * (0.25 + 0.5 * 0.35),
+        14 * (0.55 + 0.5 * 0.85)
+      );
+      return [
+        [tick.x1, tick.y1],
+        [tick.x2, tick.y2],
+      ];
+    }).flat()
+  );
+  clock.mockReturnValue(2000 + VISUAL.ROID_SHATTER_MS);
+  strokes.length = 0;
+  drawAsteroidShatterBursts(pilot.ship);
+  expect(strokes).toEqual([]);
 });

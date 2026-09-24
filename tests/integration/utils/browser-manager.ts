@@ -38,7 +38,7 @@ export class BrowserManager {
     });
   }
 
-  async createPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  async createPage(options: { hasTouch?: boolean; music?: boolean } = {}): Promise<Page> {
     if (this.cleanupFailed) {
       await this.closeAllPages();
     }
@@ -54,18 +54,26 @@ export class BrowserManager {
       options.hasTouch ? { hasTouch: true, deviceScaleFactor: 2 } : { hasTouch: false }
     );
     this.contexts.add(context);
+    await context.addInitScript((musicEnabled: boolean) => {
+      localStorage.setItem('musicOn', String(musicEnabled));
+    }, options.music === true);
     let page: Page;
     try {
       page = await context.newPage();
     } catch (error: unknown) {
+      let closeError: unknown;
       try {
         await context.close();
         this.contexts.delete(context);
-      } catch (closeError: unknown) {
-        throw new AggregateError(
-          [error, closeError],
-          'Browser context failed while creating a scenario page'
-        );
+      } catch (writeError: unknown) {
+        closeError = writeError;
+      }
+      if (closeError) {
+        const closeMessage =
+          closeError instanceof Error ? closeError.message : 'unknown close failure';
+        throw new Error(`Browser context failed while creating a scenario page (${closeMessage})`, {
+          cause: error,
+        });
       }
       throw error;
     }
@@ -94,7 +102,7 @@ export class BrowserManager {
   }
 
   /** Replace the scenario page when a test needs a different input device. */
-  async recreatePage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  async recreatePage(options: { hasTouch?: boolean; music?: boolean } = {}): Promise<Page> {
     await this.closeAllPages();
     return this.createPage(options);
   }
@@ -144,7 +152,7 @@ export class BrowserManager {
   }
 
   /** Open an additional independent browser context for a multi-client scenario. */
-  async createAdditionalPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  createAdditionalPage(options: { hasTouch?: boolean; music?: boolean } = {}): Promise<Page> {
     return this.createPage(options);
   }
 

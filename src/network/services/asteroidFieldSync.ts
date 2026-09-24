@@ -147,6 +147,8 @@ export function writeAsteroidKinematicUpdates(
   writeOptionalField(into, 'isCollabTarget', asteroid.isCollabTarget);
   writeOptionalField(into, 'miningContributors', asteroid.miningContributors);
   writeOptionalField(into, 'phenomenon', asteroid.phenomenon);
+  writeOptionalField(into, 'boost', asteroid.boost);
+  writeOptionalField(into, 'probe', asteroid.probe);
   if (asteroid.material === undefined || isAsteroidMaterial(asteroid.material)) {
     writeOptionalField(into, 'material', asteroid.material);
   } else {
@@ -204,10 +206,13 @@ export interface AsteroidKinematicTarget {
   r: number;
   isCollabTarget?: boolean;
   material?: AsteroidMaterial;
+  ore?: AsteroidMaterial | null;
   offsets?: number[];
   vertices?: number;
   jaggedness?: number;
   phenomenon?: AsteroidData['phenomenon'];
+  boost?: AsteroidData['boost'];
+  probe?: AsteroidData['probe'];
 }
 
 export function shouldSnapAsteroidPose(
@@ -230,6 +235,12 @@ export function applyAsteroidKinematics(
   updates: Partial<AsteroidData>,
   options: { snapPosition?: boolean; complete?: boolean } = {}
 ): void {
+  if (options.complete || 'probe' in updates) {
+    roid.probe = updates.probe ? { ...updates.probe } : null;
+  }
+  if (options.complete || 'boost' in updates) {
+    roid.boost = updates.boost ? { ...updates.boost } : null;
+  }
   if (options.complete) {
     if (updates.material !== undefined) {
       roid.material = updates.material;
@@ -237,6 +248,11 @@ export function applyAsteroidKinematics(
       delete roid.material;
     }
     roid.isCollabTarget = updates.isCollabTarget ?? false;
+    if (updates.ore !== undefined) {
+      roid.ore = updates.ore;
+    } else {
+      delete roid.ore;
+    }
     if (updates.surveyedBy) {
       roid.surveyedBy = [...updates.surveyedBy];
     } else {

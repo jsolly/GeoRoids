@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { SPAWN } from '../../../src/constants';
+import { TOWN_SPAWN_RADIUS } from '../../../shared/furnaces';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { resolveSpawnPosition } from '../../../src/utils/spawnPosition';
 
@@ -15,7 +15,7 @@ test('local players spawn near the arena center so co-players are in view', () =
   for (let i = 0; i < 100; i++) {
     const player = entityFactory.createLocalPlayer('Tester');
     const distanceFromCenter = Math.hypot(player.ship.position.x, player.ship.position.y);
-    expect(distanceFromCenter).toBeLessThanOrEqual(SPAWN.NEAR_CENTER_RADIUS);
+    expect(distanceFromCenter).toBeCloseTo(TOWN_SPAWN_RADIUS, 5);
   }
 });
 
@@ -23,8 +23,9 @@ test('remote players spawn on the same near-center path as local ships', () => {
   for (let i = 0; i < 40; i++) {
     const local = entityFactory.createLocalPlayer('Local');
     const remote = entityFactory.createRemotePlayer('remote', 'Remote', { x: 12, y: -8 });
-    expect(Math.hypot(local.ship.position.x, local.ship.position.y)).toBeLessThanOrEqual(
-      SPAWN.NEAR_CENTER_RADIUS
+    expect(Math.hypot(local.ship.position.x, local.ship.position.y)).toBeCloseTo(
+      TOWN_SPAWN_RADIUS,
+      5
     );
     expect(remote.ship.position).toEqual({ x: 12, y: -8 });
   }
@@ -43,5 +44,5 @@ test('two freshly spawned players are close enough to share a viewport', () => {
     a.ship.position.x - b.ship.position.x,
     a.ship.position.y - b.ship.position.y
   );
-  expect(separation).toBeLessThanOrEqual(2 * SPAWN.NEAR_CENTER_RADIUS);
+  expect(separation).toBeLessThanOrEqual(2 * TOWN_SPAWN_RADIUS);
 });

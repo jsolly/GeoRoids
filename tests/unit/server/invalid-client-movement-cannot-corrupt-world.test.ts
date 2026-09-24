@@ -14,9 +14,10 @@ const invalidMovements: Array<{ label: string; movement: Record<string, unknown>
   { label: 'null velocity', movement: { velocity: null } },
   { label: 'non-finite velocity', movement: { velocity: { x: 0, y: Number.NaN } } },
   { label: 'non-finite angle', movement: { angle: Number.POSITIVE_INFINITY } },
-  { label: 'non-finite angular velocity', movement: { angularVelocity: Number.NaN } },
   { label: 'non-boolean thrust', movement: { thrusting: 'true' } },
   { label: 'non-boolean boost', movement: { boosting: 'true' } },
+  { label: 'non-boolean boost depletion', movement: { boostDepleted: 'true' } },
+  { label: 'non-boolean overlay hold', movement: { overlayHold: 'true' } },
 ];
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
@@ -95,7 +96,6 @@ describe('invalid client movement cannot corrupt the shared world', () => {
             position: nextPosition,
             velocity: { x: 0.25, y: 0.5 },
             angle: 0.25,
-            angularVelocity: 0.5,
             thrusting: true,
             motionEpoch: pilot.playerMotion?.epoch,
             motionSequence: 1,
@@ -126,6 +126,11 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     assert.ok(pilot, 'latch pilot');
     const rock = engine.getAllAsteroids()[0];
     assert.ok(rock, 'latch asteroid');
+    // Fresh flights arrive on the town ring. Park beside the pose this test
+    // submits so the movement envelope accepts the sanitized coordinates.
+    expect(
+      engine.playerMotion.placeActorForTesting(pilot.id, { x: 5, y: 5 }, engine.getServerTime())
+    ).toBe(true);
     // The trusted entity API remains available to the authoritative ability
     // owner; the untrusted movement route may not rewrite its active endpoint.
     const latch = { ...rock.position };
@@ -155,6 +160,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
           socket: {},
           harpoonTargetId: 'missing',
           harpoonLatchPos: { x: null, y: 'bad' },
+          angularVelocity: Number.NaN,
           lasers: [{ position: null }],
           futureServerField: { poisoned: true },
         },

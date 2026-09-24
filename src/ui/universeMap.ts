@@ -1,16 +1,39 @@
+import { beltSlotPosition, beltSlots } from '../../shared/asteroidBelt';
+import { oreResource } from '../../shared/economy';
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { sectorBounds } from '../../shared/sectors';
-import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
+import { RICOCHET_COURT } from '../../shared/ricochetCourt';
+import { WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
+import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE } from '../constants';
+import { LootField } from '../entities/loot/LootField';
 import { PlayerManager } from '../entities/player/PlayerManager';
+import type { Roid } from '../entities/roid/Roid';
+import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
+import { activeScanners, scannedMaterial } from '../entities/ship/surveyScan';
+import { getWorldExploration, getWorldMapAssets, worldFurnaces } from '../network/worldExploration';
+import { getSpiderField } from '../physics/terrain/spiderSession';
+import { strokeFurnaceFireTrail } from '../rendering/furnaceRenderer';
 import {
-  getCompletedSectors,
-  getWorldExploration,
-  getWorldMapAssets,
-} from '../network/worldExploration';
+  drawFoundationMapMark,
+  drawFurnaceMapMark,
+  UNIVERSE_MAP_LANDMARK_SIZE,
+  universeMapFurnaceMarkAppearance,
+  universeMapMarkScreenSize,
+} from '../rendering/hud/furnaceMapMark';
+import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
+import { drawCourtMapMark } from '../rendering/ricochetCourtRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
+import { requestTownStoreClose } from './townStoreState';
+import {
+  canPlaceMapAssetLabel,
+  canPlaceMapCrewLabel,
+  isFiniteMapPosition,
+  type MapLabelRect,
+} from './universeMapLabels';
+import { shouldUseTouchControls } from './viewportChrome';
 
 export const UNIVERSE_MAP_IDS = {
   dialog: 'universe-map-dialog',
@@ -20,16 +43,22 @@ export const UNIVERSE_MAP_IDS = {
   center: 'universe-map-center',
   zoomIn: 'universe-map-zoom-in',
   zoomOut: 'universe-map-zoom-out',
-  zoomReadout: 'universe-map-zoom',
   status: 'universe-map-status',
   locations: 'universe-map-locations',
 } as const;
 
 export const UNIVERSE_MAP_ZOOM = {
   min: 1,
-  max: 12,
+  max: 48,
+  initial: 24,
   step: 1.35,
 } as const;
+
+export const UNIVERSE_MAP_LOCATE_LABEL = 'Center on you';
+export const DESKTOP_MAP_HELP =
+  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · Rocks pass through until you return and blink.';
+export const TOUCH_MAP_HELP =
+  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · Rocks pass through until you return and blink.';
 
 const MAP_RASTER_SIZE = 960;
 const CELLS_PER_SECTOR = 16;
@@ -61,13 +90,7 @@ type MapFrame = {
   y: number;
   size: number;
   scale: number;
-};
-
-type MapLabelRect = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
+  zoom: number;
 };
 
 type MapView = {
@@ -83,9 +106,11 @@ type UniverseMapElements = {
   center: HTMLButtonElement;
   zoomIn: HTMLButtonElement;
   zoomOut: HTMLButtonElement;
-  zoomReadout: HTMLOutputElement;
+  zoomControls: HTMLElement;
   status: HTMLElement;
   locations: HTMLUListElement;
+  help: HTMLElement;
+  compass: HTMLElement;
 };
 
 type ExplorationRaster = {
@@ -94,6 +119,12 @@ type ExplorationRaster = {
   context: CanvasRenderingContext2D | null;
 };
 
+let readMapRoids: () => readonly Roid[] = () => [];
+
+export function bindUniverseMapField(source: () => readonly Roid[]): void {
+  readMapRoids = source;
+}
+
 let initialized = false;
 let mapOpen = false;
 let frameRequest: number | null = null;
@@ -101,8 +132,7 @@ let closeInProgress = false;
 let openInputRelease: (() => void) | undefined;
 let elements: UniverseMapElements | null = null;
 let dimensions: MapCanvasDimensions = { width: 1, height: 1, dpr: 1 };
-const view: MapView = { center: { x: 0, y: 0 }, zoom: UNIVERSE_MAP_ZOOM.min };
-let hasInitialCenter = false;
+const view: MapView = { center: { x: 0, y: 0 }, zoom: UNIVERSE_MAP_ZOOM.initial };
 let nextLocationUpdateAt = 0;
 let pointerPan: { id: number; x: number; y: number } | null = null;
 const explorationRaster: ExplorationRaster = {
@@ -110,15 +140,6 @@ const explorationRaster: ExplorationRaster = {
   canvas: null,
   context: null,
 };
-
-function finitePosition(value: Position | undefined): value is Position {
-  return (
-    value !== undefined &&
-    Number.isFinite(value.x) &&
-    Number.isFinite(value.y) &&
-    Math.hypot(value.x, value.y) <= WORLD.radius * 1.25
-  );
-}
 
 function clampZoom(zoom: number): number {
   return Math.min(UNIVERSE_MAP_ZOOM.max, Math.max(UNIVERSE_MAP_ZOOM.min, zoom));
@@ -136,24 +157,70 @@ function mapFrameFor(width: number, height: number, zoom: number): MapFrame {
     y: (height - size) / 2,
     size,
     scale: (size / WORLD_DIAMETER) * zoom,
+    zoom,
+  };
+}
+
+/** Canvas rotation that puts this ship heading at the top of the chart. North is −Y. */
+export function universeMapHeadingRotation(shipAngle: number | undefined): number {
+  if (typeof shipAngle !== 'number' || !Number.isFinite(shipAngle)) {
+    return 0;
+  }
+  return shipAngle - Math.PI / 2;
+}
+
+function chartHeadingRotation(): number {
+  return universeMapHeadingRotation(
+    PlayerManager.getInstance().getLocalPlayer()?.ship.angle ?? Math.PI / 2
+  );
+}
+
+export function mapScreenDeltaToWorld(
+  dx: number,
+  dy: number,
+  scale: number,
+  headingRotation = 0
+): Position {
+  const safeScale = scale === 0 ? 1 : scale;
+  const cos = Math.cos(headingRotation);
+  const sin = Math.sin(headingRotation);
+  return {
+    x: (cos * dx + sin * dy) / safeScale,
+    y: (-sin * dx + cos * dy) / safeScale,
   };
 }
 
 export function mapWorldToCanvas(
   position: Position,
   viewCenter: Position,
-  frame: Pick<MapFrame, 'x' | 'y' | 'size' | 'scale'>
+  frame: Pick<MapFrame, 'x' | 'y' | 'size' | 'scale'>,
+  headingRotation = 0
 ): Position {
+  const dx = position.x - viewCenter.x;
+  const dy = position.y - viewCenter.y;
+  const cos = Math.cos(headingRotation);
+  const sin = Math.sin(headingRotation);
   return {
-    x: frame.x + frame.size / 2 + (position.x - viewCenter.x) * frame.scale,
-    y: frame.y + frame.size / 2 + (position.y - viewCenter.y) * frame.scale,
+    x: frame.x + frame.size / 2 + (cos * dx - sin * dy) * frame.scale,
+    y: frame.y + frame.size / 2 + (sin * dx + cos * dy) * frame.scale,
   };
 }
 
-function mapCanvasToWorld(x: number, y: number, mapFrame: MapFrame): Position {
+function mapCanvasToWorld(
+  x: number,
+  y: number,
+  mapFrame: MapFrame,
+  headingRotation: number
+): Position {
+  const delta = mapScreenDeltaToWorld(
+    x - (mapFrame.x + mapFrame.size / 2),
+    y - (mapFrame.y + mapFrame.size / 2),
+    mapFrame.scale,
+    headingRotation
+  );
   return {
-    x: view.center.x + (x - (mapFrame.x + mapFrame.size / 2)) / mapFrame.scale,
-    y: view.center.y + (y - (mapFrame.y + mapFrame.size / 2)) / mapFrame.scale,
+    x: view.center.x + delta.x,
+    y: view.center.y + delta.y,
   };
 }
 
@@ -170,12 +237,70 @@ function clampCenter(center: Position, mapFrame: MapFrame): Position {
   };
 }
 
+function isNearbyZoom(zoom: number): boolean {
+  return Math.round(zoom * 100) === Math.round(UNIVERSE_MAP_ZOOM.initial * 100);
+}
+
+function isNearbyLocalView(): boolean {
+  if (!isNearbyZoom(view.zoom)) {
+    return false;
+  }
+  const local = PlayerManager.getInstance().getLocalPlayer();
+  const target = local?.ship.position ?? { x: 0, y: 0 };
+  const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
+  const expected = clampCenter(target, frame);
+  return Math.hypot(view.center.x - expected.x, view.center.y - expected.y) < 1;
+}
+
+function positionMapOverlayControls(): void {
+  if (!elements) {
+    return;
+  }
+  const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
+  const inset = 12;
+  const size = 44;
+  elements.center.style.left = `${Math.round(frame.x + frame.size - inset - size)}px`;
+  elements.center.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
+  elements.center.style.right = 'auto';
+  elements.center.style.bottom = 'auto';
+  elements.zoomControls.style.left = `${Math.round(frame.x + inset)}px`;
+  elements.zoomControls.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
+  elements.zoomControls.style.right = 'auto';
+  elements.zoomControls.style.bottom = 'auto';
+}
+
+function updateLocateControl(): void {
+  if (!elements) {
+    return;
+  }
+  elements.center.setAttribute('aria-pressed', isNearbyLocalView() ? 'true' : 'false');
+}
+
+function syncMapInputChrome(): void {
+  if (!elements) {
+    return;
+  }
+  const touch = shouldUseTouchControls();
+  elements.dialog.classList.toggle('universe-map-touch', touch);
+  elements.toggle.classList.toggle('universe-map-touch', touch);
+  elements.help.textContent = touch ? TOUCH_MAP_HELP : DESKTOP_MAP_HELP;
+  elements.toggle.setAttribute('aria-label', touch ? 'Open universe map' : 'Open universe map (M)');
+  if (touch) {
+    elements.toggle.removeAttribute('aria-keyshortcuts');
+    elements.center.removeAttribute('aria-keyshortcuts');
+  } else {
+    elements.toggle.setAttribute('aria-keyshortcuts', 'M');
+    elements.center.setAttribute('aria-keyshortcuts', 'Home');
+  }
+}
+
 function setViewCenter(center: Position): void {
   if (!elements) {
     return;
   }
   const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
   view.center = clampCenter(center, frame);
+  updateLocateControl();
 }
 
 function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
@@ -185,11 +310,12 @@ function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
   }
 
   if (anchor) {
+    const heading = chartHeadingRotation();
     const oldFrame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
-    const anchorWorld = mapCanvasToWorld(anchor.x, anchor.y, oldFrame);
+    const anchorWorld = mapCanvasToWorld(anchor.x, anchor.y, oldFrame, heading);
     view.zoom = nextZoom;
     const nextFrame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
-    const nextAnchorWorld = mapCanvasToWorld(anchor.x, anchor.y, nextFrame);
+    const nextAnchorWorld = mapCanvasToWorld(anchor.x, anchor.y, nextFrame, heading);
     view.center = clampCenter(
       {
         x: view.center.x + (anchorWorld.x - nextAnchorWorld.x),
@@ -201,15 +327,7 @@ function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
     view.zoom = nextZoom;
     setViewCenter(view.center);
   }
-  updateZoomReadout();
-}
-
-function updateZoomReadout(): void {
-  if (!elements) {
-    return;
-  }
-  elements.zoomReadout.value = `${Math.round(view.zoom * 100)}%`;
-  elements.zoomReadout.textContent = `${Math.round(view.zoom * 100)}%`;
+  updateLocateControl();
 }
 
 function createButton(id: string, label: string, ariaLabel = label): HTMLButtonElement {
@@ -221,6 +339,26 @@ function createButton(id: string, label: string, ariaLabel = label): HTMLButtonE
   return button;
 }
 
+const LOCATE_ICON = `<svg class="universe-map-locate-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>${UNIVERSE_MAP_LOCATE_LABEL}</title><circle class="universe-map-locate-dot" cx="12" cy="12" r="3"/><circle class="universe-map-locate-ring" cx="12" cy="12" r="7"/><path class="universe-map-locate-cross" d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/></svg>`;
+
+function locateControlMarkup(): string {
+  return `<button id="${UNIVERSE_MAP_IDS.center}" type="button" class="universe-map-locate" aria-label="${UNIVERSE_MAP_LOCATE_LABEL}" title="${UNIVERSE_MAP_LOCATE_LABEL}" aria-keyshortcuts="Home" aria-pressed="true">${LOCATE_ICON}</button>`;
+}
+
+function decorateLocateControl(button: HTMLButtonElement, stage: Element): void {
+  button.classList.add('universe-map-locate');
+  button.type = 'button';
+  button.setAttribute('aria-label', UNIVERSE_MAP_LOCATE_LABEL);
+  button.setAttribute('title', UNIVERSE_MAP_LOCATE_LABEL);
+  button.setAttribute('aria-keyshortcuts', 'Home');
+  if (!button.querySelector('svg')) {
+    button.innerHTML = LOCATE_ICON;
+  }
+  if (button.parentElement !== stage) {
+    stage.append(button);
+  }
+}
+
 function createDialogMarkup(dialog: HTMLDialogElement): void {
   if (dialog.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`)) {
     return;
@@ -230,32 +368,74 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       <div>
         <p class="universe-map-eyebrow">Shared field cartography</p>
         <h2 id="universe-map-title">Universe map</h2>
-        <p class="universe-map-subtitle">Crew discoveries persist across the whole world. Zoom in for more landmark names.</p>
+        <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
       </div>
       <div class="universe-map-actions">
-        <button id="${UNIVERSE_MAP_IDS.center}" type="button">Local pilot</button>
-        <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
-        <output id="${UNIVERSE_MAP_IDS.zoomReadout}" aria-label="Map zoom">100%</output>
-        <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
-        <button id="${UNIVERSE_MAP_IDS.close}" type="button">Close <kbd>Esc</kbd></button>
+        <button id="${UNIVERSE_MAP_IDS.close}" type="button" aria-label="Close">Close <kbd>Esc</kbd></button>
       </div>
     </header>
     <div class="universe-map-stage">
       <canvas id="${UNIVERSE_MAP_IDS.canvas}" tabindex="0" role="img" aria-label="Shared universe map" aria-details="${UNIVERSE_MAP_IDS.locations}"></canvas>
       <ul id="${UNIVERSE_MAP_IDS.locations}" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
-      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i></div>
+      <div class="universe-map-zoom">
+        <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
+        <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
+      </div>
+      ${locateControlMarkup()}
     </div>
     <footer class="universe-map-footer">
-      <div class="universe-map-legend">
-        <span><i class="map-key map-key-local"></i>You</span>
-        <span><i class="map-key map-key-crew"></i>Crew</span>
-        <span><i class="map-key map-key-furnace"></i>Furnace</span>
-        <span><i class="map-key map-key-discovery"></i>Discovery</span>
-        <span><i class="map-key map-key-fog"></i>Uncharted</span>
-      </div>
+      <div class="universe-map-legend"></div>
       <p id="${UNIVERSE_MAP_IDS.status}" aria-live="polite"></p>
-      <p class="universe-map-help">Drag to pan · Scroll or +/- to zoom · M or Esc closes · Cruise continues while you read the map.</p>
+      <p class="universe-map-help">${DESKTOP_MAP_HELP}</p>
     </footer>`;
+}
+
+function drawMapLegend(dialog: HTMLDialogElement): void {
+  const legend = dialog.querySelector('.universe-map-legend');
+  if (!legend) {
+    return;
+  }
+  legend.replaceChildren();
+  for (const kind of ['You', 'Crew', 'Furnace', 'Court', 'Resources', 'Nest', 'Uncharted']) {
+    const item = document.createElement('span');
+    const canvas = document.createElement('canvas');
+    canvas.className = 'map-key';
+    canvas.width = 32;
+    canvas.height = 32;
+    canvas.setAttribute('aria-hidden', 'true');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(2, 2);
+      if (kind === 'You' || kind === 'Crew') {
+        ctx.strokeStyle = kind === 'You' ? PALETTE.LOCAL : PALETTE.REMOTE;
+        ctx.lineWidth = 1;
+        const player =
+          kind === 'You'
+            ? PlayerManager.getInstance().getLocalPlayer()
+            : PlayerManager.getInstance().getNonLocalPlayers()[0];
+        const hull = getKitHullOutline(player?.ship.kitId ?? 'scout');
+        if (traceMapPolyline(ctx, projectHullPolyline(8, 8, 6, Math.PI / 2, hull.hull), true)) {
+          ctx.stroke();
+        }
+      } else if (kind === 'Furnace') {
+        drawFurnaceMapMark(ctx, 8, 8, 6);
+      } else if (kind === 'Court') {
+        drawCourtMapMark(ctx, 8, 8, 7);
+      } else if (kind === 'Resources') {
+        drawResourceMapMark(ctx, 'asteroid', 8, 8, 5, PALETTE.ROID);
+      } else if (kind === 'Nest') {
+        drawResourceMapMark(ctx, 'nest', 8, 8, 6, PALETTE.DANGER);
+      } else {
+        ctx.fillStyle = '#050914';
+        ctx.fillRect(3, 3, 10, 10);
+        ctx.strokeStyle = PALETTE.HUD_MUTED;
+        ctx.strokeRect(3, 3, 10, 10);
+      }
+    }
+    item.append(canvas, kind);
+    legend.append(item);
+  }
 }
 
 function ensureElements(): UniverseMapElements | null {
@@ -263,7 +443,7 @@ function ensureElements(): UniverseMapElements | null {
     return null;
   }
 
-  let dialog = document.getElementById(UNIVERSE_MAP_IDS.dialog) as HTMLDialogElement | null;
+  let dialog = document.querySelector<HTMLDialogElement>(`#${UNIVERSE_MAP_IDS.dialog}`);
   if (!dialog) {
     dialog = document.createElement('dialog');
     dialog.id = UNIVERSE_MAP_IDS.dialog;
@@ -273,9 +453,9 @@ function ensureElements(): UniverseMapElements | null {
   dialog.classList.add('universe-map-dialog');
   createDialogMarkup(dialog);
 
-  let toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement | null;
+  let toggle = document.querySelector<HTMLButtonElement>(`#${UNIVERSE_MAP_IDS.toggle}`);
   if (!toggle) {
-    const gameArea = document.getElementById('gameArea') ?? document.body;
+    const gameArea = document.querySelector('#gameArea') ?? document.body;
     toggle = createButton(UNIVERSE_MAP_IDS.toggle, 'Map', 'Open universe map (M)');
     toggle.setAttribute('aria-keyshortcuts', 'M');
     gameArea.appendChild(toggle);
@@ -286,28 +466,50 @@ function ensureElements(): UniverseMapElements | null {
   const canvas = dialog.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement | null;
   const close = dialog.querySelector(`#${UNIVERSE_MAP_IDS.close}`) as HTMLButtonElement | null;
   const center = dialog.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement | null;
+  const stage = dialog.querySelector('.universe-map-stage');
+  const zoomControls = dialog.querySelector('.universe-map-zoom') as HTMLElement | null;
   const zoomIn = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement | null;
   const zoomOut = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement | null;
-  const zoomReadout = dialog.querySelector(
-    `#${UNIVERSE_MAP_IDS.zoomReadout}`
-  ) as HTMLOutputElement | null;
   const status = dialog.querySelector(`#${UNIVERSE_MAP_IDS.status}`) as HTMLElement | null;
   const locations = dialog.querySelector(
     `#${UNIVERSE_MAP_IDS.locations}`
   ) as HTMLUListElement | null;
+  const help = dialog.querySelector('.universe-map-help') as HTMLElement | null;
+  const compass = dialog.querySelector('.universe-map-compass') as HTMLElement | null;
   if (
     !canvas ||
     !close ||
     !center ||
+    !stage ||
+    !zoomControls ||
     !zoomIn ||
     !zoomOut ||
-    !zoomReadout ||
     !status ||
-    !locations
+    !locations ||
+    !help ||
+    !compass
   ) {
     return null;
   }
-  return { dialog, canvas, toggle, close, center, zoomIn, zoomOut, zoomReadout, status, locations };
+  decorateLocateControl(center, stage);
+  if (zoomControls.parentElement !== stage) {
+    stage.append(zoomControls);
+  }
+  close.setAttribute('aria-label', 'Close');
+  return {
+    dialog,
+    canvas,
+    toggle,
+    close,
+    center,
+    zoomIn,
+    zoomOut,
+    zoomControls,
+    status,
+    locations,
+    help,
+    compass,
+  };
 }
 
 function resizeCanvas(): void {
@@ -394,6 +596,44 @@ function isRevealed(position: Position, exploration: readonly ExplorationTile[])
   return cell !== null && isCellExplored(exploration, cell);
 }
 
+/** Furnace lots stay on the chart before their ground is explored. Loot does not. */
+function chartShowsAsset(asset: MapAsset, exploration: readonly ExplorationTile[]): boolean {
+  return (
+    asset.kind === 'furnace' ||
+    asset.kind === 'foundation' ||
+    isRevealed(asset.position, exploration)
+  );
+}
+
+const beltMapPositions = beltSlots().map(beltSlotPosition);
+
+function drawDiscoveredBelt(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  exploration: readonly ExplorationTile[]
+): void {
+  const revealed = beltMapPositions.filter((position) => isRevealed(position, exploration));
+  context.save();
+  context.strokeStyle = '#e9b96d';
+  context.fillStyle = '#e9b96d';
+  context.lineWidth = 1.5 / frame.scale;
+  for (const position of revealed) {
+    context.beginPath();
+    context.arc(position.x, position.y, 3 / frame.scale, 0, Math.PI * 2);
+    context.stroke();
+  }
+  const label = revealed[Math.floor(revealed.length / 2)];
+  if (label) {
+    context.save();
+    context.translate(label.x, label.y);
+    context.rotate(-chartHeadingRotation());
+    context.font = `${11 / frame.scale}px monospace`;
+    context.fillText('ASTEROID BELT', 12 / frame.scale, -15 / frame.scale);
+    context.restore();
+  }
+  context.restore();
+}
+
 function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): void {
   context.fillStyle = '#050914';
   context.fillRect(-WORLD.radius, -WORLD.radius, WORLD_DIAMETER, WORLD_DIAMETER);
@@ -422,19 +662,6 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.arc(0, 0, WORLD.radius, 0, Math.PI * 2);
   context.stroke();
 
-  context.fillStyle = hexToRgba(PALETTE.DANGER, 0.16);
-  context.strokeStyle = hexToRgba(PALETTE.DANGER, 0.7);
-  context.lineWidth = 2 / frame.scale;
-  for (const id of getCompletedSectors()) {
-    const parsed = parseSectorId(id);
-    if (!parsed) {
-      continue;
-    }
-    const bounds = sectorBounds(parsed.x, parsed.y);
-    context.fillRect(bounds.minX, bounds.minY, WORLD.sectorSize, WORLD.sectorSize);
-    context.strokeRect(bounds.minX, bounds.minY, WORLD.sectorSize, WORLD.sectorSize);
-  }
-
   context.strokeStyle = hexToRgba(PALETTE.REMOTE, 0.2);
   context.lineWidth = 1 / frame.scale;
   context.beginPath();
@@ -445,146 +672,229 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.stroke();
 }
 
+const MAP_LOCAL_SHIP_SIZE = 18;
+const MAP_CREW_SHIP_SIZE = 14;
+
+function mapStrokeWidth(screen: number, nearSize: number, frame: MapFrame): number {
+  return (1.5 * screen) / nearSize / frame.scale;
+}
+
+function mapGlowBlur(screen: number, nearSize: number, frame: MapFrame): number {
+  return (8 * screen) / nearSize / frame.scale;
+}
+
 function drawMapAsset(
   context: CanvasRenderingContext2D,
   asset: MapAsset,
   frame: MapFrame,
   showLabel: boolean
 ): void {
-  if (!finitePosition(asset.position)) {
+  if (!isFiniteMapPosition(asset.position)) {
     return;
   }
-  const size = 11 / frame.scale;
+  const screen = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom);
+  const size = screen / frame.scale;
   context.save();
   context.translate(asset.position.x, asset.position.y);
-  context.lineWidth = 1.5 / frame.scale;
-  context.shadowBlur = 8 / frame.scale;
-  const color =
-    asset.kind === 'furnace'
-      ? PALETTE.SATELLITE
-      : asset.kind === 'laserCore'
-        ? PALETTE.LASER_LOCAL
-        : asset.kind === 'satellite'
-          ? PALETTE.REMOTE
-          : PALETTE.LOOT;
-  context.strokeStyle = color;
-  context.fillStyle = hexToRgba(color, 0.2);
-  context.shadowColor = color;
-  context.beginPath();
-  switch (asset.kind) {
-    case 'furnace':
-      context.rect(-size, -size, size * 2, size * 2);
-      context.moveTo(-size * 0.55, 0);
-      context.lineTo(size * 0.55, 0);
-      context.moveTo(0, -size * 0.55);
-      context.lineTo(0, size * 0.55);
-      break;
-    case 'laserCore':
-      context.moveTo(0, -size);
-      context.lineTo(size, 0);
-      context.lineTo(0, size);
-      context.lineTo(-size, 0);
-      context.closePath();
-      context.moveTo(-size * 0.5, size * 0.5);
-      context.lineTo(size * 0.5, -size * 0.5);
-      break;
-    case 'satellite':
-      context.arc(0, 0, size * 0.55, 0, Math.PI * 2);
-      context.ellipse(0, 0, size * 1.35, size * 0.45, 0, 0, Math.PI * 2);
-      break;
-    case 'wreckage':
-      context.moveTo(-size, -size * 0.3);
-      context.lineTo(-size * 0.25, -size);
-      context.lineTo(size, -size * 0.15);
-      context.lineTo(size * 0.3, size);
-      context.lineTo(-size, size * 0.45);
-      context.closePath();
-      break;
+  context.lineWidth = mapStrokeWidth(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
+  context.shadowBlur = mapGlowBlur(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
+  if (asset.kind === 'furnace') {
+    context.save();
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    drawFurnaceMapMark(context, 0, 0, screen, universeMapFurnaceMarkAppearance(frame.zoom).lod);
+    context.restore();
+  } else if (asset.kind === 'foundation') {
+    context.save();
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    drawFoundationMapMark(context, 0, 0, screen * 0.7);
+    context.restore();
+  } else {
+    const color = asset.kind === 'satellite' ? PALETTE.SATELLITE : PALETTE.LOOT;
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    drawResourceMapMark(context, asset.kind, 0, 0, screen, color);
+    context.scale(frame.scale, frame.scale);
   }
-  context.fill();
-  context.shadowBlur = 0;
-  context.stroke();
   if (showLabel && asset.name) {
+    context.save();
+    context.rotate(-chartHeadingRotation());
     context.font = `${12 / frame.scale}px "Courier New", monospace`;
     context.fillStyle = hexToRgba(PALETTE.HUD, 0.86);
-    context.textAlign = 'left';
-    context.textBaseline = 'middle';
-    context.fillText(asset.name, size * 1.5, 0);
+    context.textAlign = 'center';
+    context.textBaseline = 'top';
+    context.fillText(asset.name, 0, size * 1.6);
+    context.restore();
   }
   context.restore();
 }
 
-function canPlaceMapAssetLabel(
-  asset: MapAsset,
+/** Local snapshot details supplement the chart's persistent landmarks. */
+function drawNearbyResources(
+  context: CanvasRenderingContext2D,
   frame: MapFrame,
-  occupied: MapLabelRect[]
+  exploration: readonly ExplorationTile[]
+): void {
+  const local = PlayerManager.getInstance().getLocalPlayer();
+  if (!local) {
+    return;
+  }
+  const scanners = activeScanners(
+    local.ship,
+    PlayerManager.getInstance()
+      .getNonLocalPlayers()
+      .map((player) => player.ship)
+  );
+  context.save();
+  context.scale(1 / frame.scale, 1 / frame.scale);
+  for (const roid of readMapRoids()) {
+    if (
+      roid.health <= 0 ||
+      !isFiniteMapPosition(roid.position) ||
+      !isRevealed(roid.position, exploration)
+    ) {
+      continue;
+    }
+    const material =
+      roid.surveyedBy && roid.surveyedBy.length > 0
+        ? (oreResource(roid) ?? undefined)
+        : scanners
+            .map((scanner) => scannedMaterial(scanner, roid))
+            .find((value) => value !== undefined);
+    drawResourceMapMark(
+      context,
+      'asteroid',
+      roid.position.x * frame.scale,
+      roid.position.y * frame.scale,
+      universeMapMarkScreenSize(material ? 5 : 3, frame.zoom),
+      asteroidMapInk(material),
+      material
+    );
+  }
+  for (const drop of LootField.getInstance().getAll()) {
+    // Wreckage and cores already have persistent landmark entries.
+    if (
+      (drop.kind !== 'shard' && drop.kind !== 'tap') ||
+      !isFiniteMapPosition(drop.position) ||
+      !isRevealed(drop.position, exploration)
+    ) {
+      continue;
+    }
+    drawResourceMapMark(
+      context,
+      drop.kind,
+      drop.position.x * frame.scale,
+      drop.position.y * frame.scale,
+      universeMapMarkScreenSize(6, frame.zoom),
+      PALETTE.LOOT
+    );
+  }
+  context.restore();
+}
+
+function drawNestMarks(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  exploration: readonly ExplorationTile[]
+): void {
+  context.save();
+  context.scale(1 / frame.scale, 1 / frame.scale);
+  for (const nest of getSpiderField().nests) {
+    if (!isFiniteMapPosition(nest.position) || !isRevealed(nest.position, exploration)) {
+      continue;
+    }
+    drawResourceMapMark(
+      context,
+      'nest',
+      nest.position.x * frame.scale,
+      nest.position.y * frame.scale,
+      universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom),
+      PALETTE.DANGER
+    );
+  }
+  context.restore();
+}
+
+function traceMapPolyline(
+  context: CanvasRenderingContext2D,
+  points: readonly Position[],
+  closed: boolean
 ): boolean {
-  if (!asset.name || !finitePosition(asset.position)) {
+  const first = points[0];
+  if (!first) {
     return false;
   }
-
-  const fontSize = 12 / frame.scale;
-  const iconSize = 11 / frame.scale;
-  const gap = 6 / frame.scale;
-  const left = asset.position.x + iconSize * 1.5;
-  const top = asset.position.y - fontSize / 2 - gap;
-  const rect: MapLabelRect = {
-    left,
-    right: left + asset.name.length * fontSize * 0.62 + gap,
-    top,
-    bottom: top + fontSize + gap * 2,
-  };
-
-  if (
-    occupied.some(
-      (other) =>
-        rect.left < other.right &&
-        rect.right > other.left &&
-        rect.top < other.bottom &&
-        rect.bottom > other.top
-    )
-  ) {
-    return false;
+  context.beginPath();
+  context.moveTo(first.x, first.y);
+  for (let index = 1; index < points.length; index++) {
+    const point = points[index];
+    if (point) {
+      context.lineTo(point.x, point.y);
+    }
   }
-  occupied.push(rect);
+  if (closed) {
+    context.closePath();
+  }
   return true;
 }
 
-function drawCrew(context: CanvasRenderingContext2D, frame: MapFrame): number {
+function drawCrew(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  occupied: MapLabelRect[]
+): number {
   const local = PlayerManager.getInstance().getLocalPlayer();
   const crew = PlayerManager.getInstance().getNonLocalPlayers();
   const players = local ? [local, ...crew] : crew;
   for (const player of players) {
     const position = player.ship.position;
-    if (!finitePosition(position)) {
+    if (!isFiniteMapPosition(position)) {
       continue;
     }
-    const size = (player.type === 'local' ? 16 : 12) / frame.scale;
-    const color = player.type === 'local' ? PALETTE.LOCAL : player.color;
+    const nearSize = player.type === 'local' ? MAP_LOCAL_SHIP_SIZE : MAP_CREW_SHIP_SIZE;
+    const screen = universeMapMarkScreenSize(nearSize, frame.zoom);
+    const size = screen / frame.scale;
+    const color = player.ship.color;
+    const outline = getKitHullOutline(player.ship.kitId);
     context.save();
     context.translate(position.x, position.y);
-    context.rotate(-player.ship.angle);
-    context.lineWidth = 1.5 / frame.scale;
+    context.lineWidth = mapStrokeWidth(screen, nearSize, frame);
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
     context.strokeStyle = color;
     context.fillStyle = hexToRgba(color, player.type === 'local' ? 0.22 : 0.12);
     context.shadowColor = color;
-    context.shadowBlur = 8 / frame.scale;
-    context.beginPath();
-    context.moveTo(size, 0);
-    context.lineTo(-size * 0.7, -size * 0.62);
-    context.lineTo(-size * 0.45, 0);
-    context.lineTo(-size * 0.7, size * 0.62);
-    context.closePath();
-    context.fill();
-    context.shadowBlur = 0;
-    context.stroke();
-    if (view.zoom >= 1.35 && player.name) {
-      context.rotate(player.ship.angle);
+    context.shadowBlur = mapGlowBlur(screen, nearSize, frame);
+    const hull = projectHullPolyline(0, 0, size, player.ship.angle, outline.hull);
+    if (traceMapPolyline(context, hull, outline.hull.closed)) {
+      context.fill();
+      context.shadowBlur = 0;
+      context.stroke();
+    }
+    for (const extra of outline.extras) {
+      const points = projectHullPolyline(0, 0, size, player.ship.angle, extra);
+      if (traceMapPolyline(context, points, extra.closed)) {
+        context.stroke();
+      }
+    }
+    if (
+      view.zoom >= 1.35 &&
+      canPlaceMapCrewLabel(
+        player.name,
+        position,
+        size,
+        frame,
+        view.center,
+        occupied,
+        chartHeadingRotation()
+      )
+    ) {
+      context.save();
+      context.rotate(-chartHeadingRotation());
       context.font = `${11 / frame.scale}px "Courier New", monospace`;
       context.fillStyle = hexToRgba(PALETTE.HUD, 0.9);
       context.textAlign = 'left';
       context.textBaseline = 'bottom';
       context.fillText(player.name, size * 1.4, -size);
+      context.restore();
     }
     context.restore();
   }
@@ -595,12 +905,25 @@ function formatCoordinate(value: number): string {
   return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
 }
 
+const NIBBLE_POPCOUNT = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+
+function exploredCellCount(tiles: readonly ExplorationTile[]): number {
+  let count = 0;
+  for (const tile of tiles) {
+    for (const char of tile.bits) {
+      const nibble = Number.parseInt(char, 16);
+      count += NIBBLE_POPCOUNT[nibble] ?? 0;
+    }
+  }
+  return count;
+}
+
 function updateStatus(revealedAssetCount: number, crewCount: number): void {
   if (!elements) {
     return;
   }
-  const exploredCells = getWorldExploration().length;
-  elements.status.textContent = `Sector ${sectorAt(view.center).x},${sectorAt(view.center).y} · X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored sectors`;
+  const exploredCells = exploredCellCount(getWorldExploration());
+  elements.status.textContent = `X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored cells`;
 }
 
 function updateAccessibleLocations(assets: readonly MapAsset[]): void {
@@ -611,10 +934,23 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
   const crew = PlayerManager.getInstance().getNonLocalPlayers();
   const players = local ? [local, ...crew] : crew;
+  const knownBelt = beltMapPositions.find((position) =>
+    isRevealed(position, getWorldExploration())
+  );
   const locations = [
+    ...(knownBelt
+      ? [{ name: 'Asteroid belt · rich mining / surface crawlers', position: knownBelt }]
+      : []),
+    { name: `${RICOCHET_COURT.name} · bank-shot dueling`, position: RICOCHET_COURT.center },
     ...assets.map((asset) => ({ name: `${asset.name} (${asset.kind})`, position: asset.position })),
+    ...getSpiderField()
+      .nests.filter(
+        (nest) =>
+          isFiniteMapPosition(nest.position) && isRevealed(nest.position, getWorldExploration())
+      )
+      .map((nest) => ({ name: 'Spider nest · guarded resource', position: nest.position })),
     ...players
-      .filter((player) => finitePosition(player.ship.position))
+      .filter((player) => isFiniteMapPosition(player.ship.position))
       .map((player) => ({
         name: `${player.name}${player.type === 'local' ? ' (you)' : ' (crew)'}`,
         position: player.ship.position,
@@ -629,11 +965,59 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   );
 }
 
+/** Lit furnaces only. Dark lots stay marked, with no line back to Town Square. */
+function drawLitFurnacePipes(context: CanvasRenderingContext2D, frame: MapFrame): void {
+  const now = performance.now();
+  const width = 2.6 / frame.scale;
+  for (const lot of CIVIC_LOTS) {
+    if (!worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    const hop = pipeHopToParent(lot.id);
+    strokeFurnaceFireTrail(context, hop, hop.length, now, width, 12 / frame.scale, 480);
+  }
+}
+
+function drawCourtLandmark(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  labelRects: MapLabelRect[]
+): void {
+  const markSize = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom);
+  const showLabel = canPlaceMapAssetLabel(
+    { name: RICOCHET_COURT.name, position: RICOCHET_COURT.center },
+    frame,
+    view.center,
+    labelRects,
+    chartHeadingRotation()
+  );
+  context.save();
+  context.translate(RICOCHET_COURT.center.x, RICOCHET_COURT.center.y);
+  context.save();
+  context.scale(1 / frame.scale, 1 / frame.scale);
+  drawCourtMapMark(context, 0, 0, markSize);
+  context.restore();
+  if (showLabel) {
+    context.rotate(-chartHeadingRotation());
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    context.font = '12px "Courier New", monospace';
+    context.textAlign = 'center';
+    context.textBaseline = 'top';
+    context.fillStyle = hexToRgba(PALETTE.REMOTE, 0.9);
+    context.fillText(RICOCHET_COURT.name, 0, markSize * 1.6);
+  }
+  context.restore();
+}
+
 function renderMap(): void {
   if (!elements || !mapOpen) {
     return;
   }
   resizeCanvas();
+  positionMapOverlayControls();
+  updateLocateControl();
+  const heading = chartHeadingRotation();
+  elements.compass.style.transform = `rotate(${heading}rad)`;
   const context = elements.canvas.getContext('2d');
   if (!context) {
     return;
@@ -649,18 +1033,21 @@ function renderMap(): void {
   context.rect(frame.x, frame.y, frame.size, frame.size);
   context.clip();
   context.translate(frame.x + frame.size / 2, frame.y + frame.size / 2);
+  context.rotate(heading);
   context.scale(frame.scale, frame.scale);
   context.translate(-view.center.x, -view.center.y);
 
   const exploration = getWorldExploration();
   drawMapBackground(context, frame);
+  drawLitFurnacePipes(context, frame);
+  drawNearbyResources(context, frame, exploration);
+  drawDiscoveredBelt(context, frame, exploration);
   let revealedAssetCount = 0;
   let drawnLabelCount = 0;
-  const revealedAssets = getWorldMapAssets().filter((asset) =>
-    isRevealed(asset.position, exploration)
-  );
+  const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));
   updateAccessibleLocations(revealedAssets);
   const labelRects: MapLabelRect[] = [];
+  drawCourtLandmark(context, frame, labelRects);
   revealedAssets.sort((left, right) => {
     const furnacePriority = Number(right.kind === 'furnace') - Number(left.kind === 'furnace');
     if (furnacePriority !== 0) {
@@ -681,13 +1068,16 @@ function renderMap(): void {
   for (const asset of revealedAssets) {
     revealedAssetCount++;
     const labelAllowed = view.zoom >= MAP_LABEL_ZOOM || drawnLabelCount < MAP_DEFAULT_LABEL_LIMIT;
-    const showLabel = labelAllowed && canPlaceMapAssetLabel(asset, frame, labelRects);
+    const showLabel =
+      labelAllowed &&
+      canPlaceMapAssetLabel(asset, frame, view.center, labelRects, chartHeadingRotation());
     if (showLabel) {
       drawnLabelCount++;
     }
     drawMapAsset(context, asset, frame, showLabel);
   }
-  const crewCount = drawCrew(context, frame);
+  drawNestMarks(context, frame, exploration);
+  const crewCount = drawCrew(context, frame, labelRects);
   context.restore();
 
   context.save();
@@ -696,12 +1086,10 @@ function renderMap(): void {
   context.strokeRect(frame.x, frame.y, frame.size, frame.size);
   context.fillStyle = hexToRgba(PALETTE.HUD, 0.72);
   context.font = '10px "Courier New", monospace';
-  context.textAlign = 'left';
-  context.textBaseline = 'top';
-  context.fillText('NORTH', frame.x + 8, frame.y + 8);
   context.textAlign = 'right';
+  context.textBaseline = 'top';
   context.fillText(
-    `${Math.round(WORLD.radius / 1000)}k radius`,
+    `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
     frame.x + frame.size - 8,
     frame.y + 8
   );
@@ -735,6 +1123,7 @@ function openMap(): void {
   if (!elements || mapOpen || !document.body.classList.contains('in-play')) {
     return;
   }
+  requestTownStoreClose();
   try {
     elements.dialog.showModal();
   } catch (error) {
@@ -748,15 +1137,15 @@ function openMap(): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
   mapOpen = true;
   nextLocationUpdateAt = 0;
-  if (!hasInitialCenter) {
-    view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
-    hasInitialCenter = true;
-  }
+  syncMapInputChrome();
+  drawMapLegend(elements.dialog);
+  view.zoom = UNIVERSE_MAP_ZOOM.initial;
+  view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
   resizeCanvas();
   setViewCenter(view.center);
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameMapOpen'));
-  updateZoomReadout();
+  playFeedback('interface');
   renderMap();
   startRenderLoop();
   elements.close.focus({ preventScroll: true });
@@ -773,6 +1162,7 @@ function closeMap(): void {
   elements.dialog.close();
   closeInProgress = false;
   window.dispatchEvent(new CustomEvent('gameMapClose'));
+  playFeedback('interface');
 }
 
 function handleDialogClosed(): void {
@@ -783,6 +1173,7 @@ function handleDialogClosed(): void {
   pointerPan = null;
   stopRenderLoop();
   window.dispatchEvent(new CustomEvent('gameMapClose'));
+  playFeedback('interface');
 }
 
 function handleMapKeydown(ev: KeyboardEvent): void {
@@ -817,6 +1208,12 @@ function handleMapKeydown(ev: KeyboardEvent): void {
     closeMap();
     return;
   }
+  if (ev.code === 'Home') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    centerOnLocalPlayer();
+    return;
+  }
   if (ev.target instanceof HTMLButtonElement) {
     ev.stopPropagation();
     return;
@@ -847,9 +1244,6 @@ function handleMapKeydown(ev: KeyboardEvent): void {
     case 'NumpadSubtract':
       setViewZoom(view.zoom / UNIVERSE_MAP_ZOOM.step);
       break;
-    case 'Home':
-      centerOnLocalPlayer();
-      break;
     default:
       if (!BLOCKED_GAMEPLAY_KEYS.has(ev.code)) {
         return;
@@ -857,7 +1251,8 @@ function handleMapKeydown(ev: KeyboardEvent): void {
       break;
   }
   if (panX !== 0 || panY !== 0) {
-    setViewCenter({ x: view.center.x + panX, y: view.center.y + panY });
+    const pan = mapScreenDeltaToWorld(panX, panY, 1, chartHeadingRotation());
+    setViewCenter({ x: view.center.x + pan.x, y: view.center.y + pan.y });
   }
   ev.preventDefault();
   ev.stopPropagation();
@@ -876,6 +1271,7 @@ function canvasPoint(ev: PointerEvent | WheelEvent): { x: number; y: number } | 
 
 function centerOnLocalPlayer(): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
+  setViewZoom(UNIVERSE_MAP_ZOOM.initial);
   setViewCenter(local?.ship.position ?? { x: 0, y: 0 });
 }
 
@@ -901,9 +1297,15 @@ function onPointerMove(ev: PointerEvent): void {
     return;
   }
   const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
+  const pan = mapScreenDeltaToWorld(
+    point.x - pointerPan.x,
+    point.y - pointerPan.y,
+    frame.scale,
+    chartHeadingRotation()
+  );
   setViewCenter({
-    x: view.center.x - (point.x - pointerPan.x) / frame.scale,
-    y: view.center.y - (point.y - pointerPan.y) / frame.scale,
+    x: view.center.x - pan.x,
+    y: view.center.y - pan.y,
   });
   pointerPan.x = point.x;
   pointerPan.y = point.y;
@@ -967,6 +1369,7 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
   elements.canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keydown', handleMapKeydown, true);
   window.addEventListener('resize', () => {
+    syncMapInputChrome();
     if (mapOpen) {
       resizeCanvas();
       renderMap();
@@ -976,10 +1379,10 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
     const wasOpen = mapOpen;
     closeMap();
     if (wasOpen) {
-      document.getElementById('playerNameInput')?.focus({ preventScroll: true });
+      document.querySelector<HTMLInputElement>('#playerNameInput')?.focus({ preventScroll: true });
     }
   });
-  updateZoomReadout();
+  syncMapInputChrome();
 }
 
 export function closeUniverseMap(): void {

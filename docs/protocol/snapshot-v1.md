@@ -18,6 +18,12 @@ receive HTTP 426 before upgrade and must refresh. The join message is validated
 again, so the URL parameter alone does not grant access. The client also rejects
 an unsupported server acknowledgment. No protocol rollout or rollback flags exist.
 
+Updated servers include `boost: {phase, charge}` in every player row: phase is
+`idle`, `active`, or `exhausted`, and charge is a fraction from zero to one. The
+field remains optional while client and server deploy independently. If an older
+server omits it, the client keeps its finite predicted tank without replenishing
+or resetting it. Deploy the server first to enforce charge authoritatively.
+
 ## Wire contract
 
 The envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
@@ -31,12 +37,39 @@ named optional fields. An omitted field is unchanged. Collection patches contain
 `add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
 `order` (complete ID order when membership/order changes). Empty arrays are
 complete empty collections. Removed remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
-Hauler snapshots include optional `haulerUtility` (`resource_tap` or
-`tow_cable`; missing means tow cable). Loot kind `tap` is a Resource Tap
+Hauler snapshots include optional `haulerUtility` (`resource_tap`,
+`boost_coupling`, or `tow_cable`; missing means tow cable). Loot kind `tap` is a Resource Tap
 canister. Harpoon attachments persist until release, delivery, target removal, death or
 excessive cable separation. An explicit null target clears the client's cached
 latch. Reconnection uses authoritative attachment state and never replays an
 ability request.
+
+Scout snapshots include optional `scoutUtility` (`mineral_scan` or
+`survey_probe`; missing means mineral scan). Retired wire token `build_furnace`
+still decodes and readers map it to mineral scan; `setScoutUtility` rejects
+it. Near a dark furnace lot within approach range, `useAbility` builds that
+furnace instead of launching the equipped scan or probe. Clients never submit a
+probe pose, target, health, or expiry.
+An asteroid's optional `probe` stores its beacon ID, owner, health, maximum
+health, attachment and expiry times in epoch milliseconds, and its local angle
+and radial offset. The client derives the moving beacon pose from the host.
+An explicit null or absence in a complete asteroid row clears the beacon.
+The server owns attachment, damage, scan pulses, expiry, and replacement.
+
+`civicModules` lists lit furnaces with `builderName` and an optional
+`builderId`. That id is the public pilot who paid; older unnamed furnaces omit
+it. Attribution does not change delivery rewards. `buyStoreItem` accepts the
+socket owner's id and catalog `offerId`. The server checks living state,
+Town Square proximity, settlement level, bank balance, and existing receipt.
+Success returns `townStoreResult` with a notice, banked `score`, and `purchases`.
+Repeated purchases spend nothing. Placeholder offers grant no gameplay effect.
+Old owned hull colors remain readable, but paint and life purchases are retired.
+
+Entities carry `cargo`, banked `score`, and `purchases`; there is no lives field.
+World snapshots include `settlement` with level, points and four resource balances.
+Asteroids may contain `ore` (null means barren); older rows derive it from a stable
+ID hash. Point loot has kind `points` and a point quantity. Furnace refinement
+credits resources once per rock and personal rewards once per distinct contributor.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
@@ -79,7 +112,7 @@ next delta. Backpressure above 1 MiB, failed writes and explicitly requested
 resynchronization force the next send to be full.
 Excluded recipients keep their own baseline. Each recipient receives nearby
 asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
-The crew roster, shared exploration, completed sectors and revealed `mapAssets` remain global.
+The crew roster, shared exploration, and revealed `mapAssets` remain global.
 These lightweight furnace and valuable-drop markers supply the universe map;
 they do not require distant asteroid geometry. The outbound budget accommodates
 a fully explored 120,000-unit-wide atlas on late joins and resynchronization.
@@ -221,3 +254,40 @@ position, velocity, or other authoritative movement state. The client rebases
 each authoritative frame and replays only its bounded unacknowledged input queue.
 A new handoff epoch and reachable-pose acknowledgment are required before free
 prediction resumes. Server time and kit speed bound all subsequent free poses.
+
+## Ship boost budget
+
+Movement poses carry a boolean `boosting` request and a `boostDepleted` advisory.
+The advisory spends the last fraction when client prediction reaches empty
+before its next pose arrives; it can never grant charge or restart a tank. The server owns the charge
+budget using its monotonic elapsed clock, not the client's packet frequency or
+charge claims. Repeated true requests cannot extend an active burst or restart
+an exhausted tank. After exhaustion, a false request followed by a fresh true
+request is needed once any charge has returned. Activation interrupts recharge;
+there is no full-tank requirement. Limits live in `shared/shipBoost.ts`.
+
+Snapshots carry the authoritative boost phase and remaining charge. Local
+prediction drains at the fixed simulation rate and reconciles against motion
+acknowledgments without letting an older echo undo a newer toggle. Active echoes
+cannot replenish an active tank or restart a locally exhausted one. Respawns
+restore a full tank; brief reconnects preserve the tank, and persisted recent
+flights restore it with elapsed inactive recharge. Menus stop active boost.
+
+## Asteroid belt
+
+`beltRecovery` lists imminent belt replacements with `slot`, `position`, `size`
+and absolute `recoverAt` time. An empty list clears warnings. Clients draw a
+non-colliding amber ring before the authoritative replacement appears.
+
+Belt spiders share `spiderField.spiders` with terrain spiders. Their `crawler`
+object contains `hostId`, the surface `anchor`, phase (`crawling`, `winding`,
+`lunging`, `recovering` or `escaping`) and normalized `progress`. Position, health and
+attack targets remain server-owned. Clients render rock-occluded crawlers as
+faint silhouettes, rather than exposing a shootable target through cover.
+`beltCrawlerHealth` on an asteroid carries persistent occupant health; parallel
+`beltCrawlerIds` retain identity when a spider transfers to another host. Zero
+health entries prevent revival on sector reload. During `escaping`, `hostId`
+and `anchor` identify the destination, while `position` follows the visible leap.
+This phase covers both pursuit hops between living rocks and escapes from a
+destroyed host. The client folds the legs instead of drawing feet attached across
+the gap.

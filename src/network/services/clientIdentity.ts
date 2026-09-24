@@ -20,7 +20,7 @@ export function readOrCreateClientId(
   return created;
 }
 
-/** Game-over / Start mint a new tab id so we do not rejoin a 0-life ship. */
+/** Start mints a new tab identity; the private resume token preserves pilot progress. */
 export function replaceStoredClientId(storage?: Pick<Storage, 'setItem'> | null): string {
   const created = createClientId();
   storage?.setItem(CLIENT_ID_STORAGE_KEY, created);

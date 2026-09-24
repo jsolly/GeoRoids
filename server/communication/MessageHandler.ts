@@ -1,8 +1,11 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
+import { isTownSquareArrival } from '../../shared/furnaces';
+import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
-import type { PlayerShotAcknowledgement } from '../../shared-types';
+import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
 import { sanitizePlayerName } from '../../src/utils/playerName';
 import type { GameEntity } from '../core/EntityManager';
@@ -49,9 +52,26 @@ export class MessageHandler {
       return;
     }
     const command = decoded.command;
+    const commandType = command.type;
+    if (
+      this.gameEngine.getPlayerBySocket(ws)?.furnaceTransit &&
+      [
+        'update',
+        'shoot',
+        'collisionDamage',
+        'useAbility',
+        'equipSatellite',
+        'setHaulerUtility',
+        'setScoutUtility',
+        'buyShipPaint',
+        'buyExtraLife',
+      ].includes(commandType)
+    ) {
+      return;
+    }
 
     try {
-      switch (command.type) {
+      switch (commandType) {
         case 'join':
           this.handleJoin(ws, command);
           break;
@@ -72,12 +92,47 @@ export class MessageHandler {
           }
           break;
 
+        case 'travelFurnace': {
+          const owner = this.gameEngine.getPlayerBySocket(ws);
+          if (owner?.id !== command.id) {
+            break;
+          }
+          const issue = this.gameEngine.travelFurnace(command.id, command.destinationId);
+          ws.send(
+            JSON.stringify({
+              type: 'furnaceTravelResult',
+              data: { ok: !issue, message: issue ?? 'Travelling' },
+              timestamp: this.gameEngine.getServerTime(),
+            })
+          );
+          if (!issue) {
+            this.broadcaster.broadcastGameState();
+          }
+          break;
+        }
+
         case 'useAbility':
           this.handleUseAbility(ws, command);
           break;
 
+        case 'equipSatellite': {
+          const player = this.gameEngine.getPlayerBySocket(ws);
+          if (
+            player?.id === command.id &&
+            this.gameEngine.equipSatellite(command.id, command.pickupId)
+          ) {
+            this.broadcaster.broadcastGameState();
+          }
+          break;
+        }
         case 'setHaulerUtility':
           this.handleSetHaulerUtility(ws, command);
+          break;
+        case 'setScoutUtility':
+          this.handleSetScoutUtility(ws, command);
+          break;
+        case 'buyStoreItem':
+          this.handleBuyStoreItem(ws, command);
           break;
 
         case 'update':
@@ -107,12 +162,15 @@ export class MessageHandler {
         case 'ping':
           this.handlePing(ws, command.probeId);
           break;
+
+        default:
+          throw new Error(`Unexpected client command type: ${commandType}`);
       }
     } catch (error) {
       logger.error(
         'Error handling message',
         {
-          messageType: command.type,
+          messageType: commandType,
           messageId: 'id' in command ? command.id : '<missing>',
         },
         error
@@ -194,7 +252,9 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'The game server is full');
         return;
       }
-      player = this.gameEngine.addPlayer(id, name, ws, command.position, command.kitId);
+      const arrival =
+        command.position && isTownSquareArrival(command.position) ? command.position : undefined;
+      player = this.gameEngine.addPlayer(id, name, ws, arrival, command.kitId);
       player.asteroidInteractions = 1;
       const registered = this.gameEngine.registerPilot(player, ws, command.clientReleaseId);
       if (!registered.ok) {
@@ -273,16 +333,22 @@ export class MessageHandler {
       return;
     }
 
+    this.gameEngine.setOverlayHold(id, update.overlayHold === true);
+
     // Ignore movement updates while the player is dead, exploding, or waiting to
     // respawn. Otherwise the client's stale position keeps overwriting the
     // server-chosen respawn position, leaving the ship frozen where it died
-    // (e.g. stuck outside the boundary at full health).
-    const existing = this.gameEngine.getPlayer(id);
-    if (
-      existing &&
-      (existing.exploding || existing.respawnTimer !== undefined || existing.health <= 0)
-    ) {
+    // (e.g. stuck outside the boundary at full health). Overlay hold still
+    // latches above so closing a menu during that window cannot stick forever.
+    const held = this.gameEngine.getPlayer(id);
+    if (held && (held.exploding || held.respawnTimer !== undefined || held.health <= 0)) {
       return;
+    }
+    if (held?.overlayHold === true) {
+      update.position = { ...held.position };
+      update.velocity = { x: 0, y: 0 };
+      update.thrusting = false;
+      update.boosting = false;
     }
 
     if (
@@ -310,6 +376,7 @@ export class MessageHandler {
         angle: update.angle,
         thrusting: update.thrusting,
         boosting: update.boosting === true,
+        boostDepleted: update.boostDepleted === true,
       },
       motionNow
     );
@@ -329,6 +396,19 @@ export class MessageHandler {
         receivedAt,
         command.motionSequence
       );
+    }
+    // Only the first pose after a block carries its credit, so this fires once
+    // per session per stall and marks where the old one-second cap would have
+    // rebased an honest pilot.
+    if (outcome.ok && outcome.blockedMs >= MAX_TICK_DEBT_MS) {
+      logger.warn('STATE', 'motion_blocked_time_credited', {
+        releaseId: SERVER_RELEASE_ID,
+        playerId: socketPlayer.id,
+        receivedAt,
+        gameTime: this.gameEngine.getDiagnostics().gameTime,
+        receivedSequence: command.motionSequence,
+        blockedMs: outcome.blockedMs,
+      });
     }
   }
 
@@ -391,7 +471,7 @@ export class MessageHandler {
       attackerId,
       damage,
       remainingHealth: outcome.entity.health,
-      remainingLives: outcome.entity.lives,
+
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
@@ -428,6 +508,42 @@ export class MessageHandler {
     this.broadcaster.broadcastGameState();
   }
 
+  private handleBuyStoreItem(ws: WebSocket, command: CommandOf<'buyStoreItem'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id) {
+      return;
+    }
+    const issue = this.gameEngine.buyStoreItem(command.id, command.offerId);
+    const pilot = this.gameEngine.getPlayer(command.id);
+    ws.send(
+      JSON.stringify({
+        type: 'townStoreResult',
+        data: issue
+          ? { message: issue }
+          : {
+              message: this.gameEngine.townStoreNotice(command.offerId),
+              score: pilot?.score,
+              purchases: pilot?.purchases,
+            },
+        timestamp: Date.now(),
+      })
+    );
+    if (!issue) {
+      this.broadcaster.broadcastGameState();
+    }
+  }
+
+  private handleSetScoutUtility(ws: WebSocket, command: CommandOf<'setScoutUtility'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id || socketPlayer.kitId !== 'scout') {
+      return;
+    }
+    if (!this.gameEngine.setScoutUtility(command.id, command.utilityId)) {
+      return;
+    }
+    this.broadcaster.broadcastGameState();
+  }
+
   private handleUseAbility(ws: WebSocket, command: CommandOf<'useAbility'>): void {
     const playerId = command.id;
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
@@ -440,7 +556,25 @@ export class MessageHandler {
     if (command.kitId !== undefined && command.kitId !== socketPlayer.kitId) {
       return;
     }
+    const latchedTarget = socketPlayer.harpoonTargetId
+      ? this.gameEngine.getAsteroid(socketPlayer.harpoonTargetId)
+      : undefined;
+    const wasArmed = latchedTarget?.boost?.phase === 'armed';
+    const offeringBuild =
+      socketPlayer.kitId === 'scout' &&
+      scoutAbilityBuildsAt(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
+    if (offeringBuild) {
+      ws.send(
+        JSON.stringify({
+          type: 'furnaceBuildResult',
+          data: activated
+            ? this.gameEngine.furnaceBuildNotice()
+            : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
+          timestamp: Date.now(),
+        })
+      );
+    }
     if (!activated) {
       return;
     }
@@ -463,7 +597,10 @@ export class MessageHandler {
           : {}),
 
         abilityActiveFrames: entity.abilityActiveFrames,
-      },
+        ...(wasArmed && latchedTarget?.boost?.phase === 'burning'
+          ? { boostIgnitionPosition: { ...latchedTarget.position } }
+          : {}),
+      } satisfies AbilityUsedEvent,
       timestamp: sentAt,
     });
     this.broadcaster.broadcastGameState();
@@ -523,9 +660,8 @@ export class MessageHandler {
       return;
     }
 
-    // The active server owns field creation and replenishment. Keep this
-    // message as an idempotent resync for reconnecting clients, but do not
-    // trust a client-requested count as the source of world state.
+    // The active server owns field creation and replenishment. This message
+    // is an idempotent resync for reconnecting clients.
     const created = this.gameEngine.ensureAsteroidField();
     if (created.length > 0) {
       this.broadcaster.broadcastAsteroidCreation(created);
@@ -589,6 +725,7 @@ export class MessageHandler {
       ...(motion
         ? { motionEpoch: motion.epoch, motionAck: motion.ack, motionMode: motion.mode }
         : {}),
+      ...(outcome.envelope ? { envelope: outcome.envelope } : {}),
       ...(previous?.suppressed ? { suppressed: previous.suppressed } : {}),
     });
     this.motionRejections.set(ws, { lastThrottleAt: throttleAt, suppressed: 0 });

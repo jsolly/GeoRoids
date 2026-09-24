@@ -62,7 +62,7 @@ describe('server-authoritative health regeneration', () => {
     expect(ship.health).toBeCloseTo(healthBeforeSecondHit - 1 + calculateHealthRegenPerFrame());
   });
 
-  test('a client update cannot clear the server timer and a last-life ship stays dead', () => {
+  test('a client update cannot clear the server timer and the dead ship waits for respawn', () => {
     const ship = world.entity(pilot);
     world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     const delay = ship.healthRegenTimer;
@@ -74,11 +74,10 @@ describe('server-authoritative health regeneration', () => {
     });
     expect(ship.healthRegenTimer).toBe(delay);
 
-    ship.lives = 0;
     world.engine.handleShipDamage(pilot.id, 'asteroid', ship.health);
     expect(ship.health).toBe(0);
     world.tick(SHIP.EXPLODE_DURATION_FRAMES + SHIP.RESPAWN_DELAY_FRAMES + 1);
-    expect(ship.health).toBe(0);
+    expect(ship.health).toBe(SHIP.MAX_HEALTH);
     expect(ship.respawnTimer).toBeUndefined();
   });
 });

@@ -8,6 +8,7 @@ vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 beforeEach(() => {
   vi.stubEnv('VERCEL_GIT_COMMIT_SHA', undefined);
   vi.stubEnv('RAILWAY_GIT_COMMIT_SHA', undefined);
+  vi.stubEnv('GEOROIDS_COMMIT_SHA', undefined);
 });
 
 afterEach(() => {
@@ -22,7 +23,7 @@ function buildConfig() {
   return config({ command: 'build', mode: 'production' });
 }
 
-test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA'])(
+test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA', 'GEOROIDS_COMMIT_SHA'])(
   'hosted builds retain %s when the Git checkout is absent',
   async (variable) => {
     const release = 'a'.repeat(40);
@@ -66,10 +67,36 @@ test('a failed Git lookup stops the build instead of disabling release refresh',
   expect(buildConfig).toThrow(failure);
 });
 
+test('empty VERCEL_GIT_COMMIT_SHA still uses a valid GEOROIDS_COMMIT_SHA', async () => {
+  const release = 'c'.repeat(40);
+  vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
+  vi.stubEnv('GEOROIDS_COMMIT_SHA', release);
+  vi.mocked(execFileSync).mockImplementation(() => {
+    throw new Error('Git checkout unavailable');
+  });
+
+  const built = await buildConfig();
+  expect(built.define?.['import.meta.env.VITE_COMMIT_HASH']).toBe(
+    JSON.stringify(release.slice(0, 7))
+  );
+  expect(built.define?.['import.meta.env.VITE_COMMIT_SHA']).toBe(JSON.stringify(release));
+  expect(execFileSync).not.toHaveBeenCalled();
+});
+
 test.each(['', 'unknown', 'abc1234', 'x'.repeat(40)])(
-  'an invalid hosted release %j stops the build',
-  (release) => {
+  'an invalid hosted release %j falls through to Git',
+  async (release) => {
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', release);
-    expect(buildConfig).toThrow('Cannot build client without a valid Git commit SHA');
+    const gitSha = 'b'.repeat(40);
+    vi.mocked(execFileSync).mockReturnValue(`${gitSha}\n`);
+
+    const built = await buildConfig();
+    expect(built.define?.['import.meta.env.VITE_COMMIT_SHA']).toBe(JSON.stringify(gitSha));
+    expect(execFileSync).toHaveBeenCalled();
   }
 );
+
+test('an invalid Git identity stops the build', () => {
+  vi.mocked(execFileSync).mockReturnValue('not-a-sha\n');
+  expect(buildConfig).toThrow('Cannot build client without a valid Git commit SHA');
+});

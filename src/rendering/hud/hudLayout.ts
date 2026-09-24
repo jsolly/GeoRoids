@@ -10,11 +10,12 @@ export type SafeAreaInsets = {
 };
 
 export type HudLayout = {
+  compact: boolean;
   padTop: number;
   padLeft: number;
   padRight: number;
   padBottom: number;
-  lives: { x: number; y: number };
+  balance: { x: number; y: number };
   score: { x: number; y: number };
   notificationY: number;
   leaderboard: {
@@ -28,6 +29,7 @@ export type HudLayout = {
   overlayFontScale: number;
   hudTypeScale: number;
   kitNameY: number;
+  economyBottomY: number;
 };
 
 /** Scale a canvas font such as `14px Arial` for the compact touch HUD. */
@@ -36,11 +38,12 @@ export function scaleHudFont(font: string, scale: number): string {
     return font;
   }
   return font.replace(
-    /(\d+(?:\.\d+)?)px/,
+    HUD_FONT_SIZE_PATTERN,
     (_, px: string) => `${Math.max(1, Math.round(Number(px) * scale))}px`
   );
 }
 
+const HUD_FONT_SIZE_PATTERN = /(\d+(?:\.\d+)?)px/u;
 const ZERO_SAFE: SafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DESKTOP_EDGE = VISUAL.HUD_INSET;
 
@@ -48,7 +51,7 @@ function readSafeAreaInsets(): SafeAreaInsets {
   if (typeof document === 'undefined') {
     return { ...ZERO_SAFE };
   }
-  const probe = document.getElementById('safe-area-probe');
+  const probe = document.querySelector('#safe-area-probe');
   if (!probe) {
     return { ...ZERO_SAFE };
   }
@@ -81,14 +84,15 @@ export function computeHudLayout(
   const hudTypeScale = touch ? (viewport.width < 480 ? 1.18 : 1.1) : 1;
 
   if (!touch) {
-    const lives = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
-    const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+    const balance = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
+    const kitNameY = balance.y + VISUAL.HUD_BALANCE_HEIGHT + 8;
     return {
+      compact: false,
       padTop: 0,
       padLeft: 0,
       padRight: 0,
       padBottom: 0,
-      lives,
+      balance,
       score: { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET },
       notificationY: 12,
       leaderboard: {
@@ -106,6 +110,7 @@ export function computeHudLayout(
       overlayFontScale,
       hudTypeScale,
       kitNameY,
+      economyBottomY: kitNameY + 96,
     };
   }
 
@@ -114,17 +119,17 @@ export function computeHudLayout(
   const padTop = Math.max(12, safe.top + 8);
   const padBottom = Math.max(12, safe.bottom + 8);
   const compactHeight = viewport.height < 500;
-  const boardWidth = viewport.width < 400 ? 148 : 168;
+  const boardWidth = Math.min(168, Math.round(viewport.width * 0.3));
   const rowHeight = compactHeight ? 16 : 18;
-  const maxRows = compactHeight ? 4 : 6;
+  const maxRows = 3;
   const miniMapSize = compactHeight ? 64 : 80;
-  const lives = { x: padLeft, y: padTop };
-  const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+  const balance = { x: padLeft, y: padTop };
+  const kitNameY = balance.y + 20;
   const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
-        x: padLeft,
-        y: Math.max(padTop + VISUAL.HUD_LIFE_SIZE + 52, clusterClear),
+        x: viewport.width - padRight - miniMapSize,
+        y: viewport.height - padBottom - miniMapSize,
         size: miniMapSize,
       }
     : {
@@ -134,13 +139,14 @@ export function computeHudLayout(
       };
 
   return {
+    compact: true,
     padTop,
     padLeft,
     padRight,
     padBottom,
-    lives,
+    balance,
     score: { x: padLeft, y: padTop },
-    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12,
+    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 64,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
@@ -152,6 +158,7 @@ export function computeHudLayout(
     overlayFontScale,
     hudTypeScale,
     kitNameY,
+    economyBottomY: kitNameY + 18,
   };
 }
 

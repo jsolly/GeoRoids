@@ -1,20 +1,31 @@
 import type { AbilityBody, AbilityHost } from './shipAbilities';
+import { hullRadiusForKit } from './shipKits';
 
 const cables = new WeakMap<AbilityHost, { targetId: string | undefined; length: number }>();
+const TOW_HULL_GAP = 16;
+
+function cargoRadius(rock: AbilityBody): number {
+  const value = rock.r ?? rock.size;
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 20;
+}
 
 /** Attaching preserves the rock's position and momentum; thrust makes the cable taut. */
 export function attachTowCable(host: AbilityHost, rock: AbilityBody): void {
   cables.set(host, {
     targetId: rock.id,
     length: Math.max(
-      (host.r ?? 20) + (rock.r ?? rock.size ?? 20) + 16,
+      hullRadiusForKit(host.kitId) + cargoRadius(rock) + TOW_HULL_GAP,
       Math.hypot(rock.position.x - host.position.x, rock.position.y - host.position.y)
     ),
   });
 }
 
 /** A damped cable only pulls when stretched. It never reels or throws cargo. */
-export function tickTowCable(host: AbilityHost, rock: AbilityBody | undefined): void {
+export function tickTowCable(
+  host: AbilityHost,
+  rock: AbilityBody | undefined,
+  canHaul = true
+): void {
   const cable = cables.get(host);
   if (!cable) {
     return;
@@ -29,6 +40,9 @@ export function tickTowCable(host: AbilityHost, rock: AbilityBody | undefined): 
     rock.health === 0
   ) {
     cables.delete(host);
+    return;
+  }
+  if (!canHaul) {
     return;
   }
   // Mild cargo drag damps swing while the Hauler supplies towing force.

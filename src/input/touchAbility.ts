@@ -1,10 +1,23 @@
-import type { HaulerUtilityId, ShipKitId } from '../../shared-types';
+import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
+import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
+import { scoutUtilityOf } from '../entities/ship/scoutUtility';
+import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
+import { worldFurnaces } from '../network/worldExploration';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
+const SCOUT_ABILITY_LABEL: Record<ScoutUtilityId, string> = {
+  mineral_scan: 'SCAN',
+  survey_probe: 'PROBE',
+};
+const SCOUT_ABILITY_NAME: Record<ScoutUtilityId, string> = {
+  mineral_scan: 'Mineral scan',
+  survey_probe: 'Survey probe',
+};
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',
+  boost_coupling: 'ARM',
   tow_cable: 'HOOK',
 };
 
@@ -16,6 +29,9 @@ type AbilityChromeHost = {
   abilityActiveFrames: number;
   harpoonTargetId?: string | null;
   haulerUtility?: HaulerUtilityId | null;
+  scoutUtility?: ScoutUtilityId | null;
+  furnaceTransit?: unknown;
+  position?: { x: number; y: number };
 };
 
 type AbilityChromeState = {
@@ -28,13 +44,30 @@ type AbilityChromeState = {
   cooldownRatio: number;
 };
 
-/** Short phosphor label for the on-screen kit button. */
-export function touchAbilityLabel(kitId: unknown): string {
-  return ABILITY_LABEL[getShipKit(kitId).abilityId];
+function scoutOffersBuild(host: AbilityChromeHost): boolean {
+  return (
+    getShipKit(host.kitId).id === 'scout' &&
+    host.position !== undefined &&
+    scoutAbilityBuildsAt(host.position, (id) => worldFurnaces.isLit(id))
+  );
 }
 
-export function touchAbilityName(kitId: unknown): string {
+/** Short phosphor label for the on-screen kit button. */
+export function touchAbilityLabel(kitId: unknown, utilityId?: unknown): string {
   const kit = getShipKit(kitId);
+  if (kit.id === 'scout') {
+    const utility = scoutUtilityOf({ kitId: kit.id, scoutUtility: utilityId });
+    return SCOUT_ABILITY_LABEL[utility];
+  }
+  return ABILITY_LABEL[kit.abilityId];
+}
+
+export function touchAbilityName(kitId: unknown, utilityId?: unknown): string {
+  const kit = getShipKit(kitId);
+  if (kit.id === 'scout') {
+    const utility = scoutUtilityOf({ kitId: kit.id, scoutUtility: utilityId });
+    return SCOUT_ABILITY_NAME[utility];
+  }
   return kit.abilityName;
 }
 
@@ -51,21 +84,48 @@ function abilityCooldownRatio(
 
 export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const kit = getShipKit(host.kitId);
-  const alive = !host.exploding && Number.isFinite(host.health) && host.health > 0;
+  const alive =
+    !host.furnaceTransit && !host.exploding && Number.isFinite(host.health) && host.health > 0;
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
   const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
+  const offeringBuild = scoutOffersBuild(host);
   const readyLabel =
     kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
     towing || (Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0);
   return {
-    label: towing ? 'RELEASE' : readyLabel,
-    name: towing ? 'Release asteroid' : touchAbilityName(kit.id),
-    ready: alive && (towing || !cooling),
+    label: towing
+      ? haulerUtilityOf(host) === 'boost_coupling'
+        ? 'IGNITE'
+        : 'RELEASE'
+      : offeringBuild
+        ? 'BUILD'
+        : kit.id === 'scout'
+          ? touchAbilityLabel(kit.id, host.scoutUtility)
+          : readyLabel,
+    name: towing
+      ? haulerUtilityOf(host) === 'boost_coupling'
+        ? 'Ignite asteroid boost'
+        : 'Release asteroid'
+      : offeringBuild
+        ? 'Build furnace'
+        : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+          ? 'Arm asteroid boost'
+          : kit.id === 'scout'
+            ? touchAbilityName(kit.id, host.scoutUtility)
+            : touchAbilityName(kit.id),
+    ready: alive && (towing || offeringBuild || !cooling),
     active,
-    cooling,
+    cooling: offeringBuild ? false : cooling,
     unavailable,
-    cooldownRatio: towing ? 0 : abilityCooldownRatio(kit.id, host.abilityCooldownFrames),
+    cooldownRatio:
+      towing || offeringBuild
+        ? 0
+        : abilityCooldownRatio(
+            kit.id,
+            host.abilityCooldownFrames,
+            kit.id === 'scout' ? abilityCooldownFramesFor(host) : undefined
+          ),
   };
 }

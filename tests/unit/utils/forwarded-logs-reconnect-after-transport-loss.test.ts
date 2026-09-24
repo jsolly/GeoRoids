@@ -64,7 +64,7 @@ afterEach(() => {
   });
 });
 
-test('the client log forwarder can reconnect after its first socket closes', async () => {
+test('an idle log socket stays down after it closes', async () => {
   vi.useFakeTimers();
   FakeWebSocket.instances = [];
   Object.defineProperty(globalThis, 'WebSocket', {
@@ -87,10 +87,114 @@ test('the client log forwarder can reconnect after its first socket closes', asy
     expect(FakeWebSocket.instances).toHaveLength(1);
 
     FakeWebSocket.instances[0]?.close();
-    await vi.advanceTimersByTimeAsync(4999);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+  } finally {
+    stopClientLogForwarder();
+  }
+});
+
+test('a queued warning waits out a five-second gap instead of opening another log socket', async () => {
+  vi.useFakeTimers();
+  FakeWebSocket.instances = [];
+  Object.defineProperty(globalThis, 'WebSocket', {
+    configurable: true,
+    writable: true,
+    value: FakeWebSocket,
+  });
+  Object.defineProperty(window, 'WebSocket', {
+    configurable: true,
+    writable: true,
+    value: FakeWebSocket,
+  });
+
+  const { forwardLogToServer, startClientLogForwarder, stopClientLogForwarder } = await import(
+    '../../../src/utils/logForwarder'
+  );
+
+  try {
+    startClientLogForwarder();
+    const first = FakeWebSocket.instances[0];
+    if (!first) {
+      throw new Error('Expected first log socket');
+    }
+    first.readyState = FakeWebSocket.CLOSING;
+    forwardLogToServer(
+      '{"version":1,"timestamp":"2026-01-01T00:00:00.000Z","source":"client","level":"warn","releaseId":"test","message":"kept across the gap"}'
+    );
+    expect(FakeWebSocket.instances).toHaveLength(1);
+
+    first.readyState = FakeWebSocket.CLOSED;
+    first.onclose?.({ code: 1006, reason: 'lost' });
+    forwardLogToServer(
+      '{"version":1,"timestamp":"2026-01-01T00:00:00.000Z","source":"client","level":"error","releaseId":"test","message":"second while down"}'
+    );
+    await vi.advanceTimersByTimeAsync(400);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(4599);
     expect(FakeWebSocket.instances).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(1);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    const replacement = FakeWebSocket.instances[1];
+    if (!replacement) {
+      throw new Error('Expected replacement log socket');
+    }
+    replacement.readyState = FakeWebSocket.OPEN;
+    replacement.onopen?.();
+    expect(replacement.sent.some((message) => message.includes('kept across the gap'))).toBe(true);
+    expect(replacement.sent.some((message) => message.includes('second while down'))).toBe(true);
+
+    replacement.readyState = FakeWebSocket.CLOSED;
+    replacement.onclose?.({ code: 1006, reason: 'lost again' });
+    forwardLogToServer(
+      '{"version":1,"timestamp":"2026-01-01T00:00:00.000Z","source":"client","level":"warn","releaseId":"test","message":"third after the replacement died"}'
+    );
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(FakeWebSocket.instances).toHaveLength(3);
+  } finally {
+    stopClientLogForwarder();
+  }
+});
+
+test('a log socket that is still closing does not open another after the gap', async () => {
+  vi.useFakeTimers();
+  FakeWebSocket.instances = [];
+  Object.defineProperty(globalThis, 'WebSocket', {
+    configurable: true,
+    writable: true,
+    value: FakeWebSocket,
+  });
+  Object.defineProperty(window, 'WebSocket', {
+    configurable: true,
+    writable: true,
+    value: FakeWebSocket,
+  });
+
+  const { forwardLogToServer, startClientLogForwarder, stopClientLogForwarder } = await import(
+    '../../../src/utils/logForwarder'
+  );
+
+  try {
+    startClientLogForwarder();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    const first = FakeWebSocket.instances[0];
+    if (!first) {
+      throw new Error('Expected first log socket');
+    }
+    first.readyState = FakeWebSocket.CLOSING;
+    forwardLogToServer(
+      '{"version":1,"timestamp":"2026-01-01T00:00:00.000Z","source":"client","level":"warn","releaseId":"test","message":"held while closing"}'
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+
+    first.readyState = FakeWebSocket.CLOSED;
+    first.onclose?.({ code: 1006, reason: 'finished closing' });
+    await vi.advanceTimersByTimeAsync(0);
     expect(FakeWebSocket.instances).toHaveLength(2);
   } finally {
     stopClientLogForwarder();

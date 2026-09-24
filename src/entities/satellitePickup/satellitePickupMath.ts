@@ -1,7 +1,7 @@
 import type { Position, Velocity } from '../../../shared-types';
 import { SATELLITE_PICKUP } from '../../constants';
 
-/** Circular offset around an owner or loose-orbit center. */
+/** Circular offset around an owner. */
 export function orbitOffset(phase: number, radius: number): Position {
   return {
     x: Math.cos(phase) * radius,
@@ -17,42 +17,12 @@ export function attachOrbitPosition(owner: Position, phase: number, radius: numb
   };
 }
 
-/** Keep an orbiting pickup outside the owner's current grown hull. */
+/** Keep an orbiting pickup outside the owner's kit hull. */
 export function orbitRadiusForOwner(ownerRadius: number, pickupRadius: number): number {
   return Math.max(
     SATELLITE_PICKUP.ORBIT_RADIUS,
     ownerRadius + pickupRadius + SATELLITE_PICKUP.ORBIT_GAP
   );
-}
-
-export function clampToRadius(position: Position, maxRadius: number): Position {
-  const dist = Math.hypot(position.x, position.y);
-  if (dist <= maxRadius || dist === 0) {
-    return { x: position.x, y: position.y };
-  }
-  const scale = maxRadius / dist;
-  return { x: position.x * scale, y: position.y * scale };
-}
-
-export function advanceDriftCenter(
-  center: Position,
-  driftAngle: number,
-  speed: number,
-  maxRadius: number
-): { center: Position; driftAngle: number } {
-  const next = clampToRadius(
-    {
-      x: center.x + Math.cos(driftAngle) * speed,
-      y: center.y + Math.sin(driftAngle) * speed,
-    },
-    maxRadius
-  );
-  const dist = Math.hypot(next.x, next.y);
-  let nextAngle = driftAngle;
-  if (dist > maxRadius - 40) {
-    nextAngle = Math.atan2(-next.y, -next.x);
-  }
-  return { center: next, driftAngle: nextAngle };
 }
 
 export function velocityFromDelta(prev: Position, next: Position): Velocity {

@@ -1,15 +1,14 @@
+import { townSquareSpawn } from '../../shared/furnaces';
 import type { Position } from '../../shared-types';
-import { DEBUG, SPAWN } from '../constants';
+import { DEBUG } from '../constants';
 import { getAsteroidFieldRadius } from '../physics/asteroidMotion';
 import { getGameBoundary } from '../physics/boundary';
-import { getRandomPositionNearBoundary, getRandomPositionNearPoint } from './positionUtils';
-
-const WORLD_ORIGIN: Position = { x: 0, y: 0 };
+import { getRandomPositionNearBoundary } from './positionUtils';
 
 /**
  * Shared player spawn. Local and remote ships use this — no factory-specific
- * forks. Debug "near center" is world origin, not canvas (400, 300), so a
- * late-join camera does not sit 500px off the belt.
+ * forks. A fresh flight stands on the town ring. Debug "near boundary" is the
+ * world edge, not a canvas corner.
  */
 export function resolveSpawnPosition(explicit?: Position): Position {
   if (explicit) {
@@ -18,7 +17,7 @@ export function resolveSpawnPosition(explicit?: Position): Position {
   if (DEBUG.PLACE_PLAYERS_NEAR_BOUNDARY) {
     return getRandomPositionNearBoundary();
   }
-  return getRandomPositionNearPoint(WORLD_ORIGIN, SPAWN.NEAR_CENTER_RADIUS);
+  return townSquareSpawn(Math.random);
 }
 
 /** Local placeholder positions use the same world bounds as the server. */

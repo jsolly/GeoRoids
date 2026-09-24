@@ -1,18 +1,21 @@
 import { readReleaseId } from '../../shared/releaseId';
+import { storeOffer } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type {
   HaulerUtilityId,
   PingMessage,
   Position,
+  ScoutUtilityId,
   ShipKitId,
   Velocity,
 } from '../../shared-types';
 import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
+import { isScoutUtilityId } from '../../src/entities/ship/scoutUtility';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
 
-const SHOT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const SHOT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]+$/u;
 
 interface PlayerMovementUpdate {
   position?: Position;
@@ -20,7 +23,8 @@ interface PlayerMovementUpdate {
   angle?: number;
   thrusting?: boolean;
   boosting?: boolean;
-  angularVelocity?: number;
+  boostDepleted?: boolean;
+  overlayHold?: boolean;
 }
 
 export type ClientCommand =
@@ -36,6 +40,8 @@ export type ClientCommand =
       resumeToken?: string;
       clientReleaseId?: string;
     }
+  | { type: 'travelFurnace'; id: string; destinationId: string }
+  | { type: 'equipSatellite'; id: string; pickupId: string }
   | { type: 'leave' }
   | { type: 'snapshotResync' }
   | {
@@ -48,6 +54,16 @@ export type ClientCommand =
       type: 'setHaulerUtility';
       id: string;
       utilityId: HaulerUtilityId;
+    }
+  | {
+      type: 'setScoutUtility';
+      id: string;
+      utilityId: ScoutUtilityId;
+    }
+  | {
+      type: 'buyStoreItem';
+      id: string;
+      offerId: string;
     }
   | {
       type: 'update';
@@ -115,18 +131,8 @@ function readJoinPosition(value: unknown): Position | undefined {
   if (value === undefined) {
     return { x: 0, y: 0 };
   }
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const rawX = value['x'];
-  const rawY = value['y'];
-  const x = typeof rawX === 'number' ? rawX : typeof rawX === 'string' ? parseFloat(rawX) : NaN;
-  const y = typeof rawY === 'number' ? rawY : typeof rawY === 'string' ? parseFloat(rawY) : NaN;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return undefined;
-  }
-  const position = { x, y };
-  return Math.hypot(position.x, position.y) <= WORLD.radius ? position : undefined;
+  const position = readFinitePosition(value);
+  return position && Math.hypot(position.x, position.y) <= WORLD.radius ? position : undefined;
 }
 
 function invalid(messageType: string, error?: string): ClientCommandDecodeResult {
@@ -141,24 +147,26 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawPosition = fields['position'];
   const rawVelocity = fields['velocity'];
   const rawAngle = fields['angle'];
-  const rawAngularVelocity = fields['angularVelocity'];
   const rawThrusting = fields['thrusting'];
   const rawBoosting = fields['boosting'];
+  const rawBoostDepleted = fields['boostDepleted'];
+  const rawOverlayHold = fields['overlayHold'];
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
-  const angularVelocity = readFiniteNumber(rawAngularVelocity);
   const thrusting = typeof rawThrusting === 'boolean' ? rawThrusting : undefined;
   const boosting = typeof rawBoosting === 'boolean' ? rawBoosting : undefined;
+  const boostDepleted = typeof rawBoostDepleted === 'boolean' ? rawBoostDepleted : undefined;
 
   if (
     !id ||
     (rawPosition !== undefined && position === undefined) ||
     (rawVelocity !== undefined && velocity === undefined) ||
     (rawAngle !== undefined && angle === undefined) ||
-    (rawAngularVelocity !== undefined && angularVelocity === undefined) ||
     (rawThrusting !== undefined && thrusting === undefined) ||
-    (rawBoosting !== undefined && boosting === undefined)
+    (rawBoosting !== undefined && boosting === undefined) ||
+    (rawBoostDepleted !== undefined && boostDepleted === undefined) ||
+    (rawOverlayHold !== undefined && typeof rawOverlayHold !== 'boolean')
   ) {
     return invalid('update', !id ? 'Missing player ID' : 'Invalid player movement update');
   }
@@ -169,7 +177,8 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(angle !== undefined ? { angle } : {}),
     ...(thrusting !== undefined ? { thrusting } : {}),
     ...(boosting !== undefined ? { boosting } : {}),
-    ...(angularVelocity !== undefined ? { angularVelocity } : {}),
+    ...(boostDepleted !== undefined ? { boostDepleted } : {}),
+    ...(typeof rawOverlayHold === 'boolean' ? { overlayHold: rawOverlayHold } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);
   const motionSequence = readSafeInteger(fields['motionSequence']);
@@ -186,7 +195,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
 }
 
 function decodeUseAbility(id: string, fields: WireRecord): ClientCommandDecodeResult {
-  const playerId = id || readString(fields['id']) || '';
+  const playerId = id ? id : (readString(fields['id']) ?? '');
   if (!playerId) {
     return invalid('useAbility', 'Missing player ID for useAbility');
   }
@@ -285,6 +294,21 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return decodeUpdate(id, fields);
     case 'useAbility':
       return decodeUseAbility(id, fields);
+    case 'travelFurnace': {
+      const destinationId = fields['destinationId'];
+      return id &&
+        typeof destinationId === 'string' &&
+        destinationId.length > 0 &&
+        destinationId.length <= 128
+        ? { ok: true, command: { type, id, destinationId } }
+        : invalid(type, 'Invalid furnace travel request');
+    }
+    case 'equipSatellite': {
+      const pickupId = fields['pickupId'];
+      return id && typeof pickupId === 'string' && pickupId.length > 0 && pickupId.length <= 128
+        ? { ok: true, command: { type, id, pickupId } }
+        : invalid(type, 'Invalid satellite equipment request');
+    }
     case 'setHaulerUtility': {
       if (!id) {
         return invalid(type, 'Missing player ID for setHaulerUtility');
@@ -293,6 +317,24 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return isHaulerUtilityId(utilityId)
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Hauler utility');
+    }
+    case 'setScoutUtility': {
+      if (!id) {
+        return invalid(type, 'Missing player ID for setScoutUtility');
+      }
+      const utilityId = fields['utilityId'];
+      return isScoutUtilityId(utilityId)
+        ? { ok: true, command: { type, id, utilityId } }
+        : invalid(type, 'Invalid Scout utility');
+    }
+    case 'buyStoreItem': {
+      if (!id) {
+        return invalid(type, 'Missing player ID for buyStoreItem');
+      }
+      const offerId = fields['offerId'];
+      return typeof offerId === 'string' && storeOffer(offerId)
+        ? { ok: true, command: { type, id, offerId } }
+        : invalid(type, 'Invalid store offer');
     }
     case 'shoot': {
       if (!id) {

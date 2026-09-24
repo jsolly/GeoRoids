@@ -10,6 +10,7 @@ function isClosed(socket: WebSocket): boolean {
   return socket.readyState === WebSocket.CLOSED;
 }
 
+import process from 'node:process';
 import { SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { Measurement } from './results';
 
@@ -117,7 +118,8 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
           counts.receivedPayloadBytes += Buffer.byteLength(text);
         }
         const result = decoder.readMessage(text, { acceptSnapshots: state.joined });
-        switch (result.kind) {
+        const { kind: decodeKind } = result;
+        switch (decodeKind) {
           case 'snapshot':
             assert(state.joined, 'Snapshot arrived before join');
             assert.equal(
@@ -125,7 +127,9 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
               state.sequence + 1,
               'Snapshot sequence did not advance'
             );
-            state.decodedParticipantIds = result.state.entities.map((entity) => entity.id).sort();
+            state.decodedParticipantIds = result.state.entities
+              .map((entity) => entity.id)
+              .sort((left, right) => left.localeCompare(right));
             state.sequence++;
             state.snapshotPackets++;
             if (measuring) {
@@ -168,9 +172,13 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
                   state.pingSentAt = 0;
                 }
                 break;
+              default:
+                throw new Error(`Unexpected transport message type: ${message['type']}`);
             }
             break;
           }
+          default:
+            throw new Error(`Unexpected decode result kind: ${decodeKind}`);
         }
       } catch (error) {
         fail(error);
@@ -212,7 +220,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
           id,
           name: `Transport Pilot ${index}`,
           position: { x: Math.cos(angle) * 600, y: Math.sin(angle) * 600 },
-          kitId: 'surveyor',
+          kitId: 'scout',
           asteroidInteractions: 1,
           snapshotVersion: 1,
         },
@@ -233,7 +241,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
       for (const client of clients) {
         if (client.pingSentAt === 0) {
           client.pingSentAt = performance.now();
-          send(client, { type: 'ping', timestamp: Date.now() });
+          send(client, { type: 'ping' });
         }
       }
       await delay(Math.min(100, Math.max(1, end - performance.now())), undefined, {

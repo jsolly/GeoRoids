@@ -1,6 +1,11 @@
 /* @vitest-environment node */
+
+import process from 'node:process';
 import type { Writable } from 'node:stream';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
+
+const SERVER_LOG_ROTATED_PATTERN = /server\.log\.1$/u;
+const SERVER_LOG_PATTERN = /server\.log$/u;
 
 const state = vi.hoisted(() => ({
   callbacks: [] as Array<(error?: Error | null) => void>,
@@ -14,11 +19,11 @@ const state = vi.hoisted(() => ({
   rename: vi.fn(async () => undefined),
 }));
 vi.mock('node:fs', async () => {
-  const { Writable } = await import('node:stream');
+  const { Writable: WritableStream } = await import('node:stream');
   return {
     default: {
       createWriteStream: () => {
-        const stream = new Writable({
+        const stream = new WritableStream({
           write(_chunk, _encoding, callback) {
             state.chunks.push(String(_chunk));
             if (state.manualWrites) {
@@ -85,6 +90,51 @@ test('debug request logs preserve useful headers while redacting proxy and API c
   });
   expect(process.stdout.write).toHaveBeenCalledWith(state.chunks[0]);
   expect(state.chunks.join('')).not.toContain('private-');
+});
+
+test('a logged error keeps its cause chain, error code and aggregate members, bounded in depth', async () => {
+  const { flushServerLogs, logger } = await import('../../../setup/serverLogger');
+  const disk = Object.assign(new Error('database is locked'), { code: 'ERR_SQLITE_ERROR' });
+  const wrapped = new Error('Persistent world checkpoint failed', {
+    cause: new Error('World store worker failed', { cause: disk }),
+  });
+  logger.error('STATE', 'cause_probe', {
+    error: wrapped,
+    shutdown: new AggregateError(
+      [new Error('Server shutdown timed out'), wrapped],
+      'Server shutdown did not complete cleanly'
+    ),
+  });
+  await expect(flushServerLogs()).resolves.toBe(true);
+  const record = JSON.parse(state.chunks[0] ?? 'null');
+  expect(record.context.error).toMatchObject({
+    errorName: 'Error',
+    message: 'Persistent world checkpoint failed',
+    cause: {
+      message: 'World store worker failed',
+      cause: { message: 'database is locked', code: 'ERR_SQLITE_ERROR' },
+    },
+  });
+  expect(record.context.shutdown).toMatchObject({
+    errorName: 'AggregateError',
+    message: 'Server shutdown did not complete cleanly',
+    errors: [
+      { message: 'Server shutdown timed out' },
+      { message: 'Persistent world checkpoint failed' },
+    ],
+  });
+
+  // A cause chain deeper than the record depth ends in the same marker as any nested value.
+  let deep: Error = new Error('root');
+  for (let level = 0; level < 8; level++) {
+    deep = new Error(`level ${level}`, { cause: deep });
+  }
+  state.chunks = [];
+  logger.error('STATE', 'deep_cause_probe', { error: deep });
+  await expect(flushServerLogs()).resolves.toBe(true);
+  const chain = JSON.parse(state.chunks[0] ?? 'null');
+  expect(chain.context.error.cause.cause.cause).toBe('[depth-limit]');
+  expect(JSON.stringify(chain)).not.toContain('root');
 });
 
 test('a failed file append returns failure and includes the cause in the local error signal', async () => {
@@ -301,10 +351,12 @@ test('server.log rotates before a record would exceed its disk bound', async () 
   state.statSize = 10 * 1024 * 1024;
   const { writeServerDiagnostic } = await import('../../../setup/serverLogger');
   await expect(writeServerDiagnostic('after rotation')).resolves.toBe(true);
-  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(/server\.log\.1$/), { force: true });
+  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(SERVER_LOG_ROTATED_PATTERN), {
+    force: true,
+  });
   expect(state.rename).toHaveBeenCalledWith(
-    expect.stringMatching(/server\.log$/),
-    expect.stringMatching(/server\.log\.1$/)
+    expect.stringMatching(SERVER_LOG_PATTERN),
+    expect.stringMatching(SERVER_LOG_ROTATED_PATTERN)
   );
 });
 

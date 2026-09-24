@@ -14,6 +14,7 @@ import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { Roid } from '../../../src/entities/roid/Roid';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
+import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp } from '../../../src/input/keybindings';
 import { handleMouseDown, handleMouseUp } from '../../../src/input/mouse';
@@ -27,6 +28,14 @@ import { ConnectionManager } from '../../../src/network/services/ConnectionManag
 import { setSelectedShipKitId } from '../../../src/ui/shipKitSelect';
 import { logger } from '../../../src/utils/Logger';
 import { snapshotFixture } from './snapshotFixture';
+
+const LASER_SOUND_PATH_PATTERN = /sounds\/laser\.m4a$/u;
+const LOOT_PICKUP_SOUND_PATH_PATTERN = /sounds\/loot-pickup\.m4a$/u;
+const SURVEY_SCAN_SOUND_PATH_PATTERN = /survey-scan\.m4a$/u;
+const ORBITAL_PICKUP_SOUND_PATH_PATTERN = /orbital-pickup\.m4a$/u;
+const CLIENT_RELEASE_ID_PATTERN = /^(dev|[a-f0-9]{40})$/u;
+const RESUME_TOKEN_PATTERN = /^[a-z0-9]{64}$/u;
+const JOIN_ACK_ORDER_ERROR_PATTERN = /before.*join ack/u;
 
 type TransportMessage = {
   type: string;
@@ -79,7 +88,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager.disconnect();
     unbindAsteroidFieldApply();
     vi.restoreAllMocks();
-    setSelectedShipKitId('surveyor');
+    setSelectedShipKitId('scout');
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     resetControlSources();
@@ -104,11 +113,45 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
   }
 
+  test.each([1, 7])('a returning pilot moves after its saved epoch %i restarts', async (epoch) => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'scout');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
+    let ws = await connect();
+    acknowledge(ws);
+    const frame = captureSnapshot(snapshotFixture());
+    const pilot = frame.entities[0];
+    assert.ok(pilot);
+    pilot.id = manager.getClientId();
+    pilot.playerMotion = { epoch, mode: 'free', ack: 80 };
+    ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
+
+    // A hidden tab can outlive the live actor. Its private credential restores
+    // the saved pilot with the same ID but a new motion session starting at 1.
+    ws.close();
+    ws = await connect();
+    acknowledge(ws);
+    pilot.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
+    pilot.position = { x: 2382, y: 2849 };
+    ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
+    expect(player.ship.serverOwnsMotion).toBe(false);
+    expect(player.ship.position).toEqual(pilot.position);
+    manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
+    expect(ws.sent.at(-1)).toMatchObject({
+      type: 'update',
+      data: { motionEpoch: 1, motionSequence: 1 },
+    });
+    const before = { ...player.ship.position };
+    player.ship.update();
+    expect(player.ship.position).not.toEqual(before);
+  });
+
   test('nearby remote shots sound once, self echoes stay silent and collected loot is deduplicated', async () => {
-    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
     setSound(true);
     bindGameAudio({
       getListenerPosition: () => ({ x: 0, y: 0 }),
@@ -119,6 +162,10 @@ describe('actual ConnectionManager WebSocket message path', () => {
       played.push(this.src);
       return Promise.resolve();
     });
+    vi.spyOn(Sound.prototype, 'playNote').mockImplementation(function (this: Sound) {
+      played.push(this.src);
+      return true;
+    });
     try {
       ws.receive('playerShotFired', {
         id: 'remote-shot',
@@ -126,7 +173,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
         position: { x: 30, y: 0 },
       });
       expect(played).toHaveLength(1);
-      expect(played[0]).toMatch(/sounds\/laser\.m4a$/);
+      expect(played[0]).toMatch(LASER_SOUND_PATH_PATTERN);
       ws.receive('playerShotFired', {
         id: 'self-shot',
         ownerId: player.id,
@@ -148,10 +195,10 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('lootCollected', collection);
       ws.receive('lootCollected', collection);
       expect(played).toHaveLength(2);
-      expect(played[1]).toMatch(/sounds\/loot-pickup\.m4a$/);
+      expect(played[1]).toMatch(LOOT_PICKUP_SOUND_PATH_PATTERN);
       ws.receive('lootCollected', { ...collection, lootId: 'tap-canister', kind: 'tap' });
       expect(played).toHaveLength(3);
-      expect(played[2]).toMatch(/sounds\/loot-pickup\.m4a$/);
+      expect(played[2]).toMatch(LOOT_PICKUP_SOUND_PATH_PATTERN);
       ws.receive('lootCollected', { ...collection, lootId: 'invalid-kind', kind: 'unknown' });
       ws.receive('lootCollected', {
         ...collection,
@@ -172,6 +219,14 @@ describe('actual ConnectionManager WebSocket message path', () => {
       acknowledge(reconnected);
       setSound(true);
       reconnected.receive('lootCollected', collection);
+      expect(played).toHaveLength(3);
+      reconnected.receive(
+        'snapshot',
+        new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1)
+      );
+      reconnected.receive('lootCollected', collection);
+      expect(played).toHaveLength(3);
+      reconnected.receive('lootCollected', { ...collection, lootId: 'new-live-pickup' });
       expect(played).toHaveLength(4);
     } finally {
       resetGameAudio();
@@ -179,8 +234,108 @@ describe('actual ConnectionManager WebSocket message path', () => {
     }
   });
 
+  test('tap ejection events sound once; malformed, distant and baseline loot stay silent', async () => {
+    const ws = await connect();
+    acknowledge(ws);
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const notes = vi.spyOn(Sound.prototype, 'playNote').mockReturnValue(true);
+    try {
+      const event = { lootId: 'tap-1', position: { x: 10, y: 0 } };
+      ws.receive('tapEjected', { ...event, lootId: 'before-baseline' });
+      ws.receive('lootCollected', {
+        lootId: 'old-pickup',
+        kind: 'tap',
+        collectorId: 'other',
+        position: { x: 10, y: 0 },
+      });
+      expect(notes).not.toHaveBeenCalled();
+      const state = captureSnapshot(snapshotFixture());
+      state.loot = [
+        { id: 'existing-tap', kind: 'tap', position: { x: 10, y: 0 }, mass: 0.1, radius: 5 },
+      ];
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+      expect(notes).not.toHaveBeenCalled();
+      ws.receive('tapEjected', event);
+      ws.receive('tapEjected', event);
+      ws.receive('tapEjected', { ...event, lootId: 'bad', position: { x: 'bad', y: 0 } });
+      ws.receive('tapEjected', { ...event, lootId: 'far', position: { x: 5000, y: 0 } });
+      expect(notes).toHaveBeenCalledTimes(1);
+      setSound(false);
+      ws.receive('tapEjected', { ...event, lootId: 'muted' });
+      setSound(true);
+      ws.receive('tapEjected', { ...event, lootId: 'muted' });
+      expect(notes).toHaveBeenCalledTimes(1);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
+  test('a surviving local hull hit has feedback; a zero-damage notification stays quiet', async () => {
+    const player = entityFactory.createLocalPlayer('Hull pilot', { x: 0, y: 0 }, 'scout');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
+    setSound(true);
+    const played: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      played.push(this.src);
+    });
+    const damage = {
+      targetPlayerId: player.id,
+      attackerId: 'asteroid',
+      damage: 10,
+      remainingHealth: 90,
+      isDestroyed: false,
+    };
+    ws.receive('playerDamaged', damage);
+    expect(played).toContain('/sounds/hull-damage.m4a');
+    played.length = 0;
+    ws.receive('playerDamaged', damage);
+    expect(played).toEqual([]);
+    ws.receive('playerDamaged', { ...damage, damage: 0 });
+    expect(played).toEqual([]);
+    setSound(false);
+  });
+
+  test('offscreen coupling ignition still confirms release at the local ship', async () => {
+    const player = entityFactory.createLocalPlayer('Hauler pilot', { x: 0, y: 0 }, 'hauler');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => player.ship.position,
+      getViewport: () => ({ width: 390, height: 844 }),
+    });
+    const played: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      played.push(this.src);
+    });
+    try {
+      ws.receive('abilityUsed', {
+        id: player.id,
+        kitId: 'hauler',
+        abilityId: 'harpoon',
+        harpoonTargetId: null,
+        abilityActiveFrames: 0,
+        boostIgnitionPosition: { x: player.ship.position.x + 250, y: player.ship.position.y },
+      });
+      expect(played).toEqual(['/sounds/harpoon-release.m4a']);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
   test('a warm reconnect silently hydrates destruction before later deaths sound normally', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -221,10 +376,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('mineral scan waits for one accepted ability cue and unknown orbital pickups use event positions', async () => {
-    const player = entityFactory.createLocalPlayer('Survey pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Survey pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
     setSound(true);
     bindGameAudio({
       getListenerPosition: () => ({ x: 0, y: 0 }),
@@ -238,9 +394,9 @@ describe('actual ConnectionManager WebSocket message path', () => {
     try {
       player.ship.activateAbility();
       expect(paths).toEqual([]);
-      ws.receive('abilityUsed', { id: player.id, kitId: 'surveyor', abilityId: 'surveyScan' });
+      ws.receive('abilityUsed', { id: player.id, kitId: 'scout', abilityId: 'surveyScan' });
       expect(paths).toHaveLength(1);
-      expect(paths[0]).toMatch(/survey-scan\.m4a$/);
+      expect(paths[0]).toMatch(SURVEY_SCAN_SOUND_PATH_PATTERN);
       const pickup = {
         pickupId: 'uncached',
         playerId: 'uncached-pilot',
@@ -253,7 +409,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       expect(paths).toHaveLength(1);
       ws.receive('satellitePickupCollected', { ...pickup, position: { x: 30, y: 0 } });
       expect(paths).toHaveLength(2);
-      expect(paths[1]).toMatch(/orbital-pickup\.m4a$/);
+      expect(paths[1]).toMatch(ORBITAL_PICKUP_SOUND_PATH_PATTERN);
     } finally {
       resetGameAudio();
       setSound(false);
@@ -276,7 +432,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a new socket and join cannot reuse a departed session snapshot witness', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
     const oldSocket = await connect();
@@ -392,7 +548,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       // An older echo arrives before the newly held input has been sent.
       clock.mockReturnValue(10_017);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
-      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
         thrusting: true,
       });
@@ -401,7 +557,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       local.thrusting = true;
       clock.mockReturnValue(10_034);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
-      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
         thrusting: true,
       });
@@ -410,14 +566,14 @@ describe('actual ConnectionManager WebSocket message path', () => {
       Object.assign(local, { health: 0, exploding: true, thrusting: false });
       clock.mockReturnValue(10_051);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(4));
-      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(player.ship.thrusting).toBe(false);
       expect(ws.sent.filter((message) => message.type === 'asteroidInput')).toHaveLength(0);
     }
   );
 
   test('cruise and held turn resume after authoritative respawn', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     ws.receive('joined', {
@@ -431,7 +587,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const state = captureSnapshot(snapshotFixture());
     const [local] = state.entities;
     assert.ok(local);
-    Object.assign(local, { id: player.id, kitId: 'surveyor', thrusting: false });
+    Object.assign(local, { id: player.id, kitId: 'scout', thrusting: false });
     state.entities = [local];
     const receive = (sequence: number) =>
       ws.receive('snapshot', new SnapshotEncoder(state).encode(sequence));
@@ -465,7 +621,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('sampled snapshots correlate predicted and authoritative local state', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const ws = await connect();
@@ -528,7 +684,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('applies authoritative local health damage and partial regeneration snapshots', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -547,10 +703,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(baseline).encode(1));
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
-    }).toEqual({ health: 100, lives: 3, maxHealth: 100, exploding: false });
+    }).toEqual({ health: 100, cargo: 0, purchases: [], maxHealth: 100, exploding: false });
 
     const damaged = structuredClone(baseline);
     const damagedEntity = damaged.entities[0];
@@ -563,10 +720,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     );
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
-    }).toEqual({ health: 75, lives: 3, maxHealth: 100, exploding: false });
+    }).toEqual({ health: 75, cargo: 0, purchases: [], maxHealth: 100, exploding: false });
 
     const healing = structuredClone(damaged);
     const healingEntity = healing.entities[0];
@@ -577,19 +735,21 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(healing).encode(3, { sequence: 2, state: damaged }));
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
     }).toEqual({
       health: regeneratedHealth,
-      lives: 3,
+      cargo: 0,
+      purchases: [],
       maxHealth: 100,
       exploding: false,
     });
   });
 
   test('an expired enhanced session replaces its cached identity before a fresh join', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     const oldId = manager.getClientId();
@@ -616,7 +776,25 @@ describe('actual ConnectionManager WebSocket message path', () => {
     state.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     expect(manager.getAllPlayers()).toEqual([player]);
+    const { getSpiderField, setSpiderField } = await import(
+      '../../../src/physics/terrain/spiderSession'
+    );
+    setSpiderField({
+      nests: [{ id: '0,0', resourceId: 'ore', position: { x: 5000, y: 5000 } }],
+      spiders: [
+        {
+          id: 'expired-spider',
+          position: { x: 2000, y: 0 },
+          angle: 0,
+          health: 75,
+          maxHealth: 75,
+          phase: 'hunting',
+          targetId: oldId,
+        },
+      ],
+    });
     ws.receive('sessionExpired', {});
+    expect(getSpiderField()).toEqual({ spiders: [], nests: [] });
     const freshJoin = ws.sent.filter((message) => message.type === 'join').at(-1);
     assert.ok(freshJoin, 'fresh join message');
     const freshId = freshJoin.id;
@@ -652,11 +830,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     assert.ok(initialJoinData, 'initial join data');
     expect(initialJoinData.snapshotVersion).toBe(1);
     expect(initialJoinData.asteroidInteractions).toBe(1);
-    expect(initialJoinData['clientReleaseId']).toMatch(/^(dev|[a-f0-9]{40})$/);
+    expect(initialJoinData['clientReleaseId']).toMatch(CLIENT_RELEASE_ID_PATTERN);
     expect(new URL(ws.url).searchParams.get('snapshotVersion')).toBe('1');
     expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
     if (initialJoinData.resumeToken !== undefined) {
-      expect(initialJoinData.resumeToken).toMatch(/^[a-z0-9]{64}$/);
+      expect(initialJoinData.resumeToken).toMatch(RESUME_TOKEN_PATTERN);
     }
     acknowledge(ws);
   });
@@ -699,7 +877,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(errorLog).toHaveBeenCalledWith(
       'STATE',
       'snapshot_rejected',
-      expect.objectContaining({ message: expect.stringMatching(/before.*join ack/) }),
+      expect.objectContaining({ message: expect.stringMatching(JOIN_ACK_ORDER_ERROR_PATTERN) }),
       expect.objectContaining({
         lastAcceptedSequence: 0,
         expectedSequence: 1,
@@ -761,7 +939,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getAllPlayers()).toHaveLength(9);
     expect(manager.getPlayer('pilot-1')?.ship.harpoonTargetId).toBeNull();
     expect(manager.getPlayer('pilot-1')?.ship.harpoonLatchPos).toBeUndefined();
-    expect(manager.getPlayer('pilot-1')?.ship.kitId).toBe('surveyor');
+    expect(manager.getPlayer('pilot-1')?.ship.kitId).toBe('scout');
     expect(manager.getPlayer('pilot-1')?.name).toBe('Renamed pilot');
     expect(removed).toHaveLength(80);
     expect(LootField.getInstance().getAll()).toEqual([]);
@@ -882,6 +1060,58 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(player.ship.harpoonTargetId).toBeNull();
     expect(player.ship.harpoonLatchPos).toBeUndefined();
     expect(player.ship.abilityActiveFrames).toBe(0);
+  });
+
+  test('a stale snapshot does not clear a predicted Mineral Scan cooldown', async () => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    const zero = captureSnapshot(snapshotFixture());
+    const zeroEntity = zero.entities[0];
+    assert.ok(zeroEntity, 'zero snapshot entity');
+    zeroEntity.id = manager.getClientId();
+    zeroEntity.kitId = 'scout';
+    zeroEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
+    player.ship.scoutUtility = 'mineral_scan';
+    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout;
+    const stale = captureSnapshot(zero);
+    const staleEntity = stale.entities[0];
+    assert.ok(staleEntity, 'stale snapshot entity');
+    staleEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(stale).encode(2));
+    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout);
+    const echoed = captureSnapshot(stale);
+    const echoedEntity = echoed.entities[0];
+    assert.ok(echoedEntity, 'echoed snapshot entity');
+    echoedEntity.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout - 4;
+    ws.receive('snapshot', new SnapshotEncoder(echoed).encode(3));
+    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout - 4);
+  });
+
+  test('a probe miss snapshot keeps the Scout ability ready', async () => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    const zero = captureSnapshot(snapshotFixture());
+    const zeroEntity = zero.entities[0];
+    assert.ok(zeroEntity, 'zero snapshot entity');
+    zeroEntity.id = manager.getClientId();
+    zeroEntity.kitId = 'scout';
+    zeroEntity.equipment = ['survey_probe'];
+    zeroEntity.scoutUtility = 'survey_probe';
+    zeroEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
+    player.ship.scoutUtility = 'survey_probe';
+    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout;
+    const miss = captureSnapshot(zero);
+    const missEntity = miss.entities[0];
+    assert.ok(missEntity, 'miss snapshot entity');
+    missEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(miss).encode(2));
+    expect(player.ship.abilityCooldownFrames).toBe(0);
   });
 
   test('unacked Hauler tow survives an empty-belt snapshot while the held rock remains', async () => {

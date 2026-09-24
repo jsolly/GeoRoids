@@ -11,6 +11,8 @@ import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
 
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+
 let cleanup: (() => Promise<void>) | undefined;
 afterEach(async () => {
   try {
@@ -25,6 +27,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   vi.spyOn(Date, 'now').mockReturnValue(10_000);
   const failures: unknown[] = [];
   const engine = new GameEngine(731);
+  vi.spyOn(engine, 'getServerTime').mockReturnValue(10_000);
   const broadcaster = new GameStateBroadcaster(engine);
   const handler = new MessageHandler(engine, broadcaster);
   const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
@@ -172,7 +175,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   assert.ok(joined && typeof joined === 'object' && 'resumeToken' in joined);
   assert.equal(typeof joined.resumeToken, 'string');
   const token = joined.resumeToken as string;
-  expect(token).toMatch(/^[a-f0-9]{64}$/);
+  expect(token).toMatch(RESUME_TOKEN_PATTERN);
   const preservedPosition = { ...secondPlayer.position };
   const closed = once(second.socket, 'close', { signal: AbortSignal.timeout(2_000) });
   second.socket.close();

@@ -8,7 +8,6 @@ import {
   LOOT_BLAST,
 } from '../../../shared/lootBlast';
 import { PALETTE } from '../../../src/constants';
-import { lootStrokeColor } from '../../../src/entities/loot/lootRenderer';
 
 describe('loot blast math', () => {
   test('blast radius includes nearby hulls and excludes far ones', () => {
@@ -31,9 +30,6 @@ describe('loot blast math', () => {
   });
 
   test('kind colors stay on the locked palette', () => {
-    expect(lootStrokeColor('shard')).toBe(PALETTE.LOOT);
-    expect(lootStrokeColor('wreckage')).toBe(PALETTE.LOOT);
-
     expect(PALETTE.LOOT).toBe('#E8D5A3');
   });
 });

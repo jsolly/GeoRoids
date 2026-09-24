@@ -131,23 +131,6 @@ export function thrusterFlameGeometry(
   };
 }
 
-export function laserBoltOffsets(
-  vx: number,
-  vy: number,
-  halfLength: number,
-  trailLength: number
-): { halfX: number; halfY: number; trailX: number; trailY: number } {
-  const speed = Math.hypot(vx, vy);
-  const dx = speed > 0 ? vx / speed : 1;
-  const dy = speed > 0 ? vy / speed : 0;
-  return {
-    halfX: dx * halfLength,
-    halfY: dy * halfLength,
-    trailX: dx * trailLength,
-    trailY: dy * trailLength,
-  };
-}
-
 export function strokePhosphorPolyline(
   ctx: DrawingContext,
   points: readonly Vec2[],
@@ -211,12 +194,13 @@ export function strokeBurstTicks(
   ctx.shadowBlur = resolveGlow(glow);
   ctx.lineWidth = width;
   ctx.lineCap = 'round';
+  // Keep each tick disconnected while compositing their shared halo once.
+  ctx.beginPath();
   for (let i = 0; i < count; i++) {
     const tick = burstTick(x, y, phase + (i * Math.PI * 2) / count, inner, outer);
-    ctx.beginPath();
     ctx.moveTo(tick.x1, tick.y1);
     ctx.lineTo(tick.x2, tick.y2);
-    ctx.stroke();
   }
+  ctx.stroke();
   ctx.restore();
 }

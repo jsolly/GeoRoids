@@ -1,15 +1,20 @@
 import type { Position } from '../../shared-types';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 
-/** Hue 0. Lightness runs from a pale easy route to a very dark steep climb. */
-const CONTOUR_SATURATION = 0.78;
+/** Endpoints of the difficulty ramp. The middle stays a muted rose, not spider red. */
+const CLIMB_RED = [82, 10, 10] as const;
+const EASY_RED = [246, 182, 182] as const;
 const UPHILL_LIGHTNESS = 0.18;
 const DOWNHILL_LIGHTNESS = 0.84;
 
 function redChannels(lightness: number): [number, number, number] {
-  const chroma = (1 - Math.abs(2 * lightness - 1)) * CONTOUR_SATURATION;
-  const match = lightness - chroma / 2;
-  return [Math.round((chroma + match) * 255), Math.round(match * 255), Math.round(match * 255)];
+  const span = DOWNHILL_LIGHTNESS - UPHILL_LIGHTNESS;
+  const mix = Math.min(1, Math.max(0, (lightness - UPHILL_LIGHTNESS) / span));
+  return [
+    Math.round(CLIMB_RED[0] + (EASY_RED[0] - CLIMB_RED[0]) * mix),
+    Math.round(CLIMB_RED[1] + (EASY_RED[1] - CLIMB_RED[1]) * mix),
+    Math.round(CLIMB_RED[2] + (EASY_RED[2] - CLIMB_RED[2]) * mix),
+  ];
 }
 
 function rampLightness(slope: number, passage: number): number {

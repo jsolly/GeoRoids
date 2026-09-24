@@ -90,6 +90,17 @@ test('a partial passage keeps only the open share of the downhill pull', () => {
       expect(velocity.x).toBeCloseTo((-gradient.x / steepness) * accel, 5);
       expect(velocity.y).toBeCloseTo((-gradient.y / steepness) * accel, 5);
       expect(Math.hypot(velocity.x, velocity.y)).toBeGreaterThan(0.2);
+      const nx = gradient.x / steepness;
+      const ny = gradient.y / steepness;
+      const climbing = { x: nx * 8, y: ny * 8 };
+      applySlopeForce(climbing, { x, y }, terrain, 1);
+      const pulledX = nx * 8 - nx * accel;
+      const pulledY = ny * 8 - ny * accel;
+      const uphillAfter = pulledX * nx + pulledY * ny;
+      const drag = TERRAIN.UPHILL_DRAG * scale * uphillAfter * open;
+      expect(uphillAfter).toBeGreaterThan(0);
+      expect(climbing.x).toBeCloseTo(pulledX - nx * drag, 5);
+      expect(climbing.y).toBeCloseTo(pulledY - ny * drag, 5);
       return;
     }
   }

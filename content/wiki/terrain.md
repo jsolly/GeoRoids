@@ -18,7 +18,7 @@ media:
 
 Contour lines are one red ramp, not a closed height map. Light red is an easy route, and an easy route joins other easy routes; very dark red is a steep climb. A lower stretch can keep falling.
 
-Downhill speeds you up a little and uphill slows you a little. Either ship can climb without Boost. The view ahead colors a straight route on that ramp. Follow a light passage either way for up to 50% extra cruise; turning across it loses the boost. Ordinary terrain does no damage and does not deflect shots.
+Downhill accelerates you and uphill slows you a little. Boost stacks with downhill speed, but either ship can climb without it. The view ahead colors a straight route on that ramp. Follow a light passage either way for up to 50% extra cruise; turning across it loses the boost. Ordinary terrain does no damage and does not deflect shots.
 
 ## Outer boundary
 

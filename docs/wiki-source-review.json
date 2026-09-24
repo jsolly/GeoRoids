@@ -1,5 +1,5 @@
 {
-  "note": "Merged current main. Contour lines stay one red ramp from light easy routes to very dark climbs. The terrain manual and demonstration match.",
+  "note": "Merged current main. Contours are a muted red ramp from light easy routes to very dark climbs, colored ahead of the ship. Downhill still accelerates and Boost stacks with it. A passage keeps only the open share of the height pull.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -66,7 +66,7 @@
     "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
     "scripts/wiki-media-requirements.txt": "sha256:41b54a6fb2918667ca47a61d73b522629d84490f3d78f0f20b21135faba10d35",
-    "scripts/wiki-media.ts": "sha256:eef2a1028b2e6070124cf17f7157f7b6d130f56b7fbf3a5076ee1e6356ac82b4",
+    "scripts/wiki-media.ts": "sha256:0ef64ef7e8d7efa3cfb8453fd1fc33bde220e77b74a9fbd098c2b3e0400de008",
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-vite.ts": "sha256:a20cca6c58262a96b23334348619ac8bbcfd0a05c77be5dc475a9994877dafa1",
     "server.ts": "sha256:1847341c2cd9286dc2a2ef87693cdb199d290d58f16a3a195c4e34d158c24125",
@@ -249,7 +249,7 @@
     "src/rendering/boundaryRenderer.ts": "sha256:434b87b42a7230f74f05452cf8758bf90f9ed63cdd434104140fde89f0698c15",
     "src/rendering/canvas.ts": "sha256:c647ee5ed018252c55d99a5f43a332f38c883054a4dff5919ddb95ef548edd65",
     "src/rendering/canvasSurface.ts": "sha256:7dac6f284dc2acc483e3845f08eccda91702e7251eb261bb26289a55644fcba6",
-    "src/rendering/contourAppearance.ts": "sha256:ee4a4b62f9ab7ed422a9f688796471eca9df51f784a227f9fa7b51c005de7c9e",
+    "src/rendering/contourAppearance.ts": "sha256:ef672ee396a8ec6098a3e0ddf5bc5a310e9f91786ab6611945785a523a11b7e3",
     "src/rendering/contourDisplay.ts": "sha256:8bba547d4817add2d8929a6a6ca5c111467595e0cf5dcf10e4679aa71075684f",
     "src/rendering/contourLabels.ts": "sha256:7c570c2834e4df78d43e89b9a2dfa07fe5013891ca2e813e845f531b1a862686",
     "src/rendering/contourLaserRenderer.ts": "sha256:7d922c5e02c58e5feb4ff41fcc8c7b04efa47472b5b5a4efea15cd3a5430cc00",
@@ -369,7 +369,7 @@
     "tests/unit/entities/local-ship-haptics.test.ts": "sha256:b6bc4559d028a510289325cb312c69faf1aba04eb9b2f81ea3a79a5573fa477f",
     "tests/unit/entities/menu-stops-flight-and-protects-the-hull.test.ts": "sha256:81398cc9dd9f0a9e3432cb639b42c92d6586784b5c836f9565513cce5fcf1518",
     "tests/unit/entities/mineral-asteroids-break-with-distinct-rewards.test.ts": "sha256:fbd7d24585f29f7e8bbcda148a45929736041dedec1b679b2d1b3ccd3138158d",
-    "tests/unit/entities/pilots-find-speed-passages-through-hills.test.ts": "sha256:784de6fd559cd3b791b043aed23690af62b955fe5f44eb6168c47adb1619709d",
+    "tests/unit/entities/pilots-find-speed-passages-through-hills.test.ts": "sha256:60e0b34ea6aa8645b6512fed1a833c8231b6cc569dbfb509ba388feb796ac331",
     "tests/unit/entities/roidScore.test.ts": "sha256:6b644f0b7d704f9d41c6d2949acfe4aa0a75d93f6529ce2db0dc9c4180e64bff",
     "tests/unit/entities/satellite-pickups-follow-authoritative-health.test.ts": "sha256:61be7447c241dea68b7d3170ed92d7a51eac4dde20cd065a760542075fd95a38",
     "tests/unit/entities/satellitePickupMath.test.ts": "sha256:7e598ec66e0a271c06db476cc994e7c6f32b99f29b3b0c3a1bc4928d3f08c758",

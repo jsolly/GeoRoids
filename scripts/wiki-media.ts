@@ -77,7 +77,11 @@ import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield';
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
-import { contourSlopeHex, radialSlope } from '../src/rendering/contourAppearance';
+import {
+  contourSlopeHex,
+  previewConeWeight,
+  radialSlope,
+} from '../src/rendering/contourAppearance';
 import { contourSlope } from '../src/rendering/contourDisplay';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
@@ -992,22 +996,23 @@ function makeTerrainDemo(): Demo {
             continue;
           }
           const slope = contourSlope(segment, field);
-          const climb = radialSlope(
-            {
-              x: (segment.ax + segment.bx) / 2 - state.position.x,
-              y: (segment.ay + segment.by) / 2 - state.position.y,
-            },
-            slope.gradient
-          );
+          const offset = {
+            x: (segment.ax + segment.bx) / 2 - state.position.x,
+            y: (segment.ay + segment.by) / 2 - state.position.y,
+          };
+          const heading = cruiseVelocity(state.angle, 1);
+          const weight = previewConeWeight(offset, heading);
+          const climb = radialSlope(offset, slope.gradient);
+          const colored = weight > 0 || slope.passage > 0;
           renderSegment(
             ctx,
             a.x,
             a.y,
             b.x,
             b.y,
-            contourSlopeHex(climb, slope.passage),
+            colored ? contourSlopeHex(weight > 0 ? climb : 0, slope.passage) : PALETTE.CONTOUR,
             level.index % 3 === 0 ? 1.1 : 0.65,
-            0.35
+            colored ? 0.55 : 0.2
           );
         }
       }

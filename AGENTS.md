@@ -34,7 +34,7 @@ Local gate before push: `npm run gate` (full working-tree checks, including an e
 
 Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDOMAIN). The live client is **georoids.com**.
 
-**Server changes** (`server.ts`, `server/**`, `.railway/**`, or server-facing changes in `shared-types.ts`):
+**Server changes** are classified by `node scripts/server-release-inputs.mjs --changed <base-sha> <merge-sha>` from the merged checkout. The classifier includes the TypeScript dependency graph rooted at `server.ts`, server/shared/setup/Railway paths, and runtime/build manifests. This includes server-consumed modules under `src/`. If it prints `true`:
 
 1. Complete client verification above if the push also touched client files.
 2. Deploy manually on [Railway](https://railway.app). **A merge to `main` does not deploy the server**: the Railway API reports the GitHub push-deploy trigger disabled (`NO_INSTALLATION` — no GitHub App on the public repo), and #608's merge produced no deployment until it was triggered by hand. The tracked `.railway/railway.ts` `source: github('jsolly/GeoRoids', { branch: 'main' })` only pins which repo and branch a deploy builds from; it does not by itself enable a push trigger. Deploy the **exact merged commit SHA**: the Railway dashboard's Deploy on that commit, or the Railway MCP agent / API deploy pinned to that `commitSha`. `railway redeploy` re-runs the previous build (its old SHA) and `railway up` uploads your local tree, so **neither** builds the merged commit. Deploy the commit only — do not commit unrelated staged environment patches.
@@ -42,6 +42,29 @@ Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDO
 4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
 
 Do not run `vercel deploy` from `/ship` unless Git integration is broken.
+
+### Production smoke workflow
+
+The separate **Production smoke** workflow follows successful trusted `main` CI.
+It checks the intended client release and the minimum required server release,
+then uses the real production UI to join, receive snapshots, move, and fire.
+It fails on stale releases, unhealthy persistence, stalled simulation, broken
+interaction, browser errors, or a deadline. Logs, screenshots, traces, and a
+machine-readable receipt are retained as workflow artifacts.
+
+Run `npm run smoke:production` with `PRODUCTION_SMOKE_SHA` set to the full merged
+SHA and `PRODUCTION_SMOKE_REQUEST_ID` set to a unique request ID. The checkout
+must match that SHA. This production-only runner does not start local servers.
+`PRODUCTION_SMOKE_SERVER_SHA` explicitly identifies a separate Railway release;
+otherwise the classifier computes the last server-affecting commit.
+
+During `/ship`, follow CI, deployment, and the exact smoke request to completion.
+Use the canonical `skills/ship/scripts/follow-production-smoke.mjs` helper from
+dotagents. Missing triggers require explicit dispatch; skipped, cancelled,
+missing, timed-out, or failed smoke is not verified. After a Railway deployment,
+request a fresh smoke run with its exact `server_sha`; an earlier client-only
+success cannot verify that deployment. Fix post-merge failures in a new PR.
+Triggers do not wake idle agents, and no recurring monitor is configured.
 
 ## Project
 

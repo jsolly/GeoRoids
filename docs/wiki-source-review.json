@@ -1,5 +1,5 @@
 {
-  "note": "Merged current main. Furnace names stay hidden until the heading-up chart is zoomed in close. The field manual describes both.",
+  "note": "Merged current main. Furnace names stay hidden until the heading-up chart is zoomed in close.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -8,7 +8,7 @@
     "index.css": "sha256:b65d5f1702ba17e05667854608809032613f5839b39089c7a18f0cb75e0eef3b",
     "index.html": "sha256:1ccd30e7bf228c6c2a00c0dbe33158874ecbacbd551713aed51721cc941187d5",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
-    "package.json": "sha256:db2485307ed93de62f5fe43ee7eddb8deded382671aca65f9135d0ff5a3233cd",
+    "package.json": "sha256:7103dbc14f0676081f289a35e3873ed2a4c5c8fb7e9e2366c3b34d20123151cb",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",

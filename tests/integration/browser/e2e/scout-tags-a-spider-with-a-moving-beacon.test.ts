@@ -1,7 +1,8 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 import { TOWN_HEARTH } from '../../../../shared/furnaces';
-import type { SpiderFieldState } from '../../../../shared-types';
+import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
+import type { Position, SpiderFieldState } from '../../../../shared-types';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -22,6 +23,21 @@ for (const width of [1280, 390]) {
     const page = await browserManager.recreatePage({ hasTouch: mobile });
     await page.setViewportSize({ width, height: mobile ? 844 : 900 });
     const diagnostics = watchBrowserDiagnostics(page);
+    const decoder = new SnapshotDecoder();
+    const serverPoses = new Map<string, { position: Position; angle: number }>();
+    page.on('websocket', (socket) => {
+      socket.on('framereceived', ({ payload }) => {
+        const result = decoder.readMessage(String(payload), { acceptSnapshots: true });
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        if (result.kind === 'snapshot') {
+          for (const entity of result.state.entities) {
+            serverPoses.set(entity.id, { position: entity.position, angle: entity.angle });
+          }
+        }
+      });
+    });
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     await game.collectEquipment(['survey_probe']);
@@ -42,20 +58,44 @@ for (const width of [1280, 390]) {
     const works = TOWN_HEARTH;
     await arrangeCrewField([id], 'spider-tools');
     await game.placeShipAt(works.position.x + 400, works.position.y);
-    await page.evaluate(() => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Missing Scout');
-      }
-      ship.angle = 0;
-      ship.angularVelocity = 0;
-    });
     await expect.poll(async () => (await field(page)).spiders.length).toBe(1);
     const target = (await field(page)).spiders[0];
     if (!target) {
       throw new Error('Missing spider');
     }
-    await game.aimAtWorldPosition(target.position);
+    // A probe is a server hitscan: track the moving spider until both the
+    // predicted ship and its acknowledged pose point at the current target.
+    await expect
+      .poll(
+        async () => {
+          const current = (await field(page)).spiders.find((spider) => spider.id === target.id);
+          if (!current) {
+            throw new Error('Spider disappeared before launch');
+          }
+          await game.pointAtWorldPosition(current.position);
+          const local = {
+            position: await game.getShipPosition(),
+            angle: await game.getShipAngle(),
+          };
+          const server = serverPoses.get(id);
+          if (!server) {
+            return Math.PI;
+          }
+          return Math.max(
+            ...[local, server].map((pose) => {
+              const desired = Math.atan2(
+                pose.position.y - current.position.y,
+                current.position.x - pose.position.x
+              );
+              return Math.abs(
+                Math.atan2(Math.sin(pose.angle - desired), Math.cos(pose.angle - desired))
+              );
+            })
+          );
+        },
+      { timeout: 5000, interval: 16 }
+      )
+      .toBeLessThan(0.02);
     if (mobile) {
       await page.locator('#touch-ability').tap();
     } else {

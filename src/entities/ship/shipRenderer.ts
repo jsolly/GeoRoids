@@ -438,7 +438,7 @@ function prepareLaserBoltSprites(
   return laserBoltSprites;
 }
 
-/** The existing trail, body and white core, painted once facing screen-right. */
+/** Body and core, painted once facing screen-right. Butt caps keep thickness off the flight axis. */
 function paintLaserBolt(
   ctx: DrawingContext,
   x: number,
@@ -448,35 +448,39 @@ function paintLaserBolt(
 ): void {
   const halfLength = (VISUAL.LASER_LENGTH / 2) * scale;
   const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
-  strokePhosphorSegment(
-    ctx,
-    x - halfLength - trailLength,
-    y,
-    x - halfLength,
-    y,
-    color,
-    VISUAL.LASER_STROKE_WIDTH * 0.7,
-    VISUAL.LASER_GLOW * 0.55,
-    0.38
-  );
-  strokePhosphorSegment(
-    ctx,
-    x - halfLength,
-    y,
-    x + halfLength,
-    y,
-    color,
-    VISUAL.LASER_STROKE_WIDTH,
-    VISUAL.LASER_GLOW
-  );
+  if (trailLength > 0) {
+    strokePhosphorSegment(
+      ctx,
+      x - halfLength - trailLength,
+      y,
+      x - halfLength,
+      y,
+      color,
+      VISUAL.LASER_STROKE_WIDTH * 0.7,
+      VISUAL.LASER_GLOW * 0.55,
+      0.38
+    );
+  }
+  const trace = (): void => {
+    ctx.beginPath();
+    ctx.moveTo(x - halfLength, y);
+    ctx.lineTo(x + halfLength, y);
+  };
   ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
+  ctx.lineCap = 'butt';
+  ctx.lineWidth = VISUAL.LASER_STROKE_WIDTH;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = resolveGlow(VISUAL.LASER_GLOW);
+  ctx.strokeStyle = hexToRgba(color, 0.5);
+  trace();
+  ctx.stroke();
   ctx.shadowBlur = 0;
+  ctx.strokeStyle = color;
+  trace();
+  ctx.stroke();
+  ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
   ctx.strokeStyle = VISUAL.LASER_CORE_COLOR;
-  ctx.beginPath();
-  ctx.moveTo(x - halfLength, y);
-  ctx.lineTo(x + halfLength, y);
+  trace();
   ctx.stroke();
   ctx.restore();
 }
@@ -490,7 +494,7 @@ function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprit
   const halfLength = (VISUAL.LASER_LENGTH / 2) * cache.scale;
   const trailLength = VISUAL.LASER_TRAIL_LENGTH * cache.scale;
   // Match the main context's DPR transform and the painter's existing blur values.
-  // Keep room for the round stroke caps and the complete soft halo in backing pixels.
+  // Keep room for the thick body and the complete soft halo in backing pixels.
   const padding = Math.ceil(VISUAL.LASER_STROKE_WIDTH / 2 + (3 * cache.glow + 2) / cache.dpr);
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil((halfLength * 2 + trailLength + padding * 2) * cache.dpr);

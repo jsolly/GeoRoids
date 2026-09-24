@@ -25,7 +25,7 @@ test('a spider pursues and bites nearby prey then releases a pilot who escapes',
   expect(manager.snapshot().spiders.find((row) => row.id === spider?.id)?.targetId).toBeNull();
 });
 
-test('three regular laser hits kill a spider and cancel its pending bite', () => {
+test('one regular laser hit kills a spider and cancels its pending bite', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
   manager.spawnSpider({ x: 2200, y: 2200 });
   const pilot = actorAt({ x: 2200, y: 2200 });
@@ -34,15 +34,7 @@ test('three regular laser hits kill a spider and cancel its pending bite', () =>
   expect(bite).toBeDefined();
   const start = { x: 2100, y: 2200 };
   const end = { x: 2300, y: 2200 };
-  for (let hits = 1; hits <= 3; hits++) {
-    expect(manager.resolveLaserHit(start, end, DAMAGE.LASER_HIT)?.kind).toBe('spider');
-    if (hits < 3) {
-      expect(manager.snapshot().spiders[0]?.health).toBe(
-        SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT * hits
-      );
-      expect(manager.snapshot().spiders[0]?.phase).toBe('hunting');
-    }
-  }
+  expect(manager.resolveLaserHit(start, end, DAMAGE.LASER_HIT)?.kind).toBe('spider');
   expect(manager.snapshot().spiders).toEqual([]);
   if (bite) {
     expect(manager.isAttackActive(bite)).toBe(false);

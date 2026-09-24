@@ -394,6 +394,7 @@
     "tests/unit/network/asteroidFieldSync.test.ts",
     "tests/integration/browser/sanity/crew-scoreboard-lists-pilots.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
+    "tests/unit/ui/furnace-names-stay-hidden-until-the-chart-is-zoomed-in.test.ts",
     "src/audio/Sound.ts",
     "src/audio/audioRuntime.ts",
     "src/audio/musicBeds.ts",

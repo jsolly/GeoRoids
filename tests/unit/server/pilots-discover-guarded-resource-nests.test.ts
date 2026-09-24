@@ -90,7 +90,7 @@ test('leaving and revisiting preserves wounded guards and never replaces killed 
   if (!wounded || !killed) {
     throw new Error('Expected guards');
   }
-  manager.resolveLaserHit(wounded.position, wounded.position, DAMAGE.LASER_HIT);
+  manager.resolveLaserHit(wounded.position, wounded.position, DAMAGE.LASER_HIT * 0.5);
   manager.resolveLaserHit(killed.position, killed.position, SPIDER.MAX_HEALTH);
   const expected = manager
     .snapshot()

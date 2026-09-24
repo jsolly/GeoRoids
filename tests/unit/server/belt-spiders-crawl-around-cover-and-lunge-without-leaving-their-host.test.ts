@@ -189,16 +189,17 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
     throw new Error('Expected crawler');
   }
   const y = original.position.y;
-  manager.resolveLaserHit({ x: 180, y }, { x: 100, y }, 25);
+  const graze = BELT_CRAWLER.MAX_HEALTH / 2;
+  manager.resolveLaserHit({ x: 180, y }, { x: 100, y }, graze);
   expect(rock.health).toBe(150);
   manager.escapeDestroyedHost(rock, [destination], 1);
   expect(manager.snapshot()[0]).toMatchObject({
     id: original.id,
-    health: 50,
+    health: BELT_CRAWLER.MAX_HEALTH - graze,
     crawler: { phase: 'escaping', hostId: destination.id },
   });
   expect(rock.beltCrawlerHealth).toEqual([0]);
-  expect(destination.beltCrawlerHealth).toEqual([50]);
+  expect(destination.beltCrawlerHealth).toEqual([BELT_CRAWLER.MAX_HEALTH - graze]);
   manager.advance({ rocks: [destination], players: [pilot({ x: 160, y: 0 })], nowFrame: 19 });
   const airborne = manager.snapshot()[0];
   expect(airborne?.position.x).toBeGreaterThan(original.position.x);
@@ -216,12 +217,12 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
   expect(manager.snapshot()).toHaveLength(1);
   expect(manager.snapshot()[0]).toMatchObject({
     id: original.id,
-    health: 50,
+    health: BELT_CRAWLER.MAX_HEALTH - graze,
     crawler: { hostId: destination.id, phase: 'crawling' },
   });
   manager.clear();
   manager.advance({ rocks: [structuredClone(destination)], players: [], nowFrame: 22 });
-  expect(manager.snapshot()[0]?.health).toBe(50);
+  expect(manager.snapshot()[0]?.health).toBe(BELT_CRAWLER.MAX_HEALTH - graze);
 });
 
 test('escape preserves the destination native guard and does not resurrect a killed migrant', () => {
@@ -250,7 +251,7 @@ test('destroyed hosts without a reachable landing kill their spiders, while slee
   manager.advance({ rocks: [rock, distant], players: [], nowFrame: 0 });
   manager.advance({ rocks: [distant], players: [], nowFrame: 1 });
   expect(manager.snapshot()).toEqual([]);
-  expect(rock.beltCrawlerHealth).toEqual([75]);
+  expect(rock.beltCrawlerHealth).toEqual([BELT_CRAWLER.MAX_HEALTH]);
   manager.advance({ rocks: [rock, distant], players: [], nowFrame: 2 });
   manager.escapeDestroyedHost(rock, [distant], 3);
   expect(manager.snapshot()).toEqual([]);
@@ -317,7 +318,7 @@ test('a wounded hunter pursues across living rocks and repeatedly returns withou
       const bodies = manager.snapshot();
       expect(bodies).toHaveLength(1);
       expect(bodies[0]?.id).toBe(`belt-crawler:${source.id}:0`);
-      expect(bodies[0]?.health).toBe(50);
+      expect(bodies[0]?.health).toBe(BELT_CRAWLER.MAX_HEALTH);
       homes.add(bodies[0]?.crawler?.hostId ?? 'missing');
     }
     expect(manager.snapshot()[0]?.crawler?.hostId).toBe(cycle % 2 === 0 ? last.id : source.id);
@@ -327,11 +328,14 @@ test('a wounded hunter pursues across living rocks and repeatedly returns withou
   expect(rocks.every((rock) => (rock.beltCrawlerIds?.length ?? 0) <= 1)).toBe(true);
   expect(
     rocks.flatMap((rock) => rock.beltCrawlerHealth ?? []).filter((health) => health > 0)
-  ).toEqual([50]);
+  ).toEqual([BELT_CRAWLER.MAX_HEALTH]);
   manager.clear();
   manager.advance({ rocks: structuredClone(rocks), players: [], nowFrame: frame + 1 });
   expect(manager.snapshot()).toHaveLength(1);
-  expect(manager.snapshot()[0]).toMatchObject({ health: 50, crawler: { hostId: source.id } });
+  expect(manager.snapshot()[0]).toMatchObject({
+    health: BELT_CRAWLER.MAX_HEALTH,
+    crawler: { hostId: source.id },
+  });
 });
 
 test('a hunter crawls around its host to a departure edge before hopping toward a pilot behind it', () => {

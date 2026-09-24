@@ -47,11 +47,29 @@ test.each([1280, 390])(
     const ids = await Promise.all([listener.getLocalPlayerId(), shooter.getLocalPlayerId()]);
     await arrangeCrewField(ids, 'empty');
     await Promise.all([listener.waitForCombatReady(), shooter.waitForCombatReady()]);
+    // Wait for the two samples this scenario uses, not the global bank size.
+    const requiredDurations = await listenerPage.evaluate(() => {
+      const context = new OfflineAudioContext(2, 1, 48000);
+      return Promise.all(
+        ['laser', 'asteroid-explode'].map(async (name) => {
+          const response = await fetch(`/sounds/${name}.m4a`);
+          const buffer = await context.decodeAudioData(await response.arrayBuffer());
+          return buffer.duration;
+        })
+      );
+    });
     await expect
       .poll(() =>
-        listenerPage.evaluate(() => Number(document.documentElement.dataset['decodedAudio']))
+        listenerPage.evaluate((durations) => {
+          const decoded: number[] = JSON.parse(
+            document.documentElement.dataset['decodedAudioDurations'] ?? '[]'
+          );
+          return durations.every((duration) =>
+            decoded.some((value) => Math.abs(value - duration) < 0.00001)
+          );
+        }, requiredDurations)
       )
-      .toBeGreaterThanOrEqual(25);
+      .toBe(true);
     const listenerId = ids[0];
     assert.ok(listenerId);
     await shooter.fireLaserAtRemotePlayer(listenerId, 110);

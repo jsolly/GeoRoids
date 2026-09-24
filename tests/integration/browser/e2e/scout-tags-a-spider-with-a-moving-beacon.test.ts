@@ -10,6 +10,7 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
+import { centerOf } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 function field(page: Page): Promise<SpiderFieldState> {
@@ -93,9 +94,16 @@ for (const width of [1280, 390]) {
             })
           );
         },
-      { timeout: 5000, interval: 16 }
+        { timeout: 5000, interval: 16 }
       )
       .toBeLessThan(0.02);
+    // Release the steering command before the UI tap; a held off-center
+    // cursor would keep turning with the travel-relative camera during it.
+    const center = await centerOf(page, '#gameCanvas');
+    await page.mouse.move(center.x, center.y);
+    await page.evaluate(() => {
+      window.gameController?.updateNetworkPlayerState();
+    });
     if (mobile) {
       await page.locator('#touch-ability').tap();
     } else {

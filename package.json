@@ -37,7 +37,7 @@
     "fix": "npm run check:fix && npm run check:ts && npm run check:benchmarks && npm run test",
     "format": "biome format --write .",
     "prepare": "if [ -z \"$CI\" ] && git rev-parse --git-dir >/dev/null 2>&1; then git config core.hooksPath .git-hooks; fi",
-    "check:actions": "node scripts/ci-contract.mjs && bash scripts/check-actions-contract.sh && bash scripts/check-actions.sh && bash scripts/vercel-preview-comment-contract.sh && bash scripts/vercel-preview-workflow-contract.sh",
+    "check:actions": "node --test scripts/server-release-inputs.test.mjs && node scripts/ci-contract.mjs && bash scripts/check-actions-contract.sh && bash scripts/check-actions.sh && bash scripts/vercel-preview-comment-contract.sh && bash scripts/vercel-preview-workflow-contract.sh",
     "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit && npm run test:review",
     "check:lint-policy": "bash scripts/lint-policy-contract.sh",
     "check:knip": "knip --treat-config-hints-as-errors --treat-tag-hints-as-errors",
@@ -48,7 +48,9 @@
     "wiki:media:check": "tsx scripts/wiki-media.ts --verify",
     "test:coverage": "vitest run --dir tests/unit --coverage",
     "benchmark:realtime": "./scripts/test-runner.sh --benchmark-client",
-    "benchmark:load": "./scripts/test-runner.sh --benchmark-load"
+    "benchmark:load": "./scripts/test-runner.sh --benchmark-load",
+    "smoke:production": "node scripts/production-smoke.mjs",
+    "smoke:scenario-contract": "node --test scripts/server-release-inputs.test.mjs scripts/production-smoke-scenario.test.mjs"
   },
   "repository": {
     "type": "git",

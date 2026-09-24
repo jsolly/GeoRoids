@@ -74,11 +74,27 @@ for (const viewport of [
       if (collected.has(drop.lootId)) {
         continue;
       }
-      const position: { x: number; y: number } | null = await page.evaluate(`(async () => {
-        const { LootField } = await import('/src/entities/loot/LootField.ts');
-        return LootField.getInstance().getAll().find(drop => drop.id === ${JSON.stringify(drop.lootId)})?.position ?? null;
-      })()`);
-      expect(position).not.toBeNull();
+      let position: { x: number; y: number } | null = null;
+      // A placement can collect neighboring drops too. Their client removal and
+      // the observer's collection event can arrive on opposite sides of evaluate.
+      await expect
+        .poll(
+          async () => {
+            if (collected.has(drop.lootId)) {
+              return true;
+            }
+            position = await page.evaluate(`(async () => {
+            const { LootField } = await import('/src/entities/loot/LootField.ts');
+            return LootField.getInstance().getAll().find(drop => drop.id === ${JSON.stringify(drop.lootId)})?.position ?? null;
+          })()`);
+            return collected.has(drop.lootId) || position !== null;
+          },
+          { timeout: 2000, interval: 20 }
+        )
+        .toBe(true);
+      if (collected.has(drop.lootId)) {
+        continue;
+      }
       if (!position) {
         throw new Error('Uncollected canister missing');
       }

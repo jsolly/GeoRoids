@@ -32,16 +32,16 @@ test('the last pilot disconnecting preserves a wounded resource guard and its sl
   engine.advanceCombatFrame();
   const [wounded, killed] = engine.getSpiderField().spiders;
   assert(wounded && killed);
-  assert(engine.spawnLaser(pilot.id, wounded.position, { x: 1, y: 0 }));
+  const graze = engine.spawnLaser(pilot.id, wounded.position, { x: 1, y: 0 });
+  assert(graze);
+  graze.energy = 0.5;
   engine.advanceLasersAndResolveHits();
-  for (let i = 0; i < 3; i++) {
-    assert(engine.spawnLaser(pilot.id, killed.position, { x: 1, y: 0 }));
-    engine.advanceLasersAndResolveHits();
-  }
+  assert(engine.spawnLaser(pilot.id, killed.position, { x: 1, y: 0 }));
+  engine.advanceLasersAndResolveHits();
   const before = engine.getSpiderField().spiders.map(({ id, health }) => ({ id, health }));
   expect(before).toHaveLength(SPIDER.NEST_GUARDS - 1);
   expect(before.find(({ id }) => id === wounded.id)?.health).toBe(
-    SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT
+    SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT * 0.5
   );
   engine.removePlayer(pilot.id);
   expect(engine.getSpiderField().spiders).toEqual([]);

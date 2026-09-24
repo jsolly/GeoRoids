@@ -41,7 +41,7 @@ Head east to mine the metal-rich belt or tow its deposits to a furnace; explored
 
 ## Belt spiders
 
-Black, red-eyed crawlers round rock cover and hop between nearby rocks to chase you. Shoot exposed bodies without destroying their rocks, and retreat beyond their telegraphed lunges; solid rock blocks both attacks and shots. When a host breaks, survivors leap to a reachable rock with their wounds intact, or die if none is reachable.
+Black, red-eyed crawlers round rock cover and hop between nearby rocks to chase you. One shot kills an exposed body without destroying its rock; retreat beyond their telegraphed lunges, and solid rock blocks both attacks and shots. When a host breaks, living crawlers leap to a reachable rock, or die if none is reachable.
 
 ## Ore and refining
 

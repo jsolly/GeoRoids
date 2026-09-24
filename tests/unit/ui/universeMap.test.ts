@@ -20,7 +20,6 @@ import {
   UNIVERSE_MAP_IDS,
   UNIVERSE_MAP_LOCATE_LABEL,
   UNIVERSE_MAP_ZOOM,
-  universeMapHeadingRotation,
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
 
@@ -172,15 +171,10 @@ describe('universe map play chrome', () => {
     ).toEqual({ x: 420, y: 130 });
   });
 
-  test('the chart keeps the ship nose up and slides north onto the compass', () => {
+  test('the chart keeps eastbound travel up and slides north onto the compass', () => {
     const frame = { x: 20, y: 30, size: 400, scale: 2 };
     const center = { x: 0, y: 0 };
-    expect(universeMapHeadingRotation(Math.PI / 2)).toBe(0);
-    expect(universeMapHeadingRotation(undefined)).toBe(0);
-    expect(universeMapHeadingRotation(Number.NaN)).toBe(0);
-
-    const facingEast = universeMapHeadingRotation(0);
-    expect(facingEast).toBeCloseTo(-Math.PI / 2);
+    const facingEast = -Math.PI / 2;
     const ahead = mapWorldToCanvas({ x: 100, y: 0 }, center, frame, facingEast);
     expect(ahead).toEqual({ x: 220, y: 30 });
     const north = mapWorldToCanvas({ x: 0, y: -100 }, center, frame, facingEast);
@@ -196,7 +190,8 @@ describe('universe map play chrome', () => {
       type: 'local',
       input: new MockPlayerInput(),
     });
-    pilot.ship.angle = 0;
+    pilot.ship.angle = Math.PI / 2;
+    pilot.ship.velocity = { x: 4, y: 0 };
     const localPlayer = vi
       .spyOn(PlayerManager.getInstance(), 'getLocalPlayer')
       .mockReturnValue(pilot);

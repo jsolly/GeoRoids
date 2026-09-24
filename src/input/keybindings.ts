@@ -1,5 +1,6 @@
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
+import { canvasManager } from '../rendering/canvasSurface';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { isTownStoreOpen } from '../ui/townStoreState';
 import { logger } from '../utils/Logger';
@@ -70,7 +71,9 @@ function updateTurnFromKeys(player: Player): void {
   if (!turningLeft && !turningRight) {
     const heading = controlSources.pointerHeading;
     player.ship.angularVelocity =
-      heading === null ? 0 : steeringTurn(player.ship.angle, heading, turnSpeed);
+      heading === null
+        ? 0
+        : steeringTurn(player.ship.angle, heading + canvasManager.getCameraRotation(), turnSpeed);
   }
 }
 

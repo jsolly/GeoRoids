@@ -67,3 +67,33 @@ test('an isolated source remains visible with an explanation instead of an empty
   expect(container.textContent).toContain('No other furnaces are lit yet');
   expect(container.querySelector('[data-furnace-id]')).toBeNull();
 });
+
+test('pilots see a destination along their course above them with pipes attached', () => {
+  const container = document.createElement('div');
+  const east = CIVIC_LOTS.find((site) => site.id === 'street-1-0');
+  if (!east) {
+    throw new Error('Missing east street');
+  }
+  const course = Math.atan2(
+    -(east.position.y - TOWN_HEARTH.position.y),
+    east.position.x - TOWN_HEARTH.position.x
+  );
+  renderFurnaceTravelMap(container, TOWN_HEARTH, [east], vi.fn(), course - Math.PI / 2);
+  const current = container.querySelector<HTMLElement>('[aria-current="location"]');
+  const destination = container.querySelector<HTMLElement>('[data-furnace-id="street-1-0"]');
+  if (!current || !destination) {
+    throw new Error('Missing furnace marker');
+  }
+  expect(Number.parseFloat(destination.style.left)).toBeCloseTo(
+    Number.parseFloat(current.style.left)
+  );
+  expect(Number.parseFloat(destination.style.top)).toBeLessThan(
+    Number.parseFloat(current.style.top)
+  );
+  const points = [...container.querySelectorAll('polyline')].flatMap((line) =>
+    (line.getAttribute('points') ?? '').split(' ')
+  );
+  expect(points).toContain(
+    `${Number.parseFloat(destination.style.left)},${Number.parseFloat(destination.style.top)}`
+  );
+});

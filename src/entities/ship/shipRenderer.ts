@@ -5,6 +5,7 @@ import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import type { PlayfieldSize } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
+import { rotateVectorInto } from '../../rendering/travelCamera';
 import {
   driftSegment,
   easeOutCubic,
@@ -30,6 +31,7 @@ const thrusterGeom = {
   rearCenter: { x: 0, y: 0 },
 };
 
+const laserVelocityScreen = { x: 0, y: 0 };
 const laserScreen = { x: 0, y: 0 };
 const shipScreen = { x: 0, y: 0 };
 /** Shared phosphor stroke for kit outlines. */
@@ -202,7 +204,7 @@ export function drawThruster(ship: Ship, color: string = ship.color): void {
     drawGenericThruster(
       viewport.width / 2,
       viewport.height / 2,
-      ship.angle,
+      ship.angle - canvasManager.getCameraRotation(),
       ship.r,
       color,
       ship.kitId,
@@ -237,7 +239,7 @@ export function drawThrusterAtPosition(
     drawGenericThruster(
       screen.x,
       screen.y,
-      ship.angle,
+      ship.angle - canvasManager.getCameraRotation(),
       ship.r * scale,
       color,
       ship.kitId,
@@ -365,7 +367,7 @@ export function drawShipExplosion(ship: Ship, color?: string): void {
     viewport.width / 2,
     viewport.height / 2,
     ship.r * canvasManager.getPlayfieldScale(),
-    ship.angle,
+    ship.angle - canvasManager.getCameraRotation(),
     explosionProgress(ship),
     color ?? ship.color ?? PALETTE.LOCAL,
     ship.kitId
@@ -390,7 +392,7 @@ export function drawShipExplosionAtPosition(
     screen.x,
     screen.y,
     ship.r * scale,
-    ship.angle,
+    ship.angle - canvasManager.getCameraRotation(),
     explosionProgress(ship),
     color ?? ship.color ?? PALETTE.REMOTE,
     ship.kitId
@@ -568,14 +570,20 @@ export function drawLaserBolts(
 
     const boltColor = laserBoltColor(color, laser.bounceCount);
     if (laser.explodeTime === 0) {
+      const velocity = rotateVectorInto(
+        laserVelocityScreen,
+        laser.velocity.x,
+        laser.velocity.y,
+        canvasManager.getCameraRotation()
+      );
       drawCachedLaserBolt(
         ctx,
         sprites,
         boltColor,
         screenPos.x,
         screenPos.y,
-        laser.velocity.x,
-        laser.velocity.y
+        velocity.x,
+        velocity.y
       );
     } else {
       const t = 1 - laser.explodeTime / Math.ceil(LASER.EXPLODE_DURATION * GAME.FPS);
@@ -695,13 +703,19 @@ export function drawShipAtPosition(
     }
     ctx.stroke();
     ctx.restore();
-    drawFurnaceTravelFlame(ctx, screenX, screenY, shipR, ship.angle);
+    drawFurnaceTravelFlame(
+      ctx,
+      screenX,
+      screenY,
+      shipR,
+      canvasManager.getCameraRotation() - ship.angle
+    );
     strokeKitHullOutline(
       ctx,
       screenX,
       screenY,
       shipR,
-      ship.angle,
+      ship.angle - canvasManager.getCameraRotation(),
       color ?? ship.color,
       ship.kitId,
       haulerUtilityOf(ship)
@@ -719,7 +733,7 @@ export function drawShipAtPosition(
     screenX,
     screenY,
     shipR,
-    ship.angle,
+    ship.angle - canvasManager.getCameraRotation(),
     shipColor,
     ship.kitId,
     haulerUtilityOf(ship)

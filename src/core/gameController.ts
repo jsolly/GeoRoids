@@ -109,7 +109,11 @@ export class GameController {
           return undefined;
         }
         const viewport = canvasManager.getViewportSize();
-        return { width: viewport.width, height: viewport.height };
+        return {
+          width: viewport.width,
+          height: viewport.height,
+          rotation: canvasManager.getCameraRotation(),
+        };
       },
     });
 

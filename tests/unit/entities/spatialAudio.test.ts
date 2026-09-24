@@ -245,3 +245,16 @@ test('directions stay relative to the listener as both move across world sectors
   expect(moved.offset).toEqual({ x: -200, y: -100 });
   expect(moved.volumeScale).toBe(plan.volumeScale);
 });
+
+test('eastbound pilots hear eastern sources ahead and southern sources on screen right', () => {
+  const rotated = { ...viewport, rotation: -Math.PI / 2 };
+  const east = planPositionalPlayback({ x: listener.x + 100, y: listener.y }, listener, rotated);
+  expect(east.offset?.x).toBeCloseTo(0);
+  expect(east.offset?.y).toBeCloseTo(-100);
+  const south = planPositionalPlayback({ x: listener.x, y: listener.y + 350 }, listener, rotated, {
+    requireViewport: true,
+  });
+  expect(south.shouldPlay).toBe(true);
+  expect(south.offset?.x).toBeCloseTo(350);
+  expect(south.offset?.y).toBeCloseTo(0);
+});

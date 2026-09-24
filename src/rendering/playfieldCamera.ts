@@ -1,4 +1,5 @@
 import type { Position } from '../../shared-types';
+import { rotateVectorInto } from './travelCamera';
 
 export type PlayfieldSize = { width: number; height: number };
 
@@ -13,10 +14,12 @@ export function projectWorldToScreenInto(
   world: Position,
   ship: Position,
   canvas: PlayfieldSize,
-  scale = 1
+  scale = 1,
+  rotation = 0
 ): { x: number; y: number } {
-  out.x = canvas.width / 2 + (world.x - ship.x) * scale;
-  out.y = canvas.height / 2 + (world.y - ship.y) * scale;
+  rotateVectorInto(out, world.x - ship.x, world.y - ship.y, rotation);
+  out.x = canvas.width / 2 + out.x * scale;
+  out.y = canvas.height / 2 + out.y * scale;
   return out;
 }
 

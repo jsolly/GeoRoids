@@ -88,7 +88,10 @@
     "shared/equipment.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "src/rendering/travelCamera.ts",
+    "src/rendering/canvasSurface.ts",
+    "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -429,7 +432,9 @@
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
     "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
     "shared/economy.ts",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+    "src/rendering/travelCamera.ts",
+    "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts"
   ],
   "scout": [
     "src/entities/ship/shipKits.ts",

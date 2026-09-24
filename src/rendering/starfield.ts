@@ -3,6 +3,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { getGameBoundary } from '../physics/boundary';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
+import { rotatedViewSize } from './travelCamera';
 
 const starScreen = { x: 0, y: 0 };
 
@@ -128,8 +129,13 @@ export function drawStarfield(shipPosition: Position): void {
 
   const boundary = getGameBoundary();
   const scale = canvasManager.getPlayfieldScale();
-  const halfWidth = viewport.width / (2 * scale);
-  const halfHeight = viewport.height / (2 * scale);
+  const bounds = rotatedViewSize(
+    viewport.width,
+    viewport.height,
+    canvasManager.getCameraRotation()
+  );
+  const halfWidth = bounds.width / (2 * scale);
+  const halfHeight = bounds.height / (2 * scale);
   const viewPadding = (size + 1) / scale;
   const minTileX = Math.floor(
     (shipPosition.x - halfWidth - viewPadding - boundary.cx) / STAR_TILE_SIZE

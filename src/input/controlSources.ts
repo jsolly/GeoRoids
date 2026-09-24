@@ -1,3 +1,4 @@
+/** Pointer headings stay in screen space and are converted each simulation step. */
 export const controlSources: { pointerHeading: number | null; touchFire: boolean } = {
   pointerHeading: null,
   touchFire: false,

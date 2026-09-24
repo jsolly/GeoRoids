@@ -164,6 +164,8 @@ test.each([
     const frame = await openAndCaptureMap(page, touch);
     expect(frame.labels).toContain('NORTH');
     expect(frame.labels).toContain('5k across');
+    expect(frame.labels).not.toContain(FAR_FURNACE.name);
+    expect(frame.labels).not.toContain('Town Square');
     expect(await page.locator('#universe-map-zoom').count()).toBe(0);
     expect(await page.locator('.universe-map-stage .universe-map-zoom').isVisible()).toBe(true);
     expect(await page.locator('.universe-map-actions #universe-map-zoom-in').count()).toBe(0);
@@ -201,8 +203,21 @@ test.each([
           timeout: 5000,
         })
         .toBe(true);
+      expect((await readMapFrame(page)).labels).toContain('Town Square');
       expect(await locate.getAttribute('aria-pressed')).toBe('false');
+    } else {
+      await page.locator('#universe-map-zoom-in').tap();
+      await expect
+        .poll(async () => (await readMapFrame(page)).labels.includes('Town Square'), {
+          timeout: 5000,
+        })
+        .toBe(true);
     }
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(
+        `crew-universe-map-${touch ? 'mobile' : 'desktop'}-close.png`
+      ),
+    });
     const zoomOut = page.locator('#universe-map-zoom-out');
     for (let index = 0; index < 12; index++) {
       if (touch) {
@@ -210,12 +225,23 @@ test.each([
       } else {
         await zoomOut.click();
       }
+      const zoomed = await readMapFrame(page);
+      if (zoomed.labels.includes('16.6k across')) {
+        await page.screenshot({
+          path: screenshotManager.getScreenshotPath(
+            `crew-universe-map-${touch ? 'mobile' : 'desktop'}-wide.png`
+          ),
+        });
+      }
     }
     const wholeWorld = await readMapFrame(page);
     expect(wholeWorld.labels).toContain('120k across');
-    expect(wholeWorld.labels).toContain(FAR_FURNACE.name);
+    expect(wholeWorld.labels).not.toContain(FAR_FURNACE.name);
+    expect(wholeWorld.labels).not.toContain('Town Square');
     await locate.click();
-    expect((await readMapFrame(page)).labels).toContain('5k across');
+    const nearbyAgain = await readMapFrame(page);
+    expect(nearbyAgain.labels).toContain('5k across');
+    expect(nearbyAgain.labels).not.toContain('Town Square');
     expect(await locate.getAttribute('aria-pressed')).toBe('true');
 
     if (touch) {
@@ -235,6 +261,17 @@ test.each([
       .poll(() => page.locator('#universe-map-status').textContent())
       .toContain(`X ${formatMapCoordinate(FAR_FURNACE.position.x)}`);
     expect((await readMapFrame(page)).labels).toContain('5k across');
+    expect((await readMapFrame(page)).labels).not.toContain(FAR_FURNACE.name);
+    if (touch) {
+      await page.locator('#universe-map-zoom-in').tap();
+    } else {
+      await page.locator('#universe-map-zoom-in').click();
+    }
+    await expect
+      .poll(async () => (await readMapFrame(page)).labels.includes(FAR_FURNACE.name), {
+        timeout: 5000,
+      })
+      .toBe(true);
     await page.locator('#universe-map-close').click();
     if (!touch) {
       expect(await page.evaluate(() => document.activeElement?.id)).toBe('universe-map-toggle');

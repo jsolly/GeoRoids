@@ -8,37 +8,6 @@ import { arrangeCrewField, getWorldDiagnostics, placePlayer } from './test-serve
 
 let nextPilotNumber = 1;
 
-type CrashAsteroidCandidate = {
-  x: number;
-  y: number;
-  id: string;
-  radius: number;
-};
-
-function compareCrashTargets(
-  left: CrashAsteroidCandidate,
-  right: CrashAsteroidCandidate,
-  hazards: Array<{ x: number; y: number; radius: number }>,
-  impact: { x: number; y: number }
-): number {
-  const actorClearance = (candidate: CrashAsteroidCandidate) =>
-    hazards.length
-      ? Math.min(
-          ...hazards.map(
-            (hazard) =>
-              Math.hypot(candidate.x - hazard.x, candidate.y - hazard.y) -
-              candidate.radius -
-              hazard.radius
-          )
-        )
-      : Number.POSITIVE_INFINITY;
-  return (
-    actorClearance(right) - actorClearance(left) ||
-    Math.hypot(left.x - impact.x, left.y - impact.y) -
-      Math.hypot(right.x - impact.x, right.y - impact.y)
-  );
-}
-
 export class GameInteractions {
   constructor(private page: Page) {}
 
@@ -782,14 +751,23 @@ export class GameInteractions {
   /** Record the cause carried by the next authoritative death event. */
   private async observeNextDeathCause(): Promise<void> {
     await this.page.evaluate(() => {
-      const testWindow = window as typeof window & { __testDeathCause?: string };
+      const testWindow = window as typeof window & {
+        __testDeathCause?: string;
+        __testDeathPosition?: { x: number; y: number };
+      };
       delete testWindow.__testDeathCause;
+      delete testWindow.__testDeathPosition;
       window.addEventListener(
         'playerDied',
         (event) => {
-          const cause = (event as CustomEvent<{ deathCause?: string }>).detail?.deathCause;
-          if (cause) {
-            testWindow.__testDeathCause = cause;
+          const detail = (event as CustomEvent<{ playerId?: string; deathCause?: string }>).detail;
+          const player = window.gameController?.getCurrPlayer();
+          if (detail?.playerId === player?.id && detail?.deathCause) {
+            testWindow.__testDeathCause = detail.deathCause;
+            const ship = player?.ship;
+            if (ship) {
+              testWindow.__testDeathPosition = { ...ship.position };
+            }
           }
         },
         { once: true }
@@ -812,82 +790,20 @@ export class GameInteractions {
     }
   }
 
-  /**
-   * Ram distinct live asteroids until their real 25-damage impacts destroy the
-   * ship. A ram destroys its asteroid, so repeatedly using one stale position
-   * cannot produce sustained damage. Returns the final impact position.
-   */
-  private selectCrashTarget(
-    field: CrashAsteroidCandidate[],
-    hazards: Array<{ x: number; y: number; radius: number }>,
-    lastImpact: { x: number; y: number },
-    usedAsteroids: Set<string>
-  ) {
-    const candidates = field.filter((candidate) => !usedAsteroids.has(candidate.id));
-    candidates.sort((left, right) => compareCrashTargets(left, right, hazards, lastImpact));
-    return candidates[0];
-  }
-
-  async crashShipIntoAsteroidUntilDestroyed(): Promise<{ x: number; y: number }> {
+  /** Arrange one real fatal asteroid impact without unrelated world hazards. */
+  async dieFromAsteroidImpact(): Promise<{ x: number; y: number }> {
     await this.observeNextDeathCause();
-    const usedAsteroids = new Set<string>();
-    let lastImpact = { x: 0, y: 0 };
-    const deadline = Date.now() + 25000;
-    while (Date.now() < deadline) {
-      const [field, hazards] = await Promise.all([
-        this.getAsteroidPositions(),
-        this.page.evaluate(() => {
-          const gc = window.gameController;
-          if (!gc) {
-            throw new Error('gameController is not available');
-          }
-          const players = gc.getNetworkManager().getAllPlayers();
-          return players
-            .filter((player) => player.ship.health > 0 && !player.ship.exploding)
-            .map((player) => ({
-              x: player.ship.position.x,
-              y: player.ship.position.y,
-              radius: player.ship.r,
-            }));
-        }),
-      ]);
-      const target = this.selectCrashTarget(field, hazards, lastImpact, usedAsteroids);
-      if (!target) {
-        usedAsteroids.clear();
-        await this.waitForAnimationFrames(3);
-        continue;
+    await arrangeCrewField([await this.getLocalPlayerId()], 'impact');
+    await this.requireObservedDeathCause('asteroid');
+    return this.page.evaluate(() => {
+      const position = (
+        window as typeof window & { __testDeathPosition?: { x: number; y: number } }
+      ).__testDeathPosition;
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+        throw new Error('Missing observed asteroid death position');
       }
-      usedAsteroids.add(target.id);
-      lastImpact = { x: target.x, y: target.y };
-      await this.placeShipAt(target.x, target.y);
-      await this.waitForAnimationFrames(5);
-      await this.page.waitForTimeout(100);
-
-      const deathObserved = await this.page.evaluate(() =>
-        Boolean((window as typeof window & { __testDeathCause?: string }).__testDeathCause)
-      );
-      if (deathObserved || (await this.getShipHealth()) <= 0) {
-        // The authoritative event survives a respawn between test observations.
-        await this.requireObservedDeathCause('asteroid');
-        // Move off the impact point so split fragments cannot re-damage the
-        // ship while we wait for the server respawn reposition.
-        await this.page.evaluate(({ x, y }) => {
-          const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-          if (!ship) {
-            throw new Error('No local ship after asteroid impact');
-          }
-          if (ship.health > 0) {
-            return;
-          }
-          const dist = Math.hypot(x, y) || 1;
-          const step = Math.min(400, dist);
-          ship.position = { x: x - (x / dist) * step, y: y - (y / dist) * step };
-          ship.velocity = { x: 0, y: 0 };
-        }, lastImpact);
-        return lastImpact;
-      }
-    }
-    throw new Error('Ship was not destroyed by sustained asteroid collision');
+      return position;
+    });
   }
 
   /** Distance of the local ship from the world origin (boundary is a circle). */

@@ -20,7 +20,7 @@ test(
 
     // The helper requires the authoritative asteroid death event, which remains
     // observable even if the short respawn finishes before the next test step.
-    const deathPosition = await game.crashShipIntoAsteroidUntilDestroyed();
+    const deathPosition = await game.dieFromAsteroidImpact();
     const respawnPosition = await game.waitForRandomRespawnPlacement(deathPosition);
     expectFurnaceRespawnPlacement(deathPosition, respawnPosition);
     const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);

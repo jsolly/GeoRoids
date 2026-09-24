@@ -274,10 +274,17 @@ test('local and remote shots retain their glowing artwork and direction, then hi
     const y = -artwork.y;
     expect([...sprite.getImageData(x, y, 1, 1).data]).toEqual([255, 248, 225, 255]);
     expect([...sprite.getImageData(x, y + 2, 1, 1).data]).toEqual([253, 230, 138, 255]);
-    const trail = sprite.getImageData(x - VISUAL.LASER_LENGTH / 2 - 10, y, 1, 1).data;
-    expect(trail[3]).toBeGreaterThan(90);
-    expect(trail[3]).toBeLessThan(200);
-    expect(sprite.getImageData(x, y + 9, 1, 1).data[3]).toBeGreaterThan(0);
+    const pastBolt = sprite.getImageData(
+      x - VISUAL.LASER_LENGTH / 2 - VISUAL.LASER_GLOW * 3 - 2,
+      y,
+      1,
+      1
+    ).data;
+    expect(pastBolt[3]).toBe(0);
+    const edge = sprite.getImageData(x, y + VISUAL.LASER_STROKE_WIDTH / 2, 1, 1).data;
+    expect(edge[3]).toBeGreaterThan(0);
+    expect(edge[3]).toBeLessThan(80);
+    expect(sprite.getImageData(x, y + VISUAL.LASER_STROKE_WIDTH / 2 + 1, 1, 1).data[3]).toBe(0);
   }
   expect(fill).not.toHaveBeenCalled();
 
@@ -551,12 +558,12 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
     expect(
       strokes.every((path) => path.blur === 0 && path.width === VISUAL.CONTOUR_STROKE_WIDTH)
     ).toBe(true);
-    // A flat passage uses the light end of the slate ramp even when its opacity varies.
-    expect(strokes.some((path) => String(path.color).startsWith('rgba(173, 183, 194,'))).toBe(true);
+    // A flat passage uses the light red end even when its opacity varies.
+    expect(strokes.some((path) => String(path.color).startsWith('rgba(246, 182, 182,'))).toBe(true);
     strokes.length = 0;
     drawIsoContours({ x: -2100, y: 700 }, 0);
-    expect(strokes.some((path) => String(path.color).startsWith('rgba(78, 91, 106,'))).toBe(true);
-    expect(strokes.some((path) => String(path.color).startsWith('rgba(173, 183, 194,'))).toBe(true);
+    expect(strokes.some((path) => String(path.color).startsWith('rgba(82, 10, 10,'))).toBe(true);
+    expect(strokes.some((path) => String(path.color).startsWith('rgba(246, 182, 182,'))).toBe(true);
     strokes.length = 0;
     drawContourLaserTicks({ x: -2100, y: 700 }, [{ x: -2100, y: 700 }]);
     expect(strokes).toHaveLength(1);

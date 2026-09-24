@@ -31,17 +31,20 @@ const compareTerrainFrames = `(async () => {
   });
   let changes = 0;
   let light = 0;
+  let dark = 0;
   let chromatic = 0;
   let lightBehind = 0;
   let checksum = 0;
-  const isLightEnd = (r, g, b) => r >= 88 && g >= r - 2 && b > r && b - r < 40 && g < r + 22;
-  const isOldHue = (r, g, b) => r > b + 40 || (b > r + 25 && r > g + 12);
+  const isLightEnd = (r, g, b) => r > 210 && g > 140 && b > 140 && r > g + 30 && Math.abs(g - b) < 24;
+  const isDarkClimb = (r, g, b) => r > 60 && g < 14 && b < 14;
+  const isOldHue = (r, g, b) => (r > 200 && g > 140 && b < 100) || (b > r + 25 && r > g + 12);
   for (let i = 0; i < frames[0].length; i += 4) {
     const r = frames[0][i];
     const g = frames[0][i + 1];
     const b = frames[0][i + 2];
     if (r !== frames[1][i] || g !== frames[1][i + 1] || b !== frames[1][i + 2]) changes++;
     if (isLightEnd(r, g, b)) light++;
+    if (isDarkClimb(r, g, b)) dark++;
     if (isOldHue(r, g, b)) chromatic++;
     if (i % 16 === 0) checksum = (checksum + r * 3 + g * 5 + b * 7) >>> 0;
   }
@@ -56,7 +59,7 @@ const compareTerrainFrames = `(async () => {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(saved, 0, 0);
   ctx.restore();
-  return {changes, light, chromatic, lightBehind, checksum};
+  return {changes, light, dark, chromatic, lightBehind, checksum};
 })()`;
 
 for (const viewport of [
@@ -81,12 +84,14 @@ for (const viewport of [
     const moving = await page.evaluate<{
       changes: number;
       light: number;
+      dark: number;
       chromatic: number;
       lightBehind: number;
       checksum: number;
     }>(compareTerrainFrames);
     expect(moving.changes).toBe(0);
     expect(moving.light).toBeGreaterThan(50);
+    expect(moving.dark).toBeGreaterThan(10);
     expect(moving.chromatic).toBe(0);
     expect(moving.lightBehind).toBeGreaterThan(50);
     await page.screenshot({ path: `/tmp/georoids-color-terrain-${viewport.name}.png` });
@@ -96,12 +101,14 @@ for (const viewport of [
     const still = await page.evaluate<{
       changes: number;
       light: number;
+      dark: number;
       chromatic: number;
       lightBehind: number;
       checksum: number;
     }>(compareTerrainFrames);
     expect(still.changes).toBe(0);
     expect(still.light).toBe(moving.light);
+    expect(still.dark).toBe(moving.dark);
     expect(still.chromatic).toBe(moving.chromatic);
     expect(still.lightBehind).toBe(moving.lightBehind);
     expect(still.checksum).toBe(moving.checksum);

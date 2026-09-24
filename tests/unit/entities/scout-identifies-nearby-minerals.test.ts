@@ -15,6 +15,9 @@ test('Scout scan identifies nearby minerals then expires without changing motion
   };
   expect(scannedMaterial(ship, rock)).toBeUndefined();
   expect(activateAbilityOnHost(ship).activated).toBe(true);
+  expect(ship.abilityActiveFrames).toBe(SHIP_ABILITY.SCAN_FRAMES);
+  expect(ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout);
+  expect(ship.abilityCooldownFrames).toBeGreaterThan(ship.abilityActiveFrames);
   expect(ship.velocity).toEqual({ x: 1, y: 0.25 });
   expect(scannedMaterial(ship, rock)).toBe('metal');
   expect(
@@ -25,6 +28,7 @@ test('Scout scan identifies nearby minerals then expires without changing motion
     tickAbilityHost(ship);
   }
   expect(scannedMaterial(ship, rock)).toBeUndefined();
+  expect(ship.abilityCooldownFrames).toBeGreaterThan(0);
   expect(activateAbilityOnHost(ship).activated).toBe(false);
   while (ship.abilityCooldownFrames > 0) {
     tickAbilityHost(ship);

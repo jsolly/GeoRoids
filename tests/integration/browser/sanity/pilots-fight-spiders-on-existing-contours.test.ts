@@ -166,11 +166,6 @@ for (const viewport of [
         break;
       }
       seenHealth.push(target.health);
-      if (target.health < target.maxHealth) {
-        await page.screenshot({
-          path: screenshotManager.getScreenshotPath(`spider-wounded-${viewport.name}.png`),
-        });
-      }
       // Arrange the firing lane, then use real input and authoritative damage.
       await game.placeShipAt(target.position.x - 320, target.position.y);
       await page.evaluate(() => {
@@ -198,7 +193,7 @@ for (const viewport of [
         (await readField(page)).spiders.some((spider) => spider.id === nextPredator.id)
       )
       .toBe(false);
-    expect(seenHealth.some((value) => value < nextPredator.maxHealth)).toBe(true);
+    expect(seenHealth.every((value) => value === nextPredator.maxHealth)).toBe(true);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`spider-defeated-${viewport.name}.png`),
     });

@@ -79,13 +79,14 @@ export const TITLE = {
 export const VISUAL = {
   SHIP_STROKE_WIDTH: 1.25,
   SHIP_GLOW: 1.25,
-  // Broad glowing bolts with a bright core and a short trailing streak.
-  LASER_STROKE_WIDTH: 7,
-  LASER_CORE_WIDTH: 2.5,
+  // Fat bolts with a bright core. Body, trail, and round caps stay shorter than
+  // one Scout shot interval so a held trigger reads as separate shots.
+  LASER_STROKE_WIDTH: 11,
+  LASER_CORE_WIDTH: 3.5,
   LASER_CORE_COLOR: '#FFF8E1',
-  LASER_LENGTH: 34,
-  LASER_TRAIL_LENGTH: 20,
-  LASER_EXPLODE_RADIUS: 16,
+  LASER_LENGTH: 14,
+  LASER_TRAIL_LENGTH: 10,
+  LASER_EXPLODE_RADIUS: 12,
   LASER_GLOW: 14,
   LASER_HIT_TICKS: 4,
   HEALTH_CAPSULE_HEIGHT: 1.5,
@@ -167,7 +168,7 @@ export const VISUAL = {
   CONTOUR_LABEL_MARGIN_X: 28,
   CONTOUR_LABEL_MARGIN_Y: 18,
   // Cream iso-tangent under each live shot. Terrain answers; shots stay amber on top.
-  CONTOUR_LASER_LENGTH: 42,
+  CONTOUR_LASER_LENGTH: 24,
   CONTOUR_LASER_STROKE_WIDTH: 2,
   CONTOUR_LASER_ALPHA: 0.5,
 } as const;

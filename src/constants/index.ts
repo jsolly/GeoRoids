@@ -57,8 +57,8 @@ export const PALETTE = {
   LOCAL: '#5EEAD4',
   REMOTE: '#7DD3FC',
   ROID: '#94A3B8',
-  /** Canonical terrain slate; subdued beneath ships, lasers, and pickups. */
-  CONTOUR: '#5A6B7D',
+  /** Quiet dark-red contour ink. The slope ramp runs lighter and darker than this. */
+  CONTOUR: '#4A1016',
   LASER_LOCAL: '#FDE68A',
   HUD: '#E2E8F0',
   HUD_MUTED: '#64748B',
@@ -144,10 +144,10 @@ export const VISUAL = {
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,
-  // Hairline contours. The steering cone walks one slate ramp from dark climbs to light descents.
+  // Hairline contours. The steering cone walks one red ramp from very dark climbs to light descents.
   CONTOUR_STROKE_WIDTH: 1,
-  CONTOUR_ALPHA: 0.16,
-  CONTOUR_INDEX_ALPHA: 0.24,
+  CONTOUR_ALPHA: 0.28,
+  CONTOUR_INDEX_ALPHA: 0.42,
   CONTOUR_INDEX_EVERY: 3,
   // Static title map: crop, line weights, and sparse elevation labels.
   TITLE_TERRAIN_GRID_SIZE: 320,

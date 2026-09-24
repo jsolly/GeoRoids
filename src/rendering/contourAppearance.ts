@@ -1,21 +1,15 @@
 import type { Position } from '../../shared-types';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 
-/** Hue 211°, the quiet contour ink. Lightness is the only change along the ramp. */
-const CONTOUR_SATURATION = 0.15;
-const UPHILL_LIGHTNESS = 0.36;
-const DOWNHILL_LIGHTNESS = 0.72;
+/** Hue 0. Lightness runs from a pale easy route to a very dark steep climb. */
+const CONTOUR_SATURATION = 0.78;
+const UPHILL_LIGHTNESS = 0.18;
+const DOWNHILL_LIGHTNESS = 0.84;
 
-function slateChannels(lightness: number): [number, number, number] {
+function redChannels(lightness: number): [number, number, number] {
   const chroma = (1 - Math.abs(2 * lightness - 1)) * CONTOUR_SATURATION;
-  // Hue 211 sits in the blue sector, so red carries only the lightness match.
-  const x = chroma * (1 - Math.abs(((211 / 60) % 2) - 1));
   const match = lightness - chroma / 2;
-  return [
-    Math.round(match * 255),
-    Math.round((x + match) * 255),
-    Math.round((chroma + match) * 255),
-  ];
+  return [Math.round((chroma + match) * 255), Math.round(match * 255), Math.round(match * 255)];
 }
 
 function rampLightness(slope: number, passage: number): number {
@@ -28,9 +22,23 @@ function rampLightness(slope: number, passage: number): number {
   return UPHILL_LIGHTNESS + (DOWNHILL_LIGHTNESS - UPHILL_LIGHTNESS) * position;
 }
 
-/** Darker slate uphill, lighter slate downhill. Shortcuts stay on the light end. */
+/** `#RRGGBB` for the same ramp, so demonstrations can stroke it as a hex. */
+export function contourSlopeHex(slope: number, passage = 0): string {
+  const [red, green, blue] = redChannels(rampLightness(slope, passage));
+  const channel = (value: number) => value.toString(16).padStart(2, '0');
+  return `#${channel(red)}${channel(green)}${channel(blue)}`;
+}
+
+/**
+ * One red ramp. Steep climbs are very dark; descents and passages stay light.
+ * The light end does not wrap, so an easy route can keep meeting easier ground.
+ */
 export function contourSlopeColor(slope: number, alpha: number, passage = 0): string {
-  const [red, green, blue] = slateChannels(rampLightness(slope, passage));
+  const hex = contourSlopeHex(slope, passage);
+  const raw = hex.slice(1);
+  const red = Number.parseInt(raw.slice(0, 2), 16);
+  const green = Number.parseInt(raw.slice(2, 4), 16);
+  const blue = Number.parseInt(raw.slice(4, 6), 16);
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 

@@ -1,7 +1,7 @@
 ---
 title: Terrain and the boundary
 category: Arena
-summary: Contour lines reveal slopes that change your motion. The outer wall
+summary: Contour lines mark easy and steep routes. The outer wall
   destroys ships that cross it.
 order: 120
 related:
@@ -16,11 +16,9 @@ media:
 
 ## Slope and contours
 
-Broad gentle plains connect hills and valleys. Dense contour lines preserve the terrain texture even where their height differences are tiny. Downhill accelerates you, uphill slows you a little, and following a contour keeps nearly full cruise. Boost stacks with downhill speed, but either ship can climb without it. Ordinary terrain does no damage and does not deflect shots.
+Contour lines are one red ramp, not a closed height map. Light red is an easy route, and an easy route joins other easy routes; very dark red is a steep climb. A lower stretch can keep falling.
 
-The 75° view ahead darkens contour lines on an uphill approach and lightens them downhill, assuming you fly straight toward that point.
-
-Winding shortcuts stay on that light end in every direction. Follow a passage in either direction for up to 50% extra cruise speed; turning across it loses the boost.
+Downhill speeds you up a little and uphill slows you a little. Either ship can climb without Boost. The view ahead colors a straight route on that ramp. Follow a light passage either way for up to 50% extra cruise; turning across it loses the boost. Ordinary terrain does no damage and does not deflect shots.
 
 ## Outer boundary
 
@@ -36,7 +34,7 @@ Each new nest has ten guards and mixed salvage, often including [rare equipment]
 
 ## Guard patrols
 
-Guards chase briefly and return home, while rare roaming hunters pursue farther. Red contours and a red screen edge warn of nearby spiders and pursuit. Killing guards clears that nest for the server session, but collecting its resource does not remove surviving guards.
+Guards chase briefly and return home, while rare roaming hunters pursue farther. A bright red wash on nearby lines marks spiders. A red screen edge means one is hunting you. Killing guards clears that nest for the server session, but collecting its resource does not remove surviving guards.
 
 ## Survive a hunt
 

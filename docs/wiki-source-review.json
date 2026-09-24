@@ -1,5 +1,5 @@
 {
-  "note": "No player-facing field-manual change. Production log forwarding is an ops diagnostic: warnings, errors, and death/respawn still forward; reconnect and snapshot info stay in the browser. A bad /logs frame is terminated once. Checked hud-network Copy Diagnostics and controls; no article or GIF depicts the /logs socket. Existing demonstrations do not need regeneration.",
+  "note": "Removed the surveyed-rock world caption (ore yield and BARREN). Reviewed asteroids, scout, teamwork, hauler, and HUD: scan still shares mineral colors on the crew radar and surveyedBy still records delivery credit. Asteroids now says the reveal is on the crew radar. Scout, teamwork, and hauler already describe scan-then-tow without an on-rock name, so those pages stayed. The scout demonstration tags shared radar marks itself and did not need a new GIF.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -181,7 +181,7 @@
     "src/entities/roid/Roid.ts": "sha256:cea25875f125e2dd68f6b9ad28fde3e06be27243fb685d7e5dd75c19e6176d83",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
-    "src/entities/roid/roidRenderer.ts": "sha256:c48ffae139a6f196e700291995c632f74a4b49e22eca995d01d5e9873b3006cd",
+    "src/entities/roid/roidRenderer.ts": "sha256:7024c6355c93707282e8d91af6bd73e791d441280e78d8eb4a189666d89467ed",
     "src/entities/roid/roidScore.ts": "sha256:73a4dd7758103e3e5e11d5f74c74d41b4bdda12023ef932d30fbf62ee99c7df9",
     "src/entities/roid/surveyProbeRenderer.ts": "sha256:5d3c4a0b3b03f712c0d1c16e5acc230d8a6d7c400311c9ea646589512c63c9dc",
     "src/entities/satellite/eoOutlines.ts": "sha256:5b5c22d18294ab26a1a54308c8ae5e2f1ef5413a0bb9f7ec6b55e48256ba376a",

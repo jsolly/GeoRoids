@@ -65,14 +65,37 @@ function asteroid(id: string, radius = 30): Roid {
   return roid;
 }
 
-test('moving and spinning snapshots reuse numeric geometry while damage and survey overlays update', () => {
+test('moving and spinning snapshots reuse numeric geometry while damage marks update and surveyed rocks stay unlabeled', () => {
   const view = scene();
   const detail = vi.spyOn(materialArt, 'drawAsteroidMaterialDetails');
-  const label = vi.spyOn(view.ctx, 'fillText');
+  const captions: string[] = [];
+  const watchCaptions = (ctx: CanvasRenderingContext2D): void => {
+    if (vi.isMockFunction(ctx.fillText)) {
+      return;
+    }
+    const fill = ctx.fillText.bind(ctx);
+    vi.spyOn(ctx, 'fillText').mockImplementation((text, x, y, maxWidth) => {
+      captions.push(String(text));
+      fill(text, x, y, maxWidth);
+    });
+  };
+  watchCaptions(view.ctx);
+  const getContext = HTMLCanvasElement.prototype.getContext;
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+    this: HTMLCanvasElement,
+    ...args: Parameters<HTMLCanvasElement['getContext']>
+  ) {
+    const ctx = getContext.apply(this, args);
+    if (args[0] === '2d' && ctx && 'fillText' in ctx) {
+      watchCaptions(ctx);
+    }
+    return ctx;
+  });
   const turn = vi.spyOn(view.ctx, 'rotate');
   const placement = vi.spyOn(view.ctx, 'translate');
   const roid = asteroid('surveyed-metal');
   roid.material = 'metal';
+  roid.ore = 'metal';
   roid.surveyedBy = ['pilot'];
   roid.maxHealth = 100;
   roid.health = 100;
@@ -86,7 +109,7 @@ test('moving and spinning snapshots reuse numeric geometry while damage and surv
   expect(placement).toHaveBeenCalledWith(262, 242);
   expect(turn).toHaveBeenCalledWith(0.7);
   expect(detail.mock.calls.map((call) => call[6])).toEqual([1, 0.4]);
-  expect(label).toHaveBeenCalledTimes(2);
+  expect(captions).toEqual([]);
 
   const replacement = asteroid(roid.id);
   replacement.material = 'metal';
@@ -99,6 +122,13 @@ test('moving and spinning snapshots reuse numeric geometry while damage and surv
   expect(resized).not.toBe(reshaped);
   delete replacement.material;
   expect(view.draw(replacement)).not.toBe(resized);
+
+  const barren = asteroid('surveyed-barren', 40);
+  delete barren.material;
+  barren.ore = null;
+  barren.surveyedBy = ['pilot'];
+  view.draw(barren);
+  expect(captions).toEqual([]);
 });
 
 test('DPR, playfield scale and glow changes regenerate full-resolution asteroid artwork', () => {

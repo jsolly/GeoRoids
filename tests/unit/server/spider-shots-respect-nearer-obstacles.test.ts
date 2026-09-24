@@ -36,19 +36,17 @@ test('a nearer asteroid takes the shot before a spider, and an unobstructed shot
   expect(engine.getSpiderField().spiders.find((row) => row.id === spider.id)?.position).toEqual(
     spider.position
   );
-  assert(engine.spawnLaser(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 }));
-  engine.advanceLasersAndResolveHits();
-  const damaged = engine.getSpiderField().spiders.find((row) => row.id === spider.id);
-  expect(damaged?.position).toEqual(spider.position);
-  expect(damaged?.health).toBe(SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT);
-  expect(engine.getServerLasers()).toHaveLength(0);
   const weakened = engine.spawnLaser(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 });
   assert(weakened);
   weakened.energy = 0.5;
   engine.advanceLasersAndResolveHits();
-  expect(engine.getSpiderField().spiders.find((row) => row.id === spider.id)?.health).toBe(
-    SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT * 1.5
-  );
+  const damaged = engine.getSpiderField().spiders.find((row) => row.id === spider.id);
+  expect(damaged?.position).toEqual(spider.position);
+  expect(damaged?.health).toBe(SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT * 0.5);
+  expect(engine.getServerLasers()).toHaveLength(0);
+  assert(engine.spawnLaser(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 }));
+  engine.advanceLasersAndResolveHits();
+  expect(engine.getSpiderField().spiders.some((row) => row.id === spider.id)).toBe(false);
 });
 
 test('killing the spider before combat resolves cancels the pending bite', () => {
@@ -66,10 +64,8 @@ test('killing the spider before combat resolves cancels the pending bite', () =>
   engine.advanceCombatFrame();
   engine.advanceCombatFrame();
   const health = pilot.health;
-  for (let shot = 0; shot < 3; shot++) {
-    assert(engine.spawnLaser(pilot.id, { ...spider.position }, { x: 10, y: 0 }));
-    engine.advanceLasersAndResolveHits();
-  }
+  assert(engine.spawnLaser(pilot.id, { ...spider.position }, { x: 10, y: 0 }));
+  engine.advanceLasersAndResolveHits();
   expect(engine.getSpiderField().spiders.some((row) => row.id === spider.id)).toBe(false);
   engine.resolveAuthoritativeCombat();
   expect(pilot.health).toBe(health);

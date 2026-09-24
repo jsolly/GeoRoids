@@ -5,6 +5,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
+import { SPIDER } from '../../../shared/terrainSpider';
 import type { AsteroidData, TerrainSpider } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -173,6 +174,8 @@ describe('spiders carry Scout probes', () => {
     expect(
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.health
     ).toBe(15);
-    expect(engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.health).toBe(75);
+    expect(engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.health).toBe(
+      SPIDER.MAX_HEALTH
+    );
   });
 });

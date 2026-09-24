@@ -30,7 +30,8 @@ test('a natural belt shares valid snapshots with roaming spiders and retains cra
     const host = engine.getAsteroid(crawler.crawler.hostId);
     assert(host);
     expect(beltSlotForAsteroid(host.id)).toBeDefined();
-    host.beltCrawlerHealth = [BELT_CRAWLER.MAX_HEALTH - DAMAGE.LASER_HIT];
+    const wound = BELT_CRAWLER.MAX_HEALTH - DAMAGE.LASER_HIT * 0.5;
+    host.beltCrawlerHealth = [wound];
     engine.spawnTerrainSpider({ x: player.position.x, y: player.position.y + 400 });
     engine.advanceCombatFrame();
     expect(engine.getSpiderField().spiders.some((spider) => !spider.crawler)).toBe(true);
@@ -48,12 +49,12 @@ test('a natural belt shares valid snapshots with roaming spiders and retains cra
     restarted.ensureAsteroidField();
     restarted.advanceCombatFrame();
     const recovered = restarted.getAsteroid(host.id);
-    expect(recovered?.beltCrawlerHealth).toEqual([BELT_CRAWLER.MAX_HEALTH - DAMAGE.LASER_HIT]);
+    expect(recovered?.beltCrawlerHealth).toEqual([wound]);
     const survivors = restarted
       .getSpiderField()
       .spiders.filter((spider) => spider.crawler?.hostId === host.id);
     expect(survivors).toHaveLength(1);
-    expect(survivors[0]?.health).toBe(BELT_CRAWLER.MAX_HEALTH - DAMAGE.LASER_HIT);
+    expect(survivors[0]?.health).toBe(wound);
   } finally {
     engine.stopGameLoop();
     restarted?.stopGameLoop();
@@ -90,16 +91,14 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
       .getSpiderField()
       .spiders.find((spider) => spider.crawler?.hostId === rock.id && spider.id.endsWith(':0'));
     assert(crawler);
-    for (let i = 0; i < 3; i++) {
-      const shot = engine.spawnLaser(
-        player.id,
-        { x: crawler.position.x + 45, y: crawler.position.y },
-        { x: -80, y: 0 }
-      );
-      assert(shot);
-      engine.advanceLasersAndResolveHits();
-      expect(shot.hasExploded).toBe(true);
-    }
+    const shot = engine.spawnLaser(
+      player.id,
+      { x: crawler.position.x + 45, y: crawler.position.y },
+      { x: -80, y: 0 }
+    );
+    assert(shot);
+    engine.advanceLasersAndResolveHits();
+    expect(shot.hasExploded).toBe(true);
     expect(engine.getAsteroid(rock.id)?.health).toBe(150);
     expect(engine.getSpiderField().spiders.some((spider) => spider.id === crawler.id)).toBe(false);
     expect(engine.getAsteroid(rock.id)?.beltCrawlerHealth?.[0]).toBe(0);
@@ -197,7 +196,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       vertices: 4,
       offsets: [1, 1, 1, 1],
       material: 'metal',
-      beltCrawlerHealth: [50],
+      beltCrawlerHealth: [50], // Older than one laser hit; adoption clamps it.
     };
     const destination: AsteroidData = {
       ...rock,
@@ -216,7 +215,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       'destroyed'
     );
     expect(engine.getSpiderField().spiders.find((body) => body.id === before.id)).toMatchObject({
-      health: 50,
+      health: BELT_CRAWLER.MAX_HEALTH,
       crawler: { phase: 'escaping', hostId: destination.id },
     });
     engine.checkpointWorld();
@@ -226,7 +225,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     restarted.ensureAsteroidField();
     restarted.advanceCombatFrame();
     expect(restarted.getSpiderField().spiders.find((body) => body.id === before.id)).toMatchObject({
-      health: 50,
+      health: BELT_CRAWLER.MAX_HEALTH,
       crawler: { hostId: destination.id },
     });
     expect(restarted.getSpiderField().spiders.filter((body) => body.id === before.id)).toHaveLength(

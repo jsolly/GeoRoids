@@ -32,6 +32,7 @@ import {
   canPlaceMapCrewLabel,
   isFiniteMapPosition,
   type MapLabelRect,
+  mapAssetNameVisible,
 } from './universeMapLabels';
 import { shouldUseTouchControls } from './viewportChrome';
 
@@ -76,8 +77,6 @@ const BLOCKED_GAMEPLAY_KEYS = new Set([
   'ShiftLeft',
   'ShiftRight',
 ]);
-const MAP_LABEL_ZOOM = 2.8;
-const MAP_DEFAULT_LABEL_LIMIT = 1;
 
 type MapCanvasDimensions = {
   width: number;
@@ -1067,7 +1066,7 @@ function renderMap(): void {
   });
   for (const asset of revealedAssets) {
     revealedAssetCount++;
-    const labelAllowed = view.zoom >= MAP_LABEL_ZOOM || drawnLabelCount < MAP_DEFAULT_LABEL_LIMIT;
+    const labelAllowed = mapAssetNameVisible(asset.kind, view.zoom, drawnLabelCount);
     const showLabel =
       labelAllowed &&
       canPlaceMapAssetLabel(asset, frame, view.center, labelRects, chartHeadingRotation());

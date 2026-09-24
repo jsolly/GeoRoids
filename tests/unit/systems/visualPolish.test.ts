@@ -13,6 +13,7 @@ import {
 } from '../../../src/entities/ship/hullOutlines';
 import {
   drawLaserBolts,
+  drawShipAtPosition,
   drawShipExplosion,
   drawThruster,
   drawThrusterAtPosition,
@@ -168,6 +169,42 @@ test('every playable kit draws its outlined hull and retained details without fi
     );
   }
   expect(fill).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['scout', 'tow_cable'],
+  ['hauler', 'tow_cable'],
+  ['hauler', 'resource_tap'],
+  ['hauler', 'boost_coupling'],
+] as const)('fast travel retains the %s hull and %s equipment', (kit, utility) => {
+  const { ctx, strokes } = recordingContext();
+  const ship = pilot('traveler').ship;
+  ship.kitId = kit;
+  ship.haulerUtility = utility;
+  ship.health = 100;
+  ship.exploding = false;
+  ship.angle = 0.7;
+  ship.furnaceTransit = {
+    sourceId: 'town-square',
+    destinationId: 'street-1-0',
+    startedAt: 0,
+    durationMs: 3000,
+  };
+  const color = '#ff8844';
+  const center = canvasManager.worldToScreen(ship.position, ship.position);
+  strokeKitHullOutline(
+    ctx,
+    center.x,
+    center.y,
+    ship.r * canvasManager.getPlayfieldScale(),
+    ship.angle,
+    color,
+    kit,
+    utility
+  );
+  const expected = strokes.splice(0);
+  drawShipAtPosition(ship, ship.position, color);
+  expect(strokes.slice(-expected.length)).toEqual(expected);
 });
 
 test.each(['tow_cable', 'resource_tap', 'boost_coupling'] as const)(

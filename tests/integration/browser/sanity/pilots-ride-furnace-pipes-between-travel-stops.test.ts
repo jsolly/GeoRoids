@@ -11,7 +11,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 for (const width of [1280, 390]) {
-  test(`a pilot rides a rocket from a built furnace to Town Square and back at ${width}px`, async () => {
+  test(`a pilot rides their ship from a built furnace to Town Square and back at ${width}px`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: width === 390 });
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     const diagnostics = watchBrowserDiagnostics(page);
@@ -98,21 +98,34 @@ for (const width of [1280, 390]) {
       return ship && !ship.furnaceTransit && Math.hypot(ship.position.x, ship.position.y) < 220;
     });
     if (width === 390) {
-      await prompt.getByRole('button', { name: 'Tap to travel' }).tap();
+      await prompt.getByRole('button', { name: 'Enter', exact: true }).tap();
     } else {
+      expect(await prompt.locator('span').textContent()).toBe('Press E to enter');
       await page.keyboard.press('KeyE');
     }
-    await menu.waitFor({ state: 'visible' });
+    const townMenu = page.getByRole('dialog', { name: 'Town Square', exact: true });
+    await townMenu.waitFor({ state: 'visible' });
+    expect(await townMenu.locator('#town-store-offer').isVisible()).toBe(false);
+    expect(await townMenu.locator('#town-store-travel').isVisible()).toBe(false);
+    await page.screenshot({ path: screenshotManager.getScreenshotPath(`town-entry-${width}.png`) });
+    await townMenu.getByRole('button', { name: 'Store', exact: true }).click();
+    const store = page.getByRole('dialog', { name: 'Store', exact: true });
+    await store.waitFor({ state: 'visible' });
     const scoreBefore = await page.evaluate(
       () => window.gameController?.getCurrPlayer()?.score ?? 0
     );
-    await menu.locator('[data-offer="placeholder-1"]').click();
+    await store.locator('[data-offer="placeholder-1"]').click();
     await page.waitForFunction(() =>
       window.gameController?.getCurrPlayer()?.purchases.includes('placeholder-1')
     );
     expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.score)).toBe(
       scoreBefore - 100
     );
+    await page.screenshot({ path: screenshotManager.getScreenshotPath(`town-store-${width}.png`) });
+    await store.getByRole('button', { name: 'Back to Town Square' }).click();
+    await townMenu.getByRole('button', { name: 'Fast Travel', exact: true }).click();
+    await menu.waitFor({ state: 'visible' });
+    expect(await menu.locator('#town-store-offer').isVisible()).toBe(false);
     const back = menu.locator('[data-furnace-id="street-1-0"]');
     expect(await back.isEnabled()).toBe(true);
     await page.screenshot({

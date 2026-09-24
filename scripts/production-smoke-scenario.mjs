@@ -8,7 +8,7 @@ import { minimumServerRelease } from './server-release-inputs.mjs';
 
 export const productionUrl = 'https://www.georoids.com/';
 const { SnapshotDecoder } = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
-const healthUrl = 'https://geoasteroids-production-2403.up.railway.app/health';
+const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
 
 async function waitForEvidence(predicate, description) {
   const deadline = Date.now() + 10000;

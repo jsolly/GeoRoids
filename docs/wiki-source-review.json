@@ -1,5 +1,5 @@
 {
-  "note": "Removed the surveyed-rock world caption (ore yield and BARREN). Reviewed asteroids, scout, teamwork, hauler, and HUD: scan still shares mineral colors on the crew radar and surveyedBy still records delivery credit. Asteroids now says the reveal is on the crew radar. Scout, teamwork, and hauler already describe scan-then-tow without an on-rock name, so those pages stayed. The scout demonstration tags shared radar marks itself and did not need a new GIF.",
+  "note": "Re-reviewed after merging the solid radar. Surveyed rocks still have no ore or BARREN playfield caption; crew radar colors and surveyedBy delivery credit remain. Asteroids says the reveal is on the crew radar. hud-network still describes pale explored ground and dark fog. No demonstration change.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -263,7 +263,7 @@
     "src/rendering/hud/gameInfo.ts": "sha256:4d3feb217dbe1c4f5f3f457f9cb9a4a172a10ded3957780c63be70d6bac32345",
     "src/rendering/hud/hudLayout.ts": "sha256:7811dbd19774bbf8f50ed482333a75b1daf5597ef4aa79945a83aad91f0da2ae",
     "src/rendering/hud/leaderboard.ts": "sha256:9b11db76cc6635998907bccc4a9f388aa458beb8d3d7c07bb51ff39bfa9e1b47",
-    "src/rendering/hud/minimap.ts": "sha256:f6c785bf34bd6421535b999f3788eca0cf1c5ca8af9e6e6c5a06c2c0ff7d95c8",
+    "src/rendering/hud/minimap.ts": "sha256:9b4a5f42a3041acd1ea2779912c5f38ddc3782f88b73dc68c8a7f603db599d5e",
     "src/rendering/hud/resourceMapMark.ts": "sha256:0f2fff2bfeab6eee5719bc0d6ff7f18d6f42b5be3a5613c0de42ab9dc0b45f3a",
     "src/rendering/playfieldCamera.ts": "sha256:57f526c939e5e78115e92dc5548bf57a0f94f5c2873fe2884ff4e574bf772e1f",
     "src/rendering/renderError.ts": "sha256:426004f76c64f1e368bad54c746a8799c7bc7044a701717a5bb083f3b4c94a99",
@@ -310,7 +310,7 @@
     "src/utils/safeStorage.ts": "sha256:9540743d8a87bca16e1243f389113f48a14bfda169475115e4b1ead9eaae6874",
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:cc6763407a8257cb93472babbbaddaa474dcd49d2ebe0f4c198b84df73bc0224",
+    "src/wiki/articleSources.json": "sha256:ad202959d0255917e37c983ecf5916e92cdf4d8287550908b105ed45e5bdb6fb",
     "src/wiki/gameReference.ts": "sha256:cc09472e3881bfefa3a295a8149af5bfda15dace55c4bce6b177e754ab693270",
     "src/wiki/main.ts": "sha256:55e2f9bc2a01cc11b571eaf4e2cc227e4e1b814d13c1598769d4bfe4b9093222",
     "src/wiki/media.ts": "sha256:dce3d7248903643ac58eac57ad2b174fc7bdbd04824c9c793ca2dd4d375436b4",
@@ -399,6 +399,7 @@
     "tests/unit/rendering/furnace-hearth-roars-inside-the-delivery-zone.test.ts": "sha256:a8832858486e2933669ed0acf0c21289a834216059e1ba9836cf7f1e31ba65e6",
     "tests/unit/rendering/hudLayout.test.ts": "sha256:7cfc46f13773100f2be43fe2e2020e6d13f92ab573985a13bdf84019d55cad89",
     "tests/unit/rendering/playfield-chrome-matches-the-visible-viewport.test.ts": "sha256:ac7e16a1adc58732b4eafe3ef935aa27eace2f1f24bfac38e1e19ff1d232f407",
+    "tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts": "sha256:1a7af63eab933c85bd62b5522fd3db45edd55d5b6d4c656d621baac4f61ee9fb",
     "tests/unit/rendering/radar-marks-a-discovered-furnace-as-fire.test.ts": "sha256:04d41ef533d651d95705d74482b1d124b755c6b97b9f0b506d2ab66ba9f3572e",
     "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-furnace-is-lit.test.ts": "sha256:11bbb8a1ec7495a3ef75c7f4068d01bd3c068872e519d712ff12911592f0d118",
     "tests/unit/rendering/short-touch-screens-keep-inventory-off-the-radar.test.ts": "sha256:694e404bf265b3a27dd87d1543e5d3c420bc40b5a7f6525e012cfc3a6e3109e4",

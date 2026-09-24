@@ -86,8 +86,18 @@ for (const viewport of [
         const inventoryBox = inventory.getBoundingClientRect();
         const canvasBox = canvas.getBoundingClientRect();
         const modalBox = modal.getBoundingClientRect();
+        const copy = inventory.querySelector(':scope > p');
+        if (!(copy instanceof HTMLElement)) {
+          throw new Error('Missing inventory copy');
+        }
+        const copyBox = copy.getBoundingClientRect();
+        const copyStyle = getComputedStyle(copy);
+        const copyPadX =
+          Number.parseFloat(copyStyle.paddingLeft) + Number.parseFloat(copyStyle.paddingRight);
         return {
           inventoryBesideHull: inventoryBox.left >= canvasBox.right - 2,
+          inventoryBelowHull: inventoryBox.top >= canvasBox.bottom - 4,
+          copyContentWidth: copyBox.width - copyPadX,
           inventoryInView: inventoryBox.top < modalBox.bottom && inventoryBox.bottom > modalBox.top,
           cardsBelow:
             cardsBox.top >= canvasBox.bottom - 2 && cardsBox.top >= inventoryBox.bottom - 2,
@@ -98,7 +108,13 @@ for (const viewport of [
           ),
         };
       });
-      expect(layout.inventoryBesideHull).toBe(true);
+      if (viewport.touch) {
+        expect(layout.inventoryBesideHull).toBe(false);
+        expect(layout.inventoryBelowHull).toBe(true);
+        expect(layout.copyContentWidth).toBeGreaterThanOrEqual(layout.width - 40);
+      } else {
+        expect(layout.inventoryBesideHull).toBe(true);
+      }
       expect(layout.inventoryInView).toBe(true);
       expect(layout.cardsBelow).toBe(true);
       expect(layout.contentWidth).toBeLessThanOrEqual(layout.width + 1);

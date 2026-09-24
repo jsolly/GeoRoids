@@ -5,6 +5,28 @@ import {
   universeMapMarkScreenSize,
 } from '../rendering/hud/furnaceMapMark';
 
+/** Other landmarks may name themselves once the chart is inside this zoom. */
+const MAP_LABEL_ZOOM = 2.8;
+/** Wide views keep a single non-furnace name so the chart is not blank. */
+const MAP_DEFAULT_LABEL_LIMIT = 1;
+/**
+ * Furnace and foundation names wait until one step inside the 5k nearby view
+ * (`UNIVERSE_MAP_ZOOM.initial` × `UNIVERSE_MAP_ZOOM.step`). Marks stay visible.
+ */
+export const FURNACE_NAME_ZOOM = 32;
+
+/** Furnace names stay off wide charts; salvage and satellites keep the older gate. */
+export function mapAssetNameVisible(
+  kind: MapAsset['kind'],
+  zoom: number,
+  labelsAlreadyDrawn: number
+): boolean {
+  if (kind === 'furnace' || kind === 'foundation') {
+    return zoom >= FURNACE_NAME_ZOOM;
+  }
+  return zoom >= MAP_LABEL_ZOOM || labelsAlreadyDrawn < MAP_DEFAULT_LABEL_LIMIT;
+}
+
 export type MapLabelRect = {
   left: number;
   right: number;

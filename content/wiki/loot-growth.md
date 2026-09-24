@@ -15,49 +15,26 @@ media:
 
 ## Loot and mass
 
-Growth uses the same base health curve for every kit. When a pickup raises
-maximum health, it adds the same amount to current health; it does not fully
-repair existing damage. For a heavy kit such as Hauler, the first small mass
-pickup can lower its starting maximum health to the shared growth value.
-Laser cores do not add mass. Hull draw size and collision radius stay at the
-kit base; collecting does not enlarge the silhouette.
+Nearby shards, wreckage, and Tap canisters pull toward you and add mass when collected; shards and canisters also fill your point cargo. More mass changes health capacity and slows your ship without enlarging its hull, while death resets growth. Health gains do not fully repair damage, and Hauler's first small pickup can lower its starting health capacity to the shared growth curve.
 
-Asteroid breaks can release shards, and an environmental ship death releases
-wreckage. A Resource Tap ejects cream canisters with amber tips in spaced bursts during
-extraction; the asteroid stays intact. The full reward is split across the
-canisters, and each one can be collected separately. That Tap loot is not a diamond chip. A death converts a base amount plus a fraction of the destroyed
-ship's excess mass into pellets, subject to per-pellet and global limits. Loot
-expires after its configured lifetime. A nearby drop is pulled toward a living
-ship once it comes within magnet range. Tap canisters use a stronger pull when
-a Hauler is nearby. The pull adds to whatever motion the
-drop already has, including motion from its existing velocity. Collecting still
-happens when the drop overlaps the kit hull, not an inflated ship hitbox.
-A map or schematic hold does not collect loot until you return to flight.
-Mass follows a shared growth curve:
-greater mass raises health capacity while reducing thrust and speed;
-the growth model soft-caps mass and enforces minimum thrust
-and speed scales. Death resets the growth.
+## Salvaged equipment
 
-A shard has a score value. A reflective core grants stronger laser charges with
-energy 2, scores when collected, expires after a timed lifetime, and is cleared
-on death. The shared reflection rules cap laser energy; enhanced energy also
-lets a laser apply the metal hit twice.
+Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, glowing hardware in spider nests, which have a 65% chance to contain a tool, or among laser-mined asteroid drops with a 1.5% chance. Either ship can collect any tool, but only its matching kit can equip it.
 
-Spider silk comes from using Resource Tap on a spider. Collect it as a separate
-material in your inventory; it has no crafting use yet and does not grant ore,
-mass, or score. The tapped spider shudders and becomes hostile.
+Tools add no mass or score and survive ordinary deaths, reconnects, and server restarts. Duplicates stay for teammates, and shooting cannot destroy equipment.
 
 ## Shoot a drop
 
-A laser can detonate a nearby loot drop when the shooter is within its arm
-range. The drop is removed and its shot-triggered blast is safe for every crew
-hull, including the shooter and teammates. It adds an outward velocity impulse
-to small asteroids. A rock is affected when its edge reaches the blast radius;
-the blast does not deal ship damage or consume a life.
+Shoot a mass or silk loot drop from nearby to detonate it and push small rocks away. The blast consumes the drop but cannot hurt any crew hull.
+
+## Spider silk
+
+Tap a spider and collect its silk into your material inventory. Silk adds no mass or score and has no crafting use yet.
 
 ## Pickup melody
 
-With Sound Effects on, collecting material plays a bright crystal note. Quick
-pickups continue a composed phrase, while a pause starts it again. Laser cores
-use a brighter voice in the same melody. Resource Tap ejections provide the
-lower accompanying notes.
+With Sound Effects on, quick pickups play successive notes of a short melody. Tap extraction supplies lower notes.
+
+## Cargo and banks
+
+Both ships collect point loot: Scout holds 500 and Hauler holds 1,500. Loot keeps magnetizing and disappears even at capacity; excess points are discarded. Fly into a lit furnace intake to offload automatically. The deposit credits your bank and the shared settlement once. Store purchases spend your bank, never carried cargo.

@@ -1,3 +1,4 @@
+import { isEquipmentId } from '../../../shared/equipment';
 import { validExploration } from '../../../shared/exploration';
 import { releaseField } from '../../../shared/releaseId';
 import {
@@ -55,19 +56,19 @@ import { PlayerManager } from '../../entities/player/PlayerManager';
 import { recordAsteroidLatch } from '../../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
-import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
-import { setSurveyorUtilityOnHost } from '../../entities/ship/shipAbilities';
+import { scoutUtilityOf } from '../../entities/ship/scoutUtility';
+import { setScoutUtilityOnHost } from '../../entities/ship/shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
-import { preferredSurveyorUtility, surveyorUtilityOf } from '../../entities/ship/surveyorUtility';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
+import { setSettlement } from '../../network/worldExploration';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
+import { setBeltRecovery } from '../../rendering/beltRenderer';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { getClientReleaseId } from '../../utils/buildInfo';
 import { setClientLogContext } from '../../utils/clientLogContext';
-import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage } from '../types';
 import {
@@ -150,9 +151,9 @@ function isLootKind(value: unknown): value is LootKind {
   return (
     value === 'shard' ||
     value === 'wreckage' ||
-    value === 'laserCore' ||
     value === 'tap' ||
-    value === 'silk'
+    value === 'silk' ||
+    isEquipmentId(value)
   );
 }
 
@@ -183,7 +184,6 @@ function captureClientPlayerState(player: Player) {
     angle: player.ship.angle,
     health: player.ship.health,
     maxHealth: player.ship.maxHealth,
-    lives: player.lives,
     score: player.score,
     exploding: player.ship.exploding,
     spawnProtectionTimer: player.serverSpawnProtectionTimer,
@@ -561,7 +561,7 @@ export class ConnectionManager {
     if (localShip) {
       localShip.serverOwnsMotion = false;
       delete localShip.playerMotion;
-      delete localShip.laserUpgrade;
+      localShip.furnaceTransit = null;
     }
 
     this.resetSnapshotSession();
@@ -805,7 +805,7 @@ export class ConnectionManager {
       return;
     }
     const ship = PlayerManager.getInstance().getLocalShip();
-    if (!ship) {
+    if (!ship || ship.furnaceTransit) {
       return;
     }
     const pose = this.motionReconciliation.buildHandoffPose(ship);
@@ -997,6 +997,7 @@ export class ConnectionManager {
         break;
       case 'sessionExpired': {
         setSpiderField(undefined);
+        setBeltRecovery();
         // Remove the previous map key before initializeAsteroidSync changes
         // the local Player object's id for the replacement session.
         const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1057,7 +1058,6 @@ export class ConnectionManager {
             damage: number;
             remainingHealth: number;
             isDestroyed: boolean;
-            remainingLives?: number;
           }
         );
         break;
@@ -1076,6 +1076,9 @@ export class ConnectionManager {
         if (typeof data === 'string') {
           GameStateManager.getInstance().setNotice(data);
         }
+        break;
+      case 'furnaceTravelResult':
+        window.dispatchEvent(new CustomEvent('furnaceTravelResult', { detail: data }));
         break;
       case 'townStoreResult':
         window.dispatchEvent(new CustomEvent('townStoreResult', { detail: data }));
@@ -1108,6 +1111,7 @@ export class ConnectionManager {
     this.playedTapEjectionIds.clear();
     this.playedLootExplosionIds.clear();
     setSpiderField(undefined);
+    setBeltRecovery();
     this.shotAcknowledgements = false;
     AuthoritativeProjectileField.getInstance().clear();
     this.clearJoinCompletionTimer();
@@ -1322,8 +1326,10 @@ export class ConnectionManager {
 
   private handleSnapshotState(data: ServerGameSnapshot): void {
     setSpiderField(data.spiderField);
+    setBeltRecovery(data.beltRecovery);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
+    setSettlement(data.settlement);
     worldFurnaces.replaceLit(data.civicModules ?? []);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
@@ -1348,7 +1354,7 @@ export class ConnectionManager {
           if (isLocalPlayer) {
             // Adopt the game-loop's local player as the single source of truth
             // for the local ship, so server-authoritative state (health, score,
-            // lives, respawn) flows into the same object the game loop renders,
+            // cargo, respawn) flows into the same object the game loop renders,
             // collides, and attributes damage with. Align its id to the
             // server-assigned id.
             if (localPlayer) {
@@ -1402,34 +1408,32 @@ export class ConnectionManager {
         }
         const snapshotUtility =
           entity.type === 'local'
-            ? surveyorUtilityOf(entity.ship)
-            : (entityData.surveyorUtility ?? surveyorUtilityOf(entity.ship));
-        const surveyorToolSelected =
-          entity.ship.kitId === 'surveyor' && snapshotUtility !== 'mineral_scan';
+            ? scoutUtilityOf(entity.ship)
+            : (entityData.scoutUtility ?? scoutUtilityOf(entity.ship));
+        const scoutToolSelected =
+          entity.ship.kitId === 'scout' && snapshotUtility !== 'mineral_scan';
         const serverCooldown = entityData.abilityCooldownFrames ?? 0;
         // Mineral Scan predicts its cooldown on send. A snapshot that still
         // reads 0 must not clear that timer before the server echo. Failed
         // probe launches and furnace builds stay at 0 and remain usable.
         if (
           entity.type !== 'local' ||
-          entity.ship.kitId !== 'surveyor' ||
-          surveyorToolSelected ||
+          entity.ship.kitId !== 'scout' ||
+          scoutToolSelected ||
           serverCooldown > 0 ||
           entity.ship.abilityCooldownFrames <= 0
         ) {
           entity.ship.abilityCooldownFrames = serverCooldown;
         }
-        entity.ship.abilityActiveFrames = surveyorToolSelected
+        entity.ship.abilityActiveFrames = scoutToolSelected
           ? 0
           : (entityData.abilityActiveFrames ?? 0);
-        if (entityData.laserUpgrade) {
-          entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
-        } else {
-          delete entity.ship.laserUpgrade;
-        }
 
         if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
           delete entity.deathCause;
+        }
+        if (data.serverTime !== undefined) {
+          entity.ship.furnaceClockOffsetMs = data.serverTime - Date.now();
         }
         entity.updateFromServer(entityData);
         if (isLocalPlayer) {
@@ -1556,7 +1560,7 @@ export class ConnectionManager {
       }
     }
     this.playedLootCollectionIds.add(data.lootId);
-    playLootPickup(data.kind, data.position);
+    playLootPickup(data.position);
     playLocalHaptic(data.collectorId === this.getLocalPlayerId(), 'pickup');
   }
 
@@ -1670,7 +1674,7 @@ export class ConnectionManager {
         applyShipKitToShip(localPlayer.ship, authoritativeKit);
       }
       if (localPlayer.ship.kitId === 'hauler') {
-        const utility = preferredHaulerUtility();
+        const utility = 'tow_cable';
         localPlayer.ship.haulerUtility = utility;
         this.sendMessage({
           type: 'setHaulerUtility',
@@ -1678,11 +1682,11 @@ export class ConnectionManager {
           data: { utilityId: utility },
         });
       }
-      if (localPlayer.ship.kitId === 'surveyor') {
-        const utility = preferredSurveyorUtility();
-        setSurveyorUtilityOnHost(localPlayer.ship, utility);
+      if (localPlayer.ship.kitId === 'scout') {
+        const utility = 'mineral_scan';
+        setScoutUtilityOnHost(localPlayer.ship, utility);
         this.sendMessage({
-          type: 'setSurveyorUtility',
+          type: 'setScoutUtility',
           id: localPlayer.id,
           data: { utilityId: utility },
         });
@@ -1771,7 +1775,6 @@ export class ConnectionManager {
     damage: number;
     remainingHealth: number;
     isDestroyed: boolean;
-    remainingLives?: number;
   }): void {
     logger.debug('NETWORK', 'Player damaged', {
       targetPlayerId: data.targetPlayerId,
@@ -1779,7 +1782,6 @@ export class ConnectionManager {
       damage: data.damage,
       remainingHealth: data.remainingHealth,
       isDestroyed: data.isDestroyed,
-      remainingLives: data.remainingLives,
     });
 
     const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1787,10 +1789,6 @@ export class ConnectionManager {
       localPlayer &&
         (localPlayer.id === data.targetPlayerId || this.getLocalPlayerId() === data.targetPlayerId)
     );
-    const prevLocalLives =
-      isLocalTarget && localPlayer && data.remainingLives !== undefined
-        ? localPlayer.lives
-        : undefined;
     const beforeHealth = isLocalTarget && localPlayer ? localPlayer.ship.health : undefined;
 
     let targetPlayer = this.allPlayers.get(data.targetPlayerId);
@@ -1810,10 +1808,10 @@ export class ConnectionManager {
     if (data.attackerId) {
       targetPlayer.deathCause = data.attackerId;
     }
-    if (data.remainingLives !== undefined) {
-      targetPlayer.lives = data.remainingLives;
-    }
 
+    if (data.isDestroyed) {
+      targetPlayer.reportDeath();
+    }
     this.applyDamageToLocalPlayerIfTarget(data);
 
     this.applyAuthoritativeDamageHealth(targetPlayer, data.remainingHealth, data.isDestroyed);
@@ -1830,17 +1828,6 @@ export class ConnectionManager {
       targetPlayer.ship.explode(data.attackerId);
     }
 
-    if (
-      localPlayer &&
-      prevLocalLives !== undefined &&
-      data.remainingLives !== undefined &&
-      prevLocalLives > data.remainingLives
-    ) {
-      const deathCause = describeDeathCause(data.attackerId);
-      localPlayer.deathCause = deathCause;
-      this.dispatchLocalPlayerDied(localPlayer, data.remainingLives, deathCause);
-    }
-
     if (isLocalTarget) {
       const observedAt = Date.now();
       const shouldLogDamage = data.isDestroyed || observedAt - this.lastDamageStateLogAt >= 1000;
@@ -1853,36 +1840,16 @@ export class ConnectionManager {
           damage: data.damage,
           ...(beforeHealth !== undefined ? { healthBefore: beforeHealth } : {}),
           healthAfter: data.remainingHealth,
-          ...(prevLocalLives !== undefined ? { livesBefore: prevLocalLives } : {}),
-          ...(data.remainingLives !== undefined ? { livesAfter: data.remainingLives } : {}),
           ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
         });
       }
     }
   }
 
-  /** Fire playerDied when server reports a life loss before game-state sync arrives. */
-  private dispatchLocalPlayerDied(
-    localPlayer: Player,
-    remainingLives: number,
-    deathCause: string
-  ): void {
-    window.dispatchEvent(
-      new CustomEvent('playerDied', {
-        detail: {
-          playerId: localPlayer.id,
-          deathCause,
-          isGameOver: remainingLives <= 0,
-        },
-      })
-    );
-  }
-
   /** Keep PlayerManager's local ship in sync when damage hits a network duplicate. */
   private applyDamageToLocalPlayerIfTarget(data: {
     targetPlayerId: string;
     remainingHealth: number;
-    remainingLives?: number;
     isDestroyed: boolean;
     attackerId: string;
   }): void {
@@ -1899,9 +1866,6 @@ export class ConnectionManager {
     this.applyAuthoritativeDamageHealth(localPlayer, data.remainingHealth, data.isDestroyed);
     if (data.attackerId) {
       localPlayer.deathCause = data.attackerId;
-    }
-    if (data.remainingLives !== undefined) {
-      localPlayer.lives = data.remainingLives;
     }
     if (data.isDestroyed && !localPlayer.ship.exploding) {
       localPlayer.ship.explode(data.attackerId);

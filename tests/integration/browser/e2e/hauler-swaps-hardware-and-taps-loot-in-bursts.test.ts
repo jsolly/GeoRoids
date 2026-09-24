@@ -21,6 +21,8 @@ test.each([1280, 954, 390])(
     const diagnostics = watchBrowserDiagnostics(page);
     const decoder = new SnapshotDecoder();
     const drops = new Map<string, number>();
+    const seenLoot = new Set<string>();
+    let observingTap = false;
     page.on('websocket', (socket) => {
       if (!WS_PATH.test(socket.url())) {
         return;
@@ -29,9 +31,10 @@ test.each([1280, 954, 390])(
         const result = decoder.readMessage(String(payload), { acceptSnapshots: true });
         if (result.kind === 'snapshot') {
           for (const loot of result.state.loot ?? []) {
-            if (loot.kind === 'tap' && !drops.has(loot.id)) {
+            if (observingTap && loot.kind === 'tap' && !seenLoot.has(loot.id)) {
               drops.set(loot.id, result.state.gameTime);
             }
+            seenLoot.add(loot.id);
           }
         } else if (
           result.kind === 'message' &&
@@ -47,9 +50,9 @@ test.each([1280, 954, 390])(
     const game = new GameInteractions(page);
     await game.bootGame({
       kitId: 'hauler',
-      haulerUtility: 'resource_tap',
       waitForCombatReady: false,
     });
+    await game.collectEquipment(['resource_tap'], 'resource_tap');
     const id = await game.getLocalPlayerId();
     const openSchematic = async () => {
       if (mobile) {
@@ -94,6 +97,9 @@ test.each([1280, 954, 390])(
         path: screenshotManager.getScreenshotPath(`equipment-${utility}-${width}.png`),
       });
       await page.locator('#ship-schematic-return').click();
+      // The shared server can retain earlier runs' canisters. Observe new
+      // drops only after this pilot starts the Resource Tap action.
+      observingTap = utility === 'resource_tap';
       await useAbility();
       await expect
         .poll(() =>

@@ -1,4 +1,4 @@
-import { type Heightfield, sampleHeight } from './heightfield';
+import { type Heightfield, sampleContourHeight, terrainElevation } from './heightfield';
 import { TERRAIN } from './terrainConfig';
 
 interface ContourSegment {
@@ -48,7 +48,7 @@ function addSegment(
 }
 
 /**
- * Marching squares on a regular grid of sampleHeight. Same seed → same lines
+ * Marching squares on a regular grid of the original terrain shape. Same seed → same lines
  * on every client and the server.
  */
 export function extractIsoContours(
@@ -68,7 +68,7 @@ export function extractIsoContours(
   let maxH = Number.NEGATIVE_INFINITY;
   for (let j = 0; j < dim; j++) {
     for (let i = 0; i < dim; i++) {
-      const h = sampleHeight(field, originX + i * cell, originY + j * cell);
+      const h = sampleContourHeight(field, originX + i * cell, originY + j * cell);
       heights[j * dim + i] = h;
       if (h < minH) {
         minH = h;
@@ -162,7 +162,7 @@ export function extractIsoContours(
       }
     }
 
-    levels.push({ index: li, height, segments });
+    levels.push({ index: li, height: terrainElevation(height), segments });
   }
 
   return levels;

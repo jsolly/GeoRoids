@@ -50,9 +50,11 @@ test('an editor adds a formatted searchable article without changing application
   expect(searchArticles(articles, 'orbiting').map((entry) => entry.id)).toContain('practice');
   expect(article?.sources).toEqual([]);
   expect(article?.related).toEqual(['controls']);
-  const surveyor = articles.find((entry) => entry.id === 'surveyor');
-  expect(surveyor?.html).toContain(String(getShipKit('surveyor').maxHealth));
-  expect(surveyor?.html).toContain('CURRENT GAME VALUES');
+  const scout = articles.find((entry) => entry.id === 'scout');
+  expect(scout?.html).toContain(String(getShipKit('scout').maxHealth));
+  expect(scout?.html).toContain(
+    '<details class="game-reference"><summary>Exact values and detailed rules</summary>'
+  );
 });
 
 test('an editor cannot publish a broken article link or a missing image', () => {
@@ -87,8 +89,9 @@ test('the compiler accepts Pages CMS frontmatter serialization', () => {
   const file = join(root, 'content/wiki/field-manual.md');
   const saved = readFileSync(file, 'utf8')
     .replace('\nmedia: []', '')
-    .replace('---\n\n## What the manual covers', '---\n## What the manual covers')
+    .replace('---\n\n## Start flying', '---\n## Start flying')
     .replace(TRAILING_NEWLINE_PATTERN, '');
+  expect(saved).toContain('---\n## Start flying');
   writeFileSync(file, saved);
   expect(readWikiArticles(root).find((entry) => entry.id === 'field-manual')?.title).toBe(
     'Read the field'

@@ -10,6 +10,7 @@ import {
   type WorldCheckpoint,
   WorldWriterUnreleasedError,
 } from '../../../server/world/worldPersistence';
+import { emptySettlement } from '../../../shared/economy';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 
@@ -76,7 +77,12 @@ test('batches handed to the worker are committed in order and survive a reopen',
   const path = worldFile();
   const persistence = new WorkerWorldPersistence(path);
   shutDownAfter(persistence);
-  expect(persistence.load()).toEqual({ world: undefined, sectors: new Map(), pilots: [] });
+  expect(persistence.load()).toEqual({
+    world: undefined,
+    sectors: new Map(),
+    pilots: [],
+    economy: { settlement: emptySettlement(), pointLoot: [] },
+  });
 
   persistence.persist(batch(new Map([['0,0', [deposit('ore', { x: 20, y: 20 })]]]), 10));
   persistence.persist({ sectors: new Map([['0,0', []]]), pilots: batch(new Map(), 25).pilots });

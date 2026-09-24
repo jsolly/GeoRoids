@@ -1,7 +1,19 @@
 import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+// Audio diagnostics stay real; forwarding them must not open a logging socket in unit tests.
+vi.mock('../../../src/utils/logForwarder', () => ({
+  startClientLogForwarder: vi.fn(),
+  forwardLogToServer: vi.fn(),
+}));
+
 import { AUDIO } from '../../../src/constants';
+
+// Audio unit tests must not connect to a developer's running game server.
+vi.mock('../../../src/utils/logForwarder', () => ({
+  startClientLogForwarder: vi.fn(),
+  forwardLogToServer: vi.fn(),
+}));
 
 class FakeHowl {
   static instances: FakeHowl[] = [];
@@ -129,6 +141,26 @@ async function settle() {
   }
 }
 
+// Invoke the registered listener with a trusted-event double. Browser coverage
+// separately verifies that native gestures recover a frozen AudioContext.
+function trustedPointerDown(): void {
+  const listener = vi
+    .mocked(document.addEventListener)
+    .mock.calls.filter(([type]) => type === 'pointerdown')
+    .at(-1)?.[1];
+  if (typeof listener !== 'function') {
+    throw new Error('Expected audio gesture listener');
+  }
+  listener.call(
+    document,
+    new Proxy(new Event('pointerdown'), {
+      get(target, property, receiver) {
+        return property === 'isTrusted' ? true : Reflect.get(target, property, receiver);
+      },
+    })
+  );
+}
+
 function howlFor(fragment: string): FakeHowl | undefined {
   return FakeHowl.instances.find((howl) =>
     (howl.options.src as string[] | undefined)?.some((src) => src.includes(fragment))
@@ -187,6 +219,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.doUnmock('howler');
+  vi.useRealTimers();
 });
 
 test('missing beds keep the Music checkbox without loading or logging', async () => {
@@ -331,8 +364,9 @@ test('an interrupted phone session restarts the bed after a deferred device star
   expect(errors.mock.calls.some((call) => call[0] === 'SOUND')).toBe(false);
 });
 
-test('restarting silent audio preserves the danger bed and muted effects without replaying cues', async () => {
-  const { restartAudio, readAudioDiagnostics } = await import('../../../src/audio/audioRuntime');
+test('recovering stalled audio preserves the danger bed and muted effects without replaying cues', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  const { readAudioDiagnostics } = await import('../../../src/audio/audioRuntime');
   const { readMusicDiagnostics } = await import('../../../src/audio/musicBeds');
   const cue = new Sound('sounds/laser.m4a', 2);
   setSound(true);
@@ -346,7 +380,9 @@ test('restarting silent audio preserves the danger bed and muted effects without
   const previousContext = FakeContext.instances[0];
   const registrations = vi.mocked(document.addEventListener).mock.calls.length;
   expect(readMusicDiagnostics().currentBed).toBe('danger');
-  expect(restartAudio()).toBe(true);
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  trustedPointerDown();
   await settle();
   expect(previousContext?.close).toHaveBeenCalledOnce();
   expect(previousBeds.every((bed) => bed.unload.mock.calls.length === 1)).toBe(true);

@@ -17,11 +17,6 @@ declare global {
     gameMapOpen: CustomEvent<undefined>;
     gameMapClose: CustomEvent<undefined>;
     playerIdentityChanged: CustomEvent<PlayerIdentityChangedDetail>;
-    playerDied: CustomEvent<{
-      playerId: string;
-      deathCause: string;
-      isGameOver: boolean;
-    }>;
     shipExploded: CustomEvent<{
       shipId?: string;
       position?: Position;

@@ -46,15 +46,6 @@ for (const viewport of [
     });
     const game = new GameInteractions(page);
     await game.bootGame();
-    const restart = page.locator('#restart-audio-play');
-    if (viewport.name === 'mobile') {
-      await restart.tap();
-    } else {
-      await restart.click();
-    }
-    expect(await page.locator('#audio-status-play').textContent()).toBe(
-      'Enable Sound Effects or Music first'
-    );
     expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe('0');
     const beforeInput = await readTouchControlState(page);
     if (viewport.name === 'mobile') {
@@ -231,7 +222,9 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`audio-${viewport.name}.png`),
     });
     await page.goto(new URL('/wiki/#hud-network', page.url()).href);
-    await expect.poll(() => page.locator('body').textContent()).toContain('crystal');
+    await expect
+      .poll(() => page.locator('body').textContent())
+      .toContain('separate Sound Effects, Music, and Haptics settings');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`audio-wiki-${viewport.name}.png`),
     });

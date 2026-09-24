@@ -23,6 +23,7 @@ interface SatellitePickupInternal extends SatellitePickupData {
   rosterIndex: number;
   orbitPhase: number;
   respawnTimer: number;
+  nestSalvage?: true;
 }
 
 export class SatellitePickupManager {
@@ -39,6 +40,12 @@ export class SatellitePickupManager {
 
   public getPickup(id: string): SatellitePickupInternal | undefined {
     return this.pickups.get(id);
+  }
+
+  public getNestResources(): SatellitePickupData[] {
+    return [...this.pickups.values()]
+      .filter((pickup) => !pickup.nestSalvage)
+      .map((pickup) => this.toPublic(pickup));
   }
 
   public getAllPickups(): SatellitePickupData[] {
@@ -66,6 +73,17 @@ export class SatellitePickupManager {
 
     logger.info(`🛰️ Created ${created.length} satellite pickups`);
     return created;
+  }
+
+  /** A bounded supply of recoverable hardware among nest salvage. */
+  public spawnNestPickup(position: { x: number; y: number }): void {
+    if (this.pickups.size >= SATELLITE_PICKUP.MAX_COUNT + 12) {
+      return;
+    }
+    const pickup = this.spawnLoose(this.pickups.size, SATELLITE_PICKUP.MAX_COUNT);
+    pickup.position = { x: position.x - 100, y: position.y - 100 };
+    pickup.nestSalvage = true;
+    this.pickups.set(pickup.id, pickup);
   }
 
   /** Store a loose pickup until its owner chooses to deploy it. */

@@ -28,7 +28,7 @@ test('Town Square is the only pre-lit hearth and sits on the origin', () => {
   expect(TOWN_HEARTH.radius).toBe(85);
 });
 
-test('street lots keep a whole grate inside one sector and clear of each other', () => {
+test('furnace lots keep a whole grate inside one sector and clear of each other', () => {
   expect(CIVIC_LOTS.filter((lot) => lot.ring === 1)).toHaveLength(6);
   expect(CIVIC_LOTS.filter((lot) => lot.ring === 2)).toHaveLength(12);
   expect(CIVIC_LOTS.filter((lot) => lot.ring === 3)).toHaveLength(24);
@@ -51,7 +51,7 @@ test('street lots keep a whole grate inside one sector and clear of each other',
   }
 });
 
-test('street lots scatter off a perfect ring and stay in separate bands', () => {
+test('furnace lots scatter off a perfect ring and stay in separate bands', () => {
   const radii = (ring: 1 | 2 | 3): number[] =>
     CIVIC_LOTS.filter((lot) => lot.ring === ring).map((lot) =>
       Math.hypot(lot.position.x, lot.position.y)
@@ -104,12 +104,12 @@ function cornerCount(points: readonly { x: number; y: number }[]) {
   return corners;
 }
 
-test('a street stays dark until its inward parent lot is lit', () => {
+test('a furnace stays dark until its inward parent lot is lit', () => {
   const first = civicLot('street-1-0');
   const second = civicLot('street-2-0');
   const third = civicLot('street-3-1');
   if (!first || !second || !third) {
-    throw new Error('Missing civic street lots');
+    throw new Error('Missing civic furnace lots');
   }
   expect(first.parentId).toBe(TOWN_HEARTH.id);
   expect(second.parentId).toBe('street-1-0');
@@ -171,14 +171,14 @@ test('scatter keeps index parents even when another inward lot is closer', () =>
   expect(mismatches.length).toBeGreaterThan(0);
 });
 
-test('a street pipe turns at right angles through each inward parent lot to Town Square', () => {
+test('a furnace pipe turns at right angles through each inward parent lot to Town Square', () => {
   const first = civicLot('street-1-0');
   const second = civicLot('street-2-0');
   const third = civicLot('street-3-1');
   const secondParent = civicLot('street-1-0');
   const thirdParent = civicLot('street-2-0');
   if (!first || !second || !third || !secondParent || !thirdParent) {
-    throw new Error('Missing civic street lots');
+    throw new Error('Missing civic furnace lots');
   }
   expect(pipeToTownSquare(TOWN_HEARTH.id)).toEqual([TOWN_HEARTH.position]);
   expect(pipeToTownSquare('missing')).toEqual([]);
@@ -239,7 +239,7 @@ function hopBend(hop: readonly { x: number; y: number }[]): number {
     .reduce((best, point) => Math.max(best, distanceToSegment(point, from, to)), 0);
 }
 
-test('a street pipe prefers the shorter clear bend toward its parent', () => {
+test('a furnace pipe prefers the shorter clear bend toward its parent', () => {
   for (const lot of CIVIC_LOTS) {
     const hop = pipeHopToParent(lot.id);
     const from = hop[0];
@@ -258,7 +258,7 @@ test('a street pipe prefers the shorter clear bend toward its parent', () => {
   }
 });
 
-test('a street pipe stays outside every other grate', () => {
+test('a furnace pipe stays outside every other grate', () => {
   const grates = [TOWN_HEARTH, ...CIVIC_LOTS];
   for (const lot of CIVIC_LOTS) {
     const hop = pipeHopToParent(lot.id);

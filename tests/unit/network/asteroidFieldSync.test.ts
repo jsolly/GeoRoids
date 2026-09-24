@@ -301,7 +301,7 @@ test('mining contributor metadata roundtrips through complete and kinematic aste
   const local = localRoid(1, 2);
   const source = {
     ...roid('mining-ledger-0', 10, 10),
-    surveyedBy: ['surveyor-0'],
+    surveyedBy: ['scout-0'],
     miningContributors: ['miner-0', 'miner-1'],
   };
 
@@ -358,7 +358,7 @@ test('a probe follows complete asteroid snapshots and disappears when the server
   };
   const probe = {
     id: 'probe',
-    ownerId: 'surveyor',
+    ownerId: 'scout',
     health: 40,
     maxHealth: 40,
     attachedAt: 1000,

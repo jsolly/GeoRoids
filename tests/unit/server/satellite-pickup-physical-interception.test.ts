@@ -40,7 +40,7 @@ describe('satellite pickups intercept physical damage', () => {
   });
 
   function addOwner(): void {
-    engine.addPlayer('owner', 'Owner', new RecordingSocket(), { x: 0, y: 0 }, 'surveyor');
+    engine.addPlayer('owner', 'Owner', new RecordingSocket(), { x: 0, y: 0 }, 'scout');
     engine.updatePlayer('owner', { spawnProtectionTimer: 0 });
     clearAsteroids(engine);
   }
@@ -61,13 +61,7 @@ describe('satellite pickups intercept physical damage', () => {
   }
 
   function addAttacker(): void {
-    engine.addPlayer(
-      'attacker',
-      'Attacker',
-      new RecordingSocket(),
-      { x: 1000, y: 1000 },
-      'surveyor'
-    );
+    engine.addPlayer('attacker', 'Attacker', new RecordingSocket(), { x: 1000, y: 1000 }, 'scout');
     engine.updatePlayer('attacker', { spawnProtectionTimer: 0 });
     clearAsteroids(engine);
   }

@@ -1,0 +1,113 @@
+import { expect, test } from 'vitest';
+import { civicLot } from '../../../../shared/furnaces';
+import {
+  assertNoBrowserDiagnostics,
+  watchBrowserDiagnostics,
+} from '../../utils/browser-diagnostics';
+import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { GameInteractions } from '../../utils/game-interactions';
+import { arrangeCrewField } from '../../utils/test-server-control';
+
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+
+for (const viewport of [
+  { width: 1280, height: 900, touch: false },
+  { width: 390, height: 844, touch: true },
+]) {
+  test(`a Scout builds a shared furnace near a dark furnace at ${viewport.width}px`, async () => {
+    const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
+    await page.setViewportSize(viewport);
+    const diagnostics = watchBrowserDiagnostics(page);
+    const game = new GameInteractions(page);
+    await game.navigateToGame();
+    await page.locator('[data-kit-id="scout"]').click();
+    await game.startGame();
+    await game.waitForGameReady();
+    await game.waitForServerJoin();
+    await game.placeShipAt(0, 0);
+    const store = page.locator('#town-store-dialog');
+    if (viewport.touch) {
+      await page.getByRole('button', { name: 'Enter', exact: true }).tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
+    await store.waitFor({ state: 'visible' });
+    await store.getByRole('button', { name: 'Store', exact: true }).click();
+    expect(await store.textContent()).toContain('Placeholder A');
+    expect(await store.textContent()).not.toMatch(/street|deliveries|bonus|10%/iu);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`town-store-furnaces-${viewport.width}.png`),
+    });
+    await page.locator('#town-store-return').click();
+    await store.waitFor({ state: 'hidden' });
+    const openSchematic = async () => {
+      const toggle = page.locator('#ship-schematic-toggle');
+      if (viewport.touch) {
+        await toggle.tap();
+      } else {
+        await toggle.click();
+      }
+      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+    };
+    await openSchematic();
+    expect(await page.locator('[data-utility-id="build_furnace"]').count()).toBe(0);
+    expect(await page.locator('[data-utility-id]').count()).toBe(2);
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Mineral Scan');
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Survey Probe');
+    await page.locator('#ship-schematic-return').click();
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'hidden' });
+    const lot = civicLot('street-1-0');
+    if (!lot) {
+      throw new Error('Missing furnace lot');
+    }
+    await arrangeCrewField([await game.getLocalPlayerId()], 'furnace-build');
+    await page.waitForFunction(({ x, y }) => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      return Boolean(
+        ship && Math.abs(ship.position.x - x) < 20 && Math.abs(ship.position.y - y) < 20
+      );
+    }, lot.position);
+    if (viewport.touch) {
+      await page.waitForFunction(
+        () => document.querySelector('#touch-ability')?.textContent?.includes('BUILD') === true
+      );
+      expect(await page.locator('#touch-ability').textContent()).toContain('BUILD');
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`scout-ability-build-${viewport.width}.png`),
+      });
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`scout-ability-build-${viewport.width}.png`),
+      });
+      await page.keyboard.press('KeyE');
+    }
+    await page.waitForFunction((furnaceName) => {
+      const message = window.gameController?.getGameStateManager().getPickupMessage() ?? '';
+      return message.includes(furnaceName) && message.includes('is burning');
+    }, lot.name);
+    await page.waitForFunction(() => window.gameController?.getCurrPlayer()?.score === 0);
+    expect(
+      await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.abilityActiveFrames)
+    ).toBe(0);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`scout-lit-furnace-${viewport.width}.png`),
+    });
+    await game.placeShipAt(0, 0);
+    await game.waitForAnimationFrames(12);
+    await page.evaluate(
+      "import('/src/fx/furnacePipePulse.ts').then(({noteFurnacePipePulse}) => noteFurnacePipePulse('street-1-0'))"
+    );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`town-square-pipe-rim-${viewport.width}.png`),
+    });
+    await page.goto(`${new URL(page.url()).origin}/wiki/#scout`);
+    const buildHeading = page.getByRole('heading', { name: 'Build', exact: true });
+    await buildHeading.waitFor();
+    await buildHeading.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`scout-wiki-${viewport.width}.png`),
+    });
+    assertNoBrowserDiagnostics(diagnostics);
+  }, 60_000);
+}

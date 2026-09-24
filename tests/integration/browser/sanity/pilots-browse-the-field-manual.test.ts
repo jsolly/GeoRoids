@@ -126,8 +126,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
       .toMatch(PNG_SRC_SUFFIX_PATTERN);
-    await page.goto(`${TestConfig.GAME_URL}/wiki/#surveyor`);
-    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Surveyor');
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#scout`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Scout');
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
       PNG_SRC_SUFFIX_PATTERN
@@ -157,11 +157,11 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       WHITESPACE_COLLAPSE_PATTERN,
       ' '
     );
-    expect(haulerContent).toContain('E attaches a tow cable to the nearest living asteroid');
-    expect(haulerContent).toContain('never reels a rock into the hull or throws it');
+    expect(haulerContent).toContain('Press E near a rock or spider to latch');
+    expect(haulerContent).toContain('Cargo keeps its momentum');
     expect(haulerContent).not.toMatch(HAULER_LEGACY_TERMS_PATTERN);
     expect(haulerContent).toContain('Boost Coupling E');
-    expect(haulerContent).toContain('IGNITE on touch');
+    expect(haulerContent).toContain('then E again to ignite autonomous delivery');
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     const haulerOffset = await page.evaluate(() => {
       const link = document.querySelector('.related-link');
@@ -187,6 +187,9 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     for (const article of articles) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
       await expect.poll(() => page.locator('h1').textContent()).toBe(article.title);
+      if (article.id === 'terrain') {
+        await page.screenshot({ path: resolve(output, 'wiki-terrain-desktop.png') });
+      }
       if (article.id === 'satellites') {
         await page.screenshot({
           path: resolve(output, 'wiki-satellite-inventory-desktop.png'),
@@ -290,8 +293,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.locator('.ship-card').first().waitFor();
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     await page.locator('#navigation summary').click();
-    await page.locator('#article-nav a[href="#surveyor"]').click();
-    await expect.poll(() => page.locator('h1').textContent()).toBe('Surveyor');
+    await page.locator('#article-nav a[href="#scout"]').click();
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Scout');
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
@@ -305,7 +308,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
-    await page.screenshot({ path: resolve(output, 'wiki-surveyor-mobile.png'), fullPage: true });
+    await page.screenshot({ path: resolve(output, 'wiki-scout-mobile.png'), fullPage: true });
     await page.locator('.ship-rating-guide summary').click();
     expect(await page.locator('.ship-rating-guide p').isVisible()).toBe(true);
     expect(await page.locator('.ship-rating-guide p').textContent()).toContain('Smaller size');
@@ -334,10 +337,17 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
     await page.screenshot({ path: resolve(output, 'wiki-hauler-mobile.png'), fullPage: true });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#terrain`);
+    await expect
+      .poll(() => page.locator('.article-header h1').textContent())
+      .toBe('Terrain and the boundary');
+    await page
+      .locator('.article-body')
+      .screenshot({ path: resolve(output, 'wiki-terrain-mobile.png') });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect(
       (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')
-    ).toContain('Touch and hold the playfield to steer');
+    ).toContain('Hold and drag one finger to steer');
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#satellites`);
     await expect.poll(() => page.locator('h1').textContent()).toBe('Satellites and pickups');

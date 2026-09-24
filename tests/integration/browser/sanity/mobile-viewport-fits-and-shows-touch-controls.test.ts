@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
 
 import {
   assertNoBrowserDiagnostics,
@@ -157,7 +158,12 @@ test(
     if (!inventory || !map || !hud || !boostBox || !abilityBox) {
       throw new Error('Expected all five action buttons');
     }
-    expect(inventory.y).toBeLessThan(100);
+    const economyBottom = computeHudLayout(
+      { width: 390, height: 844 },
+      { touchControls: true }
+    ).economyBottomY;
+    expect(inventory.y).toBeGreaterThanOrEqual(economyBottom);
+    expect(inventory.y + inventory.height).toBeLessThan(844 / 3);
     expect([map.y, hud.y, abilityBox.y]).toEqual([inventory.y, inventory.y, inventory.y]);
     expect(boostBox.y + boostBox.height).toBe(844 - 28);
     expect(boostBox.x + boostBox.width / 2).toBe(390 / 2);
@@ -261,7 +267,7 @@ test(
             const ship = window.gameController?.getCurrPlayer()?.ship;
             return Boolean(ship && ship.abilityCooldownFrames > 0 && ship.abilityActiveFrames > 0);
           }),
-        { message: 'Surveyor scan and cooldown should arrive from the server' }
+        { message: 'Scout scan and cooldown should arrive from the server' }
       )
       .toBe(true);
     for (const viewport of [
@@ -299,7 +305,7 @@ test(
 );
 
 test(
-  'mobile menu stays inside the viewport before play and after game over',
+  'mobile menu stays inside the viewport before play and keeps flight active after death',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -330,9 +336,10 @@ test(
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
-    await game.dieUntilGameOver();
-    await expect.poll(() => game.isStartScreenVisible(), { timeout: 10000 }).toBe(true);
-    await assertMenuFits('after-game-over');
+    await game.dieOnceViaBoundary();
+    await game.waitForShipAlive();
+    expect(await game.isGameRunning()).toBe(true);
+    expect(await game.isStartScreenVisible()).toBe(false);
   },
   TestConfig.DEFAULT_TIMEOUT * 3
 );

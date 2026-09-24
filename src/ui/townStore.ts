@@ -1,15 +1,12 @@
-import {
-  EXTRA_LIFE_COST,
-  insideTownStore,
-  MAX_LIVES,
-  TOWN_YIELD_PER_MODULE,
-  townDeliveryBonusPercent,
-} from '../../shared/townStore';
+import { TOWN_HEARTH } from '../../shared/furnaces';
+import { litTravelDestinations, nearestTravelFurnace } from '../../shared/furnaceTravel';
+import { insideTownStore, STORE_OFFERS } from '../../shared/townStore';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { NetworkManager } from '../network/networkManager';
-import { worldFurnaces } from '../network/worldExploration';
+import { getSettlement, worldFurnaces } from '../network/worldExploration';
 import { logger } from '../utils/Logger';
+import { renderFurnaceTravelMap } from './furnaceTravelMap';
 import { closeShipSchematic } from './shipSchematic';
 import { isShipSchematicOpen } from './shipSchematicState';
 import { bindTownStoreClose, isTownStoreOpen, setTownStoreOpen } from './townStoreState';
@@ -18,12 +15,14 @@ import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
 export const TOWN_STORE_IDS = {
   dialog: 'town-store-dialog',
   close: 'town-store-close',
-  yield: 'town-store-yield',
   score: 'town-store-score',
   offer: 'town-store-offer',
-  price: 'town-store-life-price',
   status: 'town-store-status',
   return: 'town-store-return',
+  destinations: 'town-store-destinations',
+  choices: 'town-store-choices',
+  travel: 'town-store-travel',
+  back: 'town-store-back',
 } as const;
 
 const BLOCKED_GAMEPLAY_KEYS = new Set([
@@ -40,13 +39,18 @@ const BLOCKED_GAMEPLAY_KEYS = new Set([
 type StoreElements = {
   dialog: HTMLDialogElement;
   close: HTMLButtonElement;
-  yieldLine: HTMLElement;
   score: HTMLElement;
   offer: HTMLElement;
+  destinations: HTMLElement;
+  choices: HTMLElement;
+  travel: HTMLElement;
+  back: HTMLButtonElement;
   status: HTMLElement;
   return: HTMLButtonElement;
 };
 
+type TownView = 'entry' | 'store' | 'travel';
+let view: TownView = 'entry';
 let initialized = false;
 let closeInProgress = false;
 let elements: StoreElements | null = null;
@@ -58,22 +62,35 @@ export function canEnterTownStore(): boolean {
     return false;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
-  if (!player || player.lives <= 0 || player.ship.exploding || player.ship.health <= 0) {
+  if (!player || player.ship.exploding || player.ship.health <= 0) {
     return false;
   }
-  // Tow/ignite chrome wins while hooked — match ability button, not Enter store.
-  if (player.ship.harpoonTargetId) {
+  if (player.ship.furnaceTransit) {
     return false;
   }
-  return insideTownStore(player.ship.position);
+  return nearestTravelFurnace(player.ship.position, worldFurnaces) !== undefined;
 }
 
-function streetsBuiltByLocal() {
-  const id = PlayerManager.getInstance().getLocalPlayer()?.id;
-  if (!id) {
-    return 0;
+/** Whether the current boarding stop also offers the Town Square store. */
+export function isAtTownSquare(): boolean {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  return (
+    player != null &&
+    nearestTravelFurnace(player.ship.position, worldFurnaces)?.id === TOWN_HEARTH.id
+  );
+}
+
+function selectView(next: TownView): void {
+  view = next;
+  if (!elements) {
+    return;
   }
-  return worldFurnaces.modulesBuiltBy(id);
+  elements.status.textContent = '';
+  refreshStoreCopy();
+  const panel =
+    next === 'entry' ? elements.choices : next === 'store' ? elements.offer : elements.travel;
+  const first = panel.querySelector<HTMLButtonElement>('button:not(:disabled)');
+  (first ?? elements.back).focus({ preventScroll: true });
 }
 
 function setTextIfChanged(node: HTMLElement, text: string): void {
@@ -82,36 +99,19 @@ function setTextIfChanged(node: HTMLElement, text: string): void {
   }
 }
 
-function lifeButton(): HTMLButtonElement | null {
-  if (!elements) {
-    return null;
+function requestFurnaceTravel(destinationId: string): void {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (!player || !canEnterTownStore()) {
+    return;
   }
-  const existing = elements.offer.querySelector<HTMLButtonElement>(
-    'button[data-offer="extra-life"]'
-  );
-  if (existing) {
-    return existing;
-  }
-  const row = document.createElement('div');
-  row.className = 'town-store-row';
-  const copy = document.createElement('span');
-  copy.className = 'town-store-copy';
-  const name = document.createElement('strong');
-  name.textContent = 'Extra life';
-  const price = document.createElement('small');
-  price.id = TOWN_STORE_IDS.price;
-  price.textContent = `${EXTRA_LIFE_COST.toLocaleString('en-US')} score`;
-  copy.append(name, price);
-  const buy = document.createElement('button');
-  buy.type = 'button';
-  buy.dataset['offer'] = 'extra-life';
-  buy.setAttribute('aria-describedby', TOWN_STORE_IDS.price);
-  buy.addEventListener('click', () => {
-    purchaseExtraLife();
+  NetworkManager.getInstance().sendMessage({
+    type: 'travelFurnace',
+    id: player.id,
+    data: { destinationId },
   });
-  row.append(copy, buy);
-  elements.offer.replaceChildren(row);
-  return buy;
+  if (elements) {
+    elements.status.textContent = 'Preparing rocket…';
+  }
 }
 
 function refreshStoreCopy(): void {
@@ -119,32 +119,80 @@ function refreshStoreCopy(): void {
     return;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
-  const built = streetsBuiltByLocal();
-  const bonus = townDeliveryBonusPercent(built);
-  const perStreet = Math.round(TOWN_YIELD_PER_MODULE * 100);
-  setTextIfChanged(
-    elements.yieldLine,
-    built === 0
-      ? `Each street you build adds ${perStreet}% to your own furnace deliveries.`
-      : `You built ${built} ${built === 1 ? 'street' : 'streets'}. Your deliveries pay ${bonus}% more.`
-  );
+  const source = player ? nearestTravelFurnace(player.ship.position, worldFurnaces) : undefined;
+  const town = source?.id === TOWN_HEARTH.id;
+  const activeView = town ? view : 'travel';
+  elements.choices.hidden = !town || activeView !== 'entry';
+  elements.offer.hidden = activeView !== 'store';
+  elements.travel.hidden = activeView !== 'travel';
+  elements.back.hidden = !town || activeView === 'entry';
+  const heading = elements.dialog.querySelector<HTMLElement>('#town-store-title');
+  const eyebrow = elements.dialog.querySelector('.town-store-eyebrow');
+  if (heading) {
+    setTextIfChanged(
+      heading,
+      activeView === 'entry' ? 'Town Square' : activeView === 'store' ? 'Store' : 'Furnace travel'
+    );
+  }
+  if (eyebrow) {
+    eyebrow.textContent = source?.name ?? 'FURNACE';
+  }
+  const destinations = source ? litTravelDestinations(source.id, worldFurnaces) : [];
+  const signature = `${source?.id ?? ''}|${destinations
+    .map((destination) => `${destination.id}:${destination.name}`)
+    .join('|')}`;
+  if (activeView === 'travel' && elements.destinations.dataset['destinations'] !== signature) {
+    elements.destinations.dataset['destinations'] = signature;
+    if (source) {
+      renderFurnaceTravelMap(elements.destinations, source, destinations, requestFurnaceTravel);
+    } else {
+      elements.destinations.replaceChildren();
+    }
+  }
+  const level = getSettlement().level;
   setTextIfChanged(
     elements.score,
-    `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`
+    `Bank ${(player?.score ?? 0).toLocaleString()} · Settlement level ${level}`
   );
-  const buy = lifeButton();
-  if (!buy) {
-    return;
+  if (!elements.offer.children.length) {
+    for (const offer of STORE_OFFERS) {
+      const row = document.createElement('div');
+      row.className = 'town-store-row';
+      const copy = document.createElement('span');
+      copy.className = 'town-store-copy';
+      const name = document.createElement('strong');
+      name.textContent = offer.name;
+      const price = document.createElement('small');
+      price.id = `town-store-price-${offer.id}`;
+      price.textContent = `${offer.cost} banked points · Level ${offer.level} · No gameplay effect`;
+      copy.append(name, price);
+      const buy = document.createElement('button');
+      buy.type = 'button';
+      buy.dataset['offer'] = offer.id;
+      buy.setAttribute('aria-describedby', price.id);
+      buy.addEventListener('click', () => purchasePlaceholder(offer.id));
+      row.append(copy, buy);
+      elements.offer.append(row);
+    }
   }
-  const full = (player?.lives ?? 0) >= MAX_LIVES;
-  const label = full ? 'Extra life, lives full' : 'Buy extra life';
-  const wasFocused = document.activeElement === buy;
-  setTextIfChanged(buy, label);
-  if (buy.disabled !== full) {
-    buy.disabled = full;
-  }
-  if (wasFocused && buy.disabled) {
-    elements.return.focus({ preventScroll: true });
+  for (const offer of STORE_OFFERS) {
+    const button = elements.offer.querySelector<HTMLButtonElement>(
+      `button[data-offer="${offer.id}"]`
+    );
+    if (!button) {
+      continue;
+    }
+    const owned = player?.purchases.includes(offer.id) ?? false;
+    const locked = level < offer.level;
+    const hadFocus = document.activeElement === button;
+    button.disabled = owned || locked || (player?.score ?? 0) < offer.cost;
+    if (button.disabled && hadFocus) {
+      elements.return.focus();
+    }
+    setTextIfChanged(
+      button,
+      owned ? 'Purchased' : locked ? `Unlocks at level ${offer.level}` : `Buy ${offer.name}`
+    );
   }
 }
 
@@ -160,11 +208,20 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <p class="town-store-eyebrow">TOWN SQUARE</p>
         <h2 id="town-store-title">Store</h2>
       </div>
-      <button id="${TOWN_STORE_IDS.close}" type="button" aria-label="Close store">×</button>
+      <button id="${TOWN_STORE_IDS.close}" type="button" aria-label="Close menu">×</button>
     </header>
-    <p id="${TOWN_STORE_IDS.yield}"></p>
     <p id="${TOWN_STORE_IDS.score}"></p>
-    <div id="${TOWN_STORE_IDS.offer}"></div>
+    <div id="${TOWN_STORE_IDS.choices}" class="town-store-choices">
+      <button type="button" data-town-view="store">Store</button>
+      <button type="button" data-town-view="travel">Fast Travel</button>
+    </div>
+    <div id="${TOWN_STORE_IDS.offer}" hidden></div>
+    <section id="${TOWN_STORE_IDS.travel}" hidden>
+    <h3>Destination map</h3>
+    <p>Ride your ship along the pipes to any lit furnace. Travel is free.</p>
+    <div id="${TOWN_STORE_IDS.destinations}" class="furnace-destinations"></div>
+    </section>
+    <button id="${TOWN_STORE_IDS.back}" type="button" hidden>Back to Town Square</button>
     <p id="${TOWN_STORE_IDS.status}" role="status" aria-live="polite"></p>
     <button id="${TOWN_STORE_IDS.return}" type="button">Return to flight</button>
   `;
@@ -182,26 +239,50 @@ function ensureElements(): StoreElements | null {
   }
   createDialogMarkup(dialog);
   const close = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.close}`);
-  const yieldLine = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.yield}`);
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
   const offer = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`);
+  const destinations = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.destinations}`);
+  const choices = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.choices}`);
+  const travel = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.travel}`);
+  const back = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.back}`);
   const status = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.status}`);
   const returnButton = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.return}`);
-  if (!close || !yieldLine || !score || !offer || !status || !returnButton) {
+  if (
+    !close ||
+    !score ||
+    !offer ||
+    !destinations ||
+    !status ||
+    !returnButton ||
+    !choices ||
+    !travel ||
+    !back
+  ) {
     return null;
   }
-  return { dialog, close, yieldLine, score, offer, status, return: returnButton };
+  return {
+    dialog,
+    close,
+    score,
+    offer,
+    destinations,
+    choices,
+    travel,
+    back,
+    status,
+    return: returnButton,
+  };
 }
 
-function purchaseExtraLife(): void {
+function purchasePlaceholder(offerId: string): void {
   const player = PlayerManager.getInstance().getLocalPlayer();
-  if (!player || !isTownStoreOpen()) {
+  if (!player || !isTownStoreOpen() || !insideTownStore(player.ship.position)) {
     return;
   }
   NetworkManager.getInstance().sendMessage({
-    type: 'buyExtraLife',
+    type: 'buyStoreItem',
     id: player.id,
-    data: {},
+    data: { offerId },
   });
 }
 
@@ -223,8 +304,12 @@ export function applyTownStoreResult(data: unknown): void {
   if ('score' in data && typeof data.score === 'number' && Number.isFinite(data.score)) {
     player.score = data.score;
   }
-  if ('lives' in data && typeof data.lives === 'number' && Number.isInteger(data.lives)) {
-    player.lives = data.lives;
+  if (
+    'purchases' in data &&
+    Array.isArray(data.purchases) &&
+    data.purchases.every((id) => typeof id === 'string')
+  ) {
+    player.purchases = [...data.purchases];
   }
   refreshStoreCopy();
 }
@@ -253,13 +338,15 @@ export function openTownStore(): boolean {
     );
     return false;
   }
+  view = isAtTownSquare() ? 'entry' : 'travel';
   setTownStoreOpen(true);
   elements.status.textContent = '';
   refreshStoreCopy();
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameStoreOpen'));
   playFeedback('interface');
-  elements.close.focus({ preventScroll: true });
+  const firstChoice = elements.choices.querySelector<HTMLButtonElement>('button');
+  (view === 'entry' && firstChoice ? firstChoice : elements.close).focus({ preventScroll: true });
   return true;
 }
 
@@ -341,6 +428,14 @@ function handleStoreKeydown(ev: KeyboardEvent): void {
 }
 
 if (typeof window !== 'undefined') {
+  window.addEventListener('furnaceTravelResult', (ev: Event) => {
+    const data: unknown = (ev as CustomEvent<unknown>).detail;
+    if (data && typeof data === 'object' && 'ok' in data && data.ok === true) {
+      closeTownStore();
+    } else {
+      applyTownStoreResult(data);
+    }
+  });
   window.addEventListener('townStoreResult', (ev: Event) => {
     applyTownStoreResult((ev as CustomEvent<unknown>).detail);
   });
@@ -357,11 +452,24 @@ export function initializeTownStore(options?: { onOpen?: () => void }): void {
   openInputRelease = options?.onOpen;
   initialized = true;
   bindTownStoreClose(closeTownStore);
+  elements.choices
+    .querySelector('[data-town-view="store"]')
+    ?.addEventListener('click', () => selectView('store'));
+  elements.choices
+    .querySelector('[data-town-view="travel"]')
+    ?.addEventListener('click', () => selectView('travel'));
+  elements.back.addEventListener('click', () => selectView('entry'));
   elements.close.addEventListener('click', () => {
     closeTownStore();
   });
   elements.return.addEventListener('click', () => {
     closeTownStore();
+    // Return to flight restores gameplay focus; native Space must not reopen the HUD button.
+    const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+    if (canvas) {
+      canvas.tabIndex = -1;
+      canvas.focus({ preventScroll: true });
+    }
   });
   elements.dialog.addEventListener('close', handleDialogClosed);
   elements.dialog.addEventListener('cancel', (ev) => {

@@ -9,13 +9,14 @@ import { TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
 import { fullShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   PlayerMotionState,
   Position,
+  ScoutUtilityId,
   ShipBoostState,
   ShipKitId,
-  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
@@ -30,7 +31,9 @@ import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */
 export interface GameEntity {
+  furnaceTransit?: FurnaceTransit | null;
   silk?: number;
+  equipment?: EquipmentId[];
   id: string;
   name: string;
   type: 'player';
@@ -42,7 +45,8 @@ export interface GameEntity {
   thrusting: boolean;
   boost: ShipBoostState;
   color: string;
-  lives: number;
+  cargo: number;
+  purchases: string[];
   score: number;
   health: number;
   maxHealth: number;
@@ -64,14 +68,13 @@ export interface GameEntity {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
-  surveyorUtility?: SurveyorUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Environmental cause of the current death (cleared on respawn). */
   deathCause?: string;
   asteroidInteractions?: 1;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 }
 
 export class EntityManager {
@@ -216,7 +219,8 @@ export class EntityManager {
       thrusting: false,
       boost: fullShipBoost(),
       color: PALETTE.REMOTE,
-      lives: 3,
+      cargo: 0,
+      purchases: [],
       score: 0,
       health: 100,
       maxHealth: 100,
@@ -269,19 +273,12 @@ export class EntityManager {
     return entity;
   }
 
-  private shouldScheduleRespawn(entity: GameEntity): boolean {
-    return entity.lives > 0;
-  }
-
   /**
    * Do not reset an existing countdown (that stacked a second wait and felt
-   * like freeze-stick). Last-life pilots stay dead.
+   * like freeze-stick). Every pilot returns to flight.
    */
   public scheduleShipRespawn(entity: GameEntity): void {
     if (entity.respawnTimer !== undefined) {
-      return;
-    }
-    if (!this.shouldScheduleRespawn(entity)) {
       return;
     }
     entity.respawnTimer = SHIP.RESPAWN_DELAY_FRAMES;
@@ -310,7 +307,7 @@ export class EntityManager {
     return finishedExploding;
   }
 
-  // Shared ship respawn for living pilots.
+  // Shared ship respawn for all pilots.
   public updateRespawns(): string[] {
     const finishedRespawning: string[] = [];
 
@@ -321,12 +318,6 @@ export class EntityManager {
         }
 
         if (entity.respawnTimer === 0) {
-          // A leftover timer must not resurrect a player who already spent their last life.
-          if (!this.shouldScheduleRespawn(entity)) {
-            delete entity.respawnTimer;
-            continue;
-          }
-
           this.respawnShip(entity);
           finishedRespawning.push(entityId);
           logger.debug('ENTITY', 'Entity respawned', {

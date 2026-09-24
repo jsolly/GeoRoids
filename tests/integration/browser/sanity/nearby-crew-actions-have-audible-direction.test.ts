@@ -43,15 +43,33 @@ test.each([1280, 390])(
     const listener = new GameInteractions(listenerPage);
     const shooter = new GameInteractions(shooterPage);
     await listener.bootGame({ waitForCombatReady: false });
-    await shooter.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await shooter.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const ids = await Promise.all([listener.getLocalPlayerId(), shooter.getLocalPlayerId()]);
     await arrangeCrewField(ids, 'empty');
     await Promise.all([listener.waitForCombatReady(), shooter.waitForCombatReady()]);
+    // Wait for the two samples this scenario uses, not the global bank size.
+    const requiredDurations = await listenerPage.evaluate(() => {
+      const context = new OfflineAudioContext(2, 1, 48000);
+      return Promise.all(
+        ['laser', 'asteroid-explode'].map(async (name) => {
+          const response = await fetch(`/sounds/${name}.m4a`);
+          const buffer = await context.decodeAudioData(await response.arrayBuffer());
+          return buffer.duration;
+        })
+      );
+    });
     await expect
       .poll(() =>
-        listenerPage.evaluate(() => Number(document.documentElement.dataset['decodedAudio']))
+        listenerPage.evaluate((durations) => {
+          const decoded: number[] = JSON.parse(
+            document.documentElement.dataset['decodedAudioDurations'] ?? '[]'
+          );
+          return durations.every((duration) =>
+            decoded.some((value) => Math.abs(value - duration) < 0.00001)
+          );
+        }, requiredDurations)
       )
-      .toBeGreaterThanOrEqual(25);
+      .toBe(true);
     const listenerId = ids[0];
     assert.ok(listenerId);
     await shooter.fireLaserAtRemotePlayer(listenerId, 110);
@@ -67,6 +85,10 @@ test.each([1280, 390])(
 
     await arrangeCrewField(ids, 'mining');
     await listener.placeShipAt(120, -460);
+    // The fixture response does not wait for the shooter's next snapshot.
+    await expect
+      .poll(async () => (await shooter.getAsteroidPositions()).map((asteroid) => asteroid.id))
+      .toContain('crew-fixture-ore');
     const rock = (await shooter.getAsteroidPositions()).find(
       (asteroid) => asteroid.id === 'crew-fixture-ore'
     );

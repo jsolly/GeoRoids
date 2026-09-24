@@ -4,8 +4,8 @@ import type {
   AsteroidMaterial,
   AsteroidPhenomenon,
   AsteroidProbe,
+  FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   LootData,
   LootKind,
   MapAsset,
@@ -22,8 +22,14 @@ import type {
   SpiderFieldState,
   TerrainSpider,
 } from '../shared-types';
+import type { BeltRecoveryWarning } from './asteroidBelt';
+import { ASTEROID_BELT } from './asteroidBelt';
+import { BELT_CRAWLER } from './beltCrawler';
+import { validSettlement } from './economy';
+import { validEquipment } from './equipment';
 import { validExploration } from './exploration';
-import { validCivicModules } from './furnaces';
+import { civicLot, TOWN_HEARTH, validCivicModules } from './furnaces';
+import { FURNACE_TRAVEL } from './furnaceTravel';
 import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
@@ -48,7 +54,7 @@ const enumeration =
   (value) =>
     typeof value === 'string' && Object.hasOwn(values, value);
 const kit = enumeration<ShipKitId>({
-  surveyor: true,
+  scout: true,
   hauler: true,
 });
 const haulerUtility = enumeration<HaulerUtilityId>({
@@ -57,14 +63,17 @@ const haulerUtility = enumeration<HaulerUtilityId>({
   tow_cable: true,
 });
 // `build_furnace` is a retired equip token. Older clients may still send it.
-const surveyorUtility: Rule = (value) =>
+const scoutUtility: Rule = (value) =>
   value === 'mineral_scan' || value === 'survey_probe' || value === 'build_furnace';
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,
-  laserCore: true,
   tap: true,
   silk: true,
+  resource_tap: true,
+  boost_coupling: true,
+  survey_probe: true,
+  points: true,
 });
 const array =
   (rule: Rule): Rule =>
@@ -82,21 +91,48 @@ const shape = <T>(rules: Shape<T>): Rule => {
 };
 const position = shape<{ x: number; y: number }>({ x: number, y: number });
 const energy: Rule = (value) => number(value) && (value as number) >= 0 && (value as number) <= 8;
-const material = enumeration<AsteroidMaterial>({ ice: true, metal: true, rubble: true });
+const material = enumeration<AsteroidMaterial>({
+  ice: true,
+  metal: true,
+  rubble: true,
+  crystal: true,
+});
 const motion = shape<PlayerMotionState>({
   epoch: counter,
   mode: choice('free', 'handoff'),
   ack: counter,
   anchor: optional(position),
 });
-const upgrade = shape<LaserUpgrade>({ charges: counter, expiresAt: number });
 const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
   kind: choice('reflective'),
   clusterId: string,
   energy,
   maxEnergy: energy,
 });
+const hearthId: Rule = (value) =>
+  typeof value === 'string' && (value === TOWN_HEARTH.id || civicLot(value) !== undefined);
+const transit = shape<FurnaceTransit>({
+  sourceId: hearthId,
+  destinationId: hearthId,
+  startedAt: (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0,
+  durationMs: (value) =>
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= FURNACE_TRAVEL.MIN_DURATION_MS &&
+    value <= FURNACE_TRAVEL.MAX_DURATION_MS,
+});
 const entity = shape<ServerEntityData>({
+  furnaceTransit: optional(
+    (value) =>
+      value === null ||
+      (transit(value) &&
+        typeof value === 'object' &&
+        value !== null &&
+        'sourceId' in value &&
+        'destinationId' in value &&
+        value.sourceId !== value.destinationId)
+  ),
+  equipment: optional(validEquipment),
   silk: optional((value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0),
   id: string,
   name: string,
@@ -108,7 +144,8 @@ const entity = shape<ServerEntityData>({
   thrusting: boolean,
   boost: optional(isShipBoostState),
   color: string,
-  lives: number,
+  cargo: counter,
+  purchases: array(string),
   score: number,
   health: number,
   maxHealth: number,
@@ -123,10 +160,9 @@ const entity = shape<ServerEntityData>({
   harpoonTargetId: optional((value) => value === null || string(value)),
   harpoonLatchPos: optional(position),
   haulerUtility: optional(haulerUtility),
-  surveyorUtility: optional(surveyorUtility),
+  scoutUtility: optional(scoutUtility),
   deathCause: optional(string),
   playerMotion: optional(motion),
-  laserUpgrade: optional(upgrade),
 });
 const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({
   phase: choice('armed'),
@@ -150,7 +186,19 @@ const probe = shape<AsteroidProbe>({
   angle: number,
   radialOffset: number,
 });
-const asteroid = shape<AsteroidData>({
+const asteroidShape = shape<AsteroidData>({
+  beltCrawlerIds: optional(
+    (value) =>
+      Array.isArray(value) && value.length <= BELT_CRAWLER.MAX_ACTIVE && value.every(string)
+  ),
+  beltCrawlerHealth: optional(
+    (value) =>
+      Array.isArray(value) &&
+      value.length <= BELT_CRAWLER.MAX_ACTIVE &&
+      value.every(
+        (health: unknown) => typeof health === 'number' && Number.isFinite(health) && health >= 0
+      )
+  ),
   id: string,
   position,
   velocity: position,
@@ -164,13 +212,30 @@ const asteroid = shape<AsteroidData>({
   offsets: array(number),
   isCollabTarget: optional(boolean),
   material: optional(material),
+  ore: optional((value) => value === null || material(value)),
   surveyedBy: optional(array(string)),
   miningContributors: optional(array(string)),
   phenomenon: optional(reflective),
   boost: optional((value) => value === null || armedBoost(value) || burningBoost(value)),
   probe: optional((value) => value === null || probe(value)),
 });
+const asteroid: Rule = (value) => {
+  if (!asteroidShape(value) || typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (!('beltCrawlerIds' in value) || value.beltCrawlerIds === undefined) {
+    return true;
+  }
+  return (
+    Array.isArray(value.beltCrawlerIds) &&
+    'beltCrawlerHealth' in value &&
+    Array.isArray(value.beltCrawlerHealth) &&
+    value.beltCrawlerIds.length === value.beltCrawlerHealth.length &&
+    new Set(value.beltCrawlerIds).size === value.beltCrawlerIds.length
+  );
+};
 const loot = shape<LootData>({
+  points: optional(counter),
   id: string,
   position,
   mass: number,
@@ -224,7 +289,7 @@ const collabTag = shape<SnapshotCollabTag>({
 });
 const mapAsset = shape<MapAsset>({
   id: string,
-  kind: choice('furnace', 'foundation', 'laserCore', 'wreckage', 'satellite'),
+  kind: choice('furnace', 'foundation', 'wreckage', 'satellite'),
   position,
   name: string,
 });
@@ -239,6 +304,15 @@ const spider = shape<TerrainSpider>({
   angle: number,
   phase: choice('scuttling', 'hunting'),
   shudderFrames: optional(number),
+  crawler: optional(
+    shape<NonNullable<TerrainSpider['crawler']>>({
+      hostId: string,
+      anchor: position,
+      phase: choice('crawling', 'winding', 'lunging', 'recovering', 'escaping'),
+      progress: (value) =>
+        typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1,
+    })
+  ),
   probe: optional((value) => value === null || probe(value)),
   targetId: (value) => value === null || string(value),
 });
@@ -278,12 +352,27 @@ const consumedSpider = shape<NonNullable<SpiderFieldState['consumed']>[number]>(
 });
 const spiderField = shape<SpiderFieldState>({
   consumed: optional(uniqueRows(consumedSpider, SPIDER.MAX_ACTIVE)),
-  spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE),
+  spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE + BELT_CRAWLER.MAX_ACTIVE),
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
+  serverTime: optional(number),
+  settlement: validSettlement,
   civicModules: optional(validCivicModules),
   spiderField: optional(spiderField),
+  beltRecovery: optional(
+    (value) =>
+      Array.isArray(value) &&
+      value.length <= ASTEROID_BELT.columns * ASTEROID_BELT.rows &&
+      value.every(
+        shape<BeltRecoveryWarning>({
+          slot: counter,
+          position,
+          size: number,
+          recoverAt: number,
+        })
+      )
+  ),
   exploration: validExploration,
   mapAssets: array(mapAsset),
   entities: array(entity),

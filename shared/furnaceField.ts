@@ -10,18 +10,17 @@ import {
 
 export const FURNACE_BUILD = {
   RADIUS: TOWN_HEARTH.radius,
-  /** World units from a dark lot where Surveyor E becomes Build. */
+  /** World units from a dark lot where Scout E becomes Build. */
   APPROACH: 220,
   ISSUE: {
-    NEST: 'Too close to a spider nest',
-    STAND: 'Stand inside a street foundation',
-    LIT: 'This street is already burning',
+    STAND: 'Stand inside a furnace foundation',
+    LIT: 'This furnace is already burning',
     READY: 'Furnace builder not ready',
   },
 } as const;
 
-/** Surveyor E builds instead of scan/probe while a dark street lot is this close. */
-export function surveyorAbilityBuildsAt(
+/** Scout E builds instead of scan/probe while a dark furnace lot is this close. */
+export function scoutAbilityBuildsAt(
   position: Position,
   isLit: (lotId: string) => boolean
 ): boolean {
@@ -38,7 +37,7 @@ interface Hearth {
   radius: number;
 }
 
-/** Lit hearths only. Dark street lots stay out of intake, guidance, and spider safety. */
+/** Lit hearths only. Dark furnace lots stay out of intake, guidance, and spider safety. */
 export class FurnaceField {
   private modules: CivicModule[] = [];
   private readonly lit = new Set<string>();
@@ -62,16 +61,6 @@ export class FurnaceField {
 
   isLit(id: string): boolean {
     return id === TOWN_HEARTH.id || this.lit.has(id);
-  }
-
-  modulesBuiltBy(playerId: string) {
-    let built = 0;
-    for (const module of this.modules) {
-      if (module.builderId === playerId) {
-        built += 1;
-      }
-    }
-    return built;
   }
 
   replaceLit(modules: readonly CivicModule[]): void {

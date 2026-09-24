@@ -40,9 +40,9 @@ for (const viewport of [
     const game = new GameInteractions(page);
     await game.bootGame({
       kitId: 'hauler',
-      haulerUtility: 'resource_tap',
       waitForCombatReady: false,
     });
+    await game.collectEquipment(['resource_tap'], 'resource_tap');
     const id = await game.getLocalPlayerId();
     await arrangeCrewField([id], 'tow');
     await game.waitForAnimationFrames(10);
@@ -74,11 +74,27 @@ for (const viewport of [
       if (collected.has(drop.lootId)) {
         continue;
       }
-      const position: { x: number; y: number } | null = await page.evaluate(`(async () => {
-        const { LootField } = await import('/src/entities/loot/LootField.ts');
-        return LootField.getInstance().getAll().find(drop => drop.id === ${JSON.stringify(drop.lootId)})?.position ?? null;
-      })()`);
-      expect(position).not.toBeNull();
+      let position: { x: number; y: number } | null = null;
+      // A placement can collect neighboring drops too. Their client removal and
+      // the observer's collection event can arrive on opposite sides of evaluate.
+      await expect
+        .poll(
+          async () => {
+            if (collected.has(drop.lootId)) {
+              return true;
+            }
+            position = await page.evaluate(`(async () => {
+            const { LootField } = await import('/src/entities/loot/LootField.ts');
+            return LootField.getInstance().getAll().find(drop => drop.id === ${JSON.stringify(drop.lootId)})?.position ?? null;
+          })()`);
+            return collected.has(drop.lootId) || position !== null;
+          },
+          { timeout: 2000, interval: 20 }
+        )
+        .toBe(true);
+      if (collected.has(drop.lootId)) {
+        continue;
+      }
       if (!position) {
         throw new Error('Uncollected canister missing');
       }
@@ -108,9 +124,12 @@ for (const viewport of [
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`crystal-pickups-${viewport.name}.png`),
     });
+    const interfaceBeforeMap = (await readSamplePlaybackRates(page, 'interface')).length;
     await page.locator('#universe-map-toggle').click();
     await page.locator('#universe-map-close').click();
-    expect(await readSamplePlaybackRates(page, 'interface')).toEqual([1, 1]);
+    expect((await readSamplePlaybackRates(page, 'interface')).slice(interfaceBeforeMap)).toEqual([
+      1, 1,
+    ]);
     await page.locator('#soundPref').evaluate((input) => {
       if (!(input instanceof HTMLInputElement)) {
         throw new Error('Missing sound checkbox');
@@ -124,8 +143,10 @@ for (const viewport of [
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
       .toBe('suspended');
-    await page.goto(new URL('/wiki/#hauler', page.url()).href);
-    await expect.poll(() => page.locator('body').textContent()).toContain('crystal');
+    await page.goto(new URL('/wiki/#loot-growth', page.url()).href);
+    await expect
+      .poll(() => page.locator('body').textContent())
+      .toContain('quick pickups play successive notes of a short melody');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`crystal-wiki-${viewport.name}.png`),
     });

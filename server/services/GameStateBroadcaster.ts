@@ -339,8 +339,7 @@ export class GameStateBroadcaster {
       result.attackerId,
       result.damage,
       result.remainingHealth,
-      result.isDestroyed,
-      result.remainingLives
+      result.isDestroyed
     );
 
     if (result.destroyedAsteroidId) {
@@ -364,8 +363,7 @@ export class GameStateBroadcaster {
     attackerId: string,
     damage: number,
     remainingHealth: number,
-    isDestroyed: boolean,
-    remainingLives?: number
+    isDestroyed: boolean
   ): void {
     const message = {
       type: 'playerDamaged',
@@ -375,7 +373,6 @@ export class GameStateBroadcaster {
         damage,
         remainingHealth,
         isDestroyed,
-        ...(remainingLives !== undefined ? { remainingLives } : {}),
       },
       timestamp: Date.now(),
     };

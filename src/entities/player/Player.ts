@@ -1,17 +1,19 @@
+import { canEquipUtility } from '../../../shared/equipment';
 import { purchasedHullColor } from '../../../shared/townStore';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
   Position,
+  ScoutUtilityId,
   ShipBoostState,
   ShipKitId,
-  SurveyorUtilityId,
 } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
-import { GAME } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getPlayerColor } from '../../utils/colorUtils';
-import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
+import { preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
 import { applySharedHarpoonLatch } from '../ship/shipAbilities';
@@ -21,7 +23,6 @@ import {
   applySharedShipRespawnCue,
   applyShipSpawnProtection,
   isServerRespawnActive,
-  isSilentHudReset,
   resolveCombatDeathCause,
 } from '../ship/shipUtils';
 
@@ -38,7 +39,8 @@ export class Player {
   score: number = 0;
   silk = 0;
   lastUpdate: number = Date.now();
-  lives: number = GAME.START_LIVES;
+  cargo = 0;
+  purchases: string[] = [];
   color: string; // Player's unique color for lasers and other visual elements
   deathCause?: string; // Environmental death cause
   input: PlayerInput; // Unified input system for all player types
@@ -47,6 +49,17 @@ export class Player {
   // again, trust the server for position (so the respawn point is adopted).
   // While alive it predicts locally and ignores the lagging server echo.
   private adoptServerPosition = false;
+  private reportedDeath = false;
+
+  reportDeath(): void {
+    if (this.type !== 'local' || this.reportedDeath) {
+      return;
+    }
+    this.reportedDeath = true;
+    window.dispatchEvent(
+      new CustomEvent('playerDied', { detail: { playerId: this.id, deathCause: this.deathCause } })
+    );
+  }
 
   /** Ship position when death forced server-authoritative movement (respawn latch). */
   private respawnLatchOrigin: Position | null = null;
@@ -97,9 +110,12 @@ export class Player {
     position?: Position;
     velocity?: Position;
     angle?: number;
-    lives?: number;
+    cargo?: number;
+    purchases?: string[];
     score?: number;
     silk?: number;
+    equipment?: EquipmentId[];
+    furnaceTransit?: FurnaceTransit | null;
     exploding?: boolean;
     thrusting?: boolean;
     boost?: ShipBoostState;
@@ -118,13 +134,26 @@ export class Player {
     harpoonTargetId?: string | null;
     harpoonLatchPos?: { x: number; y: number };
     haulerUtility?: HaulerUtilityId;
-    surveyorUtility?: SurveyorUtilityId;
+    scoutUtility?: ScoutUtilityId;
   }): void {
+    const wasInTransit = this.ship.furnaceTransit !== null;
+    if (data.furnaceTransit !== undefined) {
+      this.ship.furnaceTransit = data.furnaceTransit;
+    }
     // Local selection is established at join. Preserve it during runtime reconciliation.
     if (data.kitId && data.kitId !== this.ship.kitId && this.type !== 'local') {
       const color = this.ship.color;
       applyShipKitToShip(this.ship, data.kitId);
       this.ship.color = color;
+    }
+    if (data.equipment !== undefined) {
+      this.ship.equipment = [...data.equipment];
+      if (!canEquipUtility(this.ship, this.ship.haulerUtility)) {
+        this.ship.haulerUtility = 'tow_cable';
+      }
+      if (!canEquipUtility(this.ship, this.ship.scoutUtility)) {
+        this.ship.scoutUtility = 'mineral_scan';
+      }
     }
     if (data.silk !== undefined) {
       this.silk = data.silk;
@@ -154,10 +183,11 @@ export class Player {
         this.adoptServerPosition = true;
       }
     }
-    const acceptServerTransform = !isLocal || this.adoptServerPosition;
+    const acceptServerTransform =
+      !isLocal || this.adoptServerPosition || wasInTransit || this.ship.furnaceTransit !== null;
 
     // Infer wall from the pre-echo pose. Adopting a lagged inside position
-    // first is what turned last-life wall GO into a generic overlay.
+    // first is what turned a wall death into a generic overlay.
     const inferenceShip = {
       position: { x: this.ship.position.x, y: this.ship.position.y },
       r: this.ship.r,
@@ -192,38 +222,17 @@ export class Player {
       this.deathCause = preferDeathCause(explodeCause, this.deathCause) ?? explodeCause;
     }
 
-    const skipHudReset = isSilentHudReset(this.lives, this.score, data.lives, data.score);
-    const snapshotDeathCause = this.deathCause ?? data.deathCause;
-    const staleSnapshot =
-      isLocal &&
-      data.lives !== undefined &&
-      isStaleGameOverSnapshot({
-        prevLives: this.lives,
-        nextLives: data.lives,
-        ...(snapshotDeathCause !== undefined ? { deathCause: snapshotDeathCause } : {}),
-        health: data.health ?? this.ship.health,
-        exploding: data.exploding ?? this.ship.exploding,
-      });
-    if (data.lives !== undefined && !skipHudReset && !staleSnapshot) {
-      const prevLives = this.lives;
-      this.lives = data.lives;
-      if (isLocal && prevLives > this.lives) {
-        window.dispatchEvent(
-          new CustomEvent('playerDied', {
-            detail: {
-              playerId: this.id,
-              deathCause: resolveCombatDeathCause(
-                preferDeathCause(this.deathCause, data.deathCause, this.ship.lastExplodeCause),
-                inferenceShip
-              ),
-              isGameOver: this.lives <= 0,
-            },
-          })
-        );
-      }
+    if (data.exploding === true || data.health === 0) {
+      this.reportDeath();
     }
-    if (data.score !== undefined && !skipHudReset) {
+    if (data.score !== undefined) {
       this.score = data.score;
+    }
+    if (data.cargo !== undefined) {
+      this.cargo = data.cargo;
+    }
+    if (data.purchases !== undefined) {
+      this.purchases = [...data.purchases];
     }
     // Thrusting is client-owned for the local player (keyboard/mouse input).
     // The server echo lacks thrusting when updates omit it, which flickers the flame.
@@ -233,14 +242,16 @@ export class Player {
     if (data.boost !== undefined && this.type !== 'local') {
       this.ship.boost = { ...data.boost };
     }
-    if (data.color !== undefined && (this.type !== 'local' || purchasedHullColor(data.color))) {
-      this.color = data.color;
-      this.ship.color = data.color;
+    if (data.color !== undefined) {
+      const color =
+        this.type === 'local' && !purchasedHullColor(data.color)
+          ? getPlayerColor('local')
+          : data.color;
+      this.color = color;
+      this.ship.color = color;
     }
     if (data.health !== undefined) {
-      if (isLocal && this.lives <= 0) {
-        this.ship.health = 0;
-      } else {
+      {
         const wasDead = this.ship.health <= 0;
         const wasExploding = this.ship.exploding;
         const oldHealth = this.ship.health;
@@ -290,6 +301,7 @@ export class Player {
           this.ship.health > 0 &&
           (data.health === undefined || data.health > 0)
         ) {
+          this.reportedDeath = false;
           playRespawn(this.ship.position);
           playLocalHaptic(this.type === 'local', 'pickup');
           delete this.ship.lastExplodeCause;
@@ -336,10 +348,10 @@ export class Player {
     if (data.haulerUtility !== undefined && this.type !== 'local') {
       this.ship.haulerUtility = data.haulerUtility;
     }
-    // A local tool choice survives stale snapshots while a remote Surveyor
+    // A local tool choice survives stale snapshots while a remote Scout
     // follows the authoritative utility row.
-    if (data.surveyorUtility !== undefined && this.type !== 'local') {
-      this.ship.surveyorUtility = data.surveyorUtility;
+    if (data.scoutUtility !== undefined && this.type !== 'local') {
+      this.ship.scoutUtility = data.scoutUtility;
     }
     // Handle respawn timer from server
     if (data.respawnTimer !== undefined) {

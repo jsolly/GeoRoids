@@ -1,11 +1,13 @@
+import { emptySettlement } from '../../../shared/economy';
 import { SATELLITE_PROFILES } from '../../../shared/eoSatellites';
 import { EMPTY_EXPLORATION } from '../../../shared/exploration';
 import type { AsteroidMaterial, ServerGameSnapshot, ShipKitId } from '../../../shared-types';
 
 export function snapshotFixture(tick = 0): ServerGameSnapshot {
-  const kits: ShipKitId[] = ['surveyor', 'hauler'];
+  const kits: ShipKitId[] = ['scout', 'hauler'];
   const materials: AsteroidMaterial[] = ['ice', 'metal', 'rubble'];
   return {
+    settlement: emptySettlement(),
     exploration: EMPTY_EXPLORATION,
     mapAssets: [],
     entities: Array.from({ length: 10 }, (_, i) => {
@@ -24,7 +26,8 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
         thrusting: true,
         boost: { phase: 'idle', charge: 1 },
         color: '#89aaff',
-        lives: 3,
+        cargo: 0,
+        purchases: [],
         score: 10,
         health: 100,
         maxHealth: 100,

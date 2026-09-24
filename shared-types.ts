@@ -28,6 +28,13 @@ export interface TerrainSpider {
   shudderFrames?: number;
   probe?: AsteroidProbe | null;
   targetId: string | null;
+  /** Present only on spiders anchored to an asteroid belt deposit. */
+  crawler?: {
+    hostId: string;
+    anchor: Position;
+    phase: 'crawling' | 'winding' | 'lunging' | 'recovering' | 'escaping';
+    progress: number;
+  };
 }
 
 export interface SpiderFieldState {
@@ -50,13 +57,13 @@ export interface Velocity {
 
 // Network update interface - only what needs to be synced
 /** Chosen at join. Shared by every player ship. */
-export type ShipKitId = 'surveyor' | 'hauler';
+export type ShipKitId = 'scout' | 'hauler';
 
 /** Hauler v1 utility slot. Same E key; one option active. */
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
-/** Surveyor v1 utility slot. Same E key; one option active. */
-export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe';
+/** Scout v1 utility slot. Same E key; one option active. */
+export type ScoutUtilityId = 'mineral_scan' | 'survey_probe';
 
 export interface AbilityUsedEvent {
   id: string;
@@ -120,7 +127,13 @@ export interface PlayerLeave {
 }
 
 // Game state types that might be shared
-export type AsteroidMaterial = 'ice' | 'metal' | 'rubble';
+export type AsteroidMaterial = 'ice' | 'metal' | 'rubble' | 'crystal';
+
+export interface SettlementState {
+  level: number;
+  points: number;
+  resources: Record<AsteroidMaterial, number>;
+}
 
 export interface AsteroidPhenomenon {
   kind: 'reflective';
@@ -134,11 +147,6 @@ export interface PlayerMotionState {
   mode: 'free' | 'handoff';
   ack: number;
   anchor?: Position;
-}
-
-export interface LaserUpgrade {
-  charges: number;
-  expiresAt: number;
 }
 
 export interface PlayerProjectileState {
@@ -165,7 +173,7 @@ export type AsteroidBoost =
   | { phase: 'armed'; ownerId: string; angle: number; couplings?: string[] }
   | { phase: 'burning'; ownerId: string; angle: number; couplings?: string[] };
 
-/** Transient Surveyor hardware attached to one asteroid face. */
+/** Transient Scout hardware attached to one asteroid face. */
 export interface AsteroidProbe {
   id: string;
   ownerId: string;
@@ -191,8 +199,14 @@ export interface AsteroidData {
   maxHealth: number;
   vertices: number;
   offsets: number[];
+  /** Attached belt crawler health; zero remains dead until the deposit regenerates. */
+  beltCrawlerHealth?: number[];
+  /** Stable identities follow crawlers to their new host after an escape. */
+  beltCrawlerIds?: string[];
   /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
+  /** Null is barren. Absent old rocks use a stable ID-derived deposit. */
+  ore?: AsteroidMaterial | null;
   /** Pilots who identified this deposit by scan or satellite; retained until it leaves the field. */
   surveyedBy?: string[];
   /** Pilots who have mined this deposit; persisted until the deposit is destroyed. */
@@ -206,7 +220,9 @@ export interface AsteroidData {
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
-export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk';
+export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
+
+export type LootKind = 'shard' | 'wreckage' | 'tap' | 'silk' | EquipmentId | 'points';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -222,7 +238,15 @@ export interface TapEjected {
   position: Position;
 }
 
+export interface SavedPointLoot {
+  id: string;
+  position: Position;
+  points: number;
+  expiresAt: number;
+}
+
 export interface LootData {
+  points?: number;
   id: string;
   position: Position;
   mass: number;
@@ -282,19 +306,23 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
-/** A street furnace a Surveyor lit with their own score. */
+/** A furnace a Scout lit with their own score. */
 export interface CivicModule {
   id: string;
   builderName: string;
-  /** Public pilot id of the Surveyor who paid. Absent on older unnamed streets. */
+  /** Public pilot id of the Scout who paid. Absent on older unnamed furnaces. */
   builderId?: string;
 }
 
 export interface ServerGameState {
-  /** Street furnaces the crew has lit, named for the Surveyor who paid. */
+  /** Epoch milliseconds for client animation clocks. */
+  serverTime?: number;
+  settlement: SettlementState;
+  /** Furnaces the crew has lit, named for the Scout who paid. */
   civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
+  beltRecovery?: import('./shared/asteroidBelt').BeltRecoveryWarning[];
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
   exploration: ExplorationTile[];
   /** Revealed landmarks and valuable drops, independent of local simulation visibility. */
@@ -311,7 +339,7 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  kind: 'furnace' | 'foundation' | 'laserCore' | 'wreckage' | 'satellite';
+  kind: 'furnace' | 'foundation' | 'wreckage' | 'satellite';
   position: Position;
   name: string;
 }
@@ -339,9 +367,19 @@ export interface ShipBoostState {
   charge: number;
 }
 
+export interface FurnaceTransit {
+  sourceId: string;
+  destinationId: string;
+  startedAt: number;
+  durationMs: number;
+}
+
 export interface ServerEntityData {
+  furnaceTransit?: FurnaceTransit | null;
   /** Stored spider silk, retained across flights. */
   silk?: number;
+  /** Salvaged tools owned by this pilot, retained across flights. */
+  equipment?: EquipmentId[];
   id: string;
   name: string;
   type: 'player';
@@ -353,7 +391,8 @@ export interface ServerEntityData {
   /** Omitted only by servers predating the independently deployed boost update. */
   boost?: ShipBoostState;
   color: string;
-  lives: number;
+  cargo: number;
+  purchases: string[];
   score: number;
   health: number;
   maxHealth: number;
@@ -369,12 +408,11 @@ export interface ServerEntityData {
   harpoonLatchPos?: Position;
   /** Equipped Hauler utility. Omitted on other kits. Missing means tow cable. */
   haulerUtility?: HaulerUtilityId;
-  /** Equipped Surveyor utility. Omitted on other kits. Missing means mineral scan. */
-  surveyorUtility?: SurveyorUtilityId;
+  /** Equipped Scout utility. Omitted on other kits. Missing means mineral scan. */
+  scoutUtility?: ScoutUtilityId;
   /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 }
 
 /** Optional monotonic probe identity; bare heartbeat messages remain supported. */

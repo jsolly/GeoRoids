@@ -11,10 +11,10 @@ import {
   terrainSpeedLimit,
 } from '../../../src/physics/terrain/terrainTravel';
 
-const position = { x: 2250, y: 0 };
+const position = { x: -2100, y: 700 };
 afterEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius }));
 
-test.each(['surveyor', 'hauler'] as const)(
+test.each(['scout', 'hauler'] as const)(
   '%s can climb steep contours at any mass without boost, but descents are much faster',
   (kitId) => {
     const field = ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
@@ -25,7 +25,13 @@ test.each(['surveyor', 'hauler'] as const)(
     for (const mass of [1, 8]) {
       const cruise = cruiseSpeed(mass, kit.maxVelocity);
       const speeds = [uphill, uphill + Math.PI].map((angle) => {
-        const ship = { position, angle, mass, thrust: kit.thrust, velocity: { x: 0, y: 0 } };
+        const ship: Parameters<typeof advanceCruiseVelocity>[0] = {
+          position,
+          angle,
+          mass,
+          thrust: kit.thrust,
+          velocity: { x: 0, y: 0 },
+        };
         for (let frame = 0; frame < 300; frame++) {
           advanceCruiseVelocity(ship, cruise);
         }
@@ -48,8 +54,8 @@ test('crossing a steep hillside keeps nearly full cruise with a light downhill t
   const gradient = sampleGradient(field, position.x, position.y);
   const magnitude = Math.hypot(gradient.x, gradient.y);
   const uphill = Math.atan2(-gradient.y, gradient.x);
-  const kit = getShipKit('surveyor');
-  const ship = {
+  const kit = getShipKit('scout');
+  const ship: Parameters<typeof advanceCruiseVelocity>[0] = {
     position,
     angle: uphill + Math.PI / 2,
     mass: 1,
@@ -71,7 +77,7 @@ test('crossing a steep hillside keeps nearly full cruise with a light downhill t
 
 test('flat starter terrain preserves the normal cap and steep descents have a bounded ceiling for every heading', () => {
   ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
-  const cruise = getShipKit('surveyor').maxVelocity;
+  const cruise = getShipKit('scout').maxVelocity;
   expect(terrainSpeedLimit({ x: 0, y: 0 }, cruise)).toBe(cruise);
   for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
     const velocity = terrainCruiseVelocity(position, angle, cruise);

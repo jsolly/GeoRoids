@@ -5,8 +5,9 @@ import { createConnection, createServer, type Socket } from 'node:net';
 import WebSocket from 'ws';
 import type { createServerInstance } from '../server/createServer';
 import { serverPerformanceMetrics } from '../server/performanceMetrics';
+import { TOWN_HEARTH } from '../shared/furnaces';
 import { resetShipMass } from '../shared/shipGrowth';
-import type { AsteroidData } from '../shared-types';
+import type { AsteroidData, Position } from '../shared-types';
 import { applyShipKitStats, hullRadiusForKit } from '../src/entities/ship/shipKits';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
@@ -29,15 +30,20 @@ export function normalizeFixtureAsteroids(asteroids: AsteroidData[]) {
   }));
 }
 
-type FixtureRequest = { scenario: 'traversal' | 'combat'; participants: string[] };
+type FixtureRequest = { scenario: 'traversal' | 'combat' | 'dense-combat'; participants: string[] };
 function parseRequest(value: unknown): FixtureRequest {
   assert(value && typeof value === 'object' && 'scenario' in value && 'participants' in value);
-  assert(value.scenario === 'traversal' || value.scenario === 'combat', 'Unknown scenario');
+  assert(
+    value.scenario === 'traversal' ||
+      value.scenario === 'combat' ||
+      value.scenario === 'dense-combat',
+    'Unknown scenario'
+  );
   assert(
     Array.isArray(value.participants) && value.participants.every((id) => typeof id === 'string')
   );
   assert(
-    value.participants.length === (value.scenario === 'combat' ? 5 : 1),
+    value.participants.length === (value.scenario === 'traversal' ? 1 : 5),
     'Wrong participant count'
   );
   assert(new Set(value.participants).size === value.participants.length, 'Duplicate participants');
@@ -109,7 +115,7 @@ export async function startFixtureControl(
           return player;
         });
         // This synchronous callback runs between simulation ticks. No HTTP route or production hook.
-        engine.prepareDiagnosticWorld(request.scenario);
+        engine.prepareDiagnosticWorld(request.scenario === 'traversal' ? 'traversal' : 'combat');
         const actors = [...players];
         for (const [index, actor] of actors.entries()) {
           resetShipMass(actor);
@@ -120,7 +126,6 @@ export async function startFixtureControl(
           delete actor.respawnTimer;
           delete actor.explodeTime;
           delete actor.deathCause;
-          delete actor.laserUpgrade;
           actor.harpoonTargetId = null;
           delete actor.harpoonLatchPos;
           const angle = (index * Math.PI * 2) / actors.length;
@@ -135,7 +140,8 @@ export async function startFixtureControl(
             angle,
             health: actor.maxHealth,
             exploding: false,
-            lives: 3,
+            cargo: 0,
+            purchases: [],
             score: 0,
             abilityCooldownFrames: 0,
             abilityActiveFrames: 0,
@@ -152,6 +158,71 @@ export async function startFixtureControl(
             const asteroid = engine.getAllAsteroids()[index];
             assert(asteroid);
             engine.updateAsteroid(asteroid.id, { position, size: 30 });
+          }
+        }
+        if (request.scenario === 'dense-combat') {
+          const groups = new Map<string, AsteroidData[]>();
+          for (const rock of engine.getAllAsteroids()) {
+            const key =
+              rock.phenomenon?.kind === 'reflective' ? rock.phenomenon.clusterId : rock.id;
+            const group = groups.get(key);
+            if (group) {
+              group.push(rock);
+            } else {
+              groups.set(key, [rock]);
+            }
+          }
+          const cells = Array.from({ length: 14 * 8 }, (_, index) => ({
+            x: ((index % 14) - 6.5) * 110,
+            y: (Math.floor(index / 14) - 3.5) * 110,
+          })).sort((left, right) => Math.hypot(left.x, left.y) - Math.hypot(right.x, right.y));
+          const occupied: Array<{ position: Position; radius: number }> = [];
+          // Translate reflective pockets as groups; preserve every rock's relative pose.
+          for (const group of [...groups.values()].sort(
+            (left, right) => right.length - left.length
+          )) {
+            const center = {
+              x: group.reduce((sum, rock) => sum + rock.position.x, 0) / group.length,
+              y: group.reduce((sum, rock) => sum + rock.position.y, 0) / group.length,
+            };
+            const radius = Math.max(
+              ...group.map(
+                (rock) =>
+                  Math.hypot(rock.position.x - center.x, rock.position.y - center.y) + rock.size
+              )
+            );
+            const slot = cells.find(
+              (cell) =>
+                occupied.every(
+                  (other) =>
+                    Math.hypot(cell.x - other.position.x, cell.y - other.position.y) >
+                    radius + other.radius + 8
+                ) &&
+                group.every((rock) => {
+                  const x = cell.x + rock.position.x - center.x;
+                  const y = cell.y + rock.position.y - center.y;
+                  return (
+                    Math.hypot(x - TOWN_HEARTH.position.x, y - TOWN_HEARTH.position.y) >
+                      TOWN_HEARTH.radius + rock.size + 20 &&
+                    actors.every(
+                      (actor) =>
+                        Math.hypot(x - actor.position.x, y - actor.position.y) >
+                        hullRadiusForKit(actor.kitId) + rock.size + 20
+                    )
+                  );
+                })
+            );
+            assert(slot, 'Dense combat layout cannot place every asteroid safely');
+            occupied.push({ position: slot, radius });
+            for (const rock of group) {
+              engine.updateAsteroid(rock.id, {
+                position: {
+                  x: slot.x + rock.position.x - center.x,
+                  y: slot.y + rock.position.y - center.y,
+                },
+                velocity: { x: 0, y: 0 },
+              });
+            }
           }
         }
         for (const [index, actor] of actors.entries()) {
@@ -174,6 +245,7 @@ export async function startFixtureControl(
                 hullRadiusForKit(actor.kitId) + asteroid.size + 20
             );
           if (!clearsHulls()) {
+            assert(request.scenario !== 'dense-combat', 'Dense combat asteroid overlaps a hull');
             const angle = index * 2.399963229728653;
             engine.updateAsteroid(asteroid.id, {
               position: { x: Math.cos(angle) * 900, y: Math.sin(angle) * 900 },
@@ -187,7 +259,7 @@ export async function startFixtureControl(
           asteroids: engine.getAsteroidCount(),
           pickups: engine.getSatellitePickupCount(),
         };
-        if (request.scenario === 'combat') {
+        if (request.scenario !== 'traversal') {
           assert.deepEqual(counts, {
             players: 5,
             asteroids: 80,
@@ -209,6 +281,17 @@ export async function startFixtureControl(
           version: 1,
           seed,
           scenario: request.scenario,
+          ...(request.scenario === 'dense-combat'
+            ? {
+                layout: {
+                  kind: 'compact-grid',
+                  spacing: 110,
+                  columns: 14,
+                  rows: 8,
+                  initialTranslation: 'stationary',
+                },
+              }
+            : {}),
           counts,
           placements: actors.map((actor, index) => ({
             slot: index,

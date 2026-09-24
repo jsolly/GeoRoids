@@ -21,6 +21,7 @@ import { shouldDrawShipHull } from '../entities/ship/shipUtils';
 import { drawSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
+import { drawBeltEncounters } from './beltRenderer';
 import { drawFieryBoundary } from './boundaryRenderer';
 import { canvasManager } from './canvasSurface';
 import {
@@ -29,13 +30,13 @@ import {
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
-import { drawFurnacePipes, drawFurnacesRelative, drawStreetFoundations } from './furnaceRenderer';
+import { drawFurnaceFoundations, drawFurnacePipes, drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
-import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
+import { drawRicochetCourt } from './ricochetCourtRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield } from './starfield';
@@ -49,7 +50,6 @@ export function drawGame(
   currScore: number,
   textAlpha: number,
   text: string,
-  lives: number,
   allPlayers: Player[]
 ): void {
   const currShip = currPlayer.ship;
@@ -67,7 +67,8 @@ export function drawGame(
   const roids = currRoidBelt.getRoids();
 
   drawStarfield(currShip.position);
-  drawIsoContours(currShip.position);
+  drawIsoContours(currShip.position, currShip.angle);
+  drawRicochetCourt(currShip.position);
   drawTerrainSpiders(currShip.position, currPlayer.id, currShip.health > 0 && !currShip.exploding);
 
   const localId = currPlayer.id;
@@ -93,11 +94,12 @@ export function drawGame(
   drawFieryBoundary(currShip.position);
 
   drawRoidsRelative(currShip, roids);
+  drawBeltEncounters(currShip.position, roids);
   if (roids.length > 0) {
     drawSurveyProbes(roids, currShip.position);
   }
   drawFurnacePipes(currShip.position);
-  drawStreetFoundations(currShip.position);
+  drawFurnaceFoundations(currShip.position);
   drawFurnacesRelative(currShip.position);
   drawAsteroidShatterBursts(currShip);
 
@@ -175,9 +177,7 @@ export function drawGame(
   const otherPlayers = allPlayers.filter((player) => player.id !== localId);
   drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups, otherPlayers);
 
-  drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives);
-
-  drawLivesIndicator(ctx, hudLayout, lives, currPlayer.color, currShip.kitId);
+  drawScoreOverlay(ctx, hudLayout, viewport, currScore);
 
   if (text && textAlpha > 0) {
     drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);

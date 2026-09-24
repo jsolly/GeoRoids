@@ -55,14 +55,13 @@ import {
 } from '../physics/terrain/terrainSession';
 import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
-import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
+import { syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { syncTownStoreChrome } from '../ui/townStore';
 import { setPlayView } from '../ui/uiUtils';
 import { bindUniverseMapField } from '../ui/universeMap';
-import { formatGameOverText, preferDeathCause } from '../utils/deathCause';
 import { logger } from '../utils/Logger';
 import { GameStateManager } from './services/GameStateManager';
 import { InputManager } from './services/InputManager';
@@ -93,11 +92,7 @@ export class GameController {
   private currRoidBelt: RoidBelt;
   private recentShockwaveKeys = new Set<string>();
   private readonly localFirstPlayers: Player[] = [];
-  private gameOverInProgress: boolean = false;
-  private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
-  private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
   private simulationAccumulatorMs = 0;
-  private laserUpgradeReadout: LaserUpgradeReadout | undefined;
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -130,8 +125,6 @@ export class GameController {
     // Set up network disconnection handler
     this.setupNetworkDisconnectionHandler();
 
-    // Set up game over handler
-    this.setupGameOverHandler();
     this.setupShipExplodedHandler();
 
     // Expose game controller globally for testing
@@ -154,7 +147,6 @@ export class GameController {
     this.simulationAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
-    this.laserUpgradeReadout?.update(undefined);
 
     // Set the player name if provided
     if (playerName) {
@@ -171,9 +163,6 @@ export class GameController {
       this.resetSessionForNewGame();
       clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
-      this.laserUpgradeReadout ??= new LaserUpgradeReadout(
-        document.querySelector('#gameArea') ?? document.body
-      );
 
       // Reset button text to default state
       this.inputManager.resetButtonText();
@@ -435,58 +424,11 @@ export class GameController {
     window.removeEventListener('furnaceDelivery', this.handleFurnaceDelivery);
   }
 
-  /** Drop a pending return-to-menu so Start (or a test) can open a new session. */
-  cancelPendingGameOver(): void {
-    if (this.gameOverTimer !== null) {
-      clearTimeout(this.gameOverTimer);
-      this.gameOverTimer = null;
-    }
-    this.gameOverInProgress = false;
-  }
-
   private resetSessionForNewGame(): void {
-    this.cancelPendingGameOver();
-    this.laserUpgradeReadout?.update(undefined);
     this.gameStateManager.clearOverlay();
     canvasManager.clearPlayfield();
     PlayerNetwork.getInstance().stopNetworkUpdates();
     this.networkManager.disconnect({ newSession: true });
-  }
-
-  gameOver(deathCause?: string): void {
-    if (this.gameOverInProgress) {
-      return;
-    }
-    this.gameOverInProgress = true;
-    playFeedback('gameOver');
-    this.laserUpgradeReadout?.update(undefined);
-
-    const localPlayer = this.playerManager.getLocalPlayer();
-    const raw = preferDeathCause(
-      deathCause,
-      localPlayer?.deathCause,
-      localPlayer?.ship.lastExplodeCause
-    );
-    this.gameStateManager.updateTextProperties(formatGameOverText(raw), 1.0);
-
-    this.cleanupServerAsteroidListeners();
-    PlayerNetwork.getInstance().stopNetworkUpdates();
-    this.networkManager.disconnect({ newSession: true });
-
-    // Refresh UI state in case a menu closed between the last frame and this death.
-    InputManager.getInstance().updateMovementLock();
-    // An open menu would hide the game-over message; return straight to Home.
-    if (localPlayer?.ship.movementLocked) {
-      this.gameStateManager.setIsGameRunning(false);
-      setPlayView(false);
-      return;
-    }
-
-    this.gameOverTimer = setTimeout(() => {
-      this.gameOverTimer = null;
-      this.gameStateManager.setIsGameRunning(false);
-      setPlayView(false);
-    }, GameController.GAME_OVER_MENU_DELAY_MS);
   }
 
   private setupShipExplodedHandler(): void {
@@ -510,36 +452,6 @@ export class GameController {
         if (player.ship.id === customEvent.detail.shipId) {
           player.onShipExploded({ cause });
           return;
-        }
-      }
-    });
-  }
-
-  private setupGameOverHandler(): void {
-    // Listen for player death events (both life loss and game over)
-    window.addEventListener('playerDied', (event) => {
-      const customEvent = event as CustomEvent<{
-        playerId: string;
-        deathCause: string;
-        isGameOver: boolean;
-      }>;
-
-      // Only handle events for local player
-      const localPlayer = this.playerManager.getLocalPlayer();
-      if (customEvent.detail.playerId === localPlayer?.id) {
-        const { deathCause, isGameOver } = customEvent.detail;
-
-        if (isGameOver) {
-          // Final death - show game over message
-          logger.info('GAME', 'Game over', {
-            playerId: customEvent.detail.playerId,
-          });
-          this.gameOver(deathCause);
-        } else {
-          // Life loss - death message is handled by GameLoopManager during respawn
-          logger.info('GAME', 'Life lost', {
-            playerId: customEvent.detail.playerId,
-          });
         }
       }
     });
@@ -776,6 +688,7 @@ export class GameController {
   private advanceSimulationFrame(currPlayer: Player): void {
     InputManager.getInstance().updateMovementLock();
     syncTownStoreChrome();
+    syncFurnaceTravelPrompt();
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
     shockwaveManager.update();
@@ -840,17 +753,6 @@ export class GameController {
     const text = this.gameStateManager.getText();
 
     // Render the current game state
-    drawGame(
-      currPlayer,
-      this.currRoidBelt,
-      currScore,
-      textAlpha,
-      text,
-      currPlayer.lives,
-      playersToRender
-    );
-    this.laserUpgradeReadout?.update(
-      currPlayer.ship.exploding ? undefined : currPlayer.ship.laserUpgrade
-    );
+    drawGame(currPlayer, this.currRoidBelt, currScore, textAlpha, text, playersToRender);
   }
 }

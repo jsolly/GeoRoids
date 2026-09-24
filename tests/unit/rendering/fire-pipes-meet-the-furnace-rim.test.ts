@@ -38,7 +38,7 @@ test.each([false, true])(
     canvasManager.initialize();
     const lot = civicLot('street-1-0');
     if (!lot) {
-      throw new Error('Missing street');
+      throw new Error('Missing furnace');
     }
     worldFurnaces.light(lot.id);
     if (pulsing) {

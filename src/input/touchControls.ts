@@ -3,7 +3,6 @@ import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
-import { canEnterTownStore, openTownStore } from '../ui/townStore';
 import { isTownStoreOpen } from '../ui/townStoreState';
 import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
@@ -107,7 +106,9 @@ function syncLiveTouches(ev: TouchEvent): void {
 function onTouchListChange(ev: TouchEvent): void {
   syncLiveTouches(ev);
   if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
-    resetTouchInteraction(requireLocalPlayer(), { forgetTouches: false });
+    resetTouchInteraction(requireLocalPlayer(), {
+      forgetTouches: false,
+    });
   }
 }
 
@@ -137,7 +138,7 @@ export function setTouchFire(player: Player, held: boolean): void {
     return;
   }
 
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
     return;
@@ -148,23 +149,19 @@ export function setTouchFire(player: Player, held: boolean): void {
 }
 
 export function triggerTouchAbility(player: Player): boolean {
-  if (isShipSchematicOpen() || isTownStoreOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (
+    isShipSchematicOpen() ||
+    isTownStoreOpen() ||
+    player.ship.health <= 0 ||
+    player.ship.exploding
+  ) {
     return false;
-  }
-  if (canEnterTownStore()) {
-    return openTownStore();
   }
   return player.ship.activateAbility();
 }
 
 function triggerTouchBoost(player: Player): boolean {
-  if (
-    !isInPlay() ||
-    isBoostMenuOpen() ||
-    player.lives <= 0 ||
-    player.ship.health <= 0 ||
-    player.ship.exploding
-  ) {
+  if (!isInPlay() || isBoostMenuOpen() || player.ship.health <= 0 || player.ship.exploding) {
     syncBoostChrome(player);
     return false;
   }
@@ -180,7 +177,7 @@ export function tickTouchControls(player: Player): void {
       syncAbilityChrome(player);
     }
   }
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     resetTouchInteraction(player);
     return;
   }
@@ -305,7 +302,7 @@ function syncBoostChrome(player: Player): void {
   const charge = state.charge;
   const percent = Math.round(charge * 100);
   const inPlay = isInPlay();
-  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
+  const alive = player.ship.health > 0 && !player.ship.exploding;
   const menuOpen = isBoostMenuOpen();
   const active = alive && state.phase === 'active' && player.ship.boosting;
   const empty = charge <= 0;
@@ -317,7 +314,7 @@ function syncBoostChrome(player: Player): void {
   }
   lastBoostChromeKey = key;
   const ready = state.phase === 'idle' && charge >= 1;
-  let text = ready ? 'READY' : `RECHARGING ${percent}%`;
+  let text = ready ? 'BOOST' : `RECHARGING ${percent}%`;
   let label = active
     ? `Stop boost, ${percent}% charge remaining`
     : ready
@@ -503,7 +500,7 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
     return;
   }
   const player = requireLocalPlayer();
-  if (!player || player.lives <= 0 || player.ship.exploding) {
+  if (!player || player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
   ev.preventDefault();
@@ -661,12 +658,12 @@ function onAbilityClick(ev: MouseEvent): void {
     return;
   }
   ev.preventDefault();
+  ev.stopPropagation();
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchAbility(player);
     syncAbilityChrome(player);
   }
-  ev.stopPropagation();
 }
 
 function onBoostPointerDown(ev: PointerEvent, boost: HTMLElement): void {

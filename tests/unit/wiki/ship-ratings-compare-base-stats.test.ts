@@ -2,17 +2,17 @@ import { expect, test } from 'vitest';
 import { listShipKits } from '../../../src/entities/ship/shipKits';
 import { shipRatings } from '../../../src/wiki/shipScorecard';
 
-test('Hauler rates highest for hull while Surveyor rates highest for quick, compact handling', () => {
+test('Hauler rates highest for hull while Scout rates highest for quick, compact handling', () => {
   const hauler = shipRatings('hauler');
-  const surveyor = shipRatings('surveyor');
+  const scout = shipRatings('scout');
   expect(hauler.find((stat) => stat.label === 'Hull')?.rating).toBe(5);
-  expect(surveyor.find((stat) => stat.label === 'Hull')?.rating).toBe(1);
-  expect(surveyor.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
+  expect(scout.find((stat) => stat.label === 'Hull')?.rating).toBe(1);
+  expect(scout.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
   expect(hauler.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
   for (const label of ['Size', 'Thrust', 'Turn rate', 'Shot interval']) {
-    expect(surveyor.find((stat) => stat.label === label)?.rating).toBe(5);
+    expect(scout.find((stat) => stat.label === label)?.rating).toBe(5);
   }
-  expect(shipRatings('surveyor').find((stat) => stat.label === 'E cooldown')?.rating).toBe(1);
+  expect(shipRatings('scout').find((stat) => stat.label === 'E cooldown')?.rating).toBe(1);
   expect(hauler.find((stat) => stat.label === 'E cooldown')?.rating).toBe(5);
 });
 

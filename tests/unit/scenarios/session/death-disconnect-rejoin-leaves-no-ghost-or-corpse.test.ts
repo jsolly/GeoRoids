@@ -89,13 +89,11 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
         attackerId: 'boundary',
       },
     });
-    const livesAfterDeath = world.entity(ace).lives;
     world.dropTransport(ace);
     world.tickThroughRespawn();
     ace = world.resume(ace);
 
     const ship = world.entity(ace);
-    expect(ship.lives).toBe(livesAfterDeath);
     expect(ship.health).toBe(ship.maxHealth);
     expect(ship.exploding).toBe(false);
     expect(ship.spawnProtectionTimer).toBeGreaterThan(0);

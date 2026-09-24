@@ -208,7 +208,7 @@ export function drawFurnaceMapMark(
   ctx.restore();
 }
 
-/** Unlit street lot: a hollow ring, not a flame. */
+/** Unlit furnace lot: a hollow ring, not a flame. */
 export function drawFoundationMapMark(
   ctx: CanvasRenderingContext2D,
   x: number,

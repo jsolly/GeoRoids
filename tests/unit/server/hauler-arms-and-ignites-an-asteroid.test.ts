@@ -22,6 +22,9 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
   let rock: AsteroidData;
 
   function equip(pilot: Pilot, utilityId: HaulerUtilityId): void {
+    if (utilityId !== 'tow_cable') {
+      world.entity(pilot).equipment = [utilityId];
+    }
     world.send(pilot, { type: 'setHaulerUtility', id: pilot.id, data: { utilityId } });
   }
   function activate(pilot: Pilot): void {
@@ -304,10 +307,10 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     expect(world.engine.getLoot()).toEqual([]);
   });
 
-  test('delivery still pays its original launcher after the launcher loses the last life', () => {
+  test('delivery still pays its original launcher after the launcher dies', () => {
     activate(alice);
     activate(alice);
-    world.entity(alice).lives = 0;
+    world.entity(alice).health = 0;
     rock.position = { ...nearestFurnace(rock.position).position };
     world.engine.processFurnaceDeliveries();
     expect(world.entity(alice).score).toBe(furnaceReward(rock));

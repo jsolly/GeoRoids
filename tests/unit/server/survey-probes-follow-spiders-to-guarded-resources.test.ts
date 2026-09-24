@@ -12,7 +12,7 @@ const pilot = {
   id: 'scout',
   position: { x: 0, y: 0 },
   angle: 0,
-  kitId: 'surveyor' as const,
+  kitId: 'scout' as const,
   exploding: false,
   health: 100,
   abilityCooldownFrames: 0,
@@ -44,7 +44,7 @@ function rockAt(id: string, x: number, y = 0): AsteroidData {
   };
 }
 
-describe('spiders carry Surveyor probes', () => {
+describe('spiders carry Scout probes', () => {
   test('a spider intercepts the launch before a rock and an occupied spider blocks another launch', () => {
     const manager = new SurveyProbeManager();
     const spider = spiderAt('spider', 200);
@@ -151,23 +151,24 @@ describe('spiders carry Surveyor probes', () => {
     expect(manager.observerPositions()).toEqual([]);
   });
 
-  test('a Surveyor attaches a networked spider beacon that a laser can shoot off', () => {
+  test('a Scout attaches a networked spider beacon that a laser can shoot off', () => {
     const engine = new GameEngine(42);
-    const surveyor = engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
+    const scout = engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
     for (const rock of engine.getAllAsteroids()) {
       engine.removeAsteroid(rock.id);
     }
-    surveyor.position = { x: 0, y: 0 };
-    surveyor.angle = 0;
-    engine.setSurveyorUtility(surveyor.id, 'survey_probe');
+    scout.position = { x: 0, y: 0 };
+    scout.angle = 0;
+    scout.equipment = ['survey_probe'];
+    engine.setScoutUtility(scout.id, 'survey_probe');
     const spider = engine.spawnTerrainSpider({ x: 200, y: 0 });
     assert.ok(spider);
-    expect(engine.useAbility(surveyor.id, 'surveyor')).toBe(true);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     expect(
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.ownerId
-    ).toBe(surveyor.id);
+    ).toBe(scout.id);
     const now = engine.getServerTime();
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 }, now);
+    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
     engine.advanceLasersAndResolveHits(now + 1);
     expect(
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.health

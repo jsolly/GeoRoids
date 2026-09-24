@@ -1,3 +1,4 @@
+import { oreResource } from '../../../shared/economy';
 import {
   cellWorldBounds,
   explorationCellAt,
@@ -5,6 +6,7 @@ import {
   isCellExplored,
 } from '../../../shared/exploration';
 import { CIVIC_LOTS, pipeHopToParent } from '../../../shared/furnaces';
+import { RICOCHET_COURT } from '../../../shared/ricochetCourt';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { WORLD } from '../../../shared/world';
 import type {
@@ -15,7 +17,6 @@ import type {
   ShipKitId,
 } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
-import { lootStrokeColor } from '../../entities/loot/lootRenderer';
 import type { Player } from '../../entities/player/Player';
 import type { Roid } from '../../entities/roid/Roid';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
@@ -29,6 +30,7 @@ import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { strokeFurnaceFireTrail } from '../furnaceRenderer';
 import { resolveGlow } from '../renderQuality';
+import { drawCourtMapMark } from '../ricochetCourtRenderer';
 import {
   drawFoundationMapMark,
   drawFurnaceMapMark,
@@ -49,9 +51,11 @@ type RadarMark = {
 const LOOT_MARK_KINDS = [
   'wreckage',
   'shard',
-  'laserCore',
   'tap',
   'silk',
+  'resource_tap',
+  'boost_coupling',
+  'survey_probe',
 ] satisfies readonly LootKind[];
 
 // These marks stay visible at the radar's world scale without borrowing the
@@ -152,23 +156,42 @@ function isExploredPosition(
   return cell !== null && isCellExplored(geometry.exploration, cell);
 }
 
+const EXPLORED_RADAR_ALPHA = 0.18;
+
+function hexChannels(hex: string): [number, number, number] {
+  const raw = hex.startsWith('#') ? hex.slice(1) : hex;
+  return [
+    Number.parseInt(raw.slice(0, 2), 16),
+    Number.parseInt(raw.slice(2, 4), 16),
+    Number.parseInt(raw.slice(4, 6), 16),
+  ];
+}
+
+/** One solid color. Translucent tiles double-paint their overlap and read as a grid. */
+function solidRadarInk(tint: string, alpha: number): string {
+  const [backR, backG, backB] = hexChannels(PALETTE.BG);
+  const [tintR, tintG, tintB] = hexChannels(tint);
+  const mix = (back: number, front: number) => Math.round(back + (front - back) * alpha);
+  return `rgb(${mix(backR, tintR)}, ${mix(backG, tintG)}, ${mix(backB, tintB)})`;
+}
+
 /** Draw the shared exploration mask behind known world marks. */
 function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   ctx.save();
-  ctx.fillStyle = hexToRgba(PALETTE.BG, 0.78);
+  // Pale explored ground has to be its own ink: dark fog over a dark void disappears.
+  const exploredInk = solidRadarInk(PALETTE.REMOTE, EXPLORED_RADAR_ALPHA);
   const cellScale = geometry.size / (geometry.radius * 2);
   for (const cell of explorationCellsInView({
     cx: geometry.center.x,
     cy: geometry.center.y,
     radius: geometry.radius,
   })) {
-    if (isCellExplored(geometry.exploration, cell)) {
-      continue;
-    }
+    ctx.fillStyle = isCellExplored(geometry.exploration, cell) ? exploredInk : PALETTE.BG;
     const bounds = cellWorldBounds(cell);
     const x = geometry.x + geometry.size / 2 + (bounds.x - geometry.center.x) * cellScale;
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;
-    const size = bounds.size * cellScale + 0.5;
+    // One extra pixel closes tile gaps. The fill is opaque, so the overlap stays invisible.
+    const size = bounds.size * cellScale + 1;
     ctx.fillRect(x, y, size, size);
   }
   ctx.restore();
@@ -308,7 +331,7 @@ function drawAsteroidMarks(
     }
     const material =
       roid.surveyedBy && roid.surveyedBy.length > 0
-        ? roid.material
+        ? (oreResource(roid) ?? undefined)
         : scanners
             .map((scanner) => scannedMaterial(scanner, roid))
             .find((value) => value !== undefined);
@@ -364,7 +387,7 @@ function drawLootMarks(
       }
       if (!painted) {
         ctx.save();
-        ctx.strokeStyle = lootStrokeColor(kind);
+        ctx.strokeStyle = PALETTE.LOOT;
         ctx.lineWidth = 1;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -551,7 +574,7 @@ function polylineHitsRadar(
   return false;
 }
 
-/** Fire only after the street is lit, clipped to the radar disc. */
+/** Fire only after the furnace is lit, clipped to the radar disc. */
 function drawLitFurnacePipes(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   const now = performance.now();
   for (const lot of CIVIC_LOTS) {
@@ -737,6 +760,9 @@ export function drawMiniMap(
       roids
     );
     drawFurnaceMarks(ctx, geometry);
+    if (projectPosition(geometry, RICOCHET_COURT.center)) {
+      drawCourtMapMark(ctx, geometry.projection.x, geometry.projection.y, 7);
+    }
     const spiderField = getSpiderField();
     for (const spider of spiderField.spiders) {
       if (

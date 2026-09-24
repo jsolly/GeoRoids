@@ -3,7 +3,8 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
-import { surveyorAbilityBuildsAt } from '../../../shared/furnaceField';
+import { scoutAbilityBuildsAt } from '../../../shared/furnaceField';
+import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import {
   advanceShipBoost,
@@ -14,12 +15,13 @@ import {
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GROWTH } from '../../../shared/shipGrowth';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   PlayerMotionState,
   Position,
+  ScoutUtilityId,
   ShipKitId,
-  SurveyorUtilityId,
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
@@ -36,6 +38,7 @@ import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileFi
 import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
+import { scoutUtilityOf } from './scoutUtility';
 import {
   type AbilityWorld,
   abilityCooldownFramesFor,
@@ -59,7 +62,6 @@ import {
   shouldStartHealthRegeneration,
   tickShipImpactFlash,
 } from './shipUtils';
-import { surveyorUtilityOf } from './surveyorUtility';
 
 class Ship {
   id: string = uuidv4(); // Unique identifier for event handling
@@ -76,7 +78,6 @@ class Ship {
   /** Constrained/released/handoff transforms are advanced by the negotiated predictor. */
   serverOwnsMotion: boolean = false;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 
   exploding: boolean = false;
   lasers: Laser[] = [];
@@ -113,8 +114,11 @@ class Ship {
 
   harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
+  furnaceTransit: FurnaceTransit | null = null;
+  furnaceClockOffsetMs = 0;
+  equipment: EquipmentId[] = [];
   haulerUtility?: HaulerUtilityId;
-  surveyorUtility?: SurveyorUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Last specific environmental cause (boundary, asteroid, or ricochet). */
@@ -220,6 +224,9 @@ class Ship {
   }
 
   shoot(): void {
+    if (this.furnaceTransit) {
+      return;
+    }
     logger.debug('SHIP', 'Shoot method called', {
       canShoot: this.canShoot,
       laserCount: this.lasers.length,
@@ -235,6 +242,9 @@ class Ship {
   }
 
   fireLaser(): void {
+    if (this.furnaceTransit) {
+      return;
+    }
     const laser = this.generateLaser();
     this.lasers.push(laser);
     laser.playLaserSound();
@@ -258,7 +268,7 @@ class Ship {
 
   /** Toggle a stronger cruise using any charge currently available. */
   toggleBoost(): boolean {
-    if (this.exploding || this.health <= 0 || this.movementLocked) {
+    if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
       this.stopBoost();
       return false;
     }
@@ -279,7 +289,15 @@ class Ship {
 
   /** Returns request submission when connected, or activation in offline play. */
   activateAbility(world?: AbilityWorld): boolean {
-    if (!canActivateAbility(this)) {
+    const building =
+      this.kitId === 'scout' &&
+      scoutAbilityBuildsAt(this.position, (id) => worldFurnaces.isLit(id));
+    if (
+      this.furnaceTransit ||
+      this.exploding ||
+      this.health <= 0 ||
+      (!building && !canActivateAbility(this))
+    ) {
       return false;
     }
     const kit = getShipKit(this.kitId);
@@ -295,17 +313,14 @@ class Ship {
         if (!sent) {
           return false;
         }
-        if (
-          this.kitId === 'surveyor' &&
-          !surveyorAbilityBuildsAt(this.position, (id) => worldFurnaces.isLit(id))
-        ) {
-          // Surveyor tools share the same request, but the probe has no local
+        if (this.kitId === 'scout' && !building) {
+          // Scout tools share the same request, but the probe has no local
           // world effect. Predict only the user-facing timer; asteroid
           // attachment and mineral classification remain server-owned. Near a
-          // dark street the server builds instead, so skip local scan timing.
+          // dark furnace the server builds instead, so skip local scan timing.
           this.abilityCooldownFrames = abilityCooldownFramesFor(this);
           this.abilityActiveFrames =
-            surveyorUtilityOf(this) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
+            scoutUtilityOf(this) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
         }
         return true;
       }
@@ -450,10 +465,22 @@ class Ship {
 
   /** Advance one 60 Hz simulation step, including movement and combat timers. */
   update(): void {
+    if (this.furnaceTransit) {
+      const pose = furnaceTravelPose(this.furnaceTransit, Date.now() + this.furnaceClockOffsetMs);
+      this.position = { ...pose.position };
+      this.angle = pose.angle;
+      this.velocity = { x: 0, y: 0 };
+      this.angularVelocity = 0;
+      this.thrusting = false;
+      this.stopBoost();
+      this.updateShootCooldown();
+      this.moveLasers();
+      return;
+    }
     if (this.isLocalPlayer) {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
     }
-    if (this.exploding || this.health <= 0 || this.movementLocked) {
+    if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
       this.stopBoost();
     }
     const wasBoosting = this.boosting;

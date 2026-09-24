@@ -22,7 +22,7 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const id = await game.getLocalPlayerId();
     await arrangeCrewField([id], 'spider-tools');
     await expect.poll(async () => (await field(page)).spiders[0]?.targetId).toBe(id);
@@ -46,7 +46,7 @@ for (const width of [1280, 390]) {
       path: screenshotManager.getScreenshotPath(`spider-retreat-${width}.png`),
     });
     await page.goto(`${new URL(page.url()).origin}/wiki/#terrain`);
-    const heading = page.getByRole('heading', { name: 'Terrain spiders', exact: true });
+    const heading = page.getByRole('heading', { name: 'Survive a hunt', exact: true });
     await heading.waitFor();
     await heading.scrollIntoViewIfNeeded();
     await page.screenshot({

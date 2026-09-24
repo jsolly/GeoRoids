@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
+import { DAMAGE, SHIP } from '../../../../src/constants';
 import {
   EXPLOSION_FRAMES,
   GameServerWorld,
@@ -65,10 +65,8 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
     expect(world.engine.getSatellitePickup(parkedPickup.id)?.state).toBe('loose');
 
     const health = held.health;
-    const lives = held.lives;
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health);
-    expect(world.entity(ace).lives).toBe(lives);
     expect(world.engine.handleShipDamage(ace.id, 'ricochet', 25).applied).toBe(false);
     expect(world.engine.handleShipDamage(ace.id, 'boundary', health).applied).toBe(false);
     world.clearAsteroids();
@@ -80,7 +78,6 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
 
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health);
-    expect(world.entity(ace).lives).toBe(GAME.START_LIVES);
     expect(world.entity(ace).exploding).toBe(false);
     world.clearAsteroids();
 
@@ -100,7 +97,6 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
     world.tick(SPAWN_PROTECTION_FRAMES - consumed);
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health - DAMAGE.ASTEROID_COLLISION);
-    expect(world.entity(ace).lives).toBe(GAME.START_LIVES);
   });
 
   test('a hold latched during explosion does not freeze or extra-blink the next life', () => {

@@ -38,13 +38,13 @@ afterEach(() => {
 
 test('three pickups answer lower extraction notes with E, G, C and a longer streak varies', () => {
   playTapEjection(position);
-  playLootPickup('tap', position);
+  playLootPickup(position);
   now += 350;
   playTapEjection(position);
-  playLootPickup('shard', position);
+  playLootPickup(position);
   now += 350;
   playTapEjection(position);
-  playLootPickup('wreckage', position);
+  playLootPickup(position);
   expect(
     notes.filter((note) => note.src.includes('tap-eject')).map((note) => note.semitones)
   ).toEqual([0, 7, 4]);
@@ -53,44 +53,44 @@ test('three pickups answer lower extraction notes with E, G, C and a longer stre
   ).toEqual([4, 7, 12]);
   for (let i = 0; i < 9; i++) {
     now += 200;
-    playLootPickup('tap', position);
+    playLootPickup(position);
   }
   expect(notes.slice(-9).map((note) => note.semitones)).toEqual([2, 4, 9, 7, 9, 16, 7, 4, 12]);
   now += 1500;
-  playLootPickup('laserCore', position);
-  expect(notes.at(-1)).toMatchObject({ src: '/sounds/core-pickup.m4a', semitones: 4 });
+  playLootPickup(position);
+  expect(notes.at(-1)).toMatchObject({ src: '/sounds/loot-pickup.m4a', semitones: 4 });
 });
 
 test('simultaneous pickups form a chord immediately and a mute starts a fresh phrase', () => {
   for (let i = 0; i < 3; i++) {
-    playLootPickup('tap', position);
+    playLootPickup(position);
   }
   expect(notes.map((note) => note.semitones)).toEqual([4, 7, 12]);
   setSound(false);
   playTapEjection(position);
-  playLootPickup('tap', position);
+  playLootPickup(position);
   expect(notes).toHaveLength(3);
   localStorage.setItem('soundOn', 'true');
-  playLootPickup('tap', position);
+  playLootPickup(position);
   expect(notes.at(-1)?.semitones).toBe(4);
 });
 
 test('offscreen, reconnect-baseline and unavailable voices do not consume melody notes', () => {
   playTapEjection({ x: 5000, y: 0 });
-  playLootPickup('tap', { x: 5000, y: 0 });
+  playLootPickup({ x: 5000, y: 0 });
   withoutWorldAudio(() => {
     playTapEjection(position);
-    playLootPickup('tap', position);
+    playLootPickup(position);
   });
   expect(notes).toEqual([]);
   vi.mocked(Sound.prototype.playNote).mockReturnValueOnce(false);
-  playLootPickup('tap', position);
-  playLootPickup('tap', position);
+  playLootPickup(position);
+  playLootPickup(position);
   expect(notes.map((note) => note.semitones)).toEqual([4]);
-  playLootPickup('shard', { x: 100, y: 0 });
+  playLootPickup({ x: 100, y: 0 });
   expect(notes.at(-1)?.semitones).toBe(7);
   expect(notes.at(-1)?.volume).toBeLessThan(1);
   resetResourceMusic();
-  playLootPickup('tap', position);
+  playLootPickup(position);
   expect(notes.at(-1)?.semitones).toBe(4);
 });

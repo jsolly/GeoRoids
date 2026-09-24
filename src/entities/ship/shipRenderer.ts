@@ -1,3 +1,4 @@
+import { planFurnaceRoute } from '../../../shared/furnaceTravel';
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
@@ -7,7 +8,6 @@ import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
   easeOutCubic,
-  laserBoltOffsets,
   strokeBurstTicks,
   strokePhosphorPolyline as strokeJuicePolyline,
   thrusterFlameGeometry,
@@ -397,6 +397,139 @@ export function drawShipExplosionAtPosition(
   );
 }
 
+interface LaserBoltSprite {
+  canvas: HTMLCanvasElement;
+  originX: number;
+  originY: number;
+}
+
+interface LaserBoltSprites {
+  dpr: number;
+  scale: number;
+  glow: number;
+  baseColor: string;
+  // drawLaserBolts supplies only baseColor or the bounced-bolt danger color.
+  // Replacing this cache on a baseColor change bounds it to two sprites.
+  colors: Map<string, LaserBoltSprite>;
+}
+
+let laserBoltSprites: LaserBoltSprites | null = null;
+
+/** Read once per drawLaserBolts batch, outside its projectile loop. */
+function prepareLaserBoltSprites(
+  ctx: CanvasRenderingContext2D,
+  baseColor: string,
+  scale: number
+): LaserBoltSprites {
+  const transform = ctx.getTransform();
+  const dpr = Math.hypot(transform.a, transform.b);
+  const glow = resolveGlow(VISUAL.LASER_GLOW);
+  if (
+    !laserBoltSprites ||
+    laserBoltSprites.dpr !== dpr ||
+    laserBoltSprites.scale !== scale ||
+    laserBoltSprites.glow !== glow ||
+    laserBoltSprites.baseColor !== baseColor
+  ) {
+    laserBoltSprites = { dpr, scale, glow, baseColor, colors: new Map() };
+  }
+  return laserBoltSprites;
+}
+
+/** The existing trail, body and white core, painted once facing screen-right. */
+function paintLaserBolt(
+  ctx: DrawingContext,
+  x: number,
+  y: number,
+  color: string,
+  scale: number
+): void {
+  const halfLength = (VISUAL.LASER_LENGTH / 2) * scale;
+  const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
+  strokePhosphorSegment(
+    ctx,
+    x - halfLength - trailLength,
+    y,
+    x - halfLength,
+    y,
+    color,
+    VISUAL.LASER_STROKE_WIDTH * 0.7,
+    VISUAL.LASER_GLOW * 0.55,
+    0.38
+  );
+  strokePhosphorSegment(
+    ctx,
+    x - halfLength,
+    y,
+    x + halfLength,
+    y,
+    color,
+    VISUAL.LASER_STROKE_WIDTH,
+    VISUAL.LASER_GLOW
+  );
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = VISUAL.LASER_CORE_COLOR;
+  ctx.beginPath();
+  ctx.moveTo(x - halfLength, y);
+  ctx.lineTo(x + halfLength, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprite {
+  const existing = cache.colors.get(color);
+  if (existing) {
+    return existing;
+  }
+
+  const halfLength = (VISUAL.LASER_LENGTH / 2) * cache.scale;
+  const trailLength = VISUAL.LASER_TRAIL_LENGTH * cache.scale;
+  // Match the main context's DPR transform and the painter's existing blur values.
+  // Keep room for the round stroke caps and the complete soft halo in backing pixels.
+  const padding = Math.ceil(VISUAL.LASER_STROKE_WIDTH / 2 + (3 * cache.glow + 2) / cache.dpr);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil((halfLength * 2 + trailLength + padding * 2) * cache.dpr);
+  canvas.height = Math.ceil(padding * 2 * cache.dpr);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Laser bolt canvas context unavailable');
+  }
+  const sprite = { canvas, originX: padding + halfLength + trailLength, originY: padding };
+  ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
+  paintLaserBolt(ctx, sprite.originX, sprite.originY, color, cache.scale);
+  cache.colors.set(color, sprite);
+  return sprite;
+}
+
+function drawCachedLaserBolt(
+  ctx: CanvasRenderingContext2D,
+  cache: LaserBoltSprites,
+  color: string,
+  x: number,
+  y: number,
+  velocityX: number,
+  velocityY: number
+): void {
+  const sprite = laserBoltSprite(cache, color);
+  // A stationary bolt faces screen-right.
+  const angle = Math.hypot(velocityX, velocityY) > 0 ? Math.atan2(velocityY, velocityX) : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.shadowBlur = 0;
+  ctx.drawImage(
+    sprite.canvas,
+    -sprite.originX,
+    -sprite.originY,
+    sprite.canvas.width / cache.dpr,
+    sprite.canvas.height / cache.dpr
+  );
+  ctx.restore();
+}
+
 export function drawLaserBolts(
   lasers: Array<{
     position: Position;
@@ -419,6 +552,9 @@ export function drawLaserBolts(
   const cullPad =
     (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * canvasManager.getPlayfieldScale();
 
+  const scale = canvasManager.getPlayfieldScale();
+  const sprites = prepareLaserBoltSprites(ctx, color, scale);
+
   for (const laser of lasers) {
     const screenPos = canvasManager.worldToScreenInto(laserScreen, laser.position, viewerPosition);
     if (
@@ -432,34 +568,14 @@ export function drawLaserBolts(
 
     const boltColor = laserBoltColor(color, laser.bounceCount);
     if (laser.explodeTime === 0) {
-      const scale = canvasManager.getPlayfieldScale();
-      const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
-      const { halfX, halfY, trailX, trailY } = laserBoltOffsets(
+      drawCachedLaserBolt(
+        ctx,
+        sprites,
+        boltColor,
+        screenPos.x,
+        screenPos.y,
         laser.velocity.x,
-        laser.velocity.y,
-        bolt,
-        VISUAL.LASER_TRAIL_LENGTH * scale
-      );
-      strokePhosphorSegment(
-        ctx,
-        screenPos.x - halfX - trailX,
-        screenPos.y - halfY - trailY,
-        screenPos.x - halfX,
-        screenPos.y - halfY,
-        boltColor,
-        VISUAL.LASER_STROKE_WIDTH * 0.7,
-        VISUAL.LASER_GLOW * 0.55,
-        0.38
-      );
-      strokePhosphorSegment(
-        ctx,
-        screenPos.x - halfX,
-        screenPos.y - halfY,
-        screenPos.x + halfX,
-        screenPos.y + halfY,
-        boltColor,
-        VISUAL.LASER_STROKE_WIDTH,
-        VISUAL.LASER_GLOW
+        laser.velocity.y
       );
     } else {
       const t = 1 - laser.explodeTime / Math.ceil(LASER.EXPLODE_DURATION * GAME.FPS);
@@ -499,6 +615,34 @@ export function drawLasers(
   drawLaserBolts(ship.lasers, color ?? PALETTE.LASER_LOCAL, viewerShipPosition ?? ship.position);
 }
 
+/** Fast travel adds a flame behind the equipped hull. */
+function drawFurnaceTravelFlame(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  angle: number
+): void {
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const flame = reducedMotion ? 2 : 2.2 + Math.sin(performance.now() / 45) * 0.35;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = PALETTE.LASER_LOCAL;
+  ctx.shadowColor = PALETTE.LASER_LOCAL;
+  ctx.shadowBlur = resolveGlow(18);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.65, -radius * 0.3);
+  ctx.lineTo(-radius * flame, 0);
+  ctx.lineTo(-radius * 0.65, radius * 0.3);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Ship rendering with world coordinates (for other players)
 export function drawShipAtPosition(
   ship: Ship,
@@ -529,6 +673,41 @@ export function drawShipAtPosition(
     return;
   }
 
+  if (ship.furnaceTransit) {
+    ctx.save();
+    ctx.strokeStyle = hexToRgba(PALETTE.LASER_LOCAL, 0.55);
+    ctx.lineWidth = 3;
+    ctx.shadowColor = PALETTE.LASER_LOCAL;
+    ctx.shadowBlur = resolveGlow(8);
+    ctx.beginPath();
+    const route = planFurnaceRoute(ship.furnaceTransit.sourceId, ship.furnaceTransit.destinationId);
+    for (let index = 0; index < route.length; index++) {
+      const point = route[index];
+      if (!point) {
+        continue;
+      }
+      const projected = canvasManager.worldToScreen(point, shipPosition);
+      if (index === 0) {
+        ctx.moveTo(projected.x, projected.y);
+      } else {
+        ctx.lineTo(projected.x, projected.y);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+    drawFurnaceTravelFlame(ctx, screenX, screenY, shipR, ship.angle);
+    strokeKitHullOutline(
+      ctx,
+      screenX,
+      screenY,
+      shipR,
+      ship.angle,
+      color ?? ship.color,
+      ship.kitId,
+      haulerUtilityOf(ship)
+    );
+    return;
+  }
   if (ship.blinkCount > 0 && !ship.blinkOn) {
     return;
   }
@@ -645,37 +824,37 @@ export function drawHaulerHarpoonVfx(
   ctx.restore();
 }
 
-const SURVEYOR_SCAN_PULSE_COUNT = 3;
-const SURVEYOR_SCAN_PULSE_FRAMES = SHIP_ABILITY.SCAN_FRAMES / SURVEYOR_SCAN_PULSE_COUNT;
-const SURVEYOR_SCAN_EDGE_OVERSHOOT = 1.1;
-const SURVEYOR_SCAN_FADE_START = 0.75;
-const SURVEYOR_SCAN_MAX_ALPHA = 0.28;
+const SCOUT_SCAN_PULSE_COUNT = SHIP_ABILITY.SCAN_PULSES;
+const SCOUT_SCAN_PULSE_FRAMES = SHIP_ABILITY.SCAN_FRAMES / SCOUT_SCAN_PULSE_COUNT;
+const SCOUT_SCAN_EDGE_OVERSHOOT = 1.1;
+const SCOUT_SCAN_FADE_START = 0.75;
+const SCOUT_SCAN_MAX_ALPHA = 0.28;
 
-export interface SurveyorScanVisualHost {
+export interface ScoutScanVisualHost {
   kitId: Ship['kitId'];
   abilityActiveFrames: number;
   health: number;
   exploding: boolean;
 }
 
-interface SurveyorScanPulse {
+interface ScoutScanPulse {
   readonly radius: number;
   readonly alpha: number;
 }
 
-/** One of three expanding radar pulses, measured in viewport pixels. */
-export function surveyorScanPulseGeometry(
+/** The single expanding radar pulse, measured in viewport pixels. */
+export function scoutScanPulseGeometry(
   pulseIndex: number,
   screenX: number,
   screenY: number,
   shipR: number,
   abilityActiveFrames: number,
   viewport: Readonly<PlayfieldSize>
-): SurveyorScanPulse | undefined {
+): ScoutScanPulse | undefined {
   if (
     !Number.isInteger(pulseIndex) ||
     pulseIndex < 0 ||
-    pulseIndex >= SURVEYOR_SCAN_PULSE_COUNT ||
+    pulseIndex >= SCOUT_SCAN_PULSE_COUNT ||
     !Number.isFinite(abilityActiveFrames) ||
     abilityActiveFrames <= 0
   ) {
@@ -686,8 +865,8 @@ export function surveyorScanPulseGeometry(
     SHIP_ABILITY.SCAN_FRAMES,
     Math.max(0, SHIP_ABILITY.SCAN_FRAMES - abilityActiveFrames)
   );
-  const pulseElapsed = elapsedFrames - pulseIndex * SURVEYOR_SCAN_PULSE_FRAMES;
-  if (pulseElapsed < 0 || pulseElapsed >= SURVEYOR_SCAN_PULSE_FRAMES) {
+  const pulseElapsed = elapsedFrames - pulseIndex * SCOUT_SCAN_PULSE_FRAMES;
+  if (pulseElapsed < 0 || pulseElapsed >= SCOUT_SCAN_PULSE_FRAMES) {
     return undefined;
   }
 
@@ -695,28 +874,27 @@ export function surveyorScanPulseGeometry(
   const farthestCornerY = Math.max(screenY, viewport.height - screenY);
   const edgeRadius = Math.max(
     shipR,
-    Math.hypot(farthestCornerX, farthestCornerY) * SURVEYOR_SCAN_EDGE_OVERSHOOT
+    Math.hypot(farthestCornerX, farthestCornerY) * SCOUT_SCAN_EDGE_OVERSHOOT
   );
-  const progress = pulseElapsed / SURVEYOR_SCAN_PULSE_FRAMES;
-  const fade =
-    progress <= SURVEYOR_SCAN_FADE_START ? 1 : (1 - progress) / (1 - SURVEYOR_SCAN_FADE_START);
+  const progress = pulseElapsed / SCOUT_SCAN_PULSE_FRAMES;
+  const fade = progress <= SCOUT_SCAN_FADE_START ? 1 : (1 - progress) / (1 - SCOUT_SCAN_FADE_START);
   return {
     radius: shipR + (edgeRadius - shipR) * progress,
-    alpha: SURVEYOR_SCAN_MAX_ALPHA * fade,
+    alpha: SCOUT_SCAN_MAX_ALPHA * fade,
   };
 }
 
-/** Draw the Surveyor radar sweep in viewport space; it never changes scan gameplay. */
-export function drawSurveyorScanFx(
+/** Draw the Scout radar sweep in viewport space; it never changes scan gameplay. */
+export function drawScoutScanFx(
   ctx: DrawingContext,
-  host: SurveyorScanVisualHost,
+  host: ScoutScanVisualHost,
   screenX: number,
   screenY: number,
   shipR: number,
   viewport: Readonly<PlayfieldSize>
 ): void {
   if (
-    host.kitId !== 'surveyor' ||
+    host.kitId !== 'scout' ||
     host.exploding ||
     host.health <= 0 ||
     host.abilityActiveFrames <= 0
@@ -724,8 +902,8 @@ export function drawSurveyorScanFx(
     return;
   }
 
-  for (let pulseIndex = 0; pulseIndex < SURVEYOR_SCAN_PULSE_COUNT; pulseIndex += 1) {
-    const pulse = surveyorScanPulseGeometry(
+  for (let pulseIndex = 0; pulseIndex < SCOUT_SCAN_PULSE_COUNT; pulseIndex += 1) {
+    const pulse = scoutScanPulseGeometry(
       pulseIndex,
       screenX,
       screenY,
@@ -758,7 +936,7 @@ function drawAbilityFx(
   screenY: number,
   shipR: number
 ): void {
-  drawSurveyorScanFx(ctx, ship, screenX, screenY, shipR, canvasManager.getViewportSize());
+  drawScoutScanFx(ctx, ship, screenX, screenY, shipR, canvasManager.getViewportSize());
 }
 
 function drawShipImpactFlash(

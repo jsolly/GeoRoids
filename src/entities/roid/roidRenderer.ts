@@ -21,6 +21,29 @@ import type { Roid } from './Roid';
 const roidScreen = { x: 0, y: 0 };
 const latchShudders = new Map<string, number>();
 
+interface RoidSilhouetteSprite {
+  radius: number;
+  vertices: number;
+  offsets: readonly number[];
+  inner: boolean;
+  canvas: HTMLCanvasElement;
+  origin: number;
+  lastUsedFrame: number;
+}
+
+interface RoidSilhouetteSprites {
+  dpr: number;
+  scale: number;
+  glow: number;
+  entries: Map<string, RoidSilhouetteSprite>;
+  pixels: number;
+  frame: number;
+}
+
+const MAX_ROID_SILHOUETTE_SPRITES = 128;
+const MAX_ROID_SILHOUETTE_PIXELS = 8_000_000;
+let roidSilhouetteSprites: RoidSilhouetteSprites | null = null;
+
 export function recordAsteroidLatch(id: string, now = performance.now()): void {
   latchShudders.set(id, now);
 }
@@ -55,6 +78,7 @@ export function markFurnaceAsteroidShatter(asteroidId: string): void {
 export function clearAsteroidShatters(): void {
   shatterBursts.length = 0;
   latchShudders.clear();
+  roidSilhouetteSprites = null;
 }
 
 export function getRoidStrokeWidth(
@@ -128,6 +152,135 @@ function drawRoidSilhouette(
       0.62
     );
   }
+}
+
+/** Share backing resolution and glow state across this frame's asteroid sprites. */
+function prepareRoidSilhouetteSprites(
+  ctx: CanvasRenderingContext2D,
+  scale: number
+): RoidSilhouetteSprites {
+  const transform = ctx.getTransform();
+  const dpr = Math.hypot(transform.a, transform.b);
+  const glow = resolveGlow(VISUAL.ROID_GLOW);
+  if (
+    !roidSilhouetteSprites ||
+    roidSilhouetteSprites.dpr !== dpr ||
+    roidSilhouetteSprites.scale !== scale ||
+    roidSilhouetteSprites.glow !== glow
+  ) {
+    roidSilhouetteSprites = { dpr, scale, glow, entries: new Map(), pixels: 0, frame: 0 };
+  }
+  roidSilhouetteSprites.frame += 1;
+  return roidSilhouetteSprites;
+}
+
+/** Cache only the unchanging outline; health and interaction overlays stay live. */
+function drawCachedRoidSilhouette(
+  ctx: CanvasRenderingContext2D,
+  cache: RoidSilhouetteSprites,
+  roid: Roid,
+  screen: Vec2,
+  offsets: readonly number[],
+  vertices: number
+): void {
+  const inner = !roid.material && shouldDrawRoidInnerFacet(roid.r);
+  let sprite = cache.entries.get(roid.id);
+  if (
+    !sprite ||
+    sprite.radius !== roid.r ||
+    sprite.vertices !== vertices ||
+    sprite.inner !== inner ||
+    sprite.offsets.length !== offsets.length ||
+    !offsets.every((offset, index) => offset === sprite?.offsets[index])
+  ) {
+    const radius = roid.r * cache.scale;
+    const extent = Math.abs(radius) * Math.max(1, ...offsets.map(Math.abs));
+    // Shadow blur is measured in backing pixels, independently of the DPR transform.
+    const padding = getRoidStrokeWidth(roid.r) / 2 + (3 * cache.glow + 2) / cache.dpr;
+    const side = Math.ceil((extent + padding) * 2 * cache.dpr);
+    if (sprite) {
+      cache.pixels -= sprite.canvas.width * sprite.canvas.height;
+      cache.entries.delete(roid.id);
+    }
+    if (side * side <= MAX_ROID_SILHOUETTE_PIXELS) {
+      while (
+        cache.entries.size >= MAX_ROID_SILHOUETTE_SPRITES ||
+        cache.pixels + side * side > MAX_ROID_SILHOUETTE_PIXELS
+      ) {
+        let evicted = false;
+        for (const [id, candidate] of cache.entries) {
+          if (candidate.lastUsedFrame === cache.frame) {
+            continue;
+          }
+          cache.pixels -= candidate.canvas.width * candidate.canvas.height;
+          cache.entries.delete(id);
+          evicted = true;
+          break;
+        }
+        if (!evicted) {
+          break;
+        }
+      }
+    }
+    if (
+      cache.entries.size >= MAX_ROID_SILHOUETTE_SPRITES ||
+      cache.pixels + side * side > MAX_ROID_SILHOUETTE_PIXELS
+    ) {
+      // Keep full-size artwork when the bitmap is too large or all retained art
+      // is already in use this frame. Crowded scenes must not repaint the cache.
+      drawRoidSilhouette(
+        ctx,
+        roidOutline(screen, radius, roid.angle, vertices, offsets),
+        roid.r,
+        inner
+          ? roidOutline(screen, radius, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
+          : null
+      );
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = side;
+    canvas.height = side;
+    const paint = canvas.getContext('2d');
+    if (!paint) {
+      throw new Error('Asteroid silhouette canvas context unavailable');
+    }
+    const origin = canvas.width / (2 * cache.dpr);
+    paint.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
+    const center = { x: origin, y: origin };
+    drawRoidSilhouette(
+      paint,
+      roidOutline(center, radius, 0, vertices, offsets),
+      roid.r,
+      inner ? roidOutline(center, radius, 0, vertices, offsets, VISUAL.ROID_INNER_SCALE) : null
+    );
+    sprite = {
+      radius: roid.r,
+      vertices,
+      offsets: [...offsets],
+      inner,
+      canvas,
+      origin,
+      lastUsedFrame: cache.frame,
+    };
+    // Numeric comparison survives snapshot array replacement. Retained canvases
+    // use at most 8 million backing pixels (~32 MiB RGBA) across 128 IDs.
+    cache.entries.set(roid.id, sprite);
+    cache.pixels += side * side;
+  }
+  sprite.lastUsedFrame = cache.frame;
+  ctx.save();
+  ctx.translate(screen.x, screen.y);
+  ctx.rotate(roid.angle);
+  ctx.shadowBlur = 0;
+  ctx.drawImage(
+    sprite.canvas,
+    -sprite.origin,
+    -sprite.origin,
+    sprite.canvas.width / cache.dpr,
+    sprite.canvas.height / cache.dpr
+  );
+  ctx.restore();
 }
 
 /** Number of reflective facets to show at the current energy level. */
@@ -287,6 +440,8 @@ function drawRoidShatter(
   ctx.globalAlpha = alpha;
   ctx.lineCap = 'round';
 
+  // Open edges share one halo; overlapping endpoints composite once per burst.
+  ctx.beginPath();
   for (let i = 0; i < points.length; i++) {
     const a = points[i];
     const b = points[(i + 1) % points.length];
@@ -295,11 +450,10 @@ function drawRoidShatter(
     }
     const edge = driftSegment(a, b, origin, t, spread);
     const wobble = material === 'rubble' ? Math.sin(i * 2.4 + t * 8) * radius * t * 0.3 : 0;
-    ctx.beginPath();
     ctx.moveTo(edge.a.x + wobble, edge.a.y - wobble);
     ctx.lineTo(edge.b.x - wobble, edge.b.y + wobble);
-    ctx.stroke();
   }
+  ctx.stroke();
   ctx.restore();
 
   if (furnace) {
@@ -330,6 +484,7 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
   }
 
   const scale = canvasManager.getPlayfieldScale();
+  const silhouettes = prepareRoidSilhouetteSprites(ctx, scale);
   const viewport = cvs ? canvasManager.getViewportSize() : undefined;
   const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
   const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
@@ -363,13 +518,7 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     }
     const offsets = drawingOffsets(roid.offsets);
     const vertices = Math.max(roid.vertices, 1);
-    const outline = roidOutline(screenPos, r, roid.angle, vertices, offsets);
-
-    const inner =
-      !roid.material && shouldDrawRoidInnerFacet(roid.r)
-        ? roidOutline(screenPos, r, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
-        : null;
-    drawRoidSilhouette(ctx, outline, roid.r, inner);
+    drawCachedRoidSilhouette(ctx, silhouettes, roid, screenPos, offsets, vertices);
     if (roid.material) {
       drawAsteroidMaterialDetails(
         ctx,

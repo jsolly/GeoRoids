@@ -92,7 +92,7 @@ describe('shared ship motion helper', () => {
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });
 
-  test.each(['surveyor', 'hauler'] as const)('%s cruises at its kit velocity cap', (kitId) => {
+  test.each(['scout', 'hauler'] as const)('%s cruises at its kit velocity cap', (kitId) => {
     const cap = getShipKit(kitId).maxVelocity;
     const ship = new Ship({ kitId, position: { x: 0, y: 0 }, isLocalPlayer: true });
     ship.angle = 0;
@@ -134,34 +134,34 @@ describe('shared ship motion helper', () => {
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
-  test('Boost raises cruise, and Surveyor outruns a boosting Hauler', () => {
-    const surveyor = new Ship({ kitId: 'surveyor', isLocalPlayer: true });
+  test('Boost raises cruise, and Scout outruns a boosting Hauler', () => {
+    const scout = new Ship({ kitId: 'scout', isLocalPlayer: true });
     const hauler = new Ship({ kitId: 'hauler', isLocalPlayer: true });
-    surveyor.angle = 0;
+    scout.angle = 0;
     hauler.angle = 0;
-    surveyor.velocity = { x: 20, y: 0 };
+    scout.velocity = { x: 20, y: 0 };
     hauler.velocity = { x: 20, y: 0 };
-    surveyor.toggleBoost();
+    scout.toggleBoost();
     hauler.toggleBoost();
-    surveyor.update();
+    scout.update();
     hauler.update();
-    const surveyorBoost = cruiseSpeed(
-      surveyor.mass,
-      surveyor.maxVelocity,
-      getShipKit('surveyor').boostMultiplier
+    const scoutBoost = cruiseSpeed(
+      scout.mass,
+      scout.maxVelocity,
+      getShipKit('scout').boostMultiplier
     );
     const haulerBoost = cruiseSpeed(
       hauler.mass,
       hauler.maxVelocity,
       getShipKit('hauler').boostMultiplier
     );
-    expect(surveyorBoost).toBeGreaterThan(haulerBoost);
-    expect(Math.hypot(surveyor.velocity.x, surveyor.velocity.y)).toBeCloseTo(surveyorBoost);
+    expect(scoutBoost).toBeGreaterThan(haulerBoost);
+    expect(Math.hypot(scout.velocity.x, scout.velocity.y)).toBeCloseTo(scoutBoost);
     expect(Math.hypot(hauler.velocity.x, hauler.velocity.y)).toBeCloseTo(haulerBoost);
-    surveyor.toggleBoost();
-    surveyor.update();
-    expect(Math.hypot(surveyor.velocity.x, surveyor.velocity.y)).toBeCloseTo(
-      cruiseSpeed(surveyor.mass, surveyor.maxVelocity)
+    scout.toggleBoost();
+    scout.update();
+    expect(Math.hypot(scout.velocity.x, scout.velocity.y)).toBeCloseTo(
+      cruiseSpeed(scout.mass, scout.maxVelocity)
     );
   });
 

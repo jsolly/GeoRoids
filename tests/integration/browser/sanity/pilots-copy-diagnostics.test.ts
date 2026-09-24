@@ -36,6 +36,33 @@ for (const viewport of [
       () => document.querySelector('#copy-debug-diagnostics')?.textContent === 'Copied!'
     );
     const report = await page.evaluate(() => navigator.clipboard.readText());
+    const copiedState: unknown = JSON.parse(
+      report.slice('GeoRoids diagnostics\n'.length, report.indexOf('\nRecent client logs'))
+    );
+    const deviceDpr = viewport.name === 'mobile' ? 2 : 1;
+    expect(await page.evaluate(() => devicePixelRatio)).toBe(deviceDpr);
+    const terrainSeed: unknown = await page.evaluate(
+      "import('/src/physics/terrain/terrainSession.ts').then(({ getTerrainSeed }) => getTerrainSeed())"
+    );
+    expect(copiedState).toMatchObject({
+      page: { width: viewport.width, height: viewport.height, deviceDpr },
+      canvas: {
+        cssWidth: viewport.width,
+        cssHeight: viewport.height,
+        backingWidth: viewport.width * deviceDpr,
+        backingHeight: viewport.height * deviceDpr,
+        effectiveDpr: deviceDpr,
+      },
+      world: { terrainSeed },
+      ship: {
+        angle: await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.angle),
+      },
+      graphics: {
+        maxDpr: 'native',
+        glow: 'full',
+        source: viewport.name === 'mobile' ? 'touch-default' : 'desktop-default',
+      },
+    });
     const playerId = await page.evaluate(() => window.gameController?.getCurrPlayer()?.id);
     expect(playerId).toBeTruthy();
     expect(report).toContain(playerId);

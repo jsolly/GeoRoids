@@ -1,18 +1,17 @@
-import { surveyorAbilityBuildsAt } from '../../shared/furnaceField';
-import { insideTownStore } from '../../shared/townStore';
-import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
+import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
+import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
+import { scoutUtilityOf } from '../entities/ship/scoutUtility';
 import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
-import { surveyorUtilityOf } from '../entities/ship/surveyorUtility';
 import { worldFurnaces } from '../network/worldExploration';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
-const SURVEYOR_ABILITY_LABEL: Record<SurveyorUtilityId, string> = {
+const SCOUT_ABILITY_LABEL: Record<ScoutUtilityId, string> = {
   mineral_scan: 'SCAN',
   survey_probe: 'PROBE',
 };
-const SURVEYOR_ABILITY_NAME: Record<SurveyorUtilityId, string> = {
+const SCOUT_ABILITY_NAME: Record<ScoutUtilityId, string> = {
   mineral_scan: 'Mineral scan',
   survey_probe: 'Survey probe',
 };
@@ -30,7 +29,8 @@ type AbilityChromeHost = {
   abilityActiveFrames: number;
   harpoonTargetId?: string | null;
   haulerUtility?: HaulerUtilityId | null;
-  surveyorUtility?: SurveyorUtilityId | null;
+  scoutUtility?: ScoutUtilityId | null;
+  furnaceTransit?: unknown;
   position?: { x: number; y: number };
 };
 
@@ -44,40 +44,29 @@ type AbilityChromeState = {
   cooldownRatio: number;
 };
 
-function surveyorOffersBuild(host: AbilityChromeHost): boolean {
+function scoutOffersBuild(host: AbilityChromeHost): boolean {
   return (
-    getShipKit(host.kitId).id === 'surveyor' &&
+    getShipKit(host.kitId).id === 'scout' &&
     host.position !== undefined &&
-    surveyorAbilityBuildsAt(host.position, (id) => worldFurnaces.isLit(id))
-  );
-}
-
-/** Near Town Square, E / the ability button become Enter store for any kit. */
-function abilityOffersTownStore(host: AbilityChromeHost): boolean {
-  return (
-    !host.exploding &&
-    Number.isFinite(host.health) &&
-    host.health > 0 &&
-    host.position !== undefined &&
-    insideTownStore(host.position)
+    scoutAbilityBuildsAt(host.position, (id) => worldFurnaces.isLit(id))
   );
 }
 
 /** Short phosphor label for the on-screen kit button. */
 export function touchAbilityLabel(kitId: unknown, utilityId?: unknown): string {
   const kit = getShipKit(kitId);
-  if (kit.id === 'surveyor') {
-    const utility = surveyorUtilityOf({ kitId: kit.id, surveyorUtility: utilityId });
-    return SURVEYOR_ABILITY_LABEL[utility];
+  if (kit.id === 'scout') {
+    const utility = scoutUtilityOf({ kitId: kit.id, scoutUtility: utilityId });
+    return SCOUT_ABILITY_LABEL[utility];
   }
   return ABILITY_LABEL[kit.abilityId];
 }
 
 export function touchAbilityName(kitId: unknown, utilityId?: unknown): string {
   const kit = getShipKit(kitId);
-  if (kit.id === 'surveyor') {
-    const utility = surveyorUtilityOf({ kitId: kit.id, surveyorUtility: utilityId });
-    return SURVEYOR_ABILITY_NAME[utility];
+  if (kit.id === 'scout') {
+    const utility = scoutUtilityOf({ kitId: kit.id, scoutUtility: utilityId });
+    return SCOUT_ABILITY_NAME[utility];
   }
   return kit.abilityName;
 }
@@ -95,12 +84,12 @@ function abilityCooldownRatio(
 
 export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const kit = getShipKit(host.kitId);
-  const alive = !host.exploding && Number.isFinite(host.health) && host.health > 0;
+  const alive =
+    !host.furnaceTransit && !host.exploding && Number.isFinite(host.health) && host.health > 0;
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
   const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
-  const offeringStore = !towing && abilityOffersTownStore(host);
-  const offeringBuild = !offeringStore && surveyorOffersBuild(host);
+  const offeringBuild = scoutOffersBuild(host);
   const readyLabel =
     kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
@@ -110,37 +99,33 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'IGNITE'
         : 'RELEASE'
-      : offeringStore
-        ? 'ENTER'
-        : offeringBuild
-          ? 'BUILD'
-          : kit.id === 'surveyor'
-            ? touchAbilityLabel(kit.id, host.surveyorUtility)
-            : readyLabel,
+      : offeringBuild
+        ? 'BUILD'
+        : kit.id === 'scout'
+          ? touchAbilityLabel(kit.id, host.scoutUtility)
+          : readyLabel,
     name: towing
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'Ignite asteroid boost'
         : 'Release asteroid'
-      : offeringStore
-        ? 'Enter store'
-        : offeringBuild
-          ? 'Build furnace'
-          : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
-            ? 'Arm asteroid boost'
-            : kit.id === 'surveyor'
-              ? touchAbilityName(kit.id, host.surveyorUtility)
-              : touchAbilityName(kit.id),
-    ready: alive && (towing || offeringStore || !cooling),
+      : offeringBuild
+        ? 'Build furnace'
+        : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+          ? 'Arm asteroid boost'
+          : kit.id === 'scout'
+            ? touchAbilityName(kit.id, host.scoutUtility)
+            : touchAbilityName(kit.id),
+    ready: alive && (towing || offeringBuild || !cooling),
     active,
-    cooling: offeringStore ? false : cooling,
+    cooling: offeringBuild ? false : cooling,
     unavailable,
     cooldownRatio:
-      towing || offeringStore
+      towing || offeringBuild
         ? 0
         : abilityCooldownRatio(
             kit.id,
             host.abilityCooldownFrames,
-            kit.id === 'surveyor' ? abilityCooldownFramesFor(host) : undefined
+            kit.id === 'scout' ? abilityCooldownFramesFor(host) : undefined
           ),
   };
 }

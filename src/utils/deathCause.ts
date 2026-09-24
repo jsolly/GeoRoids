@@ -1,11 +1,11 @@
-/** Tokens that must never be printed on the HUD / game-over overlay. */
+/** Tokens that must never be printed on the death overlay. */
 export function isGenericDeathCause(cause?: string): boolean {
   return !cause || cause === 'unknown' || cause === 'server-damage';
 }
 
 /**
  * First specific cause wins. Generic tokens (unknown / server-damage) lose
- * to a later wall / asteroid report so a lagged snapshot cannot lock GO.
+ * to a later wall / asteroid report so a lagged snapshot cannot obscure the cause.
  */
 export function preferDeathCause(...causes: Array<string | undefined>): string | undefined {
   for (const cause of causes) {
@@ -45,34 +45,4 @@ export function formatDeathCauseForOverlay(cause?: string): string | undefined {
     return undefined;
   }
   return described;
-}
-
-/** Overlay string. Omit "killed by unknown" when the cause is missing. */
-export function formatGameOverText(deathCause?: string): string {
-  const killer = formatDeathCauseForOverlay(deathCause);
-  if (!killer) {
-    return 'Game Over';
-  }
-  return `Game Over: You were killed by ${killer}`;
-}
-
-/**
- * A fresh local player (3 lives, full health) can see a leftover 0-life
- * server snapshot for the previous session. That is not a real death.
- * Leftover deathCause on a full-health hull is still stale.
- */
-export function isStaleGameOverSnapshot(params: {
-  prevLives: number;
-  nextLives: number;
-  deathCause?: string;
-  health?: number;
-  exploding?: boolean;
-}): boolean {
-  const drop = params.prevLives - params.nextLives;
-  if (drop <= 1 || params.nextLives > 0) {
-    return false;
-  }
-  const looksDead =
-    (params.exploding ?? false) || (params.health !== undefined && params.health <= 0);
-  return !looksDead;
 }

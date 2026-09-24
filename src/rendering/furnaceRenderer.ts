@@ -3,7 +3,7 @@ import { CIVIC_LOTS, pipeHopToParent, TOWN_HEARTH } from '../../shared/furnaces'
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { activeFurnacePipePulses, furnacePipeFrame } from '../fx/furnacePipePulse';
-import { getWorldExploration, worldFurnaces } from '../network/worldExploration';
+import { getSettlement, getWorldExploration, worldFurnaces } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
 import type { DrawingContext } from './drawingContext';
@@ -142,7 +142,7 @@ export function drawFurnacesRelative(viewerPosition: Position): void {
     }
     const screen = canvasManager.worldToScreenInto(furnaceScreen, furnace.position, viewerPosition);
     const radius = furnace.radius * scale;
-    const cull = radius * 2;
+    const cull = radius * 5;
     if (
       screen.x < -cull ||
       screen.y < -cull ||
@@ -150,6 +150,9 @@ export function drawFurnacesRelative(viewerPosition: Position): void {
       screen.y > viewport.height + cull
     ) {
       continue;
+    }
+    if (furnace.id === TOWN_HEARTH.id) {
+      drawDockingStation(ctx, screen.x, screen.y, radius, getSettlement().level);
     }
     drawFurnaceArtwork(ctx, screen.x, screen.y, radius, now);
     drawFurnaceLabel(
@@ -466,7 +469,7 @@ function tracePolyline(ctx: DrawingContext, points: readonly Position[], count: 
 }
 
 /**
- * A burning street's pipeline: a hot core with embers running toward Town Square.
+ * A burning furnace's pipeline: a hot core with embers running toward Town Square.
  * `points` uses the caller's coordinate space. `width` and `glow` use that same space.
  */
 export function strokeFurnaceFireTrail(
@@ -543,7 +546,7 @@ function projectHop(viewer: Position, world: readonly Position[]): number {
 }
 
 /**
- * Lit streets show a fire trail along the right-angle pipeline back to Town Square.
+ * Lit furnaces show a fire trail along the right-angle pipeline back to Town Square.
  * A delivery sends one brighter head along that same run.
  */
 export function drawFurnacePipes(viewerPosition: Position, now = performance.now()): void {
@@ -643,8 +646,8 @@ export function drawFurnacePipes(viewerPosition: Position, now = performance.now
   ctx.restore();
 }
 
-/** Dark street lots. A dashed ring with no flame until a Surveyor builds it. */
-export function drawStreetFoundations(viewerPosition: Position): void {
+/** Dark furnace lots. A dashed ring with no flame until a Scout builds it. */
+export function drawFurnaceFoundations(viewerPosition: Position): void {
   const ctx = canvasManager.getContext();
   const cvs = canvasManager.getCanvas();
   if (!ctx || !cvs) {
@@ -662,7 +665,7 @@ export function drawStreetFoundations(viewerPosition: Position): void {
     }
     const screen = canvasManager.worldToScreenInto(furnaceScreen, lot.position, viewerPosition);
     const radius = lot.radius * scale;
-    const cull = radius * 2;
+    const cull = radius * 5;
     if (
       screen.x < -cull ||
       screen.y < -cull ||
@@ -688,4 +691,57 @@ export function drawStreetFoundations(viewerPosition: Position): void {
       `SCORE ${lot.cost.toLocaleString('en-US')}`
     );
   }
+}
+
+/** Docking arms and habitat rings grow around the original intake. */
+function drawDockingStation(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  level: number
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = '#91A7C0';
+  ctx.fillStyle = '#111C2B';
+  ctx.lineWidth = 1.5;
+  const r = radius * 1.6;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    const px = Math.cos(angle) * r;
+    const py = Math.sin(angle) * r;
+    if (i === 0) {
+      ctx.moveTo(px, py);
+    } else {
+      ctx.lineTo(px, py);
+    }
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  const arms = Math.min(12, 2 + level * 2);
+  for (let i = 0; i < arms; i++) {
+    ctx.save();
+    ctx.rotate((i * Math.PI * 2) / arms);
+    const length = radius * (0.8 + Math.min(level, 8) * 0.18);
+    ctx.fillRect(r - 4, -radius * 0.2, length, radius * 0.4);
+    ctx.strokeRect(r - 4, -radius * 0.2, length, radius * 0.4);
+    ctx.strokeStyle = '#7DE8D4';
+    ctx.strokeRect(r + length - radius * 0.15, -radius * 0.33, radius * 0.25, radius * 0.66);
+    if (level >= 3) {
+      ctx.strokeStyle = '#647E9A';
+      ctx.strokeRect(r + length * 0.3, -radius * 0.7, radius * 0.45, radius * 0.35);
+      ctx.strokeRect(r + length * 0.3, radius * 0.35, radius * 0.45, radius * 0.35);
+    }
+    ctx.restore();
+  }
+  if (level >= 2) {
+    ctx.strokeStyle = '#4D6C86';
+    ctx.beginPath();
+    ctx.arc(0, 0, r + radius * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }

@@ -151,6 +151,9 @@ export function drawTerrainSpiders(position: Position, playerId: string, alive: 
       Math.hypot(position.x - spider.position.x, position.y - spider.position.y) <
       radius + SPIDER.INFLUENCE_RADIUS
     ) {
+      if (spider.crawler) {
+        continue;
+      }
       drawInfestedContours(ctx, spider, time, scale, levels);
       drawSpider(ctx, spider, time, scale, levels);
     }

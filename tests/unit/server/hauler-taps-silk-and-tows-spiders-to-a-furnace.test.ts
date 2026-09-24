@@ -24,6 +24,9 @@ describe('Hauler tools interact with living spiders', () => {
   afterEach(() => world.dispose());
 
   function equip(utilityId: HaulerUtilityId) {
+    if (utilityId !== 'tow_cable') {
+      world.entity(pilot).equipment = [utilityId];
+    }
     world.send(pilot, { type: 'setHaulerUtility', id: pilot.id, data: { utilityId } });
     world.entity(pilot).abilityCooldownFrames = 0;
   }
@@ -88,18 +91,18 @@ describe('Hauler tools interact with living spiders', () => {
   test.each(['landmark', 'built'])(
     'tow pulls a spider into a %s furnace, consumes it once, and releases its cable',
     (kind) => {
-      const street = civicLot('street-1-0');
-      if (!street) {
-        throw new Error('Missing street lot');
+      const lot = civicLot('street-1-0');
+      if (!lot) {
+        throw new Error('Missing lot lot');
       }
       if (kind === 'built') {
-        const scout = world.join('Builder', street.position, { kitId: 'surveyor' });
-        world.entity(scout).position = { ...street.position };
-        world.entity(scout).score = street.cost;
+        const scout = world.join('Builder', lot.position, { kitId: 'scout' });
+        world.entity(scout).position = { ...lot.position };
+        world.entity(scout).score = lot.cost;
         world.entity(scout).abilityCooldownFrames = 0;
         expect(world.engine.useAbility(scout.id)).toBe(true);
       }
-      const furnace = kind === 'built' ? street : TOWN_HEARTH;
+      const furnace = kind === 'built' ? lot : TOWN_HEARTH;
       world.engine.updatePlayer(pilot.id, {
         position: { x: furnace.position.x + 400, y: furnace.position.y },
       });

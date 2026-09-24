@@ -6,6 +6,8 @@ type ResourceMapIcon = 'asteroid' | 'satellite' | 'nest' | LootKind;
 
 export function asteroidMapInk(material: AsteroidMaterial | undefined) {
   switch (material) {
+    case 'crystal':
+      return '#D8B4FE';
     case 'ice':
       return '#A5F3FC';
     case 'metal':
@@ -95,24 +97,6 @@ export function addResourceMapPath(
         }
       }
       return;
-    case 'laserCore':
-      // Horizontal emitter and a long beam, distinct from an upright Tap canister.
-      move(-1, -0.5);
-      line(-0.1, -0.5);
-      line(0.2, -0.25);
-      line(0.2, 0.25);
-      line(-0.1, 0.5);
-      line(-1, 0.5);
-      ctx.closePath();
-      move(-0.6, -0.5);
-      line(-0.6, 0.5);
-      move(0.2, 0);
-      line(1.45, 0);
-      move(0.6, -0.5);
-      line(1, -0.7);
-      move(0.6, 0.5);
-      line(1, 0.7);
-      return;
     case 'wreckage':
       // Broken ship hull and a detached panel, rather than another rock.
       move(-0.9, 0.75);
@@ -159,6 +143,33 @@ export function addResourceMapPath(
         );
       }
       return;
+    case 'boost_coupling':
+      move(-0.65, -0.75);
+      line(0.65, -0.75);
+      line(0.45, 0.35);
+      line(-0.45, 0.35);
+      ctx.closePath();
+      move(-0.4, 0.35);
+      line(0, 1.1);
+      line(0.4, 0.35);
+      move(-0.9, -0.3);
+      line(0.9, -0.3);
+      return;
+    case 'survey_probe':
+      move(0, -1);
+      line(0.55, 0);
+      line(0, 0.8);
+      line(-0.55, 0);
+      ctx.closePath();
+      move(-1, -0.55);
+      line(-0.7, 0);
+      line(-1, 0.55);
+      move(1, -0.55);
+      line(0.7, 0);
+      line(1, 0.55);
+      return;
+    case 'resource_tap':
+    case 'points':
     case 'tap':
       move(-0.55, -0.35);
       line(-0.55, 0.6);

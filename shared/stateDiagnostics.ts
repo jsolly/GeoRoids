@@ -9,7 +9,7 @@ interface DiagnosticActorState {
   angle: number;
   health: number;
   maxHealth: number;
-  lives: number;
+
   score: number;
   exploding: boolean;
   respawnTimer?: number;
@@ -26,7 +26,7 @@ export function captureDiagnosticActorState(source: ActorStateSource): Diagnosti
     angle: source.angle,
     health: source.health,
     maxHealth: source.maxHealth,
-    lives: source.lives,
+
     score: source.score,
     exploding: source.exploding,
     ...(source.respawnTimer !== undefined ? { respawnTimer: source.respawnTimer } : {}),

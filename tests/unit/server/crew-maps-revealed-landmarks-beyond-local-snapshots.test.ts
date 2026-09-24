@@ -14,10 +14,10 @@ import type { LootData } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('the global map shares the street plan while each pilot receives only nearby asteroid geometry', () => {
+test('the global map shares the furnace plan while each pilot receives only nearby asteroid geometry', () => {
   const distantLot = CIVIC_LOTS.find((lot) => lot.ring === 3);
   if (!distantLot) {
-    throw new Error('Expected an outer street lot');
+    throw new Error('Expected an outer furnace lot');
   }
   const distant = distantLot.position;
   const engine = new GameEngine(82);
@@ -25,7 +25,7 @@ test('the global map shares the street plan while each pilot receives only nearb
   const nearSocket = new RecordingSocket();
   const farSocket = new RecordingSocket();
   engine.addPlayer('near', 'Near', nearSocket, { x: 0, y: 0 }, 'hauler');
-  const scout = engine.addPlayer('far', 'Far', farSocket, distant, 'surveyor');
+  const scout = engine.addPlayer('far', 'Far', farSocket, distant, 'scout');
   broadcaster.negotiateSnapshot(nearSocket);
   broadcaster.negotiateSnapshot(farSocket);
   expect(engine.getGameState().mapAssets).toContainEqual({
@@ -84,20 +84,20 @@ test('valuable drops appear only after exploration and disappear when collected 
   const assets = new MapAssets();
   const exploration = new ExplorationMap();
   const drops: LootData[] = [
-    { id: 'core', kind: 'laserCore', position: { x: 40_000, y: 24_000 }, radius: 10, mass: 0 },
+    { id: 'salvage', kind: 'wreckage', position: { x: 40_000, y: 24_000 }, radius: 10, mass: 0 },
     { id: 'fragment', kind: 'shard', position: { x: 40_000, y: 24_000 }, radius: 5, mass: 0.25 },
     { id: 'canister', kind: 'tap', position: { x: 40_000, y: 24_000 }, radius: 28, mass: 0.4 },
   ];
   const cold = assets.snapshot(exploration.snapshot(), drops, []);
   expect(cold.every((asset) => asset.kind === 'furnace' || asset.kind === 'foundation')).toBe(true);
-  expect(cold.some((asset) => asset.id === 'loot:core')).toBe(false);
+  expect(cold.some((asset) => asset.id === 'loot:salvage')).toBe(false);
   exploration.reveal(drops[0]?.position ?? { x: 0, y: 0 }, 260);
   const revealed = assets.snapshot(exploration.snapshot(), drops, []);
-  expect(revealed.some((asset) => asset.id === 'loot:core')).toBe(true);
+  expect(revealed.some((asset) => asset.id === 'loot:salvage')).toBe(true);
   expect(revealed.some((asset) => asset.id === 'loot:fragment')).toBe(false);
   expect(revealed.some((asset) => asset.id === 'loot:canister')).toBe(false);
   expect(
-    assets.snapshot(exploration.snapshot(), [], []).some((asset) => asset.id === 'loot:core')
+    assets.snapshot(exploration.snapshot(), [], []).some((asset) => asset.id === 'loot:salvage')
   ).toBe(false);
 });
 

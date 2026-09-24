@@ -106,6 +106,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
       type: 'persist',
       id: this.nextRequestId++,
       world: batch.world,
+      economy: batch.economy,
       sectors: batch.sectors,
       pilots: [...batch.pilots],
     });

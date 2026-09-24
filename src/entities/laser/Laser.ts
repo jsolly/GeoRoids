@@ -1,5 +1,6 @@
+import { ASTEROID_INTERACTIONS } from '../../../shared/asteroidPhenomena';
 import { reflectVector } from '../../../shared/asteroidReflection';
-import { findWorldBoundaryImpact } from '../../../shared/worldBoundary';
+import { findLaserSurfaceImpact } from '../../../shared/laserSurface';
 import type { Position, Velocity } from '../../../shared-types';
 import {
   getHitSound,
@@ -52,15 +53,27 @@ export class Laser implements LaserData {
         x: this.position.x + this.velocity.x,
         y: this.position.y + this.velocity.y,
       };
-      const impact = findWorldBoundaryImpact(this.prevPosition, this.position);
-      if (impact) {
-        const speed = getVelocityMagnitude(this.velocity);
+      const speed = getVelocityMagnitude(this.velocity);
+      let remaining = speed;
+      for (let work = 0; work <= ASTEROID_INTERACTIONS.maxBounces; work++) {
+        const impact = findLaserSurfaceImpact(this.prevPosition, this.position);
+        if (!impact) {
+          break;
+        }
+        if (this.bounceCount >= ASTEROID_INTERACTIONS.maxBounces) {
+          this.hasExploded = true;
+          this.position = impact.point;
+          break;
+        }
         this.velocity = reflectVector(this.velocity, impact.normal);
-        const remaining = Math.max(0, speed - impact.distance);
-        this.prevPosition = impact.point;
+        remaining = Math.max(0, remaining - impact.distance);
+        this.prevPosition = {
+          x: impact.point.x - impact.normal.x * 1e-5,
+          y: impact.point.y - impact.normal.y * 1e-5,
+        };
         this.position = {
-          x: impact.point.x - impact.normal.x * 1e-5 + (this.velocity.x / speed) * remaining,
-          y: impact.point.y - impact.normal.y * 1e-5 + (this.velocity.y / speed) * remaining,
+          x: this.prevPosition.x + (this.velocity.x / speed) * remaining,
+          y: this.prevPosition.y + (this.velocity.y / speed) * remaining,
         };
         this.bounceCount++;
       }

@@ -25,9 +25,9 @@ for (const width of [1280, 390]) {
     const game = new GameInteractions(page);
     await game.bootGame({
       kitId: 'hauler',
-      haulerUtility: 'resource_tap',
       waitForCombatReady: false,
     });
+    await game.collectEquipment(['resource_tap'], 'resource_tap');
     const id = await game.getLocalPlayerId();
     const use = () => (mobile ? page.locator('#touch-ability').tap() : page.keyboard.press('e'));
     const open = async () => {
@@ -41,7 +41,7 @@ for (const width of [1280, 390]) {
     const works = TOWN_HEARTH;
     const arrange = async (angle: number) => {
       await arrangeCrewField([id], 'spider-tools');
-      await game.placeShipAt(works.position.x + 400, works.position.y);
+      await game.placeShipAt(works.position.x + 800, works.position.y);
       await page.evaluate((heading) => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
         if (!ship) {

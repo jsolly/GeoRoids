@@ -88,7 +88,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager.disconnect();
     unbindAsteroidFieldApply();
     vi.restoreAllMocks();
-    setSelectedShipKitId('surveyor');
+    setSelectedShipKitId('scout');
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     resetControlSources();
@@ -114,7 +114,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   }
 
   test.each([1, 7])('a returning pilot moves after its saved epoch %i restarts', async (epoch) => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
     let ws = await connect();
@@ -147,7 +147,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('nearby remote shots sound once, self echoes stay silent and collected loot is deduplicated', async () => {
-    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -276,7 +276,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a surviving local hull hit has feedback; a zero-damage notification stays quiet', async () => {
-    const player = entityFactory.createLocalPlayer('Hull pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Hull pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -292,7 +292,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
       damage: 10,
       remainingHealth: 90,
       isDestroyed: false,
-      remainingLives: 3,
     };
     ws.receive('playerDamaged', damage);
     expect(played).toContain('/sounds/hull-damage.m4a');
@@ -336,7 +335,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a warm reconnect silently hydrates destruction before later deaths sound normally', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -377,7 +376,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('mineral scan waits for one accepted ability cue and unknown orbital pickups use event positions', async () => {
-    const player = entityFactory.createLocalPlayer('Survey pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Survey pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -395,7 +394,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     try {
       player.ship.activateAbility();
       expect(paths).toEqual([]);
-      ws.receive('abilityUsed', { id: player.id, kitId: 'surveyor', abilityId: 'surveyScan' });
+      ws.receive('abilityUsed', { id: player.id, kitId: 'scout', abilityId: 'surveyScan' });
       expect(paths).toHaveLength(1);
       expect(paths[0]).toMatch(SURVEY_SCAN_SOUND_PATH_PATTERN);
       const pickup = {
@@ -433,7 +432,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a new socket and join cannot reuse a departed session snapshot witness', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
     const oldSocket = await connect();
@@ -574,7 +573,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   );
 
   test('cruise and held turn resume after authoritative respawn', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     ws.receive('joined', {
@@ -588,7 +587,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const state = captureSnapshot(snapshotFixture());
     const [local] = state.entities;
     assert.ok(local);
-    Object.assign(local, { id: player.id, kitId: 'surveyor', thrusting: false });
+    Object.assign(local, { id: player.id, kitId: 'scout', thrusting: false });
     state.entities = [local];
     const receive = (sequence: number) =>
       ws.receive('snapshot', new SnapshotEncoder(state).encode(sequence));
@@ -622,7 +621,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('sampled snapshots correlate predicted and authoritative local state', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const ws = await connect();
@@ -685,7 +684,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('applies authoritative local health damage and partial regeneration snapshots', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -704,10 +703,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(baseline).encode(1));
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
-    }).toEqual({ health: 100, lives: 3, maxHealth: 100, exploding: false });
+    }).toEqual({ health: 100, cargo: 0, purchases: [], maxHealth: 100, exploding: false });
 
     const damaged = structuredClone(baseline);
     const damagedEntity = damaged.entities[0];
@@ -720,10 +720,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     );
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
-    }).toEqual({ health: 75, lives: 3, maxHealth: 100, exploding: false });
+    }).toEqual({ health: 75, cargo: 0, purchases: [], maxHealth: 100, exploding: false });
 
     const healing = structuredClone(damaged);
     const healingEntity = healing.entities[0];
@@ -734,19 +735,21 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(healing).encode(3, { sequence: 2, state: damaged }));
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
     }).toEqual({
       health: regeneratedHealth,
-      lives: 3,
+      cargo: 0,
+      purchases: [],
       maxHealth: 100,
       exploding: false,
     });
   });
 
   test('an expired enhanced session replaces its cached identity before a fresh join', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     const oldId = manager.getClientId();
@@ -936,7 +939,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getAllPlayers()).toHaveLength(9);
     expect(manager.getPlayer('pilot-1')?.ship.harpoonTargetId).toBeNull();
     expect(manager.getPlayer('pilot-1')?.ship.harpoonLatchPos).toBeUndefined();
-    expect(manager.getPlayer('pilot-1')?.ship.kitId).toBe('surveyor');
+    expect(manager.getPlayer('pilot-1')?.ship.kitId).toBe('scout');
     expect(manager.getPlayer('pilot-1')?.name).toBe('Renamed pilot');
     expect(removed).toHaveLength(80);
     expect(LootField.getInstance().getAll()).toEqual([]);
@@ -1060,7 +1063,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a stale snapshot does not clear a predicted Mineral Scan cooldown', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -1068,27 +1071,27 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const zeroEntity = zero.entities[0];
     assert.ok(zeroEntity, 'zero snapshot entity');
     zeroEntity.id = manager.getClientId();
-    zeroEntity.kitId = 'surveyor';
+    zeroEntity.kitId = 'scout';
     zeroEntity.abilityCooldownFrames = 0;
     ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
-    player.ship.surveyorUtility = 'mineral_scan';
-    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.surveyor;
+    player.ship.scoutUtility = 'mineral_scan';
+    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout;
     const stale = captureSnapshot(zero);
     const staleEntity = stale.entities[0];
     assert.ok(staleEntity, 'stale snapshot entity');
     staleEntity.abilityCooldownFrames = 0;
     ws.receive('snapshot', new SnapshotEncoder(stale).encode(2));
-    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor);
+    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout);
     const echoed = captureSnapshot(stale);
     const echoedEntity = echoed.entities[0];
     assert.ok(echoedEntity, 'echoed snapshot entity');
-    echoedEntity.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.surveyor - 4;
+    echoedEntity.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout - 4;
     ws.receive('snapshot', new SnapshotEncoder(echoed).encode(3));
-    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor - 4);
+    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout - 4);
   });
 
-  test('a probe miss snapshot keeps the Surveyor ability ready', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
+  test('a probe miss snapshot keeps the Scout ability ready', async () => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -1096,11 +1099,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const zeroEntity = zero.entities[0];
     assert.ok(zeroEntity, 'zero snapshot entity');
     zeroEntity.id = manager.getClientId();
-    zeroEntity.kitId = 'surveyor';
+    zeroEntity.kitId = 'scout';
+    zeroEntity.equipment = ['survey_probe'];
+    zeroEntity.scoutUtility = 'survey_probe';
     zeroEntity.abilityCooldownFrames = 0;
     ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
-    player.ship.surveyorUtility = 'survey_probe';
-    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.surveyor;
+    player.ship.scoutUtility = 'survey_probe';
+    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout;
     const miss = captureSnapshot(zero);
     const missEntity = miss.entities[0];
     assert.ok(missEntity, 'miss snapshot entity');

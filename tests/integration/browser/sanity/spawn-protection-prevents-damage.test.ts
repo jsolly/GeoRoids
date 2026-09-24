@@ -23,12 +23,23 @@ test(
     await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
     const playerId = await game.getLocalPlayerId();
     await arrangeCrewField([playerId], 'delivery');
-    await game.placeShipAt(0, -360);
+    await page.waitForFunction(() =>
+      window.gameController
+        ?.getCurrRoidBelt()
+        .getRoids()
+        .some((candidate) => candidate.id === 'crew-fixture-ore')
+    );
+    const rock = (await game.getAsteroidPositions()).find(
+      (candidate) => candidate.id === 'crew-fixture-ore'
+    );
+    if (!rock) {
+      throw new Error('Environmental collision fixture missing');
+    }
+    await game.placeShipAt(rock.x, rock.y + 100);
     await game.waitForServerSpawnProtection();
 
     const protectedHealth = await game.getShipHealth();
-    const protectedLives = await game.getLives();
-    const placement = await placePlayer(playerId, { x: 0, y: -460 });
+    const placement = await placePlayer(playerId, { x: rock.x, y: rock.y });
     await page.waitForFunction(
       (motionEpoch) =>
         window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship.playerMotion?.epoch ===
@@ -36,35 +47,42 @@ test(
       placement.motionEpoch,
       { timeout: 5000, polling: 25 }
     );
-    await page.evaluate(() => {
-      const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-      if (!ship) {
-        throw new Error('Local ship unavailable after environmental placement');
-      }
-      // Keep the client prediction aligned with the authoritative fixture
-      // without clearing its server-owned protection timer.
-      ship.position = { x: 0, y: -460 };
-      ship.velocity = { x: 0, y: 0 };
-      ship.thrusting = false;
-      ship.angularVelocity = 0;
-    });
+    await page.evaluate(
+      (position) => {
+        const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
+        if (!ship) {
+          throw new Error('Local ship unavailable after environmental placement');
+        }
+        // Keep the client prediction aligned with the authoritative fixture
+        // without clearing its server-owned protection timer.
+        ship.position = position;
+        ship.velocity = { x: 0, y: 0 };
+        ship.thrusting = false;
+        ship.angularVelocity = 0;
+      },
+      { x: rock.x, y: rock.y }
+    );
 
     await page.waitForTimeout(500);
     expect(await game.getShipHealth()).toBe(protectedHealth);
-    expect(await game.getLives()).toBe(protectedLives);
-
-    expect((await game.getAsteroidPositions()).some((rock) => rock.id === 'crew-fixture-ore')).toBe(
-      true
+    expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.exploding)).toBe(
+      false
     );
+
+    expect(
+      (await game.getAsteroidPositions()).some((candidate) => candidate.id === 'crew-fixture-ore')
+    ).toBe(true);
     await game.waitForCombatReady();
-    await game.placeShipAt(0, -460);
+    await game.placeShipAt(rock.x, rock.y);
     await expect
       .poll(() => game.getShipHealth(), {
         timeout: 15000,
         message: 'the same environmental impact should apply after protection expires',
       })
       .toBe(protectedHealth - 25);
-    expect(await game.getLives()).toBe(protectedLives);
+    expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.exploding)).toBe(
+      false
+    );
     assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT * 2

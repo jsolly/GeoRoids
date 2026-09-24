@@ -16,7 +16,7 @@ let clockTimer: ReturnType<typeof setInterval> | undefined;
 let clockSample: { time: number; observedAt: number } | undefined;
 let clockProgress: 'not-observed' | 'advancing' | 'stalled' = 'not-observed';
 let contextRestarts = 0;
-let lastRestartReason: 'manual' | 'stalled-clock' | null = null;
+let lastRestartReason: 'stalled-clock' | null = null;
 const resetHooks = new Set<() => void>();
 const sfxInitializers = new Set<(audio: AudioLibrary) => void>();
 const musicInitializers = new Set<(audio: AudioLibrary) => void>();
@@ -213,12 +213,8 @@ function resume(fromGesture = false): void {
 }
 
 function resumeFromGesture(event: Event): void {
-  // The explicit button handles its click once, after pointer/touch capture.
-  if (event.target instanceof Element && event.target.closest('[data-audio-restart]')) {
-    return;
-  }
   if (clockProgress === 'stalled' && event.isTrusted) {
-    rebuildAudio('stalled-clock');
+    rebuildAudio();
     return;
   }
   resume(true);
@@ -293,9 +289,9 @@ function bindLibraryContext(): void {
   syncState();
 }
 
-function rebuildAudio(reason: 'manual' | 'stalled-clock'): boolean {
+function rebuildAudio(): void {
   if (!sessionEnabled() || typeof AudioContext === 'undefined') {
-    return false;
+    return;
   }
   const previous = context;
   stopClockMonitor();
@@ -317,16 +313,13 @@ function rebuildAudio(reason: 'manual' | 'stalled-clock'): boolean {
     });
   }
   contextRestarts++;
-  lastRestartReason = reason;
+  lastRestartReason = 'stalled-clock';
   // Keep creation and resume inside the trusted gesture, without awaiting close.
   activateAudio();
-  logger.info('SOUND', 'Audio context restart requested', { reason, contextRestarts });
-  return context !== undefined;
-}
-
-/** User-requested recovery also covers silent output while the clock advances. */
-export function restartAudio(): boolean {
-  return rebuildAudio('manual');
+  logger.info('SOUND', 'Audio context restart requested', {
+    reason: lastRestartReason,
+    contextRestarts,
+  });
 }
 
 /** Retire Howler's transport as well as its sources before replacing a sound. */

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
+import { DAMAGE, SHIP } from '../../../../src/constants';
 import {
   EXPLOSION_FRAMES,
   GameServerWorld,
@@ -31,7 +31,6 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
     expect(world.entity(ace).health).toBe(0);
     expect(world.entity(ace).exploding).toBe(true);
     expect(world.entity(ace).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
-    expect(world.entity(ace).lives).toBe(GAME.START_LIVES - 1);
 
     world.tick(EXPLOSION_FRAMES);
 
@@ -58,6 +57,5 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
     expect(ship.health).toBe(ship.maxHealth);
     expect(ship.respawnTimer).toBeUndefined();
     expect(ship.spawnProtectionTimer).toBeGreaterThan(SPAWN_PROTECTION_FRAMES - 2);
-    expect(ship.lives).toBe(GAME.START_LIVES - 1);
   });
 });

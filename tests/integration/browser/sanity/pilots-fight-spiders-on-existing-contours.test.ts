@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
+import { SPIDER } from '../../../../shared/terrainSpider';
 import type { SpiderFieldState } from '../../../../shared-types';
 import { installAudioProbe } from '../../utils/audio-probe';
 import {
@@ -72,7 +73,7 @@ for (const viewport of [
     await game.placeShipAt(3000, 5000);
     await expect
       .poll(async () => (await readField(page)).spiders.length, { timeout: 5000 })
-      .toBe(4);
+      .toBe(SPIDER.NEST_GUARDS);
     const predator = (await readField(page)).spiders.toSorted(
       (a, b) => a.position.x - b.position.x
     )[0];
@@ -224,9 +225,9 @@ for (const viewport of [
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
       .toBe('suspended');
     await page.goto(new URL('/wiki/#terrain', page.url()).href);
-    await page.getByRole('heading', { name: 'Terrain spiders', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Survive a hunt', exact: true }).waitFor();
     await page
-      .getByRole('heading', { name: 'Terrain spiders', exact: true })
+      .getByRole('heading', { name: 'Survive a hunt', exact: true })
       .evaluate((heading) => heading.scrollIntoView({ block: 'start', behavior: 'instant' }));
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`spider-wiki-${viewport.name}.png`),

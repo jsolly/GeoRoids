@@ -27,6 +27,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   vi.spyOn(Date, 'now').mockReturnValue(10_000);
   const failures: unknown[] = [];
   const engine = new GameEngine(731);
+  vi.spyOn(engine, 'getServerTime').mockReturnValue(10_000);
   const broadcaster = new GameStateBroadcaster(engine);
   const handler = new MessageHandler(engine, broadcaster);
   const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });

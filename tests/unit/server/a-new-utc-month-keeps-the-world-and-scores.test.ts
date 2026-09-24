@@ -43,7 +43,6 @@ test('a UTC month boundary keeps scores, exploration, and the live ship', () => 
     const registered = engine.registerPilot(actor, socket);
     assert(registered.ok);
     actor.score = 880;
-    actor.lives = 2;
     engine.revealArea(actor.position, WORLD.sectorSize);
     engine.revealArea({ x: 40_000, y: 24_000 }, WORLD.sectorSize);
     const distantCell = explorationCellAt({ x: 40_000, y: 24_000 });
@@ -59,7 +58,6 @@ test('a UTC month boundary keeps scores, exploration, and the live ship', () => 
 
     expect(engine.getPlayer('pilot')).toBe(actor);
     expect(actor.score).toBe(880);
-    expect(actor.lives).toBe(2);
     expect(actor.position).toEqual(placement);
     expect(isCellExplored(engine.getGameState().exploration, distantCell)).toBe(true);
     expect(store.loadPilots().find((pilot) => pilot.id === 'pilot')?.score).toBe(880);

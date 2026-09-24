@@ -133,6 +133,9 @@ async function join(socket: WireClient, id: string, position: Position): Promise
   await socket.barrier();
   const joined = messageAt(socket.messages, start, 'joined');
   expect(readJoinedId(joined)).toBe(id);
+  // This suite compares field visibility from a shared fixture pose; joins use town-ring spawns.
+  const engine = requireServer().gameEngine;
+  expect(engine.playerMotion.placeActorForTesting(id, position, engine.getServerTime())).toBe(true);
 }
 
 async function requestAsteroids(socket: WireClient, id: string): Promise<FieldRock[]> {

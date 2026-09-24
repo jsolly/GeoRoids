@@ -169,7 +169,7 @@ describe('server-authoritative combat', () => {
 
   test('towed cargo that hits another rock and another ship still damages that ship', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
-    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, 'surveyor');
+    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, 'scout');
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'pilot');
     clearAsteroidField(engine);
@@ -238,7 +238,7 @@ describe('server-authoritative combat', () => {
 
   test('an attached asteroid still damages and breaks for another overlapping pilot', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
-    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, 'surveyor');
+    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, 'scout');
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'pilot');
     clearAsteroidField(engine);
@@ -307,12 +307,10 @@ describe('server-authoritative combat', () => {
       source: 'collision',
       healthBefore: DAMAGE.LASER_HIT,
       healthAfter: 0,
-      livesBefore: 3,
-      livesAfter: 2,
     });
     expect(stateEvents[2]?.[2]).toMatchObject({
       playerId: 'p1',
-      state: { health: SHIP.MAX_HEALTH, lives: 2, exploding: false },
+      state: { health: SHIP.MAX_HEALTH, exploding: false },
     });
   });
 
@@ -388,20 +386,20 @@ describe('server-authoritative combat', () => {
     join(wsCore, alphaWs, {
       id: 'alpha',
       name: 'Alpha',
-      kitId: 'surveyor',
+      kitId: 'scout',
       position: { x: 0, y: 0 },
     });
     join(wsCore, betaWs, {
       id: 'beta',
       name: 'Beta',
-      kitId: 'surveyor',
+      kitId: 'scout',
       position: { x: 100, y: 0 },
     });
 
     const alpha = engine.getPlayer('alpha');
     const beta = engine.getPlayer('beta');
-    expect(alpha?.kitId).toBe('surveyor');
-    expect(beta?.kitId).toBe('surveyor');
+    expect(alpha?.kitId).toBe('scout');
+    expect(beta?.kitId).toBe('scout');
     const alphaPosition = alpha ? { ...alpha.position } : undefined;
     const betaPosition = beta ? { ...beta.position } : undefined;
 
@@ -428,12 +426,12 @@ describe('server-authoritative combat', () => {
       {
         type: 'useAbility',
         id: 'alpha',
-        data: { kitId: 'surveyor', abilityId: 'surveyScan' },
+        data: { kitId: 'scout', abilityId: 'surveyScan' },
       },
       unjoinedWs
     );
-    expect(engine.getPlayer('beta')?.kitId).toBe('surveyor');
-    expect(engine.getPlayer('alpha')?.kitId).toBe('surveyor');
+    expect(engine.getPlayer('beta')?.kitId).toBe('scout');
+    expect(engine.getPlayer('alpha')?.kitId).toBe('scout');
   });
 
   test('shoot reports bind to the socket before creating a server laser', () => {
@@ -509,6 +507,5 @@ describe('server-authoritative combat', () => {
     );
 
     expect(engine.getPlayer('nova')?.health).toBe(0);
-    expect(engine.getPlayer('nova')?.lives).toBe(2);
   });
 });

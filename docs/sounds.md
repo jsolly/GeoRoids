@@ -17,10 +17,9 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 | --- | --- |
 | Resource Tap ejection | Lower C4–G4–E4–C5 plucks with a small rounded pop |
 | Material pickup | C5-root crystal instrument; three-note answers begin E5–G5–C6 |
-| Laser core pickup | Brighter octave partial in the same pickup phrase |
 | Orbital pickup | G4–C5 answering interval |
 | Harpoon launch, latch, release | Low plucks, seated latch tone, descending release |
-| Surveyor scan | C4–G4–D5 rising shimmer |
+| Scout scan | C4–G4–D5 rising shimmer |
 | Flight entry and respawn | C4–E4–G4–C5 welcoming phrase |
 | Ship and orbital shots | Short G4 and C4 pulses, without pitch randomization |
 | Hits | Rounded low impact with a soft C4 overtone |
@@ -32,7 +31,6 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 | Boost start and stop/depletion | Low ascending/descending two-note acknowledgements |
 | Boost Coupling ignition | Rounded push with a rising C/G crystal tail |
 | Furnace reward | E4–G4–C5 cadence for each rewarded pilot, including distant collaborators |
-| Game over | G3–E3–C3 descending resolution, once per run |
 | Ship selection, map, schematic and utility selection | Quiet crystal tick on actual open/close/change |
 | Satellite equip | C4–G4 confirmation when stored hardware enters orbit |
 | Local satellite orbit | Soft C4/C5 chime once per orbit, with silence between passes; HRTF movement follows orbital phase |
@@ -43,7 +41,7 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 The audit traced firing, damage/death/respawn, asteroid destruction/splits,
 resource extraction/collection, tools, boost, satellite inventory, furnace
 rewards, and in-flight menus. Missing boost transitions, surviving hull damage,
-coupling ignition, satellite equip, game-over and menu feedback now have cues.
+coupling ignition, satellite equip and menu feedback now have cues.
 Furnace delivery now has its own cadence rather than reusing orbital pickup.
 A permanent connection failure sounds once until connection recovery. Local
 shots, boost controls and predicted boundary death intentionally acknowledge
@@ -102,7 +100,7 @@ another's melody steps. Each accepted event sounds immediately; simultaneous
 pickups form a chord instead of queuing a delayed tune. Pickups cycle through
 four composed three-note answers, with bounded register rather than endless
 ascending pitch. After 1.4 seconds without an audible resource note the phrase
-restarts. Laser cores share the melody with a brighter instrument.
+restarts.
 
 The server emits `tapEjected` for each created canister before collection
 notifications and snapshots. The client validates positions and deduplicates
@@ -173,20 +171,14 @@ next gesture by queuing its retry outside the gesture handler. That rejection is
 initialization failure. Looping beds start again once the shared context is
 running.
 
-The title screen and playfield both expose **Restart audio**, including when
-Debug is off. A trusted tap or keyboard activation replaces the shared context
-and its sample/bed playback objects, then starts the current menu, playfield or
-danger bed when ready. It retains Sound Effects and Music preferences and does
-not reconnect the player. Turning both preferences off prevents a restart from
-allocating audio. The visible confirmation reports that a restart was requested,
-not that the device produced audible output.
-
 Context state and a library's playing flag do not prove speaker output. A visible,
 enabled context can report `running` while its clock is stalled. The runtime
 checks clock progress outside the simulation loop and defers a detected stall's
-context replacement until the next trusted user gesture. Diagnostics preserve
-clock progress and recovery state for the next report. A progressing clock can
-still accompany an inaudible device route; the explicit restart remains available.
+context replacement until the next trusted user gesture. Recovery preserves the
+current music bed and Sound Effects and Music preferences without reconnecting
+the player or replaying old cues. Diagnostics preserve clock progress and
+recovery state for the next report. A progressing clock can still accompany an
+inaudible device route.
 
 These choices follow [MDN's short-sample guidance](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices)
 and [shared-context recommendation](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext).

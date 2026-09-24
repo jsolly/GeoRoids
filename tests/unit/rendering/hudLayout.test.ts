@@ -10,7 +10,6 @@ test('desktop 800x600 keeps the Wave1 compact cluster anchors', () => {
     { width: 800, height: 600 },
     { touchControls: false, safeArea: ZERO }
   );
-  expect(layout.lives).toEqual({ x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET });
   expect(layout.score).toEqual({ x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET });
   expect(layout.notificationY).toBe(12);
   expect(layout.leaderboard).toMatchObject({
@@ -31,8 +30,8 @@ test('phone portrait keeps notices below the leaderboard and radar above the abi
     { width: 390, height: 844 },
     { touchControls: true, safeArea: ZERO }
   );
-  expect(layout.lives.x).toBeGreaterThanOrEqual(12);
-  expect(layout.lives.y).toBeGreaterThanOrEqual(12);
+  expect(layout.balance.x).toBeGreaterThanOrEqual(12);
+  expect(layout.balance.y).toBeGreaterThanOrEqual(12);
   expect(layout.miniMap.x + layout.miniMap.size).toBeLessThanOrEqual(390 - 12);
   expect(layout.miniMap.y + layout.miniMap.size).toBeLessThanOrEqual(844 - 12 - 112);
   expect(layout.leaderboard.maxRows).toBe(3);
@@ -52,11 +51,11 @@ test('phone landscape keeps the radar below the top action buttons', () => {
   expect(layout.leaderboard.maxRows).toBe(3);
 });
 
-test('safe-area insets push lives off the notch', () => {
+test('safe-area insets push the bank balance off the notch', () => {
   const layout = computeHudLayout(
     { width: 390, height: 844 },
     { touchControls: true, safeArea: { top: 47, right: 0, bottom: 34, left: 0 } }
   );
-  expect(layout.lives.y).toBeGreaterThanOrEqual(47);
+  expect(layout.balance.y).toBeGreaterThanOrEqual(47);
   expect(layout.padBottom).toBeGreaterThanOrEqual(34);
 });

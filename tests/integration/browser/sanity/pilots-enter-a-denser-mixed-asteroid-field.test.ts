@@ -17,7 +17,7 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     await page.waitForFunction(
       () => (window.gameController?.getCurrRoidBelt().getRoids().length ?? 0) >= 400,
       undefined,

@@ -53,6 +53,7 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`inventory-button-${viewport.width}.png`),
     });
     await game.waitForNetworkAsteroids(1);
+    await game.collectEquipment(['resource_tap', 'boost_coupling']);
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
     if (viewport.touch) {
       await schematicToggle.tap();
@@ -133,7 +134,7 @@ for (const viewport of [
   }, 40000);
 }
 
-test('a short touch screen keeps all action buttons at the top', async () => {
+test('a short touch screen keeps tools at the top and Boost at bottom center', async () => {
   const width = 844;
   const height = 390;
   const page = await browserManager.recreatePage({ hasTouch: true });
@@ -145,12 +146,7 @@ test('a short touch screen keeps all action buttons at the top', async () => {
   await game.waitForGameReady();
   const toggle = page.locator('#ship-schematic-toggle');
   await toggle.waitFor({ state: 'visible' });
-  for (const id of [
-    'ship-schematic-toggle',
-    'universe-map-toggle',
-    'touch-boost',
-    'touch-ability',
-  ]) {
+  for (const id of ['ship-schematic-toggle', 'universe-map-toggle', 'touch-ability']) {
     const box = await page.locator(`#${id}`).boundingBox();
     if (!box) {
       throw new Error(`Missing ${id}`);
@@ -160,6 +156,15 @@ test('a short touch screen keeps all action buttons at the top', async () => {
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThan(height / 2);
   }
+  const boost = await page.locator('#touch-boost').boundingBox();
+  if (!boost) {
+    throw new Error('Missing bottom Boost button');
+  }
+  expect(boost.x).toBeGreaterThanOrEqual(0);
+  expect(boost.x + boost.width).toBeLessThanOrEqual(width);
+  expect(boost.x + boost.width / 2).toBe(width / 2);
+  expect(boost.y).toBeGreaterThan(height / 2);
+  expect(boost.y + boost.height).toBe(height - 20);
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('inventory-button-short-touch.png'),
   });

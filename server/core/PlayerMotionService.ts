@@ -132,8 +132,7 @@ export class PlayerMotionService {
       actor.health > 0 &&
       Number.isFinite(actor.health) &&
       !actor.exploding &&
-      actor.respawnTimer === undefined &&
-      actor.lives > 0
+      actor.respawnTimer === undefined
     );
   }
 
@@ -434,6 +433,7 @@ export class PlayerMotionService {
     if (
       !session ||
       !this.validActor(session.actor) ||
+      session.actor.furnaceTransit ||
       !['free', 'handoff'].includes(session.mode)
     ) {
       return { ok: false, error: 'Server still owns this motion transform' };
@@ -604,6 +604,16 @@ export class PlayerMotionService {
     this.publish(session);
   }
 
+  /** Start a fresh client prediction epoch after server-owned pipe travel. */
+  public handoffActor(actorId: string, now: number): void {
+    const session = this.sessions.get(actorId);
+    if (session) {
+      delete session.knockback;
+      session.boostRequested = false;
+      this.handoff(session, now, 0);
+    }
+  }
+
   /** Keep test-only fixture placement coherent with enhanced motion ownership. */
   public placeActorForTesting(actorId: string, position: Position, now: number): boolean {
     this.assertTime(now);
@@ -664,7 +674,11 @@ export class PlayerMotionService {
         session.wasAlive = alive;
         this.handoff(session, now);
       }
-      if (session.mode === 'handoff' && now - session.anchorAt >= PLAYER_MOTION.handoffTimeoutMs) {
+      if (
+        !session.actor.furnaceTransit &&
+        session.mode === 'handoff' &&
+        now - session.anchorAt >= PLAYER_MOTION.handoffTimeoutMs
+      ) {
         this.handoff(session, now);
       }
       this.publish(session);
@@ -677,7 +691,7 @@ export class PlayerMotionService {
     if (!session) {
       return false;
     }
-    return session.mode !== 'free' || !session.socket;
+    return Boolean(session.actor.furnaceTransit) || session.mode !== 'free' || !session.socket;
   }
 
   public getState(actorId: string): PlayerMotionState | undefined {

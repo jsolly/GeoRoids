@@ -105,7 +105,7 @@ test('an old completed-sector list does not wall harvested ground or refill it',
     expect(crossed.ok).toBe(true);
     expect(pilot.position).toEqual({ x: 2_020, y: 800 });
     engine.ensureAsteroidField();
-    const shot = engine.spawnLaser('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 }, joinedAt);
+    const shot = engine.spawnLaser('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 });
     expect(shot).not.toBeNull();
     engine.advanceLasersAndResolveHits(joinedAt);
     const liveShot = engine.getServerLasers().find((laser) => laser.id === shot?.id);
@@ -123,7 +123,14 @@ test('an old completed-sector list does not wall harvested ground or refill it',
     expect(engine.getAsteroid(`deposit-${seed}-0-0-0`)).toBeDefined();
     engine.revealArea({ x: 2_500, y: 200 }, 100);
     engine.checkpointWorld();
-    expect(store.loadSector('1,0')).toEqual([]);
+    // Only the additive belt rollout may populate this old harvest tombstone.
+    // Ordinary harvested deposits remain absent; no extra rows are tolerated.
+    expect(
+      store
+        .loadSector('1,0')
+        ?.map((row) => row.id)
+        .sort()
+    ).toEqual([`belt-${seed}-93-0`, `belt-${seed}-96-0`]);
     engine.stopGameLoop();
     engine = undefined;
     store.close();

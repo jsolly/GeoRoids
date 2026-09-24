@@ -233,6 +233,8 @@ describe('current pilots share the production handler and broadcaster', () => {
   });
 
   test('late joins, exclusions, backpressure, rejoin and reconnect have independent baselines', () => {
+    // Hold snapshot time steady while comparing independently reconstructed world baselines.
+    vi.spyOn(engine, 'getServerTime').mockReturnValue(engine.getServerTime());
     const expectedWorld = (id = 'a') => {
       const viewer = engine.getPlayer(id);
       assert(viewer);
@@ -358,13 +360,13 @@ describe('current pilots share the production handler and broadcaster', () => {
     expect(aWorld).toMatchObject({ entities: expect.any(Array) });
   });
 
-  test('a laser core stays collectible while current pilots decode keyframes and deltas', () => {
+  test('a reflective asteroid shard stays collectible while current pilots decode keyframes and deltas', () => {
     const recovery = socket();
     const peer = socket();
     joinPilot(handler, recovery.ws, 'recovery');
     joinPilot(handler, peer.ws, 'peer');
     engine.addAsteroid({
-      id: 'core-rock',
+      id: 'reflector-rock',
       position: { x: 500, y: 500 },
       velocity: { x: 0, y: 0 },
       size: 32,
@@ -379,10 +381,10 @@ describe('current pilots share the production handler and broadcaster', () => {
       phenomenon: { kind: 'reflective', clusterId: 'test', energy: 0, maxEnergy: 6 },
     });
     for (let hit = 0; hit < 3; hit++) {
-      engine.handleAsteroidHit('core-rock', 'peer');
+      engine.handleAsteroidHit('reflector-rock', 'peer');
     }
-    const core = engine.getLoot().find((loot) => loot.kind === 'laserCore');
-    assert.ok(core, 'laser core loot');
+    const shard = engine.getLoot().find((loot) => loot.kind === 'shard');
+    assert.ok(shard, 'laser shard loot');
     broadcaster.broadcastGameState();
     broadcaster.requestSnapshotKeyframe(recovery.ws);
     broadcaster.broadcastGameState();
@@ -392,33 +394,32 @@ describe('current pilots share the production handler and broadcaster', () => {
     expect(
       decodeAll(recovery)
         .at(-1)
-        ?.loot.find((loot) => loot.id === core.id)?.kind
-    ).toBe('laserCore');
+        ?.loot.find((loot) => loot.id === shard.id)?.kind
+    ).toBe('shard');
     expect(
       decodeAll(peer)
         .at(-1)
-        ?.loot.find((loot) => loot.id === core.id)?.kind
-    ).toBe('laserCore');
+        ?.loot.find((loot) => loot.id === shard.id)?.kind
+    ).toBe('shard');
     const collector = engine.getPlayer('recovery');
     assert.ok(collector, 'recovery player');
-    collector.position = { ...core.position };
-    const score = collector.score;
+    collector.position = { ...shard.position };
+    const score = collector.cargo;
     engine.collectLoot();
-    expect(collector.laserUpgrade?.charges).toBe(6);
-    expect(collector.score).toBeGreaterThanOrEqual(score + 150);
-    const collectedScore = collector.score;
+    expect(collector.cargo).toBeGreaterThanOrEqual(score + 5);
+    const collectedScore = collector.cargo;
     engine.collectLoot();
-    expect(collector.score).toBe(collectedScore);
+    expect(collector.cargo).toBe(collectedScore);
     broadcaster.broadcastGameState();
     expect(
       decodeAll(recovery)
         .at(-1)
-        ?.loot.some((loot) => loot.id === core.id)
+        ?.loot.some((loot) => loot.id === shard.id)
     ).toBe(false);
     expect(
       decodeAll(peer)
         .at(-1)
-        ?.loot.some((loot) => loot.id === core.id)
+        ?.loot.some((loot) => loot.id === shard.id)
     ).toBe(false);
   });
 

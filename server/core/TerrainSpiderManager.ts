@@ -6,6 +6,7 @@ import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-typ
 import { SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import { sampleGradient } from '../../src/physics/terrain/heightfield';
 import { getTerrainField } from '../../src/physics/terrain/terrainSession';
+import { nearestRescueTow } from './spiderRescueTarget';
 import type { SpiderResource } from './spiderResources';
 
 interface SpiderActor {
@@ -23,14 +24,22 @@ interface SpiderAdvanceOptions {
   players: readonly SpiderActor[];
   nowFrame: number;
   towedIds?: ReadonlySet<string>;
+  spiderTows?: readonly { ownerId: string; spiderId: string }[];
+  releaseTow?: (ownerId: string, spiderId: string) => void;
   resources?: () => readonly SpiderResource[];
   dormantResource?: (id: string, home: Position) => SpiderResource | undefined;
+  onNestCreated?: (nest: SpiderFieldState['nests'][number]) => void;
 }
 
 export interface SpiderAttack {
   spiderId: string;
   targetId: string;
   attackerId: 'spider';
+}
+
+interface SpiderTow {
+  owner: SpiderActor;
+  friend: RuntimeSpider;
 }
 
 interface SpiderBodyHit {
@@ -57,6 +66,7 @@ interface RuntimeSpider extends TerrainSpider {
   silkBursts: number;
   displaced: boolean;
   biteReadyAt: number;
+  rescuing: boolean;
   territory: Territory;
 }
 
@@ -66,13 +76,10 @@ interface SpiderNest {
   guards: RuntimeSpider[];
 }
 
-function nestCell(position: Position): { id: string; center: Position } {
+function nestCell(position: Position): string {
   const x = Math.floor(position.x / SPIDER.NEST_SPACING);
   const y = Math.floor(position.y / SPIDER.NEST_SPACING);
-  return {
-    id: `${x},${y}`,
-    center: { x: (x + 0.5) * SPIDER.NEST_SPACING, y: (y + 0.5) * SPIDER.NEST_SPACING },
-  };
+  return `${x},${y}`;
 }
 
 const SPAWN_ATTEMPTS = 32;
@@ -134,6 +141,7 @@ export class TerrainSpiderManager {
   private spiderSequence = 0;
   private nextSpawnFrame: number | null = null;
   private nextNestFrame = 0;
+  private nextRescueFrame: number | null = null;
   private nowFrame = 0;
   private readonly nests = new Map<string, SpiderNest>();
   private nestMarkers: SpiderFieldState['nests'] = [];
@@ -156,27 +164,16 @@ export class TerrainSpiderManager {
     };
   }
 
-  /**
-   * True when a furnace at `position` would occupy a known nest home the same
-   * way standing hearths hide webs and cull guards: dist < FURNACE_SAFE_RADIUS
-   * + HIT_RADIUS. Cleared deposits (web gone) are not keep-out.
-   */
-  public furnaceWouldCoverNest(position: Position): boolean {
-    return this.nestMarkers.some(
-      (nest) =>
-        distanceBetween(position, nest.position) < SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
-    );
-  }
-
   public isAttackActive(attack: SpiderAttack): boolean {
     const spider = this.spiders.get(attack.spiderId);
-    return spider?.phase === 'hunting' && spider.targetId === attack.targetId;
+    return spider?.phase === 'hunting' && !spider.rescuing && spider.targetId === attack.targetId;
   }
 
   /** Pause population without forgetting cleared or wounded territories. */
   public suspend(): void {
     this.removeDistantBodies([]);
     this.nextSpawnFrame = null;
+    this.nextRescueFrame = null;
     this.nextNestFrame = 0;
   }
 
@@ -184,6 +181,7 @@ export class TerrainSpiderManager {
     this.spiders.clear();
     this.consumed = [];
     this.nextSpawnFrame = null;
+    this.nextRescueFrame = null;
     this.nextNestFrame = 0;
     this.nests.clear();
     this.nestMarkers = [];
@@ -215,6 +213,7 @@ export class TerrainSpiderManager {
       silkBursts: SPIDER.SILK_BURSTS,
       displaced: false,
       biteReadyAt: 0,
+      rescuing: false,
       territory: { kind: 'roaming' },
     };
     this.spiders.set(spider.id, spider);
@@ -290,16 +289,32 @@ export class TerrainSpiderManager {
         spider.displaced = true;
       }
     }
-    this.removeBlockedBodies();
+    this.repelProtectedSpiders();
     this.removeDistantBodies(players);
     if (players.length > 0 && nowFrame >= this.nextNestFrame) {
-      this.updateNests(options.resources?.() ?? [], players, options.dormantResource);
+      this.updateNests(
+        options.resources?.() ?? [],
+        players,
+        options.dormantResource,
+        options.onNestCreated
+      );
       this.nextNestFrame = nowFrame + 60;
     }
     if (this.nextSpawnFrame === null) {
       this.scheduleRoamer(nowFrame);
     }
 
+    const tows: SpiderTow[] = [];
+    for (const tow of options.spiderTows ?? []) {
+      const owner = playerById.get(tow.ownerId);
+      const friend = this.spiders.get(tow.spiderId);
+      if (owner && friend && friend.health > 0 && options.towedIds?.has(friend.id)) {
+        tows.push({ owner, friend });
+      }
+    }
+    if (tows.length > 0 && this.nextRescueFrame === null) {
+      this.nextRescueFrame = nowFrame + SPIDER.RESCUE_SPAWN_INTERVAL_FRAMES;
+    }
     const attacks: SpiderAttack[] = [];
     for (const spider of [...this.spiders.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       if (options.towedIds?.has(spider.id)) {
@@ -308,7 +323,9 @@ export class TerrainSpiderManager {
           x: start.x + spider.velocity.x,
           y: start.y + spider.velocity.y,
         });
-        this.consumeAtFurnace(spider, start);
+        if (!this.consumeAtFurnace(spider, start)) {
+          this.biteWhileTowed(spider, players, nowFrame, attacks);
+        }
         continue;
       }
       spider.velocity.x = 0;
@@ -319,7 +336,21 @@ export class TerrainSpiderManager {
         }
         spider.displaced = false;
       }
-      this.advanceSpider(spider, players, playerById, nowFrame, attacks);
+      this.advanceSpider(spider, players, playerById, nowFrame, attacks, tows, options.releaseTow);
+    }
+
+    const rescueOwners = tows
+      .filter(({ owner, friend }) => this.canRescue(owner, friend))
+      .map(({ owner }) => owner);
+    if (rescueOwners.length > 0 && nowFrame >= (this.nextRescueFrame ?? Infinity)) {
+      const roamers = [...this.spiders.values()].filter(
+        (spider) => spider.territory.kind === 'roaming'
+      );
+      if (roamers.length < SPIDER.MAX_RESCUE_ROAMERS) {
+        this.spawnNearPlayers(rescueOwners, players);
+      }
+      // A global deadline survives release/re-latch and failed spawn attempts.
+      this.nextRescueFrame = nowFrame + SPIDER.RESCUE_SPAWN_INTERVAL_FRAMES;
     }
 
     // A nest encounter also buys a full quiet interval before another ambush.
@@ -387,14 +418,23 @@ export class TerrainSpiderManager {
     return hit;
   }
 
-  private removeBlockedBodies(): void {
-    for (const spider of [...this.spiders.values()]) {
+  /** A newly lit hearth breaks nearby hunts; living spiders walk out instead of vanishing. */
+  public repelProtectedSpiders(): void {
+    for (const spider of this.spiders.values()) {
       if (
-        (!spider.displaced && !this.canOccupy(spider.position, SPIDER.HIT_RADIUS)) ||
-        (spider.territory.kind === 'guard' &&
-          !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS))
+        spider.territory.kind === 'guard' &&
+        !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS)
       ) {
-        this.removeSpider(spider.id);
+        const nest = this.nests.get(spider.territory.nestId);
+        if (nest) {
+          nest.guards = nest.guards.filter((guard) => guard.id !== spider.id);
+        }
+        spider.territory = { kind: 'roaming' };
+        spider.targetId = null;
+        spider.phase = 'scuttling';
+      }
+      if (!spider.displaced && !this.canOccupy(spider.position, SPIDER.HIT_RADIUS)) {
+        this.retreatFromProtection(spider, false);
       }
     }
   }
@@ -433,14 +473,14 @@ export class TerrainSpiderManager {
   private updateNests(
     resources: readonly SpiderResource[],
     players: readonly SpiderActor[],
-    dormantResource: SpiderAdvanceOptions['dormantResource']
+    dormantResource: SpiderAdvanceOptions['dormantResource'],
+    onNestCreated: SpiderAdvanceOptions['onNestCreated']
   ): void {
     const candidates = new Map<string, SpiderResource>();
     for (const resource of resources) {
       const cell = nestCell(resource.position);
       if (
-        this.nests.has(cell.id) ||
-        distanceBetween(resource.position, cell.center) > SPIDER.NEST_SITE_RADIUS ||
+        this.nests.has(cell) ||
         !this.canOccupy(resource.position, SPIDER.NEST_PATROL_RADIUS + SPIDER.HIT_RADIUS) ||
         !players.some(
           (player) =>
@@ -453,17 +493,17 @@ export class TerrainSpiderManager {
       ) {
         continue;
       }
-      const previous = candidates.get(cell.id);
+      const previous = candidates.get(cell);
       if (
         !previous ||
         resource.value > previous.value ||
         (resource.value === previous.value && resource.id.localeCompare(previous.id) < 0)
       ) {
-        candidates.set(cell.id, resource);
+        candidates.set(cell, resource);
       }
     }
     for (const [id, resource] of candidates) {
-      const count = SPIDER.NEST_GUARDS[resource.value];
+      const count = SPIDER.NEST_GUARDS;
       if (this.spiders.size + count > SPIDER.MAX_ACTIVE) {
         continue;
       }
@@ -494,10 +534,11 @@ export class TerrainSpiderManager {
           nest.guards.push(guard);
         }
       }
+      onNestCreated?.({ id, resourceId: resource.id, position: copyPosition(home) });
     }
     const available = new Map(resources.map((resource) => [resource.id, resource]));
     const markers: SpiderFieldState['nests'] = [];
-    // At most one nest per 10,000-unit cell (144 cells across this world).
+    // At most one nest per 5,000-unit cell (576 cells across this world).
     // Check only those known homes once a second, never scan dormant sectors.
     for (const [id, nest] of this.nests) {
       const resource =
@@ -551,8 +592,11 @@ export class TerrainSpiderManager {
     players: readonly SpiderActor[],
     playerById: ReadonlyMap<string, SpiderActor>,
     nowFrame: number,
-    attacks: SpiderAttack[]
+    attacks: SpiderAttack[],
+    tows: SpiderTow[],
+    releaseTow: SpiderAdvanceOptions['releaseTow']
   ): void {
+    spider.rescuing = false;
     const scanner = players
       .filter(
         (player) =>
@@ -592,6 +636,9 @@ export class TerrainSpiderManager {
         this.returnHome(spider, territory);
         return;
       }
+    }
+    if (releaseTow && this.rescueFriend(spider, tows, nowFrame, releaseTow)) {
+      return;
     }
     if (spider.phase !== 'hunting') {
       const nextTarget = this.findHuntTarget(spider, players);
@@ -649,18 +696,121 @@ export class TerrainSpiderManager {
       }
       spider.position = next;
     }
+    this.bite(spider, target, nowFrame, attacks);
+  }
+
+  /** A tow restrains movement, but ships within reach can still be bitten. */
+  private biteWhileTowed(
+    spider: RuntimeSpider,
+    players: readonly SpiderActor[],
+    nowFrame: number,
+    attacks: SpiderAttack[]
+  ): void {
+    spider.rescuing = false;
+    spider.phase = 'scuttling';
+    spider.targetId = null;
+    if (
+      !this.canOccupy(spider.position, SPIDER.HIT_RADIUS) ||
+      players.some(
+        (player) =>
+          player.scanning &&
+          distanceBetween(player.position, spider.position) <= SHIP_ABILITY.SCAN_RANGE
+      )
+    ) {
+      return;
+    }
+    const target = players
+      .filter(
+        (player) =>
+          this.canOccupy(player.position, player.radius ?? 0) &&
+          distanceBetween(player.position, spider.position) <=
+            SPIDER.BITE_DISTANCE + POSITION_EPSILON
+      )
+      .sort(
+        (a, b) =>
+          distanceBetween(a.position, spider.position) -
+            distanceBetween(b.position, spider.position) || a.id.localeCompare(b.id)
+      )[0];
+    if (!target) {
+      return;
+    }
+    spider.phase = 'hunting';
+    spider.targetId = target.id;
+    spider.angle = normalizeAngle(
+      Math.atan2(target.position.y - spider.position.y, target.position.x - spider.position.x)
+    );
+    this.bite(spider, target, nowFrame, attacks);
+  }
+
+  private bite(
+    spider: RuntimeSpider,
+    target: SpiderActor,
+    nowFrame: number,
+    attacks: SpiderAttack[]
+  ): void {
     if (
       distanceBetween(spider.position, target.position) <=
         SPIDER.BITE_DISTANCE + POSITION_EPSILON &&
       nowFrame >= spider.biteReadyAt
     ) {
-      attacks.push({
-        spiderId: spider.id,
-        targetId: target.id,
-        attackerId: 'spider',
-      });
+      attacks.push({ spiderId: spider.id, targetId: target.id, attackerId: 'spider' });
       spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
     }
+  }
+
+  private canRescue(owner: SpiderActor, friend: RuntimeSpider): boolean {
+    return (
+      this.spiders.has(friend.id) &&
+      friend.health > 0 &&
+      this.canOccupy(owner.position, owner.radius ?? 0) &&
+      this.canOccupy(friend.position, SPIDER.HIT_RADIUS)
+    );
+  }
+
+  private rescueFriend(
+    spider: RuntimeSpider,
+    tows: SpiderTow[],
+    nowFrame: number,
+    releaseTow: NonNullable<SpiderAdvanceOptions['releaseTow']>
+  ): boolean {
+    const rescue = nearestRescueTow(
+      spider.position,
+      tows.filter((tow) => tow.friend.id !== spider.id && this.canRescue(tow.owner, tow.friend)),
+      spider.territory.kind === 'guard' ? spider.territory.home : undefined
+    );
+    if (!rescue) {
+      return false;
+    }
+    const { tow: chosenTow, point, distance } = rescue;
+    const stride = Math.min(SPIDER.HUNT_SPEED, Math.max(0, distance - SPIDER.BITE_DISTANCE));
+    const angle = Math.atan2(point.y - spider.position.y, point.x - spider.position.x);
+    const next = {
+      x: spider.position.x + Math.cos(angle) * stride,
+      y: spider.position.y + Math.sin(angle) * stride,
+    };
+    if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+      return false;
+    }
+    if (spider.territory.kind === 'guard' && spider.phase !== 'hunting') {
+      spider.territory.chaseUntil = nowFrame + SPIDER.NEST_CHASE_FRAMES;
+    }
+    spider.phase = 'hunting';
+    spider.targetId = chosenTow.owner.id;
+    spider.rescuing = true;
+    spider.angle = normalizeAngle(angle);
+    spider.position = next;
+    if (
+      distanceBetween(next, point) <= SPIDER.BITE_DISTANCE + POSITION_EPSILON &&
+      nowFrame >= spider.biteReadyAt
+    ) {
+      releaseTow(chosenTow.owner.id, chosenTow.friend.id);
+      tows.splice(tows.indexOf(chosenTow), 1);
+      spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
+      spider.shudderFrames = SPIDER.SHUDDER_FRAMES;
+      spider.phase = 'scuttling';
+      spider.targetId = null;
+    }
+    return true;
   }
 
   private fleeFrom(spider: RuntimeSpider, origin: Position): void {
@@ -708,7 +858,7 @@ export class TerrainSpiderManager {
   }
 
   /** Released cargo walks out of safe areas instead of freezing or attacking inside them. */
-  private retreatFromProtection(spider: RuntimeSpider): boolean {
+  private retreatFromProtection(spider: RuntimeSpider, consume = true): boolean {
     const furnace = this.furnaces
       .nearby(spider.position, SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS)
       .find(
@@ -733,7 +883,9 @@ export class TerrainSpiderManager {
     spider.angle = angle;
     const start = spider.position;
     spider.position = next;
-    this.consumeAtFurnace(spider, start);
+    if (consume) {
+      this.consumeAtFurnace(spider, start);
+    }
     return true;
   }
 
@@ -826,7 +978,7 @@ export class TerrainSpiderManager {
     );
   }
 
-  private spawnNearPlayers(players: readonly SpiderActor[]): boolean {
+  private spawnNearPlayers(players: readonly SpiderActor[], allPlayers = players): boolean {
     for (let attempt = 0; attempt < SPAWN_ATTEMPTS; attempt++) {
       const player = players[(this.spawnTargetIndex + attempt) % players.length];
       if (!player || !this.canOccupy(player.position, player.radius ?? 0)) {
@@ -841,7 +993,7 @@ export class TerrainSpiderManager {
         x: player.position.x + Math.cos(angle) * distance,
         y: player.position.y + Math.sin(angle) * distance,
       };
-      if (!this.validSpawn(position, players)) {
+      if (!this.validSpawn(position, allPlayers)) {
         continue;
       }
       const spawned = this.spawnSpider(position, angle);

@@ -62,6 +62,9 @@ describe('Colossal asteroids need a crew', () => {
   });
 
   function equip(pilot: Pilot, utilityId: HaulerUtilityId): void {
+    if (utilityId !== 'tow_cable') {
+      world.entity(pilot).equipment = [utilityId];
+    }
     world.send(pilot, { type: 'setHaulerUtility', id: pilot.id, data: { utilityId } });
   }
 
@@ -168,7 +171,7 @@ describe('Colossal asteroids need a crew', () => {
     );
   });
 
-  test('a Surveyor needs many laser hits to fragment a colossal deposit', () => {
+  test('a Scout needs many laser hits to fragment a colossal deposit', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     for (const existing of engine.getAllAsteroids()) {
@@ -191,7 +194,7 @@ describe('Colossal asteroids need a crew', () => {
     expect(last.newAsteroids.every((fragment) => !isColossalAsteroid(fragment.size))).toBe(true);
     expect(last.newAsteroids[0]?.size).toBe(ROID.COLOSSAL_SIZE * 0.5);
     expect(last.newAsteroids[1]?.size).toBe(ROID.COLOSSAL_SIZE * 0.5);
-    expect(engine.getPlayer('p1')?.score).toBe(ROID.POINTS_COLOSSAL);
+    expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 
   test('a Hauler fragments a colossal deposit in half as many hits', () => {
@@ -211,7 +214,7 @@ describe('Colossal asteroids need a crew', () => {
 
   test('ramming a colossal deposit damages the ship and leaves the rock', () => {
     world = new GameServerWorld();
-    const alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'surveyor' });
+    const alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'scout' });
     world.clearAsteroids();
     const rock = colossalRock('colossal-ram', { x: 0, y: 0 });
     world.engine.addAsteroid(rock);

@@ -10,8 +10,7 @@ import { getStoredItem } from '../utils/safeStorage';
 // GAME CONFIGURATION
 // ============================================================================
 export const GAME = {
-  // Lives and scoring
-  START_LIVES: 3,
+  // Bank starting balance and simulation timing
   STARTING_SCORE: 0,
 
   // Physics
@@ -80,12 +79,14 @@ export const TITLE = {
 export const VISUAL = {
   SHIP_STROKE_WIDTH: 1.25,
   SHIP_GLOW: 1.25,
-  // Thicker short cream dash plus a faint heading ghost — still a shot, never a beam.
-  LASER_STROKE_WIDTH: 3.5,
-  LASER_LENGTH: 24,
-  LASER_TRAIL_LENGTH: 13,
+  // Broad glowing bolts with a bright core and a short trailing streak.
+  LASER_STROKE_WIDTH: 7,
+  LASER_CORE_WIDTH: 2.5,
+  LASER_CORE_COLOR: '#FFF8E1',
+  LASER_LENGTH: 34,
+  LASER_TRAIL_LENGTH: 20,
   LASER_EXPLODE_RADIUS: 16,
-  LASER_GLOW: 6,
+  LASER_GLOW: 14,
   LASER_HIT_TICKS: 4,
   HEALTH_CAPSULE_HEIGHT: 1.5,
   BOUNDARY_STROKE_WIDTH: 1.25,
@@ -139,14 +140,11 @@ export const VISUAL = {
   MINIMAP_VOID_ALPHA: 0.5,
   MINIMAP_RING_ALPHA: 0.85,
   HUD_INSET: 16,
-  HUD_LIFE_SIZE: 14,
-  HUD_LIFE_HEADING: Math.PI / 2,
-  HUD_LIFE_GAP: 6,
-  HUD_SCORE_GAP: 10,
+  HUD_BALANCE_HEIGHT: 14,
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,
-  // Iso-contours: hairline slate, no glow. Index lines are only slightly stronger.
+  // Hairline contours. The steering cone walks one slate ramp from dark climbs to light descents.
   CONTOUR_STROKE_WIDTH: 1,
   CONTOUR_ALPHA: 0.16,
   CONTOUR_INDEX_ALPHA: 0.24,
@@ -184,7 +182,7 @@ export const SHIP = {
   TURN_SPEED: 450, // degrees per second
   THRUST: 5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   MAX_VELOCITY: 2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
-  SIZE: 30, // Surveyor / classic hull height in pixels. Hauler uses kit size.
+  SIZE: 30, // Scout / classic hull height in pixels. Hauler uses kit size.
 
   // Combat
   MAX_LASERS: 5, // maximum lasers a ship can have at once
@@ -332,7 +330,6 @@ export const AUDIO = {
   ORBITAL_PICKUP: ['/sounds/orbital-pickup.m4a', 4, 0.04],
   TAP_EJECT: ['/sounds/tap-eject.m4a', 4, 0.055],
   LOOT_PICKUP: ['/sounds/loot-pickup.m4a', 8, 0.065],
-  CORE_PICKUP: ['/sounds/core-pickup.m4a', 4, 0.04],
   SURVEY_SCAN: ['/sounds/survey-scan.m4a', 3, 0.035],
   RESPAWN: ['/sounds/respawn.m4a', 3, 0.035],
   ASTEROID_EXPLODE: ['/sounds/asteroid-explode.m4a', 5, 0.045],

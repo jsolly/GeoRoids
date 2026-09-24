@@ -31,11 +31,7 @@ describe('Satellite pickups', () => {
     vi.clearAllMocks();
   });
 
-  function addPilot(
-    id = 'pilot',
-    position = { x: 0, y: 0 },
-    kitId: 'surveyor' | 'hauler' = 'surveyor'
-  ) {
+  function addPilot(id = 'pilot', position = { x: 0, y: 0 }, kitId: 'scout' | 'hauler' = 'scout') {
     const pilot = gameEngine.addPlayer(id, id, new RecordingSocket(), position, kitId);
     gameEngine.updatePlayer(id, { spawnProtectionTimer: 0 });
     return pilot;
@@ -116,7 +112,7 @@ describe('Satellite pickups', () => {
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
 
-    expect(pilot.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(pilot.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(pilot.spawnProtectionTimer).toBe(0);
     expect(attached.state).toBe('orbiting');
     expect(attached.ownerId).toBe('pilot');
@@ -141,11 +137,11 @@ describe('Satellite pickups', () => {
     gameEngine.tickSatellitePickups();
 
     expect(gameEngine.getSatellitePickup(pickup.id)?.ownerId).toBe('first');
-    expect(gameEngine.getPlayer('first')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
-    expect(gameEngine.getPlayer('second')?.score).toBe(0);
+    expect(gameEngine.getPlayer('first')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
     gameEngine.tickSatellitePickups();
-    expect(gameEngine.getPlayer('first')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
-    expect(gameEngine.getPlayer('second')?.score).toBe(0);
+    expect(gameEngine.getPlayer('first')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
   });
 
   test('collected hardware stays stored and only one owned satellite can be equipped', () => {
@@ -277,7 +273,7 @@ describe('Satellite pickups', () => {
     expect(respawned?.state).toBe('loose');
     expect(respawned?.ownerId).toBeNull();
     expect(respawned?.health).toBe(SATELLITE_PICKUP.HEALTH);
-    expect(gameEngine.getPlayer('pilot')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.getPlayer('pilot')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
   });
 
   test('owner death releases a damaged orbiting pickup while preserving its remaining health', () => {
@@ -300,7 +296,7 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getSatellitePickup(attached.id)).toEqual(released);
   });
 
-  test('Surveyor mass does not expand a satellite orbit beyond the kit hull', () => {
+  test('Scout mass does not expand a satellite orbit beyond the kit hull', () => {
     addPilot();
     gameEngine.updatePlayer('pilot', { mass: GROWTH.SOFT_MAX_MASS });
     const pilot = gameEngine.getPlayer('pilot');
@@ -317,8 +313,8 @@ describe('Satellite pickups', () => {
     expect(pilot.mass).toBe(GROWTH.SOFT_MAX_MASS);
   });
 
-  test('a Hauler satellite orbits farther than a same-mass Surveyor and clears the barge hull', () => {
-    addPilot('scout', { x: 0, y: 0 }, 'surveyor');
+  test('a Hauler satellite orbits farther than a same-mass Scout and clears the barge hull', () => {
+    addPilot('scout', { x: 0, y: 0 }, 'scout');
     addPilot('barge', { x: 4000, y: 0 }, 'hauler');
     const [scoutPickup, bargePickup] = gameEngine.getAllSatellitePickups();
     assert.ok(scoutPickup);
@@ -371,7 +367,7 @@ describe('Satellite pickups', () => {
     });
     gameEngine.tickSatellitePickups();
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');
-    expect(gameEngine.getPlayer('pilot')?.score).toBe(0);
+    expect(gameEngine.getPlayer('pilot')?.cargo).toBe(0);
   });
 
   test('resetting the world clears pickups', () => {

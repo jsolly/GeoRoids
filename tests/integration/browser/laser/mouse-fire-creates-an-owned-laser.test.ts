@@ -1,6 +1,7 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { PALETTE, VISUAL } from '../../../../src/constants';
+import { VISUAL } from '../../../../src/constants';
+import { PLAYFIELD_CLOSE_SCALE } from '../../../../src/rendering/playfieldCamera';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -10,58 +11,70 @@ import { localPlayerId, observeLaser, parkLaserClient } from './laser-observatio
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
-/** Observe the real animation loop and real core strokes while the shoot packet is in flight. */
+/** Observe actual cached-bolt draws while the shoot packet is in flight. */
 function paintedShotFrames(page: Page) {
   return page.evaluate(
-    async ({ coreWidth, coreLength, coreColor }) => {
-      const original = CanvasRenderingContext2D.prototype.stroke;
-      const originalMoveTo = CanvasRenderingContext2D.prototype.moveTo;
-      const originalLineTo = CanvasRenderingContext2D.prototype.lineTo;
-      let from = { x: 0, y: 0 };
-      let to = { x: 0, y: 0 };
-      CanvasRenderingContext2D.prototype.moveTo = function (
-        this: CanvasRenderingContext2D,
-        x: number,
-        y: number
-      ) {
-        from = { x, y };
-        originalMoveTo.call(this, x, y);
-      };
-      CanvasRenderingContext2D.prototype.lineTo = function (
-        this: CanvasRenderingContext2D,
-        x: number,
-        y: number
-      ) {
-        to = { x, y };
-        originalLineTo.call(this, x, y);
-      };
+    async ({ coreColor, playfieldScale }) => {
+      const original = CanvasRenderingContext2D.prototype.drawImage;
+      const coreMatches = new WeakMap<HTMLCanvasElement, boolean>();
       let painted = 0;
       let started = false;
       let raf = 0;
       const frames: Array<{ count: number; painted: number; x: number; y: number }> = [];
-      CanvasRenderingContext2D.prototype.stroke = function (
+      CanvasRenderingContext2D.prototype.drawImage = function (
         this: CanvasRenderingContext2D,
-        path?: Path2D
+        source: CanvasImageSource,
+        ...coordinates: number[]
       ) {
+        Reflect.apply(original, this, [source, ...coordinates]);
+        const ship = window.gameController?.getPlayerManager().getLocalShip();
+        const shot = ship?.lasers[0];
         if (
-          this.canvas.id === 'gameCanvas' &&
-          this.strokeStyle === coreColor &&
-          this.lineWidth === coreWidth
+          this.canvas.id !== 'gameCanvas' ||
+          !(source instanceof HTMLCanvasElement) ||
+          coordinates.length !== 4 ||
+          !ship ||
+          !shot
         ) {
-          const ship = window.gameController?.getPlayerManager().getLocalShip();
-          const shot = ship?.lasers[0];
-          if (ship && shot) {
-            const x = innerWidth / 2 + shot.position.x - ship.position.x;
-            const y = innerHeight / 2 + shot.position.y - ship.position.y;
-            if (
-              Math.hypot((from.x + to.x) / 2 - x, (from.y + to.y) / 2 - y) < 0.01 &&
-              Math.abs(Math.hypot(to.x - from.x, to.y - from.y) - coreLength) < 0.01
-            ) {
-              painted++;
-            }
-          }
+          return;
         }
-        Reflect.apply(original, this, path ? [path] : []);
+        const [dx, dy, width, height] = coordinates;
+        if (dx === undefined || dy === undefined || !width || !height) {
+          return;
+        }
+        const transform = this.getTransform();
+        const dpr = Math.hypot(transform.a, transform.b);
+        const rect = this.canvas.getBoundingClientRect();
+        const x = rect.width / 2 + (shot.position.x - ship.position.x) * playfieldScale;
+        const y = rect.height / 2 + (shot.position.y - ship.position.y) * playfieldScale;
+        if (Math.hypot(transform.e / dpr - x, transform.f / dpr - y) >= 0.01) {
+          return;
+        }
+        // The sprite origin is the bolt center. Verify its opaque core, not
+        // merely any image drawn at the predicted projectile position.
+        if (!coreMatches.has(source)) {
+          const pixel = source
+            .getContext('2d')
+            ?.getImageData(
+              Math.round((-dx * source.width) / width),
+              Math.round((-dy * source.height) / height),
+              1,
+              1
+            ).data;
+          coreMatches.set(
+            source,
+            Boolean(
+              pixel &&
+                pixel[0] === coreColor[0] &&
+                pixel[1] === coreColor[1] &&
+                pixel[2] === coreColor[2] &&
+                pixel[3] === 255
+            )
+          );
+        }
+        if (coreMatches.get(source)) {
+          painted++;
+        }
       };
       let deadline = 0;
       try {
@@ -93,15 +106,14 @@ function paintedShotFrames(page: Page) {
       } finally {
         clearTimeout(deadline);
         cancelAnimationFrame(raf);
-        CanvasRenderingContext2D.prototype.stroke = original;
-        CanvasRenderingContext2D.prototype.moveTo = originalMoveTo;
-        CanvasRenderingContext2D.prototype.lineTo = originalLineTo;
+        CanvasRenderingContext2D.prototype.drawImage = original;
       }
     },
     {
-      coreWidth: VISUAL.LASER_STROKE_WIDTH,
-      coreLength: VISUAL.LASER_LENGTH,
-      coreColor: PALETTE.LASER_LOCAL.toLowerCase(),
+      coreColor: [1, 3, 5].map((offset) =>
+        Number.parseInt(VISUAL.LASER_CORE_COLOR.slice(offset, offset + 2), 16)
+      ),
+      playfieldScale: PLAYFIELD_CLOSE_SCALE,
     }
   );
 }

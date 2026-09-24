@@ -17,9 +17,9 @@ describe('A pilot joins with a chosen ship kit', () => {
     world.dispose();
   });
 
-  test('the default kit is Surveyor with classic health', () => {
+  test('the default kit is Scout with classic health', () => {
     alice = world.join('Alice');
-    expect(world.entity(alice).kitId).toBe('surveyor');
+    expect(world.entity(alice).kitId).toBe('scout');
     expect(world.entity(alice).maxHealth).toBe(SHIP.MAX_HEALTH);
     expect(world.entity(alice).health).toBe(SHIP.MAX_HEALTH);
   });

@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager } = createBrowserScenarioHooks();
 
@@ -16,18 +17,22 @@ test(
 
     const game = new GameInteractions(page);
     await game.bootGame();
-    await game.waitForAsteroids(1);
+    await arrangeCrewField([await game.getLocalPlayerId()], 'mining');
+    await page.waitForFunction(() =>
+      window.gameController
+        ?.getCurrRoidBelt()
+        .getRoids()
+        .some((rock) => rock.id === 'crew-fixture-ore')
+    );
 
-    const initialScore = await game.getScore();
+    const initialCargo = await game.getCargo();
     const initialMass = await game.getShipMass();
     const roids = await game.getAsteroidPositions();
-    const target =
-      roids.find((roid) => roid.radius < 40 && !roid.isCollabTarget && roid.material === 'ice') ??
-      roids.find((roid) => !roid.isCollabTarget && roid.material === 'ice');
-    expect(target).toBeTruthy();
+    const target = roids.find((roid) => roid.id === 'crew-fixture-ore');
     if (!target) {
-      return;
+      throw new Error('Mining fixture missing');
     }
+    expect(target.material).toBe('ice');
 
     await game.destroyAsteroidWithLaser(target, 25000);
 
@@ -58,11 +63,11 @@ test(
       .poll(
         async () => {
           await game.waitForAnimationFrames(6);
-          return game.getScore();
+          return game.getCargo();
         },
-        { timeout: 10000, message: 'flying over the shard should tick score' }
+        { timeout: 10000, message: 'flying over the shard should add carried points' }
       )
-      .toBeGreaterThan(initialScore);
+      .toBeGreaterThan(initialCargo);
 
     await expect
       .poll(

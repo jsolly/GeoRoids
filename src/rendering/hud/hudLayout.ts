@@ -10,11 +10,12 @@ export type SafeAreaInsets = {
 };
 
 export type HudLayout = {
+  compact: boolean;
   padTop: number;
   padLeft: number;
   padRight: number;
   padBottom: number;
-  lives: { x: number; y: number };
+  balance: { x: number; y: number };
   score: { x: number; y: number };
   notificationY: number;
   leaderboard: {
@@ -28,6 +29,7 @@ export type HudLayout = {
   overlayFontScale: number;
   hudTypeScale: number;
   kitNameY: number;
+  economyBottomY: number;
 };
 
 /** Scale a canvas font such as `14px Arial` for the compact touch HUD. */
@@ -82,14 +84,15 @@ export function computeHudLayout(
   const hudTypeScale = touch ? (viewport.width < 480 ? 1.18 : 1.1) : 1;
 
   if (!touch) {
-    const lives = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
-    const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+    const balance = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
+    const kitNameY = balance.y + VISUAL.HUD_BALANCE_HEIGHT + 8;
     return {
+      compact: false,
       padTop: 0,
       padLeft: 0,
       padRight: 0,
       padBottom: 0,
-      lives,
+      balance,
       score: { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET },
       notificationY: 12,
       leaderboard: {
@@ -107,6 +110,7 @@ export function computeHudLayout(
       overlayFontScale,
       hudTypeScale,
       kitNameY,
+      economyBottomY: kitNameY + 96,
     };
   }
 
@@ -115,12 +119,12 @@ export function computeHudLayout(
   const padTop = Math.max(12, safe.top + 8);
   const padBottom = Math.max(12, safe.bottom + 8);
   const compactHeight = viewport.height < 500;
-  const boardWidth = viewport.width < 400 ? 148 : 168;
+  const boardWidth = Math.min(168, Math.round(viewport.width * 0.3));
   const rowHeight = compactHeight ? 16 : 18;
   const maxRows = 3;
   const miniMapSize = compactHeight ? 64 : 80;
-  const lives = { x: padLeft, y: padTop };
-  const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+  const balance = { x: padLeft, y: padTop };
+  const kitNameY = balance.y + 20;
   const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
@@ -135,13 +139,14 @@ export function computeHudLayout(
       };
 
   return {
+    compact: true,
     padTop,
     padLeft,
     padRight,
     padBottom,
-    lives,
+    balance,
     score: { x: padLeft, y: padTop },
-    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12 + 100,
+    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 64,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
@@ -153,6 +158,7 @@ export function computeHudLayout(
     overlayFontScale,
     hudTypeScale,
     kitNameY,
+    economyBottomY: kitNameY + 18,
   };
 }
 

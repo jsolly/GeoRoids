@@ -1,10 +1,12 @@
 import type { Page } from 'playwright';
 import { WORLD } from '../../../shared/world';
-import type { HaulerUtilityId } from '../../../shared-types';
+import type { EquipmentId, HaulerUtilityId } from '../../../shared-types';
 import { HAULER_UTILITY_STORAGE_KEY } from '../../../src/entities/ship/haulerUtility';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
-import { getWorldDiagnostics, placePlayer } from './test-server-control';
+import { arrangeCrewField, getWorldDiagnostics, placePlayer } from './test-server-control';
+
+let nextPilotNumber = 1;
 
 type CrashAsteroidCandidate = {
   x: number;
@@ -414,27 +416,6 @@ export class GameInteractions {
     });
   }
 
-  /**
-   * Get the current number of lives
-   */
-  async getLives(): Promise<number> {
-    return await this.page.evaluate(() => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('gameController is not available');
-      }
-      const nm = gc.getNetworkManager();
-      const localId = nm.getLocalPlayerId();
-      const fromNetwork = localId ? nm.getPlayer(localId) : undefined;
-      const local = gc.getPlayerManager().getLocalPlayer();
-      const player = fromNetwork ?? local;
-      if (!player) {
-        throw new Error('No local player available');
-      }
-      return player.lives;
-    });
-  }
-
   // ==========================================================================
   // Deterministic test primitives
   //
@@ -444,7 +425,17 @@ export class GameInteractions {
   // no gameplay-hostile debug flags required.
   // ==========================================================================
 
-  /** Server-assigned id of the local player (used as attackerId in damage). */
+  /** Points currently at risk in the hold. */
+  getCargo(): Promise<number> {
+    return this.page.evaluate(() => {
+      const player = window.gameController?.getCurrPlayer();
+      if (!player) {
+        throw new Error('No local player available');
+      }
+      return player.cargo;
+    });
+  }
+
   async getLocalPlayerId(): Promise<string> {
     return await this.page.evaluate(() => {
       const gc = window.gameController;
@@ -492,7 +483,12 @@ export class GameInteractions {
     });
     const placement = await placePlayer(playerId, { x, y });
     await this.waitForFixtureMotionEpoch(placement.motionEpoch);
-    await this.setPredictedShipPosition(x, y, { clearSpawnProtection: true });
+    await this.setPredictedShipPosition(x, y, {
+      clearSpawnProtection: true,
+      ...(placement.motionEpoch !== undefined
+        ? { expectedMotionEpoch: placement.motionEpoch }
+        : {}),
+    });
   }
 
   private async waitForFixtureMotionEpoch(motionEpoch: number | undefined): Promise<void> {
@@ -502,7 +498,9 @@ export class GameInteractions {
     await this.page.waitForFunction(
       (expectedEpoch) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-        return ship?.playerMotion?.epoch === expectedEpoch;
+        // Immediate collision/death can advance this connection's epoch before
+        // the placement snapshot is observed by the test.
+        return (ship?.playerMotion?.epoch ?? -1) >= expectedEpoch;
       },
       motionEpoch,
       { timeout: 5000, polling: 25 }
@@ -512,13 +510,18 @@ export class GameInteractions {
   private async setPredictedShipPosition(
     x: number,
     y: number,
-    options: { clearSpawnProtection?: boolean } = {}
+    options: { clearSpawnProtection?: boolean; expectedMotionEpoch?: number } = {}
   ): Promise<void> {
     await this.page.evaluate(
-      ({ x: worldX, y: worldY, clearSpawnProtection: clearProtection }) => {
+      ({ x: worldX, y: worldY, clearSpawnProtection: clearProtection, expectedMotionEpoch }) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!ship) {
           throw new Error('No local ship to align after fixture placement');
+        }
+        // Check in the same browser task as the writes so a death or respawn
+        // that superseded this placement keeps its authoritative pose.
+        if (expectedMotionEpoch !== undefined && ship.playerMotion?.epoch !== expectedMotionEpoch) {
+          return;
         }
         ship.position = { x: worldX, y: worldY };
         ship.velocity = { x: 0, y: 0 };
@@ -529,7 +532,12 @@ export class GameInteractions {
           ship.spawnProtectionTimer = 0;
         }
       },
-      { x, y, clearSpawnProtection: options.clearSpawnProtection ?? false }
+      {
+        x,
+        y,
+        clearSpawnProtection: options.clearSpawnProtection ?? false,
+        expectedMotionEpoch: options.expectedMotionEpoch,
+      }
     );
   }
 
@@ -771,7 +779,7 @@ export class GameInteractions {
     );
   }
 
-  /** Record the cause carried by the next authoritative life-loss event. */
+  /** Record the cause carried by the next authoritative death event. */
   private async observeNextDeathCause(): Promise<void> {
     await this.page.evaluate(() => {
       const testWindow = window as typeof window & { __testDeathCause?: string };
@@ -790,11 +798,16 @@ export class GameInteractions {
   }
 
   private async requireObservedDeathCause(expected: 'asteroid' | 'boundary'): Promise<void> {
+    await this.page.waitForFunction(
+      () => Boolean((window as typeof window & { __testDeathCause?: string }).__testDeathCause),
+      undefined,
+      { timeout: 5000 }
+    );
     const observed = await this.page.evaluate(
       () => (window as typeof window & { __testDeathCause?: string }).__testDeathCause ?? null
     );
     const expectedLabel = describeDeathCause(expected);
-    if (observed !== expectedLabel) {
+    if (describeDeathCause(observed ?? undefined) !== expectedLabel) {
       throw new Error(`Expected ${expectedLabel} death, observed ${observed ?? 'no causal event'}`);
     }
   }
@@ -816,7 +829,6 @@ export class GameInteractions {
   }
 
   async crashShipIntoAsteroidUntilDestroyed(): Promise<{ x: number; y: number }> {
-    const startLives = await this.getLives();
     await this.observeNextDeathCause();
     const usedAsteroids = new Set<string>();
     let lastImpact = { x: 0, y: 0 };
@@ -851,7 +863,12 @@ export class GameInteractions {
       await this.waitForAnimationFrames(5);
       await this.page.waitForTimeout(100);
 
-      if ((await this.getLives()) < startLives) {
+      const deathObserved = await this.page.evaluate(() =>
+        Boolean((window as typeof window & { __testDeathCause?: string }).__testDeathCause)
+      );
+      if (deathObserved || (await this.getShipHealth()) <= 0) {
+        // The authoritative event survives a respawn between test observations.
+        await this.requireObservedDeathCause('asteroid');
         // Move off the impact point so split fragments cannot re-damage the
         // ship while we wait for the server respawn reposition.
         await this.page.evaluate(({ x, y }) => {
@@ -859,12 +876,14 @@ export class GameInteractions {
           if (!ship) {
             throw new Error('No local ship after asteroid impact');
           }
+          if (ship.health > 0) {
+            return;
+          }
           const dist = Math.hypot(x, y) || 1;
           const step = Math.min(400, dist);
           ship.position = { x: x - (x / dist) * step, y: y - (y / dist) * step };
           ship.velocity = { x: 0, y: 0 };
         }, lastImpact);
-        await this.requireObservedDeathCause('asteroid');
         return lastImpact;
       }
     }
@@ -945,7 +964,8 @@ export class GameInteractions {
           health: ship?.health,
           exploding: ship?.exploding,
           position: ship?.position,
-          lives: player?.lives,
+          cargo: player?.cargo,
+          purchases: player?.purchases,
           deathPosition: deathPoint,
         };
       },
@@ -982,7 +1002,7 @@ export class GameInteractions {
     });
   }
 
-  /** HUD overlay text (game over, death messages). */
+  /** HUD overlay text. */
   async getHudText(): Promise<string> {
     return await this.page.evaluate(() => {
       const gc = window.gameController;
@@ -1080,10 +1100,9 @@ export class GameInteractions {
 
   async dieOnceViaBoundary(): Promise<{ x: number; y: number }> {
     await this.waitForCombatReady();
-    const livesBefore = await this.getLives();
     await this.observeNextDeathCause();
     const loot = await this.getLoot();
-    const rotation = Math.max(0, 3 - livesBefore) * ((Math.PI * 2) / 3);
+    const rotation = 0;
     const deathPosition = Array.from({ length: 24 }, (_, index) => {
       const angle = rotation + (index * Math.PI * 2) / 24;
       const point = {
@@ -1100,42 +1119,26 @@ export class GameInteractions {
     }
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
-      // A final boundary death disconnects before another motion acknowledgement
-      // can arrive. Finish fixture placement inside the arena, then cross the
-      // wall through the real client collision path.
+      // Finish fixture placement inside the arena, then cross the wall through
+      // the real client collision path.
       await this.placeShipAt(
         (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
         (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
       );
       await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
       // Observe enough collision frames for a ship whose collected mass raised
-      // its health above the base 100, including the final game-over transition.
+      // its health above the base 100, before waiting for the authoritative death event.
       await this.waitForAnimationFrames(4);
       await this.page.waitForTimeout(100);
-      if ((await this.getLives()) < livesBefore) {
+      if ((await this.getShipHealth()) <= 0) {
         await this.requireObservedDeathCause('boundary');
-        if ((await this.getLives()) > 0 && (await this.isGameRunning())) {
+        if (await this.isGameRunning()) {
           await this.waitForRandomRespawnPlacement(deathPosition, 25000);
         }
         return { x: deathPosition.x, y: deathPosition.y };
       }
     }
-    throw new Error('boundary crossing should cost a life');
-  }
-
-  /** Burn through all lives until the game-over flow stops the session. */
-  async dieUntilGameOver(): Promise<void> {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const lives = await this.getLives();
-      if (lives <= 0 || !(await this.isGameRunning())) {
-        break;
-      }
-      await this.dieOnceViaBoundary();
-      if ((await this.getLives()) > 0 && (await this.isGameRunning())) {
-        await this.waitForShipAlive(25000);
-        await this.waitForCombatReady();
-      }
-    }
+    throw new Error('boundary crossing should destroy the ship');
   }
 
   /** Wait until the local ship is alive again (ignores respawn placement). */
@@ -1273,13 +1276,87 @@ export class GameInteractions {
     );
   }
 
+  /** Collect real server drops before scenarios that exercise salvaged hardware. */
+  async collectEquipment(equipment: readonly EquipmentId[], selected?: EquipmentId): Promise<void> {
+    const playerId = await this.getLocalPlayerId();
+    const epochs = await arrangeCrewField([playerId], 'equipment');
+    await this.waitForFixtureMotionEpoch(epochs.get(playerId));
+    for (const equipmentId of equipment) {
+      const owned = await this.page.evaluate(
+        (id) => window.gameController?.getCurrPlayer()?.ship.equipment.includes(id),
+        equipmentId
+      );
+      if (owned) {
+        continue;
+      }
+      await this.page.waitForFunction(
+        (id) => window.gameController?.getLoot().some((drop) => drop.kind === id),
+        equipmentId,
+        { timeout: 5000 }
+      );
+      const position = await this.page.evaluate((id) => {
+        const drop = window.gameController?.getLoot().find((item) => item.kind === id);
+        if (!drop) {
+          throw new Error(`Missing equipment fixture drop: ${id}`);
+        }
+        return { ...drop.position };
+      }, equipmentId);
+      await this.placeShipAt(position.x, position.y);
+      try {
+        await this.page.waitForFunction(
+          (id) => window.gameController?.getCurrPlayer()?.ship.equipment.includes(id),
+          equipmentId,
+          { timeout: 5000 }
+        );
+      } catch (error) {
+        const state = await this.page.evaluate(() => {
+          const gc = window.gameController;
+          const ship = gc?.getCurrPlayer()?.ship;
+          return {
+            ship: ship
+              ? {
+                  position: ship.position,
+                  health: ship.health,
+                  exploding: ship.exploding,
+                  equipment: ship.equipment,
+                  movementLocked: ship.movementLocked,
+                  motion: ship.playerMotion,
+                  transit: ship.furnaceTransit,
+                }
+              : null,
+            loot: gc?.getLoot(),
+          };
+        });
+        throw new Error(`Equipment ${equipmentId} was not collected: ${JSON.stringify(state)}`, {
+          cause: error,
+        });
+      }
+    }
+    if (selected) {
+      await this.page.locator('#ship-schematic-toggle').click();
+      await this.page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+      await this.page.locator(`[data-utility-id="${selected}"]`).click();
+      await this.page.waitForFunction(
+        (id) => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          return ship?.haulerUtility === id || ship?.scoutUtility === id;
+        },
+        selected,
+        { timeout: 5000 }
+      );
+      await this.page.locator('#ship-schematic-return').click();
+    }
+  }
+
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
     waitForCombatReady?: boolean;
-    kitId?: 'surveyor' | 'hauler';
+    kitId?: 'scout' | 'hauler';
     haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
     await this.navigateToGame();
+    // Distinct scenario pilots must not collide in the menu's random nickname pool.
+    await this.page.locator('#playerNameInput').fill(`Test pilot ${nextPilotNumber++}`);
     if (options?.haulerUtility) {
       await this.page.evaluate(
         ({ key, utility }) => {

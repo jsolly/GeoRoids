@@ -1,17 +1,17 @@
 import { readReleaseId } from '../../shared/releaseId';
-import { shipPaintById } from '../../shared/townStore';
+import { storeOffer } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type {
   HaulerUtilityId,
   PingMessage,
   Position,
+  ScoutUtilityId,
   ShipKitId,
-  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
+import { isScoutUtilityId } from '../../src/entities/ship/scoutUtility';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
-import { isSurveyorUtilityId } from '../../src/entities/ship/surveyorUtility';
 
 type WireRecord = Record<string, unknown>;
 
@@ -40,6 +40,7 @@ export type ClientCommand =
       resumeToken?: string;
       clientReleaseId?: string;
     }
+  | { type: 'travelFurnace'; id: string; destinationId: string }
   | { type: 'equipSatellite'; id: string; pickupId: string }
   | { type: 'leave' }
   | { type: 'snapshotResync' }
@@ -55,18 +56,14 @@ export type ClientCommand =
       utilityId: HaulerUtilityId;
     }
   | {
-      type: 'setSurveyorUtility';
+      type: 'setScoutUtility';
       id: string;
-      utilityId: SurveyorUtilityId;
+      utilityId: ScoutUtilityId;
     }
   | {
-      type: 'buyShipPaint';
+      type: 'buyStoreItem';
       id: string;
-      paintId: string;
-    }
-  | {
-      type: 'buyExtraLife';
-      id: string;
+      offerId: string;
     }
   | {
       type: 'update';
@@ -297,6 +294,15 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return decodeUpdate(id, fields);
     case 'useAbility':
       return decodeUseAbility(id, fields);
+    case 'travelFurnace': {
+      const destinationId = fields['destinationId'];
+      return id &&
+        typeof destinationId === 'string' &&
+        destinationId.length > 0 &&
+        destinationId.length <= 128
+        ? { ok: true, command: { type, id, destinationId } }
+        : invalid(type, 'Invalid furnace travel request');
+    }
     case 'equipSatellite': {
       const pickupId = fields['pickupId'];
       return id && typeof pickupId === 'string' && pickupId.length > 0 && pickupId.length <= 128
@@ -312,28 +318,23 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Hauler utility');
     }
-    case 'setSurveyorUtility': {
+    case 'setScoutUtility': {
       if (!id) {
-        return invalid(type, 'Missing player ID for setSurveyorUtility');
+        return invalid(type, 'Missing player ID for setScoutUtility');
       }
       const utilityId = fields['utilityId'];
-      return isSurveyorUtilityId(utilityId)
+      return isScoutUtilityId(utilityId)
         ? { ok: true, command: { type, id, utilityId } }
-        : invalid(type, 'Invalid Surveyor utility');
+        : invalid(type, 'Invalid Scout utility');
     }
-    case 'buyShipPaint': {
+    case 'buyStoreItem': {
       if (!id) {
-        return invalid(type, 'Missing player ID for buyShipPaint');
+        return invalid(type, 'Missing player ID for buyStoreItem');
       }
-      const paintId = fields['paintId'];
-      return typeof paintId === 'string' && shipPaintById(paintId)
-        ? { ok: true, command: { type, id, paintId } }
-        : invalid(type, 'Invalid ship paint');
-    }
-    case 'buyExtraLife': {
-      return id
-        ? { ok: true, command: { type, id } }
-        : invalid(type, 'Missing player ID for buyExtraLife');
+      const offerId = fields['offerId'];
+      return typeof offerId === 'string' && storeOffer(offerId)
+        ? { ok: true, command: { type, id, offerId } }
+        : invalid(type, 'Invalid store offer');
     }
     case 'shoot': {
       if (!id) {

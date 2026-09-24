@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { TOWN_SPAWN_RADIUS } from '../../../shared/furnaces';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('supported gameplay message envelopes', () => {
@@ -34,10 +35,18 @@ describe('supported gameplay message envelopes', () => {
         owner
       );
       expect(core.getPlayerCount()).toBe(1);
-      expect(owner.lastReceived('joined')?.data).toMatchObject(identity);
+      expect(owner.lastReceived('joined')?.data).toMatchObject({
+        ...identity,
+        position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      });
       const pilot = engine.getPlayer(identity.id);
       assert.ok(pilot);
       expect(pilot.name).toBe(identity.name);
+      expect(owner.lastReceived('joined')?.data).toMatchObject({ position: pilot.position });
+      expect(Math.hypot(pilot.position.x, pilot.position.y)).toBeCloseTo(TOWN_SPAWN_RADIUS);
+      expect(
+        engine.playerMotion.placeActorForTesting(pilot.id, { x: 0, y: 0 }, engine.getServerTime())
+      ).toBe(true);
 
       core.handleClientMessage(
         {

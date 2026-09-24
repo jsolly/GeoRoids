@@ -14,7 +14,7 @@ import {
   webkit,
 } from 'playwright';
 import { SnapshotDecoder } from '../shared/snapshotProtocol';
-import type { ServerGameSnapshot } from '../shared-types';
+import type { Position, ServerGameSnapshot } from '../shared-types';
 import type { ClientPerformanceMetrics } from '../src/diagnostics/performanceMetrics';
 import { PLAYFIELD_CLOSE_SCALE } from '../src/rendering/playfieldCamera';
 import { finalizeServerWindow, prepareFixture } from './fixture-control';
@@ -424,6 +424,7 @@ const { values } = parseArgs({
     'cpu-profile': { type: 'string' },
     trace: { type: 'string' },
     'chromium-gpu': { type: 'boolean', default: false },
+    headed: { type: 'boolean', default: false },
   },
 });
 assert(
@@ -435,6 +436,7 @@ assert(
   'Browser tracing requires Chromium and one viewport'
 );
 const chromiumGpu = values['chromium-gpu'];
+const headed = values.headed;
 assert(!chromiumGpu || values.browser === 'chromium', 'chromium-gpu requires Chromium');
 const browserLaunchArgs = chromiumGpu ? ['--enable-gpu'] : [];
 const dpr = Number(values.dpr);
@@ -449,7 +451,11 @@ assert(
   'seed must match owned server'
 );
 assert(network === 'clean' || network === 'normal' || network === 'degraded', 'Unknown network');
-assert(workload === 'traversal' || workload === 'combat', 'Unknown scenario');
+assert(
+  workload === 'traversal' || workload === 'combat' || workload === 'dense-combat',
+  'Unknown scenario'
+);
+const combatWorkload = workload !== 'traversal';
 assert(['native', '2', '1.5'].includes(values['render-dpr']), 'Invalid render-dpr');
 assert(['full', 'off'].includes(values['render-glow']), 'Invalid render-glow');
 assert(values.browser === 'chromium' || cpuSlowdown === 1, 'CPU slowdown requires Chromium');
@@ -474,7 +480,7 @@ assert(
 const browserChannel =
   values.browser === 'chromium' ? (chromiumGpu ? 'chromium' : 'playwright-bundled') : 'webkit';
 const cases = [
-  { name: 'desktop', viewport: { width: 1280, height: 900 }, hasTouch: false },
+  { name: 'desktop', viewport: { width: 1920, height: 1080 }, hasTouch: false },
   { name: 'touch-portrait', viewport: { width: 390, height: 844 }, hasTouch: true },
   { name: 'touch-landscape', viewport: { width: 844, height: 390 }, hasTouch: true },
 ].filter((item) => values.viewport === 'all' || values.viewport === item.name);
@@ -558,6 +564,7 @@ function createMeasurement(): Measurement | undefined {
     parameters: {
       browser: values.browser,
       browserChannel,
+      headed,
       dpr,
       cpuSlowdown,
       network,
@@ -605,7 +612,7 @@ function drain(page: Page): Promise<Interval> {
 
 try {
   browser = await (values.browser === 'webkit' ? webkit : chromium).launch({
-    headless: true,
+    headless: !headed,
     args: browserLaunchArgs,
     ...(chromiumGpu ? { channel: 'chromium' } : {}),
   });
@@ -658,7 +665,7 @@ try {
     const intervals: Interval[] = [];
     const warmupIntervals: Interval[] = [];
     const restarts: Array<{
-      kind: 'browser-gameover' | 'peer-rejoin';
+      kind: 'browser-respawn' | 'peer-rejoin';
       startedAt: number;
       durationMs: number;
     }> = [];
@@ -667,6 +674,7 @@ try {
     const finalizedHealth: unknown[] = [];
     const peers: Pilot[] = [];
     let measuring = false;
+    let arranging = false;
     let peerTimer: ReturnType<typeof setInterval> | undefined;
     const sockets: string[] = [];
     let measuredPilotId: string | undefined;
@@ -685,6 +693,52 @@ try {
     const stateGaps: Array<{ from: number; to: number; durationMs: number }> = [];
     let latestAuthoritativeState: ServerGameSnapshot | undefined;
     const populationSamples: unknown[] = [];
+    let sampledCamera:
+      | { position: Position; width: number; height: number; observedAtMs: number }
+      | undefined;
+    let previousHealth:
+      | { entities: Map<string, number>; asteroids: Map<string, number> }
+      | undefined;
+    function viewportWitness(position: Position | undefined, observedAtMs: number) {
+      if (!sampledCamera || !position) {
+        return { relation: 'unknown' };
+      }
+      const inside =
+        Math.abs(position.x - sampledCamera.position.x) * PLAYFIELD_CLOSE_SCALE <=
+          sampledCamera.width / 2 &&
+        Math.abs(position.y - sampledCamera.position.y) * PLAYFIELD_CLOSE_SCALE <=
+          sampledCamera.height / 2;
+      return {
+        relation: inside ? 'inside-last-sampled-viewport' : 'outside-last-sampled-viewport',
+        cameraSampleAgeMs: observedAtMs - sampledCamera.observedAtMs,
+      };
+    }
+    const healthDecreases: Array<{
+      observedAtMs: number;
+      gameTime: number;
+      snapshotSequence: number;
+      collection: 'entities' | 'asteroids';
+      id: string;
+      before: number;
+      after: number;
+      position: Position;
+      viewport: ReturnType<typeof viewportWitness>;
+    }> = [];
+    const authoritativeEvents: Array<Record<string, unknown>> = [];
+    const combatWitness = {
+      healthDecreaseCounts: { entities: 0, asteroids: 0 },
+      authoritativeEventCounts: {
+        asteroidDestroy: 0,
+        shockwave: 0,
+        playerDamaged: 0,
+        asteroidTagged: 0,
+      },
+      healthDecreases,
+      authoritativeEvents,
+      omittedHealthDecreases: 0,
+      omittedAuthoritativeEvents: 0,
+      retainedLimitPerSeries: 4096,
+    };
     let inputSteps = 0;
     const inputSchedule: Array<{
       scheduledAt: number;
@@ -703,6 +757,7 @@ try {
     let traceMeasurementEndAttempted = false;
     const constraints: Record<string, unknown> = {
       browserChannel,
+      headed,
       dpr,
       cpuSlowdown,
       chromiumGpu,
@@ -718,6 +773,9 @@ try {
       deviceScaleFactor: dpr,
     });
     const page = await context.newPage();
+    if (headed) {
+      await page.bringToFront();
+    }
     const loadedBundles: LoadedBundle[] = [];
     const capturedBundleUrls = new Set<string>();
     const bundleCaptureFailures: unknown[] = [];
@@ -821,6 +879,113 @@ try {
               decoder.reset();
               sequence = 0;
               acceptSnapshots = true;
+              previousHealth = undefined;
+            }
+            if (
+              measuring &&
+              !arranging &&
+              (envelope.type === 'asteroidDestroy' ||
+                envelope.type === 'shockwave' ||
+                envelope.type === 'playerDamaged' ||
+                envelope.type === 'asteroidTagged')
+            ) {
+              const data = envelope.data;
+              assert(data && typeof data === 'object', 'Invalid authoritative combat event');
+              const asteroidId =
+                'asteroidId' in data && typeof data.asteroidId === 'string'
+                  ? data.asteroidId
+                  : undefined;
+              let targetPlayerId: string | undefined;
+              let hitDetails: Record<string, unknown> = {};
+              if (envelope.type === 'playerDamaged') {
+                assert(
+                  'targetPlayerId' in data &&
+                    typeof data.targetPlayerId === 'string' &&
+                    'attackerId' in data &&
+                    typeof data.attackerId === 'string' &&
+                    'damage' in data &&
+                    typeof data.damage === 'number' &&
+                    Number.isFinite(data.damage) &&
+                    'remainingHealth' in data &&
+                    typeof data.remainingHealth === 'number' &&
+                    Number.isFinite(data.remainingHealth) &&
+                    'isDestroyed' in data &&
+                    typeof data.isDestroyed === 'boolean',
+                  'Invalid authoritative player damage'
+                );
+                targetPlayerId = data.targetPlayerId;
+                hitDetails = {
+                  targetPlayerId,
+                  attackerId: data.attackerId,
+                  damage: data.damage,
+                  remainingHealth: data.remainingHealth,
+                  isDestroyed: data.isDestroyed,
+                };
+              } else if (envelope.type === 'asteroidTagged') {
+                assert(
+                  asteroidId &&
+                    'shooterId' in data &&
+                    typeof data.shooterId === 'string' &&
+                    'expiresAt' in data &&
+                    typeof data.expiresAt === 'number' &&
+                    Number.isFinite(data.expiresAt),
+                  'Invalid authoritative asteroid tag'
+                );
+                hitDetails = { shooterId: data.shooterId, expiresAt: data.expiresAt };
+              }
+              let eventOrigin: Position | undefined;
+              if ('origin' in data && data.origin !== undefined) {
+                const value = data.origin;
+                assert(
+                  value &&
+                    typeof value === 'object' &&
+                    'x' in value &&
+                    typeof value.x === 'number' &&
+                    Number.isFinite(value.x) &&
+                    'y' in value &&
+                    typeof value.y === 'number' &&
+                    Number.isFinite(value.y),
+                  'Invalid combat event origin'
+                );
+                eventOrigin = { x: value.x, y: value.y };
+              }
+              assert(envelope.type !== 'asteroidDestroy' || asteroidId, 'Destroy event lacks id');
+              assert(envelope.type !== 'shockwave' || eventOrigin, 'Shockwave event lacks origin');
+              combatWitness.authoritativeEventCounts[envelope.type]++;
+              if (authoritativeEvents.length < combatWitness.retainedLimitPerSeries) {
+                const observedAtMs = performance.now();
+                const position =
+                  eventOrigin ??
+                  (envelope.type === 'playerDamaged'
+                    ? latestAuthoritativeState?.entities.find(
+                        (entity) => entity.id === targetPlayerId
+                      )?.position
+                    : latestAuthoritativeState?.asteroids.find(
+                        (asteroid) => asteroid.id === asteroidId
+                      )?.position);
+                authoritativeEvents.push({
+                  type: envelope.type,
+                  ...hitDetails,
+                  observedAtMs,
+                  serverTimestamp:
+                    'timestamp' in envelope && typeof envelope.timestamp === 'number'
+                      ? envelope.timestamp
+                      : null,
+                  asteroidId: asteroidId ?? null,
+                  position: position ? { ...position } : null,
+                  positionSource: eventOrigin
+                    ? 'event-origin'
+                    : position
+                      ? 'latest-snapshot'
+                      : 'unknown',
+                  viewport: viewportWitness(position, observedAtMs),
+                  collabSplit: 'collabSplit' in data && data.collabSplit === true,
+                  consumedBy:
+                    'consumedBy' in data && data.consumedBy === 'furnace' ? 'furnace' : null,
+                });
+              } else {
+                combatWitness.omittedAuthoritativeEvents++;
+              }
             }
             return;
           }
@@ -835,6 +1000,39 @@ try {
           const motion = state.entities.find(
             (entity) => entity.id === measuredPilotId
           )?.playerMotion;
+          if (measuring && !arranging) {
+            const observedAtMs = performance.now();
+            for (const collection of ['entities', 'asteroids'] as const) {
+              for (const actor of state[collection]) {
+                const before = previousHealth?.[collection].get(actor.id);
+                if (before === undefined || actor.health >= before) {
+                  continue;
+                }
+                combatWitness.healthDecreaseCounts[collection]++;
+                if (healthDecreases.length < combatWitness.retainedLimitPerSeries) {
+                  healthDecreases.push({
+                    observedAtMs,
+                    gameTime: state.gameTime,
+                    snapshotSequence: sequence,
+                    collection,
+                    id: actor.id,
+                    before,
+                    after: actor.health,
+                    position: { ...actor.position },
+                    viewport: viewportWitness(actor.position, observedAtMs),
+                  });
+                } else {
+                  combatWitness.omittedHealthDecreases++;
+                }
+              }
+            }
+            previousHealth = {
+              entities: new Map(state.entities.map((entity) => [entity.id, entity.health])),
+              asteroids: new Map(state.asteroids.map((asteroid) => [asteroid.id, asteroid.health])),
+            };
+          } else {
+            previousHealth = undefined;
+          }
           if (!measuring) {
             warmupSnapshotBytes +=
               typeof payload === 'string' ? Buffer.byteLength(payload) : payload.length;
@@ -936,6 +1134,58 @@ try {
     }
     let touchSession: CDPSession | undefined;
     let touchActive = false;
+    let desktopFireTimer: ReturnType<typeof setInterval> | undefined;
+    let desktopFirePending: Promise<void> | undefined;
+    const desktopFire = {
+      periodMs: 250,
+      measuredOffered: 0,
+      measuredCompleted: 0,
+      measuredSkippedSlots: 0,
+    };
+    function startDesktopFire(): void {
+      if (desktopFireTimer !== undefined) {
+        return;
+      }
+      let nextSlot = performance.now() + desktopFire.periodMs;
+      desktopFireTimer = setInterval(() => {
+        const now = performance.now();
+        const missedSlots = Math.max(0, Math.floor((now - nextSlot) / desktopFire.periodMs));
+        nextSlot += (missedSlots + 1) * desktopFire.periodMs;
+        const measured = measuring;
+        if (measured) {
+          desktopFire.measuredSkippedSlots += missedSlots;
+        }
+        if (desktopFirePending) {
+          if (measured) {
+            desktopFire.measuredSkippedSlots++;
+          }
+          return;
+        }
+        if (measured) {
+          desktopFire.measuredOffered++;
+        }
+        desktopFirePending = page.keyboard
+          .press('Space')
+          .then(() => {
+            if (measured) {
+              desktopFire.measuredCompleted++;
+            }
+          })
+          .catch((error: unknown) => {
+            errors.push(`Desktop combat firing failed: ${String(error)}`);
+            clearInterval(desktopFireTimer);
+            desktopFireTimer = undefined;
+          })
+          .finally(() => {
+            desktopFirePending = undefined;
+          });
+      }, desktopFire.periodMs);
+    }
+    async function stopDesktopFire(): Promise<void> {
+      clearInterval(desktopFireTimer);
+      desktopFireTimer = undefined;
+      await desktopFirePending;
+    }
     try {
       const cpuSession =
         values.browser === 'chromium' ? await context.newCDPSession(page) : undefined;
@@ -1074,10 +1324,13 @@ try {
           touchPoints: navigator.maxTouchPoints,
           backing: canvas ? { width: canvas.width, height: canvas.height } : null,
           visibility: document.visibilityState,
+          canvasVisible: canvas?.checkVisibility() ?? false,
           clientReleaseId: window.georoidsPerformance?.read().clientReleaseId,
           serverReleaseId: window.georoidsPerformance?.read().serverReleaseId,
         };
       });
+      assert.equal(metadata['visibility'], 'visible', 'Admitted page is hidden');
+      assert.equal(metadata['canvasVisible'], true, 'Admitted game canvas is hidden');
       assert.equal(metadata['dpr'], dpr, 'Browser device DPR differs from request');
       const backing = metadata['backing'];
       const css = metadata['css'];
@@ -1128,7 +1381,7 @@ try {
         deliveryBudget: () => delivery,
         repeatMeasuredPings: false,
       });
-      for (let index = 0; index < (workload === 'combat' ? 4 : 0); index++) {
+      for (let index = 0; index < (combatWorkload ? 4 : 0); index++) {
         await delay(1500);
         const peer = new Pilot(index, protocolPeerOptions(index));
         peers.push(peer);
@@ -1141,9 +1394,9 @@ try {
         }
         assert(peer.state, 'Protocol peer failed admission');
       }
-      let arranging = false;
       let preparedJoins: number[] = [];
       async function arrange(target: Interval[]) {
+        previousHealth = undefined;
         // Stop starting new attempts after 30 seconds. In-flight control and
         // menu operations retain their own bounded deadlines.
         const deadline = performance.now() + 30_000;
@@ -1154,7 +1407,8 @@ try {
               const controller = window.gameController;
               const player = controller?.getCurrPlayer();
               return player &&
-                player.lives > 0 &&
+                player.ship.health > 0 &&
+                !player.ship.exploding &&
                 controller?.getNetworkManager().isConnected &&
                 window.georoidsPerformance &&
                 !window.georoidsPerformance.read().pendingJoin
@@ -1206,7 +1460,7 @@ try {
                 return {
                   departed:
                     player?.id !== playerId ||
-                    (player?.lives ?? 0) <= 0 ||
+                    (player?.ship.health ?? 0) <= 0 ||
                     !window.gameController?.getNetworkManager().isConnected ||
                     !interval ||
                     interval.pendingJoin,
@@ -1292,7 +1546,10 @@ try {
         peerTick++;
       }, 50);
       // Real input and real animation frames. No manual updateGame or source-module imports.
-      async function releaseInput() {
+      async function releaseInput({ stopFiring = true } = {}) {
+        if (stopFiring) {
+          await stopDesktopFire();
+        }
         if (touchActive) {
           assert(touchSession, 'Active touch must have an owning session');
           await touchSession.send('Input.dispatchTouchEvent', {
@@ -1304,6 +1561,9 @@ try {
         if (!scenario.hasTouch || values.browser !== 'chromium') {
           await page.keyboard.up('ArrowUp');
           await page.keyboard.up('ArrowLeft');
+          if (stopFiring) {
+            await page.keyboard.up('Space');
+          }
         }
       }
       async function applyInput() {
@@ -1314,7 +1574,7 @@ try {
         };
         inputActions.push(action);
         inputSteps++;
-        await releaseInput();
+        await releaseInput({ stopFiring: false });
         if (scenario.hasTouch && values.browser === 'chromium') {
           touchSession ??= await context.newCDPSession(page);
           const playfield = await page.locator('#gameCanvas').boundingBox();
@@ -1347,7 +1607,11 @@ try {
         } else {
           await page.keyboard.down('ArrowUp');
           await page.keyboard.down('ArrowLeft');
-          await page.keyboard.press('Space');
+          if (combatWorkload) {
+            startDesktopFire();
+          } else {
+            await page.keyboard.press('Space');
+          }
           if (inputSteps % 20 === 0) {
             await page.keyboard.press('e');
           }
@@ -1360,8 +1624,14 @@ try {
       async function recoverBrowser(target: Interval[]) {
         const restartAt = performance.now();
         await releaseInput();
-        await page.locator('#start-game').waitFor({ state: 'visible', timeout: 6000 });
-        await page.locator('#start-game').click();
+        await page.waitForFunction(
+          () => {
+            const player = window.gameController?.getCurrPlayer();
+            return player && player.ship.health > 0 && !player.ship.exploding;
+          },
+          undefined,
+          { timeout: 15000 }
+        );
         await page.waitForFunction(
           () =>
             window.gameController?.getNetworkManager().isConnected &&
@@ -1372,7 +1642,7 @@ try {
         );
         target.push(await drain(page));
         restarts.push({
-          kind: 'browser-gameover',
+          kind: 'browser-respawn',
           startedAt: restartAt,
           durationMs: performance.now() - restartAt,
         });
@@ -1405,6 +1675,10 @@ try {
             peers.some((peer, index) => peer.gameJoins !== expectedJoins[index]);
           const awaitingPeerState = () => peers.some((peer) => !peer.state);
           if (peerJoinsChanged(preparedJoins)) {
+            assert(
+              workload !== 'dense-combat',
+              'Dense combat lost a peer; refusing to reseed its asteroid field'
+            );
             const restartAt = performance.now();
             await releaseInput();
             const deadline = performance.now() + 10_000;
@@ -1439,6 +1713,7 @@ try {
                 }
               : null;
           });
+          sampledCamera = camera ? { ...camera, observedAtMs: performance.now() } : undefined;
           if (camera && latestAuthoritativeState) {
             const state = latestAuthoritativeState;
             const visible = (position: { x: number; y: number }) =>
@@ -1448,6 +1723,7 @@ try {
             const populations = {
               players: state.entities,
               asteroids: state.asteroids,
+              loot: state.loot,
               pickups: state.satellitePickups,
               projectiles: state.playerProjectiles,
             };
@@ -1478,21 +1754,13 @@ try {
             Object.values(interval.metrics).every((metric) => metric.omittedSamples === 0),
             'Raw samples omitted'
           );
-          const dead = await page.evaluate(
-            () => (window.gameController?.getCurrPlayer()?.lives ?? 0) <= 0
+          const frames = Object.entries(interval.metrics)
+            .filter(([name]) => name.endsWith('.frameCpuMs'))
+            .reduce((sum, [, metric]) => sum + metric.count, 0);
+          assert(
+            frames > 0 || interval.durationMs < 100,
+            'No active game frames during observation'
           );
-          if (dead) {
-            await recoverBrowser(target);
-            await arrange(target);
-          } else {
-            const frames = Object.entries(interval.metrics)
-              .filter(([name]) => name.endsWith('.frameCpuMs'))
-              .reduce((sum, [, metric]) => sum + metric.count, 0);
-            assert(
-              frames > 0 || interval.durationMs < 100,
-              'No active game frames during observation'
-            );
-          }
           const response = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) });
           assert(response.ok, 'Server health failed');
           const healthSample: unknown = await response.json();
@@ -1559,6 +1827,7 @@ try {
       const stateMeasuredEnded = performance.now();
       measurementStoppedAt = stateMeasuredEnded;
       measuring = false;
+      await stopDesktopFire();
       clearInterval(peerTimer);
       for (const peer of peers) {
         peer.stopMeasurement();
@@ -1758,6 +2027,8 @@ try {
         measuredServerWindows,
         serverMeasurement: { startedAt: serverBoundary.endedAt, endedAt: serverTail.endedAt },
         populationSamples,
+        combatWitness,
+        desktopFire,
         inputSteps,
         inputActions,
         inputSchedule,
@@ -1786,7 +2057,9 @@ try {
         input:
           scenario.hasTouch && values.browser === 'chromium'
             ? 'trusted simultaneous playfield steering/fire'
-            : 'keyboard thrust/turn and four shots per second',
+            : combatWorkload
+              ? 'keyboard thrust/turn with trusted Space presses offered every 250ms'
+              : 'keyboard thrust/turn and one shot offered per second',
         status: errors.length || warnings.length ? 'failed' : 'passed',
       });
     } catch (error) {
@@ -1814,6 +2087,8 @@ try {
         fixtures,
         finalizedHealth,
         populationSamples,
+        combatWitness,
+        desktopFire,
         inputSteps,
         inputActions,
         inputSchedule,
@@ -1843,6 +2118,7 @@ try {
     } finally {
       measuredIntervals.push(...intervals);
       measuring = false;
+      await stopDesktopFire();
       try {
         await markTraceMeasurementEnd();
       } catch (error) {
@@ -1959,6 +2235,7 @@ try {
           name: values.browser ?? 'chromium',
           version: browserVersion,
           launchFlags: browserLaunchArgs,
+          headed,
         },
         gpu,
         measurementSource: cases.some((scenario) => scenario.hasTouch) ? 'emulated-touch' : 'host',
@@ -1969,6 +2246,7 @@ try {
     details: {
       browser: values.browser,
       browserChannel,
+      headed,
       browserVersion,
       cleanupComplete,
       profileRecorded,

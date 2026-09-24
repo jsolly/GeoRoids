@@ -18,11 +18,11 @@ npm run dev
 
 Vite serves the client at `http://localhost:5173`; the game server listens on port 3001. `npm run dev` routes `/ws` and `/logs` through the Vite origin to the local server, including custom dev ports. A public HTTPS tunnel to Vite therefore also carries the game WebSocket, so phones never connect to their own `localhost`. Direct Vite and production endpoint configuration is documented in `.env.example`.
 
-Choose a ship, enter the game, steer with the mouse or left/right arrow keys while thrust stays on, Space to fire, E to scan as Surveyor or attach/release cargo as Hauler. Mobile players use the on-screen controls. The minimap follows your ship through the 120,000-unit-wide world. Shared fog records discoveries; Surveyors reveal more terrain, and discovered furnaces remain marked.
+Choose a ship, enter the game, steer with the mouse or left/right arrow keys while thrust stays on, Space to fire, E to scan as Scout or attach/release cargo as Hauler. Mobile players use the on-screen controls. The minimap follows your ship through the 120,000-unit-wide world. Shared fog records discoveries; Scouts reveal more terrain, and discovered furnaces remain marked.
 
-Every player belongs to the crew. Direct crew lasers pass through ships; a bounced shot becomes a ricochet that can hurt you or another pilot. Tow a scanned asteroid into a furnace to give both the Hauler and its Surveyors the full reward, including Surveyors who are offline.
+Every player belongs to the crew. Direct crew lasers pass through ships; a bounced shot becomes a ricochet that can hurt you or another pilot. Tow a scanned asteroid into a furnace to give both the Hauler and its Scouts the full reward, including Scouts who are offline.
 
-Reflective asteroid clusters can bounce lasers and release laser-core upgrades. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, core charges and the shared snapshot behavior.
+Reflective asteroid clusters can bounce lasers and release ordinary salvage. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, ricochet energy and the shared snapshot behavior.
 
 ## Field manual
 

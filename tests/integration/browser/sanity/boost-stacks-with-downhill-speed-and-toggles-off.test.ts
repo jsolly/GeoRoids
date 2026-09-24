@@ -9,11 +9,12 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 test.each(['Shift', 'right-click'])(
-  '%s boost raises Surveyor cruise and a second press returns to downhill cruise',
+  '%s boost raises Scout cruise and a second press returns to downhill cruise',
   async (input) => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -30,8 +31,14 @@ test.each(['Shift', 'right-click'])(
       }
     };
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
-    await game.placeShipAt(-2200, 650);
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    // This seeded route descends a steep east-facing slope, outside passages.
+    const slope = await page.evaluate(() =>
+      window.gameController?.getTerrainProbe({ x: 3090, y: 1150 })
+    );
+    expect(slope?.gradient.x).toBeGreaterThan(TERRAIN.TRAVEL_STEEP_GRADIENT);
+    await game.placeShipAt(3090, 1150);
     await game.armSpawnProtection();
     await page.evaluate(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -80,9 +87,7 @@ test.each(['Shift', 'right-click'])(
       }
       return Math.hypot(ship.velocity.x, ship.velocity.y);
     });
-    expect(boosted).toBeLessThanOrEqual(
-      downhillCap * getShipKit('surveyor').boostMultiplier + 1e-6
-    );
+    expect(boosted).toBeLessThanOrEqual(downhillCap * getShipKit('scout').boostMultiplier + 1e-6);
 
     if (input === 'right-click') {
       await page.screenshot({ path: screenshotManager.getScreenshotPath('boost-desktop.png') });
@@ -118,13 +123,16 @@ test.each(['Shift', 'right-click'])(
       ]) {
         await page.setViewportSize(viewport);
         for (const article of [
-          { id: 'controls', text: 'Right-click toggles Boost on,' },
+          { id: 'controls', text: 'right-click to toggle Boost' },
           { id: 'terrain', text: 'Boost stacks with downhill speed' },
-          { id: 'hauler', text: 'a cable winch and hook' },
-          { id: 'surveyor', text: 'The sweep is a visual cue' },
-          { id: 'asteroids', text: 'roughly four drifting rocks' },
+          { id: 'hauler', text: 'Cargo keeps its momentum' },
+          { id: 'scout', text: 'turns faster and boosts harder than Hauler' },
+          { id: 'asteroids', text: 'Fresh interior sectors have' },
         ]) {
           await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
+          if (article.id === 'asteroids') {
+            await page.locator('.game-reference summary').click();
+          }
           await page.getByText(article.text, { exact: false }).waitFor();
           await page.screenshot({
             path: screenshotManager.getScreenshotPath(`boost-${article.id}-${viewport.name}.png`),

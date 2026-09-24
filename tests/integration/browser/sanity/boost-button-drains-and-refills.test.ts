@@ -21,7 +21,7 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await installAudioProbe(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     const id = await page.evaluate(() => window.gameController?.getCurrPlayer()?.id);
     if (!id) {
       throw new Error('Missing pilot');
@@ -31,6 +31,10 @@ for (const viewport of [
     const button = page.locator('#touch-boost');
     await button.waitFor({ state: 'visible' });
     await expect.poll(() => button.isEnabled()).toBe(true);
+    await expect.poll(() => button.textContent()).toBe('BOOST');
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`boost-ready-${viewport.name}.png`),
+    });
     const activate = () => (viewport.touch ? button.tap() : button.click());
     await activate();
     await page.waitForFunction(() => {
@@ -112,7 +116,7 @@ test('a narrow-phone Debug overlay keeps boost and the ability disc fully on scr
   await page.setViewportSize({ width: 390, height: 650 });
   await page.addInitScript(() => localStorage.setItem('debugOn', 'true'));
   const game = new GameInteractions(page);
-  await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+  await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
   await game.placeShipAt(0, -500);
   const panel = page.locator('#debug-hud');
   const boost = page.locator('#touch-boost');

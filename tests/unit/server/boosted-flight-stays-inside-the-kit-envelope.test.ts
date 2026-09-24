@@ -18,36 +18,32 @@ beforeEach(() => {
 });
 afterEach(() => world.dispose());
 
-test('a boosting Surveyor may cruise faster than a boosting Hauler, and overspeed is rejected', () => {
-  const surveyorPilot = world.join('Boost Surveyor', { x: 0, y: 0 }, { kitId: 'surveyor' });
+test('a boosting Scout may cruise faster than a boosting Hauler, and overspeed is rejected', () => {
+  const scoutPilot = world.join('Boost Scout', { x: 0, y: 0 }, { kitId: 'scout' });
   const haulerPilot = world.join('Boost Hauler', { x: 40, y: 0 }, { kitId: 'hauler' });
   world.clearAsteroids();
-  const surveyor = world.entity(surveyorPilot);
+  const scout = world.entity(scoutPilot);
   const hauler = world.entity(haulerPilot);
   const now = world.engine.getServerTime();
-  const surveyorKit = getShipKit('surveyor');
+  const scoutKit = getShipKit('scout');
   const haulerKit = getShipKit('hauler');
-  const surveyorBoost = cruiseSpeed(
-    surveyor.mass,
-    surveyorKit.maxVelocity,
-    surveyorKit.boostMultiplier
-  );
+  const scoutBoost = cruiseSpeed(scout.mass, scoutKit.maxVelocity, scoutKit.boostMultiplier);
   const haulerBoost = cruiseSpeed(hauler.mass, haulerKit.maxVelocity, haulerKit.boostMultiplier);
-  expect(surveyorBoost).toBeGreaterThan(haulerBoost);
-  expect(surveyorKit.maxVelocity).toBe(haulerKit.maxVelocity);
+  expect(scoutBoost).toBeGreaterThan(haulerBoost);
+  expect(scoutKit.maxVelocity).toBe(haulerKit.maxVelocity);
 
-  const surveyorPose = {
-    epoch: surveyor.playerMotion?.epoch ?? 0,
+  const scoutPose = {
+    epoch: scout.playerMotion?.epoch ?? 0,
     sequence: 1,
-    position: { x: surveyorBoost, y: 0 },
-    velocity: { x: surveyorBoost, y: 0 },
+    position: { x: scoutBoost, y: 0 },
+    velocity: { x: scoutBoost, y: 0 },
     angle: 0,
     thrusting: true,
     boosting: true,
   };
-  expect(
-    world.engine.playerMotion.acceptFreePose(surveyorPilot.socket, surveyorPose, now + 17).ok
-  ).toBe(true);
+  expect(world.engine.playerMotion.acceptFreePose(scoutPilot.socket, scoutPose, now + 17).ok).toBe(
+    true
+  );
 
   const haulerPose = {
     epoch: hauler.playerMotion?.epoch ?? 0,
@@ -69,8 +65,8 @@ test('a boosting Surveyor may cruise faster than a boosting Hauler, and overspee
         ...haulerPose,
         epoch: hauler.playerMotion?.epoch ?? 0,
         sequence: 2,
-        position: { x: 40 + surveyorBoost, y: 0 },
-        velocity: { x: surveyorBoost, y: 0 },
+        position: { x: 40 + scoutBoost, y: 0 },
+        velocity: { x: scoutBoost, y: 0 },
       },
       now + 34
     ).ok
@@ -78,7 +74,7 @@ test('a boosting Surveyor may cruise faster than a boosting Hauler, and overspee
 });
 
 test('a pilot must release and reactivate boost but can spend a partially recharged tank', () => {
-  const pilot = world.join('Burst', { x: 0, y: 0 }, { kitId: 'surveyor' });
+  const pilot = world.join('Burst', { x: 0, y: 0 }, { kitId: 'scout' });
   const actor = world.entity(pilot);
   const motion = world.engine.playerMotion;
   const now = world.engine.getServerTime();
@@ -184,7 +180,7 @@ test('a predicted-empty pose spends the last fraction and starts recharge withou
 });
 
 test('disconnect and handoff remove boosted velocity without refilling the tank', () => {
-  const pilot = world.join('Disconnect speed', { x: 0, y: 0 }, { kitId: 'surveyor' });
+  const pilot = world.join('Disconnect speed', { x: 0, y: 0 }, { kitId: 'scout' });
   const actor = world.entity(pilot);
   const motion = world.engine.playerMotion;
   const now = world.engine.getServerTime();
@@ -219,7 +215,7 @@ test('disconnect and handoff remove boosted velocity without refilling the tank'
 });
 
 test('a pilot can restart partial boost after a motion correction resets the epoch', () => {
-  const pilot = world.join('Corrected boost', { x: 0, y: 0 }, { kitId: 'surveyor' });
+  const pilot = world.join('Corrected boost', { x: 0, y: 0 }, { kitId: 'scout' });
   const actor = world.entity(pilot);
   const motion = world.engine.playerMotion;
   const now = world.engine.getServerTime();
@@ -280,7 +276,7 @@ test('a pilot can boost immediately after dying during a burst and respawning', 
   expect(actor.boost.phase).toBe('active');
 });
 
-test.each(['surveyor', 'hauler'] as const)(
+test.each(['scout', 'hauler'] as const)(
   '%s reports downhill speed, fires, and turns across contours without server corrections',
   (kitId) => {
     const pilot = world.join('Contour pilot', { x: 2250, y: 0 }, { kitId });

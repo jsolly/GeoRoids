@@ -33,10 +33,10 @@ function mineral(material: AsteroidMaterial, size = 36): AsteroidData {
 }
 
 describe('mineral asteroids break with distinct rewards', () => {
-  test('a shared field supplies all three readable contours and syncs them to a joining pilot', () => {
+  test('a shared field supplies all four readable contours and syncs them to a joining pilot', () => {
     const rocks = new AsteroidManager(new RNGService(42)).createAsteroids(6);
     expect(new Set(rocks.map((rock) => rock.material))).toEqual(
-      new Set(['ice', 'metal', 'rubble'])
+      new Set(['ice', 'metal', 'rubble', 'crystal'])
     );
     expect(new Set(rocks.map((rock) => rock.size)).size).toBeGreaterThan(1);
     expect(rocks.every((rock) => rock.size >= 18 && rock.size <= 48)).toBe(true);

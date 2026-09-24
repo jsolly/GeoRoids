@@ -9,6 +9,8 @@ import {
   tickTouchControls,
 } from '../../../src/input/touchControls';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
+import * as townStore from '../../../src/ui/townStore';
 
 let player: Player;
 let canvas: HTMLCanvasElement;
@@ -21,7 +23,7 @@ beforeEach(() => {
     type: 'local',
     input: new MockPlayerInput(),
   });
-  // Stay outside Town Square so E/ability tests exercise kit tools, not Enter store.
+  // Keep ordinary tool scenarios away from contextual furnace actions.
   player.ship.position = { x: 2_000, y: 0 };
   canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
@@ -462,4 +464,44 @@ test('a nearby second finger keeps firing after the reserved steer id disappears
   expect(controlSources.pointerHeading).not.toBe(heading);
   expect(controlSources.touchFire).toBe(true);
   expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+});
+
+test('releasing a tow while entering furnace range does not turn the same touch into store entry', () => {
+  player.ship.position = { x: 500, y: 0 };
+  player.ship.harpoonTargetId = 'tow-rock';
+  const activate = vi.spyOn(player.ship, 'activateAbility').mockImplementation(() => {
+    player.ship.harpoonTargetId = null;
+    player.ship.position = { x: 0, y: 0 };
+    return true;
+  });
+  const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
+  const ability = document.querySelector<HTMLElement>('#touch-ability');
+  if (!ability) {
+    throw new Error('Ability button missing');
+  }
+  ability.setPointerCapture = vi.fn();
+  ability.hasPointerCapture = () => false;
+  pointer('pointerdown', 81, 0, 330, 164, ability);
+  expect(activate).toHaveBeenCalledTimes(1);
+  pointer('pointerup', 81, 10, 330, 164, ability);
+  touchChange('touchend', []);
+  ability.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(openStore).not.toHaveBeenCalled();
+});
+
+test('furnace prompt entry waits for the completed click and survives touch-end cleanup', () => {
+  player.ship.position = { x: 0, y: 0 };
+  vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
+  const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
+  syncFurnaceTravelPrompt();
+  const prompt = document.querySelector<HTMLElement>('#furnace-travel-prompt button');
+  if (!prompt) {
+    throw new Error('Furnace prompt missing');
+  }
+  pointer('pointerdown', 82, 0, 195, 500, prompt);
+  pointer('pointerup', 82, 10, 195, 500, prompt);
+  touchChange('touchend', []);
+  expect(openStore).not.toHaveBeenCalled();
+  prompt.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(openStore).toHaveBeenCalledTimes(1);
 });

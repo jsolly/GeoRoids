@@ -3,6 +3,7 @@ import { logger } from '../../setup/serverLogger';
 import { tickAsteroidBoost } from '../../shared/asteroidBoost';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { isColossalAsteroid } from '../../shared/asteroidScale';
+import { oreResource } from '../../shared/economy';
 import { FurnaceField } from '../../shared/furnaceField';
 import { WORLD } from '../../shared/world';
 import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
@@ -25,13 +26,13 @@ export type AsteroidHitOutcome = {
   newAsteroids: AsteroidData[];
   split: boolean;
   expiresAt?: number;
-  /** Laser miners and Surveyors credited for this destruction. */
+  /** Laser miners and Scouts credited for this destruction. */
   contributors?: string[];
 };
 
 export type ExpiredCollabHit = {
   playerId: string;
-  /** Every laser miner and Surveyor credited for the destroyed deposit. */
+  /** Every laser miner and Scout credited for the destroyed deposit. */
   contributors: string[];
   points: number;
   destroyed: AsteroidData;
@@ -60,7 +61,8 @@ export class AsteroidManager {
 
   constructor(
     rngService: RNGService,
-    private readonly furnaces = new FurnaceField()
+    private readonly furnaces = new FurnaceField(),
+    private readonly onDestroyed?: (rock: AsteroidData) => void
   ) {
     this.rng = rngService;
   }
@@ -517,6 +519,7 @@ export class AsteroidManager {
       this.asteroids.set(fragment.id, fragment);
     }
 
+    this.onDestroyed?.(destroyed);
     return {
       outcome: 'destroyed',
       destroyed,
@@ -578,6 +581,8 @@ export class AsteroidManager {
         vertices: newVertices,
         offsets: newOffsets,
         ...(destroyed.material ? { material: destroyed.material } : {}),
+        ore: oreResource(destroyed),
+        surveyedBy: [...(destroyed.surveyedBy ?? [])],
       });
     }
 

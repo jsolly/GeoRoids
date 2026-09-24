@@ -44,11 +44,11 @@ excessive cable separation. An explicit null target clears the client's cached
 latch. Reconnection uses authoritative attachment state and never replays an
 ability request.
 
-Surveyor snapshots include optional `surveyorUtility` (`mineral_scan` or
+Scout snapshots include optional `scoutUtility` (`mineral_scan` or
 `survey_probe`; missing means mineral scan). Retired wire token `build_furnace`
-still decodes and readers map it to mineral scan; `setSurveyorUtility` rejects
-it. Near a dark street lot within approach range, `useAbility` builds that
-street instead of launching the equipped scan or probe. Clients never submit a
+still decodes and readers map it to mineral scan; `setScoutUtility` rejects
+it. Near a dark furnace lot within approach range, `useAbility` builds that
+furnace instead of launching the equipped scan or probe. Clients never submit a
 probe pose, target, health, or expiry.
 An asteroid's optional `probe` stores its beacon ID, owner, health, maximum
 health, attachment and expiry times in epoch milliseconds, and its local angle
@@ -56,17 +56,20 @@ and radial offset. The client derives the moving beacon pose from the host.
 An explicit null or absence in a complete asteroid row clears the beacon.
 The server owns attachment, damage, scan pulses, expiry, and replacement.
 
-`civicModules` lists lit street furnaces with `builderName` and an optional
-`builderId`. That id is the public pilot who paid; older unnamed streets omit
-it and grant no delivery bonus. `buyShipPaint` accepts the socket owner's id
-and a catalog `paintId` while that ship is inside the Town Square store.
-Success replies `townStoreResult` with the notice, the new score, and the
-catalog color, then broadcasts. `buyExtraLife` accepts the socket owner's id
-while that ship is inside the store. Success replies `townStoreResult` with
-the notice, the new score, and the new life count, then broadcasts. A refusal
-replies with the notice only and spends nothing. The storefront sells one
-extra life at a time, up to 6 lives. A request for another pilot's id is
-ignored. Player `color` stays the kit default until a catalog paint is worn.
+`civicModules` lists lit furnaces with `builderName` and an optional
+`builderId`. That id is the public pilot who paid; older unnamed furnaces omit
+it. Attribution does not change delivery rewards. `buyStoreItem` accepts the
+socket owner's id and catalog `offerId`. The server checks living state,
+Town Square proximity, settlement level, bank balance, and existing receipt.
+Success returns `townStoreResult` with a notice, banked `score`, and `purchases`.
+Repeated purchases spend nothing. Placeholder offers grant no gameplay effect.
+Old owned hull colors remain readable, but paint and life purchases are retired.
+
+Entities carry `cargo`, banked `score`, and `purchases`; there is no lives field.
+World snapshots include `settlement` with level, points and four resource balances.
+Asteroids may contain `ore` (null means barren); older rows derive it from a stable
+ID hash. Point loot has kind `points` and a point quantity. Furnace refinement
+credits resources once per rock and personal rewards once per distinct contributor.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
@@ -269,3 +272,22 @@ acknowledgments without letting an older echo undo a newer toggle. Active echoes
 cannot replenish an active tank or restart a locally exhausted one. Respawns
 restore a full tank; brief reconnects preserve the tank, and persisted recent
 flights restore it with elapsed inactive recharge. Menus stop active boost.
+
+## Asteroid belt
+
+`beltRecovery` lists imminent belt replacements with `slot`, `position`, `size`
+and absolute `recoverAt` time. An empty list clears warnings. Clients draw a
+non-colliding amber ring before the authoritative replacement appears.
+
+Belt spiders share `spiderField.spiders` with terrain spiders. Their `crawler`
+object contains `hostId`, the surface `anchor`, phase (`crawling`, `winding`,
+`lunging`, `recovering` or `escaping`) and normalized `progress`. Position, health and
+attack targets remain server-owned. Clients render rock-occluded crawlers as
+faint silhouettes, rather than exposing a shootable target through cover.
+`beltCrawlerHealth` on an asteroid carries persistent occupant health; parallel
+`beltCrawlerIds` retain identity when a spider transfers to another host. Zero
+health entries prevent revival on sector reload. During `escaping`, `hostId`
+and `anchor` identify the destination, while `position` follows the visible leap.
+This phase covers both pursuit hops between living rocks and escapes from a
+destroyed host. The client folds the legs instead of drawing feet attached across
+the gap.

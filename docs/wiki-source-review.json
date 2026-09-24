@@ -1,5 +1,5 @@
 {
-  "note": "Merged current main. Mobile inventory copy wraps across the panel, and the small-screen test requires the stacked copy to use the dialog width. This merge does not change a wiki article.",
+  "note": "Merged current main. Mobile inventory copy wraps across the panel, and the small-screen test measures that copy against the dialog width. This merge does not change a wiki article.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -338,7 +338,7 @@
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:2e0d0d0f52719ed039b0891cc7d145cc0d3195291c539e85f25f9ea21511b36c",
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts": "sha256:b6d78d1ccb3a79b970ea0e786ef837649ca2d619cdc095ceba189effba5fd3e3",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:35f05f3e53236101302af88e2880487e13b97c54c2d1a568fd370b5d38470112",
-    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:e008e38de8f9be625f3b5c8f4c00594e01854a83cf291bc19898f756d0620083",
+    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:1cf77467c8d9c0c353f392f26bcbf85ce11f6e835c3df427f9fc1cb1f5f5e882",
     "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:c803d9a2b2ba96d532d2289cef621daff4767973d26f0634fa86942112eca05e",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:d5db2e525622efef4bcb16c6be007950367c9e5b031a955dd40be3ba96aae6f8",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:dbe7b3189b8658f2344a6397005d3b8897a5e2db8e6d7f5a9a40c710054e334b",

@@ -22,7 +22,7 @@ Inside a lit furnace's visible footprint, the prompt offers travel; at Town Squa
 
 ## Radar and universe map
 
-The minimap shows nearby space; M or Map opens the full shared chart with your heading at the top. The N marker keeps pointing north. Discovered furnaces appear as flames, dark furnace lots stay marked, and only lit furnaces show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
+The minimap shows nearby space; M or Map opens the full shared chart with your heading at the top. The N marker keeps pointing north. Discovered furnaces appear as flames and dark lots stay marked; their names appear on the chart only after you zoom in close, and only lit furnaces show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
 
 ## Ricochet Court
 

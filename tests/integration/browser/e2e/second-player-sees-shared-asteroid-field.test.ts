@@ -4,7 +4,7 @@ import { PALETTE } from '../../../../src/constants';
 import { getGameBoundary } from '../../../../src/physics/boundary';
 import {
   PLAYFIELD_CLOSE_SCALE,
-  projectWorldToScreen,
+  projectWorldToScreenInto,
 } from '../../../../src/rendering/playfieldCamera';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
@@ -39,6 +39,7 @@ type CanvasImage = {
 };
 
 type AsteroidDrawCapture = {
+  cameraRotation: number;
   canvas: { width: number; height: number };
   rock: {
     id: string;
@@ -128,170 +129,188 @@ async function renderFullFrame(page: BrowserPage): Promise<void> {
   });
 }
 
-function captureAsteroidDraw(page: BrowserPage, targetId: string): Promise<AsteroidDrawCapture> {
-  return page.evaluate(
-    ({ id, roidColor, scale }) => {
-      const gameController = window.gameController;
-      const canvas = document.querySelector('#gameCanvas');
-      if (!gameController || !(canvas instanceof HTMLCanvasElement)) {
-        throw new Error('Asteroid field fixture requires a game controller and canvas');
-      }
-      if (!canvas.getContext('2d')) {
-        throw new Error('Asteroid field fixture requires a 2D canvas context');
-      }
+async function captureAsteroidDraw(
+  page: BrowserPage,
+  targetId: string
+): Promise<AsteroidDrawCapture> {
+  const camera = await page.evaluateHandle<
+    typeof import('../../../../src/rendering/canvasSurface').canvasManager
+  >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
+  try {
+    return await camera.evaluate(
+      (canvasManager, { id, roidColor, scale }) => {
+        const gameController = window.gameController;
+        const canvas = document.querySelector('#gameCanvas');
+        if (!gameController || !(canvas instanceof HTMLCanvasElement)) {
+          throw new Error('Asteroid field fixture requires a game controller and canvas');
+        }
+        if (!canvas.getContext('2d')) {
+          throw new Error('Asteroid field fixture requires a 2D canvas context');
+        }
 
-      const local = gameController.getCurrPlayer();
-      const roidBelt = gameController.getCurrRoidBelt();
-      const roid = roidBelt.getRoids().find((candidate) => candidate.id === id);
-      if (!local || !roid) {
-        throw new Error(`Asteroid field fixture lost target rock ${id}`);
-      }
-      const styleProbe = document.createElement('canvas').getContext('2d');
-      if (!styleProbe) {
-        throw new Error('Asteroid field fixture requires a style probe context');
-      }
-      styleProbe.fillStyle = roidColor;
-      styleProbe.fillRect(0, 0, 1, 1);
-      const expectedColor = styleProbe.getImageData(0, 0, 1, 1).data;
+        const local = gameController.getCurrPlayer();
+        const roidBelt = gameController.getCurrRoidBelt();
+        const roid = roidBelt.getRoids().find((candidate) => candidate.id === id);
+        if (!local || !roid) {
+          throw new Error(`Asteroid field fixture lost target rock ${id}`);
+        }
+        const styleProbe = document.createElement('canvas').getContext('2d');
+        if (!styleProbe) {
+          throw new Error('Asteroid field fixture requires a style probe context');
+        }
+        styleProbe.fillStyle = roidColor;
+        styleProbe.fillRect(0, 0, 1, 1);
+        const expectedColor = styleProbe.getImageData(0, 0, 1, 1).data;
 
-      const images: CanvasImage[] = [];
-      const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
-      CanvasRenderingContext2D.prototype.drawImage = function (
-        this: CanvasRenderingContext2D,
-        image: CanvasImageSource,
-        ...coordinates: number[]
-      ): void {
-        // Forward the real draw before inspecting the bitmap used by this frame.
-        Reflect.apply(originalDrawImage, this, [image, ...coordinates]);
-        if (this.canvas !== canvas || !(image instanceof HTMLCanvasElement)) {
-          return;
-        }
-        const [x, y, width, height] = coordinates;
-        if (
-          coordinates.length !== 4 ||
-          x === undefined ||
-          y === undefined ||
-          width === undefined ||
-          height === undefined ||
-          width <= 0 ||
-          height <= 0
-        ) {
-          return;
-        }
-        const source = image.getContext('2d');
-        if (!source) {
-          throw new Error('Drawn asteroid image has no readable 2D context');
-        }
-        const pixels = source.getImageData(0, 0, image.width, image.height).data;
-        const pixelRatio = image.width / width;
-        const offsets = roid.offsets.length > 0 ? roid.offsets : [1];
-        const vertices = Math.max(roid.vertices, 1);
-        const outline = Array.from({ length: vertices }, (_, index) => {
-          const angle = (index * Math.PI * 2) / vertices;
-          const radius = roid.r * scale * (offsets[index] ?? 1) * pixelRatio;
-          return {
-            x: image.width / 2 + radius * Math.cos(angle),
-            y: image.height / 2 + radius * Math.sin(angle),
-          };
-        });
-        // Check the polygon edges as well as its vertices. A blank bitmap, wrong
-        // shape or filled rectangle must not count as a visible asteroid outline.
-        const samples = outline.flatMap((point, index) => {
-          const next = outline[(index + 1) % outline.length];
-          if (!next) {
-            throw new Error('Asteroid outline lost its closing edge');
+        const images: CanvasImage[] = [];
+        const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
+        CanvasRenderingContext2D.prototype.drawImage = function (
+          this: CanvasRenderingContext2D,
+          image: CanvasImageSource,
+          ...coordinates: number[]
+        ): void {
+          // Forward the real draw before inspecting the bitmap used by this frame.
+          Reflect.apply(originalDrawImage, this, [image, ...coordinates]);
+          if (this.canvas !== canvas || !(image instanceof HTMLCanvasElement)) {
+            return;
           }
-          return [point, { x: (point.x + next.x) / 2, y: (point.y + next.y) / 2 }];
-        });
-        const matchingOutlineSamples = samples.filter((point) => {
-          for (let py = Math.floor(point.y) - 1; py <= Math.floor(point.y) + 1; py++) {
-            for (let px = Math.floor(point.x) - 1; px <= Math.floor(point.x) + 1; px++) {
-              if (px < 0 || py < 0 || px >= image.width || py >= image.height) {
-                continue;
-              }
-              const offset = (py * image.width + px) * 4;
-              if (
-                (pixels[offset + 3] ?? 0) >= 64 &&
-                [0, 1, 2].every(
-                  (channel) =>
-                    Math.abs((pixels[offset + channel] ?? 0) - (expectedColor[channel] ?? 0)) <= 4
-                )
-              ) {
-                return true;
+          const [x, y, width, height] = coordinates;
+          if (
+            coordinates.length !== 4 ||
+            x === undefined ||
+            y === undefined ||
+            width === undefined ||
+            height === undefined ||
+            width <= 0 ||
+            height <= 0
+          ) {
+            return;
+          }
+          const source = image.getContext('2d');
+          if (!source) {
+            throw new Error('Drawn asteroid image has no readable 2D context');
+          }
+          const pixels = source.getImageData(0, 0, image.width, image.height).data;
+          const pixelRatio = image.width / width;
+          const offsets = roid.offsets.length > 0 ? roid.offsets : [1];
+          const vertices = Math.max(roid.vertices, 1);
+          const outline = Array.from({ length: vertices }, (_, index) => {
+            const angle = (index * Math.PI * 2) / vertices;
+            const radius = roid.r * scale * (offsets[index] ?? 1) * pixelRatio;
+            return {
+              x: image.width / 2 + radius * Math.cos(angle),
+              y: image.height / 2 + radius * Math.sin(angle),
+            };
+          });
+          // Check the polygon edges as well as its vertices. A blank bitmap, wrong
+          // shape or filled rectangle must not count as a visible asteroid outline.
+          const samples = outline.flatMap((point, index) => {
+            const next = outline[(index + 1) % outline.length];
+            if (!next) {
+              throw new Error('Asteroid outline lost its closing edge');
+            }
+            return [point, { x: (point.x + next.x) / 2, y: (point.y + next.y) / 2 }];
+          });
+          const matchingOutlineSamples = samples.filter((point) => {
+            for (let py = Math.floor(point.y) - 1; py <= Math.floor(point.y) + 1; py++) {
+              for (let px = Math.floor(point.x) - 1; px <= Math.floor(point.x) + 1; px++) {
+                if (px < 0 || py < 0 || px >= image.width || py >= image.height) {
+                  continue;
+                }
+                const offset = (py * image.width + px) * 4;
+                if (
+                  (pixels[offset + 3] ?? 0) >= 64 &&
+                  [0, 1, 2].every(
+                    (channel) =>
+                      Math.abs((pixels[offset + channel] ?? 0) - (expectedColor[channel] ?? 0)) <= 4
+                  )
+                ) {
+                  return true;
+                }
               }
             }
-          }
-          return false;
-        }).length;
-        const transform = this.getTransform();
-        const centerOffset =
-          (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
-        images.push({
-          transform: {
-            a: transform.a,
-            b: transform.b,
-            c: transform.c,
-            d: transform.d,
-            e: transform.e,
-            f: transform.f,
-          },
-          destination: { x, y, width, height },
-          width: image.width,
-          height: image.height,
-          alpha: this.globalAlpha,
-          outlineSamples: samples.length,
-          matchingOutlineSamples,
-          centerAlpha: pixels[centerOffset + 3] ?? 255,
-          cornerAlpha: pixels[3] ?? 255,
-        });
-      };
-
-      try {
-        // Use the normal render pipeline while isolating the identified rock;
-        // drawRoidsRelative then reaches the real Canvas methods.
-        const originalRoids = roidBelt.roids;
-        roidBelt.roids = [roid];
-        try {
-          gameController.renderGame();
-          return {
-            canvas: { width: canvas.width, height: canvas.height },
-            rock: {
-              id: roid.id,
-              position: { x: roid.position.x, y: roid.position.y },
-              r: roid.r,
-              angle: roid.angle,
-              vertices: roid.vertices,
-              offsets: [...roid.offsets],
+            return false;
+          }).length;
+          const transform = this.getTransform();
+          const centerOffset =
+            (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
+          images.push({
+            transform: {
+              a: transform.a,
+              b: transform.b,
+              c: transform.c,
+              d: transform.d,
+              e: transform.e,
+              f: transform.f,
             },
-            ship: { x: local.ship.position.x, y: local.ship.position.y },
-            images,
-          };
+            destination: { x, y, width, height },
+            width: image.width,
+            height: image.height,
+            alpha: this.globalAlpha,
+            outlineSamples: samples.length,
+            matchingOutlineSamples,
+            centerAlpha: pixels[centerOffset + 3] ?? 255,
+            cornerAlpha: pixels[3] ?? 255,
+          });
+        };
+
+        try {
+          // Use the normal render pipeline while isolating the identified rock;
+          // drawRoidsRelative then reaches the real Canvas methods.
+          const originalRoids = roidBelt.roids;
+          roidBelt.roids = [roid];
+          try {
+            gameController.renderGame();
+            return {
+              cameraRotation: canvasManager.getCameraRotation(),
+              canvas: { width: canvas.width, height: canvas.height },
+              rock: {
+                id: roid.id,
+                position: { x: roid.position.x, y: roid.position.y },
+                r: roid.r,
+                angle: roid.angle,
+                vertices: roid.vertices,
+                offsets: [...roid.offsets],
+              },
+              ship: { x: local.ship.position.x, y: local.ship.position.y },
+              images,
+            };
+          } finally {
+            roidBelt.roids = originalRoids;
+          }
         } finally {
-          roidBelt.roids = originalRoids;
+          CanvasRenderingContext2D.prototype.drawImage = originalDrawImage;
         }
-      } finally {
-        CanvasRenderingContext2D.prototype.drawImage = originalDrawImage;
+      },
+      {
+        id: targetId,
+        roidColor: PALETTE.ROID,
+        scale: PLAYFIELD_CLOSE_SCALE,
       }
-    },
-    { id: targetId, roidColor: PALETTE.ROID, scale: PLAYFIELD_CLOSE_SCALE }
-  );
+    );
+  } finally {
+    await camera.dispose();
+  }
 }
 
 function identifyAsteroidDraw(capture: AsteroidDrawCapture): AsteroidDrawEvidence {
-  const screen = projectWorldToScreen(
+  const screen = projectWorldToScreenInto(
+    { x: 0, y: 0 },
     capture.rock.position,
     capture.ship,
     capture.canvas,
-    PLAYFIELD_CLOSE_SCALE
+    PLAYFIELD_CLOSE_SCALE,
+    capture.cameraRotation
   );
+  const screenAngle = capture.rock.angle + capture.cameraRotation;
   const close = (actual: number, expected: number) => Math.abs(actual - expected) <= 0.001;
   const rasterSilhouetteCount = capture.images.filter((image) => {
     const { transform, destination } = image;
     return (
-      close(transform.a, Math.cos(capture.rock.angle)) &&
-      close(transform.b, Math.sin(capture.rock.angle)) &&
-      close(transform.c, -Math.sin(capture.rock.angle)) &&
-      close(transform.d, Math.cos(capture.rock.angle)) &&
+      close(transform.a, Math.cos(screenAngle)) &&
+      close(transform.b, Math.sin(screenAngle)) &&
+      close(transform.c, -Math.sin(screenAngle)) &&
+      close(transform.d, Math.cos(screenAngle)) &&
       close(transform.e, screen.x) &&
       close(transform.f, screen.y) &&
       close(destination.x, -destination.width / 2) &&

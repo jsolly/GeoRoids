@@ -50,17 +50,12 @@ for (const width of [1280, 390]) {
       ship.angle = 0;
       ship.angularVelocity = 0;
     });
-    await page.mouse.move(width * 0.9, (mobile ? 844 : 900) / 2);
-    await page.waitForFunction(() => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      return ship && Math.abs(Math.sin(ship.angle)) < 0.03 && Math.cos(ship.angle) > 0;
-    });
-    await game.waitForAnimationFrames(4);
     await expect.poll(async () => (await field(page)).spiders.length).toBe(1);
     const target = (await field(page)).spiders[0];
     if (!target) {
       throw new Error('Missing spider');
     }
+    await game.aimAtWorldPosition(target.position);
     if (mobile) {
       await page.locator('#touch-ability').tap();
     } else {

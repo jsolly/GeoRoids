@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { WORLD } from '../../../shared/world';
-import type { EquipmentId, HaulerUtilityId } from '../../../shared-types';
+import type { EquipmentId, HaulerUtilityId, Position } from '../../../shared-types';
 import { HAULER_UTILITY_STORAGE_KEY } from '../../../src/entities/ship/haulerUtility';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
@@ -112,6 +112,49 @@ export class GameInteractions {
         rect.height > 0
       );
     });
+  }
+
+  /** Aim ordinary pointer input at a world target through the current camera. */
+  async pointAtWorldPosition(target: Position): Promise<void> {
+    const camera = await this.page.evaluateHandle<
+      typeof import('../../../src/rendering/canvasSurface').canvasManager
+    >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
+    try {
+      const point = await camera.evaluate((canvasManager, position) => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        const canvas = document.querySelector('#gameCanvas');
+        if (!ship || !(canvas instanceof HTMLCanvasElement)) {
+          throw new Error('World targeting requires a ship and canvas');
+        }
+        const bounds = canvas.getBoundingClientRect();
+        const projected = canvasManager.worldToScreen(position, ship.position);
+        const dx = projected.x - bounds.width / 2;
+        const dy = projected.y - bounds.height / 2;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        return {
+          x: bounds.x + bounds.width / 2 + (dx / length) * 100,
+          y: bounds.y + bounds.height / 2 + (dy / length) * 100,
+        };
+      }, target);
+      await this.page.mouse.move(point.x, point.y);
+    } finally {
+      await camera.dispose();
+    }
+  }
+
+  /** Keep the cursor on a world bearing as the camera turns, until the nose aligns. */
+  async aimAtWorldPosition(target: Position): Promise<void> {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      await this.pointAtWorldPosition(target);
+      await this.waitForAnimationFrames(1);
+      const [position, angle] = await Promise.all([this.getShipPosition(), this.getShipAngle()]);
+      const desired = Math.atan2(position.y - target.y, target.x - position.x);
+      if (Math.abs(Math.atan2(Math.sin(angle - desired), Math.cos(angle - desired))) < 0.03) {
+        return;
+      }
+    }
+    throw new Error('Pilot did not align with the world target');
   }
 
   /**

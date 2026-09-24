@@ -23,16 +23,6 @@ export function projectWorldToScreenInto(
   return out;
 }
 
-export function projectWorldToScreen(
-  world: Position,
-  ship: Position,
-  canvas: PlayfieldSize,
-  scale = 1
-): { x: number; y: number } {
-  const projected = projectWorldToScreenInto(projectScratch, world, ship, canvas, scale);
-  return { x: projected.x, y: projected.y };
-}
-
 export function isRockOnCanvas(
   world: Position,
   ship: Position,

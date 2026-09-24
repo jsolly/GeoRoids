@@ -38,7 +38,7 @@ async function tapTouchPoint(
 }
 
 test(
-  'touch steering turns toward the finger and keeps flying after release',
+  'holding a finger beside the ship turns travel and release keeps flying',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -64,26 +64,36 @@ test(
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
       const points = [
-        { x: center.x + 100, y: center.y, angle: 0 },
-        { x: center.x, y: center.y - 100, angle: Math.PI / 2 },
-        { x: center.x - 100, y: center.y, angle: -Math.PI },
-        { x: center.x, y: center.y + 100, angle: -Math.PI / 2 },
+        { x: center.x + 100, y: center.y, turn: -1 },
+        { x: center.x - 100, y: center.y, turn: 1 },
       ];
       for (const [index, point] of points.entries()) {
+        const beforeTurn = await game.getShipAngle();
         await dispatchTouch(session, index === 0 ? 'touchStart' : 'touchMove', [
           { x: point.x, y: point.y, id: 1 },
         ]);
         touchActive = true;
-        await page.waitForFunction(() => window.gameController?.getCurrPlayer()?.ship.thrusting);
+        await expect
+          .poll(async () => {
+            const angle = await game.getShipAngle();
+            return (
+              Math.atan2(Math.sin(angle - beforeTurn), Math.cos(angle - beforeTurn)) * point.turn
+            );
+          })
+          .toBeGreaterThan(0.1);
         expect((await readLocalTouchState(page)).thrusting).toBe(true);
-        await page.waitForFunction((desired) => {
-          const angle = window.gameController?.getCurrPlayer()?.ship.angle;
-          return (
-            angle !== undefined &&
-            Math.abs(Math.atan2(Math.sin(angle - desired), Math.cos(angle - desired))) < 0.001
-          );
-        }, point.angle);
+        const afterTurn = await game.getShipAngle();
+        const turned = Math.atan2(
+          Math.sin(afterTurn - beforeTurn),
+          Math.cos(afterTurn - beforeTurn)
+        );
+        expect(turned * point.turn).toBeGreaterThan(0.1);
       }
+      await dispatchTouch(session, 'touchMove', [{ x: center.x, y: center.y - 100, id: 1 }]);
+      await game.waitForAnimationFrames(3);
+      const forwardAngle = await game.getShipAngle();
+      await game.waitForAnimationFrames(8);
+      expect(await game.getShipAngle()).toBeCloseTo(forwardAngle, 3);
       const beforeRelease = await game.getShipPosition();
       const releaseAngle = await game.getShipAngle();
       await dispatchTouch(session, 'touchEnd', []);
@@ -503,18 +513,15 @@ test(
     expect(Math.hypot(afterMove.x - beforeMove.x, afterMove.y - beforeMove.y)).toBeGreaterThan(5);
     const center = await centerOf(page, '#gameCanvas');
     await page.mouse.move(center.x, center.y - 120);
-    await page.waitForFunction(() => {
-      const angle = window.gameController?.getCurrPlayer()?.ship.angle;
-      return (
-        angle !== undefined &&
-        Math.abs(Math.atan2(Math.sin(angle - Math.PI / 2), Math.cos(angle - Math.PI / 2))) < 0.001
-      );
-    });
+    await game.waitForAnimationFrames(3);
+    const forwardAngle = await game.getShipAngle();
+    await game.waitForAnimationFrames(8);
+    expect(await game.getShipAngle()).toBeCloseTo(forwardAngle, 3);
     await page.keyboard.down('ArrowRight');
     await game.waitForAnimationFrames(8);
     await page.keyboard.up('ArrowRight');
     const keyboardAngle = await game.getShipAngle();
-    expect(Math.abs(keyboardAngle - Math.PI / 2)).toBeGreaterThan(0.1);
+    expect(Math.abs(keyboardAngle - forwardAngle)).toBeGreaterThan(0.1);
     await page.mouse.down({ button: 'right' });
     await page.mouse.up({ button: 'right' });
     await page.keyboard.press('KeyW');

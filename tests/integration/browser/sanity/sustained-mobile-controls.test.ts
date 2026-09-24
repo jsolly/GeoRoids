@@ -66,27 +66,33 @@ test(
     const ability = await centerOf(page, '#touch-ability');
     const session = await page.context().newCDPSession(page);
     const beforeHold = await readTouchControlState(page);
+    let previous = beforeHold.position;
+    let distanceTravelled = 0;
+    const observeFlight = async () => {
+      for (let sample = 0; sample < 6; sample++) {
+        await game.waitForAnimationFrames(10);
+        const position = await game.getShipPosition();
+        distanceTravelled += Math.hypot(position.x - previous.x, position.y - previous.y);
+        previous = position;
+      }
+    };
 
     await dispatchTouch(session, 'touchStart', [
       { x: steer.x + 42, y: steer.y, id: 11 },
       { ...firePoint, id: 12 },
     ]);
-    await game.waitForAnimationFrames(60);
+    await observeFlight();
     await dispatchTouch(session, 'touchMove', [
       { x: steer.x + 48, y: steer.y - 6, id: 11 },
       { ...firePoint, id: 12 },
     ]);
-    await game.waitForAnimationFrames(60);
+    await observeFlight();
 
     const duringHold = await readTouchControlState(page);
     expect(duringHold.thrusting).toBe(true);
     expect(duringHold.lastShotTime).toBeGreaterThan(beforeHold.lastShotTime);
-    expect(
-      Math.hypot(
-        duringHold.position.x - beforeHold.position.x,
-        duringHold.position.y - beforeHold.position.y
-      )
-    ).toBeGreaterThan(5);
+    // Sustained side steering can complete a circle; measure travel along the route.
+    expect(distanceTravelled).toBeGreaterThan(5);
 
     const held = [
       { x: steer.x + 48, y: steer.y - 6, id: 11 },

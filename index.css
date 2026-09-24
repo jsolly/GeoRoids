@@ -2031,13 +2031,23 @@
     }
 
     .ship-schematic-body {
-      grid-template-columns: minmax(0, 1fr) minmax(132px, 42%);
-      gap: 8px 10px;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
       margin: 8px 0;
     }
 
     .satellite-inventory {
-      padding-left: 8px;
+      border-left: 0;
+      border-top: 1px solid var(--palette-hud-muted, #64748b);
+      padding: 10px 0 0;
+    }
+
+    .satellite-inventory > p,
+    .satellite-inventory-silk,
+    .satellite-inventory-empty,
+    .satellite-inventory-row span {
+      text-wrap: pretty;
+      overflow-wrap: break-word;
     }
 
     .satellite-inventory-row {
@@ -2046,11 +2056,13 @@
     }
 
     .ship-schematic-stage {
-      min-height: 140px;
+      width: min(100%, 240px);
+      justify-self: center;
+      min-height: 132px;
     }
 
     #ship-schematic-canvas {
-      height: 140px;
+      height: 132px;
     }
 
     .ship-schematic-cards {

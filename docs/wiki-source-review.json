@@ -1,11 +1,11 @@
 {
-  "note": "Reviewed Controls, HUD/network, Scout, Teamwork, and coverage for Town Square Enter with Store/Fast Travel selection and equipped hull travel. Updated affected instructions; existing media does not depict this menu or transit replacement. Desktop 1280x900 and mobile 390x844 browser flows passed for travel, store purchases, construction, and Controls Wiki, with clean browser diagnostics. Hull geometry tests cover both kits and all Hauler utilities. Lint, Markdown, and TypeScript checks passed.",
+  "note": "Mobile inventory stacks the hull above the copy so the description, silk count, and empty state use the panel width. Satellite rules and demonstrations are unchanged, so no article or GIF was edited.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:79f3c6f3a10c220bea5fbe969dcd2f0ddc45908d39746fd437ca31bb21ced17a",
     "docs/protocol/snapshot-v1.md": "sha256:6ca9d9f5ca359ece9c6a8f663321272bdd632be3628954185f63ff351870e127",
     "docs/sounds.md": "sha256:ceabd0097fd9c8fafeb4dbc9f23002654dd1b0d3f8da977129a4bdb733278a2e",
-    "index.css": "sha256:519efe9da2608ba92a997844971c296566370efaa4359f05d3b4c20c09746b63",
+    "index.css": "sha256:9d17f0016112e193cbc854d1f4cd92d995c0358307731ce8af74fdc5c7f44106",
     "index.html": "sha256:1ccd30e7bf228c6c2a00c0dbe33158874ecbacbd551713aed51721cc941187d5",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:54bb156a4f03c98660851b6d9aa27f462b736a73f0c9ed72ed7c5adf92d54fff",
@@ -336,7 +336,7 @@
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:2e0d0d0f52719ed039b0891cc7d145cc0d3195291c539e85f25f9ea21511b36c",
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts": "sha256:7ba4eb6c422f73e8af8e84fb9f935361f11854c2152b0eb428adccbdb2baf255",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:35f05f3e53236101302af88e2880487e13b97c54c2d1a568fd370b5d38470112",
-    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:1e2e049ca591246e8cfbaf9c5c4e12ca5cab47cb8b0bb145883321f9288463c8",
+    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:12b1046a157e477fa2e90d8a2c67687ea308c40e5a18b587b9f35d67d237a98e",
     "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:b6a5b8175aa52e49a169b8f6d62600c21a1ce317d7c4507855365a26876f79ff",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:d5db2e525622efef4bcb16c6be007950367c9e5b031a955dd40be3ba96aae6f8",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:dbe7b3189b8658f2344a6397005d3b8897a5e2db8e6d7f5a9a40c710054e334b",

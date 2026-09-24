@@ -162,7 +162,7 @@ test.each([
       await page.locator('#universe-map-toggle').focus();
     }
     const frame = await openAndCaptureMap(page, touch);
-    expect(frame.labels).toContain('NORTH');
+    expect(frame.labels).not.toContain('NORTH');
     expect(frame.labels).toContain('5k across');
     expect(await page.locator('#universe-map-zoom').count()).toBe(0);
     expect(await page.locator('.universe-map-stage .universe-map-zoom').isVisible()).toBe(true);

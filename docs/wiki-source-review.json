@@ -1,5 +1,5 @@
 {
-  "note": "Mineral Scan is one radar pulse lasting 2 seconds, then a 20-second cooldown from activation. A full Boost button reads BOOST; the field manual already describes the button without that caption. The shared universe chart keeps the local ship heading at the top, and the N marker still points at true north.",
+  "note": "Mineral Scan is one radar pulse lasting 2 seconds, then a 20-second cooldown from activation. A full Boost button reads BOOST; the field manual already describes the button without that caption. The shared universe chart keeps the local ship heading at the top, and the N marker still points at true north. The semantic E browser test waits out that cooldown.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -350,7 +350,7 @@
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:1c6991fb8f632d71bdad1e812b206c96a6e23eaf1cb3c77b60c60bfd378a94f4",
     "tests/integration/browser/sanity/terrain-colors-explain-the-slope.test.ts": "sha256:f870b16cee12619141a22a5e2ace5e518f766589d2dca135f380ce7e7209a78a",
     "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:b22eba8d0cef3cc85d1e199df52bf20117b0b9957aef2bfa4680db84c31c9c3b",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:43c16c3d63dc5a7d098c8774a1ae6d1d1c0e38c63402ec83074e8dcfc9d829fe",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:adfc4f074c3c22e16687fc9dc648a65356a3cd3f3022777fdcad67d73b5c15a4",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:62675104b908bb3e96c87394970b42a107fe3537a8cae79dc5e8a9c043575e42",
     "tests/integration/entities/input/mouse.test.ts": "sha256:13cdacd658260eb109b4cdb8a7f133aa3ff40a849a045c9716745619195340ee",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:363eba19780882950818c5a68647315713ac938321eca197641eb642f7ff07c2",
@@ -374,7 +374,7 @@
     "tests/unit/entities/satellite-pickups-follow-authoritative-health.test.ts": "sha256:61be7447c241dea68b7d3170ed92d7a51eac4dde20cd065a760542075fd95a38",
     "tests/unit/entities/satellitePickupMath.test.ts": "sha256:7e598ec66e0a271c06db476cc994e7c6f32b99f29b3b0c3a1bc4928d3f08c758",
     "tests/unit/entities/satellitePickups.test.ts": "sha256:533b54cb9b0f8de038cae566070dea3493c857f7b183bafb074fcf7515da87bd",
-    "tests/unit/entities/scout-identifies-nearby-minerals.test.ts": "sha256:075777ef4f261dfb57934ccda054d56b7d533f6f2588d94910011163c3321462",
+    "tests/unit/entities/scout-identifies-nearby-minerals.test.ts": "sha256:3e5f3ae76d4d4a8dc879a7977d313c364780dc41984ad5335ea822da8ded2481",
     "tests/unit/entities/scout-scan-vfx.test.ts": "sha256:5a9a1579c1a516727166386dd1e221cb06cc98ef771a54f59807a322ee2063a9",
     "tests/unit/entities/shipAbilities.test.ts": "sha256:01aaecc52acf9c15fa278ca72683db2cc48330dfbf0c5616e34d11763b594deb",
     "tests/unit/entities/shipDamage.test.ts": "sha256:75644254daea1ef5885e442e0368b44c4273b0c6ecfd2a6c737558bdb8cf5b2d",

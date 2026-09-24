@@ -18,9 +18,9 @@ media:
 
 Broad gentle plains connect hills and valleys. Dense contour lines preserve the terrain texture even where their height differences are tiny. Downhill accelerates you, uphill slows you a little, and following a contour keeps nearly full cruise. Boost stacks with downhill speed, but either ship can climb without it. Ordinary terrain does no damage and does not deflect shots.
 
-The 75° view ahead colors contours amber for an uphill approach and blue for downhill, assuming you fly straight toward that point.
+The 75° view ahead darkens contour lines on an uphill approach and lightens them downhill, assuming you fly straight toward that point.
 
-Winding shortcuts have bright violet lines. Follow a passage in either direction for up to 50% extra cruise speed; turning across it loses the boost. These narrow cuts reward watching the terrain and steering through bends.
+Winding shortcuts stay on that light end in every direction. Follow a passage in either direction for up to 50% extra cruise speed; turning across it loses the boost.
 
 ## Outer boundary
 

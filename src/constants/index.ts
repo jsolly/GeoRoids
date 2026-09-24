@@ -144,7 +144,7 @@ export const VISUAL = {
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,
-  // Original hairline contours with directional route colors inside the steering cone.
+  // Hairline contours. The steering cone walks one slate ramp from dark climbs to light descents.
   CONTOUR_STROKE_WIDTH: 1,
   CONTOUR_ALPHA: 0.16,
   CONTOUR_INDEX_ALPHA: 0.24,

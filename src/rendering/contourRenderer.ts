@@ -97,7 +97,7 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
       ctx.lineTo(bx, by);
       ctx.strokeStyle = contourSlopeColor(
         weight > 0 ? climb : 0,
-        Math.max(0.85 * weight, 0.75 * slope.passage),
+        Math.max(0.62 * weight, 0.7 * slope.passage),
         slope.passage
       );
       ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH;

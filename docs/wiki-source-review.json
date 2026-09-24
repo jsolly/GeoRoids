@@ -311,7 +311,7 @@
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:ad202959d0255917e37c983ecf5916e92cdf4d8287550908b105ed45e5bdb6fb",
-    "src/wiki/gameReference.ts": "sha256:cbb65a07cf6ec3f4ad6f88475613a168a4ce24112f54c1bf75af809dd1326104",
+    "src/wiki/gameReference.ts": "sha256:d9a5cada7053fed82e40ea06f922595efb8e367184e2c38898e90bc5f61c03cb",
     "src/wiki/main.ts": "sha256:55e2f9bc2a01cc11b571eaf4e2cc227e4e1b814d13c1598769d4bfe4b9093222",
     "src/wiki/media.ts": "sha256:d1b7537e6ecabc14cdbb9dbe7a8d0816eff2f4613862196cb140a0340b770d2d",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",

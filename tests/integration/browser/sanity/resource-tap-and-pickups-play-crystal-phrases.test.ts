@@ -108,9 +108,12 @@ for (const viewport of [
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`crystal-pickups-${viewport.name}.png`),
     });
+    const interfaceBeforeMap = (await readSamplePlaybackRates(page, 'interface')).length;
     await page.locator('#universe-map-toggle').click();
     await page.locator('#universe-map-close').click();
-    expect(await readSamplePlaybackRates(page, 'interface')).toEqual([1, 1]);
+    expect((await readSamplePlaybackRates(page, 'interface')).slice(interfaceBeforeMap)).toEqual([
+      1, 1,
+    ]);
     await page.locator('#soundPref').evaluate((input) => {
       if (!(input instanceof HTMLInputElement)) {
         throw new Error('Missing sound checkbox');

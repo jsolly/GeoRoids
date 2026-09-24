@@ -354,6 +354,7 @@
     "src/rendering/hud/minimap.ts",
     "src/rendering/hud/furnaceMapMark.ts",
     "tests/unit/rendering/radar-marks-a-discovered-furnace-as-fire.test.ts",
+    "tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts",
     "src/rendering/hud/hudLayout.ts",
     "src/ui/universeMap.ts",
     "src/ui/universeMapLabels.ts",

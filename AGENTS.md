@@ -21,7 +21,7 @@ Persistent world state uses SQLite on the Railway `world-data` volume at `/data/
 
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
-Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.
+Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). It includes all unit and integration tests and constrained-client checks. Run it during the review/fix loop and again after final review fixes before pushing. GitHub CI independently runs parallel static validation and a small gameplay/touch/reconnect smoke, then requires both in `CI / ci`. See [CI and local review](docs/ci-and-local-review.md).
 
 ### Post-push verification (`/ship` step 12)
 
@@ -106,7 +106,7 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 
 ## CI (local pre-commit gate)
 
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. `npm run gate` also requires full integration + frame-work budget + constrained-client scenarios. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
 ### Actions helper exception
 
@@ -144,6 +144,7 @@ npm run fix                # biome write + tsc + unit tests
 # Tests
 npm run test               # unit only (tests/unit/)
 npm run test:all           # unit, server, and entity integration tests
+npm run test:review        # all integration + frame-work + constrained-client checks (also in gate)
 npm run test:integration:browser   # browser tests via test-runner.sh
 npm run test:integration:server    # server-side integration
 npm run test:integration:entities  # entity integration
@@ -272,10 +273,12 @@ npm run build        # tsc -p tsconfig.build.json && vite build — produces dis
 
 ## Verified-tree CI
 
-PRs run the full CI suite. Post-merge CI reuses a successful PR run only when
-its recorded checkout tree exactly matches the landed tree, using
-`scripts/ci-verified-tree.sh` from dotagents. Missing proof runs full CI;
-manual runs always validate. Job names and deployment triggers stay intact.
+PRs run static checks and the bounded behavioral smoke concurrently. The final
+`ci` job requires both lanes to succeed. Full unit/integration/performance checks
+run locally in the review gate. Post-merge CI reuses each successful PR lane only
+when its recorded checkout tree exactly matches the landed tree, using
+`scripts/ci-verified-tree.sh` from dotagents. Missing proof runs that CI lane;
+manual runs always validate. The required `ci` name and deployment triggers stay intact.
 Canonical contract: `~/code/dotagents/templates/github/verified-tree-ci.md`.
 
 ## Dependabot CI

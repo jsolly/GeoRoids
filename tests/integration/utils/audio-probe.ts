@@ -55,6 +55,7 @@ export async function installAudioProbe(
       const contextStates: AudioContextState[] = [];
       let media = 0;
       let decoded = 0;
+      const decodedDurations: number[] = [];
       const activeTones = new Set<OscillatorNode>();
       const toneParameters = new WeakSet<AudioParam>();
       const panParameters = new WeakSet<AudioParam>();
@@ -72,6 +73,8 @@ export async function installAudioProbe(
         );
         document.documentElement.dataset['audioMedia'] = String(media);
         document.documentElement.dataset['decodedAudio'] = String(decoded);
+        document.documentElement.dataset['decodedAudioDurations'] =
+          JSON.stringify(decodedDurations);
         document.documentElement.dataset['activeTones'] = String(activeTones.size);
         document.documentElement.dataset['orbitGains'] = JSON.stringify(
           [...activeTones].flatMap((tone) => {
@@ -129,6 +132,7 @@ export async function installAudioProbe(
         ): Promise<AudioBuffer> {
           return super.decodeAudioData(data, ...callbacks).then((buffer) => {
             decoded++;
+            decodedDurations.push(buffer.duration);
             publish();
             return buffer;
           });

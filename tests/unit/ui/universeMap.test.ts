@@ -14,11 +14,13 @@ import {
   DESKTOP_MAP_HELP,
   initializeUniverseMap,
   isUniverseMapOpen,
+  mapScreenDeltaToWorld,
   mapWorldToCanvas,
   TOUCH_MAP_HELP,
   UNIVERSE_MAP_IDS,
   UNIVERSE_MAP_LOCATE_LABEL,
   UNIVERSE_MAP_ZOOM,
+  universeMapHeadingRotation,
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
 
@@ -168,6 +170,45 @@ describe('universe map play chrome', () => {
     expect(
       mapWorldToCanvas({ x: 100, y: -50 }, { x: 0, y: 0 }, { x: 20, y: 30, size: 400, scale: 2 })
     ).toEqual({ x: 420, y: 130 });
+  });
+
+  test('the chart keeps the ship nose up and slides north onto the compass', () => {
+    const frame = { x: 20, y: 30, size: 400, scale: 2 };
+    const center = { x: 0, y: 0 };
+    expect(universeMapHeadingRotation(Math.PI / 2)).toBe(0);
+    expect(universeMapHeadingRotation(undefined)).toBe(0);
+    expect(universeMapHeadingRotation(Number.NaN)).toBe(0);
+
+    const facingEast = universeMapHeadingRotation(0);
+    expect(facingEast).toBeCloseTo(-Math.PI / 2);
+    const ahead = mapWorldToCanvas({ x: 100, y: 0 }, center, frame, facingEast);
+    expect(ahead).toEqual({ x: 220, y: 30 });
+    const north = mapWorldToCanvas({ x: 0, y: -100 }, center, frame, facingEast);
+    expect(north.x).toBeCloseTo(20);
+    expect(north.y).toBeCloseTo(230);
+    const aheadPan = mapScreenDeltaToWorld(0, -40, 2, facingEast);
+    expect(aheadPan.x).toBeCloseTo(20);
+    expect(aheadPan.y).toBeCloseTo(0);
+
+    const pilot = new Player({
+      id: 'heading-pilot',
+      name: 'Heading Pilot',
+      type: 'local',
+      input: new MockPlayerInput(),
+    });
+    pilot.ship.angle = 0;
+    const localPlayer = vi
+      .spyOn(PlayerManager.getInstance(), 'getLocalPlayer')
+      .mockReturnValue(pilot);
+    try {
+      closeUniverseMap();
+      (document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement).click();
+      const compass = document.querySelector<HTMLElement>('.universe-map-compass');
+      expect(compass?.style.transform).toBe(`rotate(${-Math.PI / 2}rad)`);
+      closeUniverseMap();
+    } finally {
+      localPlayer.mockRestore();
+    }
   });
 
   test('the map compass is a North arrow only', () => {

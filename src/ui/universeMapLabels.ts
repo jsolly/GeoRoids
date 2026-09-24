@@ -49,11 +49,23 @@ export function isFiniteMapPosition(value: Position | undefined): value is Posit
   );
 }
 
+function chartOffset(position: Position, viewCenter: Position, headingRotation: number): Position {
+  const dx = position.x - viewCenter.x;
+  const dy = position.y - viewCenter.y;
+  const cos = Math.cos(headingRotation);
+  const sin = Math.sin(headingRotation);
+  return {
+    x: cos * dx - sin * dy,
+    y: sin * dx + cos * dy,
+  };
+}
+
 export function canPlaceMapAssetLabel(
   asset: Pick<MapAsset, 'name' | 'position'>,
   frame: MapLabelFrame,
   viewCenter: Position,
-  occupied: MapLabelRect[]
+  occupied: MapLabelRect[],
+  headingRotation = 0
 ): boolean {
   if (!asset.name || !isFiniteMapPosition(asset.position)) {
     return false;
@@ -63,15 +75,16 @@ export function canPlaceMapAssetLabel(
   const iconSize = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom) / frame.scale;
   const gap = 6 / frame.scale;
   const labelWidth = asset.name.length * fontSize * 0.62;
-  const left = asset.position.x - labelWidth / 2 - gap;
-  const top = asset.position.y + iconSize * 1.6 - gap;
+  const screen = chartOffset(asset.position, viewCenter, headingRotation);
+  const left = screen.x - labelWidth / 2 - gap;
+  const top = screen.y + iconSize * 1.6 - gap;
   const rect: MapLabelRect = {
     left,
     right: left + labelWidth + gap * 2,
     top,
     bottom: top + fontSize + gap * 2,
   };
-  return reserveMapLabel(rect, frame, viewCenter, occupied);
+  return reserveMapLabel(rect, frame, occupied);
 }
 
 export function canPlaceMapCrewLabel(
@@ -80,15 +93,17 @@ export function canPlaceMapCrewLabel(
   shipSize: number,
   frame: MapLabelFrame,
   viewCenter: Position,
-  occupied: MapLabelRect[]
+  occupied: MapLabelRect[],
+  headingRotation = 0
 ): boolean {
   if (!name || !isFiniteMapPosition(position)) {
     return false;
   }
 
   const fontSize = 11 / frame.scale;
-  const labelX = position.x + shipSize * 1.4;
-  const labelY = position.y - shipSize;
+  const screen = chartOffset(position, viewCenter, headingRotation);
+  const labelX = screen.x + shipSize * 1.4;
+  const labelY = screen.y - shipSize;
   const gap = 6 / frame.scale;
   return reserveMapLabel(
     {
@@ -98,7 +113,6 @@ export function canPlaceMapCrewLabel(
       bottom: labelY + gap,
     },
     frame,
-    viewCenter,
     occupied
   );
 }
@@ -106,15 +120,14 @@ export function canPlaceMapCrewLabel(
 function reserveMapLabel(
   rect: MapLabelRect,
   frame: MapLabelFrame,
-  viewCenter: Position,
   occupied: MapLabelRect[]
 ): boolean {
   const halfSize = frame.size / 2 / frame.scale;
   if (
-    rect.left < viewCenter.x - halfSize ||
-    rect.right > viewCenter.x + halfSize ||
-    rect.top < viewCenter.y - halfSize ||
-    rect.bottom > viewCenter.y + halfSize
+    rect.left < -halfSize ||
+    rect.right > halfSize ||
+    rect.top < -halfSize ||
+    rect.bottom > halfSize
   ) {
     return false;
   }

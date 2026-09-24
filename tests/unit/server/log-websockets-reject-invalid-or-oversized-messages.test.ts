@@ -1,9 +1,10 @@
 /* @vitest-environment node */
 import { once } from 'node:events';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { ClientLogger } from '../../../server/services/ClientLogger';
+import { logger } from '../../../setup/serverLogger';
 
 let server: ReturnType<typeof createServerInstance> | undefined;
 const sockets: WebSocket[] = [];
@@ -17,6 +18,26 @@ async function connect(path: string): Promise<WebSocket> {
   sockets.push(socket);
   await once(socket, 'open');
   return socket;
+}
+
+function sendOneChunk(socket: WebSocket, frames: readonly string[]): void {
+  const transport = (socket as unknown as { _socket: { cork(): void; uncork(): void } })._socket;
+  transport.cork();
+  try {
+    for (const frame of frames) {
+      socket.send(frame);
+    }
+  } finally {
+    transport.uncork();
+  }
+}
+
+async function drainDeferredFrames(): Promise<void> {
+  for (let step = 0; step < 16; step += 1) {
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+  }
 }
 
 afterEach(async () => {
@@ -65,22 +86,57 @@ test('the log route closes invalid schemas while preserving valid forwarding', a
     JSON.stringify({ type: 'clientLog', data: { level: 'TRACE', message: 'not allowed' } })
   );
   const [code] = await closed;
-  expect(code).toBe(1008);
+  expect(code).toBe(1006);
 });
 
-test('malformed JSON and wrong log envelopes count as rejected ingress without being accepted', async () => {
+test('a log socket past its message quota closes once', async () => {
+  server = createServerInstance({ port: 0, nodeEnv: 'test' });
+  const before = ClientLogger.getDiagnostics().rateLimited;
+  const logs = await connect('/logs');
+  const closed = once(logs, 'close');
+  const filler = JSON.stringify({
+    type: 'clientLog',
+    data: { level: 'INFO', message: 'routine', sessionId: 'quota' },
+  });
+  const overQuota = JSON.stringify({
+    type: 'clientLog',
+    data: { level: 'WARN', message: 'over quota', sessionId: 'quota' },
+  });
+  sendOneChunk(logs, [
+    ...Array.from({ length: 120 }, () => filler),
+    overQuota,
+    overQuota,
+    overQuota,
+    overQuota,
+  ]);
+  const [code] = await closed;
+  await drainDeferredFrames();
+  expect(code).toBe(1006);
+  expect(logs.readyState).toBe(WebSocket.CLOSED);
+  expect(ClientLogger.getDiagnostics().rateLimited).toBe(before + 1);
+});
+
+test('a bad log frame ends the socket so a following frame is not parsed', async () => {
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
   const before = ClientLogger.getDiagnostics();
-  for (const [frame, expectedCode] of [
-    ['{broken', 1007],
-    [JSON.stringify({ type: 'unexpected', data: { message: 'discard this' } }), 1008],
-  ] as const) {
-    const socket = await connect('/logs');
-    const closed = once(socket, 'close');
-    socket.send(frame);
-    expect((await closed)[0]).toBe(expectedCode);
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  try {
+    for (const frame of [
+      '{broken',
+      JSON.stringify({ type: 'unexpected', data: { message: 'discard this' } }),
+    ]) {
+      const socket = await connect('/logs');
+      const closed = once(socket, 'close');
+      sendOneChunk(socket, [frame, frame]);
+      expect((await closed)[0]).toBe(1006);
+      await drainDeferredFrames();
+      expect(socket.readyState).toBe(WebSocket.CLOSED);
+    }
+    const after = ClientLogger.getDiagnostics();
+    expect(after.invalid).toBe(before.invalid + 2);
+    expect(after.accepted).toBe(before.accepted);
+    expect(warn).toHaveBeenCalledTimes(1);
+  } finally {
+    warn.mockRestore();
   }
-  const after = ClientLogger.getDiagnostics();
-  expect(after.invalid).toBe(before.invalid + 2);
-  expect(after.accepted).toBe(before.accepted);
 });

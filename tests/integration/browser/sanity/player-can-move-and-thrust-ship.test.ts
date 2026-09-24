@@ -3,6 +3,7 @@ import { SHIP } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager } = createBrowserScenarioHooks();
 
@@ -15,7 +16,10 @@ test(
     }
 
     const game = new GameInteractions(page);
-    await game.bootGame();
+    await game.bootGame({ waitForCombatReady: false });
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    // The origin's flat saddle has no passage speed bonus or ambient collisions.
+    await game.placeShipAt(0, 0);
 
     const startPos = await game.getShipPosition();
     const startAngle = await game.getShipAngle();

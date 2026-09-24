@@ -109,6 +109,7 @@ type UniverseMapElements = {
   status: HTMLElement;
   locations: HTMLUListElement;
   help: HTMLElement;
+  compass: HTMLElement;
 };
 
 type ExplorationRaster = {
@@ -159,21 +160,66 @@ function mapFrameFor(width: number, height: number, zoom: number): MapFrame {
   };
 }
 
-export function mapWorldToCanvas(
-  position: Position,
-  viewCenter: Position,
-  frame: Pick<MapFrame, 'x' | 'y' | 'size' | 'scale'>
+/** Canvas rotation that puts this ship heading at the top of the chart. North is −Y. */
+export function universeMapHeadingRotation(shipAngle: number | undefined): number {
+  if (typeof shipAngle !== 'number' || !Number.isFinite(shipAngle)) {
+    return 0;
+  }
+  return shipAngle - Math.PI / 2;
+}
+
+function chartHeadingRotation(): number {
+  return universeMapHeadingRotation(
+    PlayerManager.getInstance().getLocalPlayer()?.ship.angle ?? Math.PI / 2
+  );
+}
+
+export function mapScreenDeltaToWorld(
+  dx: number,
+  dy: number,
+  scale: number,
+  headingRotation = 0
 ): Position {
+  const safeScale = scale === 0 ? 1 : scale;
+  const cos = Math.cos(headingRotation);
+  const sin = Math.sin(headingRotation);
   return {
-    x: frame.x + frame.size / 2 + (position.x - viewCenter.x) * frame.scale,
-    y: frame.y + frame.size / 2 + (position.y - viewCenter.y) * frame.scale,
+    x: (cos * dx + sin * dy) / safeScale,
+    y: (-sin * dx + cos * dy) / safeScale,
   };
 }
 
-function mapCanvasToWorld(x: number, y: number, mapFrame: MapFrame): Position {
+export function mapWorldToCanvas(
+  position: Position,
+  viewCenter: Position,
+  frame: Pick<MapFrame, 'x' | 'y' | 'size' | 'scale'>,
+  headingRotation = 0
+): Position {
+  const dx = position.x - viewCenter.x;
+  const dy = position.y - viewCenter.y;
+  const cos = Math.cos(headingRotation);
+  const sin = Math.sin(headingRotation);
   return {
-    x: view.center.x + (x - (mapFrame.x + mapFrame.size / 2)) / mapFrame.scale,
-    y: view.center.y + (y - (mapFrame.y + mapFrame.size / 2)) / mapFrame.scale,
+    x: frame.x + frame.size / 2 + (cos * dx - sin * dy) * frame.scale,
+    y: frame.y + frame.size / 2 + (sin * dx + cos * dy) * frame.scale,
+  };
+}
+
+function mapCanvasToWorld(
+  x: number,
+  y: number,
+  mapFrame: MapFrame,
+  headingRotation: number
+): Position {
+  const delta = mapScreenDeltaToWorld(
+    x - (mapFrame.x + mapFrame.size / 2),
+    y - (mapFrame.y + mapFrame.size / 2),
+    mapFrame.scale,
+    headingRotation
+  );
+  return {
+    x: view.center.x + delta.x,
+    y: view.center.y + delta.y,
   };
 }
 
@@ -263,11 +309,12 @@ function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
   }
 
   if (anchor) {
+    const heading = chartHeadingRotation();
     const oldFrame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
-    const anchorWorld = mapCanvasToWorld(anchor.x, anchor.y, oldFrame);
+    const anchorWorld = mapCanvasToWorld(anchor.x, anchor.y, oldFrame, heading);
     view.zoom = nextZoom;
     const nextFrame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
-    const nextAnchorWorld = mapCanvasToWorld(anchor.x, anchor.y, nextFrame);
+    const nextAnchorWorld = mapCanvasToWorld(anchor.x, anchor.y, nextFrame, heading);
     view.center = clampCenter(
       {
         x: view.center.x + (anchorWorld.x - nextAnchorWorld.x),
@@ -427,6 +474,7 @@ function ensureElements(): UniverseMapElements | null {
     `#${UNIVERSE_MAP_IDS.locations}`
   ) as HTMLUListElement | null;
   const help = dialog.querySelector('.universe-map-help') as HTMLElement | null;
+  const compass = dialog.querySelector('.universe-map-compass') as HTMLElement | null;
   if (
     !canvas ||
     !close ||
@@ -437,7 +485,8 @@ function ensureElements(): UniverseMapElements | null {
     !zoomOut ||
     !status ||
     !locations ||
-    !help
+    !help ||
+    !compass
   ) {
     return null;
   }
@@ -458,6 +507,7 @@ function ensureElements(): UniverseMapElements | null {
     status,
     locations,
     help,
+    compass,
   };
 }
 
@@ -573,8 +623,12 @@ function drawDiscoveredBelt(
   }
   const label = revealed[Math.floor(revealed.length / 2)];
   if (label) {
+    context.save();
+    context.translate(label.x, label.y);
+    context.rotate(-chartHeadingRotation());
     context.font = `${11 / frame.scale}px monospace`;
-    context.fillText('ASTEROID BELT', label.x + 12 / frame.scale, label.y - 15 / frame.scale);
+    context.fillText('ASTEROID BELT', 12 / frame.scale, -15 / frame.scale);
+    context.restore();
   }
   context.restore();
 }
@@ -660,11 +714,14 @@ function drawMapAsset(
     context.scale(frame.scale, frame.scale);
   }
   if (showLabel && asset.name) {
+    context.save();
+    context.rotate(-chartHeadingRotation());
     context.font = `${12 / frame.scale}px "Courier New", monospace`;
     context.fillStyle = hexToRgba(PALETTE.HUD, 0.86);
     context.textAlign = 'center';
     context.textBaseline = 'top';
     context.fillText(asset.name, 0, size * 1.6);
+    context.restore();
   }
   context.restore();
 }
@@ -819,13 +876,24 @@ function drawCrew(
     }
     if (
       view.zoom >= 1.35 &&
-      canPlaceMapCrewLabel(player.name, position, size, frame, view.center, occupied)
+      canPlaceMapCrewLabel(
+        player.name,
+        position,
+        size,
+        frame,
+        view.center,
+        occupied,
+        chartHeadingRotation()
+      )
     ) {
+      context.save();
+      context.rotate(-chartHeadingRotation());
       context.font = `${11 / frame.scale}px "Courier New", monospace`;
       context.fillStyle = hexToRgba(PALETTE.HUD, 0.9);
       context.textAlign = 'left';
       context.textBaseline = 'bottom';
       context.fillText(player.name, size * 1.4, -size);
+      context.restore();
     }
     context.restore();
   }
@@ -919,13 +987,18 @@ function drawCourtLandmark(
     { name: RICOCHET_COURT.name, position: RICOCHET_COURT.center },
     frame,
     view.center,
-    labelRects
+    labelRects,
+    chartHeadingRotation()
   );
   context.save();
   context.translate(RICOCHET_COURT.center.x, RICOCHET_COURT.center.y);
+  context.save();
   context.scale(1 / frame.scale, 1 / frame.scale);
   drawCourtMapMark(context, 0, 0, markSize);
+  context.restore();
   if (showLabel) {
+    context.rotate(-chartHeadingRotation());
+    context.scale(1 / frame.scale, 1 / frame.scale);
     context.font = '12px "Courier New", monospace';
     context.textAlign = 'center';
     context.textBaseline = 'top';
@@ -942,6 +1015,8 @@ function renderMap(): void {
   resizeCanvas();
   positionMapOverlayControls();
   updateLocateControl();
+  const heading = chartHeadingRotation();
+  elements.compass.style.transform = `rotate(${heading}rad)`;
   const context = elements.canvas.getContext('2d');
   if (!context) {
     return;
@@ -957,6 +1032,7 @@ function renderMap(): void {
   context.rect(frame.x, frame.y, frame.size, frame.size);
   context.clip();
   context.translate(frame.x + frame.size / 2, frame.y + frame.size / 2);
+  context.rotate(heading);
   context.scale(frame.scale, frame.scale);
   context.translate(-view.center.x, -view.center.y);
 
@@ -991,7 +1067,9 @@ function renderMap(): void {
   for (const asset of revealedAssets) {
     revealedAssetCount++;
     const labelAllowed = mapAssetNameVisible(asset.kind, view.zoom, drawnLabelCount);
-    const showLabel = labelAllowed && canPlaceMapAssetLabel(asset, frame, view.center, labelRects);
+    const showLabel =
+      labelAllowed &&
+      canPlaceMapAssetLabel(asset, frame, view.center, labelRects, chartHeadingRotation());
     if (showLabel) {
       drawnLabelCount++;
     }
@@ -1007,10 +1085,8 @@ function renderMap(): void {
   context.strokeRect(frame.x, frame.y, frame.size, frame.size);
   context.fillStyle = hexToRgba(PALETTE.HUD, 0.72);
   context.font = '10px "Courier New", monospace';
-  context.textAlign = 'left';
-  context.textBaseline = 'top';
-  context.fillText('NORTH', frame.x + 8, frame.y + 8);
   context.textAlign = 'right';
+  context.textBaseline = 'top';
   context.fillText(
     `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
     frame.x + frame.size - 8,
@@ -1174,7 +1250,8 @@ function handleMapKeydown(ev: KeyboardEvent): void {
       break;
   }
   if (panX !== 0 || panY !== 0) {
-    setViewCenter({ x: view.center.x + panX, y: view.center.y + panY });
+    const pan = mapScreenDeltaToWorld(panX, panY, 1, chartHeadingRotation());
+    setViewCenter({ x: view.center.x + pan.x, y: view.center.y + pan.y });
   }
   ev.preventDefault();
   ev.stopPropagation();
@@ -1219,9 +1296,15 @@ function onPointerMove(ev: PointerEvent): void {
     return;
   }
   const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
+  const pan = mapScreenDeltaToWorld(
+    point.x - pointerPan.x,
+    point.y - pointerPan.y,
+    frame.scale,
+    chartHeadingRotation()
+  );
   setViewCenter({
-    x: view.center.x - (point.x - pointerPan.x) / frame.scale,
-    y: view.center.y - (point.y - pointerPan.y) / frame.scale,
+    x: view.center.x - pan.x,
+    y: view.center.y - pan.y,
   });
   pointerPan.x = point.x;
   pointerPan.y = point.y;

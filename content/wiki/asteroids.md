@@ -45,4 +45,4 @@ Black, red-eyed crawlers round rock cover and hop between nearby rocks to chase 
 
 ## Ore and refining
 
-Many asteroids are barren. Scouts and equipped satellites reveal ore: ice, metal, rubble, or crystal. Bring ore-bearing rocks to a furnace using a tow cable or Boost Coupling to refine them into shared materials and valuable banked rewards for delivery contributors. Mining produces point loot to haul home. Splitting a rock reduces its total recoverable ore; intact deliveries preserve the most value.
+Many asteroids are barren. Scouts and equipped satellites reveal ore on the crew radar: ice, metal, rubble, or crystal. Bring ore-bearing rocks to a furnace using a tow cable or Boost Coupling to refine them into shared materials and valuable banked rewards for delivery contributors. Mining produces point loot to haul home. Splitting a rock reduces its total recoverable ore; intact deliveries preserve the most value.

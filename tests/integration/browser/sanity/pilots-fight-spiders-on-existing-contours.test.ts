@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
+import { SPIDER } from '../../../../shared/terrainSpider';
 import type { SpiderFieldState } from '../../../../shared-types';
 import { installAudioProbe } from '../../utils/audio-probe';
 import {
@@ -72,7 +73,7 @@ for (const viewport of [
     await game.placeShipAt(3000, 5000);
     await expect
       .poll(async () => (await readField(page)).spiders.length, { timeout: 5000 })
-      .toBe(4);
+      .toBe(SPIDER.NEST_GUARDS);
     const predator = (await readField(page)).spiders.toSorted(
       (a, b) => a.position.x - b.position.x
     )[0];

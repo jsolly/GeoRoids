@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { oreResource } from '../../../../shared/economy';
 import { civicLot } from '../../../../shared/furnaces';
 import { WORLD } from '../../../../shared/world';
 import {
@@ -32,6 +33,7 @@ type MapFrame = {
   canvas: { width: number; height: number };
   status: string;
   labels: string[];
+  foundationMarkers: { x: number; y: number }[];
 };
 
 function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
@@ -44,6 +46,36 @@ function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
     }
 
     const labels: string[] = [];
+    const foundationMarkers: { x: number; y: number }[] = [];
+    let translatedPosition = { x: 0, y: 0 };
+    const originalTranslate = CanvasRenderingContext2D.prototype.translate;
+    const originalArc = CanvasRenderingContext2D.prototype.arc;
+    CanvasRenderingContext2D.prototype.translate = function (this: CanvasRenderingContext2D, x, y) {
+      if (this.canvas === canvas) {
+        translatedPosition = { x, y };
+      }
+      originalTranslate.call(this, x, y);
+    };
+    CanvasRenderingContext2D.prototype.arc = function (
+      this: CanvasRenderingContext2D,
+      x,
+      y,
+      radius,
+      start,
+      end,
+      counterclockwise
+    ) {
+      if (
+        this.canvas === canvas &&
+        x === 0 &&
+        y === 0 &&
+        radius > 0 &&
+        this.getLineDash().length > 0
+      ) {
+        foundationMarkers.push({ ...translatedPosition });
+      }
+      originalArc.call(this, x, y, radius, start, end, counterclockwise);
+    };
     const originalFillText = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (
       this: CanvasRenderingContext2D,
@@ -68,6 +100,8 @@ function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
       });
     } finally {
       CanvasRenderingContext2D.prototype.fillText = originalFillText;
+      CanvasRenderingContext2D.prototype.translate = originalTranslate;
+      CanvasRenderingContext2D.prototype.arc = originalArc;
     }
 
     return {
@@ -75,6 +109,7 @@ function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
       canvas: { width: canvas.width, height: canvas.height },
       status: status?.textContent ?? '',
       labels,
+      foundationMarkers,
     };
   });
 }
@@ -162,7 +197,7 @@ test.each([
       await page.locator('#universe-map-toggle').focus();
     }
     const frame = await openAndCaptureMap(page, touch);
-    expect(frame.labels).toContain('NORTH');
+    expect(frame.labels).not.toContain('NORTH');
     expect(frame.labels).toContain('5k across');
     expect(frame.labels).not.toContain(FAR_FURNACE.name);
     expect(frame.labels).not.toContain('Town Square');
@@ -238,6 +273,10 @@ test.each([
     expect(wholeWorld.labels).toContain('120k across');
     expect(wholeWorld.labels).not.toContain(FAR_FURNACE.name);
     expect(wholeWorld.labels).not.toContain('Town Square');
+    // Whole-world labels are culled for readability; the dashed foundation
+    // marker must still be drawn at its world position.
+    expect(wholeWorld.foundationMarkers).toContainEqual(FAR_FURNACE.position);
+    expect(await locations.textContent()).toContain(FAR_FURNACE.name);
     await locate.click();
     const nearbyAgain = await readMapFrame(page);
     expect(nearbyAgain.labels).toContain('5k across');
@@ -434,9 +473,14 @@ test.each([
         }
       )
       .toBe(true);
-    const mineralColors = ['#a5f3fc', '#fde68a', '#fdba74'];
+    // These fixtures contain ice and rubble ore; the metal host has no ore.
+    const mineralColors = ['#a5f3fc', '#fdba74'];
     const unscanned = await readMapStrokePaths(page, 'universe-map-canvas');
-    expect(unscanned.filter((path) => mineralColors.includes(path.color))).toHaveLength(0);
+    expect(
+      unscanned.filter(
+        (path) => [...mineralColors, '#fde68a'].includes(path.color) && path.lines >= 6
+      )
+    ).toHaveLength(0);
     await page.locator('#universe-map-close').click();
     await game.placeShipAt(4150, 5000);
     await page.screenshot({
@@ -471,6 +515,30 @@ test.each([
         { id: 'crew-fixture-map-ice', present: true, surveyed: true },
         { id: 'crew-fixture-map-rubble', present: true, surveyed: true },
       ]);
+    const surveyedRocks = await page.evaluate(() =>
+      (window.gameController?.getCurrRoidBelt()?.getRoids() ?? []).map(({ id, material, ore }) => ({
+        id,
+        material,
+        ore,
+      }))
+    );
+    for (const [id, expectedOre] of [
+      ['crew-fixture-spider-deposit', null],
+      ['crew-fixture-map-ice', 'ice'],
+      ['crew-fixture-map-rubble', 'rubble'],
+    ] as const) {
+      const rock = surveyedRocks.find((candidate) => candidate.id === id);
+      if (!rock) {
+        throw new Error(`Missing surveyed fixture ${id}`);
+      }
+      expect(
+        oreResource({
+          id: rock.id,
+          ...(rock.material === undefined ? {} : { material: rock.material }),
+          ...(rock.ore === undefined ? {} : { ore: rock.ore }),
+        })
+      ).toBe(expectedOre);
+    }
     await expect
       .poll(
         async () => {
@@ -485,7 +553,7 @@ test.each([
             )
           );
         },
-        { timeout: 5000, message: 'Scan classifies all three rock materials on the minimap' }
+        { timeout: 5000, message: 'Scan classifies the ice and rubble ore on the minimap' }
       )
       .toBe(true);
     await page.screenshot({
@@ -504,9 +572,16 @@ test.each([
       .poll(
         async () => {
           const classified = await readMapStrokePaths(page, 'universe-map-canvas');
-          return mineralColors.every((color) =>
+          const mineralsVisible = mineralColors.every((color) =>
             classified.some((path) => path.color === color && path.lines >= 6)
           );
+          const neutralVisible = classified.some(
+            (path) => path.color === '#94a3b8' && path.lines >= 6
+          );
+          const metalVisible = classified.some(
+            (path) => path.color === '#fde68a' && path.lines >= 6
+          );
+          return mineralsVisible && neutralVisible && !metalVisible;
         },
         {
           timeout: 5000,

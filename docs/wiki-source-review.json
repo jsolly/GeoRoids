@@ -1,5 +1,5 @@
 {
-  "note": "Merged current main. Spiders still die in one shot and held laser fire stays separate thick bolts. The manual matches.",
+  "note": "Merged current main. One ordinary hit removes a spider or belt crawler. Saved crawler health above that hit is clamped. Living crawlers leap when a host breaks.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -78,7 +78,7 @@
     "server/communication/messageBudget.ts": "sha256:022f26dd53a4beea08b32a6b6c90266119b6976e5352c8089ff263f692235562",
     "server/configuration.ts": "sha256:199f5b12ba2bb65dd7153b4dfdbb4d389ab48e9dc0fdedad9f3ec4280804d1c1",
     "server/core/AsteroidManager.ts": "sha256:852bfcacf9d7e77ea711e91fdf212cc5200f7bc2a72d91f7ba1ebd0b80c57ee9",
-    "server/core/BeltCrawlerManager.ts": "sha256:18f6ad4d40011e443fbeab604c994f3dce9e0057efeb7365d995629860cf9828",
+    "server/core/BeltCrawlerManager.ts": "sha256:da13be6164055dde332c2646fd21be536de28f176ee944e5c1dcc6b1c83a6cbd",
     "server/core/CollisionAuthority.ts": "sha256:e1be1d65eed030c34f8a9d94ffb1a507db94095bf39cf64ad861b9204f887cda",
     "server/core/EntityManager.ts": "sha256:f8df663da5c421e6140ce0b17239e14b12e3d4eb97d5699550c5cca2cc2dcaea",
     "server/core/GameEngine.ts": "sha256:dfc08e4822c455f95bbf42121855d0506acb781b85e68fbd34ef4ec2ba81f360",
@@ -311,7 +311,7 @@
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:ad202959d0255917e37c983ecf5916e92cdf4d8287550908b105ed45e5bdb6fb",
-    "src/wiki/gameReference.ts": "sha256:1a0893f4ffd61605e099650f888f4370854db72890bf7dba37517f18a2a89517",
+    "src/wiki/gameReference.ts": "sha256:39f21f7f40ee0b121e9775767af8ec095946b7ab1999ec578cf8b0d461776520",
     "src/wiki/main.ts": "sha256:55e2f9bc2a01cc11b571eaf4e2cc227e4e1b814d13c1598769d4bfe4b9093222",
     "src/wiki/media.ts": "sha256:d1b7537e6ecabc14cdbb9dbe7a8d0816eff2f4613862196cb140a0340b770d2d",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",

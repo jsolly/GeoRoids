@@ -383,12 +383,20 @@ export class BeltCrawlerManager {
   }
 
   private initializeHost(host: AsteroidData): void {
+    const clamp = (health: number): number =>
+      Math.min(Math.max(0, health), BELT_CRAWLER.MAX_HEALTH);
     if (host.beltCrawlerIds) {
+      if (host.beltCrawlerHealth) {
+        host.beltCrawlerHealth = host.beltCrawlerHealth.map(clamp);
+      }
       return;
     }
     const slot = beltSlotForAsteroid(host.id);
     const native = slot !== undefined && slot % 6 === 0;
-    host.beltCrawlerHealth = native ? [host.beltCrawlerHealth?.[0] ?? BELT_CRAWLER.MAX_HEALTH] : [];
+    const saved = host.beltCrawlerHealth?.[0];
+    host.beltCrawlerHealth = native
+      ? [saved === undefined ? BELT_CRAWLER.MAX_HEALTH : clamp(saved)]
+      : [];
     host.beltCrawlerIds = native ? [`belt-crawler:${host.id}:0`] : [];
   }
 

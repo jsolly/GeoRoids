@@ -196,7 +196,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       vertices: 4,
       offsets: [1, 1, 1, 1],
       material: 'metal',
-      beltCrawlerHealth: [50],
+      beltCrawlerHealth: [50], // Older than one laser hit; adoption clamps it.
     };
     const destination: AsteroidData = {
       ...rock,
@@ -215,7 +215,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       'destroyed'
     );
     expect(engine.getSpiderField().spiders.find((body) => body.id === before.id)).toMatchObject({
-      health: 50,
+      health: BELT_CRAWLER.MAX_HEALTH,
       crawler: { phase: 'escaping', hostId: destination.id },
     });
     engine.checkpointWorld();
@@ -225,7 +225,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     restarted.ensureAsteroidField();
     restarted.advanceCombatFrame();
     expect(restarted.getSpiderField().spiders.find((body) => body.id === before.id)).toMatchObject({
-      health: 50,
+      health: BELT_CRAWLER.MAX_HEALTH,
       crawler: { hostId: destination.id },
     });
     expect(restarted.getSpiderField().spiders.filter((body) => body.id === before.id)).toHaveLength(

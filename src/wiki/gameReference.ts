@@ -191,7 +191,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Boundary values',
       paragraphs: [
         `The lethal boundary radius is ${getGameBoundary().radius.toLocaleString('en-US')} units. The asteroid field radius is ${ROID.FIELD_RADIUS} units and boundary contact destroys a vulnerable ship regardless of hull health. Asteroids and lasers bounce inward; after a bounce, a laser damages any live ship it hits.`,
-        `A terrain spider has ${SPIDER.MAX_HEALTH} health. One ordinary laser hit removes it. A shot with less than full energy can leave it wounded.`,
+        `A terrain spider has ${SPIDER.MAX_HEALTH} health. One ordinary hit, including a ricochet, removes the spider.`,
       ],
     },
   ],

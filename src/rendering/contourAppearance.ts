@@ -1,20 +1,19 @@
 import type { Position } from '../../shared-types';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 
-/** Hue 211°, the quiet contour ink. Lightness is the only change along the ramp. */
-const CONTOUR_SATURATION = 0.15;
-const UPHILL_LIGHTNESS = 0.36;
-const DOWNHILL_LIGHTNESS = 0.72;
+/** Endpoints of the difficulty ramp. The middle stays a muted rose, not spider red. */
+const CLIMB_RED = [82, 10, 10] as const;
+const EASY_RED = [246, 182, 182] as const;
+const UPHILL_LIGHTNESS = 0.18;
+const DOWNHILL_LIGHTNESS = 0.84;
 
-function slateChannels(lightness: number): [number, number, number] {
-  const chroma = (1 - Math.abs(2 * lightness - 1)) * CONTOUR_SATURATION;
-  // Hue 211 sits in the blue sector, so red carries only the lightness match.
-  const x = chroma * (1 - Math.abs(((211 / 60) % 2) - 1));
-  const match = lightness - chroma / 2;
+function redChannels(lightness: number): [number, number, number] {
+  const span = DOWNHILL_LIGHTNESS - UPHILL_LIGHTNESS;
+  const mix = Math.min(1, Math.max(0, (lightness - UPHILL_LIGHTNESS) / span));
   return [
-    Math.round(match * 255),
-    Math.round((x + match) * 255),
-    Math.round((chroma + match) * 255),
+    Math.round(CLIMB_RED[0] + (EASY_RED[0] - CLIMB_RED[0]) * mix),
+    Math.round(CLIMB_RED[1] + (EASY_RED[1] - CLIMB_RED[1]) * mix),
+    Math.round(CLIMB_RED[2] + (EASY_RED[2] - CLIMB_RED[2]) * mix),
   ];
 }
 
@@ -28,9 +27,23 @@ function rampLightness(slope: number, passage: number): number {
   return UPHILL_LIGHTNESS + (DOWNHILL_LIGHTNESS - UPHILL_LIGHTNESS) * position;
 }
 
-/** Darker slate uphill, lighter slate downhill. Shortcuts stay on the light end. */
+/** `#RRGGBB` for the same ramp, so demonstrations can stroke it as a hex. */
+export function contourSlopeHex(slope: number, passage = 0): string {
+  const [red, green, blue] = redChannels(rampLightness(slope, passage));
+  const channel = (value: number) => value.toString(16).padStart(2, '0');
+  return `#${channel(red)}${channel(green)}${channel(blue)}`;
+}
+
+/**
+ * One red ramp. Steep climbs are very dark; descents and passages stay light.
+ * The light end does not wrap, so an easy route can keep meeting easier ground.
+ */
 export function contourSlopeColor(slope: number, alpha: number, passage = 0): string {
-  const [red, green, blue] = slateChannels(rampLightness(slope, passage));
+  const hex = contourSlopeHex(slope, passage);
+  const raw = hex.slice(1);
+  const red = Number.parseInt(raw.slice(0, 2), 16);
+  const green = Number.parseInt(raw.slice(2, 4), 16);
+  const blue = Number.parseInt(raw.slice(4, 6), 16);
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 

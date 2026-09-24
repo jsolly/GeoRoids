@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest';
-import { sampleContourHeight } from '../../../src/physics/terrain/heightfield';
-import { passageAlignment, samplePassages } from '../../../src/physics/terrain/passages';
+import { sampleContourHeight, sampleGradient } from '../../../src/physics/terrain/heightfield';
+import {
+  passageAlignment,
+  passageStrength,
+  samplePassages,
+} from '../../../src/physics/terrain/passages';
+import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 import {
@@ -54,6 +59,74 @@ test('narrow cuts visibly pull contours toward a level pass and preserve ordinar
   expect(Math.max(...banks)).toBeGreaterThan(centerHeight * 2);
   expect(samplePassages(terrain, 0, 0).every((route) => route.strength === 0)).toBe(true);
   expect(terrainCruiseVelocity({ x: 0, y: 0 }, 0, 1)).toEqual({ x: 1, y: 0 });
+});
+
+test('an easy passage does not pull a pilot down into a basin', () => {
+  const { position } = center();
+  const terrain = field();
+  const velocity = { x: 4, y: -2 };
+  applySlopeForce(velocity, position, terrain, 1);
+  expect(velocity).toEqual({ x: 4, y: -2 });
+});
+
+test('a partial passage keeps only the open share of the downhill pull', () => {
+  const terrain = field();
+  for (let x = 900; x < 5000; x += 35) {
+    for (let y = -2000; y < 4000; y += 41) {
+      const strength = passageStrength(terrain, x, y);
+      if (strength < 0.25 || strength > 0.75) {
+        continue;
+      }
+      const gradient = sampleGradient(terrain, x, y);
+      const steepness = Math.hypot(gradient.x, gradient.y);
+      if (steepness < TERRAIN.TRAVEL_STEEP_GRADIENT) {
+        continue;
+      }
+      const open = 1 - strength;
+      const scale = Math.min(1, steepness / TERRAIN.REF_GRADIENT);
+      const accel = TERRAIN.SLOPE_ACCEL * scale * open;
+      const velocity = { x: 0, y: 0 };
+      applySlopeForce(velocity, { x, y }, terrain, 1);
+      expect(velocity.x).toBeCloseTo((-gradient.x / steepness) * accel, 5);
+      expect(velocity.y).toBeCloseTo((-gradient.y / steepness) * accel, 5);
+      expect(Math.hypot(velocity.x, velocity.y)).toBeGreaterThan(0.2);
+      const nx = gradient.x / steepness;
+      const ny = gradient.y / steepness;
+      const climbing = { x: nx * 8, y: ny * 8 };
+      applySlopeForce(climbing, { x, y }, terrain, 1);
+      const pulledX = nx * 8 - nx * accel;
+      const pulledY = ny * 8 - ny * accel;
+      const uphillAfter = pulledX * nx + pulledY * ny;
+      const drag = TERRAIN.UPHILL_DRAG * scale * uphillAfter * open;
+      expect(uphillAfter).toBeGreaterThan(0);
+      expect(climbing.x).toBeCloseTo(pulledX - nx * drag, 5);
+      expect(climbing.y).toBeCloseTo(pulledY - ny * drag, 5);
+      return;
+    }
+  }
+  throw new Error('No partial passage on a real slope');
+});
+
+test('one easy passage joins the crossing easy passage', () => {
+  const terrain = field();
+  for (let x = 800; x < 6000; x += 23) {
+    for (let y = 800; y < 6000; y += 29) {
+      const routes = samplePassages(terrain, x, y);
+      if (routes.some((route) => route.strength < 0.85)) {
+        continue;
+      }
+      for (const route of routes) {
+        const angle = Math.atan2(-route.tangentY, route.tangentX);
+        for (const heading of [angle, angle + Math.PI]) {
+          expect(passageAlignment(terrain, x, y, heading)).toBeGreaterThan(0.85);
+          const velocity = terrainCruiseVelocity({ x, y }, heading, 1);
+          expect(Math.hypot(velocity.x, velocity.y)).toBeGreaterThan(1.4);
+        }
+      }
+      return;
+    }
+  }
+  throw new Error('No joined easy passages');
 });
 
 test('intersections never stack speed bonuses and every heading stays within the server ceiling', () => {

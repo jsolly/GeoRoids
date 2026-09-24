@@ -1,11 +1,11 @@
 {
-  "note": "Merged current main. Furnace names stay hidden until the heading-up chart is zoomed in close.",
+  "note": "Merged current main, including wrapped mobile inventory. Furnace names stay hidden until the heading-up chart is zoomed in close.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
     "docs/protocol/snapshot-v1.md": "sha256:6ca9d9f5ca359ece9c6a8f663321272bdd632be3628954185f63ff351870e127",
     "docs/sounds.md": "sha256:ceabd0097fd9c8fafeb4dbc9f23002654dd1b0d3f8da977129a4bdb733278a2e",
-    "index.css": "sha256:b65d5f1702ba17e05667854608809032613f5839b39089c7a18f0cb75e0eef3b",
+    "index.css": "sha256:1fa739e16afbc49f813f165aebbcd8ad6966820c19455ebe4b4f00bae786a4aa",
     "index.html": "sha256:1ccd30e7bf228c6c2a00c0dbe33158874ecbacbd551713aed51721cc941187d5",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:7103dbc14f0676081f289a35e3873ed2a4c5c8fb7e9e2366c3b34d20123151cb",
@@ -338,7 +338,7 @@
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:2e0d0d0f52719ed039b0891cc7d145cc0d3195291c539e85f25f9ea21511b36c",
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts": "sha256:b6d78d1ccb3a79b970ea0e786ef837649ca2d619cdc095ceba189effba5fd3e3",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:35f05f3e53236101302af88e2880487e13b97c54c2d1a568fd370b5d38470112",
-    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:98e87549df36bd3a4c970e4b0042b9ed8c3f077d11bb3af5cc3b83d4050f4241",
+    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:1cf77467c8d9c0c353f392f26bcbf85ce11f6e835c3df427f9fc1cb1f5f5e882",
     "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:c803d9a2b2ba96d532d2289cef621daff4767973d26f0634fa86942112eca05e",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:d5db2e525622efef4bcb16c6be007950367c9e5b031a955dd40be3ba96aae6f8",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:dbe7b3189b8658f2344a6397005d3b8897a5e2db8e6d7f5a9a40c710054e334b",

@@ -6,6 +6,8 @@ import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
 import { arrangeCrewField, getWorldDiagnostics, placePlayer } from './test-server-control';
 
+let nextPilotNumber = 1;
+
 type CrashAsteroidCandidate = {
   x: number;
   y: number;
@@ -1353,6 +1355,8 @@ export class GameInteractions {
     haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
     await this.navigateToGame();
+    // Distinct scenario pilots must not collide in the menu's random nickname pool.
+    await this.page.locator('#playerNameInput').fill(`Test pilot ${nextPilotNumber++}`);
     if (options?.haulerUtility) {
       await this.page.evaluate(
         ({ key, utility }) => {

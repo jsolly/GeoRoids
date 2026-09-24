@@ -135,8 +135,10 @@ add suppressions, downgrade rules, or weaken an assertion to pass the gate.
 Keep measurement fixtures and instrumentation under `benchmarks/`; production
 modules must not import them. Benchmark contract tests belong in
 `tests/unit/performance/` and prove rejected changed workloads, invalid results,
-or cleanup failures. Timed benchmark runs stay outside the test gate because
-machine scheduling is not a deterministic correctness assertion.
+or cleanup failures. Elapsed-time thresholds stay outside the test gate because machine scheduling
+is not a deterministic correctness assertion. The full local `npm run gate`
+also runs constrained production-client scenarios to validate gameplay and
+measurement correctness; their timing samples are diagnostic, not speed gates.
 
 Compare equivalent scenarios with the same pinned harness. Preserve raw timing
 samples, declared participants, final game state, and exact work counts. A faster

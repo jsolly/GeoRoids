@@ -25,6 +25,7 @@ test.each([
     await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    await game.collectEquipment(['boost_coupling']);
     if (mobile) {
       await page.locator('#ship-schematic-toggle').tap();
     } else {

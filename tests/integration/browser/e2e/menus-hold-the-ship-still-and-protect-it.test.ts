@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { DAMAGE } from '../../../../src/constants';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -84,10 +85,17 @@ test.each([
     expect(await pose()).toEqual(held);
     expect(held.velocity).toEqual({ x: 0, y: 0 });
     expect(held.thrusting).toBe(false);
-    const health = await game.getShipHealth();
-    await arrangeCrewField([id], 'impact');
+    // The impact fixture deliberately sets one-hit health and places a rock
+    // on the pilot. Compare with that arranged state, not pre-fixture health.
+    const epochs = await arrangeCrewField([id], 'impact');
     await game.waitForAnimationFrames(30);
-    expect(await game.getShipHealth()).toBe(health);
+    expect(await game.getShipHealth()).toBeGreaterThanOrEqual(DAMAGE.ASTEROID_COLLISION);
+    expect(
+      await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.playerMotion?.epoch)
+    ).toBe(epochs.get(id));
+    expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.exploding)).toBe(
+      false
+    );
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`stationary-${menu}-${width}.png`),
     });

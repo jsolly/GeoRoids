@@ -28,32 +28,34 @@ function scoutHost(): ScoutScanVisualHost {
   };
 }
 
-test('an active Scout pulse starts at the hull and reaches the farthest desktop corner', () => {
+test('one Scout pulse starts at the hull and reaches the farthest desktop corner', () => {
   const viewport = { width: 800, height: 600 };
   const start = scoutScanPulseGeometry(0, 400, 300, 24, SHIP_ABILITY.SCAN_FRAMES, viewport);
-  const midpoint = scoutScanPulseGeometry(0, 400, 300, 24, 300, viewport);
-  const edge = scoutScanPulseGeometry(0, 400, 300, 24, 241, viewport);
+  const midpoint = scoutScanPulseGeometry(0, 400, 300, 24, SHIP_ABILITY.SCAN_FRAMES / 2, viewport);
+  const edge = scoutScanPulseGeometry(0, 400, 300, 24, 1, viewport);
 
+  expect(SHIP_ABILITY.SCAN_PULSES).toBe(1);
   expect(start?.radius).toBe(24);
   expect(start?.alpha).toBeGreaterThan(0);
   expect(midpoint?.radius).toBeGreaterThan(start?.radius ?? 0);
   expect(midpoint?.alpha).toBeCloseTo(start?.alpha ?? 0);
   expect(edge?.radius).toBeGreaterThan(Math.hypot(400, 300) * 1.08);
   expect(edge?.alpha).toBeGreaterThan(0);
-  expect(scoutScanPulseGeometry(0, 400, 300, 24, 240, viewport)).toBeUndefined();
-  expect(scoutScanPulseGeometry(1, 400, 300, 24, 240, viewport)?.radius).toBeCloseTo(24);
+  expect(scoutScanPulseGeometry(0, 400, 300, 24, 0, viewport)).toBeUndefined();
+  expect(
+    scoutScanPulseGeometry(1, 400, 300, 24, SHIP_ABILITY.SCAN_FRAMES, viewport)
+  ).toBeUndefined();
 });
 
-test('the final mobile pulse uses viewport pixels and fades without leaving a later pulse', () => {
+test('the single mobile pulse uses viewport pixels and fades when the scan ends', () => {
   const viewport = { width: 390, height: 844 };
-  const edge = scoutScanPulseGeometry(2, 195, 422, 24, 1, viewport);
+  const edge = scoutScanPulseGeometry(0, 195, 422, 24, 1, viewport);
 
   expect(edge?.radius).toBeGreaterThan(Math.hypot(195, 422) * 1.08);
   expect(edge?.alpha).toBeGreaterThan(0);
   expect(edge?.alpha).toBeLessThan(0.02);
   expect(scoutScanPulseGeometry(0, 195, 422, 24, 0, viewport)).toBeUndefined();
-  expect(scoutScanPulseGeometry(1, 195, 422, 24, 0, viewport)).toBeUndefined();
-  expect(scoutScanPulseGeometry(2, 195, 422, 24, 0, viewport)).toBeUndefined();
+  expect(scoutScanPulseGeometry(1, 195, 422, 24, 1, viewport)).toBeUndefined();
 });
 
 test('only a living active Scout paints the cyan sweep', () => {

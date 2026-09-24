@@ -188,7 +188,7 @@ the furnace menu inside the hearth’s visible footprint, with Town Square retai
 level-gated placeholder purchases. Death drops cargo while banks, silk, equipment,
 and paint remain safe.
 Verify server socket/proximity/destination checks, transit action suppression,
-arrival reconciliation, reconnect behavior, and desktop/mobile rocket visuals.
+arrival reconciliation, reconnect behavior, and desktop/mobile equipped-hull travel visuals.
 
 The single Ricochet Court northeast of Town Square is covered in Combat survival,
 Terrain, Teamwork, and HUD/network. Panels reflect lasers from both sides without

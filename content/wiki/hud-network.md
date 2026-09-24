@@ -18,7 +18,7 @@ The HUD shows your bank, cargo capacity, kit, ability, shared settlement progres
 
 ## Travel prompt
 
-Inside a lit furnace's visible footprint, tap the travel prompt on mobile or press E on desktop to open its destination map. Your mobile ability button keeps its equipped tool. Choose another lit furnace for a [free rocket ride](/wiki/#controls).
+Inside a lit furnace's visible footprint, the prompt offers travel; at Town Square it says Enter and opens a choice of Store or Fast Travel. See [furnace travel and store](/wiki/#controls) for controls and boarding rules.
 
 ## Radar and universe map
 

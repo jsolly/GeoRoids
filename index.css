@@ -202,6 +202,16 @@
     font: 12px / 1.5 var(--font-mono, monospace);
   }
 
+  .town-store-choices {
+    display: grid;
+    gap: 12px;
+    margin-block: 20px;
+  }
+
+  .town-store-choices[hidden] {
+    display: none;
+  }
+
   .town-store-row {
     display: flex;
     align-items: center;
@@ -231,6 +241,8 @@
     line-height: 1;
   }
 
+  .town-store-choices button,
+  #town-store-back,
   .town-store-row button,
   .furnace-destinations button,
   #town-store-return {
@@ -239,6 +251,11 @@
     font: 700 0.7rem / 1 var(--font-mono, monospace);
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  .town-store-choices button,
+  #town-store-back {
+    min-height: 48px;
   }
 
   .furnace-destinations {

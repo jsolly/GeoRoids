@@ -35,9 +35,11 @@ V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-gro
 
 ## Furnace travel and store
 
-Inside a lit furnace's visible footprint, follow the travel prompt and press E on desktop or tap the travel prompt on mobile to open the destination map; B also toggles the menu. The mobile ability button keeps your equipped tool available over a furnace. Choose another lit furnace for a free, slower rocket ride along the pipes; dark foundations are not destinations. Boarding releases cargo, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
+Inside a lit furnace's visible footprint, press E or tap the travel prompt to open the destination map; B also toggles the menu. At Town Square, tap Enter or press E, then choose Store or Fast Travel; Back to Town Square returns to that choice. The mobile ability button keeps your equipped tool available over a furnace.
 
-Town Square's menu also offers placeholders purchased with banked points. Higher settlement levels unlock more offers; purchases have no gameplay effect.
+Choose another lit furnace for a free ride along the pipes in your equipped ship; dark foundations are not destinations. Boarding releases cargo, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
+
+Town Square's Store offers placeholders purchased with banked points. Higher settlement levels unlock more offers; purchases have no gameplay effect.
 
 ## Map
 

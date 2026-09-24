@@ -303,10 +303,8 @@ test(
     if (!teammateName) {
       throw new Error('Missing teammate name');
     }
-    await arrangeCrewField(
-      [await game.getLocalPlayerId(), await teammate.getLocalPlayerId()],
-      'empty'
-    );
+    const teammateId = await teammate.getLocalPlayerId();
+    await arrangeCrewField([await game.getLocalPlayerId(), teammateId], 'empty');
     await teammatePage.keyboard.press('KeyM');
     await game.placeShipAt(0, 0);
     await teammate.placeShipAt(0, 0);
@@ -318,8 +316,32 @@ test(
     expect((await readMapFrame(page)).labels).not.toContain(teammateName);
     await teammate.placeShipAt(2450, 0);
     await expect
-      .poll(() => page.locator('#universe-map-locations').textContent())
-      .toContain('X +2450');
+      .poll(() =>
+        page.evaluate((id) => {
+          const observed = window.gameController
+            ?.getPlayerManager()
+            .getNonLocalPlayers()
+            .find((player) => player.id === id);
+          return observed
+            ? {
+                x: Math.round(observed.ship.position.x),
+                y: Math.round(observed.ship.position.y),
+              }
+            : null;
+        }, teammateId)
+      )
+      .toEqual({ x: 2450, y: 0 });
+    // The accessible list refreshes once a second after remote interpolation.
+    await expect
+      .poll(
+        () =>
+          page
+            .locator('#universe-map-locations li')
+            .filter({ hasText: `${teammateName} (crew):` })
+            .textContent(),
+        { timeout: 2500 }
+      )
+      .toBe(`${teammateName} (crew): X +2450, Y +0`);
     expect((await readMapFrame(page)).labels).not.toContain(teammateName);
     assertNoBrowserDiagnostics(diagnostics);
   },

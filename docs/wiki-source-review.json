@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed the pinball test fixture against asteroid/combat rules and the reflection demonstration. Shots still inherit motion in gameplay; only the test now aligns and fires atomically from a stationary known lane. Both desktop/mobile scenarios retain three authoritative bounces and passed. No gameplay, Wiki copy, or demonstration generator changed; existing reflection media remains accurate.",
+  "note": "Reviewed content/wiki/hud-network.md and content/wiki/teamwork.md against universeMap accessible locations and map media declarations. This test-only synchronization waits for the observed teammate pose and the existing one-second accessible-list refresh; map controls, shared chart behavior, crew labels, and illustrations are unchanged, so no article or media edits are needed. Focused map browser scenarios and TypeScript checks passed.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -322,7 +322,7 @@
     "src/wiki/wiki.css": "sha256:d47f0c7fb925815758b7578ba53df525f58aa0d6da11a8f08992fae3c55edf58",
     "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts": "sha256:8c313209bb56ae2925811a5c6e7b57e3dbc4d701f3ad58fd831a0566b9dab12e",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts": "sha256:f59c33b77ae06e973130ea52cdd9c67178b7a9ca7fd6dc3769a3590a42ff944f",
-    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:d1331c8a5b3527bd42b147ce97790ef42d5ef0d7e5a7233a51dfed3600c876a2",
+    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:0d6685e813e9f6f224c382fb5280ecce93a5ece0960617da73b7c07b7125c41a",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts": "sha256:c2b617a89a05730dfa09d65242b6dbf51d2690751c598290d88ea86cc227ebd5",
     "tests/integration/browser/e2e/hauler-extracts-silk-and-tows-spiders-into-furnaces.test.ts": "sha256:1bcb9c236a071757228f07ed30327b85f7a07978c09f5d24155b01ab9c8c0f5e",
     "tests/integration/browser/e2e/menus-hold-the-ship-still-and-protect-it.test.ts": "sha256:9389833bd033dacf3c6b2624aaa45f160ad58778060b0121028ccdd01a2a3934",

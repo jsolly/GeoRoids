@@ -156,11 +156,30 @@ function isExploredPosition(
   return cell !== null && isCellExplored(geometry.exploration, cell);
 }
 
+const EXPLORED_RADAR_ALPHA = 0.18;
+
+function hexChannels(hex: string): [number, number, number] {
+  const raw = hex.startsWith('#') ? hex.slice(1) : hex;
+  return [
+    Number.parseInt(raw.slice(0, 2), 16),
+    Number.parseInt(raw.slice(2, 4), 16),
+    Number.parseInt(raw.slice(4, 6), 16),
+  ];
+}
+
+/** One solid color. Translucent tiles double-paint their overlap and read as a grid. */
+function solidRadarInk(tint: string, alpha: number): string {
+  const [backR, backG, backB] = hexChannels(PALETTE.BG);
+  const [tintR, tintG, tintB] = hexChannels(tint);
+  const mix = (back: number, front: number) => Math.round(back + (front - back) * alpha);
+  return `rgb(${mix(backR, tintR)}, ${mix(backG, tintG)}, ${mix(backB, tintB)})`;
+}
+
 /** Draw the shared exploration mask behind known world marks. */
 function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   ctx.save();
-  // Give explored ground its own ink: dark fog over a dark void alone is invisible.
-  const exploredInk = hexToRgba(PALETTE.REMOTE, 0.18);
+  // Pale explored ground has to be its own ink: dark fog over a dark void disappears.
+  const exploredInk = solidRadarInk(PALETTE.REMOTE, EXPLORED_RADAR_ALPHA);
   const cellScale = geometry.size / (geometry.radius * 2);
   for (const cell of explorationCellsInView({
     cx: geometry.center.x,
@@ -171,7 +190,8 @@ function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeom
     const bounds = cellWorldBounds(cell);
     const x = geometry.x + geometry.size / 2 + (bounds.x - geometry.center.x) * cellScale;
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;
-    const size = bounds.size * cellScale + 0.5;
+    // One extra pixel closes tile gaps. The fill is opaque, so the overlap stays invisible.
+    const size = bounds.size * cellScale + 1;
     ctx.fillRect(x, y, size, size);
   }
   ctx.restore();

@@ -80,20 +80,19 @@ test('roid stroke weights follow four size tiers', () => {
 
 test('arcade shots are thick bolts with a gap between Scout-cadence shots', () => {
   expect(VISUAL.LASER_STROKE_WIDTH).toBeGreaterThan(VISUAL.SHIP_STROKE_WIDTH);
-  expect(VISUAL.LASER_STROKE_WIDTH).toBeGreaterThanOrEqual(10);
-  expect(VISUAL.LASER_CORE_WIDTH).toBeLessThan(VISUAL.LASER_STROKE_WIDTH);
-  expect(VISUAL.LASER_GLOW).toBeGreaterThan(VISUAL.LASER_STROKE_WIDTH);
-  expect(VISUAL.LASER_LENGTH).toBeGreaterThan(VISUAL.LASER_STROKE_WIDTH);
-  expect(VISUAL.LASER_LENGTH).toBeLessThanOrEqual(18);
-  expect(VISUAL.LASER_TRAIL_LENGTH).toBeLessThan(VISUAL.LASER_LENGTH);
+  expect(VISUAL.LASER_STROKE_WIDTH).toBeGreaterThanOrEqual(14);
+  expect(VISUAL.LASER_CORE_WIDTH).toBeLessThan(VISUAL.LASER_STROKE_WIDTH / 2);
+  expect(VISUAL.LASER_LENGTH).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH);
+  expect(VISUAL.LASER_TRAIL_LENGTH).toBe(0);
+  expect(VISUAL.LASER_GLOW).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH / 4);
   expect(VISUAL.LASER_EXPLODE_RADIUS).toBeLessThanOrEqual(VISUAL.LASER_LENGTH);
   const scoutSpacing = (LASER.SPEED * getShipKit('scout').shotCooldown) / 1000;
-  const paintedSpan =
-    VISUAL.LASER_LENGTH +
-    VISUAL.LASER_TRAIL_LENGTH +
-    VISUAL.LASER_STROKE_WIDTH / 2 +
-    (VISUAL.LASER_STROKE_WIDTH * 0.7) / 2;
-  expect(paintedSpan).toBeLessThan(scoutSpacing - 8);
+  // paintLaserBolt uses butt caps, so thickness does not add flight-axis length.
+  // Chromium truncates shadowBlur near 3 sigma, and sigma is blur / 2.
+  const paintedSpan = VISUAL.LASER_LENGTH + VISUAL.LASER_TRAIL_LENGTH;
+  const haloSpan = paintedSpan + VISUAL.LASER_GLOW * 3;
+  expect(haloSpan).toBeLessThan(scoutSpacing / 2);
+  expect(scoutSpacing - paintedSpan).toBeGreaterThan(paintedSpan * 2);
 });
 
 test('ships stay hairline; roids read as silhouettes', () => {

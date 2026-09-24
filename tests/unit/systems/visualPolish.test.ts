@@ -274,15 +274,17 @@ test('local and remote shots retain their glowing artwork and direction, then hi
     const y = -artwork.y;
     expect([...sprite.getImageData(x, y, 1, 1).data]).toEqual([255, 248, 225, 255]);
     expect([...sprite.getImageData(x, y + 2, 1, 1).data]).toEqual([253, 230, 138, 255]);
-    const trail = sprite.getImageData(
-      x - VISUAL.LASER_LENGTH / 2 - VISUAL.LASER_STROKE_WIDTH / 2 - 2,
+    const pastBolt = sprite.getImageData(
+      x - VISUAL.LASER_LENGTH / 2 - VISUAL.LASER_GLOW * 3 - 2,
       y,
       1,
       1
     ).data;
-    expect(trail[3]).toBeGreaterThan(90);
-    expect(trail[3]).toBeLessThan(255);
-    expect(sprite.getImageData(x, y + 9, 1, 1).data[3]).toBeGreaterThan(0);
+    expect(pastBolt[3]).toBe(0);
+    const edge = sprite.getImageData(x, y + VISUAL.LASER_STROKE_WIDTH / 2, 1, 1).data;
+    expect(edge[3]).toBeGreaterThan(0);
+    expect(edge[3]).toBeLessThan(80);
+    expect(sprite.getImageData(x, y + VISUAL.LASER_STROKE_WIDTH / 2 + 1, 1, 1).data[3]).toBe(0);
   }
   expect(fill).not.toHaveBeenCalled();
 

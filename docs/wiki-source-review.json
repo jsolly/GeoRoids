@@ -1,5 +1,5 @@
 {
-  "note": "Terrain spiders and belt crawlers die to one ordinary laser hit. Hunt and belt-spider field-guide copy says so, and the terrain reference lists spider health. Laser bolts are shorter and thicker, with a gap between Scout-cadence shots. Demonstration GIFs were left as committed because a full regeneration here changed every asset, including scenes that do not draw lasers.",
+  "note": "Held fire paints separate short thick laser stamps. Butt caps and a two-pixel halo keep each Scout-cadence shot from bridging into the next. Contour ticks stay within two bolt lengths. Field-guide pages do not describe bolt shape, so combat, terrain, and asteroid copy is unchanged. Demonstration GIFs were left as committed because a full regeneration here changed every asset, including scenes that do not draw lasers.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -159,7 +159,7 @@
     "src/audio/spiderScore.ts": "sha256:7b0129c4605d2e5fcbbbde425d22f4962c81f842aced04c48e318d18df3f7a40",
     "src/audio/spiderWhimper.ts": "sha256:7cc0751ee8e82ad1636f93c9393b566a19a18c92e1b501f59c2ac5ea6d7d816c",
     "src/audio/splitSound.ts": "sha256:f1ba4b8785204096b8e10a4e90d75b04ce31b983c87f7242dc3819e4d37806c0",
-    "src/constants/index.ts": "sha256:1db076553f043ac94b9168e3dfb2ae226780793e8ec3ed60107b437bbf64e925",
+    "src/constants/index.ts": "sha256:87ed90691fdb4e3c3b26565134a3010acbfbaf0b75a0f268dfe8582c3f7bae47",
     "src/constants/user-preferences.ts": "sha256:7b2cc79d5bed47487071179249fa264be76143588c5390496774fd67e683ca3c",
     "src/core/eventLoop.ts": "sha256:dd5a3b0f489d41d7093c87a9cf6cc82265b6591f3372bc0d3da171f0997db589",
     "src/core/gameController.ts": "sha256:c65da116eeb4933b8f032f8f0be19a333d28b7c28a2217b3f90b71bf1fb5ddea",
@@ -200,7 +200,7 @@
     "src/entities/ship/shipAbilities.ts": "sha256:5746d69393d6a597274fe4df02d29b9874ce377218d40644cf44e62d48536953",
     "src/entities/ship/shipCombatNetwork.ts": "sha256:bab2e29988ae1226212e63088098aa418e831177bd9885fd88191e7a40a240de",
     "src/entities/ship/shipKits.ts": "sha256:16be28e1bee180343eec3d596feb877ed90f1e536de86c74de57832147ec289e",
-    "src/entities/ship/shipRenderer.ts": "sha256:6f07c820aee15a6d74045872941941dca3db519eff5a33de5068998b85e4fb83",
+    "src/entities/ship/shipRenderer.ts": "sha256:5fd077c99844c5a381a6e32b18cd51f5cc1ce9171b10cb723efce20ea3e80e7e",
     "src/entities/ship/shipUtils.ts": "sha256:b8c0def8d376972d6ce01fb151493f5ef891ab346a5b1ade6fba2e894843f8f7",
     "src/entities/ship/surveyScan.ts": "sha256:084a1caeb6cbb34e92d0ae88c2dae8dbaa11fa1af0a679e694fbb95e2a2235a1",
     "src/entities/ship/towCable.ts": "sha256:f70fc78b9a306eff14b374e7de688c7c9e4106c36f9039095bd60ba63fa4b8c3",

@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import type { AuthoritativeProjectileField } from '../../../../src/entities/laser/AuthoritativeProjectileField';
 import {
@@ -52,22 +53,6 @@ test.each([
         y: group.reduce((sum, rock) => sum + rock.position.y, 0) / 3,
       };
     });
-    // Match the external inward-facet lane covered by the cluster physics test.
-    // Face down that lane before placement so automatic cruise cannot shift the
-    // launch sideways while the fixture snapshot arrives.
-    const approachAngle = (Math.PI * 3) / 10;
-    await page.evaluate((angle) => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Local pilot missing');
-      }
-      ship.angle = Math.PI - angle;
-    }, approachAngle);
-    await game.placeShipAt(
-      pocket.x + Math.cos(approachAngle) * 300,
-      pocket.y + Math.sin(approachAngle) * 300
-    );
-    await game.armSpawnProtection();
     const field = await page.evaluateHandle<AuthoritativeProjectileField>(
       "import('/src/entities/laser/AuthoritativeProjectileField.ts').then(({ AuthoritativeProjectileField }) => AuthoritativeProjectileField.getInstance())"
     );
@@ -84,7 +69,40 @@ test.each([
       return evidence;
     }, field);
     try {
-      await game.fireLaserToward(pocket.x, pocket.y);
+      const approachAngle = (Math.PI * 3) / 10;
+      const launchPosition = {
+        x: pocket.x + Math.cos(approachAngle) * 300,
+        y: pocket.y + Math.sin(approachAngle) * 300,
+      };
+      await game.placeShipAt(launchPosition.x, launchPosition.y);
+      // Cruise can add lateral terrain velocity between browser round trips.
+      // Align the fixture and fire in one task, through the normal shoot path.
+      const launch = await page.evaluate(
+        ({ position, angle }) => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          if (!ship) {
+            throw new Error('Local pilot missing');
+          }
+          ship.position = position;
+          ship.velocity = { x: 0, y: 0 };
+          ship.angularVelocity = 0;
+          ship.angle = Math.PI - angle;
+          ship.blinkCount = 600;
+          ship.spawnProtectionTimer = 600;
+          ship.canShoot = true;
+          ship.shoot();
+          const shot = ship.lasers.at(-1);
+          if (!shot) {
+            throw new Error('Pinball fixture did not fire its shot');
+          }
+          return { position: shot.position, velocity: shot.velocity };
+        },
+        { position: launchPosition, angle: approachAngle }
+      );
+      writeFileSync(
+        screenshotManager.getScreenshotPath(`pinball-launch-${viewport.width}.json`),
+        JSON.stringify({ pocket, launchPosition, launch }, null, 2)
+      );
       await expect
         .poll(() => proof.evaluate((evidence) => evidence.bounces), { timeout: 5000 })
         .toBeGreaterThanOrEqual(3);

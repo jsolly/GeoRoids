@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed package.json changes: production smoke commands and classifier contract only. No gameplay, controls, Wiki articles, or demonstrations changed.",
+  "note": "Reviewed the pinball test fixture against asteroid/combat rules and the reflection demonstration. Shots still inherit motion in gameplay; only the test now aligns and fires atomically from a stationary known lane. Both desktop/mobile scenarios retain three authoritative bounces and passed. No gameplay, Wiki copy, or demonstration generator changed; existing reflection media remains accurate.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -343,7 +343,7 @@
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:d5db2e525622efef4bcb16c6be007950367c9e5b031a955dd40be3ba96aae6f8",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:dbe7b3189b8658f2344a6397005d3b8897a5e2db8e6d7f5a9a40c710054e334b",
     "tests/integration/browser/sanity/pilots-follow-winding-speed-passages.test.ts": "sha256:1f5b093bd7b779a4a36e2f18412d4997bf18aab6b06c506f481cb50c468bf146",
-    "tests/integration/browser/sanity/pilots-play-pinball-through-reflective-pockets.test.ts": "sha256:6219b4d69d96c05c0d366c9d7705f89714d079983414134a5e9d2ebff59af1a6",
+    "tests/integration/browser/sanity/pilots-play-pinball-through-reflective-pockets.test.ts": "sha256:3b7d1ba705e9a2b40f230541d3ee43d540e2fbf3d18efcf0f073994552fca3f6",
     "tests/integration/browser/sanity/pilots-see-mostly-drifting-rocks-at-varied-speeds.test.ts": "sha256:7e9edb0c6491de036baa2a9ffda53a1f10ba283db8ec1facb75e138a1267412c",
     "tests/integration/browser/sanity/reflective-asteroids-leave-ordinary-salvage.test.ts": "sha256:023d61c68955fb2931f6d38ad04d34d2de42dd5140d8e306ca8d0bc934d889b4",
     "tests/integration/browser/sanity/scout-radar-pulses-cover-the-viewport.test.ts": "sha256:b607833154cb0792eacf5f32ef9609e6c06ea8f7cc0aa1071306f108a0c29961",

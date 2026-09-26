@@ -171,7 +171,7 @@ export class PlayerMotionService {
     return Math.max(normal, impulse.speed * PLAYER_MOTION.knockbackRetention ** elapsedFrames);
   }
 
-  /** Buffered travel may cross steeper ground before its final reported pose. */
+  /** Buffered travel may follow stronger currents before its final reported pose. */
   public maximumTravelSpeed(
     actor: GameEntity,
     now: number,
@@ -181,7 +181,7 @@ export class PlayerMotionService {
     return Math.max(
       this.legalSpeed(actor, now, boosting),
       cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1) *
-        (1 + TERRAIN.DESCENT_SPEED_BONUS)
+        (1 + TERRAIN.CONTOUR_SPEED_BONUS)
     );
   }
 
@@ -484,7 +484,7 @@ export class PlayerMotionService {
       startShipBoost(candidate);
     }
     // The client samples terrain before its final movement step. Include that
-    // point and the last accepted position so downhill exits and turns do not
+    // point and the last accepted position so current exits and turns do not
     // trigger a correction; displacement is still bounded by server-time credit.
     const speed = Math.max(
       this.legalSpeed(session.actor, now, candidate.phase === 'active'),
@@ -494,7 +494,7 @@ export class PlayerMotionService {
       })
     );
     // Use the fastest legal terrain travel for elapsed distance credit. A local
-    // endpoint slope cannot bound a buffered route across hills and valleys.
+    // endpoint current cannot bound a buffered route through stronger currents.
     // Velocity itself still uses the local ceiling above.
     const travelSpeed = this.maximumTravelSpeed(session.actor, now, candidate.phase === 'active');
     const elapsedMs = now - session.poseAt;

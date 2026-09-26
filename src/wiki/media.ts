@@ -55,17 +55,16 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   terrain: {
-    title: 'Terrain contours and slope travel',
-    alt: 'A Scout rides contour lines, then turns downhill while an arrow shows the descent.',
+    title: 'Terrain contours and speed',
+    alt: 'A Scout follows neutral gray contour lines for a speed bonus, then crosses them at normal cruise.',
     caption:
-      'Controlled demonstration: automatic thrust follows a contour, then the nose turns downhill so speed more than doubles; an arrow marks the downhill direction.',
+      'Controlled demonstration: automatic thrust follows a contour for extra speed, then turns across the lines and returns to normal cruise. Following the line works in either direction.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',
       'src/physics/terrain/terrainConfig.ts',
       'src/physics/terrain/terrainTravel.ts',
       'src/entities/ship/cruiseMotion.ts',
-      'src/rendering/contourLabels.ts',
       'src/rendering/contourSpatialIndex.ts',
     ],
   },

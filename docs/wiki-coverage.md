@@ -15,7 +15,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
-| terrain | Arena | Broad gentle plains, seeded hills and valleys, dense contour elevations, 75° red slope preview from light easy routes to very dark climbs, light-red winding passages with up to 50% cruise boost, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and one-shot spider kills |
+| terrain | Arena | Broad gentle plains, neutral gray contours, bidirectional contour speed bonus, normal-speed crossings, no terrain drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and one-shot spider kills |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, cargo loss, unlimited respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, equal contributor delivery rewards, Town Square store, scattered furnace lots with right-angle fire trails only after a furnace is lit, harvested ground that stays empty and flyable, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, furnace names only when the chart is zoomed in close, right-angle furnace fire trails only after a furnace is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
@@ -42,7 +42,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | How do I arm, ignite, and cancel an asteroid thruster? | hauler, controls, asteroids, teamwork | shared/asteroidBoost.ts, shipAbilities.ts, GameEngine.ts, boost lifecycle and persistence tests |
 | What happens when towed cargo hits another rock or ship? | hauler, asteroids, combat-survival | server/core/CollisionAuthority.ts, GameEngine.ts, authoritative combat tests |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
-| Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
+| How do contours give my ship a speed bonus? | terrain | src/physics/terrain/, terrain and contour tests |
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
 | How does harvested ground stay open while the shared field continues? | teamwork, hud-network | shared/exploration.ts, shared/world.ts, shared/crewSpawn.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
@@ -72,7 +72,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   article's media placements. Requested demonstrations
   include ship abilities, movement, reflection, cooperative splits,
   Hauler tow cable and furnace delivery, shared scans, reflective asteroids,
-  satellites, pickups, terrain slope, and
+  satellites, pickups, contour travel, and
   loot blast or growth, and surviving an environmental asteroid impact.
 - When gameplay source changes, review the affected article and demonstration
   before accepting a new docs/wiki-source-review.json digest. Run the normal

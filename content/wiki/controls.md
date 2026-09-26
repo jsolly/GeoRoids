@@ -33,6 +33,10 @@ Hold and drag one finger to steer; release to keep your heading. Tap to fire onc
 
 Toggle Boost off to save charge and let the tank refill. An empty tank stops Boost; activate it again when any charge returns.
 
+## Contour travel
+
+Follow the gray lines for extra speed in either direction; crossing them keeps normal cruise. Boost stacks with the bonus. See [Contour travel](/wiki/#terrain).
+
 ## Inventory and menus
 
 V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-growth) and equip [satellites](/wiki/#satellites). Map, Inventory, and the furnace menu hold your ship safely while the world keeps moving; satellite health still drains and you cannot collect pickups. Close with Escape or the close control to resume flight with brief blink protection.

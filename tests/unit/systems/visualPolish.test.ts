@@ -548,7 +548,7 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
   try {
     configureRenderQuality('', false);
     ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: 3100 });
-    drawIsoContours({ x: -303, y: 337 }, 0);
+    drawIsoContours({ x: -303, y: 337 });
     expect(strokes.some((path) => path.points.length > 0)).toBe(true);
     expect(
       strokes
@@ -558,18 +558,15 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
     expect(
       strokes.every((path) => path.blur === 0 && path.width === VISUAL.CONTOUR_STROKE_WIDTH)
     ).toBe(true);
-    // A flat passage uses the light red end even when its opacity varies.
-    expect(strokes.some((path) => String(path.color).startsWith('rgba(246, 182, 182,'))).toBe(true);
-    strokes.length = 0;
-    drawIsoContours({ x: -2100, y: 700 }, 0);
-    expect(strokes.some((path) => String(path.color).startsWith('rgba(82, 10, 10,'))).toBe(true);
-    expect(strokes.some((path) => String(path.color).startsWith('rgba(246, 182, 182,'))).toBe(true);
+    expect(strokes.every((path) => String(path.color).startsWith('rgba(104, 104, 104,'))).toBe(
+      true
+    );
     strokes.length = 0;
     drawContourLaserTicks({ x: -2100, y: 700 }, [{ x: -2100, y: 700 }]);
     expect(strokes).toHaveLength(1);
     expect(strokes[0]?.points).toHaveLength(2);
     expect(strokes[0]?.color).toBe(
-      canvasColor(ctx, hexToRgba(PALETTE.LOOT, VISUAL.CONTOUR_LASER_ALPHA))
+      canvasColor(ctx, hexToRgba(PALETTE.CONTOUR, VISUAL.CONTOUR_LASER_ALPHA))
     );
     expect(
       strokes

@@ -10,11 +10,12 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
+import { centerOf } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 test.each(['Shift', 'right-click'])(
-  '%s boost raises Scout cruise and a second press returns to downhill cruise',
+  '%s boost raises Scout cruise and a second press returns to contour cruise',
   async (input) => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -33,22 +34,57 @@ test.each(['Shift', 'right-click'])(
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
-    // This seeded route descends a steep east-facing slope, outside passages.
-    const slope = await page.evaluate(() =>
-      window.gameController?.getTerrainProbe({ x: 3090, y: 1150 })
-    );
-    expect(slope?.gradient.x).toBeGreaterThan(TERRAIN.TRAVEL_STEEP_GRADIENT);
-    await game.placeShipAt(3090, 1150);
+    await game.placeShipAt(1700, 3600);
     await game.armSpawnProtection();
-    await page.evaluate(() => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Local ship unavailable');
+    const heading = await page.evaluate(() => {
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller unavailable');
       }
-      ship.angle = Math.PI;
+      const { gradient } = gc.getTerrainProbe({ x: 1700, y: 3600 });
+      return Math.atan2(-gradient.y, gradient.x) + Math.PI / 2;
     });
-    await game.waitForAnimationFrames(24);
-    const downhillCap = SHIP.MAX_VELOCITY * (1 + TERRAIN.DESCENT_SPEED_BONUS);
+    const center = await centerOf(page, '#gameCanvas');
+    const camera = await page.evaluateHandle<
+      typeof import('../../../../src/rendering/canvasSurface').canvasManager
+    >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
+    try {
+      await expect
+        .poll(
+          async () => {
+            const state = await camera.evaluate((surface) => {
+              const ship = window.gameController?.getCurrPlayer()?.ship;
+              if (!ship) {
+                throw new Error('Missing boost pilot');
+              }
+              return { rotation: surface.getCameraRotation(), angle: ship.angle };
+            });
+            const error = Math.atan2(
+              Math.sin(heading - state.angle),
+              Math.cos(heading - state.angle)
+            );
+            const correction = Math.max(-0.5, Math.min(0.5, error * 0.4));
+            const screenAngle = state.angle + correction - state.rotation;
+            await page.mouse.move(
+              center.x + Math.cos(screenAngle) * 300,
+              center.y - Math.sin(screenAngle) * 300
+            );
+            await game.waitForAnimationFrames(1);
+            await page.mouse.move(center.x, center.y);
+            const angle = await game.getShipAngle();
+            return Math.abs(Math.atan2(Math.sin(angle - heading), Math.cos(angle - heading)));
+          },
+          { timeout: 5000, interval: 16 }
+        )
+        .toBeLessThan(0.01);
+    } finally {
+      await page.mouse.move(center.x, center.y);
+      await camera.dispose();
+    }
+    await game.placeShipAt(1700, 3600);
+    await game.armSpawnProtection();
+    await game.waitForAnimationFrames(30);
+    const contourCap = SHIP.MAX_VELOCITY * (1 + TERRAIN.CONTOUR_SPEED_BONUS);
 
     const cruise = await page.evaluate(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -58,7 +94,7 @@ test.each(['Shift', 'right-click'])(
       return Math.hypot(ship.velocity.x, ship.velocity.y);
     });
     expect(cruise).toBeGreaterThan(SHIP.MAX_VELOCITY);
-    expect(cruise).toBeLessThanOrEqual(downhillCap + 1e-6);
+    expect(cruise).toBeLessThanOrEqual(contourCap + 1e-6);
 
     await toggleBoost();
     await expect
@@ -74,9 +110,9 @@ test.each(['Shift', 'right-click'])(
               speed: Math.hypot(local.velocity.x, local.velocity.y),
             };
           });
-          return ship.boosting && ship.speed > downhillCap;
+          return ship.boosting && ship.speed > contourCap;
         },
-        { message: 'Boost should stack with downhill speed' }
+        { message: 'Boost should stack with contour speed' }
       )
       .toBe(true);
 
@@ -87,7 +123,7 @@ test.each(['Shift', 'right-click'])(
       }
       return Math.hypot(ship.velocity.x, ship.velocity.y);
     });
-    expect(boosted).toBeLessThanOrEqual(downhillCap * getShipKit('scout').boostMultiplier + 1e-6);
+    expect(boosted).toBeLessThanOrEqual(contourCap * getShipKit('scout').boostMultiplier + 1e-6);
 
     if (input === 'right-click') {
       await page.screenshot({ path: screenshotManager.getScreenshotPath('boost-desktop.png') });
@@ -110,7 +146,7 @@ test.each(['Shift', 'right-click'])(
               speed: Math.hypot(local.velocity.x, local.velocity.y),
             };
           });
-          return !ship.boosting && ship.speed <= downhillCap + 1e-6;
+          return !ship.boosting && ship.speed <= contourCap + 1e-6;
         },
         { message: 'A second boost press should restore cruise' }
       )
@@ -124,15 +160,9 @@ test.each(['Shift', 'right-click'])(
         await page.setViewportSize(viewport);
         for (const article of [
           { id: 'controls', text: 'right-click to toggle Boost' },
-          { id: 'terrain', text: 'Boost stacks with downhill speed' },
-          { id: 'hauler', text: 'Cargo keeps its momentum' },
-          { id: 'scout', text: 'turns faster and boosts harder than Hauler' },
-          { id: 'asteroids', text: 'Fresh interior sectors have' },
+          { id: 'terrain', text: 'Boost stacks with the contour bonus' },
         ]) {
           await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
-          if (article.id === 'asteroids') {
-            await page.locator('.game-reference summary').click();
-          }
           await page.getByText(article.text, { exact: false }).waitFor();
           await page.screenshot({
             path: screenshotManager.getScreenshotPath(`boost-${article.id}-${viewport.name}.png`),

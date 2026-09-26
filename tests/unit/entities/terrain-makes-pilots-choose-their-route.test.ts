@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { WORLD } from '../../../shared/world';
 import { advanceCruiseVelocity } from '../../../src/entities/ship/cruiseMotion';
+import { Ship } from '../../../src/entities/ship/Ship';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
@@ -12,52 +13,57 @@ import {
 } from '../../../src/physics/terrain/terrainTravel';
 
 const position = { x: -2100, y: 700 };
-afterEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius }));
+const bounds = { cx: 0, cy: 0, radius: WORLD.radius };
+afterEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, bounds));
 
 test.each(['scout', 'hauler'] as const)(
-  '%s can climb steep contours at any mass without boost, but descents are much faster',
+  '%s follows contours equally fast in either direction and crosses at ordinary cruise at any mass',
   (kitId) => {
-    const field = ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+    const field = ensureTerrain(TERRAIN.DEFAULT_SEED, bounds);
     const gradient = sampleGradient(field, position.x, position.y);
     expect(Math.hypot(gradient.x, gradient.y)).toBeGreaterThan(0.002);
-    const uphill = Math.atan2(-gradient.y, gradient.x);
+    const across = Math.atan2(-gradient.y, gradient.x);
     const kit = getShipKit(kitId);
     for (const mass of [1, 8]) {
-      const cruise = cruiseSpeed(mass, kit.maxVelocity);
-      const speeds = [uphill, uphill + Math.PI].map((angle) => {
-        const ship: Parameters<typeof advanceCruiseVelocity>[0] = {
-          position,
-          angle,
-          mass,
-          thrust: kit.thrust,
-          velocity: { x: 0, y: 0 },
-        };
-        for (let frame = 0; frame < 300; frame++) {
-          advanceCruiseVelocity(ship, cruise);
-        }
-        return Math.hypot(ship.velocity.x, ship.velocity.y);
-      });
-      const [climb = 0, descent = 0] = speeds;
-      expect(TERRAIN.CLIMB_SPEED_FRACTION).toBe(0.7);
-      expect(TERRAIN.DESCENT_SPEED_BONUS).toBe(1.15);
-      expect(climb).toBeGreaterThanOrEqual(cruise * 0.65);
-      expect(climb).toBeLessThan(cruise * 0.82);
-      expect(descent).toBeGreaterThan(cruise * 1.9);
-      expect(descent).toBeGreaterThan(climb * 2.5);
-      expect(descent).toBeLessThanOrEqual(terrainSpeedLimit(position, cruise) + 1e-9);
+      for (const boost of [1, kit.boostMultiplier]) {
+        const cruise = cruiseSpeed(mass, kit.maxVelocity, boost);
+        const speeds = [across, across + Math.PI, across + Math.PI / 2, across - Math.PI / 2].map(
+          (angle) => {
+            const ship: Parameters<typeof advanceCruiseVelocity>[0] = {
+              position,
+              angle,
+              mass,
+              thrust: kit.thrust,
+              velocity: { x: 0, y: 0 },
+            };
+            for (let frame = 0; frame < 300; frame++) {
+              advanceCruiseVelocity(ship, cruise, boost);
+            }
+            // Motion follows the nose, without lateral terrain drift.
+            expect(
+              ship.velocity.x * Math.sin(angle) + ship.velocity.y * Math.cos(angle)
+            ).toBeCloseTo(0, 10);
+            return Math.hypot(ship.velocity.x, ship.velocity.y);
+          }
+        );
+        expect(speeds[0]).toBeCloseTo(cruise, 10);
+        expect(speeds[1]).toBeCloseTo(cruise, 10);
+        expect(speeds[2]).toBeGreaterThan(cruise * 1.9);
+        expect(speeds[3]).toBeCloseTo(speeds[2] ?? 0, 10);
+        expect(speeds[2]).toBeCloseTo(terrainSpeedLimit(position, cruise), 10);
+      }
     }
   }
 );
 
-test('crossing a steep hillside keeps nearly full cruise with a light downhill tug', () => {
-  const field = ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+test('turning across a current restores ordinary cruise without a speed debt', () => {
+  const field = ensureTerrain(TERRAIN.DEFAULT_SEED, bounds);
   const gradient = sampleGradient(field, position.x, position.y);
-  const magnitude = Math.hypot(gradient.x, gradient.y);
-  const uphill = Math.atan2(-gradient.y, gradient.x);
+  const across = Math.atan2(-gradient.y, gradient.x);
   const kit = getShipKit('scout');
-  const ship: Parameters<typeof advanceCruiseVelocity>[0] = {
+  const ship = {
     position,
-    angle: uphill + Math.PI / 2,
+    angle: across + Math.PI / 2,
     mass: 1,
     thrust: kit.thrust,
     velocity: { x: 0, y: 0 },
@@ -65,24 +71,43 @@ test('crossing a steep hillside keeps nearly full cruise with a light downhill t
   for (let frame = 0; frame < 180; frame++) {
     advanceCruiseVelocity(ship, kit.maxVelocity);
   }
-  const downhillDrift = -(ship.velocity.x * gradient.x + ship.velocity.y * gradient.y) / magnitude;
-  expect(TERRAIN.CROSS_SLOPE_DRIFT).toBe(0.16);
-  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(kit.maxVelocity * 0.98);
-  expect(downhillDrift).toBeGreaterThan(kit.maxVelocity * 0.1);
-  expect(downhillDrift).toBeLessThan(kit.maxVelocity * 0.22);
-  const before = { ...ship.velocity };
-  advanceCruiseVelocity(ship, kit.maxVelocity);
-  expect(ship.velocity).toEqual(before);
+  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(kit.maxVelocity * 1.9);
+  for (const angle of [across, across + Math.PI]) {
+    ship.angle = angle;
+    advanceCruiseVelocity(ship, kit.maxVelocity);
+    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeCloseTo(kit.maxVelocity, 10);
+  }
 });
 
-test('flat starter terrain preserves the normal cap and steep descents have a bounded ceiling for every heading', () => {
-  ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+test('flat spawn preserves normal cruise and every current heading stays between cruise and its ceiling', () => {
+  ensureTerrain(TERRAIN.DEFAULT_SEED, bounds);
   const cruise = getShipKit('scout').maxVelocity;
   expect(terrainSpeedLimit({ x: 0, y: 0 }, cruise)).toBe(cruise);
   for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
+    const flat = terrainCruiseVelocity({ x: 0, y: 0 }, angle, cruise);
+    expect(Math.hypot(flat.x, flat.y)).toBeCloseTo(cruise, 10);
     const velocity = terrainCruiseVelocity(position, angle, cruise);
+    expect(Math.hypot(velocity.x, velocity.y)).toBeGreaterThanOrEqual(cruise - 1e-9);
     expect(Math.hypot(velocity.x, velocity.y)).toBeLessThanOrEqual(
       terrainSpeedLimit(position, cruise) + 1e-9
     );
+    const reversed = terrainCruiseVelocity(position, angle + Math.PI, cruise);
+    expect(reversed.x).toBeCloseTo(-velocity.x, 10);
+    expect(reversed.y).toBeCloseTo(-velocity.y, 10);
   }
+});
+
+test('a blast retains the same velocity on dense contours as on flat ground without terrain tug', () => {
+  ensureTerrain(TERRAIN.DEFAULT_SEED, bounds);
+  const ships = [{ x: 0, y: 0 }, position].map((start) => {
+    const ship = new Ship({ position: { ...start }, isLocalPlayer: true });
+    ship.velocity = { x: 0, y: 12 };
+    ship.knockbackVelocityLimit = 12;
+    ship.angle = 0;
+    ship.thrusting = true;
+    ship.update();
+    return ship;
+  });
+  expect(ships[1]?.velocity).toEqual(ships[0]?.velocity);
+  expect(ships[1]?.velocity.y).toBeGreaterThan(4);
 });

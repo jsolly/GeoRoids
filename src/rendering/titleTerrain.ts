@@ -4,7 +4,6 @@ import { extractIsoContours } from '../physics/terrain/contours';
 import { createHeightfield } from '../physics/terrain/heightfield';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 import { hexToRgba } from '../utils/colorUtils';
-import { drawContourLabels } from './contourLabels';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 
 let stopDevicePixelRatioWatcher: (() => void) | null = null;
@@ -73,16 +72,6 @@ export function initTitleTerrain(): void {
       }
       ctx.stroke();
     }
-
-    drawContourLabels(ctx, contours, {
-      width,
-      height,
-      x: bounds.cx,
-      y: bounds.cy,
-      scale,
-      alpha: VISUAL.TITLE_LABEL_ALPHA,
-      spacing: VISUAL.TITLE_LABEL_SPACING,
-    });
   };
 
   resize();

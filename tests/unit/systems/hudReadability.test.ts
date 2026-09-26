@@ -703,7 +703,7 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
     LOCAL: '#5EEAD4',
     REMOTE: '#7DD3FC',
     ROID: '#94A3B8',
-    CONTOUR: '#4A1016',
+    CONTOUR: '#686868',
     LASER_LOCAL: '#FDE68A',
     HUD: '#E2E8F0',
     HUD_MUTED: '#64748B',

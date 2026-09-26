@@ -2,14 +2,12 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { WORLD } from '../../../shared/world';
 import { PALETTE, VISUAL } from '../../../src/constants';
-import { Ship } from '../../../src/entities/ship/Ship';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import {
   createHeightfield,
   sampleGradient,
   sampleHeight,
 } from '../../../src/physics/terrain/heightfield';
-import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import {
   applyTerrainSeed,
@@ -21,15 +19,9 @@ import {
   peekBuiltContourPatch,
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import {
-  collectElevationLabels,
-  elevationLabelsAreCached,
-} from '../../../src/rendering/contourLabels';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { contourSpatialIndexIsCached } from '../../../src/rendering/contourSpatialIndex';
 import { TestPath2D } from '../../support/TestPath2D';
-
-const ISO_CONTOUR_LABEL_PATTERN = /^-?\d+\.(?:\d{2}|\d{4})$/u;
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
@@ -39,13 +31,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
 });
-
-function steepestSample(seed: number): { x: number; y: number; steep: number } {
-  const field = createHeightfield(seed, BOUNDS);
-  const x = -2100;
-  const gradient = sampleGradient(field, x, 700);
-  return { x, y: 700, steep: Math.hypot(gradient.x, gradient.y) };
-}
 
 describe('seeded heightfield is shared', () => {
   test('the same seed produces the same heights and contour set', () => {
@@ -109,59 +94,6 @@ describe('iso contours encode elevation', () => {
   });
 });
 
-describe('ships feel the slope', () => {
-  test('a coasting ship accelerates downhill and slows uphill', () => {
-    const field = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const peak = steepestSample(TERRAIN.DEFAULT_SEED);
-    expect(peak.steep).toBeGreaterThan(0.0004);
-
-    const g = sampleGradient(field, peak.x, peak.y);
-    const len = Math.hypot(g.x, g.y);
-    const nx = g.x / len;
-    const ny = g.y / len;
-
-    const downhill = { x: 0, y: 0 };
-    applySlopeForce(downhill, { x: peak.x, y: peak.y }, field, 1);
-    const downDot = downhill.x * -nx + downhill.y * -ny;
-    expect(downDot).toBeGreaterThan(0);
-
-    const uphill = { x: nx * 2, y: ny * 2 };
-    const before = Math.hypot(uphill.x, uphill.y);
-    applySlopeForce(uphill, { x: peak.x, y: peak.y }, field, 1);
-    expect(Math.hypot(uphill.x, uphill.y)).toBeLessThan(before);
-  });
-
-  test('the flat spawn has no preferred downhill direction so parked ships do not slide', () => {
-    const field = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const g = sampleGradient(field, 0, 0);
-    expect(Math.hypot(g.x, g.y)).toBeLessThan(1e-5);
-    const velocity = { x: 1, y: 1 };
-    applySlopeForce(velocity, { x: 0, y: 0 }, field);
-    expect(velocity.x).toBeCloseTo(1, 6);
-    expect(velocity.y).toBeCloseTo(1, 6);
-  });
-
-  test('terrain still pushes an idle hull downhill', () => {
-    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const start = { x: -2100, y: 700 };
-    const player = new Ship({ position: { ...start }, isLocalPlayer: true });
-    player.mass = 1;
-    player.velocity = { x: 0, y: 0 };
-    player.thrusting = false;
-    player.angle = Math.PI;
-    player.blinkCount = 0;
-    player.spawnProtectionTimer = 0;
-
-    for (let frame = 0; frame < 60; frame++) {
-      player.update();
-    }
-
-    expect(player.position.x).not.toBeCloseTo(start.x, 5);
-    expect(player.position.y).toBeGreaterThan(start.y);
-    expect(Math.abs(player.velocity.x)).toBeGreaterThan(0);
-  });
-});
-
 describe('muted contour chrome', () => {
   test('contour strokes stay darker and thinner than ships and lasers', () => {
     expect(PALETTE.CONTOUR.toLowerCase()).not.toBe('#ffffff');
@@ -173,7 +105,7 @@ describe('muted contour chrome', () => {
     expect(VISUAL.CONTOUR_INDEX_ALPHA).toBeGreaterThan(VISUAL.CONTOUR_ALPHA);
   });
 
-  test('terrain elevations stay on their contours while the camera moves', () => {
+  test('contours render neutral strokes without elevation numbers', () => {
     vi.stubGlobal('Path2D', TestPath2D);
     const canvas = document.createElement('canvas');
     canvas.width = 800;
@@ -187,34 +119,17 @@ describe('muted contour chrome', () => {
     vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 800, height: 600 });
     vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
     ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const rendered: Array<{ text: string; x: number; y: number }> = [];
-    const fillText = ctx.fillText.bind(ctx);
-    vi.spyOn(ctx, 'stroke').mockImplementation(() => {});
-    vi.spyOn(ctx, 'fillText').mockImplementation((text, x, y) => {
-      const transform = ctx.getTransform();
-      rendered.push({ text, x: transform.e, y: transform.f });
-      fillText(text, x, y);
+    const strokes: Array<string | CanvasGradient | CanvasPattern> = [];
+    vi.spyOn(ctx, 'stroke').mockImplementation(() => {
+      strokes.push(ctx.strokeStyle);
     });
-    drawIsoContours({ x: -2100, y: 700 }, 0);
-    const before = rendered.splice(0);
-    expect(before.length).toBeGreaterThan(2);
-    for (const label of before) {
-      expect(label.text).toMatch(ISO_CONTOUR_LABEL_PATTERN);
-      expect(label.x).toBeGreaterThan(0);
-      expect(label.x).toBeLessThan(canvas.width);
-      expect(label.y).toBeGreaterThan(0);
-      expect(label.y).toBeLessThan(canvas.height);
+    const labels = vi.spyOn(ctx, 'fillText');
+    drawIsoContours({ x: 0, y: 0 });
+    expect(strokes.length).toBeGreaterThan(0);
+    for (const color of strokes) {
+      expect(String(color)).toMatch(/^rgba\(104, 104, 104, /u);
     }
-    drawIsoContours({ x: -2050, y: 700 }, 0);
-    const retained = before.filter((label) => label.x > 100 && label.x < 700);
-    expect(retained.length).toBeGreaterThan(0);
-    for (const label of retained) {
-      const moved = rendered.find(
-        (candidate) => candidate.text === label.text && Math.abs(candidate.y - label.y) < 0.001
-      );
-      expect(moved).toBeDefined();
-      expect(moved?.x).toBeCloseTo(label.x - 50, 5);
-    }
+    expect(labels).not.toHaveBeenCalled();
   });
 });
 
@@ -244,68 +159,11 @@ test('translated arenas retain the same terrain and a stable flat spawn', () => 
   expect(Math.hypot(inside.x, inside.y)).toBeLessThan(1e-5);
 });
 
-test.each([1, 8])(
-  'a mass-%s pilot accelerates faster downhill but automatic thrust can still climb uphill',
-  (mass) => {
-    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const startX = -2100;
-    const downhill = new Ship({ position: { x: startX, y: 700 } });
-    const uphill = new Ship({ position: { x: startX, y: 700 } });
-    for (const ship of [downhill, uphill]) {
-      ship.mass = mass;
-      ship.thrusting = true;
-      ship.velocity = { x: 0, y: 0 };
-    }
-    downhill.angle = Math.PI;
-    uphill.angle = 0;
-    for (let frame = 0; frame < 120; frame++) {
-      downhill.update();
-      uphill.update();
-      if (frame === 14) {
-        expect(Math.hypot(downhill.velocity.x, downhill.velocity.y)).toBeGreaterThan(
-          Math.hypot(uphill.velocity.x, uphill.velocity.y) * 1.05
-        );
-      }
-    }
-    const downDistance = startX - downhill.position.x;
-    const upDistance = uphill.position.x - startX;
-    expect(upDistance).toBeGreaterThan(50);
-    // Both ships reach the lower cap sooner, but downhill acceleration still gives a lead.
-    expect(downDistance).toBeGreaterThan(upDistance);
-  }
-);
-
-test('elevation labels stay a spacing apart on a dense contour patch', () => {
-  const field = createHeightfield(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
-  const levels = extractIsoContours(field, 96, TERRAIN.LEVELS, {
-    cx: 0,
-    cy: 0,
-    radius: 2048,
-  });
-  const spacing = VISUAL.CONTOUR_LABEL_SPACING;
-  const labels = collectElevationLabels(levels, spacing);
-  expect(labels.length).toBeGreaterThan(20);
-  for (let i = 0; i < labels.length; i++) {
-    const left = labels[i];
-    if (!left) {
-      continue;
-    }
-    for (let j = i + 1; j < labels.length; j++) {
-      const right = labels[j];
-      if (!right) {
-        continue;
-      }
-      expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeGreaterThanOrEqual(spacing);
-    }
-  }
-});
-
 test('crossing into the next contour patch reuses a warmed neighbor instead of remarching', async () => {
   vi.useFakeTimers();
   ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
   const origin = getTerrainContours({ x: 0, y: 0 }, 800);
   expect(builtContourPatchCount()).toBe(1);
-  expect(elevationLabelsAreCached(origin, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
   expect(contourSpatialIndexIsCached(origin)).toBe(true);
 
   const nextCenter = { x: CONTOUR_REGION_STEP, y: 0 };
@@ -319,7 +177,6 @@ test('crossing into the next contour patch reuses a warmed neighbor instead of r
     return;
   }
   expect(neighbor).not.toBe(origin);
-  expect(elevationLabelsAreCached(neighbor, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
   expect(contourSpatialIndexIsCached(neighbor)).toBe(true);
   const warmed = builtContourPatchCount();
   expect(warmed).toBeGreaterThan(1);

@@ -178,13 +178,11 @@ describe('shared ship motion helper', () => {
       ship.update();
     }
     expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(
-      SHIP.MAX_VELOCITY * (1 + TERRAIN.DESCENT_SPEED_BONUS)
+      SHIP.MAX_VELOCITY * (1 + TERRAIN.CONTOUR_SPEED_BONUS)
     );
     expect(ship.velocity.x).toBeGreaterThan(SHIP.MAX_VELOCITY * 0.24);
-    // After the blast decays, terrain can still bend the cruise direction.
-    expect(Math.abs(Math.atan2(-ship.velocity.y, ship.velocity.x) - ship.angle)).toBeLessThan(
-      Math.PI / 4
-    );
+    // After the blast decays, cruise follows the nose exactly.
+    expect(Math.atan2(-ship.velocity.y, ship.velocity.x)).toBeCloseTo(ship.angle, 10);
   });
 
   test('cruise cannot advance a dead ship or a server-owned handoff', () => {

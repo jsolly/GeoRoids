@@ -71,7 +71,7 @@
     "tests/unit/ui/equip-hint-stays-hidden-until-a-pickup.test.ts",
     "tests/unit/entities/input/keyboardControls.test.ts",
     "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts",
-    "tests/integration/browser/sanity/boost-stacks-with-downhill-speed-and-toggles-off.test.ts",
+    "tests/integration/browser/sanity/boost-stacks-with-contour-speed-and-toggles-off.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
     "tests/integration/browser/e2e/menus-hold-the-ship-still-and-protect-it.test.ts",
     "tests/unit/entities/menu-stops-flight-and-protects-the-hull.test.ts",
@@ -222,14 +222,12 @@
   "terrain": [
     "src/physics/terrain/terrainConfig.ts",
     "src/physics/terrain/heightfield.ts",
-    "src/physics/terrain/slopeForce.ts",
     "src/physics/terrain/terrainTravel.ts",
     "src/entities/ship/cruiseMotion.ts",
     "server/core/PlayerMotionService.ts",
     "tests/unit/entities/terrain-makes-pilots-choose-their-route.test.ts",
     "src/physics/terrain/contours.ts",
     "src/physics/terrain/terrainSession.ts",
-    "src/rendering/contourLabels.ts",
     "src/rendering/contourSpatialIndex.ts",
     "src/physics/boundary.ts",
     "server/world/WorldStore.ts",
@@ -276,11 +274,9 @@
     "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts",
     "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts",
     "src/physics/terrain/passages.ts",
-    "src/rendering/contourAppearance.ts",
-    "src/rendering/contourDisplay.ts",
-    "tests/unit/entities/pilots-find-speed-passages-through-hills.test.ts",
-    "tests/integration/browser/sanity/pilots-follow-winding-speed-passages.test.ts",
-    "tests/integration/browser/sanity/terrain-colors-explain-the-slope.test.ts"
+    "tests/unit/systems/contour-cuts-preserve-the-shared-world-shape.test.ts",
+    "tests/integration/browser/sanity/pilots-follow-contours-for-speed.test.ts",
+    "tests/integration/browser/sanity/contours-stay-neutral-while-pilots-turn.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",

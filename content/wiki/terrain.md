@@ -1,7 +1,7 @@
 ---
 title: Terrain and the boundary
 category: Arena
-summary: Contour lines mark easy and steep routes. The outer wall
+summary: Follow contour lines for speed or cut across at normal cruise. The outer wall
   destroys ships that cross it.
 order: 120
 related:
@@ -10,15 +10,13 @@ related:
   - content/wiki/combat-survival.md
   - content/wiki/hud-network.md
 media:
-  - heading: Slope and contours
+  - heading: Contour travel
     demo: terrain
 ---
 
-## Slope and contours
+## Contour travel
 
-Contour lines are one red ramp, not a closed height map. Light red is an easy route, and an easy route joins other easy routes; very dark red is a steep climb. A lower stretch can keep falling.
-
-Downhill accelerates you and uphill slows you a little. Boost stacks with downhill speed, but either ship can climb without it. The view ahead colors a straight route on that ramp. Follow a light passage either way for up to 50% extra cruise; turning across it loses the boost. Ordinary terrain does no damage and does not deflect shots.
+Follow the neutral gray contour lines in either direction for extra speed, or cut across them at normal cruise. Boost stacks with the contour bonus; there is no uphill penalty or sideways terrain pull. Choose between a longer, faster curved route and a shorter direct crossing; ordinary terrain does no damage and does not deflect shots.
 
 ## Outer boundary
 

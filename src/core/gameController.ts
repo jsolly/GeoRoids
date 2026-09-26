@@ -543,7 +543,7 @@ export class GameController {
     return this.playerManager;
   }
 
-  /** Probe the shared heightfield — used by tests to read elevation / slope. */
+  /** Probe the shared contour field for deterministic geometry and travel tests. */
   getTerrainProbe(position?: { x: number; y: number }): {
     seed: number;
     height: number;

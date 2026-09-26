@@ -2139,7 +2139,7 @@ export class GameEngine {
     }
     const kit = getShipKit(shooter.kitId);
     // Pose velocity is sampled before the client's final movement step. Use
-    // that same slope sample so a downhill shot is not rejected on flatter ground.
+    // that same current sample so a fast shot is not rejected after leaving a contour.
     const maxShipSpeed = Math.max(
       this.playerMotion.legalSpeed(shooter, now),
       this.playerMotion.legalSpeed(shooter, now, shooter.boost.phase === 'active', {

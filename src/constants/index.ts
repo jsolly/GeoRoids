@@ -57,14 +57,14 @@ export const PALETTE = {
   LOCAL: '#5EEAD4',
   REMOTE: '#7DD3FC',
   ROID: '#94A3B8',
-  /** Quiet dark-red contour ink. The slope ramp runs lighter and darker than this. */
-  CONTOUR: '#4A1016',
+  /** Neutral contour ink, subdued beneath ships, lasers, and pickups. */
+  CONTOUR: '#686868',
   LASER_LOCAL: '#FDE68A',
   HUD: '#E2E8F0',
   HUD_MUTED: '#64748B',
   DANGER: '#F43F5E',
   HEALTH: '#4ADE80',
-  /** Locked cream — wreckage/shard pickups + contour-laser blush. Same hex as Hauler tether. */
+  /** Locked cream — wreckage/shard pickups. Same hex as Hauler tether. */
   LOOT: '#E8D5A3',
   /** Collectible EO hardware. */
   SATELLITE: '#C4B5FD',
@@ -145,29 +145,20 @@ export const VISUAL = {
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,
-  // Hairline contours. The steering cone walks one red ramp from very dark climbs to light descents.
+  // Hairline gray contours with no glow; index lines are slightly stronger.
   CONTOUR_STROKE_WIDTH: 1,
   CONTOUR_ALPHA: 0.28,
   CONTOUR_INDEX_ALPHA: 0.42,
   CONTOUR_INDEX_EVERY: 3,
-  // Static title map: crop, line weights, and sparse elevation labels.
+  // Static title map: crop and line weights.
   TITLE_TERRAIN_GRID_SIZE: 320,
   TITLE_TERRAIN_VIEW_SPAN: 3000,
   TITLE_CONTOUR_ALPHA: 0.28,
   TITLE_CONTOUR_INDEX_ALPHA: 0.52,
   TITLE_CONTOUR_WIDTH: 0.65,
   TITLE_CONTOUR_INDEX_WIDTH: 1.1,
-  TITLE_LABEL_ALPHA: 0.5,
-  TITLE_LABEL_SPACING: 520,
   TITLE_TERRAIN_LEVELS: 28,
-  CONTOUR_LABEL_FONT: '10px "Courier New", monospace',
-  CONTOUR_LABEL_ALPHA: 0.4,
-  CONTOUR_LABEL_SPACING: 170,
-  CONTOUR_LABEL_PADDING: 4,
-  CONTOUR_LABEL_HEIGHT: 12,
-  CONTOUR_LABEL_MARGIN_X: 28,
-  CONTOUR_LABEL_MARGIN_Y: 18,
-  // Cream iso-tangent under each live shot. Terrain answers; shots stay amber on top.
+  // Neutral iso-tangent under each live shot. Terrain answers; shots stay amber on top.
   CONTOUR_LASER_LENGTH: 20,
   CONTOUR_LASER_STROKE_WIDTH: 2,
   CONTOUR_LASER_ALPHA: 0.5,

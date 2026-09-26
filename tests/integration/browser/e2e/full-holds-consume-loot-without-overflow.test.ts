@@ -46,7 +46,13 @@ for (const viewport of [
     await expect
       .poll(async () => (await peer.getLoot()).some((drop) => drop.kind === 'points'))
       .toBe(true);
-    const drops = await game.getLoot();
+    let drops: Awaited<ReturnType<GameInteractions['getLoot']>> = [];
+    await expect
+      .poll(async () => {
+        drops = await game.getLoot();
+        return drops.some((drop) => drop.kind === 'points');
+      })
+      .toBe(true);
     expect(drops.length).toBeGreaterThan(0);
     for (const drop of drops) {
       await game.placeShipAt(drop.x, drop.y);

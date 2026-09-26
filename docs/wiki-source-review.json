@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed touch steering and universe-map observer test changes. Controls and HUD already describe travel-up camera, screen-relative steering, stopped course, and map crew coordinates. No gameplay or illustration changes; existing desktop/mobile Wiki verification remains applicable. Type and lint checks pass; browser map cases pass; touch correction has independent test review and awaits focused execution.",
+  "note": "Reviewed spider pursuit, one-bite death, escape, and full-hold loot rules against unchanged terrain, combat, and loot articles. Test-only observation fixes preserve all behavioral assertions; no Wiki prose or demonstration changes needed. Independent review clean; focused spider and loot scenarios pass desktop and mobile (4/4); travel touch and map scenarios pass (14/14).",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",

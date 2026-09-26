@@ -80,7 +80,7 @@ for (const viewport of [
     if (!predator) {
       throw new Error('No spider available');
     }
-    await game.placeShipAt(predator.position.x - 120, predator.position.y);
+    await game.placeShipAt(predator.position.x - 320, predator.position.y);
     await expect
       .poll(
         async () =>
@@ -104,6 +104,8 @@ for (const viewport of [
           : 0;
       })
       .toBeGreaterThan(0);
+    // Draw the guard outside its patrol before checking its return journey.
+    await game.placeShipAt(4400, 5000);
     expect(await readField(page)).not.toHaveProperty('webs');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`spider-hunt-${viewport.name}.png`),
@@ -118,8 +120,6 @@ for (const viewport of [
         )
       )
       .toBe(true);
-    // Draw the guard outside its patrol before checking its return journey.
-    await game.placeShipAt(4400, 5000);
     await expect
       .poll(
         async () => {

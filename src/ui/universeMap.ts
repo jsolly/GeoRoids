@@ -24,6 +24,7 @@ import {
 } from '../rendering/hud/furnaceMapMark';
 import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
 import { drawCourtMapMark } from '../rendering/ricochetCourtRenderer';
+import { travelCameraRotation } from '../rendering/travelCamera';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { requestTownStoreClose } from './townStoreState';
@@ -160,18 +161,9 @@ function mapFrameFor(width: number, height: number, zoom: number): MapFrame {
   };
 }
 
-/** Canvas rotation that puts this ship heading at the top of the chart. North is −Y. */
-export function universeMapHeadingRotation(shipAngle: number | undefined): number {
-  if (typeof shipAngle !== 'number' || !Number.isFinite(shipAngle)) {
-    return 0;
-  }
-  return shipAngle - Math.PI / 2;
-}
-
 function chartHeadingRotation(): number {
-  return universeMapHeadingRotation(
-    PlayerManager.getInstance().getLocalPlayer()?.ship.angle ?? Math.PI / 2
-  );
+  const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+  return ship ? travelCameraRotation(ship) : 0;
 }
 
 export function mapScreenDeltaToWorld(
@@ -1045,7 +1037,19 @@ function renderMap(): void {
   let drawnLabelCount = 0;
   const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));
   updateAccessibleLocations(revealedAssets);
-  const labelRects: MapLabelRect[] = [];
+  // Labels use upright camera-relative coordinates; reserve the visible controls too.
+  const canvasBounds = elements.canvas.getBoundingClientRect();
+  const labelRects: MapLabelRect[] = [elements.zoomControls, elements.center].map((control) => {
+    const bounds = control.getBoundingClientRect();
+    const centerX = canvasBounds.left + frame.x + frame.size / 2;
+    const centerY = canvasBounds.top + frame.y + frame.size / 2;
+    return {
+      left: (bounds.left - centerX) / frame.scale,
+      right: (bounds.right - centerX) / frame.scale,
+      top: (bounds.top - centerY) / frame.scale,
+      bottom: (bounds.bottom - centerY) / frame.scale,
+    };
+  });
   drawCourtLandmark(context, frame, labelRects);
   revealedAssets.sort((left, right) => {
     const furnacePriority = Number(right.kind === 'furnace') - Number(left.kind === 'furnace');
@@ -1142,6 +1146,7 @@ function openMap(): void {
   view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
   resizeCanvas();
   setViewCenter(view.center);
+  chartHeadingRotation();
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameMapOpen'));
   playFeedback('interface');

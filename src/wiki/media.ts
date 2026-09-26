@@ -45,9 +45,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   movement: {
     title: 'Automatic thrust and steering',
-    alt: 'A Scout accelerates automatically, turns its nose, and keeps flying after steering is released.',
+    alt: 'An overhead diagram shows a Scout accelerating, turning, and continuing after steering is released. The gameplay camera follows travel instead.',
     caption:
-      'Controlled demonstration: thrust stays on while steering turns the ship; releasing steering keeps it flying.',
+      'Overhead movement diagram: thrust stays on while steering turns the ship; releasing steering keeps it flying. In play, the viewport rotates with travel.',
     sources: [
       'src/entities/ship/shipUtils.ts',
       'src/constants/index.ts',

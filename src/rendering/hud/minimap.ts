@@ -31,6 +31,7 @@ import { logger } from '../../utils/Logger';
 import { strokeFurnaceFireTrail } from '../furnaceRenderer';
 import { resolveGlow } from '../renderQuality';
 import { drawCourtMapMark } from '../ricochetCourtRenderer';
+import { travelCameraRotation } from '../travelCamera';
 import {
   drawFoundationMapMark,
   drawFurnaceMapMark,
@@ -745,6 +746,10 @@ export function drawMiniMap(
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.clip();
+
+  ctx.translate(centerX, centerY);
+  ctx.rotate(travelCameraRotation(ship));
+  ctx.translate(-centerX, -centerY);
 
   try {
     drawExplorationFog(ctx, geometry);

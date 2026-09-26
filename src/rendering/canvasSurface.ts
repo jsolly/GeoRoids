@@ -11,6 +11,7 @@ import {
   projectWorldToScreenInto,
 } from './playfieldCamera';
 import { configureRenderQuality } from './renderQuality';
+import { rotateVectorInto, travelCameraRotation } from './travelCamera';
 
 const TOGGLE_STEP_PX = 52;
 
@@ -46,6 +47,7 @@ class CanvasManager {
   private stopDevicePixelRatioWatcher: (() => void) | null = null;
   private readonly viewport = { width: 1, height: 1 };
   private devicePixelRatio = 1;
+  private cameraRotation = 0;
   private readonly screenPos = { x: 0, y: 0 };
 
   initialize(): void {
@@ -219,6 +221,7 @@ class CanvasManager {
     this.viewport.width = 1;
     this.viewport.height = 1;
     this.devicePixelRatio = 1;
+    this.cameraRotation = 0;
     configureRenderQuality('', false);
   }
 
@@ -258,6 +261,24 @@ class CanvasManager {
     return this.context;
   }
 
+  followTravel(ship: Parameters<typeof travelCameraRotation>[0]): void {
+    this.cameraRotation = travelCameraRotation(ship);
+  }
+
+  getCameraRotation(): number {
+    return this.cameraRotation;
+  }
+
+  /** Apply the same projection to painters that retain paths in world coordinates. */
+  applyWorldTransform(ctx: CanvasRenderingContext2D, center: Position): void {
+    const viewport = this.getViewportSize();
+    const scale = this.getPlayfieldScale();
+    ctx.translate(viewport.width / 2, viewport.height / 2);
+    ctx.rotate(this.cameraRotation);
+    ctx.scale(scale, scale);
+    ctx.translate(-center.x, -center.y);
+  }
+
   getPlayfieldScale(): number {
     return PLAYFIELD_CLOSE_SCALE;
   }
@@ -269,11 +290,19 @@ class CanvasManager {
   ): { x: number; y: number } {
     const scale = PLAYFIELD_CLOSE_SCALE;
     if (!this.canvas) {
-      out.x = (worldPos.x - shipPos.x) * scale;
-      out.y = (worldPos.y - shipPos.y) * scale;
+      rotateVectorInto(out, worldPos.x - shipPos.x, worldPos.y - shipPos.y, this.cameraRotation);
+      out.x *= scale;
+      out.y *= scale;
       return out;
     }
-    return projectWorldToScreenInto(out, worldPos, shipPos, this.viewport, scale);
+    return projectWorldToScreenInto(
+      out,
+      worldPos,
+      shipPos,
+      this.viewport,
+      scale,
+      this.cameraRotation
+    );
   }
 
   worldToScreen(worldPos: Position, shipPos: Position): Point {
@@ -283,14 +312,13 @@ class CanvasManager {
 
   screenToWorld(screenPos: Point, shipPos: Position): Position {
     const scale = PLAYFIELD_CLOSE_SCALE;
-    if (!this.canvas) {
-      return { x: screenPos.x / scale + shipPos.x, y: screenPos.y / scale + shipPos.y };
-    }
-
-    return {
-      x: (screenPos.x - this.viewport.width / 2) / scale + shipPos.x,
-      y: (screenPos.y - this.viewport.height / 2) / scale + shipPos.y,
-    };
+    const offset = rotateVectorInto(
+      { x: 0, y: 0 },
+      (screenPos.x - (this.canvas ? this.viewport.width / 2 : 0)) / scale,
+      (screenPos.y - (this.canvas ? this.viewport.height / 2 : 0)) / scale,
+      -this.cameraRotation
+    );
+    return { x: offset.x + shipPos.x, y: offset.y + shipPos.y };
   }
 }
 

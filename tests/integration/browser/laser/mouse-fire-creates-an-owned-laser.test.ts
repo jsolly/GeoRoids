@@ -12,110 +12,124 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 /** Observe actual cached-bolt draws while the shoot packet is in flight. */
-function paintedShotFrames(page: Page) {
-  return page.evaluate(
-    async ({ coreColor, playfieldScale }) => {
-      const original = CanvasRenderingContext2D.prototype.drawImage;
-      const coreMatches = new WeakMap<HTMLCanvasElement, boolean>();
-      let painted = 0;
-      let started = false;
-      let raf = 0;
-      const frames: Array<{ count: number; painted: number; x: number; y: number }> = [];
-      CanvasRenderingContext2D.prototype.drawImage = function (
-        this: CanvasRenderingContext2D,
-        source: CanvasImageSource,
-        ...coordinates: number[]
-      ) {
-        Reflect.apply(original, this, [source, ...coordinates]);
-        const ship = window.gameController?.getPlayerManager().getLocalShip();
-        const shot = ship?.lasers[0];
-        if (
-          this.canvas.id !== 'gameCanvas' ||
-          !(source instanceof HTMLCanvasElement) ||
-          coordinates.length !== 4 ||
-          !ship ||
-          !shot
+async function paintedShotFrames(page: Page) {
+  const camera = await page.evaluateHandle<
+    typeof import('../../../../src/rendering/canvasSurface').canvasManager
+  >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
+  try {
+    return await camera.evaluate(
+      async (canvasManager, { coreColor, playfieldScale }) => {
+        const original = CanvasRenderingContext2D.prototype.drawImage;
+        const coreMatches = new WeakMap<HTMLCanvasElement, boolean>();
+        let painted = 0;
+        let started = false;
+        let raf = 0;
+        const frames: Array<{ count: number; painted: number; x: number; y: number }> = [];
+        CanvasRenderingContext2D.prototype.drawImage = function (
+          this: CanvasRenderingContext2D,
+          source: CanvasImageSource,
+          ...coordinates: number[]
         ) {
-          return;
+          Reflect.apply(original, this, [source, ...coordinates]);
+          const ship = window.gameController?.getPlayerManager().getLocalShip();
+          const shot = ship?.lasers[0];
+          if (
+            this.canvas.id !== 'gameCanvas' ||
+            !(source instanceof HTMLCanvasElement) ||
+            coordinates.length !== 4 ||
+            !ship ||
+            !shot
+          ) {
+            return;
+          }
+          const [dx, dy, width, height] = coordinates;
+          if (dx === undefined || dy === undefined || !width || !height) {
+            return;
+          }
+          const transform = this.getTransform();
+          const dpr = Math.hypot(transform.a, transform.b);
+          const rect = this.canvas.getBoundingClientRect();
+          const rotation = canvasManager.getCameraRotation();
+          const worldX = shot.position.x - ship.position.x;
+          const worldY = shot.position.y - ship.position.y;
+          const x =
+            rect.width / 2 +
+            (worldX * Math.cos(rotation) - worldY * Math.sin(rotation)) * playfieldScale;
+          const y =
+            rect.height / 2 +
+            (worldX * Math.sin(rotation) + worldY * Math.cos(rotation)) * playfieldScale;
+          if (Math.hypot(transform.e / dpr - x, transform.f / dpr - y) >= 0.01) {
+            return;
+          }
+          // The sprite origin is the bolt center. Verify its opaque core, not
+          // merely any image drawn at the predicted projectile position.
+          if (!coreMatches.has(source)) {
+            const pixel = source
+              .getContext('2d')
+              ?.getImageData(
+                Math.round((-dx * source.width) / width),
+                Math.round((-dy * source.height) / height),
+                1,
+                1
+              ).data;
+            coreMatches.set(
+              source,
+              Boolean(
+                pixel &&
+                  pixel[0] === coreColor[0] &&
+                  pixel[1] === coreColor[1] &&
+                  pixel[2] === coreColor[2] &&
+                  pixel[3] === 255
+              )
+            );
+          }
+          if (coreMatches.get(source)) {
+            painted++;
+          }
+        };
+        let deadline = 0;
+        try {
+          return await new Promise<typeof frames>((resolve, reject) => {
+            deadline = window.setTimeout(() => reject(new Error('No painted local shot')), 5000);
+            const sample = () => {
+              const ship = window.gameController?.getPlayerManager().getLocalShip();
+              const shot = ship?.lasers[0];
+              if (shot) {
+                started = true;
+              }
+              if (started) {
+                frames.push({
+                  count: ship?.lasers.length ?? 0,
+                  painted,
+                  x: shot?.position.x ?? NaN,
+                  y: shot?.position.y ?? NaN,
+                });
+              }
+              painted = 0;
+              if (frames.length === 12) {
+                resolve(frames);
+              } else {
+                raf = requestAnimationFrame(sample);
+              }
+            };
+            raf = requestAnimationFrame(sample);
+          });
+        } finally {
+          clearTimeout(deadline);
+          cancelAnimationFrame(raf);
+          CanvasRenderingContext2D.prototype.drawImage = original;
         }
-        const [dx, dy, width, height] = coordinates;
-        if (dx === undefined || dy === undefined || !width || !height) {
-          return;
-        }
-        const transform = this.getTransform();
-        const dpr = Math.hypot(transform.a, transform.b);
-        const rect = this.canvas.getBoundingClientRect();
-        const x = rect.width / 2 + (shot.position.x - ship.position.x) * playfieldScale;
-        const y = rect.height / 2 + (shot.position.y - ship.position.y) * playfieldScale;
-        if (Math.hypot(transform.e / dpr - x, transform.f / dpr - y) >= 0.01) {
-          return;
-        }
-        // The sprite origin is the bolt center. Verify its opaque core, not
-        // merely any image drawn at the predicted projectile position.
-        if (!coreMatches.has(source)) {
-          const pixel = source
-            .getContext('2d')
-            ?.getImageData(
-              Math.round((-dx * source.width) / width),
-              Math.round((-dy * source.height) / height),
-              1,
-              1
-            ).data;
-          coreMatches.set(
-            source,
-            Boolean(
-              pixel &&
-                pixel[0] === coreColor[0] &&
-                pixel[1] === coreColor[1] &&
-                pixel[2] === coreColor[2] &&
-                pixel[3] === 255
-            )
-          );
-        }
-        if (coreMatches.get(source)) {
-          painted++;
-        }
-      };
-      let deadline = 0;
-      try {
-        return await new Promise<typeof frames>((resolve, reject) => {
-          deadline = window.setTimeout(() => reject(new Error('No painted local shot')), 5000);
-          const sample = () => {
-            const ship = window.gameController?.getPlayerManager().getLocalShip();
-            const shot = ship?.lasers[0];
-            if (shot) {
-              started = true;
-            }
-            if (started) {
-              frames.push({
-                count: ship?.lasers.length ?? 0,
-                painted,
-                x: shot?.position.x ?? NaN,
-                y: shot?.position.y ?? NaN,
-              });
-            }
-            painted = 0;
-            if (frames.length === 12) {
-              resolve(frames);
-            } else {
-              raf = requestAnimationFrame(sample);
-            }
-          };
-          raf = requestAnimationFrame(sample);
-        });
-      } finally {
-        clearTimeout(deadline);
-        cancelAnimationFrame(raf);
-        CanvasRenderingContext2D.prototype.drawImage = original;
+      },
+      {
+        coreColor: [1, 3, 5].map((offset) =>
+          Number.parseInt(VISUAL.LASER_CORE_COLOR.slice(offset, offset + 2), 16)
+        ),
+        playfieldScale: PLAYFIELD_CLOSE_SCALE,
       }
-    },
-    {
-      coreColor: [1, 3, 5].map((offset) =>
-        Number.parseInt(VISUAL.LASER_CORE_COLOR.slice(offset, offset + 2), 16)
-      ),
-      playfieldScale: PLAYFIELD_CLOSE_SCALE,
-    }
-  );
+    );
+  } finally {
+    await camera.dispose();
+  }
 }
 
 for (const touch of [false, true]) {

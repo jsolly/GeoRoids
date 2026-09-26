@@ -230,10 +230,23 @@ function drawCachedRoidSilhouette(
       // is already in use this frame. Crowded scenes must not repaint the cache.
       drawRoidSilhouette(
         ctx,
-        roidOutline(screen, radius, roid.angle, vertices, offsets),
+        roidOutline(
+          screen,
+          radius,
+          roid.angle + canvasManager.getCameraRotation(),
+          vertices,
+          offsets
+        ),
         roid.r,
         inner
-          ? roidOutline(screen, radius, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
+          ? roidOutline(
+              screen,
+              radius,
+              roid.angle + canvasManager.getCameraRotation(),
+              vertices,
+              offsets,
+              VISUAL.ROID_INNER_SCALE
+            )
           : null
       );
       return;
@@ -271,7 +284,7 @@ function drawCachedRoidSilhouette(
   sprite.lastUsedFrame = cache.frame;
   ctx.save();
   ctx.translate(screen.x, screen.y);
-  ctx.rotate(roid.angle);
+  ctx.rotate(roid.angle + canvasManager.getCameraRotation());
   ctx.shadowBlur = 0;
   ctx.drawImage(
     sprite.canvas,
@@ -352,7 +365,7 @@ function drawAsteroidBoost(
   }
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(-boost.angle);
+  ctx.rotate(canvasManager.getCameraRotation() - boost.angle);
   ctx.lineWidth = 1.3;
   ctx.strokeStyle = PALETTE.LOOT;
   ctx.shadowColor = PALETTE.LOOT;
@@ -526,7 +539,7 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
         screenPos.x,
         screenPos.y,
         r,
-        roid.angle,
+        roid.angle + canvasManager.getCameraRotation(),
         roid.health / roid.maxHealth
       );
     }
@@ -577,7 +590,7 @@ export function drawAsteroidShatterBursts(ship: Ship): void {
     const outline = roidOutline(
       screen,
       radius,
-      rock.angle,
+      rock.angle + canvasManager.getCameraRotation(),
       rock.vertices,
       drawingOffsets(rock.offsets)
     );

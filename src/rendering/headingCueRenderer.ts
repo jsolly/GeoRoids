@@ -1,5 +1,6 @@
 import { PALETTE, STEERING } from '../constants';
 import type { Ship } from '../entities/ship/Ship';
+import { canvasManager } from './canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE, type PlayfieldSize } from './playfieldCamera';
 
 /** Screen-pixel distance from ship center to the heading caret tip. */
@@ -19,7 +20,7 @@ export function drawHeadingCue(
   const tip = headingCueTipDistance(ship.r * PLAYFIELD_CLOSE_SCALE);
   ctx.save();
   ctx.translate(viewport.width / 2, viewport.height / 2);
-  ctx.rotate(-ship.angle);
+  ctx.rotate(canvasManager.getCameraRotation() - ship.angle);
   ctx.beginPath();
   ctx.moveTo(tip - STEERING.ARROW_LENGTH_PX, -STEERING.ARROW_HALF_WIDTH_PX);
   ctx.lineTo(tip, 0);

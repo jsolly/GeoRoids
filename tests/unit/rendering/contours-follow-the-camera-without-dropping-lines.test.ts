@@ -224,3 +224,43 @@ test('renderer reuses world paths until the candidate arrays or terrain change',
     ensureTerrain(prior.seed, { cx: prior.cx, cy: prior.cy, radius: prior.radius });
   }
 });
+
+test('an eastbound pilot sees terrain at the wide screen edge beyond the old north-up bounds', async () => {
+  const terrain = await import('../../../src/physics/terrain/terrainSession');
+  vi.stubGlobal('Path2D', TestPath2D);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1200;
+  canvas.height = 400;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Missing terrain canvas');
+  }
+  const segment = { ax: 0, ay: 500, bx: 20, by: 500 };
+  vi.spyOn(terrain, 'getTerrainContours').mockReturnValue([level([segment])]);
+  vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
+  vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+  vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue(canvas);
+  canvasManager.followTravel({ angle: 0, velocity: { x: 4, y: 0 } });
+  const strokes: { x: number; y: number }[] = [];
+  vi.spyOn(ctx, 'stroke').mockImplementation((...args: [] | [Path2D]) => {
+    const path = args[0];
+    if (!(path instanceof TestPath2D)) {
+      return;
+    }
+    for (const point of path.commands) {
+      const transform = ctx.getTransform();
+      strokes.push({
+        x: transform.a * point.x + transform.c * point.y + transform.e,
+        y: transform.b * point.x + transform.d * point.y + transform.f,
+      });
+    }
+  });
+  try {
+    drawIsoContours({ x: 0, y: 0 }, 0);
+    expect(strokes.length).toBeGreaterThan(0);
+    expect(strokes[0]?.x).toBeCloseTo(1100);
+    expect(strokes[0]?.y).toBeCloseTo(200);
+  } finally {
+    canvasManager.destroy();
+  }
+});

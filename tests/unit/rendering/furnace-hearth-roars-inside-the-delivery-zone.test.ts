@@ -1,7 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { ExplorationMap } from '../../../shared/exploration';
+import { TOWN_HEARTH } from '../../../shared/furnaces';
 import { PALETTE } from '../../../src/constants';
+import { resetWorldExploration, setWorldExploration } from '../../../src/network/worldExploration';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import { drawFurnaceArtwork } from '../../../src/rendering/furnaceRenderer';
+import { drawFurnaceArtwork, drawFurnacesRelative } from '../../../src/rendering/furnaceRenderer';
 import { hexToRgba } from '../../../src/utils/colorUtils';
 import { setWindowViewport } from '../../support/viewport';
 
@@ -18,6 +21,7 @@ let canvas: HTMLCanvasElement | undefined;
 let previousCanvas: HTMLElement | null = null;
 
 afterEach(() => {
+  resetWorldExploration();
   canvasManager.destroy();
   if (previousCanvas) {
     canvas?.replaceWith(previousCanvas);
@@ -247,4 +251,28 @@ test('the draft never falls back into the same pose on a short loop', () => {
     });
     expect(Math.max(...drift)).toBeGreaterThan(2);
   }
+});
+
+test('Town Square docking arms turn with travel while its label stays upright', () => {
+  recordingContext();
+  const ctx = canvasManager.requireContext();
+  const exploration = new ExplorationMap();
+  exploration.reveal(TOWN_HEARTH.position, 800);
+  setWorldExploration(exploration.snapshot());
+  canvasManager.followTravel({ angle: 0, velocity: { x: 1, y: -1 } });
+  const armAngles: number[] = [];
+  const labelAngles: number[] = [];
+  vi.spyOn(ctx, 'strokeRect').mockImplementation(() => {
+    const matrix = ctx.getTransform();
+    armAngles.push(Math.atan2(matrix.b, matrix.a));
+  });
+  vi.spyOn(ctx, 'fillText').mockImplementation(() => {
+    const matrix = ctx.getTransform();
+    labelAngles.push(Math.atan2(matrix.b, matrix.a));
+  });
+  drawFurnacesRelative(TOWN_HEARTH.position);
+  expect(armAngles.length).toBeGreaterThanOrEqual(4);
+  expect(armAngles[0]).toBeCloseTo(-Math.PI / 4, 5);
+  expect(labelAngles.length).toBeGreaterThan(0);
+  expect(labelAngles.every((angle) => Math.abs(angle) < 0.001)).toBe(true);
 });

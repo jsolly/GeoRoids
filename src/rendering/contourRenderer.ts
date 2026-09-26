@@ -9,6 +9,7 @@ import { contourSlopeHex, previewConeWeight, radialSlope } from './contourAppear
 import { contourSlope } from './contourDisplay';
 import { drawContourLabels } from './contourLabels';
 import { contourCandidates } from './contourSpatialIndex';
+import { rotatedViewSize } from './travelCamera';
 
 type ContourSegment = ContourLevel['segments'][number];
 
@@ -38,14 +39,18 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
 
   const field = getTerrainField();
   const heading = cruiseVelocity(headingAngle, 1);
-  const centerX = viewport.width / 2;
-  const centerY = viewport.height / 2;
+  const rotation = canvasManager.getCameraRotation();
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.shadowBlur = 0;
 
-  const view = { ...shipPosition, ...viewport, scale, pad };
+  const view = {
+    ...shipPosition,
+    ...rotatedViewSize(viewport.width, viewport.height, rotation),
+    scale,
+    pad,
+  };
   for (const [levelOrdinal, level] of levels.entries()) {
     const isIndex = level.index % VISUAL.CONTOUR_INDEX_EVERY === 0;
     ctx.strokeStyle = hexToRgba(
@@ -71,8 +76,7 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
     }
 
     ctx.save();
-    ctx.translate(centerX - shipPosition.x * scale, centerY - shipPosition.y * scale);
-    ctx.scale(scale, scale);
+    canvasManager.applyWorldTransform(ctx, shipPosition);
     ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH / scale;
     ctx.stroke(path);
     ctx.restore();
@@ -88,10 +92,14 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
         continue;
       }
       const climb = radialSlope(offset, slope.gradient);
-      const ax = centerX + (segment.ax - shipPosition.x) * scale;
-      const ay = centerY + (segment.ay - shipPosition.y) * scale;
-      const bx = centerX + (segment.bx - shipPosition.x) * scale;
-      const by = centerY + (segment.by - shipPosition.y) * scale;
+      const { x: ax, y: ay } = canvasManager.worldToScreen(
+        { x: segment.ax, y: segment.ay },
+        shipPosition
+      );
+      const { x: bx, y: by } = canvasManager.worldToScreen(
+        { x: segment.bx, y: segment.by },
+        shipPosition
+      );
       ctx.beginPath();
       ctx.moveTo(ax, ay);
       ctx.lineTo(bx, by);
@@ -110,6 +118,7 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
     x: shipPosition.x,
     y: shipPosition.y,
     scale,
+    rotation,
     alpha: VISUAL.CONTOUR_LABEL_ALPHA,
     spacing: VISUAL.CONTOUR_LABEL_SPACING,
   });

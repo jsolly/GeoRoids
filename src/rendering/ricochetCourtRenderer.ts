@@ -54,6 +54,7 @@ export function drawRicochetCourt(viewer: Position): void {
   }
   ctx.save();
   ctx.translate(center.x, center.y);
+  ctx.rotate(canvasManager.getCameraRotation());
   ctx.scale(PLAYFIELD_CLOSE_SCALE, PLAYFIELD_CLOSE_SCALE);
   ctx.lineCap = 'round';
   for (const reflector of COURT_REFLECTORS) {
@@ -82,6 +83,7 @@ export function drawRicochetCourt(viewer: Position): void {
     ctx.arc(endX, endY, 3, 0, Math.PI * 2);
     ctx.stroke();
   }
+  ctx.rotate(-canvasManager.getCameraRotation());
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '12px "Courier New", monospace';

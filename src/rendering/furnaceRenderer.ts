@@ -703,6 +703,7 @@ function drawDockingStation(
 ): void {
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate(canvasManager.getCameraRotation());
   ctx.strokeStyle = '#91A7C0';
   ctx.fillStyle = '#111C2B';
   ctx.lineWidth = 1.5;

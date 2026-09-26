@@ -52,11 +52,19 @@ for (const viewport of [
       await back.click();
     }
     await arrangeCrewField([playerId, observerId], 'probe');
-    await page.mouse.move(viewport.width * 0.9, viewport.height / 2);
-    await page.waitForFunction(() => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      return ship && Math.abs(Math.sin(ship.angle)) < 0.03 && Math.cos(ship.angle) > 0;
-    });
+    await page.waitForFunction(() =>
+      window.gameController
+        ?.getCurrRoidBelt()
+        .getRoids()
+        .some((rock) => rock.id === 'crew-fixture-probe-host')
+    );
+    const target = (await game.getAsteroidPositions()).find(
+      (rock) => rock.id === 'crew-fixture-probe-host'
+    );
+    if (!target) {
+      throw new Error('Missing moving probe host');
+    }
+    await game.aimAtWorldPosition({ x: target.x, y: target.y });
     if (viewport.touch) {
       expect((await page.locator('#touch-ability').textContent())?.toUpperCase()).toContain(
         'PROBE'

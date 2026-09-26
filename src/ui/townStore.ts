@@ -5,6 +5,7 @@ import { playFeedback } from '../audio/feedbackSounds';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { NetworkManager } from '../network/networkManager';
 import { getSettlement, worldFurnaces } from '../network/worldExploration';
+import { travelCameraRotation } from '../rendering/travelCamera';
 import { logger } from '../utils/Logger';
 import { renderFurnaceTravelMap } from './furnaceTravelMap';
 import { closeShipSchematic } from './shipSchematic';
@@ -138,13 +139,20 @@ function refreshStoreCopy(): void {
     eyebrow.textContent = source?.name ?? 'FURNACE';
   }
   const destinations = source ? litTravelDestinations(source.id, worldFurnaces) : [];
-  const signature = `${source?.id ?? ''}|${destinations
+  const rotation = player ? travelCameraRotation(player.ship) : 0;
+  const signature = `${rotation}|${source?.id ?? ''}|${destinations
     .map((destination) => `${destination.id}:${destination.name}`)
     .join('|')}`;
   if (activeView === 'travel' && elements.destinations.dataset['destinations'] !== signature) {
     elements.destinations.dataset['destinations'] = signature;
     if (source) {
-      renderFurnaceTravelMap(elements.destinations, source, destinations, requestFurnaceTravel);
+      renderFurnaceTravelMap(
+        elements.destinations,
+        source,
+        destinations,
+        requestFurnaceTravel,
+        rotation
+      );
     } else {
       elements.destinations.replaceChildren();
     }

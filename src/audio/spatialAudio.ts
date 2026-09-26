@@ -1,10 +1,11 @@
 import type { Position } from '../../shared-types';
 import { AUDIO } from '../constants';
 import { soundIsOn } from '../constants/user-preferences';
+import { rotateVectorInto } from '../rendering/travelCamera';
 import { getDistance } from '../utils/mathUtils';
 import { playSound, type Sound } from './Sound';
 
-type ViewportSize = { width: number; height: number };
+type ViewportSize = { width: number; height: number; rotation?: number };
 
 interface PlaybackPlan {
   shouldPlay: boolean;
@@ -51,8 +52,14 @@ export function isInViewport(
   listener: Position,
   viewport: ViewportSize
 ): boolean {
-  const screenX = viewport.width / 2 - listener.x + worldPos.x;
-  const screenY = viewport.height / 2 - listener.y + worldPos.y;
+  const offset = rotateVectorInto(
+    { x: 0, y: 0 },
+    worldPos.x - listener.x,
+    worldPos.y - listener.y,
+    viewport.rotation ?? 0
+  );
+  const screenX = viewport.width / 2 + offset.x;
+  const screenY = viewport.height / 2 + offset.y;
   return screenX >= 0 && screenX <= viewport.width && screenY >= 0 && screenY <= viewport.height;
 }
 
@@ -109,7 +116,12 @@ export function planPositionalPlayback(
   return {
     shouldPlay: volumeScale > 0,
     volumeScale,
-    offset: { x: sourcePosition.x - listener.x, y: sourcePosition.y - listener.y },
+    offset: rotateVectorInto(
+      { x: 0, y: 0 },
+      sourcePosition.x - listener.x,
+      sourcePosition.y - listener.y,
+      viewport?.rotation ?? 0
+    ),
   };
 }
 

@@ -43,6 +43,12 @@ for (const width of [1280, 390]) {
       width === 390 ? 'Tap to travel' : 'Press E to travel'
     );
     expect(await page.locator('[data-audio-restart]').count()).toBe(0);
+    await page.keyboard.down('ArrowRight');
+    try {
+      await game.waitForAnimationFrames(10);
+    } finally {
+      await page.keyboard.up('ArrowRight');
+    }
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`furnace-travel-prompt-${width}.png`),
     });
@@ -71,6 +77,26 @@ for (const width of [1280, 390]) {
     await prompt.waitFor({ state: 'hidden' });
     const home = menu.locator('[data-furnace-id="town-square"]');
     expect(await home.isEnabled()).toBe(true);
+    const rotation = await page.evaluate<number>(
+      "import('/src/rendering/canvasSurface.ts').then(({canvasManager}) => canvasManager.getCameraRotation())"
+    );
+    expect(Math.abs(rotation)).toBeGreaterThan(0.1);
+    const mapBearing = await page.evaluate(() => {
+      const current = document.querySelector('[aria-current="location"].furnace-travel-marker');
+      const destination = document.querySelector('[data-furnace-id="town-square"]');
+      if (!(current instanceof HTMLElement) || !(destination instanceof HTMLElement)) {
+        throw new Error('Missing furnace map bearings');
+      }
+      return {
+        x: Number.parseFloat(destination.style.left) - Number.parseFloat(current.style.left),
+        y: Number.parseFloat(destination.style.top) - Number.parseFloat(current.style.top),
+      };
+    });
+    const homeBearing = Math.atan2(-lot.position.y, -lot.position.x) + rotation;
+    expect(Math.atan2(mapBearing.y, mapBearing.x)).toBeCloseTo(
+      Math.atan2(Math.sin(homeBearing), Math.cos(homeBearing)),
+      3
+    );
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`furnace-destinations-${width}.png`),
     });
@@ -90,6 +116,14 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('KeyV');
     expect(await page.locator('#ship-schematic-dialog').isVisible()).toBe(false);
     await game.waitForAnimationFrames(3);
+    const transitHeading = await page.evaluate<number>(
+      `import('/src/rendering/canvasSurface.ts').then(({canvasManager}) => {
+        const ship = window.gameController.getCurrPlayer().ship;
+        if (!ship.furnaceTransit) throw new Error('Missing active pipe ride');
+        return ship.angle - canvasManager.getCameraRotation();
+      })`
+    );
+    expect(transitHeading).toBeCloseTo(Math.PI / 2, 2);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`rocket-pipe-ride-${width}.png`),
     });

@@ -30,7 +30,13 @@ function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
   ctx.shadowColor = color;
   ctx.shadowBlur = pickup.state === 'loose' ? resolveGlow(VISUAL.SHIP_GLOW) : 0;
   ctx.globalAlpha = pickup.state === 'orbiting' ? 0.9 : 1;
-  drawEoSatelliteOutline(ctx, pickup.typeId, radius, pickup.angle, color);
+  drawEoSatelliteOutline(
+    ctx,
+    pickup.typeId,
+    radius,
+    pickup.angle - canvasManager.getCameraRotation(),
+    color
+  );
   ctx.restore();
 
   drawSatelliteHealth(ctx, pickup, screen, radius);

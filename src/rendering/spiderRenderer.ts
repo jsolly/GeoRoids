@@ -144,8 +144,7 @@ export function drawTerrainSpiders(position: Position, playerId: string, alive: 
   const radius = Math.hypot(viewport.width, viewport.height) / (2 * scale);
   const levels = getTerrainContours(position, radius + 32 / scale);
   ctx.save();
-  ctx.translate(viewport.width / 2 - position.x * scale, viewport.height / 2 - position.y * scale);
-  ctx.scale(scale, scale);
+  canvasManager.applyWorldTransform(ctx, position);
   for (const spider of field.spiders) {
     if (
       Math.hypot(position.x - spider.position.x, position.y - spider.position.y) <

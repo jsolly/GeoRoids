@@ -125,8 +125,7 @@ export function drawBeltEncounters(pilot: Position, roids: readonly Roid[]): voi
   const radius = Math.hypot(viewport.width, viewport.height) / (2 * scale);
   const time = performance.now() / 1000;
   ctx.save();
-  ctx.translate(viewport.width / 2 - pilot.x * scale, viewport.height / 2 - pilot.y * scale);
-  ctx.scale(scale, scale);
+  canvasManager.applyWorldTransform(ctx, pilot);
   for (const warning of recovery) {
     if (
       Math.hypot(pilot.x - warning.position.x, pilot.y - warning.position.y) >
@@ -151,6 +150,7 @@ export function drawBeltEncounters(pilot: Position, roids: readonly Roid[]): voi
     ctx.setLineDash([]);
     ctx.font = `${12 / scale}px monospace`;
     ctx.textAlign = 'center';
+    ctx.rotate(-canvasManager.getCameraRotation());
     ctx.fillText('REFORMING · KEEP CLEAR', 0, -warning.size - 16 / scale);
     ctx.restore();
   }

@@ -2,6 +2,7 @@ import { PALETTE, VISUAL } from '../constants';
 import type { ContourLevel } from '../physics/terrain/contours';
 import { hexToRgba } from '../utils/colorUtils';
 import type { DrawingContext } from './drawingContext';
+import { projectWorldToScreenInto } from './playfieldCamera';
 
 interface ElevationLabel {
   x: number;
@@ -125,6 +126,7 @@ export function drawContourLabels(
     x: number;
     y: number;
     scale: number;
+    rotation?: number;
     alpha: number;
     spacing: number;
   }
@@ -139,9 +141,16 @@ export function drawContourLabels(
     metrics = { levels, font: ctx.font, widths: new Map() };
     widthCache.set(ctx, metrics);
   }
+  const screen = { x: 0, y: 0 };
   for (const label of getLabels(levels, view.spacing)) {
-    const x = view.width / 2 + (label.x - view.x) * view.scale;
-    const y = view.height / 2 + (label.y - view.y) * view.scale;
+    const { x, y } = projectWorldToScreenInto(
+      screen,
+      label,
+      view,
+      view,
+      view.scale,
+      view.rotation ?? 0
+    );
     if (
       x < VISUAL.CONTOUR_LABEL_MARGIN_X ||
       x > view.width - VISUAL.CONTOUR_LABEL_MARGIN_X ||
@@ -152,7 +161,8 @@ export function drawContourLabels(
     }
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(label.angle);
+    const angle = label.angle + (view.rotation ?? 0);
+    ctx.rotate(Math.atan(Math.tan(angle)));
     let textWidth = metrics.widths.get(label.text);
     if (textWidth === undefined) {
       textWidth = ctx.measureText(label.text).width;

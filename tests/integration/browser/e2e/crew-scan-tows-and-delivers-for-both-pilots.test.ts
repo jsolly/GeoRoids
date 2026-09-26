@@ -98,14 +98,6 @@ async function waitForFixture(
   );
 }
 
-async function pointHaulerNorth(page: Page): Promise<void> {
-  const canvas = await page.locator('#gameCanvas').boundingBox();
-  if (!canvas) {
-    throw new Error('Crew delivery fixture cannot find the Hauler canvas');
-  }
-  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.12);
-}
-
 async function assertMapButtonClearOfRadar(page: Page): Promise<void> {
   const actual = await page.evaluate(() => {
     const gameArea = document.querySelector('#gameArea');
@@ -217,9 +209,9 @@ test(
       )
       .toBe(true);
 
-    // E attaches the real persistent cable. Pointing north supplies ordinary
+    // E attaches the real persistent cable. Pointing beyond Town Square supplies ordinary
     // movement input; the fixture itself never moves the result or awards score.
-    await pointHaulerNorth(haulerPage);
+    await hauler.pointAtWorldPosition({ x: 0, y: -1000 });
     await haulerPage.keyboard.press('KeyE');
     await expect
       .poll(async () => (await readCrewState(haulerPage)).local.towId, {
@@ -235,6 +227,7 @@ test(
     await expect
       .poll(
         async () => {
+          await hauler.pointAtWorldPosition({ x: 0, y: -1000 });
           const state = await readCrewState(haulerPage);
           if (!state.asteroid) {
             return 'delivered';

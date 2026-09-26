@@ -75,7 +75,7 @@ for (const failure of [
     socket.url = () =>
       failure === 'wrong-host'
         ? 'wss://other.example/ws'
-        : `${failure === 'insecure-socket' ? 'ws' : 'wss'}://geoasteroids-production-2403.up.railway.app/ws`;
+        : `${failure === 'insecure-socket' ? 'ws' : 'wss'}://georoids-production-2403.up.railway.app/ws`;
     page.getByLabel = () => ({ fill: () => Promise.resolve() });
     page.getByRole = () => ({
       click: () => {

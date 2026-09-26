@@ -1,5 +1,6 @@
 import { pipeToTownSquare } from '../../shared/furnaces';
 import type { Position } from '../../shared-types';
+import { rotateVectorInto } from '../rendering/travelCamera';
 
 type FurnaceSite = { id: string; name: string; position: Position };
 const MARKER_SIZE = 64;
@@ -11,10 +12,21 @@ export function renderFurnaceTravelMap(
   container: HTMLElement,
   source: FurnaceSite,
   destinations: readonly FurnaceSite[],
-  onTravel: (id: string) => void
+  onTravel: (id: string) => void,
+  rotation = 0
 ): void {
-  const sites = [source, ...destinations];
-  const routes = sites.map((site) => pipeToTownSquare(site.id));
+  const projectBearing = (position: Position) =>
+    rotateVectorInto(
+      { x: 0, y: 0 },
+      position.x - source.position.x,
+      position.y - source.position.y,
+      rotation
+    );
+  const sites = [source, ...destinations].map((site) => ({
+    ...site,
+    position: projectBearing(site.position),
+  }));
+  const routes = sites.map((site) => pipeToTownSquare(site.id).map(projectBearing));
   const points = [...sites.map((site) => site.position), ...routes.flat()];
   const minX = Math.min(...points.map((point) => point.x));
   const minY = Math.min(...points.map((point) => point.y));
@@ -125,7 +137,7 @@ export function renderFurnaceTravelMap(
       : 'Select a lit furnace to travel. Scroll the map to explore.';
   container.replaceChildren(viewport, caption, hint);
   // Center the departure furnace on dense maps without smooth motion.
-  const origin = project(source.position);
+  const origin = project(projectBearing(source.position));
   if (size > fit + 1) {
     viewport.scrollLeft = Math.max(0, origin.x - fit / 2);
     viewport.scrollTop = Math.max(0, origin.y - viewportHeight / 2);

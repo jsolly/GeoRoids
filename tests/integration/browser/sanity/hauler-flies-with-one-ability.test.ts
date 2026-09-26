@@ -114,11 +114,13 @@ test.each([
 
     // Attachment preserves the rock's momentum. Turn away from it so the
     // persistent cable becomes taut before checking that towing moves cargo.
-    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.88);
+    const away = { x: atAttach.x, y: atAttach.y + 2000 };
+    await game.pointAtWorldPosition(away);
     await expect
       .poll(
-        () =>
-          page.evaluate(
+        async () => {
+          await game.pointAtWorldPosition(away);
+          return page.evaluate(
             ({ asteroidId, beforeY }) => {
               const controller = window.gameController;
               const ship = controller?.getCurrPlayer()?.ship;
@@ -133,7 +135,8 @@ test.each([
               );
             },
             { asteroidId: FIXTURE_ASTEROID_ID, beforeY: atAttach.y }
-          ),
+          );
+        },
         {
           timeout: 5000,
           message: 'The taut tow cable should move the attached rock with the Hauler',

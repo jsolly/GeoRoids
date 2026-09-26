@@ -184,15 +184,18 @@ for (const viewport of [
       if (viewport.hasTouch) {
         const session = await page.context().newCDPSession(page);
         const stick = await centerOf(page, '#gameCanvas');
-        const direction = angle === 0 ? 1 : -1;
-        const touchPoint = { x: stick.x + direction * 42, y: stick.y, id: 1 };
-        await dispatchTouch(session, 'touchStart', [touchPoint]);
-        await page.waitForFunction(
-          () => window.gameController?.getCurrPlayer()?.ship?.thrusting === true
-        );
-        expect(await page.locator('#touch-stick').count()).toBe(0);
-        await page.waitForTimeout(1200);
-        await dispatchTouch(session, 'touchEnd', []);
+        const touchPoint = { x: stick.x, y: stick.y - 42, id: 1 };
+        try {
+          await dispatchTouch(session, 'touchStart', [touchPoint]);
+          await page.waitForFunction(
+            () => window.gameController?.getCurrPlayer()?.ship?.thrusting === true
+          );
+          expect(await page.locator('#touch-stick').count()).toBe(0);
+          await page.waitForTimeout(1200);
+        } finally {
+          await dispatchTouch(session, 'touchEnd', []);
+          await session.detach();
+        }
       } else {
         await page.waitForTimeout(1200);
       }

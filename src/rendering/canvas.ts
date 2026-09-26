@@ -60,6 +60,7 @@ export function drawGame(
     return;
   }
 
+  canvasManager.followTravel(currShip);
   const viewport = canvasManager.getViewportSize();
   ctx.fillStyle = PALETTE.BG;
   ctx.fillRect(0, 0, viewport.width, viewport.height);

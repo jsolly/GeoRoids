@@ -13,6 +13,10 @@ media:
     demo: movement
 ---
 
+## Travel-up view
+
+The viewport and maps rotate like a GPS, keeping travel toward the top and retaining the last direction when stopped. Drift and knockback can turn the nose away from the top because the view follows movement. Hold a pointer beside the ship to keep turning; move it above the ship to fly ahead.
+
 ## Keyboard
 
 Steer with A/D or Left/Right, hold Space to fire, and press E for your equipped tool. Thrust is automatic; Shift toggles Boost.

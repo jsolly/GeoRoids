@@ -68,7 +68,7 @@
   "dependencies": {
     "@types/node": "^26.6.1",
     "@types/ws": "^8.18.1",
-    "@vercel/functions": "^3.9.7",
+    "@vercel/functions": "^3.9.8",
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
     "tsx": "^4.23.13",

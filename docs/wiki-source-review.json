@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed content/wiki/combat-survival.md and content/wiki/asteroids.md against the asteroid-death scenario and existing impact fixture. The fixture sets one-impact health and uses a real authoritative asteroid collision, with local death cause and copied event position required before the unchanged nearest-furnace, full-health, and alive assertions. This removes random spider interference from setup; gameplay damage, death, respawn rules, and illustrations are unchanged. Focused browser scenario and TypeScript passed; upstream terrain and map source baselines are preserved.",
+  "note": "Reviewed terrain and combat-survival spider pursuit, one-bite death, escape and combat rules. Desktop and mobile spider scenarios pass after approaching within acquisition range from 320 units and moving the escape placement before screenshot and audio observation; all behavioral assertions remain. Wiki articles and demonstrations require no changes.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",

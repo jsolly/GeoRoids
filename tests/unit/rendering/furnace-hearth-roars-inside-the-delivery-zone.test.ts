@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { ExplorationMap } from '../../../shared/exploration';
 import { TOWN_HEARTH } from '../../../shared/furnaces';
-import { PALETTE } from '../../../src/constants';
+import { CAMERA, PALETTE } from '../../../src/constants';
 import { resetWorldExploration, setWorldExploration } from '../../../src/network/worldExploration';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawFurnaceArtwork, drawFurnacesRelative } from '../../../src/rendering/furnaceRenderer';
@@ -259,7 +259,9 @@ test('Town Square docking arms turn with travel while its label stays upright', 
   const exploration = new ExplorationMap();
   exploration.reveal(TOWN_HEARTH.position, 800);
   setWorldExploration(exploration.snapshot());
+  CAMERA.FOLLOW_TRAVEL = true;
   canvasManager.followTravel({ angle: 0, velocity: { x: 1, y: -1 } });
+  CAMERA.FOLLOW_TRAVEL = false;
   const armAngles: number[] = [];
   const labelAngles: number[] = [];
   vi.spyOn(ctx, 'strokeRect').mockImplementation(() => {

@@ -13,9 +13,9 @@ media:
     demo: movement
 ---
 
-## Travel-up view
+## North-up view
 
-The viewport and maps rotate like a GPS, keeping travel toward the top and retaining the last direction when stopped. Drift and knockback can turn the nose away from the top because the view follows movement. Hold a pointer beside the ship to keep turning; move it above the ship to fly ahead.
+The viewport and maps keep north at the top while your ship turns. Point or drag toward a direction to steer toward it; holding the pointer still keeps that target direction. Drift and knockback can carry the ship sideways without rotating the view.
 
 ## Keyboard
 

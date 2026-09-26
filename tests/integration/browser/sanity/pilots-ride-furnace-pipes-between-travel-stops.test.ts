@@ -80,7 +80,7 @@ for (const width of [1280, 390]) {
     const rotation = await page.evaluate<number>(
       "import('/src/rendering/canvasSurface.ts').then(({canvasManager}) => canvasManager.getCameraRotation())"
     );
-    expect(Math.abs(rotation)).toBeGreaterThan(0.1);
+    expect(rotation).toBe(0);
     const mapBearing = await page.evaluate(() => {
       const current = document.querySelector('[aria-current="location"].furnace-travel-marker');
       const destination = document.querySelector('[data-furnace-id="town-square"]');
@@ -116,14 +116,14 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('KeyV');
     expect(await page.locator('#ship-schematic-dialog').isVisible()).toBe(false);
     await game.waitForAnimationFrames(3);
-    const transitHeading = await page.evaluate<number>(
+    const transitRotation = await page.evaluate<number>(
       `import('/src/rendering/canvasSurface.ts').then(({canvasManager}) => {
         const ship = window.gameController.getCurrPlayer().ship;
         if (!ship.furnaceTransit) throw new Error('Missing active pipe ride');
-        return ship.angle - canvasManager.getCameraRotation();
+        return canvasManager.getCameraRotation();
       })`
     );
-    expect(transitHeading).toBeCloseTo(Math.PI / 2, 2);
+    expect(transitRotation).toBe(0);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`rocket-pipe-ride-${width}.png`),
     });

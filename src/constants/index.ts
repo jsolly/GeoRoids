@@ -25,6 +25,9 @@ export const GAME = {
 // ============================================================================
 // CANVAS CONFIGURATION
 // ============================================================================
+/** Keep north fixed across flight and navigation maps by default. */
+export const CAMERA = { FOLLOW_TRAVEL: false };
+
 export const CANVAS = {
   INTERNAL_WIDTH: 800,
 } as const;

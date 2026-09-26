@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { VISUAL } from '../../../src/constants';
+import { CAMERA, VISUAL } from '../../../src/constants';
 import type { ContourLevel } from '../../../src/physics/terrain/contours';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import {
@@ -240,7 +240,9 @@ test('an eastbound pilot sees terrain at the wide screen edge beyond the old nor
   vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
   vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
   vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue(canvas);
+  CAMERA.FOLLOW_TRAVEL = true;
   canvasManager.followTravel({ angle: 0, velocity: { x: 4, y: 0 } });
+  CAMERA.FOLLOW_TRAVEL = false;
   const strokes: { x: number; y: number }[] = [];
   vi.spyOn(ctx, 'stroke').mockImplementation((...args: [] | [Path2D]) => {
     const path = args[0];

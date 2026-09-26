@@ -171,7 +171,7 @@ describe('universe map play chrome', () => {
     ).toEqual({ x: 420, y: 130 });
   });
 
-  test('the chart keeps eastbound travel up and slides north onto the compass', () => {
+  test('chart projections support rotation while the live north-up compass stays fixed', () => {
     const frame = { x: 20, y: 30, size: 400, scale: 2 };
     const center = { x: 0, y: 0 };
     const facingEast = -Math.PI / 2;
@@ -199,7 +199,7 @@ describe('universe map play chrome', () => {
       closeUniverseMap();
       (document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement).click();
       const compass = document.querySelector<HTMLElement>('.universe-map-compass');
-      expect(compass?.style.transform).toBe(`rotate(${-Math.PI / 2}rad)`);
+      expect(compass?.style.transform).toBe('rotate(0rad)');
       closeUniverseMap();
     } finally {
       localPlayer.mockRestore();

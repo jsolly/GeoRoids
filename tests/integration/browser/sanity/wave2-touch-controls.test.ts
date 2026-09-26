@@ -66,9 +66,6 @@ async function expectPointerSteering(page: Page, heading = Math.PI / 2): Promise
       { fps: GAME.FPS, heading }
     );
     expect(steps).toHaveLength(8);
-    if (heading !== Math.PI / 2) {
-      expect(steps.some((step) => Math.abs(step.before) > 1e-9)).toBe(true);
-    }
     for (const step of steps) {
       expect(Math.abs(step.turn)).toBeLessThanOrEqual(step.budget + 1e-9);
       if (Math.abs(step.before) <= step.budget) {
@@ -96,7 +93,7 @@ async function tapTouchPoint(
 }
 
 test(
-  'holding a finger beside the ship turns travel and release keeps flying',
+  'holding a finger aims at a fixed heading and release keeps flying',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -122,31 +119,25 @@ test(
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
       const points = [
-        { x: center.x + 100, y: center.y, turn: -1 },
-        { x: center.x - 100, y: center.y, turn: 1 },
+        { x: center.x + 100, y: center.y, heading: 0 },
+        { x: center.x - 100, y: center.y, heading: Math.PI },
       ];
       for (const [index, point] of points.entries()) {
-        const beforeTurn = await game.getShipAngle();
         await dispatchTouch(session, index === 0 ? 'touchStart' : 'touchMove', [
           { x: point.x, y: point.y, id: 1 },
         ]);
         touchActive = true;
+        await expectPointerSteering(page, point.heading);
         await expect
           .poll(async () => {
-            const angle = await game.getShipAngle();
-            return (
-              Math.atan2(Math.sin(angle - beforeTurn), Math.cos(angle - beforeTurn)) * point.turn
-            );
+            const delta = (await game.getShipAngle()) - point.heading;
+            return Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta)));
           })
-          .toBeGreaterThan(0.1);
-        await expectPointerSteering(page, point.turn < 0 ? 0 : Math.PI);
+          .toBeLessThan(0.01);
+        await game.waitForAnimationFrames(8);
+        const heldDelta = (await game.getShipAngle()) - point.heading;
+        expect(Math.abs(Math.atan2(Math.sin(heldDelta), Math.cos(heldDelta)))).toBeLessThan(0.01);
         expect((await readLocalTouchState(page)).thrusting).toBe(true);
-        const afterTurn = await game.getShipAngle();
-        const turned = Math.atan2(
-          Math.sin(afterTurn - beforeTurn),
-          Math.cos(afterTurn - beforeTurn)
-        );
-        expect(turned * point.turn).toBeGreaterThan(0.1);
       }
       await dispatchTouch(session, 'touchMove', [{ x: center.x, y: center.y - 100, id: 1 }]);
       await expectPointerSteering(page);

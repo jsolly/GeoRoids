@@ -45,8 +45,11 @@ Do not run `vercel deploy` from `/ship` unless Git integration is broken.
 
 ### Production smoke workflow
 
-The separate **Production smoke** workflow follows successful trusted `main` CI.
-It checks the intended client release and the minimum required server release,
+The separate **Production smoke** workflow follows Railway’s successful
+`GeoRoids / production` deployment event from `railway-app[bot]`. It verifies
+the deployment SHA belongs to `main`, waits for that client release on Vercel,
+and checks that same release on the server. This avoids racing Railway’s rollout
+after CI completes. Manual runs check the supplied client and minimum server releases,
 then uses the real production UI to join, receive snapshots, move, and fire.
 It fails on stale releases, unhealthy persistence, stalled simulation, broken
 interaction, browser errors, or a deadline. Logs, screenshots, traces, and a

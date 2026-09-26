@@ -277,14 +277,14 @@ test('a pilot can boost immediately after dying during a burst and respawning', 
 });
 
 test.each(['scout', 'hauler'] as const)(
-  '%s reports downhill speed, fires, and turns across contours without server corrections',
+  '%s reports contour speed, fires, and turns across contours without server corrections',
   (kitId) => {
     const pilot = world.join('Contour pilot', { x: 2250, y: 0 }, { kitId });
     const actor = world.entity(pilot);
     world.clearAsteroids();
     const ship = new Ship({ kitId, position: { ...actor.position }, isLocalPlayer: true });
     const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
-    ship.angle = Math.atan2(gradient.y, -gradient.x);
+    ship.angle = Math.atan2(-gradient.x, -gradient.y);
     const now = world.engine.getServerTime();
     let fastest = 0;
     for (let frame = 1; frame <= 480; frame++) {

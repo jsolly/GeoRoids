@@ -68,7 +68,7 @@ export function drawGame(
   const roids = currRoidBelt.getRoids();
 
   drawStarfield(currShip.position);
-  drawIsoContours(currShip.position, currShip.angle);
+  drawIsoContours(currShip.position);
   drawRicochetCourt(currShip.position);
   drawTerrainSpiders(currShip.position, currPlayer.id, currShip.health > 0 && !currShip.exploding);
 

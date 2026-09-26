@@ -69,9 +69,12 @@ test.each([
     >(
       `import('/src/rendering/canvasSurface.ts').then(({ canvasManager }) => () => {
       const ship = window.gameController.getCurrPlayer().ship;
-      const ahead = canvasManager.worldToScreen({ x: ship.position.x + ship.velocity.x * 40, y: ship.position.y + ship.velocity.y * 40 }, ship.position);
+      const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
+      // Probe a fixed world distance along travel, independent of acceleration.
+      const distanceScale = speed > 0 ? 40 / speed : 0;
+      const ahead = canvasManager.worldToScreen({ x: ship.position.x + ship.velocity.x * distanceScale, y: ship.position.y + ship.velocity.y * distanceScale }, ship.position);
       const viewport = canvasManager.getViewportSize();
-      return { rotation: canvasManager.getCameraRotation(), aheadX: ahead.x - viewport.width / 2, aheadY: ahead.y - viewport.height / 2, speed: Math.hypot(ship.velocity.x, ship.velocity.y), angle: ship.angle };
+      return { rotation: canvasManager.getCameraRotation(), aheadX: ahead.x - viewport.width / 2, aheadY: ahead.y - viewport.height / 2, speed, angle: ship.angle };
     })`
     );
     try {
@@ -105,6 +108,7 @@ test.each([
         .toBeGreaterThan(0.1);
       const moving = await readCamera.evaluate((read) => read());
       // Rendering and simulation can straddle one frame; allow less than a ship-width of error.
+      expect(Math.hypot(moving.aheadX, moving.aheadY)).toBeCloseTo(40, 5);
       expect(Math.abs(moving.aheadX)).toBeLessThan(12);
       expect(moving.aheadY).toBeLessThan(-5);
       expect(Math.abs(moving.rotation - initial.rotation)).toBeGreaterThan(0.3);

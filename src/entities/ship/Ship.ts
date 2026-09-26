@@ -29,7 +29,6 @@ import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
 import { worldFurnaces } from '../../network/worldExploration';
-import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
@@ -520,7 +519,7 @@ class Ship {
       this.knockbackVelocityLimit
     );
     if (this.knockbackVelocityLimit <= speed) {
-      // Terrain sets the cruise direction and speed, including downhill drift.
+      // Contour alignment adds speed while cruise continues to follow the nose.
       // A server-granted blast keeps its motion until the excess speed decays.
       advanceCruiseVelocity(this, speed, boost);
     } else {
@@ -533,7 +532,6 @@ class Ship {
         this.mass,
         velocityLimit
       );
-      applySharedShipSlope(this.velocity, this.position);
     }
     this.capVelocity(velocityLimit);
     this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;

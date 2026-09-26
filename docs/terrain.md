@@ -1,29 +1,15 @@
-# Varied isoline terrain
+# Contour travel
 
-The arena retains broad nearly level plains between seeded hills and valleys. Elevation combines smooth multi-scale noise with Gaussian landmarks. A flat spawn at the center keeps arriving pilots stable. Contours retain the original density while shallow winding cuts reshape narrow passages. Their labels use compressed relative elevations. Plains retain 1% of the original height variation; their contours remain visible but have trivial differences. Intervals are nonuniform, so contour spacing alone no longer measures steepness. Gameplay displays the original full contour density with one-pixel strokes in a dark red. A 75-degree cone centered on steering heading shifts local straight-line routes along one red gradient: very dark uphill, light red downhill, neutral flat/cross-slope. The cone fades over its outer five degrees; contours outside stay on the quiet dark red. The ramp does not wrap, and an easy passage cancels the height pull so a route can continue onto the next easy route instead of settling into a basin. Each segment projects its local gradient onto the direction from the ship, so colors can reverse beyond a crest; the preview does not simulate cross-slope drift. Contours have no travel text, arrow, or echo animation. Elevation labels retain their original spacing.
+The arena contains a seeded heightfield of hills, valleys, and saddles. Smooth multi-scale noise and Gaussian landmarks create the contour geometry used by ships and spider feet. The displayed contours and travel gradient use the same heightfield; there is no separate physical elevation remapping. Height is an internal geometry value: gameplay renders neutral gray contours without elevation labels or an elevation color gradient. Spider influence can still turn nearby segments red.
 
-The generator smoothly compresses a low-relief band while retaining tiny variations. Existing world seed, saved progress and world generation remain unchanged.
+Ships gain speed when their heading follows the local contour tangent, in either direction. The bonus scales with gradient strength and squared tangent alignment. Crossing perpendicular to the lines keeps normal cruise; the flat starter area has no bonus. There is no climb penalty, downhill drift, or terrain force on stationary ships. Local pilots and their server movement validation share the same contour field and speed ceiling. Kit, mass, and Boost set the baseline; Boost stacks with the contour bonus.
 
-`src/physics/terrain/passages.ts` defines two seeded warped families of narrow,
-interconnected passages with constant-time sampling. Their smooth proximity
-profile compresses local elevation before both contour extraction and physical
-height mapping, preserving the landscape outside the cuts. Alignment in either
-direction blends normal terrain travel toward 1.5× cruise using the fourth power
-of the tangent dot product. The advantage fades across each edge and when
-turning across the route. Intersections take the larger alignment rather than
-summing bonuses. Passage contours use the light red end of that same gradient in every direction, including where the cut climbs. Passage
-strength is cached with each contour gradient. No route membership, wind, or
-auto-steering is stored. The
-starter area and world edge smoothly disable passages. Local speed validation
-uses the same geometry; the existing global downhill ceiling still covers all
-passage travel, including Boost.
+A longer curved contour route can compete with a shorter direct crossing. Laser motion is unchanged, and short contour highlights under shots remain decorative.
 
-Ships accelerate downhill and lose speed uphill. Bots, released pilots, and local ships share the same slope force and existing speed limits.
+`src/physics/terrain/passages.ts` preserves the two seeded warped families of interconnected cuts as geometry only. Their smooth proximity profile reshapes the heightfield used by both contour extraction and travel; the starter area and world edge smoothly disable these cuts. There is no separate passage speed multiplier or route membership. Existing seeds and saved progress remain unchanged.
 
-Laser motion is unchanged. Downhill/uphill laser speed is explicitly deferred in [Todoist](https://app.todoist.com/app/task/6hRqv3q4jP2qxVC2) until John resumes it. The existing short contour highlights under shots remain decorative.
+`src/physics/terrain/heightfield.ts` defines the seeded heightfield and sampled gradient. `terrainConfig.ts` controls feature size, contour density, and travel strength. `terrainTravel.ts` calculates the shared travel velocity. The room seed in snapshots keeps clients and the server on the same terrain. The homepage uses a fixed terrain preview with denser, muted lines and no stars.
 
-`src/physics/terrain/heightfield.ts` defines the seeded heightfield and sampled gradient. `terrainConfig.ts` controls terrain feature size, contour density, and slope forces. The room seed in snapshots keeps clients and the server on the same terrain. Gameplay labels are cached in world space so camera movement does not move them along the contours. The homepage uses a fixed terrain preview with denser, muted lines and no stars.
-
-From `/Users/johnsolly/code/GeoRoids`, run `npx vitest run tests/unit/systems/isoContourTerrain.test.ts tests/unit/systems/contourLaser.test.ts tests/unit/ui/titleTerrain.test.ts` for terrain, slope, and homepage coverage. Run `./scripts/test-runner.sh tests/integration/browser/sanity/pilots-climb-and-descend-varied-terrain.test.ts` for desktop/mobile uphill and downhill travel and authoritative server observations.
+From `/Users/johnsolly/code/GeoRoids`, run `npx vitest run tests/unit/systems/isoContourTerrain.test.ts tests/unit/systems/contourLaser.test.ts tests/unit/ui/titleTerrain.test.ts` for terrain, contour, and homepage coverage. Run `./scripts/test-runner.sh tests/integration/browser/sanity/pilots-follow-contours-for-speed.test.ts` for desktop/mobile contour travel and authoritative server observations.
 
 Deploy both the Vercel client and Railway server. Both import this terrain model, so a client-only release leaves them using different physics.

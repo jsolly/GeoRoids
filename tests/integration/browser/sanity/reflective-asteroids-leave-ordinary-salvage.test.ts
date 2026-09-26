@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { SHIP } from '../../../../src/constants';
+import { ASTEROID_INTERACTIONS } from '../../../../shared/asteroidPhenomena';
+import { GAME_TICK_MS } from '../../../../shared/gameClock';
+import { LASER, SHIP } from '../../../../src/constants';
 import type { AuthoritativeProjectileField } from '../../../../src/entities/laser/AuthoritativeProjectileField';
 import { watchBrowserDiagnostics } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
@@ -70,6 +72,33 @@ async function waitForShotReady(page: Page): Promise<void> {
       { timeout: 5000, message: 'Normal firing cooldown/projectile capacity did not recover' }
     )
     .toBe(true);
+}
+
+async function waitForOwnedProjectilesToExpire(page: Page, playerId: string): Promise<void> {
+  const field = await page.evaluateHandle<AuthoritativeProjectileField>(
+    "import('/src/entities/laser/AuthoritativeProjectileField.ts').then(({ AuthoritativeProjectileField }) => AuthoritativeProjectileField.getInstance())"
+  );
+  try {
+    await expect
+      .poll(
+        () =>
+          field.evaluate(
+            (projectiles, ownerId) =>
+              projectiles.getProjectiles().filter((shot) => shot.ownerId === ownerId).length,
+            playerId
+          ),
+        {
+          // Bound the wait by the real projectile age cap plus the existing
+          // transport allowance; returning ricochets can outlive the firing cooldown.
+          timeout:
+            ASTEROID_INTERACTIONS.maxLaserFrames * GAME_TICK_MS + LASER.PREDICTION_TIMEOUT_MS,
+          message: 'Returning ricochets did not expire before the next firing approach',
+        }
+      )
+      .toBe(0);
+  } finally {
+    await field.dispose();
+  }
 }
 
 async function fireAt(game: GameInteractions, page: Page): Promise<void> {
@@ -174,7 +203,7 @@ for (const viewport of [
           // Move clear of the returning ricochet before setting up the next shot.
           // Reflection damage is tested separately; this scenario measures rewards.
           await game.placeShipAt(FIRING_POSITION.x, FIRING_POSITION.y - 160);
-          await page.waitForTimeout(800);
+          await waitForOwnedProjectilesToExpire(page, playerId);
         }
 
         await expect.poll(() => readReflector(page), { timeout: 5000 }).toEqual({ exists: false });

@@ -4,14 +4,11 @@ import type { Heightfield } from './heightfield';
 export const PASSAGES = {
   SPACING: 1100,
   HALF_WIDTH: 90,
-  SPEED_BONUS: 0.5,
   RELIEF_RETAINED: 0.08,
 };
 
 interface Passage {
   strength: number;
-  tangentX: number;
-  tangentY: number;
 }
 
 function wave(value: number, phase: number): { offset: number; derivative: number } {
@@ -29,7 +26,7 @@ function band(value: number, derivative: number, envelope: number): number {
   return t * t * (3 - 2 * t) * envelope;
 }
 
-/** Two warped families meet as forks. Each retains its tangent at a junction. */
+/** Two warped families shape the contour field into narrow, connected cuts. */
 export function samplePassages(field: Heightfield, x: number, y: number): [Passage, Passage] {
   const lx = x - field.cx;
   const ly = y - field.cy;
@@ -40,18 +37,12 @@ export function samplePassages(field: Heightfield, x: number, y: number): [Passa
   const phase = (((field.seed >>> 0) % 65536) / 65536) * Math.PI * 2;
   const horizontal = wave(lx, phase);
   const vertical = wave(ly, phase + 2.1);
-  const hLength = Math.hypot(1, horizontal.derivative);
-  const vLength = Math.hypot(1, vertical.derivative);
   return [
     {
       strength: band(ly - horizontal.offset - 330, horizontal.derivative, envelope),
-      tangentX: 1 / hLength,
-      tangentY: horizontal.derivative / hLength,
     },
     {
       strength: band(lx - vertical.offset - 570, vertical.derivative, envelope),
-      tangentX: vertical.derivative / vLength,
-      tangentY: 1 / vLength,
     },
   ];
 }
@@ -59,15 +50,4 @@ export function samplePassages(field: Heightfield, x: number, y: number): [Passa
 export function passageStrength(field: Heightfield, x: number, y: number): number {
   const [horizontal, vertical] = samplePassages(field, x, y);
   return Math.max(horizontal.strength, vertical.strength);
-}
-
-export function passageAlignment(field: Heightfield, x: number, y: number, angle: number): number {
-  const headingX = Math.cos(angle);
-  const headingY = -Math.sin(angle);
-  let alignment = 0;
-  for (const passage of samplePassages(field, x, y)) {
-    const dot = headingX * passage.tangentX + headingY * passage.tangentY;
-    alignment = Math.max(alignment, passage.strength * dot ** 4);
-  }
-  return alignment;
 }

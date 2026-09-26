@@ -17,7 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
-import { createCanvas } from 'canvas';
+import { type CanvasRenderingContext2D, createCanvas } from 'canvas';
 import { AsteroidManager } from '../server/core/AsteroidManager';
 import type { GameEntity } from '../server/core/EntityManager';
 import { LootManager } from '../server/core/LootManager';
@@ -74,16 +74,9 @@ import {
   waveVisualProgress,
 } from '../src/physics/shockwave';
 import { extractIsoContours } from '../src/physics/terrain/contours';
-import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield';
+import { sampleGradient } from '../src/physics/terrain/heightfield';
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
-import {
-  contourSlopeHex,
-  previewConeWeight,
-  radialSlope,
-} from '../src/rendering/contourAppearance';
-import { contourSlope } from '../src/rendering/contourDisplay';
-import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
 import { asteroidMapInk, drawResourceMapMark } from '../src/rendering/hud/resourceMapMark';
@@ -95,7 +88,7 @@ import {
 import { media } from '../src/wiki/media';
 import { recordSatelliteDemo, type SatelliteDemoPanel } from './wiki-satellite-demo';
 
-type RenderContext = DrawingContext;
+type RenderContext = DrawingContext & Pick<CanvasRenderingContext2D, 'clip'>;
 type MediaId =
   | 'scout'
   | 'hauler'
@@ -864,7 +857,7 @@ function makeMovementDemo(): Demo {
   };
 }
 
-const TERRAIN_DOWNHILL_START_FRAME = 28;
+const TERRAIN_CROSSING_START_FRAME = 28;
 const TERRAIN_TURN_PER_TICK = (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS);
 
 /** Nose angle whose cruiseVelocity (canvas y-down) points along `(dirX, dirY)`. */
@@ -887,7 +880,7 @@ function headingAlongContour(gradientX: number, gradientY: number, preferredAngl
   return alignment(tangentA) >= alignment(tangentB) ? tangentA : tangentB;
 }
 
-function headingDownhill(gradientX: number, gradientY: number, fallback: number): number {
+function headingAcrossContour(gradientX: number, gradientY: number, fallback: number): number {
   return Math.hypot(gradientX, gradientY) <= 0
     ? fallback
     : headingForDirection(-gradientX, -gradientY);
@@ -922,14 +915,16 @@ function makeTerrainDemo(): Demo {
   };
   const gradients: number[] = [Math.hypot(initialGradient.x, initialGradient.y)];
   let sawContourFollow = false;
-  let maxDownhillSpeed = 0;
+  let sawNormalCrossing = false;
+  let maxContourSpeed = 0;
   return {
     id: 'terrain',
     posterFrame: 20,
     verify: () => {
       invariant(contours.length > 0, 'terrain contour extraction returned no levels');
       invariant(sawContourFollow, 'terrain demo did not ride a contour');
-      invariant(maxDownhillSpeed > cruise * 1.5, 'terrain demo downhill was not a rush');
+      invariant(maxContourSpeed > cruise * 1.5, 'terrain demo did not gain contour speed');
+      invariant(sawNormalCrossing, 'terrain demo did not return to normal crossing speed');
       invariant(
         gradients.some((gradient) => gradient > 0.0001),
         'terrain gradient samples were flat'
@@ -939,7 +934,7 @@ function makeTerrainDemo(): Demo {
       drawFrameChrome(
         ctx,
         'TERRAIN · CONTOUR TRAVEL',
-        'ride the lines · downhill is a rush',
+        'follow for speed · cross at normal cruise',
         frame,
         PALETTE.CONTOUR
       );
@@ -947,9 +942,9 @@ function makeTerrainDemo(): Demo {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
           const gradient = sampleGradient(field, state.position.x, state.position.y);
           const desired =
-            frame < TERRAIN_DOWNHILL_START_FRAME
+            frame < TERRAIN_CROSSING_START_FRAME
               ? headingAlongContour(gradient.x, gradient.y, state.angle)
-              : headingDownhill(gradient.x, gradient.y, state.angle);
+              : headingAcrossContour(gradient.x, gradient.y, state.angle);
           state.angle += steeringTurn(state.angle, desired, TERRAIN_TURN_PER_TICK);
           advanceCruiseVelocity(state, cruise);
           state.position.x += state.velocity.x;
@@ -962,14 +957,16 @@ function makeTerrainDemo(): Demo {
               heading.x * (-gradient.y / magnitude) + heading.y * (gradient.x / magnitude)
             );
             if (
-              frame < TERRAIN_DOWNHILL_START_FRAME &&
+              frame < TERRAIN_CROSSING_START_FRAME &&
               tangentAlignment > 0.92 &&
               speed > cruise * 0.95
             ) {
               sawContourFollow = true;
             }
-            if (frame >= TERRAIN_DOWNHILL_START_FRAME) {
-              maxDownhillSpeed = Math.max(maxDownhillSpeed, speed);
+            if (frame < TERRAIN_CROSSING_START_FRAME) {
+              maxContourSpeed = Math.max(maxContourSpeed, speed);
+            } else if (tangentAlignment < 0.05 && Math.abs(speed / cruise - 1) < 0.01) {
+              sawNormalCrossing = true;
             }
           }
         });
@@ -977,6 +974,10 @@ function makeTerrainDemo(): Demo {
         gradients.push(Math.hypot(gradient.x, gradient.y));
       }
       const contourScale = 0.18;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 72, WIDTH, HEIGHT - 112);
+      ctx.clip();
       for (const level of contours) {
         for (const segment of level.segments) {
           const a = screenPoint(
@@ -995,42 +996,19 @@ function makeTerrainDemo(): Demo {
           ) {
             continue;
           }
-          const slope = contourSlope(segment, field);
-          const offset = {
-            x: (segment.ax + segment.bx) / 2 - state.position.x,
-            y: (segment.ay + segment.by) / 2 - state.position.y,
-          };
-          const heading = cruiseVelocity(state.angle, 1);
-          const weight = previewConeWeight(offset, heading);
-          const climb = radialSlope(offset, slope.gradient);
-          const colored = weight > 0 || slope.passage > 0;
           renderSegment(
             ctx,
             a.x,
             a.y,
             b.x,
             b.y,
-            colored ? contourSlopeHex(weight > 0 ? climb : 0, slope.passage) : PALETTE.CONTOUR,
+            PALETTE.CONTOUR,
             level.index % 3 === 0 ? 1.1 : 0.65,
-            colored ? 0.55 : 0.2
+            0.5
           );
         }
       }
-      ctx.save();
-      ctx.translate(0, 72);
-      drawContourLabels(ctx, contours, {
-        width: WIDTH,
-        height: HEIGHT - 112,
-        x: state.position.x,
-        y: state.position.y + 16 / contourScale,
-        scale: contourScale,
-        alpha: VISUAL.CONTOUR_LABEL_ALPHA,
-        spacing: VISUAL.CONTOUR_LABEL_SPACING / contourScale,
-      });
       ctx.restore();
-      const gradient = sampleGradient(field, state.position.x, state.position.y);
-      const steepness = Math.hypot(gradient.x, gradient.y);
-      const directionScale = steepness > 0 ? 64 / steepness : 0;
       drawShip(
         ctx,
         'scout',
@@ -1040,25 +1018,18 @@ function makeTerrainDemo(): Demo {
         getShipKit('scout').size / 2,
         true
       );
-      drawArrow(
-        ctx,
-        { x: 0, y: 0 },
-        { x: -gradient.x * directionScale, y: -gradient.y * directionScale },
-        PALETTE.CONTOUR,
-        1
-      );
       drawTag(
         ctx,
-        `height ${sampleHeight(field, state.position.x, state.position.y).toFixed(2)}`,
+        `speed ${(Math.hypot(state.velocity.x, state.velocity.y) / cruise).toFixed(2)}×`,
         370,
         112,
         PALETTE.CONTOUR
       );
       drawTag(
         ctx,
-        frame < TERRAIN_DOWNHILL_START_FRAME
-          ? 'ride the contours · arrow is downhill'
-          : 'downhill rush · arrow is downhill',
+        frame < TERRAIN_CROSSING_START_FRAME
+          ? 'follow the lines · speed bonus'
+          : 'cross the lines · normal cruise',
         320,
         286,
         PALETTE.HUD_MUTED

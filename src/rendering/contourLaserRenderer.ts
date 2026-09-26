@@ -7,7 +7,7 @@ import { canvasManager } from './canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 
 const viewPad = 40;
-const contourColor = hexToRgba(PALETTE.LOOT, VISUAL.CONTOUR_LASER_ALPHA);
+const contourColor = hexToRgba(PALETTE.CONTOUR, VISUAL.CONTOUR_LASER_ALPHA);
 const centerScreen = { x: 0, y: 0 };
 const endpointAWorld = { x: 0, y: 0 };
 const endpointBWorld = { x: 0, y: 0 };
@@ -32,7 +32,7 @@ function centerIsVisible(
 }
 
 /**
- * Paint a cream iso-tangent under each currently rendered live shot. This is
+ * Paint a neutral iso-tangent under each currently rendered live shot. This is
  * a client-side paint effect over the existing bolts; it never moves a shot,
  * changes hit tests, or claims that clients share authoritative laser poses.
  */

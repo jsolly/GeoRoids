@@ -19,7 +19,7 @@ override these GitHub protections.
 
 Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. Writes are write-behind through a worker thread (about a one-second loss window on a hard crash); the game loop never waits on the disk. See [world operations](docs/persistent-world.md).
 
-Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
+Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Both services deploy from `main` through their own Git integrations. Verify each release independently; a successful Vercel deployment does not prove the Railway server deployed.
 
 Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). It includes all unit and integration tests and constrained-client checks. Run it during the review/fix loop and again after final review fixes before pushing. GitHub CI independently runs parallel static validation and a small gameplay/touch/reconnect smoke, then requires both in `CI / ci`. See [CI and local review](docs/ci-and-local-review.md).
 
@@ -37,8 +37,8 @@ Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDO
 **Server changes** are classified by `node scripts/server-release-inputs.mjs --changed <base-sha> <merge-sha>` from the merged checkout. The classifier includes the TypeScript dependency graph rooted at `server.ts`, server/shared/setup/Railway paths, and runtime/build manifests. This includes server-consumed modules under `src/`. If it prints `true`:
 
 1. Complete client verification above if the push also touched client files.
-2. Deploy manually on [Railway](https://railway.app). **A merge to `main` does not deploy the server**: the Railway API reports the GitHub push-deploy trigger disabled (`NO_INSTALLATION` — no GitHub App on the public repo), and #608's merge produced no deployment until it was triggered by hand. The tracked `.railway/railway.ts` `source: github('jsolly/GeoRoids', { branch: 'main' })` only pins which repo and branch a deploy builds from; it does not by itself enable a push trigger. Deploy the **exact merged commit SHA**: the Railway dashboard's Deploy on that commit, or the Railway MCP agent / API deploy pinned to that `commitSha`. `railway redeploy` re-runs the previous build (its old SHA) and `railway up` uploads your local tree, so **neither** builds the merged commit. Deploy the commit only — do not commit unrelated staged environment patches.
-3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON (`world.persistence.mode` is `worker`, `failed` is `false`, `world.loop` stalls are `0`) and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
+2. Wait for the [Railway](https://railway.app) deployment of the merged commit. Read-only API inspection on 2026-09-24 confirmed `enabled: true` and `canEnable: true` for the GitHub auto-deploy trigger; #704 deployed automatically from `main`. This supersedes the earlier `NO_INSTALLATION` state. If the expected deployment is missing or fails, inspect the current trigger and deployment state. A manual fallback must build the **exact merged commit SHA** through Deploy-this-commit or the MCP/API `commitSha` parameter. `railway redeploy` repeats the previous build and `railway up` uploads a local tree. Never apply unrelated staged environment patches; inspect staged changes before any manual deployment and stop if it would apply them.
+3. Require `x-release-id` on `https://georoids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON (`world.persistence.mode` is `worker`, `failed` is `false`, `world.loop` stalls are `0`) and multiplayer flow. Smoke: `curl -sf https://georoids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
 4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
 
 Do not run `vercel deploy` from `/ship` unless Git integration is broken.
@@ -89,7 +89,7 @@ Two separate deploy targets — client and server do not share a host.
 
 | Variable | Purpose |
 | --- | --- |
-| `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://geoasteroids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
+| `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://georoids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
 
 `VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit is the first valid 40-character SHA among `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, and `GEOROIDS_COMMIT_SHA`, then local Git. Empty hosted values do not block the later fallbacks. A missing or invalid commit stops the build because automatic client refresh needs that identity.
 
@@ -100,9 +100,9 @@ Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManage
 | | |
 | --- | --- |
 | **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
-| **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
-| **Deploy** | Manual / separate from the Git push flow. Push-deploy auto-trigger is **off** (Railway API `NO_INSTALLATION`; #608's merge did not deploy). Deploy the exact merged commit SHA via the Railway dashboard Deploy-this-commit or the MCP agent/API pinned to that `commitSha` — `railway redeploy`/`up` do not build the merged SHA. Do not commit unrelated staged env patches |
-| **When required** | Changes under `server.ts`, `server/**`, `.railway/**`, or server protocol changes in `shared-types.ts` |
+| **Public URL** | `https://georoids-production-2403.up.railway.app` (WebSocket: `wss://georoids-production-2403.up.railway.app/ws`) |
+| **Deploy** | GitHub auto-deploy from `main` is enabled (API verified 2026-09-24; #704 deployed automatically). Verify the exact merged release. If no deployment arrives, inspect the trigger and use a pinned `commitSha` fallback only when it does not apply unrelated staged patches. |
+| **Server release verification** | Use `scripts/server-release-inputs.mjs` to classify changes, including server-consumed modules under `src/` and runtime/build manifests. |
 
 Railpack installs dependencies and runs `npm run build` during the build. The
 tracked [`.railway/railway.ts`](.railway/railway.ts) keeps the explicit
@@ -123,9 +123,9 @@ the start-command update takes effect on the next deployment. Railway's verified
 restart defaults are `ON_FAILURE` with 10 retries and are omitted from the IaC
 because the platform importer omits these default values.
 
-Smoke: `curl -i https://geoasteroids-production-2403.up.railway.app/health`. The server exposes `RAILWAY_GIT_COMMIT_SHA` as `x-release-id` and health JSON `releaseId`; `dev` is local-only and never production proof.
+Smoke: `curl -i https://georoids-production-2403.up.railway.app/health`. The server exposes `RAILWAY_GIT_COMMIT_SHA` as `x-release-id` and health JSON `releaseId`; `dev` is local-only and never production proof.
 
-The older `geoasteroids-production.up.railway.app` domain has no target port and returns an edge 404. Use the `-2403` host (port 8080) for client configuration and verification.
+The former `geoasteroids-production-2403.up.railway.app` hostname returns a Railway edge 404. Use the current `georoids-production-2403.up.railway.app` host for client configuration and verification.
 
 ## CI (local pre-commit gate)
 

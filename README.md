@@ -61,11 +61,11 @@ not claim a generic optimization or supported capacity.
 
 ## Production
 
-The static client deploys through Vercel's Git integration when a CI-approved PR merges to `main`. Branch pushes do not create Preview deployments; comment `/preview` as the first non-empty line on a same-repo PR (or run the **Vercel Preview** workflow) for a one-shot Preview. The authoritative game server deploys separately on Railway. A client deployment alone does not publish server changes. The persistent world also requires the Railway volume in `.railway/railway.ts`, mounted at `/data`, with `GEOROIDS_WORLD_PATH=/data/world.sqlite`.
+The static client deploys through Vercel's Git integration when a CI-approved PR merges to `main`. Branch pushes do not create Preview deployments; comment `/preview` as the first non-empty line on a same-repo PR (or run the **Vercel Preview** workflow) for a one-shot Preview. The authoritative game server also auto-deploys from `main` on Railway, through its own Git integration. Verify both deployed releases; a successful client deployment alone does not prove the server updated. If the expected Railway deployment is missing, inspect its trigger before using an exact-commit manual fallback, and never apply unrelated staged environment changes. The persistent world also requires the Railway volume in `.railway/railway.ts`, mounted at `/data`, with `GEOROIDS_WORLD_PATH=/data/world.sqlite`.
 
 - Client: [www.georoids.com](https://www.georoids.com)
-- Server health: [Railway health endpoint](https://geoasteroids-production-2403.up.railway.app/health)
-- Client production WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`
+- Server health: [Railway health endpoint](https://georoids-production-2403.up.railway.app/health)
+- Client production WebSocket: `wss://georoids-production-2403.up.railway.app/ws`
 
 World storage, backup, and recovery are described in [persistent world operations](docs/persistent-world.md).
 

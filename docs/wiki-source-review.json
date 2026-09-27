@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed audio reference decoding at the native playback sample rate and deterministic contour-lock test placement. Sound direction, resource melodies, controls, terrain rules, and illustrations are unchanged; focused desktop/mobile scenarios passed.",
+  "note": "Removed opt-in Vercel Preview workflow and GEOROIDS_COMMIT_SHA release-id fallback (middleware.ts, vite.config.ts, package.json check:actions). No gameplay rules, controls, or demonstrations changed; no wiki article affected.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -7,8 +7,8 @@
     "docs/sounds.md": "sha256:a35715e58266ec6919f54784c484038fb042bc086d7902b7f0e2f6d9297a1b69",
     "index.css": "sha256:4818da7e4411bdadd3a467ac71def4a574ece2c3fc4d1892763ebfaafd1c3f44",
     "index.html": "sha256:4f6387183bbdd09e3ae6d29312dc03c6e7a0dc3c6ef5446e03fe756f8c986bb3",
-    "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
-    "package.json": "sha256:7103dbc14f0676081f289a35e3873ed2a4c5c8fb7e9e2366c3b34d20123151cb",
+    "middleware.ts": "sha256:0acf90e66e33c6369a952e09cc281f79b1a0b8239b9c7a0a07f266487dbf08da",
+    "package.json": "sha256:99634bb0b76bf9751b1fd6f1a41e1ef58eee509651bd387278db2ded86407e65",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -462,7 +462,7 @@
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:a06519f570b98d0871504a977ef9221131af86623d0fff46d66c168e19c7804f",
     "tests/unit/ui/universeMap.test.ts": "sha256:d80a9d3ce675b8c722e8d37f6c228fa9a8962d4cb4102a59b1faaf60ab968f96",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
-    "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",
+    "vite.config.ts": "sha256:9607cbba4a39e40f1de822510277eb6d6b1d2e9b23937c37b206af5e9e95ee18",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"
   }
 }

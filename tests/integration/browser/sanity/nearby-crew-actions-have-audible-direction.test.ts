@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { installAudioProbe } from '../../utils/audio-probe';
+import { installAudioProbe, readSampleDuration } from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -13,19 +13,17 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
-function positionsForSample(page: Page, name: string) {
-  return page.evaluate(async (sampleName) => {
-    const context = new OfflineAudioContext(2, 1, 48000);
-    const response = await fetch(`/sounds/${sampleName}.m4a`);
-    const sample = await context.decodeAudioData(await response.arrayBuffer());
+async function positionsForSample(page: Page, name: string) {
+  const duration = await readSampleDuration(page, name);
+  return page.evaluate((sampleDuration) => {
     const events: Array<{
       duration: number;
       position?: { x: number; z: number; model: string; rolloff: number };
     }> = JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]');
     return events
-      .filter((event) => Math.abs(event.duration - sample.duration) < 0.00001)
+      .filter((event) => Math.abs(event.duration - sampleDuration) < 0.00001)
       .map((event) => event.position);
-  }, name);
+  }, duration);
 }
 
 test.each([1280, 390])(
@@ -48,16 +46,9 @@ test.each([1280, 390])(
     await arrangeCrewField(ids, 'empty');
     await Promise.all([listener.waitForCombatReady(), shooter.waitForCombatReady()]);
     // Wait for the two samples this scenario uses, not the global bank size.
-    const requiredDurations = await listenerPage.evaluate(() => {
-      const context = new OfflineAudioContext(2, 1, 48000);
-      return Promise.all(
-        ['laser', 'asteroid-explode'].map(async (name) => {
-          const response = await fetch(`/sounds/${name}.m4a`);
-          const buffer = await context.decodeAudioData(await response.arrayBuffer());
-          return buffer.duration;
-        })
-      );
-    });
+    const requiredDurations = await Promise.all(
+      ['laser', 'asteroid-explode'].map((name) => readSampleDuration(listenerPage, name))
+    );
     await expect
       .poll(() =>
         listenerPage.evaluate((durations) => {

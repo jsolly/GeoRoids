@@ -104,7 +104,7 @@ test('a narrow-phone Debug overlay keeps Contour Lock and the ability disc fully
   await page.addInitScript(() => localStorage.setItem('debugOn', 'true'));
   const game = new GameInteractions(page);
   await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
-  await placePilotNearContour(page, game);
+  await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
   const panel = page.locator('#debug-hud');
   const contourLock = page.locator('#touch-contour-lock');
   await panel.waitFor({ state: 'visible' });
@@ -180,6 +180,8 @@ test('a narrow-phone Debug overlay keeps Contour Lock and the ability disc fully
   expect(chrome.stack?.bottom).toBeLessThanOrEqual((chrome.playfield?.bottom ?? 0) + 1);
   expect(chrome.contourLock?.right).toBeLessThanOrEqual(chrome.ability?.left ?? 0);
   expect(panelBounds.y + panelBounds.height).toBeLessThan(contourLockBounds.y);
+  // Keep the cruising pilot beside a contour for the real tap, after layout work.
+  await placePilotNearContour(page, game);
   await contourLock.tap();
   await expect.poll(() => contourLock.getAttribute('aria-pressed')).toBe('true');
   assertNoBrowserDiagnostics(diagnostics);

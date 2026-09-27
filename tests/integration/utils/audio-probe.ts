@@ -101,6 +101,7 @@ export async function installAudioProbe(
         constructor(options?: AudioContextOptions) {
           super(options);
           contexts++;
+          document.documentElement.dataset['audioSampleRate'] = String(this.sampleRate);
           const id = contexts;
           contextIds.set(this, id);
           const publishState = () => {
@@ -270,22 +271,34 @@ export async function installAudioProbe(
   );
 }
 
-/** Match the native playback probe to a decoded authored sample.
- * One millisecond covers a single priming sample between Howler and a fresh decode.
- */
-export function readSamplePlaybackRates(page: Page, name: string): Promise<number[]> {
+/** Decode reference audio at the playback context's native sample rate. */
+export function readSampleDuration(page: Page, name: string): Promise<number> {
   return page.evaluate(async (sampleName) => {
+    const sampleRate = Number(document.documentElement.dataset['audioSampleRate']);
+    if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+      throw new Error('The audio probe has not observed a playback context');
+    }
     const response = await fetch(`/sounds/${sampleName}.m4a`);
     if (!response.ok) {
       throw new Error(`Missing sound ${sampleName}`);
     }
-    const context = new OfflineAudioContext(1, 1, 48000);
+    const context = new OfflineAudioContext(1, 1, sampleRate);
     const buffer = await context.decodeAudioData(await response.arrayBuffer());
+    return buffer.duration;
+  }, name);
+}
+
+/** Match the native playback probe to a decoded authored sample.
+ * One millisecond covers a single priming sample between Howler and a fresh decode.
+ */
+export async function readSamplePlaybackRates(page: Page, name: string): Promise<number[]> {
+  const duration = await readSampleDuration(page, name);
+  return page.evaluate((sampleDuration) => {
     const events: Array<{ duration: number; rate: number }> = JSON.parse(
       document.documentElement.dataset['audioEvents'] ?? '[]'
     );
     return events
-      .filter((event) => Math.abs(event.duration - buffer.duration) < 0.001)
+      .filter((event) => Math.abs(event.duration - sampleDuration) < 0.001)
       .map((event) => event.rate);
-  }, name);
+  }, duration);
 }

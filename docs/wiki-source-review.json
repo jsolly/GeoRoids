@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed contour lock validation and accessible action names; gameplay documentation remains accurate.",
+  "note": "Reviewed atomic contour acquisition fix; controls and terrain descriptions remain accurate.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -189,7 +189,7 @@
     "src/entities/satellitePickup/satellitePickupGlow.ts": "sha256:d2f65deea8024004454313ce1c1bc697dc88dee0ac2d311835aef74397c1313c",
     "src/entities/satellitePickup/satellitePickupMath.ts": "sha256:661b190c4bfc76c3be209a5d7a172defd498ef59ea026877ce0b3defb06bb81a",
     "src/entities/satellitePickup/satellitePickupRenderer.ts": "sha256:ebde4e769bdddc94ab6865927a0c39800f26ba093c8682e2694c07a3ec24b081",
-    "src/entities/ship/Ship.ts": "sha256:df5b9d6a919694a442a6f856deede47c26a226f7e34e21012e7fa2e40d098abc",
+    "src/entities/ship/Ship.ts": "sha256:e566bd755b6dcaa3d4c5e508a16f9260786e1199e8aa2f3f84671504f3340f65",
     "src/entities/ship/cruiseMotion.ts": "sha256:68babad5f46a555d31fc77df1c2f4876d5d7b64ce94383bdb39554f4dd9b0ecc",
     "src/entities/ship/harpoonField.ts": "sha256:7c2260fee9c50e9561551deff52829f5df6cfcbfe951b6689de791b789062e2f",
     "src/entities/ship/haulerUtility.ts": "sha256:fd17a2dadb194df667412b9a40bca26bb3ff5eed8e0616273129ea82245d197c",
@@ -412,7 +412,7 @@
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:1e0147b9774ff7bdb876361b90696eefb69f222345c991f12e9f3b8253f6d8d6",
     "tests/unit/server/collaborative-asteroid-split.test.ts": "sha256:60cc5d27a05ced9e0824ed9a194f7f109ad478b0097a542b6a43aa97d4c5c833",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:bf3e7f7d276d80475f887195a6cf81f264b2602c5c0b0b82d8fdcc1c7d8fb0f4",
-    "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:f01bb64e137b0c11657303df60d367577cb555d07eac8af07f48ceab1da9b8f9",
+    "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:f37fe17461e867da81e2f63f09f111099ddb0a6f54365998ee925ccc5bff2013",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:f461fd54d94d0c539f97d8386103341e5c52b00dfa78b74472cd83ef7b6f8f6e",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:025297eaa41866a94b4431a20cc15440762501c118f84892e8988d3578dac829",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:8288b2c5d73e29d553bff1990a2d24d57ced8d35d77442e9a208e27c408f9b15",

@@ -116,6 +116,37 @@ test('a ship accelerates into a nearby contour within the acquisition deadline',
   expect(contourLockDistance(actor.position, offset)).toBeLessThan(CONTOUR_LOCK.railTolerance);
 });
 
+test.each([0.1, 1])(
+  'a pilot crossing a contour at %s cruise can publish lock intent before the next movement tick',
+  (speedFraction) => {
+    const { actor, cruise, pose } = railPilot();
+    const ship = new Ship({ kitId: actor.kitId, position: { ...actor.position } });
+    const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
+    ship.angle = Math.atan2(-gradient.y, gradient.x);
+    ship.velocity = {
+      x: Math.cos(ship.angle) * cruise * speedFraction,
+      y: -Math.sin(ship.angle) * cruise * speedFraction,
+    };
+    expect(pose(0, null, ship.position, ship.velocity).ok).toBe(true);
+    const position = { ...ship.position };
+    const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
+    expect(ship.toggleContourLock()).toBe(true);
+    expect(ship.position).toEqual(position);
+    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeCloseTo(speed);
+    expect(ship.angle).toBeCloseTo(Math.atan2(-ship.velocity.y, ship.velocity.x));
+    // No Ship.update occurs between the input event and this network pose.
+    expect(pose(1, ship.contourLock, ship.position, ship.velocity).ok).toBe(true);
+    const lock = ship.contourLock;
+    for (let frame = 1; frame <= 90; frame++) {
+      ship.update();
+      const outcome = pose(1 + (frame * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+      expect(outcome.ok, JSON.stringify({ frame, outcome })).toBe(true);
+      expect(actor.contourLock).toEqual(lock);
+      expect(ship.contourLock).toEqual(lock);
+    }
+  }
+);
+
 test('a buffered curved rail route retains the server-stall travel credit', () => {
   const { actor, state, cruise, pose, now } = railPilot();
   expect(pose(0).ok).toBe(true);

@@ -286,7 +286,23 @@ class Ship {
     if (!this.canLockContour()) {
       return false;
     }
-    this.contourLock = findContourCapture(this.position, this.angle);
+    const capture = findContourCapture(this.position, this.angle);
+    const target =
+      capture &&
+      contourLockVelocity(this.position, capture, cruiseSpeed(this.mass, this.maxVelocity));
+    if (!capture || !target) {
+      return false;
+    }
+    // Input can publish a pose before the next movement tick. Capture intent
+    // and its rail-aligned velocity must therefore become visible together.
+    const targetSpeed = Math.hypot(target.x, target.y);
+    const speed = Math.min(Math.hypot(this.velocity.x, this.velocity.y), targetSpeed);
+    this.velocity = {
+      x: (target.x * speed) / targetSpeed,
+      y: (target.y * speed) / targetSpeed,
+    };
+    this.angle = Math.atan2(-target.y, target.x);
+    this.contourLock = capture;
     this.contourLockInputVersion++;
     this.angularVelocity = 0;
     return this.contourLocked;

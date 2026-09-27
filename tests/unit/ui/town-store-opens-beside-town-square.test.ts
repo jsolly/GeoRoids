@@ -12,6 +12,7 @@ import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
 import { worldFurnaces } from '../../../src/network/worldExploration';
+import { SCOUT_ONLY_BUILD_HINT } from '../../../src/ui/constants';
 import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import {
   applyTownStoreResult,
@@ -244,4 +245,32 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   expect(isTownStoreOpen()).toBe(true);
   closeTownStore();
   width.mockRestore();
+});
+
+test('a Hauler on an unbuilt furnace footprint is told only Scouts can build it', () => {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  const lot = civicLot('street-2-0');
+  if (!player || !lot) {
+    throw new Error('Missing dark lot fixture');
+  }
+  worldFurnaces.replaceLit([]);
+  closeTownStore();
+  const hint = () => document.querySelector('#furnace-build-hint');
+  const shown = () => hint()?.classList.contains('is-visible') ?? false;
+  player.ship.position = { x: lot.position.x + lot.radius - 5, y: lot.position.y };
+  syncFurnaceTravelPrompt();
+  expect(shown()).toBe(true);
+  expect(hint()?.textContent).toBe(SCOUT_ONLY_BUILD_HINT);
+  expect(hint()?.querySelector('button')?.hidden).toBe(true);
+
+  // Beside the grate but off it: the same footprint rule as Scout Build.
+  player.ship.position = { x: lot.position.x + lot.radius + 40, y: lot.position.y };
+  syncFurnaceTravelPrompt();
+  expect(shown()).toBe(false);
+
+  player.ship.position = { ...lot.position };
+  player.ship.kitId = 'scout';
+  syncFurnaceTravelPrompt();
+  expect(shown()).toBe(false);
+  player.ship.kitId = 'hauler';
 });

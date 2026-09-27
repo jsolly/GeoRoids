@@ -82,12 +82,12 @@ export const TITLE = {
 export const VISUAL = {
   SHIP_STROKE_WIDTH: 1.25,
   SHIP_GLOW: 1.25,
-  // Thick stamps with a bright core and no trail. Butt ends keep the stroke
-  // from stretching the bolt, and the halo dies before the next Scout shot.
+  // Round glowing balls with a bright core and no trail. LASER_LENGTH is the
+  // ball diameter, sized so each halo dies before the next Scout shot.
   LASER_STROKE_WIDTH: 16,
   LASER_CORE_WIDTH: 3.5,
   LASER_CORE_COLOR: '#FFF8E1',
-  LASER_LENGTH: 10,
+  LASER_LENGTH: 14,
   LASER_TRAIL_LENGTH: 0,
   LASER_EXPLODE_RADIUS: 10,
   LASER_GLOW: 2,

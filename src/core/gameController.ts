@@ -1,6 +1,6 @@
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
-import { SPIDER } from '../../shared/terrainSpider';
+import { spiderHitRadius } from '../../shared/terrainSpider';
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
@@ -55,6 +55,7 @@ import {
 } from '../physics/terrain/terrainSession';
 import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
+import { syncCargoFullHint } from '../ui/cargoFullHint';
 import { syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
@@ -76,7 +77,7 @@ export class GameController {
         position: spider.position,
         velocity: { x: 0, y: 0 },
         health: spider.health,
-        size: SPIDER.HIT_RADIUS,
+        size: spiderHitRadius(spider.id),
       })),
     ];
   }
@@ -693,6 +694,7 @@ export class GameController {
     InputManager.getInstance().updateMovementLock();
     syncTownStoreChrome();
     syncFurnaceTravelPrompt();
+    syncCargoFullHint();
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
     shockwaveManager.update();

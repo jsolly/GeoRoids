@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
+import { canCollectEquipment, isEquipmentId } from '../../shared/equipment';
 import {
   SNAPSHOT_BACKPRESSURE_BYTES,
   SNAPSHOT_KEYFRAME_INTERVAL,
@@ -138,7 +139,16 @@ export class GameStateBroadcaster {
       this.broadcastToAll({ type: 'tapEjected', data, timestamp: Date.now() });
     }
     for (const data of this.gameEngine.drainLootCollections()) {
-      this.broadcastToAll({ type: 'lootCollected', data, timestamp: Date.now() });
+      const message = { type: 'lootCollected', data, timestamp: Date.now() };
+      if (isEquipmentId(data.kind)) {
+        // Equipment drops are private to each eligible ship; do not reveal them to others.
+        const ws = this.gameEngine.getPlayer(data.collectorId)?.ws;
+        if (ws) {
+          this.sendToWebSocket(ws, message);
+        }
+      } else {
+        this.broadcastToAll(message);
+      }
     }
     const gameState = this.gameEngine.getGameState();
     const asteroidIndex = new AsteroidSpatialIndex(gameState.asteroids);
@@ -187,7 +197,9 @@ export class GameStateBroadcaster {
         const canonical = new SnapshotEncoder({
           ...gameState,
           asteroids,
-          loot: nearbyWorldRows(gameState.loot, player.position),
+          loot: nearbyWorldRows(gameState.loot, player.position).filter(
+            (drop) => !isEquipmentId(drop.kind) || canCollectEquipment(player, drop.kind)
+          ),
           satellitePickups: [
             ...gameState.satellitePickups.filter((pickup) => pickup.ownerId === player.id),
             ...nearbyWorldRows(

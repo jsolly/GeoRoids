@@ -447,7 +447,7 @@ function prepareLaserBoltSprites(
   return laserBoltSprites;
 }
 
-/** Body and core, painted once facing screen-right. Butt caps keep thickness off the flight axis. */
+/** A glowing ball with a bright core, painted once and centered on (x, y). */
 function paintLaserBolt(
   ctx: DrawingContext,
   x: number,
@@ -455,14 +455,14 @@ function paintLaserBolt(
   color: string,
   scale: number
 ): void {
-  const halfLength = (VISUAL.LASER_LENGTH / 2) * scale;
   const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
+  const radius = VISUAL.LASER_LENGTH / 2;
   if (trailLength > 0) {
     strokePhosphorSegment(
       ctx,
-      x - halfLength - trailLength,
+      x - radius - trailLength,
       y,
-      x - halfLength,
+      x - radius,
       y,
       color,
       VISUAL.LASER_STROKE_WIDTH * 0.7,
@@ -470,27 +470,23 @@ function paintLaserBolt(
       0.38
     );
   }
-  const trace = (): void => {
+  const disc = (r: number): void => {
     ctx.beginPath();
-    ctx.moveTo(x - halfLength, y);
-    ctx.lineTo(x + halfLength, y);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
   };
   ctx.save();
-  ctx.lineCap = 'butt';
-  ctx.lineWidth = VISUAL.LASER_STROKE_WIDTH;
   ctx.shadowColor = color;
   ctx.shadowBlur = resolveGlow(VISUAL.LASER_GLOW);
-  ctx.strokeStyle = hexToRgba(color, 0.5);
-  trace();
-  ctx.stroke();
+  ctx.fillStyle = hexToRgba(color, 0.5);
+  disc(radius);
+  ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = color;
-  trace();
-  ctx.stroke();
-  ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
-  ctx.strokeStyle = VISUAL.LASER_CORE_COLOR;
-  trace();
-  ctx.stroke();
+  ctx.fillStyle = color;
+  disc(radius - 0.5);
+  ctx.fill();
+  ctx.fillStyle = VISUAL.LASER_CORE_COLOR;
+  disc(VISUAL.LASER_CORE_WIDTH / 2);
+  ctx.fill();
   ctx.restore();
 }
 

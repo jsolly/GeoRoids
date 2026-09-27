@@ -19,7 +19,7 @@ Nearby shards, wreckage, and Tap canisters pull toward you; shards and canisters
 
 ## Salvaged equipment
 
-Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, glowing hardware in spider nests, which have a 65% chance to contain a tool, or among laser-mined asteroid drops with a 1.5% chance. Either ship can collect any tool, but only its matching kit can equip it.
+Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, glowing hardware in spider nests, which have a 65% chance to contain a tool, or among laser-mined asteroid drops with a 1.5% chance. Each ship sees only tools its kit can use and does not already own, and every eligible pilot can take their own copy from the same drop.
 
 Tools add no score and survive ordinary deaths, reconnects, and server restarts. Duplicates stay for teammates, and shooting cannot destroy equipment.
 
@@ -37,4 +37,4 @@ With Sound Effects on, quick pickups play successive notes of a short melody. Ta
 
 ## Cargo and banks
 
-Both ships collect point loot: Scout holds 500 and Hauler holds 1,500. Loot keeps magnetizing and disappears even at capacity; excess points are discarded. Fly into a lit furnace intake to offload automatically. The deposit credits your bank and the shared settlement once. Store purchases spend your bank, never carried cargo.
+Both ships collect point loot: Scout holds 500 and Hauler holds 1,500. Loot keeps magnetizing and disappears even at capacity; excess points are discarded. When your hold fills, a reminder to bank at a furnace shows for a few seconds, then at most every few minutes while cargo stays full. Fly into a lit furnace intake to offload automatically. The deposit credits your bank and the shared settlement once. Store purchases spend your bank, never carried cargo.

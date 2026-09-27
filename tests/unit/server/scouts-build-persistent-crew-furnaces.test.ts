@@ -117,14 +117,16 @@ test('a Scout builds only the furnace foundation they are standing in and pays w
   expect(scout.actor.score).toBe(0);
   expect(scout.actor.abilityCooldownFrames).toBe(0);
   scout.actor.score = furnace.cost;
-  // Inside approach range of a dark lot, but outside the grate — Build is offered and refuses.
+  // Beside the grate but off it: E is an ordinary scan, not a refused build.
   scout.actor.position = {
     x: furnace.position.x + FURNACE_BUILD.RADIUS + 40,
     y: furnace.position.y,
   };
-  expect(engine.useAbility(scout.actor.id)).toBe(false);
+  expect(engine.useAbility(scout.actor.id)).toBe(true);
+  expect(engine.getGameState().civicModules).toEqual([]);
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.STAND);
   expect(scout.actor.score).toBe(furnace.cost);
+  scout.actor.abilityCooldownFrames = 0;
   scout.actor.position = { ...child.position };
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(`Light ${furnace.name} first`);
   scout.actor.position = { ...furnace.position };
@@ -311,7 +313,7 @@ test('boost guidance prefers a lit furnace over the square, and dark lots are no
   const rock = cargo('guided', { x: furnace.position.x + 100, y: furnace.position.y });
   rock.boost = { phase: 'burning', ownerId: 'pilot', angle: 0 };
   expect(Math.abs(furnaceHeading(rock.position, field))).toBeCloseTo(Math.PI);
-  tickAsteroidBoost(rock, field);
+  tickAsteroidBoost(rock, rock.size, field);
   expect(rock.velocity.x).toBeLessThan(0);
   expect(new FurnaceField().nearby(furnace.position, furnace.radius)).toEqual([]);
   expect(field.nearby(furnace.position, 1).some((site) => site.id === furnace.id)).toBe(true);
@@ -342,6 +344,22 @@ test('raising a furnace during a chase repels the living spider despite tool coo
   expect(escaped?.health).toBe(spider.health);
   expect(escaped?.position.x).toBeGreaterThan(spider.position.x);
   expect(actor.health).toBe(health);
+});
+
+test('a Scout beside the grate scans instead of being told a build failed', () => {
+  const engine = new GameEngine(42);
+  const socket = new RecordingSocket();
+  const scout = addScout(engine, 'scout', socket);
+  scout.actor.score = furnace.cost;
+  scout.actor.position = { x: furnace.position.x + furnace.radius + 40, y: furnace.position.y };
+  const broadcaster = new GameStateBroadcaster(engine);
+  const handler = new MessageHandler(engine, broadcaster);
+  handler.handleMessage({ type: 'useAbility', id: scout.actor.id, kitId: 'scout' }, socket);
+  expect(socket.received('furnaceBuildResult')).toEqual([]);
+  expect(engine.getGameState().civicModules).toEqual([]);
+  expect(scout.actor.score).toBe(furnace.cost);
+  expect(scout.actor.abilityCooldownFrames).toBeGreaterThan(0);
+  broadcaster.stopPeriodicBroadcast();
 });
 
 test('a raised furnace toasts the Scout with the lot name', () => {

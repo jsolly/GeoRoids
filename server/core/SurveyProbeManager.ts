@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact } from '../../shared/asteroidReflection';
 import { probePosition, SURVEY_PROBE } from '../../shared/surveyProbe';
-import { SPIDER } from '../../shared/terrainSpider';
+import { spiderHitRadius } from '../../shared/terrainSpider';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type { AsteroidData, AsteroidProbe, Position, TerrainSpider } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
@@ -125,7 +125,12 @@ export class SurveyProbeManager {
       }
     }
     for (const spider of spiders) {
-      const fraction = segmentCircleContact(start, end, spider.position, SPIDER.HIT_RADIUS);
+      const fraction = segmentCircleContact(
+        start,
+        end,
+        spider.position,
+        spiderHitRadius(spider.id)
+      );
       if (fraction === undefined) {
         continue;
       }

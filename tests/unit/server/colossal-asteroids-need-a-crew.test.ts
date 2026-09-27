@@ -4,7 +4,7 @@ import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
-import { furnaceHeading } from '../../../shared/asteroidBoost';
+import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
 import {
   applyColossalDeposit,
   asteroidCrewNeeded,
@@ -135,12 +135,12 @@ describe('Colossal asteroids need a crew', () => {
     expect(rock.velocity.x).toBeLessThan(0);
   });
 
-  test('one Boost Coupling cannot ignite a colossal deposit; two launch and both are paid', () => {
+  test('one Boost Coupling ignites a colossal deposit at a crawl; two launch and both are paid', () => {
     world = new GameServerWorld();
-    const alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
-    const bob = world.join('Bob', { x: 0, y: 80 }, { kitId: 'hauler' });
+    const alice = world.join('Alice', { x: 500, y: 0 }, { kitId: 'hauler' });
+    const bob = world.join('Bob', { x: 500, y: 80 }, { kitId: 'hauler' });
     world.clearAsteroids();
-    const rock = colossalRock('colossal-boost', { x: 150, y: 0 });
+    const rock = colossalRock('colossal-boost', { x: 650, y: 0 });
     world.engine.addAsteroid(rock);
     world.entity(alice).angle = 0;
     world.entity(bob).angle = 0;
@@ -153,15 +153,26 @@ describe('Colossal asteroids need a crew', () => {
       angle: furnaceHeading(rock.position),
     });
     activate(alice);
-    expect(rock.boost?.phase).toBe('armed');
-    expect(world.entity(alice).harpoonTargetId).toBe(rock.id);
+    expect(rock.boost?.phase).toBe('burning');
+    expect(world.entity(alice).harpoonTargetId).toBeNull();
+    const crawl = ASTEROID_BOOST.maxSpeed * ASTEROID_BOOST.undercrewedFactor;
+    for (let frame = 0; frame < 120; frame++) {
+      world.engine.advanceOneFrame();
+    }
+    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(crawl, 5);
+
+    world.engine.updatePlayer(bob.id, {
+      position: { x: rock.position.x - 150, y: rock.position.y },
+    });
     activate(bob);
     expect(boostCrew(rock)).toEqual([alice.id, bob.id]);
-    activate(alice);
     expect(rock.boost?.phase).toBe('burning');
-    expect(rock.boost?.couplings).toEqual([alice.id, bob.id]);
-    expect(world.entity(alice).harpoonTargetId).toBeNull();
     expect(world.entity(bob).harpoonTargetId).toBeNull();
+    for (let frame = 0; frame < 60; frame++) {
+      world.engine.advanceOneFrame();
+    }
+    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeGreaterThan(crawl * 2);
+
     rock.position = { x: 0, y: 0 };
     world.engine.processFurnaceDeliveries();
     const deliveries = world.engine.drainFurnaceDeliveries();
@@ -169,6 +180,56 @@ describe('Colossal asteroids need a crew', () => {
     expect(deliveries[0]?.rewards.map((reward) => reward.playerId).sort()).toEqual(
       [alice.id, bob.id].sort()
     );
+  });
+
+  test('a full burning crew refuses a third coupling and every Tow Cable', () => {
+    world = new GameServerWorld();
+    const alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    const bob = world.join('Bob', { x: 0, y: 80 }, { kitId: 'hauler' });
+    const cleo = world.join('Cleo', { x: 0, y: -80 }, { kitId: 'hauler' });
+    world.clearAsteroids();
+    const rock = colossalRock('colossal-full-crew', { x: 150, y: 0 });
+    world.engine.addAsteroid(rock);
+    for (const pilot of [alice, bob, cleo]) {
+      world.entity(pilot).angle = 0;
+    }
+    equip(alice, 'boost_coupling');
+    equip(bob, 'boost_coupling');
+    activate(alice);
+    activate(bob);
+    activate(alice);
+    expect(rock.boost?.phase).toBe('burning');
+    expect(boostCrew(rock)).toEqual([alice.id, bob.id]);
+
+    equip(cleo, 'boost_coupling');
+    activate(cleo);
+    expect(boostCrew(rock)).toEqual([alice.id, bob.id]);
+    expect(world.entity(cleo).harpoonTargetId).toBeNull();
+
+    equip(cleo, 'tow_cable');
+    activate(cleo);
+    expect(world.entity(cleo).harpoonTargetId).toBeNull();
+    expect(boostCrew(rock)).toEqual([alice.id, bob.id]);
+  });
+
+  test('two armed Boost Couplings ignite a colossal deposit at full speed', () => {
+    world = new GameServerWorld();
+    const alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    const bob = world.join('Bob', { x: 0, y: 80 }, { kitId: 'hauler' });
+    world.clearAsteroids();
+    const rock = colossalRock('colossal-crew-boost', { x: 150, y: 0 });
+    world.engine.addAsteroid(rock);
+    world.entity(alice).angle = 0;
+    world.entity(bob).angle = 0;
+    equip(alice, 'boost_coupling');
+    equip(bob, 'boost_coupling');
+    activate(alice);
+    activate(bob);
+    expect(boostCrew(rock)).toEqual([alice.id, bob.id]);
+    activate(alice);
+    expect(rock.boost?.phase).toBe('burning');
+    expect(rock.boost?.couplings).toEqual([alice.id, bob.id]);
+    expect(world.entity(bob).harpoonTargetId).toBeNull();
   });
 
   test('a Scout needs many laser hits to fragment a colossal deposit', () => {

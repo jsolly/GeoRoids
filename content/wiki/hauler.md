@@ -33,7 +33,7 @@ Ordinary towed rocks break when they hit another rock or ship, damaging other sh
 
 ## Boost Coupling E
 
-Press E to arm a rock toward its nearest furnace, then E again to ignite autonomous delivery; colossal deposits need two armed Haulers first. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and tools until delivery pays its launchers and recorded scanning pilots.
+Press E to arm a rock toward its nearest furnace, then E again to ignite autonomous delivery. One coupling pushes a colossal deposit at a crawl; a second Hauler's coupling, before or after ignition, brings it to full speed. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and other tools until delivery pays its launchers and recorded scanning pilots.
 
 ## Spider bites
 

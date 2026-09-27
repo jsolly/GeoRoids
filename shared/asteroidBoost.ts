@@ -1,4 +1,5 @@
 import type { AsteroidBoost, Position, Velocity } from '../shared-types';
+import { asteroidCrewNeeded } from './asteroidScale';
 import type { FurnaceField } from './furnaceField';
 import { nearestFurnace } from './furnaces';
 
@@ -12,21 +13,24 @@ export function boostOwnerIds(boost: AsteroidBoost | null | undefined): string[]
   return [boost.ownerId];
 }
 
-function packArmedBoost(ownerId: string, angle: number, owners: readonly string[]): AsteroidBoost {
+function packBoost(
+  phase: AsteroidBoost['phase'],
+  ownerId: string,
+  angle: number,
+  owners: readonly string[]
+): AsteroidBoost {
   return owners.length > 1
-    ? { phase: 'armed', ownerId, angle, couplings: [...owners] }
-    : { phase: 'armed', ownerId, angle };
+    ? { phase, ownerId, angle, couplings: [...owners] }
+    : { phase, ownerId, angle };
 }
 
+/** Armed couplings gather a crew; a burning colossal accepts late couplings. */
 export function addBoostOwner(boost: AsteroidBoost, ownerId: string): AsteroidBoost {
-  if (boost.phase !== 'armed') {
-    return boost;
-  }
   const owners = boostOwnerIds(boost);
   if (!owners.includes(ownerId)) {
     owners.push(ownerId);
   }
-  return packArmedBoost(boost.ownerId, boost.angle, owners);
+  return packBoost(boost.phase, boost.ownerId, boost.angle, owners);
 }
 
 export function removeBoostOwner(boost: AsteroidBoost, ownerId: string): AsteroidBoost | null {
@@ -38,21 +42,27 @@ export function removeBoostOwner(boost: AsteroidBoost, ownerId: string): Asteroi
     return null;
   }
   const primary = owners.includes(boost.ownerId) ? boost.ownerId : (owners[0] ?? ownerId);
-  return packArmedBoost(primary, boost.angle, owners);
+  return packBoost('armed', primary, boost.angle, owners);
 }
 
 export function igniteBoost(boost: AsteroidBoost, angle: number): AsteroidBoost {
-  const owners = boostOwnerIds(boost);
-  return owners.length > 1
-    ? { phase: 'burning', ownerId: boost.ownerId, angle, couplings: owners }
-    : { phase: 'burning', ownerId: boost.ownerId, angle };
+  return packBoost('burning', boost.ownerId, angle, boostOwnerIds(boost));
 }
 
 /** Velocity uses world units per fixed 60 Hz simulation tick. */
 export const ASTEROID_BOOST = {
   acceleration: 0.025,
   maxSpeed: 2.5,
+  /** An undercrewed colossal crawls; a full crew restores normal speed. */
+  undercrewedFactor: 0.2,
 } as const;
+
+/** Full thrust needs the size's crew; fewer couplings crawl. */
+function boostThrustFactor(boost: AsteroidBoost, size: number) {
+  return boostOwnerIds(boost).length >= asteroidCrewNeeded(size)
+    ? 1
+    : ASTEROID_BOOST.undercrewedFactor;
+}
 
 export function furnaceHeading(position: Position, furnaces?: FurnaceField): number {
   const target = (furnaces?.nearest(position) ?? nearestFurnace(position)).position;
@@ -66,6 +76,7 @@ export function tickAsteroidBoost(
     position: Position;
     velocity: Velocity;
   },
+  size: number,
   furnaces?: FurnaceField
 ): void {
   const boost = body.boost;
@@ -82,16 +93,18 @@ export function tickAsteroidBoost(
   }
   // Seek a velocity, rather than adding radial thrust forever: this cancels
   // sideways momentum from impacts instead of orbiting the intake indefinitely.
-  const scale = distance > 0 ? Math.min(ASTEROID_BOOST.maxSpeed / distance, 1 / 60) : 0;
+  const thrust = boostThrustFactor(boost, size);
+  const maxSpeed = ASTEROID_BOOST.maxSpeed * thrust;
+  const scale = distance > 0 ? Math.min(maxSpeed / distance, 1 / 60) : 0;
   const changeX = dx * scale - body.velocity.x;
   const changeY = dy * scale - body.velocity.y;
   const change = Math.hypot(changeX, changeY);
-  const fraction = change > 0 ? Math.min(1, ASTEROID_BOOST.acceleration / change) : 0;
+  const fraction = change > 0 ? Math.min(1, (ASTEROID_BOOST.acceleration * thrust) / change) : 0;
   body.velocity.x += changeX * fraction;
   body.velocity.y += changeY * fraction;
   const speed = Math.hypot(body.velocity.x, body.velocity.y);
-  if (speed > ASTEROID_BOOST.maxSpeed) {
-    body.velocity.x *= ASTEROID_BOOST.maxSpeed / speed;
-    body.velocity.y *= ASTEROID_BOOST.maxSpeed / speed;
+  if (speed > maxSpeed) {
+    body.velocity.x *= maxSpeed / speed;
+    body.velocity.y *= maxSpeed / speed;
   }
 }

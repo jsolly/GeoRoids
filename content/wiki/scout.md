@@ -15,7 +15,7 @@ media:
 
 ## Mineral scan
 
-Scout starts with Mineral Scan and turns faster and boosts harder than Hauler. Select Mineral Scan in Inventory, then press E or Scan to send one pulse that shares nearby mineral classification and earns banked credit when ore-bearing rocks are delivered. That pulse also repels spiders in range, then the scan must recharge before it can fire again.
+Scout starts with Mineral Scan and turns faster than Hauler. Select Mineral Scan in Inventory, then press E or Scan to send one pulse that shares nearby mineral classification and earns banked credit when ore-bearing rocks are delivered. That pulse also repels spiders in range, then the scan must recharge before it can fire again.
 
 ## Survey probe
 

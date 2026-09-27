@@ -9,13 +9,13 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, saved score, brief-disconnect return |
-| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, Inventory button on desktop and touch, satellite-pickup label pointing at Inventory, Town Square store, and map/schematic/store hold with blink on return |
-| scout | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, one-pulse shared radar mineral scan with a longer recharge, scan spider repulsion, persistent named furnaces paid with personal score, scattered furnace lots, right-angle fire trails only after a furnace is lit, escape construction and living spider retreat, moving probe beacons, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the furnace is lit, and double metal mining damage |
-| loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, shoot-a-drop blast |
+| controls | Start here | Automatic thrust, shared cruise speed, Contour Lock toggle with explicit release or collision break, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, Inventory button on desktop and touch, satellite-pickup label pointing at Inventory, Town Square store, and map/schematic/store hold with blink on return |
+| scout | Ships | Stats scorecard, shared cruise, Contour Lock, passive exploration reveal, one-pulse shared radar mineral scan with a longer recharge, scan spider repulsion, persistent named furnaces paid with personal score, scattered furnace lots, right-angle fire trails only after a furnace is lit, escape construction and living spider retreat, moving probe beacons, and delivery tags |
+| hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, Contour Lock, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the furnace is lit, and double metal mining damage |
+| loot-growth | Systems | Cargo, silk, and equipment pickups without ship-stat changes, Tap canister extract, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
-| terrain | Arena | Broad gentle plains, neutral gray contours, bidirectional contour speed bonus, normal-speed crossings, no terrain drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and one-shot spider kills |
+| terrain | Arena | Broad gentle plains, neutral gray contours, bidirectional contour speed bonus, guided Contour Lock with ignored steering and physical contact release during protection, with lasers passing through invulnerable hulls, normal-speed crossings, no terrain drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and one-shot spider kills |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, cargo loss, unlimited respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, equal contributor delivery rewards, Town Square store, scattered furnace lots with right-angle fire trails only after a furnace is lit, harvested ground that stays empty and flyable, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, furnace names only when the chart is zoomed in close, right-angle furnace fire trails only after a furnace is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
@@ -24,7 +24,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 | Player question | Article | Primary source families |
 | --- | --- | --- |
-| How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
+| How do I move, aim, fire, lock a contour, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicEquipHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
 | How do I buy a placeholder at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyStoreItem, town store tests |
@@ -33,7 +33,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Can I clear a spider nest by building a furnace on it? | scout, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS retreat, furnace construction tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
-| How do mass, shards, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
+| How do shards, cargo, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Where is the rich belt, how do crawlers attack, and when do mined deposits return? | asteroids, terrain | shared/asteroidBelt.ts, shared/beltCrawler.ts, RegionalAsteroidField.ts, BeltCrawlerManager.ts, belt scenario tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
@@ -73,7 +73,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   include ship abilities, movement, reflection, cooperative splits,
   Hauler tow cable and furnace delivery, shared scans, reflective asteroids,
   satellites, pickups, contour travel, and
-  loot blast or growth, and surviving an environmental asteroid impact.
+  loot collection or blast, and surviving an environmental asteroid impact.
 - When gameplay source changes, review the affected article and demonstration
   before accepting a new docs/wiki-source-review.json digest. Run the normal
   TypeScript, lint, Markdown, wiki, and relevant gameplay checks from the
@@ -159,9 +159,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   record; historical `completedSectors` values on an old world row are ignored
   and omitted from the next world save. Respawn uses the nearest furnace. The
   universe map keeps its alignment grid and counts explored cells.
-- Mass pickups use the shared 100-base-health growth curve, not each kit's
-  starting health. A small first pickup can lower Hauler's 140 starting maximum;
-  increases in the calculated maximum add only that gain to current health.
+- Pickups preserve ship mass, health capacity, current health, hull size, and flight
+  tuning. Cargo, silk, equipment, and satellite collection keep their existing rewards
+  and do not release Contour Lock.
 - Cooperative splits automatically expire without a second qualifying hit.
   Their fast and heavy shockwaves push ships and asteroids without direct
   damage; metal and rubble follow their own break rules.
@@ -170,7 +170,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 Hauler and terrain articles cover tapping finite silk reserves, provocation,
 towing spiders into a furnace, proximity bites against passing ships or their own
-Hauler while attached, and the furnace whimper. Loot and growth covers the
+Hauler while attached, and the furnace whimper. Loot and salvage covers the
 separate silk inventory, which grants neither ore score nor hull mass. Scout
 covers probes riding spiders back to guarded resources, sharing the existing
 beacon limits and expiry. Server scenarios prove extraction, persistence,
@@ -198,7 +198,7 @@ rules; shots may escape through the gaps.
 
 ## Cargo and settlement
 
-Loot and growth covers finite holds, overflow disposal, furnace deposits, safe banks,
+Loot and salvage covers finite holds, overflow disposal, furnace deposits, safe banks,
 transferable death stashes and expiry. Asteroids covers barren rocks, crystal,
 scan results and reduced ore from fragments. Teamwork covers the five settlement
 requirements, surplus, station growth and level-gated placeholder purchases.

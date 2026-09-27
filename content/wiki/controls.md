@@ -2,7 +2,7 @@
 title: Controls
 category: Start here
 summary: Automatic thrust on every device, with keyboard or pointer steering,
-  firing, Boost, and kit abilities.
+  firing, Contour Lock, and kit abilities.
 order: 20
 related:
   - content/wiki/field-manual.md
@@ -19,23 +19,23 @@ The viewport and maps keep north at the top while your ship turns. Point or drag
 
 ## Keyboard
 
-Steer with A/D or Left/Right, hold Space to fire, and press E for your equipped tool. Thrust is automatic; Shift toggles Boost.
+Steer with A/D or Left/Right, hold Space to fire, and press E for your equipped tool. Thrust is automatic; Shift toggles Contour Lock.
 
 ## Mouse
 
-Move the pointer to steer toward it, hold left-click to fire, and right-click to toggle Boost. Keyboard steering takes over until you move the pointer again.
+Move the pointer to steer toward it, hold left-click to fire, and right-click to toggle Contour Lock. Keyboard steering takes over until you move the pointer again.
 
 ## Touch
 
-Hold and drag one finger to steer; release to keep your heading. Tap to fire once, or hold a second finger to fire continuously while steering. Use the on-screen ability and Boost buttons for tools and speed.
+Hold and drag one finger to steer; release to keep your heading. Tap to fire once, or hold a second finger to fire continuously while steering. Use the on-screen ability and Contour Lock buttons for tools and contour travel.
 
-## Boost charge
+## Contour Lock
 
-Toggle Boost off to save charge and let the tank refill. An empty tank stops Boost; activate it again when any charge returns.
+Near a visible contour, tap Contour Lock to catch it and follow its curves at extra speed. Tap the same control again to release; steering is ignored while locked, and physical contact releases the lock even while protected, but lasers pass through invulnerable hulls. There is no charge or cooldown, but the button needs a nearby contour.
 
 ## Contour travel
 
-Follow the gray lines for extra speed in either direction; crossing them keeps normal cruise. Boost stacks with the bonus. See [Contour travel](/wiki/#terrain).
+Follow the gray lines for extra speed in either direction; crossing them keeps normal cruise. Contour Lock follows a nearby line for stronger speed. See [Contour travel](/wiki/#terrain).
 
 ## Inventory and menus
 

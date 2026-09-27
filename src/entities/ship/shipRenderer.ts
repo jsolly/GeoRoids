@@ -2,6 +2,7 @@ import { planFurnaceRoute } from '../../../shared/furnaceTravel';
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
+import { drawContourSpeedLines } from '../../rendering/contourSpeedLines';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import type { PlayfieldSize } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
@@ -15,6 +16,7 @@ import {
 } from '../../rendering/vectorJuice';
 import { hexToRgba, laserBoltColor } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
+import { contourSpeedStrength } from './cruiseMotion';
 import { findHarpoonFieldBody } from './harpoonField';
 import { haulerUtilityOf, isResourceTapUtility } from './haulerUtility';
 import {
@@ -145,8 +147,7 @@ export function drawGenericThruster(
   angle: number,
   radius: number,
   color: string = PALETTE.LOCAL,
-  kitId?: ShipKitId,
-  boosting = false
+  kitId?: ShipKitId
 ): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
@@ -155,9 +156,7 @@ export function drawGenericThruster(
 
   const outline = getKitHullOutline(kitId);
   const flicker = Math.floor(performance.now() / VISUAL.THRUSTER_FLICKER_MS) % 2 === 0;
-  const lengthRatio =
-    (flicker ? VISUAL.THRUSTER_LENGTH_RATIO : VISUAL.THRUSTER_FLICKER_RATIO) *
-    (boosting ? 1.45 : 1);
+  const lengthRatio = flicker ? VISUAL.THRUSTER_LENGTH_RATIO : VISUAL.THRUSTER_FLICKER_RATIO;
   const rearCenter = thrusterGeom.rearCenter;
   for (const aft of outline.nozzles) {
     const rear = projectHullPoint(x, y, radius, angle, aft);
@@ -201,14 +200,25 @@ export function drawThruster(ship: Ship, color: string = ship.color): void {
 
   if (!ship.exploding && ship.thrusting) {
     const viewport = canvasManager.getViewportSize();
+    const ctx = canvasManager.getContext();
+    if (ctx) {
+      drawContourSpeedLines(
+        ctx,
+        viewport.width / 2,
+        viewport.height / 2,
+        ship.angle - canvasManager.getCameraRotation(),
+        ship.r,
+        contourSpeedStrength(ship),
+        performance.now()
+      );
+    }
     drawGenericThruster(
       viewport.width / 2,
       viewport.height / 2,
       ship.angle - canvasManager.getCameraRotation(),
       ship.r,
       color,
-      ship.kitId,
-      ship.boosting
+      ship.kitId
     );
   }
 }
@@ -242,8 +252,7 @@ export function drawThrusterAtPosition(
       ship.angle - canvasManager.getCameraRotation(),
       ship.r * scale,
       color,
-      ship.kitId,
-      ship.boosting
+      ship.kitId
     );
   }
 }

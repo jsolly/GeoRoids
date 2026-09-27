@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
@@ -9,6 +9,7 @@ import {
 import { setPlayView } from '../../../src/ui/uiUtils';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   document.body.classList.remove('in-play', 'touch-play');
   const root = document.querySelector<HTMLElement>('#touch-controls');
   if (root) {
@@ -50,11 +51,11 @@ test('phone-sized play view unhides the full touch control overlay', () => {
   expect(document.querySelector('#touch-stick')).toBeNull();
   expect(document.querySelector('#touch-fire')).toBeNull();
   expect(document.querySelector('#touch-ability')).toBeTruthy();
-  expect(document.querySelector('#touch-boost')).toBeTruthy();
+  expect(document.querySelector('#touch-contour-lock')).toBeTruthy();
   expect(document.querySelector('#touch-shield')).toBeNull();
 });
 
-test('desktop-sized play view keeps boost visible while hiding touch-only ability chrome', () => {
+test('desktop-sized play view keeps Contour Lock visible while hiding touch-only ability chrome', () => {
   initializeTouchControls();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
@@ -64,57 +65,39 @@ test('desktop-sized play view keeps boost visible while hiding touch-only abilit
   const root = document.querySelector<HTMLElement>('#touch-controls');
   expect(root?.hidden).toBe(false);
   expect(root?.classList.contains('is-desktop')).toBe(true);
-  expect(document.querySelector('#touch-boost')).toBeTruthy();
+  expect(document.querySelector('#touch-contour-lock')).toBeTruthy();
 });
 
-test('boost chrome exposes active drain, empty tank, and interruptible recharge state', () => {
+test('Contour Lock chrome shows unavailable, ready, and releasable states without a meter', () => {
   initializeTouchControls();
-  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
-  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
   document.body.classList.add('in-play');
   syncTouchChrome(true);
-
   const player = new Player({
-    id: 'boost-chrome-player',
-    name: 'Boost Tester',
+    id: 'contour-chrome-player',
+    name: 'Contour Tester',
     type: 'local',
     input: new MockPlayerInput(),
   });
-  const boost = document.querySelector<HTMLButtonElement>('#touch-boost');
-  expect(boost).toBeTruthy();
-
-  player.ship.boost = { phase: 'active', charge: 0.64 };
+  const eligible = vi.spyOn(player.ship, 'canLockContour').mockReturnValue(false);
+  const button = document.querySelector<HTMLButtonElement>('#touch-contour-lock');
   tickTouchControls(player);
-  expect(boost?.textContent).toBe('BOOSTING 64%');
-  expect(boost?.getAttribute('aria-label')).toContain('Stop boost');
-  expect(boost?.disabled).toBe(false);
-  expect(boost?.style.getPropertyValue('--boost-charge')).toBe('0.640');
-  expect(boost?.dataset['boostPhase']).toBe('active');
-
-  player.ship.boost = { phase: 'exhausted', charge: 0.24 };
+  expect(button?.textContent).toBe('CONTOUR LOCK');
+  expect(button?.disabled).toBe(true);
+  expect(button?.getAttribute('aria-label')).toContain('approach a contour');
+  eligible.mockReturnValue(true);
   tickTouchControls(player);
-  expect(boost?.textContent).toBe('RECHARGING 24%');
-  expect(boost?.getAttribute('aria-disabled')).toBe('false');
-  expect(boost?.disabled).toBe(false);
-  expect(boost?.classList.contains('is-recharging')).toBe(true);
-  expect(boost?.classList.contains('is-exhausted')).toBe(false);
-  expect(boost?.getAttribute('aria-label')).toBe('Start boost, 24% charge');
-
-  player.ship.boost = { phase: 'exhausted', charge: 0 };
+  expect(button?.disabled).toBe(false);
+  expect(button?.getAttribute('aria-label')?.toLowerCase()).toContain('contour lock');
+  player.ship.contourLock = { height: 0.16, direction: 1 };
+  eligible.mockReturnValue(false);
   tickTouchControls(player);
-  expect(boost?.disabled).toBe(true);
-  expect(boost?.getAttribute('aria-label')).toBe('Boost empty, recharging');
-
-  player.ship.boost = { phase: 'idle', charge: 0.48 };
+  expect(button?.textContent).toBe('RELEASE LOCK');
+  expect(button?.getAttribute('aria-label')?.toLowerCase()).toContain('release lock');
+  expect(button?.disabled).toBe(false);
+  expect(button?.getAttribute('aria-pressed')).toBe('true');
+  expect(button?.textContent).not.toContain('%');
+  player.ship.releaseContourLock();
   tickTouchControls(player);
-  expect(boost?.textContent).toBe('RECHARGING 48%');
-  expect(boost?.getAttribute('aria-disabled')).toBe('false');
-  expect(boost?.disabled).toBe(false);
-  expect(boost?.dataset['boostPhase']).toBe('idle');
-
-  player.ship.boost = { phase: 'idle', charge: 1 };
-  tickTouchControls(player);
-  expect(boost?.textContent).toBe('BOOST');
-  expect(boost?.getAttribute('aria-label')).toBe('Start boost, fully charged');
-  expect(boost?.disabled).toBe(false);
+  expect(button?.disabled).toBe(true);
+  expect(button?.getAttribute('aria-pressed')).toBe('false');
 });

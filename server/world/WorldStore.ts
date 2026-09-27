@@ -9,7 +9,6 @@ import { validExploration } from '../../shared/exploration';
 import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
-import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { purchasedHullColor } from '../../shared/townStore';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
@@ -21,7 +20,6 @@ import type {
   Position,
   SavedPointLoot,
   SettlementState,
-  ShipBoostState,
   ShipKitId,
   Velocity,
 } from '../../shared-types';
@@ -73,7 +71,6 @@ export interface PersistentPilot {
   angle?: number;
   mass?: number;
   health?: number;
-  boost?: ShipBoostState;
   /** Server release that issued the current token digest. */
   credentialReleaseId?: string;
   /** Client release present when the current token digest was issued. */
@@ -253,7 +250,6 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     ...(typeof silk === 'number' ? { silk } : {}),
     ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
-    ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),
   };
 }

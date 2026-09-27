@@ -103,7 +103,7 @@ test('a Hauler snapshot keeps the barge hull at any mass', () => {
   expect(remote.ship.r).toBe(hullRadiusForKit('hauler'));
 });
 
-test('a Scout snapshot keeps the kit hull after many loot-mass updates', () => {
+test('a Scout snapshot keeps the kit hull after a saved-mass update', () => {
   const local = new Player({
     id: 'scout',
     name: 'Scout',

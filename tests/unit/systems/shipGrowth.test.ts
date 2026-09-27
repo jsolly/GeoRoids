@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
   addLootMagnetPull,
-  applyLootMass,
   canCollectLoot,
   GROWTH,
   lootOverlap,
@@ -13,35 +12,12 @@ import {
 import { SHIP } from '../../../src/constants';
 import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 
-describe('ship growth math', () => {
+describe('saved ship mass and salvage rules', () => {
   test('base mass matches the stock HP and handling', () => {
     expect(maxHealthFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_HEALTH);
     expect(thrustScaleFromMass(GROWTH.BASE_MASS)).toBe(1);
     expect(maxVelocityFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_VELOCITY);
     expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
-  });
-
-  test('collecting loot grows mass and HP with a slither slowdown, not hull size', () => {
-    const grown = applyLootMass(GROWTH.BASE_MASS, 2);
-    expect(grown).toBeGreaterThan(GROWTH.BASE_MASS);
-    expect(maxHealthFromMass(grown)).toBeGreaterThan(SHIP.MAX_HEALTH);
-    expect(thrustScaleFromMass(grown)).toBeLessThan(1);
-    expect(maxVelocityFromMass(grown)).toBeLessThan(SHIP.MAX_VELOCITY);
-    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
-    expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
-  });
-
-  test('soft max keeps mass readable after many pickups without changing kit radius', () => {
-    let mass: number = GROWTH.BASE_MASS;
-    for (let i = 0; i < 80; i++) {
-      mass = applyLootMass(mass, 1);
-    }
-    expect(mass).toBeLessThanOrEqual(GROWTH.SOFT_MAX_MASS);
-    expect(mass).toBeGreaterThan(GROWTH.SOFT_MAX_MASS - 0.2);
-    expect(maxHealthFromMass(mass)).toBe(Math.round(SHIP.MAX_HEALTH * GROWTH.MAX_HEALTH_SCALE));
-    expect(thrustScaleFromMass(mass)).toBeGreaterThanOrEqual(GROWTH.MIN_THRUST_SCALE);
-    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
-    expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
   });
 
   test('a base-mass kill still plans loot pellets', () => {

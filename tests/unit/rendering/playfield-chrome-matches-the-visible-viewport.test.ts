@@ -75,7 +75,7 @@ test('the playfield overlay box follows visualViewport when it is smaller than t
   const containingWidth = Number.parseInt(playfield.style.width, 10) || window.innerWidth;
   const containingHeight = Number.parseInt(playfield.style.height, 10) || window.innerHeight;
   const abilitySize = requiredPx(
-    /\.touch-ability,\s*\.touch-boost \{[^}]*\bwidth: (\d+)px;/su,
+    /\.touch-ability,\s*\.touch-contour-lock \{[^}]*\bwidth: (\d+)px;/su,
     'ability width'
   );
   const abilityRightInset = requiredPx(
@@ -83,11 +83,11 @@ test('the playfield overlay box follows visualViewport when it is smaller than t
     'ability right inset'
   );
   const abilityBottomSafe = requiredPx(
-    /\.touch-ability,\s*\.touch-boost \{[^}]*bottom: calc\(max\((\d+)px, env\(safe-area-inset-bottom, 0px\)\) \+ \d+px\);/su,
+    /\.touch-ability,\s*\.touch-contour-lock \{[^}]*bottom: calc\(max\((\d+)px, env\(safe-area-inset-bottom, 0px\)\) \+ \d+px\);/su,
     'ability bottom safe inset'
   );
   const abilityBottomExtra = requiredPx(
-    /\.touch-ability,\s*\.touch-boost \{[^}]*bottom: calc\(max\(\d+px, env\(safe-area-inset-bottom, 0px\)\) \+ (\d+)px\);/su,
+    /\.touch-ability,\s*\.touch-contour-lock \{[^}]*bottom: calc\(max\(\d+px, env\(safe-area-inset-bottom, 0px\)\) \+ (\d+)px\);/su,
     'ability bottom extra inset'
   );
   const stackLeft = requiredPx(

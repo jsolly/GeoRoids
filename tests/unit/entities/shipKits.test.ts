@@ -29,7 +29,6 @@ test('Scout handles more nimbly while Hauler keeps its heavy hull at the same cr
   expect(scout.size).toBeLessThan(hauler.size);
   expect(scout.maxVelocity).toBe(SHIP.MAX_VELOCITY);
   expect(hauler.maxVelocity).toBe(scout.maxVelocity);
-  expect(scout.boostMultiplier).toBeGreaterThan(hauler.boostMultiplier);
   expect(hauler.maxHealth).toBeGreaterThan(scout.maxHealth);
   expect(scout.abilityId).toBe('surveyScan');
   expect(hauler.abilityId).toBe('harpoon');

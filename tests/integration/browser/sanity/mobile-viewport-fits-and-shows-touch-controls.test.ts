@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest';
 import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
-
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
 } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { placePilotNearContour } from '../../utils/contour-lock';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { canvasPoint, readTouchControlState } from '../../utils/touch-input';
@@ -131,7 +131,7 @@ test(
       'ship-schematic-toggle',
       'universe-map-toggle',
       'debug-hud-toggle',
-      'touch-boost',
+      'touch-contour-lock',
       'touch-ability',
     ]) {
       const box = await page.locator(`#${id}`).boundingBox();
@@ -140,7 +140,7 @@ test(
       }
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(390);
-      if (id !== 'touch-boost') {
+      if (id !== 'touch-contour-lock') {
         expect(box.y + box.height).toBeLessThan(844 / 2);
       }
       expect(box.height).toBeGreaterThanOrEqual(44);
@@ -154,8 +154,8 @@ test(
       }
       boxes.push(box);
     }
-    const [inventory, map, hud, boostBox, abilityBox] = boxes;
-    if (!inventory || !map || !hud || !boostBox || !abilityBox) {
+    const [inventory, map, hud, contourLockBox, abilityBox] = boxes;
+    if (!inventory || !map || !hud || !contourLockBox || !abilityBox) {
       throw new Error('Expected all five action buttons');
     }
     const economyBottom = computeHudLayout(
@@ -165,8 +165,8 @@ test(
     expect(inventory.y).toBeGreaterThanOrEqual(economyBottom);
     expect(inventory.y + inventory.height).toBeLessThan(844 / 3);
     expect([map.y, hud.y, abilityBox.y]).toEqual([inventory.y, inventory.y, inventory.y]);
-    expect(boostBox.y + boostBox.height).toBe(844 - 28);
-    expect(boostBox.x + boostBox.width / 2).toBe(390 / 2);
+    expect(contourLockBox.y + contourLockBox.height).toBe(844 - 28);
+    expect(contourLockBox.x + contourLockBox.width / 2).toBe(390 / 2);
     await page.locator('#ship-schematic-toggle').tap();
     await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     await page
@@ -186,7 +186,7 @@ test(
       const root = document.querySelector<HTMLElement>('#touch-controls');
       const stick = document.querySelector('#touch-stick');
       const ability = document.querySelector('#touch-ability');
-      const boost = document.querySelector('#touch-boost');
+      const contourLock = document.querySelector('#touch-contour-lock');
       const canvas = document.querySelector('#gameCanvas');
       const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
       const box = (el: Element | null) => {
@@ -207,9 +207,9 @@ test(
         canvas: box(canvas),
         stick: box(stick),
         ability: box(ability),
-        boost: box(boost),
+        contourLock: box(contourLock),
         abilityDisabled: ability?.getAttribute('aria-disabled'),
-        boostPressed: boost?.getAttribute('aria-pressed'),
+        contourLockPressed: contourLock?.getAttribute('aria-pressed'),
       };
     });
 
@@ -228,23 +228,24 @@ test(
     expect(chrome.abilityDisabled).toBe('false');
     expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
-    expect(chrome.boost).toBeTruthy();
-    expect(chrome.boostPressed).toBe('false');
-    expect(chrome.boost?.left).toBeGreaterThanOrEqual(-1);
-    expect(chrome.boost?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
-    expect(chrome.boost?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
+    expect(chrome.contourLock).toBeTruthy();
+    expect(chrome.contourLockPressed).toBe('false');
+    expect(chrome.contourLock?.left).toBeGreaterThanOrEqual(-1);
+    expect(chrome.contourLock?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
+    expect(chrome.contourLock?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
 
-    expect((await readTouchControlState(page)).boosting).toBe(false);
-    await page.locator('#touch-boost').tap();
+    await placePilotNearContour(page, game);
+    expect((await readTouchControlState(page)).contourLocked).toBe(false);
+    await page.locator('#touch-contour-lock').tap();
     await expect
-      .poll(async () => (await readTouchControlState(page)).boosting, {
-        message: 'Boost tap should start a stronger cruise',
+      .poll(async () => (await readTouchControlState(page)).contourLocked, {
+        message: 'Contour Lock tap should start a stronger cruise',
       })
       .toBe(true);
-    await page.locator('#touch-boost').tap();
+    await page.locator('#touch-contour-lock').tap();
     await expect
-      .poll(async () => (await readTouchControlState(page)).boosting, {
-        message: 'A second Boost tap should return to cruise',
+      .poll(async () => (await readTouchControlState(page)).contourLocked, {
+        message: 'A second Contour Lock tap should return to cruise',
       })
       .toBe(false);
 
@@ -286,14 +287,14 @@ test(
         )
       );
       expect(new Set(rowTops).size).toBe(1);
-      const bottomBoost = await page.locator('#touch-boost').boundingBox();
-      if (!bottomBoost) {
-        throw new Error('Missing bottom Boost button');
+      const bottomContourLock = await page.locator('#touch-contour-lock').boundingBox();
+      if (!bottomContourLock) {
+        throw new Error('Missing bottom Contour Lock button');
       }
-      expect(bottomBoost.y + bottomBoost.height).toBe(
+      expect(bottomContourLock.y + bottomContourLock.height).toBe(
         viewport.height - (viewport.width > viewport.height && viewport.height <= 500 ? 20 : 28)
       );
-      expect(bottomBoost.x + bottomBoost.width / 2).toBe(viewport.width / 2);
+      expect(bottomContourLock.x + bottomContourLock.width / 2).toBe(viewport.width / 2);
       await page.screenshot({
         path: screenshotManager.getScreenshotPath(`mobile-actions-${viewport.width}.png`),
       });

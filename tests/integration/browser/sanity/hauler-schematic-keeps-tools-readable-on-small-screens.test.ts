@@ -150,7 +150,7 @@ for (const viewport of [
   }, 40000);
 }
 
-test('a short touch screen keeps tools at the top and Boost at bottom center', async () => {
+test('a short touch screen keeps tools at the top and Contour Lock at bottom center', async () => {
   const width = 844;
   const height = 390;
   const page = await browserManager.recreatePage({ hasTouch: true });
@@ -172,15 +172,15 @@ test('a short touch screen keeps tools at the top and Boost at bottom center', a
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThan(height / 2);
   }
-  const boost = await page.locator('#touch-boost').boundingBox();
-  if (!boost) {
-    throw new Error('Missing bottom Boost button');
+  const contourLock = await page.locator('#touch-contour-lock').boundingBox();
+  if (!contourLock) {
+    throw new Error('Missing bottom Contour Lock button');
   }
-  expect(boost.x).toBeGreaterThanOrEqual(0);
-  expect(boost.x + boost.width).toBeLessThanOrEqual(width);
-  expect(boost.x + boost.width / 2).toBe(width / 2);
-  expect(boost.y).toBeGreaterThan(height / 2);
-  expect(boost.y + boost.height).toBe(height - 20);
+  expect(contourLock.x).toBeGreaterThanOrEqual(0);
+  expect(contourLock.x + contourLock.width).toBeLessThanOrEqual(width);
+  expect(contourLock.x + contourLock.width / 2).toBe(width / 2);
+  expect(contourLock.y).toBeGreaterThan(height / 2);
+  expect(contourLock.y + contourLock.height).toBe(height - 20);
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('inventory-button-short-touch.png'),
   });

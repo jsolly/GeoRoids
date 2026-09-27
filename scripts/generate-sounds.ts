@@ -30,8 +30,6 @@ function body(note: number, duration: number, gain = 0.6): Tone {
 // registers, contours and envelopes identify actions without unrelated timbres.
 const recipes: Record<string, Recipe> = {
   'connection-lost': { duration: 0.58, tones: [bell(2, 0, 0.32, 0.36), bell(-5, 0.15, 0.42, 0.4)] },
-  'boost-start': { duration: 0.32, tones: [bell(-12, 0, 0.24, 0.46), bell(-5, 0.06, 0.25, 0.32)] },
-  'boost-end': { duration: 0.25, tones: [bell(-5, 0, 0.18, 0.3), bell(-12, 0.07, 0.18, 0.35)] },
   'boost-ignite': {
     duration: 0.48,
     tones: [body(-24, 0.35, 0.5), bell(0, 0.04, 0.36, 0.28), bell(7, 0.1, 0.36, 0.2)],

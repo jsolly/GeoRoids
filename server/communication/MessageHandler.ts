@@ -348,7 +348,7 @@ export class MessageHandler {
       update.position = { ...held.position };
       update.velocity = { x: 0, y: 0 };
       update.thrusting = false;
-      update.boosting = false;
+      update.contourLock = null;
     }
 
     if (
@@ -375,8 +375,7 @@ export class MessageHandler {
         velocity: update.velocity,
         angle: update.angle,
         thrusting: update.thrusting,
-        boosting: update.boosting === true,
-        boostDepleted: update.boostDepleted === true,
+        contourLock: update.contourLock ?? null,
       },
       motionNow
     );

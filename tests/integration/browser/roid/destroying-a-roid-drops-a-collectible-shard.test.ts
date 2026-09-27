@@ -8,7 +8,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 const { browserManager } = createBrowserScenarioHooks();
 
 test(
-  'destroying a roid drops a collectible shard that uses grow/loot collect',
+  'mining and collecting a shard adds cargo without changing ship mass',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -72,22 +72,14 @@ test(
     await expect
       .poll(
         async () => {
-          await game.waitForAnimationFrames(4);
-          return game.getShipMass();
-        },
-        { timeout: 8000, message: 'collecting the shard should grow via the #458 mass path' }
-      )
-      .toBeGreaterThan(initialMass);
-
-    await expect
-      .poll(
-        async () => {
           const loot = await game.getLoot();
           return loot.some((item) => item.id === collectedDrop.id);
         },
         { timeout: 8000, message: 'collected shard should leave the shared field' }
       )
       .toBe(false);
+    await game.waitForAnimationFrames(12);
+    expect(await game.getShipMass()).toBe(initialMass);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

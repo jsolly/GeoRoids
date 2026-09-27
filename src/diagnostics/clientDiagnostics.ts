@@ -61,7 +61,7 @@ export function buildClientDiagnostics(): string {
           movementLocked: ship.movementLocked,
           serverOwnsMotion: ship.serverOwnsMotion,
           motion: ship.playerMotion,
-          boost: ship.boost,
+          contourLock: ship.contourLock,
         }
       : null,
     input: readTouchControlDiagnostics(),

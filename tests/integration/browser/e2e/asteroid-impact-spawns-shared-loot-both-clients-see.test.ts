@@ -166,14 +166,10 @@ test(
       })
       .toBe(false);
 
-    await expect
-      .poll(() => collector.getShipMass(), {
-        timeout: 8000,
-        message: 'the collector should grow after picking up environmental loot',
-      })
-      .toBeGreaterThan(startMass);
+    await collector.waitForAnimationFrames(12);
+    expect(await collector.getShipMass()).toBe(startMass);
     expect(await collector.getShipRadius()).toBe(startRadius);
-    expect(await collector.getShipMaxHealth()).toBeGreaterThan(startMaxHealth);
+    expect(await collector.getShipMaxHealth()).toBe(startMaxHealth);
     expect(await collector.getScore()).toBe(scoreBefore);
 
     assertNoBrowserDiagnostics(impactedPilotDiagnostics);

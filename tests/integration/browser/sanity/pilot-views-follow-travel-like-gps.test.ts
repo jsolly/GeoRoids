@@ -69,7 +69,22 @@ test.each([
       `import('/src/constants/index.ts').then(({ CAMERA }) => { CAMERA.FOLLOW_TRAVEL = ${followTravel}; })`
     );
     await game.waitForAnimationFrames(2);
-    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    const playerId = await game.getLocalPlayerId();
+    const epochs = await arrangeCrewField([playerId], 'empty');
+    const fixtureEpoch = epochs.get(playerId);
+    if (fixtureEpoch === undefined) {
+      throw new Error('GPS fixture omitted the pilot motion epoch');
+    }
+    // The HTTP fixture response precedes its WebSocket pose. Read the baseline
+    // only after that pose reaches the client, so its heading change cannot
+    // satisfy the steering assertion before the touch hold begins steering.
+    await page.waitForFunction(
+      (expectedEpoch) =>
+        window.gameController?.getCurrPlayer()?.ship.playerMotion?.epoch === expectedEpoch,
+      fixtureEpoch,
+      { timeout: 5000, polling: 25 }
+    );
+    await game.waitForAnimationFrames(2);
     const readCamera = await page.evaluateHandle<
       () => { rotation: number; aheadX: number; aheadY: number; speed: number; angle: number }
     >(

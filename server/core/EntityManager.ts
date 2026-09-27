@@ -6,16 +6,15 @@ import {
 } from '../../shared/constants/health';
 import { FurnaceField } from '../../shared/furnaceField';
 import { TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
-import { fullShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
+  ContourLockState,
   EquipmentId,
   FurnaceTransit,
   HaulerUtilityId,
   PlayerMotionState,
   Position,
   ScoutUtilityId,
-  ShipBoostState,
   ShipKitId,
   Velocity,
 } from '../../shared-types';
@@ -43,7 +42,7 @@ export interface GameEntity {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
-  boost: ShipBoostState;
+  contourLock: ContourLockState | null;
   color: string;
   cargo: number;
   purchases: string[];
@@ -217,7 +216,7 @@ export class EntityManager {
       angle: 0,
       exploding: false,
       thrusting: false,
-      boost: fullShipBoost(),
+      contourLock: null,
       color: PALETTE.REMOTE,
       cargo: 0,
       purchases: [],
@@ -266,7 +265,7 @@ export class EntityManager {
     if (entity.health <= 0 && wasAlive) {
       entity.exploding = true;
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
-      stopShipBoost(entity.boost);
+      entity.contourLock = null;
     }
 
     entity.lastUpdate = this.now();
@@ -384,7 +383,7 @@ export class EntityManager {
     entity.healthRegenTimer = 0;
 
     entity.exploding = false;
-    entity.boost = fullShipBoost();
+    entity.contourLock = null;
     delete entity.explodeTime;
     delete entity.deathCause;
 

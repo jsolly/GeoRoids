@@ -52,7 +52,7 @@ export class CollisionAuthority {
     const hits: Array<{ shipId: string; asteroidId: string }> = [];
     for (const entity of entities) {
       const ship = toCombatCircle(entity);
-      if (ship.immune) {
+      if (ship.immune && !entity.contourLock) {
         continue;
       }
       const nearby = index.query({

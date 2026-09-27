@@ -541,7 +541,7 @@ test(
 );
 
 test(
-  'desktop play view keeps the fixed close camera and hides touch chrome',
+  'desktop play view keeps the fixed close camera and hides touch-only ability chrome',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -568,8 +568,6 @@ test(
     await page.mouse.move(center.x, center.y);
     const keyboardAngle = await game.getShipAngle();
     expect(Math.abs(keyboardAngle - forwardAngle)).toBeGreaterThan(0.1);
-    await page.mouse.down({ button: 'right' });
-    await page.mouse.up({ button: 'right' });
     await page.keyboard.press('KeyW');
     await page.keyboard.press('ArrowUp');
     await game.waitForAnimationFrames(3);
@@ -578,7 +576,7 @@ test(
 
     expect(await page.locator('#touch-controls').isVisible()).toBe(true);
     expect(await page.locator('#touch-controls').getAttribute('class')).toContain('is-desktop');
-    expect(await page.locator('#touch-boost').isVisible()).toBe(true);
+    expect(await page.locator('#touch-contour-lock').isVisible()).toBe(true);
     expect(await page.locator('#touch-ability').isHidden()).toBe(true);
     expect(await page.locator('#gameCanvas').isVisible()).toBe(true);
     const desktopScreenshot = screenshotManager.getScreenshotPath('wave2-touch-desktop.png');

@@ -16,7 +16,9 @@ media:
 
 ## Contour travel
 
-Follow the neutral gray contour lines in either direction for extra speed, or cut across them at normal cruise. Boost stacks with the contour bonus; there is no uphill penalty or sideways terrain pull. Choose between a longer, faster curved route and a shorter direct crossing; ordinary terrain does no damage and does not deflect shots.
+Follow the neutral gray contours in either direction for the most extra speed; diagonal travel earns less, while perpendicular crossings and empty space keep normal cruise. Curved streamlines trail behind your ship as the terrain bonus builds, then fade as you turn across the grain. Ordinary terrain travel causes no damage, sideways pull, or shot deflection.
+
+Tap Contour Lock near a visible line to catch it and follow its curves at stronger speed. Steering is ignored until you tap the control again or collide with something; physical contact releases the lock even while protected, but lasers pass through invulnerable hulls. Locking has no charge or cooldown.
 
 ## Outer boundary
 

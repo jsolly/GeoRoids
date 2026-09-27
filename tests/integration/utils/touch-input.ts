@@ -59,7 +59,7 @@ type TouchControlState = {
   lasers: number;
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
-  boosting: boolean;
+  contourLocked: boolean;
 };
 
 export function readTouchControlState(page: Page): Promise<TouchControlState> {
@@ -76,7 +76,7 @@ export function readTouchControlState(page: Page): Promise<TouchControlState> {
       lasers: ship.lasers.length,
       abilityCooldownFrames: ship.abilityCooldownFrames,
       abilityActiveFrames: ship.abilityActiveFrames,
-      boosting: ship.boosting,
+      contourLocked: ship.contourLocked,
     };
   });
 }
@@ -93,7 +93,7 @@ type TouchControlLayout = {
   overflow: boolean;
   canvas: TouchControlBox | null;
   ability: TouchControlBox | null;
-  boost: TouchControlBox | null;
+  contourLock: TouchControlBox | null;
 };
 
 export function readTouchControlLayout(page: Page): Promise<TouchControlLayout> {
@@ -116,7 +116,7 @@ export function readTouchControlLayout(page: Page): Promise<TouchControlLayout> 
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
       canvas: box(canvas),
       ability: box(document.querySelector('#touch-ability')),
-      boost: box(document.querySelector('#touch-boost')),
+      contourLock: box(document.querySelector('#touch-contour-lock')),
     };
   });
 }

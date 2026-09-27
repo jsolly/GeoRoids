@@ -82,7 +82,7 @@ test('a long absence starts a new flight with the saved score', () => {
   }
 });
 
-test('a restart inside the return window restores the ship and refills only elapsed boost charge', () => {
+test('a restart inside the return window restores the ship without its transient contour lock', () => {
   let elapsed = 0;
   const clock = new ServerClock({ wallNow: () => 1789473600000, monotonicNow: () => elapsed });
   const store = new WorldStore(':memory:');
@@ -91,7 +91,7 @@ test('a restart inside the return window restores the ship and refills only elap
     const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
     original.actor.score = 880;
     original.actor.health = 22;
-    original.actor.boost = { phase: 'exhausted', charge: 0.4 };
+    original.actor.contourLock = { height: 0.4, direction: 1 };
     engine.removePlayer('scout');
     engine.stopGameLoop();
 
@@ -105,7 +105,7 @@ test('a restart inside the return window restores the ship and refills only elap
       purchases: [],
       score: 880,
       health: 22,
-      boost: { phase: 'exhausted', charge: 0.5 },
+      contourLock: null,
       position: { x: 2_400, y: 1_800 },
     });
     restarted.stopGameLoop();

@@ -160,7 +160,7 @@ export const VISUAL = {
   TITLE_CONTOUR_INDEX_ALPHA: 0.52,
   TITLE_CONTOUR_WIDTH: 0.65,
   TITLE_CONTOUR_INDEX_WIDTH: 1.1,
-  TITLE_TERRAIN_LEVELS: 28,
+  TITLE_TERRAIN_INTERVAL: 0.05,
   // Neutral iso-tangent under each live shot. Terrain answers; shots stay amber on top.
   CONTOUR_LASER_LENGTH: 20,
   CONTOUR_LASER_STROKE_WIDTH: 2,

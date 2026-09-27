@@ -1,27 +1,27 @@
 import { LOCAL_STORAGE_KEYS } from '../constants/user-preferences';
 import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
-type HapticKind = 'preview' | 'shot' | 'hit' | 'boom' | 'boost' | 'ability' | 'pickup';
+type HapticKind = 'asteroidIgnition' | 'preview' | 'shot' | 'hit' | 'boom' | 'ability' | 'pickup';
 
 export const HAPTICS_UNSUPPORTED_HINT =
   'This browser cannot vibrate. Android Chrome usually can; iPhone cannot.';
 
 const PATTERNS: Record<HapticKind, number | number[]> = {
+  asteroidIgnition: 20,
   preview: 24,
   shot: 12,
   hit: 32,
   boom: [40, 40, 80],
-  boost: 20,
   ability: 28,
   pickup: 16,
 };
 
 const MIN_GAP_MS: Record<HapticKind, number> = {
+  asteroidIgnition: 80,
   preview: 0,
   shot: 40,
   hit: 50,
   boom: 180,
-  boost: 80,
   ability: 80,
   pickup: 40,
 };

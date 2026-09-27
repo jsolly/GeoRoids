@@ -55,17 +55,21 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   terrain: {
-    title: 'Terrain contours and speed',
-    alt: 'A Scout follows neutral gray contour lines for a speed bonus, then crosses them at normal cruise.',
+    title: 'Contour flow and Contour Lock',
+    alt: 'A Scout follows gray contours, captures a highlighted rail for faster automatic guidance, then releases and crosses at normal cruise.',
     caption:
-      'Controlled demonstration: automatic thrust follows a contour for extra speed, then turns across the lines and returns to normal cruise. Following the line works in either direction.',
+      'Controlled demonstration: follow a contour for extra speed, lock onto it for faster automatic guidance, then release to steer across. Steering is ignored while locked.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',
+      'src/rendering/contourSpeedLines.ts',
       'src/physics/terrain/terrainConfig.ts',
       'src/physics/terrain/terrainTravel.ts',
       'src/entities/ship/cruiseMotion.ts',
       'src/rendering/contourSpatialIndex.ts',
+      'src/physics/terrain/contourCapture.ts',
+      'shared/contourLock.ts',
+      'src/entities/ship/Ship.ts',
     ],
   },
   loot: {

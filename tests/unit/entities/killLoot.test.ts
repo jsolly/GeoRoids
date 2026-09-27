@@ -4,7 +4,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { applyShipMass, GROWTH, planKillLoot } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-describe('kill loot and growth', () => {
+describe('death salvage and saved mass', () => {
   let engine: GameEngine;
 
   beforeEach(() => {
@@ -46,7 +46,7 @@ describe('kill loot and growth', () => {
     expect(second.loot).toEqual(first.loot);
   });
 
-  test('collecting kill loot grows the collector and removes the drop', () => {
+  test('collecting wreckage removes the drop without changing the collector', () => {
     const ws = new RecordingSocket();
     const collector = engine.addPlayer('p1', 'Collector', ws, { x: 200, y: 0 });
     const victim = engine.addPlayer('p2', 'Victim', ws, { x: 0, y: 0 });
@@ -59,13 +59,18 @@ describe('kill loot and growth', () => {
     assert.ok(pellet);
 
     engine.updatePlayer('p1', { position: { ...pellet.position } });
-    const before = collector.mass;
+    const before = {
+      mass: collector.mass,
+      maxHealth: collector.maxHealth,
+      health: collector.health,
+    };
     const collected = engine.collectLoot();
 
     expect(collected).toHaveLength(1);
     expect(collected[0]?.collectorId).toBe('p1');
-    expect(collector.mass).toBeGreaterThan(before);
-    expect(collector.maxHealth).toBeGreaterThan(100);
+    expect(collector.mass).toBe(before.mass);
+    expect(collector.maxHealth).toBe(before.maxHealth);
+    expect(collector.health).toBe(before.health);
     expect(engine.getLoot().some((drop) => drop.id === pellet.id)).toBe(false);
   });
 
@@ -88,11 +93,12 @@ describe('kill loot and growth', () => {
 
     expect(collected).toHaveLength(1);
     expect(collected[0]?.collectorId).toBe('p1');
-    expect(first.mass).toBeGreaterThan(GROWTH.BASE_MASS);
+    expect(first.mass).toBe(GROWTH.BASE_MASS);
+    expect(engine.getLoot().some((drop) => drop.id === pellet.id)).toBe(false);
     expect(second.mass).toBe(GROWTH.BASE_MASS);
   });
 
-  test('respawn returns a grown ship to base mass and HP', () => {
+  test('respawn returns a saved heavy ship to base mass and HP', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });

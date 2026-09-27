@@ -26,7 +26,7 @@ afterEach(() => {
   }
 });
 
-test('a local shot, boost, and explode buzz this device when Haptics is on', () => {
+test('a local shot and explosion buzz this device when Haptics is on', () => {
   const vibrate = vi.fn(() => true);
   installVibrate(vibrate);
   setHaptics(true);
@@ -34,10 +34,6 @@ test('a local shot, boost, and explode buzz this device when Haptics is on', () 
 
   const ship = new Ship({ isLocalPlayer: true });
   ship.fireLaser();
-  expect(vibrate).toHaveBeenCalled();
-  vibrate.mockClear();
-
-  expect(ship.toggleBoost()).toBe(true);
   expect(vibrate).toHaveBeenCalled();
   vibrate.mockClear();
 

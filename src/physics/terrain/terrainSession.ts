@@ -78,7 +78,7 @@ function touchContourPatch(patch: ContourPatch): ContourPatch {
 
 function buildContourPatch(field: Heightfield, region: ContourRegion): ContourPatch {
   contourPatchBuilds += 1;
-  const levels = extractIsoContours(field, region.gridSize, TERRAIN.LEVELS, region);
+  const levels = extractIsoContours(field, region.gridSize, TERRAIN.CONTOUR_INTERVAL, region);
   warmContourSpatialIndex(levels);
   return touchContourPatch({
     region,

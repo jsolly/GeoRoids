@@ -18,11 +18,10 @@ receive HTTP 426 before upgrade and must refresh. The join message is validated
 again, so the URL parameter alone does not grant access. The client also rejects
 an unsupported server acknowledgment. No protocol rollout or rollback flags exist.
 
-Updated servers include `boost: {phase, charge}` in every player row: phase is
-`idle`, `active`, or `exhausted`, and charge is a fraction from zero to one. The
-field remains optional while client and server deploy independently. If an older
-server omits it, the client keeps its finite predicted tank without replenishing
-or resetting it. Deploy the server first to enforce charge authoritatively.
+Player rows carry `contourLock: {height, direction}` while following a contour.
+`height` is a fixed visible terrain level (a multiple of 0.08) and `direction` is
+`1` or `-1`.
+Omission means unlocked. Lock state is transient and is not persisted.
 
 ## Wire contract
 
@@ -255,23 +254,24 @@ each authoritative frame and replays only its bounded unacknowledged input queue
 A new handoff epoch and reachable-pose acknowledgment are required before free
 prediction resumes. Server time and kit speed bound all subsequent free poses.
 
-## Ship boost budget
+## Contour Lock
 
-Movement poses carry a boolean `boosting` request and a `boostDepleted` advisory.
-The advisory spends the last fraction when client prediction reaches empty
-before its next pose arrives; it can never grant charge or restart a tank. The server owns the charge
-budget using its monotonic elapsed clock, not the client's packet frequency or
-charge claims. Repeated true requests cannot extend an active burst or restart
-an exhausted tank. After exhaustion, a false request followed by a fresh true
-request is needed once any charge has returned. Activation interrupts recharge;
-there is no full-tank requirement. Limits live in `shared/shipBoost.ts`.
+Movement poses carry `contourLock: {height, direction}` or `null` to release.
+Capture requires a valid terrain gradient within 48 units of the selected level.
+Height and direction stay fixed until release; the server requires convergence
+within 6 units over 600 ms, velocity along the rail, and forward displacement
+along the selected route. Speed and displacement
+remain bounded by the kit cruise speed and server-time movement credit.
+The shared guidance and limits live in `shared/contourLock.ts`.
 
-Snapshots carry the authoritative boost phase and remaining charge. Local
-prediction drains at the fixed simulation rate and reconciles against motion
-acknowledgments without letting an older echo undo a newer toggle. Active echoes
-cannot replenish an active tank or restart a locally exhausted one. Respawns
-restore a full tank; brief reconnects preserve the tank, and persisted recent
-flights restore it with elapsed inactive recharge. Menus stop active boost.
+Snapshot motion acknowledgments protect newer local capture/release input from
+older echoes. A new authoritative epoch rebases the lock along with the pose.
+Menus, death, pipe travel, any collision, knockback, and disconnect release the
+lock. Protected asteroid contact also releases it without removing protected
+health. Lasers pass through invulnerable hulls without breaking the lock; direct
+crew shots also pass through without contact. Release
+caps velocity back to ordinary contour cruise, except for server-owned knockback.
+There is no charge, recharge timer, or cooldown; pilots may capture again immediately.
 
 ## Asteroid belt
 

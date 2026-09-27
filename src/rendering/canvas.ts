@@ -8,6 +8,7 @@ import { drawAsteroidShatterBursts, drawRoidsRelative } from '../entities/roid/r
 import { drawSurveyProbes } from '../entities/roid/surveyProbeRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
+import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import {
   drawHaulerHarpoonRelative,
   drawLasers,
@@ -18,6 +19,7 @@ import {
   drawThrusterAtPosition,
 } from '../entities/ship/shipRenderer';
 import { shouldDrawShipHull } from '../entities/ship/shipUtils';
+import { activeScanners } from '../entities/ship/surveyScan';
 import { drawSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
@@ -42,31 +44,41 @@ import { drawShockwaves } from './shockwaveRenderer';
 import { drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield } from './starfield';
 
+/** Mineral Scan widens the view to the whole scanned disc plus this margin. */
+const SCAN_VIEW_MARGIN = 1.15;
+
+/** Zoom out while the local Scout's scan pulse runs so the full scan area is visible. */
+export function scanCameraZoom(
+  ship: Parameters<typeof activeScanners>[0],
+  width: number,
+  height: number
+) {
+  if (activeScanners(ship, []).length === 0) {
+    return 1;
+  }
+  return Math.min(
+    1,
+    Math.min(width, height) /
+      2 /
+      (SHIP_ABILITY.SCAN_RANGE * SCAN_VIEW_MARGIN * canvasManager.getPlayfieldScale())
+  );
+}
+
 const laserHosts: LiveLaserSource[] = [{ lasers: [] }];
 const liveLaserScratch: Position[] = [];
 
-export function drawGame(
+/** Everything drawn in world space; the scan camera may scale this layer. */
+function drawWorldLayers(
+  ctx: CanvasRenderingContext2D,
   currPlayer: Player,
-  currRoidBelt: RoidBelt,
-  currScore: number,
-  textAlpha: number,
-  text: string,
+  roids: ReturnType<RoidBelt['getRoids']>,
+  loot: ReturnType<LootField['getAll']>,
+  satellitePickups: ReturnType<SatellitePickupManager['getAll']>,
   allPlayers: Player[]
 ): void {
   const currShip = currPlayer.ship;
-  const ctx = canvasManager.getContext();
-  const canvas = canvasManager.getCanvas();
-
-  if (!ctx || !canvas) {
-    return;
-  }
-
-  canvasManager.followTravel(currShip);
+  const localId = currPlayer.id;
   const viewport = canvasManager.getViewportSize();
-  ctx.fillStyle = PALETTE.BG;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
-
-  const roids = currRoidBelt.getRoids();
 
   drawStarfield(currShip.position);
   drawIsoContours(currShip.position);
@@ -76,7 +88,6 @@ export function drawGame(
   drawRicochetCourt(currShip.position);
   drawTerrainSpiders(currShip.position, currPlayer.id, currShip.health > 0 && !currShip.exploding);
 
-  const localId = currPlayer.id;
   let laserHostCount = 1;
   const localLaserHost = laserHosts[0];
   if (localLaserHost) {
@@ -108,8 +119,6 @@ export function drawGame(
   drawFurnacesRelative(currShip.position);
   drawAsteroidShatterBursts(currShip);
 
-  const loot = LootField.getInstance().getAll();
-  const satellitePickups = SatellitePickupManager.getInstance().getAll();
   drawLootRelative(currShip, loot);
   drawSatellitePickups(satellitePickups, currShip.position);
 
@@ -176,6 +185,44 @@ export function drawGame(
       viewport.height / 2,
       currShip.r * canvasManager.getPlayfieldScale()
     );
+  }
+}
+
+export function drawGame(
+  currPlayer: Player,
+  currRoidBelt: RoidBelt,
+  currScore: number,
+  textAlpha: number,
+  text: string,
+  allPlayers: Player[]
+): void {
+  const currShip = currPlayer.ship;
+  const ctx = canvasManager.getContext();
+  const canvas = canvasManager.getCanvas();
+
+  if (!ctx || !canvas) {
+    return;
+  }
+
+  canvasManager.followTravel(currShip);
+  const viewport = canvasManager.getViewportSize();
+  ctx.fillStyle = PALETTE.BG;
+  ctx.fillRect(0, 0, viewport.width, viewport.height);
+  canvasManager.easeZoomToward(
+    scanCameraZoom(currShip, viewport.width, viewport.height),
+    performance.now()
+  );
+  const roids = currRoidBelt.getRoids();
+  const loot = LootField.getInstance().getAll();
+  const satellitePickups = SatellitePickupManager.getInstance().getAll();
+  const localId = currPlayer.id;
+
+  // Always close the zoomed layer so a painter failure cannot leave the HUD viewport inflated.
+  canvasManager.beginWorldLayers(ctx);
+  try {
+    drawWorldLayers(ctx, currPlayer, roids, loot, satellitePickups, allPlayers);
+  } finally {
+    canvasManager.endWorldLayers(ctx);
   }
 
   const hudLayout = hudLayoutForCanvas(viewport);

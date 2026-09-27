@@ -40,13 +40,19 @@ for (const viewport of [
         end,
         counterclockwise
       ) {
+        // Measure in screen pixels: the scan camera draws the sweep in a zoomed world layer.
+        const transform = this.getTransform();
+        const dpr = window.devicePixelRatio || 1;
+        const screenX = (transform.a * x + transform.c * y + transform.e) / dpr;
+        const screenY = (transform.b * x + transform.d * y + transform.f) / dpr;
+        const screenRadius = (radius * Math.hypot(transform.a, transform.b)) / dpr;
         if (
           this.canvas === canvas &&
-          Math.abs(x - window.innerWidth / 2) < 2 &&
-          Math.abs(y - window.innerHeight / 2) < 2 &&
-          radius > 50
+          Math.abs(screenX - window.innerWidth / 2) < 2 &&
+          Math.abs(screenY - window.innerHeight / 2) < 2 &&
+          screenRadius > 50
         ) {
-          observation.maxRadius = Math.max(observation.maxRadius, radius);
+          observation.maxRadius = Math.max(observation.maxRadius, screenRadius);
           observation.samples++;
         }
         originalArc.call(this, x, y, radius, start, end, counterclockwise);

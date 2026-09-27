@@ -11,7 +11,7 @@ permissions:
 jobs:
   coverage:
     name: coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -22,6 +22,17 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Verify workflow tools without publishing
+        timeout-minutes: 2
+        env:
+          VERCEL_TELEMETRY_DISABLED: '1'
+        run: |
+          test "$(uname -m)" = aarch64
+          git --version
+          gh --version
+          jq --version
+          npm install --prefix "$RUNNER_TEMP/vercel-cli" --omit=dev --no-fund --ignore-scripts vercel@59.20.0
+          "$RUNNER_TEMP/vercel-cli/node_modules/.bin/vercel" --version
       - name: Collect coverage separately from performance measurements
         run: |
           set -o pipefail

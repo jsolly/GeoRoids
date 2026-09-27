@@ -22,7 +22,7 @@ concurrency:
 jobs:
   publish:
     name: Publish saved wiki draft
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     # CI and protected auto-merge each have bounded waits in the publisher.
     # Leave room for checkout, retries, and GitHub API latency around those waits.
     timeout-minutes: 60

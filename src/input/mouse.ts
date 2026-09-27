@@ -4,7 +4,7 @@ import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { isTownStoreOpen } from '../ui/townStoreState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
-import { reconcilePlayerInput } from './keybindings';
+import { reconcilePlayerInput, togglePlayerContourLock } from './keybindings';
 import { pointerHeadingFromCenter } from './pointerSteering';
 
 /* =============
@@ -22,7 +22,7 @@ export function handleMouseMove(ev: MouseEvent, player: Player): void {
   if (isSyntheticTouchMouse(ev)) {
     return;
   }
-  if (player.ship.health <= 0 || player.ship.exploding) {
+  if (player.ship.contourLocked || player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
 
@@ -57,12 +57,12 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
     return;
   }
 
-  // Left mouse fires; right mouse toggles boost like Shift.
+  // Left mouse fires; right mouse toggles Contour Lock like Shift.
   if (ev.button === 0) {
     logger.debug('MOUSE', 'Left mouse click - shooting', { playerId: player.id });
     player.ship.shoot();
   } else if (ev.button === 2) {
-    player.ship.toggleBoost();
+    togglePlayerContourLock(player);
   }
 }
 

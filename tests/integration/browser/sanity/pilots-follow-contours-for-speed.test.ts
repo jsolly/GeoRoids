@@ -245,6 +245,11 @@ for (const viewport of [
         if (serverSpeed === undefined || observerSpeed === undefined) {
           throw new Error('Both pilots must receive the cruise velocity');
         }
+        await page.screenshot({
+          path: screenshotManager.getScreenshotPath(
+            `contour-speed-lines-${viewport.name}-${measurements.length}.png`
+          ),
+        });
         measurements.push({ local: local.speed, server: serverSpeed, observer: observerSpeed });
         expect(authoritative.isThrusting(playerId)).toBe(true);
         expect(observed.isThrusting(playerId)).toBe(true);

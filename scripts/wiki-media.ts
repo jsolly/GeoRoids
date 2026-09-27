@@ -30,6 +30,7 @@ import {
   segmentCircleContact,
 } from '../shared/asteroidPhenomena';
 import { circlesOverlap } from '../shared/combat';
+import { CONTOUR_LOCK, contourLockDistance, contourLockSpeed } from '../shared/contourLock';
 import { SATELLITE_PROFILES } from '../shared/eoSatellites';
 import { FURNACES, furnaceReward } from '../shared/furnaces';
 import {
@@ -40,7 +41,7 @@ import {
   LOOT_BLAST,
 } from '../shared/lootBlast';
 import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
-import { applyLootMass, GROWTH, lootOverlap } from '../shared/shipGrowth';
+import { GROWTH, lootOverlap } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
 import { lootScreenRadius } from '../src/entities/loot/lootRenderer';
@@ -77,6 +78,7 @@ import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient } from '../src/physics/terrain/heightfield';
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
+import { drawContourSpeedLines } from '../src/rendering/contourSpeedLines';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
 import { asteroidMapInk, drawResourceMapMark } from '../src/rendering/hud/resourceMapMark';
@@ -857,7 +859,8 @@ function makeMovementDemo(): Demo {
   };
 }
 
-const TERRAIN_CROSSING_START_FRAME = 28;
+const TERRAIN_LOCK_START_FRAME = 14;
+const TERRAIN_CROSSING_START_FRAME = 30;
 const TERRAIN_TURN_PER_TICK = (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS);
 
 /** Nose angle whose cruiseVelocity (canvas y-down) points along `(dirX, dirY)`. */
@@ -906,25 +909,31 @@ function makeTerrainDemo(): Demo {
   const contours = extractIsoContours(field);
   const cruise = cruiseSpeed(1, SHIP.MAX_VELOCITY);
   const initialGradient = sampleGradient(field, start.x, start.y);
-  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
-    position: copyPosition(start),
-    velocity: { x: 0, y: 0 },
-    angle: headingAlongContour(initialGradient.x, initialGradient.y, 0),
-    mass: 1,
-    thrust: SHIP.THRUST,
-  };
+  const state = new Ship({ kitId: 'scout', position: copyPosition(start) });
+  state.angle = headingAlongContour(initialGradient.x, initialGradient.y, 0);
   const gradients: number[] = [Math.hypot(initialGradient.x, initialGradient.y)];
   let sawContourFollow = false;
   let sawNormalCrossing = false;
+  let sawRailGuidance = false;
+  let maxRailSpeed = 0;
   let maxContourSpeed = 0;
   return {
     id: 'terrain',
-    posterFrame: 20,
+    posterFrame: 24,
     verify: () => {
       invariant(contours.length > 0, 'terrain contour extraction returned no levels');
       invariant(sawContourFollow, 'terrain demo did not ride a contour');
       invariant(maxContourSpeed > cruise * 1.5, 'terrain demo did not gain contour speed');
       invariant(sawNormalCrossing, 'terrain demo did not return to normal crossing speed');
+      invariant(sawRailGuidance, 'terrain demo did not capture and follow a real visible rail');
+      invariant(
+        maxRailSpeed > maxContourSpeed * 1.1,
+        'rail guidance did not exceed free contour cruise'
+      );
+      invariant(
+        Math.abs(maxRailSpeed - contourLockSpeed(cruise)) < 0.01,
+        'rail did not reach its shared speed limit'
+      );
       invariant(
         gradients.some((gradient) => gradient > 0.0001),
         'terrain gradient samples were flat'
@@ -934,15 +943,32 @@ function makeTerrainDemo(): Demo {
       drawFrameChrome(
         ctx,
         'TERRAIN · CONTOUR TRAVEL',
-        'follow for speed · cross at normal cruise',
+        'follow · lock for more speed · release to cross',
         frame,
         PALETTE.CONTOUR
       );
+      if (frame === TERRAIN_LOCK_START_FRAME) {
+        invariant(
+          state.toggleContourLock(),
+          'terrain demo could not capture its nearest visible contour'
+        );
+      }
+      if (frame === TERRAIN_CROSSING_START_FRAME) {
+        state.releaseContourLock();
+      }
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
           const gradient = sampleGradient(field, state.position.x, state.position.y);
+          if (state.contourLock) {
+            state.update();
+            maxRailSpeed = Math.max(maxRailSpeed, Math.hypot(state.velocity.x, state.velocity.y));
+            sawRailGuidance ||=
+              state.contourLock !== null &&
+              contourLockDistance(state.position, state.contourLock) <= CONTOUR_LOCK.railTolerance;
+            return;
+          }
           const desired =
-            frame < TERRAIN_CROSSING_START_FRAME
+            frame < TERRAIN_LOCK_START_FRAME
               ? headingAlongContour(gradient.x, gradient.y, state.angle)
               : headingAcrossContour(gradient.x, gradient.y, state.angle);
           state.angle += steeringTurn(state.angle, desired, TERRAIN_TURN_PER_TICK);
@@ -957,13 +983,13 @@ function makeTerrainDemo(): Demo {
               heading.x * (-gradient.y / magnitude) + heading.y * (gradient.x / magnitude)
             );
             if (
-              frame < TERRAIN_CROSSING_START_FRAME &&
+              frame < TERRAIN_LOCK_START_FRAME &&
               tangentAlignment > 0.92 &&
               speed > cruise * 0.95
             ) {
               sawContourFollow = true;
             }
-            if (frame < TERRAIN_CROSSING_START_FRAME) {
+            if (frame < TERRAIN_LOCK_START_FRAME) {
               maxContourSpeed = Math.max(maxContourSpeed, speed);
             } else if (tangentAlignment < 0.05 && Math.abs(speed / cruise - 1) < 0.01) {
               sawNormalCrossing = true;
@@ -1003,8 +1029,8 @@ function makeTerrainDemo(): Demo {
             b.x,
             b.y,
             PALETTE.CONTOUR,
-            level.index % 3 === 0 ? 1.1 : 0.65,
-            0.5
+            state.contourLock?.height === level.height ? 2 : level.index % 3 === 0 ? 1.1 : 0.65,
+            state.contourLock?.height === level.height ? 0.95 : 0.5
           );
         }
       }
@@ -1018,6 +1044,23 @@ function makeTerrainDemo(): Demo {
         getShipKit('scout').size / 2,
         true
       );
+      const screen = screenPoint({ x: 0, y: 0 });
+      drawContourSpeedLines(
+        ctx,
+        screen.x,
+        screen.y,
+        state.angle,
+        getShipKit('scout').size / 2,
+        Math.max(
+          0,
+          Math.min(
+            1,
+            (Math.hypot(state.velocity.x, state.velocity.y) / cruise - 1) /
+              TERRAIN.CONTOUR_SPEED_BONUS
+          )
+        ),
+        (frame * 1000) / FPS
+      );
       drawTag(
         ctx,
         `speed ${(Math.hypot(state.velocity.x, state.velocity.y) / cruise).toFixed(2)}×`,
@@ -1027,9 +1070,11 @@ function makeTerrainDemo(): Demo {
       );
       drawTag(
         ctx,
-        frame < TERRAIN_CROSSING_START_FRAME
-          ? 'follow the lines · speed bonus'
-          : 'cross the lines · normal cruise',
+        frame < TERRAIN_LOCK_START_FRAME
+          ? 'free flight · follow for a speed bonus'
+          : frame < TERRAIN_CROSSING_START_FRAME
+            ? 'contour locked · faster automatic guidance'
+            : 'released · steer across at normal cruise',
         320,
         286,
         PALETTE.HUD_MUTED
@@ -1074,8 +1119,6 @@ function makeLootDemo(): Demo {
   const secondDrop = lootManager.spawnShard({ x: 60, y: 0 }, 0, 0.25);
   const rock = makeAsteroid('loot-rock', { x: 44, y: 0 }, 22, 'rubble');
   const shooterStart = { x: -1000, y: 0 };
-  const initialMass = 1;
-  let mass = initialMass;
   let armed = false;
   let detonated = false;
   let collected = false;
@@ -1117,7 +1160,7 @@ function makeLootDemo(): Demo {
       invariant(armed, 'loot arm range was never reached');
       invariant(detonated, 'loot blast never triggered');
       invariant(firstRemoved && contactFrame >= 0, 'loot shot did not remove the first drop');
-      invariant(collected && mass > initialMass, 'loot mass growth never applied');
+      invariant(collected, 'remaining shard was never collected');
       invariant(rock.position.x > 44, 'loot blast did not push the small rock');
       invariant(magnetized, 'remaining shard never magnetized toward the hull');
       invariant(lootManager.get(secondDrop.id) === undefined, 'collected shard remained in loot');
@@ -1180,7 +1223,6 @@ function makeLootDemo(): Demo {
           const removed = lootManager.remove(secondDrop.id);
           if (removed !== undefined) {
             collected = true;
-            mass = applyLootMass(mass, removed.mass);
             liveSecond = undefined;
           }
         }
@@ -1238,7 +1280,7 @@ function makeLootDemo(): Demo {
       drawTag(
         ctx,
         collected
-          ? 'shard collected · mass gained'
+          ? 'shard collected · flight unchanged'
           : detonated
             ? 'blast pushed the rock'
             : armed

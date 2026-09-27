@@ -1,12 +1,13 @@
 import { expect, test } from 'vitest';
-import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
 } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { placePilotNearContour } from '../../utils/contour-lock';
 import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
+import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
@@ -15,113 +16,99 @@ for (const viewport of [
   { name: 'mobile', width: 390, height: 844, touch: true },
   { name: 'landscape', width: 844, height: 390, touch: true },
 ]) {
-  test(`a ${viewport.name} pilot interrupts cyan recharge with a partial amber boost`, async () => {
+  test(`a ${viewport.name} pilot catches and releases a contour without a charge meter`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize(viewport);
-    await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
-    const id = await page.evaluate(() => window.gameController?.getCurrPlayer()?.id);
-    if (!id) {
-      throw new Error('Missing pilot');
-    }
-    await arrangeCrewField([id], 'empty');
-    await game.waitForAnimationFrames(4);
-    const button = page.locator('#touch-boost');
+    const observerPage = await browserManager.createAdditionalPage();
+    const observerDiagnostics = watchBrowserDiagnostics(observerPage);
+    const observer = new GameInteractions(observerPage);
+    await observer.bootGame({ waitForCombatReady: false, kitId: 'scout' });
+    const playerId = await game.getLocalPlayerId();
+    await arrangeCrewField([playerId, await observer.getLocalPlayerId()], 'empty');
+    await placePilotNearContour(page, game);
+    const button = page.locator('#touch-contour-lock');
     await button.waitFor({ state: 'visible' });
     await expect.poll(() => button.isEnabled()).toBe(true);
-    await expect.poll(() => button.textContent()).toBe('BOOST');
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`boost-ready-${viewport.name}.png`),
-    });
+    await expect.poll(() => button.textContent()).toBe('CONTOUR LOCK');
     const activate = () => (viewport.touch ? button.tap() : button.click());
     await activate();
-    await page.waitForFunction(() => {
-      const boost = window.gameController?.getCurrPlayer()?.ship.boost;
-      return boost?.phase === 'active' && boost.charge < 0.65 && boost.charge > 0.3;
-    });
-    expect(await button.getAttribute('aria-pressed')).toBe('true');
-    const activeColor = await button.evaluate((el) =>
-      getComputedStyle(el).getPropertyValue('--boost-fill').trim()
-    );
-    expect(activeColor).toBe('#fbbf24');
-    const beforeCharge = Number(await button.getAttribute('data-boost-charge'));
-    await game.waitForAnimationFrames(6);
-    expect(Number(await button.getAttribute('data-boost-charge'))).toBeLessThan(beforeCharge);
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`boost-active-${viewport.name}.png`),
-    });
-    await page.waitForFunction(
-      () => window.gameController?.getCurrPlayer()?.ship.boost.phase === 'exhausted',
-      undefined,
-      { timeout: 5000 }
-    );
-    await page.waitForFunction(() => {
-      const boost = window.gameController?.getCurrPlayer()?.ship.boost;
-      return boost?.phase === 'exhausted' && boost.charge > 0.4 && boost.charge < 0.75;
-    });
-    expect(await button.getAttribute('aria-pressed')).toBe('false');
-    expect(await readSamplePlaybackRates(page, 'boost-start')).toEqual([1]);
-    expect(await readSamplePlaybackRates(page, 'boost-end')).toEqual([1]);
-    expect(
-      await button.evaluate((el) => getComputedStyle(el).getPropertyValue('--boost-fill').trim())
-    ).toBe('#22d3ee');
-    const refilling = Number(await button.getAttribute('data-boost-charge'));
-    await game.waitForAnimationFrames(6);
-    expect(Number(await button.getAttribute('data-boost-charge'))).toBeGreaterThan(refilling);
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`boost-refilling-${viewport.name}.png`),
-    });
-    await expect.poll(() => button.isEnabled()).toBe(true);
-    await activate();
     await expect.poll(() => button.getAttribute('aria-pressed')).toBe('true');
-    const partial = Number(await button.getAttribute('data-boost-charge'));
-    expect(partial).toBeLessThan(0.8);
-    await game.waitForAnimationFrames(12);
-    expect(await button.getAttribute('data-boost-phase')).toBe('active');
-    expect(Number(await button.getAttribute('data-boost-charge'))).toBeLessThan(partial);
-    expect(
-      await button.evaluate((el) => getComputedStyle(el).getPropertyValue('--boost-fill').trim())
-    ).toBe('#fbbf24');
+    await game.waitForAnimationFrames(90);
+    expect(await button.textContent()).toBe('RELEASE LOCK');
+    expect(await button.getAttribute('aria-pressed')).toBe('true');
+    expect(await button.textContent()).not.toContain('%');
+    await expect
+      .poll(() =>
+        observerPage.evaluate((id) => {
+          const ship = window.gameController
+            ?.getNetworkManager()
+            .getAllPlayers()
+            .find((player) => player.id === id)?.ship;
+          return Boolean(ship?.contourLock);
+        }, playerId)
+      )
+      .toBe(true);
+    // Firing uses real input and must not release the rail.
+    const center = await centerOf(page, '#gameCanvas');
+    if (viewport.touch) {
+      await page.touchscreen.tap(center.x, center.y);
+    } else {
+      await page.keyboard.press('Space');
+    }
+    expect(await button.getAttribute('aria-pressed')).toBe('true');
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`boost-partial-restart-${viewport.name}.png`),
+      path: screenshotManager.getScreenshotPath(`contour-locked-${viewport.name}.png`),
     });
     await activate();
     await expect.poll(() => button.getAttribute('aria-pressed')).toBe('false');
-    await page.waitForFunction(
-      () => {
-        const boost = window.gameController?.getCurrPlayer()?.ship.boost;
-        return boost?.phase === 'idle' && boost.charge === 1;
-      },
-      undefined,
-      { timeout: 6000 }
-    );
-    await expect.poll(() => button.isEnabled()).toBe(true);
     await activate();
-    await expect
-      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.boosting))
-      .toBe(true);
+    await expect.poll(() => button.getAttribute('aria-pressed')).toBe('true');
+    if (viewport.touch) {
+      const session = await page.context().newCDPSession(page);
+      try {
+        await dispatchTouch(session, 'touchStart', [{ ...center, id: 1 }]);
+        await dispatchTouch(session, 'touchMove', [{ x: center.x - 100, y: center.y, id: 1 }]);
+        await dispatchTouch(session, 'touchEnd', []);
+      } finally {
+        await session.detach();
+      }
+    } else {
+      await page.keyboard.press('ArrowLeft');
+    }
+    await expect.poll(() => button.getAttribute('aria-pressed')).toBe('true');
     await activate();
+    await expect.poll(() => button.getAttribute('aria-pressed')).toBe('false');
     await expect
-      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.boosting))
+      .poll(() =>
+        observerPage.evaluate((id) => {
+          const ship = window.gameController
+            ?.getNetworkManager()
+            .getAllPlayers()
+            .find((player) => player.id === id)?.ship;
+          return Boolean(ship?.contourLock);
+        }, playerId)
+      )
       .toBe(false);
     assertNoBrowserDiagnostics(diagnostics);
+    assertNoBrowserDiagnostics(observerDiagnostics);
   }, 20000);
 }
 
-test('a narrow-phone Debug overlay keeps boost and the ability disc fully on screen', async () => {
+test('a narrow-phone Debug overlay keeps Contour Lock and the ability disc fully on screen', async () => {
   const page = await browserManager.recreatePage({ hasTouch: true });
   const diagnostics = watchBrowserDiagnostics(page);
   await page.setViewportSize({ width: 390, height: 650 });
   await page.addInitScript(() => localStorage.setItem('debugOn', 'true'));
   const game = new GameInteractions(page);
   await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
-  await game.placeShipAt(0, -500);
+  await placePilotNearContour(page, game);
   const panel = page.locator('#debug-hud');
-  const boost = page.locator('#touch-boost');
+  const contourLock = page.locator('#touch-contour-lock');
   await panel.waitFor({ state: 'visible' });
-  await boost.waitFor({ state: 'visible' });
+  await contourLock.waitFor({ state: 'visible' });
   const ability = page.locator('#touch-ability');
   await ability.waitFor({ state: 'visible' });
   await expect.poll(() => ability.textContent()).toBe('SCAN');
@@ -159,18 +146,18 @@ test('a narrow-phone Debug overlay keeps boost and the ability disc fully on scr
       canvas: box(document.querySelector('#gameCanvas')),
       stack: box(document.querySelector('#debug-play-stack')),
       ability: abilityBox,
-      boost: box(document.querySelector('#touch-boost')),
+      contourLock: box(document.querySelector('#touch-contour-lock')),
       abilityLabel: abilityEl?.textContent,
       abilityHit: hit instanceof Element && Boolean(abilityEl?.contains(hit) || hit === abilityEl),
     };
   });
   const panelBounds = await page.locator('#debug-play-stack').boundingBox();
-  const boostBounds = await boost.boundingBox();
-  if (!panelBounds || !boostBounds) {
-    throw new Error('Missing Debug HUD or boost bounds');
+  const contourLockBounds = await contourLock.boundingBox();
+  if (!panelBounds || !contourLockBounds) {
+    throw new Error('Missing Debug HUD or Contour Lock bounds');
   }
   await page.screenshot({
-    path: screenshotManager.getScreenshotPath('debug-hud-keeps-boost-visible-mobile.png'),
+    path: screenshotManager.getScreenshotPath('debug-hud-keeps-contour-lock-visible-mobile.png'),
   });
   expect(chrome.abilityLabel).toBe('SCAN');
   expect(chrome.overflowX).toBe(false);
@@ -191,9 +178,9 @@ test('a narrow-phone Debug overlay keeps boost and the ability disc fully on scr
   expect(chrome.stack?.right).toBeLessThanOrEqual((chrome.playfield?.right ?? 0) + 1);
   expect(chrome.stack?.top).toBeGreaterThanOrEqual((chrome.playfield?.top ?? 0) - 1);
   expect(chrome.stack?.bottom).toBeLessThanOrEqual((chrome.playfield?.bottom ?? 0) + 1);
-  expect(chrome.boost?.right).toBeLessThanOrEqual(chrome.ability?.left ?? 0);
-  expect(panelBounds.y + panelBounds.height).toBeLessThan(boostBounds.y);
-  await boost.tap();
-  await expect.poll(() => boost.getAttribute('aria-pressed')).toBe('true');
+  expect(chrome.contourLock?.right).toBeLessThanOrEqual(chrome.ability?.left ?? 0);
+  expect(panelBounds.y + panelBounds.height).toBeLessThan(contourLockBounds.y);
+  await contourLock.tap();
+  await expect.poll(() => contourLock.getAttribute('aria-pressed')).toBe('true');
   assertNoBrowserDiagnostics(diagnostics);
 }, 20000);

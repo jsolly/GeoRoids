@@ -30,7 +30,7 @@ test('a furnace rocket follows server time despite clock skew and accepts its ar
   player.ship.fireLaser();
   expect(player.ship.lasers).toHaveLength(lasers);
   expect(player.ship.activateAbility()).toBe(false);
-  expect(player.ship.toggleBoost()).toBe(false);
+  expect(player.ship.toggleContourLock()).toBe(false);
   now.mockReturnValue(14_000);
   player.ship.update();
   const arrival = furnaceTravelPose(transit, 4_000).position;
@@ -43,5 +43,5 @@ test('a furnace rocket follows server time despite clock skew and accepts its ar
   });
   expect(player.ship.furnaceTransit).toBeNull();
   expect(player.ship.position).toEqual(arrival);
-  expect(player.ship.toggleBoost()).toBe(true);
+  expect(player.ship.toggleContourLock()).toBe(true);
 });

@@ -69,6 +69,23 @@ describe('seeded heightfield is shared', () => {
 });
 
 describe('iso contours encode elevation', () => {
+  test('neighboring camera patches draw the same canonical contour levels', () => {
+    const field = createHeightfield(TERRAIN.DEFAULT_SEED, { radius: 60000 });
+    const patches = [0, CONTOUR_REGION_STEP].map((cx) =>
+      extractIsoContours(field, 96, TERRAIN.CONTOUR_INTERVAL, { cx, cy: 0, radius: 2048 })
+    );
+    for (const levels of patches) {
+      for (const level of levels) {
+        expect(level.height).toBeCloseTo(level.index * TERRAIN.CONTOUR_INTERVAL, 12);
+      }
+    }
+    expect(
+      patches[0]?.some((left) =>
+        patches[1]?.some((right) => right.index === left.index && right.height === left.height)
+      )
+    ).toBe(true);
+  });
+
   test('cuts retain the original contour density across plains and hills', () => {
     const field = createHeightfield(TERRAIN.DEFAULT_SEED, { radius: 60000 });
     // Counts measured from the original terrain at these same views.
@@ -77,7 +94,11 @@ describe('iso contours encode elevation', () => {
       [4200, 0, 10550],
       [-2100, 700, 10170],
     ] satisfies [number, number, number][]) {
-      const levels = extractIsoContours(field, 96, 18, { cx: cx ?? 0, cy: cy ?? 0, radius: 2048 });
+      const levels = extractIsoContours(field, 96, TERRAIN.CONTOUR_INTERVAL, {
+        cx: cx ?? 0,
+        cy: cy ?? 0,
+        radius: 2048,
+      });
       expect(contourSegmentCount(levels)).toBeGreaterThan(originalCount * 0.9);
     }
   });

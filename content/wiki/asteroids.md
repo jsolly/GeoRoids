@@ -17,7 +17,7 @@ media:
 
 ## Field and materials
 
-Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Metal shards carry more mass. Outside the asteroid belt, deposits stay harvested when you return to a region.
+Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Outside the asteroid belt, deposits stay harvested when you return to a region.
 
 ## Cooperative splits and score
 

@@ -32,12 +32,31 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
   return set;
 }
 
+const TURN_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD']);
+
+/** Explicit lock controls discard steering that predates the new flight mode. */
+export function togglePlayerContourLock(player: Player): boolean {
+  const wasLocked = player.ship.contourLocked;
+  const active = player.ship.toggleContourLock();
+  if (wasLocked !== active) {
+    controlSources.pointerHeading = null;
+    controlSources.steeringEpoch++;
+    const pressed = getPressedKeysForPlayer(player);
+    for (const code of TURN_KEYS) {
+      pressed.delete(code);
+      keys[code] = false;
+    }
+    player.ship.angularVelocity = 0;
+  }
+  return active;
+}
+
 /** The live local ship cruises regardless of which controls are held. */
 function updateCruise(player: Player): void {
   const alive = player.ship.health > 0 && !player.ship.exploding;
   player.ship.thrusting = alive && !player.ship.movementLocked;
   if (!alive) {
-    player.ship.stopBoost();
+    player.ship.releaseContourLock();
   }
 }
 
@@ -51,6 +70,10 @@ function turnSpeedForShip(player: Player): number {
 
 function updateTurnFromKeys(player: Player): void {
   if (player.ship.movementLocked || player.ship.health <= 0 || player.ship.exploding) {
+    player.ship.angularVelocity = 0;
+    return;
+  }
+  if (player.ship.contourLocked) {
     player.ship.angularVelocity = 0;
     return;
   }
@@ -89,6 +112,12 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     shipExploding: player.ship.exploding,
   });
 
+  if (
+    TURN_KEYS.has(ev.code) &&
+    (player.ship.contourLocked || (ev.repeat && !getPressedKeysForPlayer(player).has(ev.code)))
+  ) {
+    return;
+  }
   if (player.ship.health > 0 && !player.ship.exploding) {
     if (ev.code in keys) {
       keys[ev.code] = true;
@@ -110,7 +139,7 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
       case 'ShiftLeft':
       case 'ShiftRight':
         if (!ev.repeat) {
-          player.ship.toggleBoost();
+          togglePlayerContourLock(player);
         }
         break;
       case 'ArrowLeft':

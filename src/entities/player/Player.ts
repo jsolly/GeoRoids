@@ -1,12 +1,12 @@
 import { canEquipUtility } from '../../../shared/equipment';
 import { purchasedHullColor } from '../../../shared/townStore';
 import type {
+  ContourLockState,
   EquipmentId,
   FurnaceTransit,
   HaulerUtilityId,
   Position,
   ScoutUtilityId,
-  ShipBoostState,
   ShipKitId,
 } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
@@ -118,7 +118,7 @@ export class Player {
     furnaceTransit?: FurnaceTransit | null;
     exploding?: boolean;
     thrusting?: boolean;
-    boost?: ShipBoostState;
+    contourLock?: ContourLockState;
     color?: string;
     deathCause?: string;
     health?: number;
@@ -239,8 +239,8 @@ export class Player {
     if (data.thrusting !== undefined && this.type !== 'local') {
       this.ship.thrusting = data.thrusting;
     }
-    if (data.boost !== undefined && this.type !== 'local') {
-      this.ship.boost = { ...data.boost };
+    if (this.type !== 'local') {
+      this.ship.contourLock = data.contourLock ? { ...data.contourLock } : null;
     }
     if (data.color !== undefined) {
       const color =

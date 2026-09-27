@@ -1,5 +1,4 @@
 import { ASTEROID_BELT, beltSlots } from '../../shared/asteroidBelt';
-import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import { ASTEROID_INTERACTIONS } from '../../shared/asteroidPhenomena';
 import { colossalMiningHealth } from '../../shared/asteroidScale';
 import { BELT_CRAWLER } from '../../shared/beltCrawler';
@@ -7,6 +6,7 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
+import { CONTOUR_LOCK } from '../../shared/contourLock';
 import { ECONOMY, settlementRecipe } from '../../shared/economy';
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { EXPLORATION_RANGE } from '../../shared/exploration';
@@ -22,7 +22,6 @@ import { FURNACE_TRAVEL } from '../../shared/furnaceTravel';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
-import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
@@ -44,7 +43,7 @@ function frameValue(frames: number): string {
 function shipStats(id: ShipKitId): string {
   const kit = getShipKit(id);
   const cooldown = SHIP_ABILITY.COOLDOWN_FRAMES[id];
-  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, boost multiplier ${kit.boostMultiplier}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
+  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
 }
 
 function satelliteProfiles(): string[] {
@@ -78,7 +77,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Movement values',
       paragraphs: [
         `Automatic movement defaults: thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, and turn rate ${SHIP.TURN_SPEED} degrees per second. Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
-        `Shift, right-click, or the Boost button multiplies cruise speed and thrust by ${getShipKit('scout').boostMultiplier} for Scout and ${getShipKit('hauler').boostMultiplier} for Hauler. Tap, click, or press again to return to the shared cruise speed. A full tank lasts ${BOOST.durationMs / 1000} seconds and refills from empty in ${BOOST.rechargeMs / 1000} seconds; any available charge can start another burst and interrupt recharging.`,
+        `Shift, right-click, or the Contour Lock button catches the nearest visible contour within ${CONTOUR_LOCK.captureRadius} world units. Locked travel follows its curves at ${CONTOUR_LOCK.speedMultiplier} times maximum contour cruise. Tap the same control again to release. Steering is ignored while locked; physical contact releases the lock even if hull protection prevents damage, while lasers pass through invulnerable hulls without releasing it. There is no charge or cooldown.`,
         `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },
@@ -125,10 +124,10 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
   ],
   'loot-growth': [
     {
-      heading: 'Growth and loot values',
+      heading: 'Loot and salvage values',
       paragraphs: [
-        `Growth starts at mass ${GROWTH.BASE_MASS}, soft-caps at ${GROWTH.SOFT_MAX_MASS}, scales health up to ${GROWTH.MAX_HEALTH_SCALE}× the Scout base, and bottoms out at thrust scale ${GROWTH.MIN_THRUST_SCALE} and speed scale ${GROWTH.MIN_SPEED_SCALE}. Hull size stays at the kit base. An environmental ship death always contributes at least ${GROWTH.BASE_KILL_MASS} mass, converts ${GROWTH.DROP_FRACTION * 100}% of excess mass, targets ${GROWTH.PELLET_MASS} mass per pellet, allows at most ${GROWTH.MAX_PELLETS} pellets, and caps live loot at ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
-        `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}. Tap canisters have radius ${GROWTH.TAP_LOOT_RADIUS}, mass ${GROWTH.TAP_LOOT_MASS}, and score ${GROWTH.TAP_LOOT_SCORE}. A living ship magnetizes ordinary drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL}. Tap loot uses range ${GROWTH.TAP_LOOT_MAGNET_RANGE} and acceleration ${GROWTH.TAP_LOOT_MAGNET_ACCEL} toward a Hauler. Pickup overlap uses each kit's hull radius plus the drop radius.`,
+        `Pickups leave ship mass, health capacity, current health, hull size, and flight tuning unchanged. Environmental death drops at most ${GROWTH.MAX_PELLETS} wreckage pellets; the live loot limit is ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
+        `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}. Tap canisters have radius ${GROWTH.TAP_LOOT_RADIUS} and score ${GROWTH.TAP_LOOT_SCORE}. A living ship magnetizes ordinary drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL}. Tap loot uses range ${GROWTH.TAP_LOOT_MAGNET_RANGE} and acceleration ${GROWTH.TAP_LOOT_MAGNET_ACCEL} toward a Hauler. Pickup overlap uses each kit's hull radius plus the drop radius.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. Reflected shots can reach a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
       ],
     },
@@ -151,7 +150,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Field and material values',
       paragraphs: [
-        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Fresh interior sectors have ${Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} stationary deposits and ${WORLD.depositsPerSector - Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} drifting deposits. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.DRIFT_SPEED_MAX * GAME.FPS).toFixed(1)} world units per second. Ice, rubble, and crystal have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. A colossal deposit is size ${ROID.COLOSSAL_SIZE} with ${colossalMiningHealth()} mining health. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
+        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Fresh interior sectors have ${Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} stationary deposits and ${WORLD.depositsPerSector - Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} drifting deposits. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.DRIFT_SPEED_MAX * GAME.FPS).toFixed(1)} world units per second. Ice, rubble, and crystal have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. A colossal deposit is size ${ROID.COLOSSAL_SIZE} with ${colossalMiningHealth()} mining health.`,
       ],
     },
     {
@@ -184,7 +183,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Terrain travel values',
       paragraphs: [
-        `At full contour strength, following a line in either direction reaches ${(1 + TERRAIN.CONTOUR_SPEED_BONUS) * 100}% of normal cruise. Crossing perpendicular to the lines keeps normal cruise. Kit, mass, and Boost scale the baseline together.`,
+        `At full contour strength, following a line in either direction reaches ${(1 + TERRAIN.CONTOUR_SPEED_BONUS) * 100}% of normal cruise. Crossing perpendicular to the lines keeps normal cruise. Kit and mass scale the baseline together; Contour Lock adds guided travel along a nearby line.`,
       ],
     },
     {

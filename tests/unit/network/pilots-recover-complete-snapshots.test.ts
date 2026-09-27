@@ -27,6 +27,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     ship.position = { x: 1.23456789, y: -2.34567891 };
     ship.velocity = { x: 0.00001234, y: -0.00002345 };
     ship.angle = 2 * Math.PI;
+    ship.contourLock = { height: 0.24, direction: -1 };
 
     ship.playerMotion = { epoch: 7, mode: 'handoff', ack: 101, anchor: ship.position };
     asteroid.position = Object.assign(
@@ -202,6 +203,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const a = captureSnapshot(snapshotFixture());
     const firstAEntity = a.entities[0];
     assert.ok(firstAEntity, 'first baseline entity');
+    firstAEntity.contourLock = { height: 0.24, direction: 1 };
     firstAEntity.harpoonTargetId = 'rock';
     firstAEntity.harpoonLatchPos = { x: 1, y: 2 };
     const b = captureSnapshot(snapshotFixture(1));
@@ -219,6 +221,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const decodedEntity = decoded.entities[0];
     assert.ok(decodedEntity, 'decoded entity');
     expect(Object.hasOwn(decodedEntity, 'harpoonTargetId')).toBe(false);
+    expect(Object.hasOwn(decodedEntity, 'contourLock')).toBe(false);
   });
 
   test('bad packets leave the last baseline intact and a fresh keyframe repairs gaps', () => {

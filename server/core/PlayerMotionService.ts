@@ -1,10 +1,16 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
+import {
+  CONTOUR_LOCK,
+  contourLockDistance,
+  contourLockSpeed,
+  contourLockVelocity,
+  isContourLockState,
+} from '../../shared/contourLock';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
-import { advanceShipBoost, startShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { cruiseSpeed } from '../../shared/shipFlight';
-import type { PlayerMotionState, Position } from '../../shared-types';
+import type { ContourLockState, PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
 import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
@@ -14,7 +20,7 @@ import type { GameEntity } from './EntityManager';
 
 /** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
 interface MotionEnvelopeRejection {
-  check: 'velocity' | 'displacement' | 'boundary' | 'anchor';
+  check: 'velocity' | 'displacement' | 'boundary' | 'anchor' | 'rail';
   mode: PlayerMotionState['mode'];
   elapsedMs: number;
   /** Part of `elapsedMs` during which the server loop itself was blocked. */
@@ -39,8 +45,7 @@ export type MotionOutcome =
 type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
   epoch: number;
   sequence: number;
-  boosting?: boolean;
-  boostDepleted?: boolean;
+  contourLock?: ContourLockState | null;
 };
 
 interface Session {
@@ -60,8 +65,7 @@ interface Session {
   burstCredit: number;
   burstAt: number;
   wasAlive: boolean;
-  boostAt: number;
-  boostRequested: boolean;
+  contourLockAt: number;
   knockback?: { speed: number; at: number };
 }
 
@@ -151,14 +155,12 @@ export class PlayerMotionService {
   public legalSpeed(
     actor: GameEntity,
     now: number,
-    boosting = actor.boost.phase === 'active',
+    locked = actor.contourLock !== null,
     position = actor.position
   ): number {
     const kit = getShipKit(actor.kitId);
-    const normal = terrainSpeedLimit(
-      position,
-      cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1)
-    );
+    const cruise = cruiseSpeed(actor.mass, kit.maxVelocity);
+    const normal = locked ? contourLockSpeed(cruise) : terrainSpeedLimit(position, cruise);
     const impulse = this.sessions.get(actor.id)?.knockback;
     if (!impulse) {
       return normal;
@@ -175,13 +177,14 @@ export class PlayerMotionService {
   public maximumTravelSpeed(
     actor: GameEntity,
     now: number,
-    boosting = actor.boost.phase === 'active'
+    locked = actor.contourLock !== null
   ): number {
     const kit = getShipKit(actor.kitId);
     return Math.max(
-      this.legalSpeed(actor, now, boosting),
-      cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1) *
-        (1 + TERRAIN.CONTOUR_SPEED_BONUS)
+      this.legalSpeed(actor, now, locked),
+      locked
+        ? contourLockSpeed(cruiseSpeed(actor.mass, kit.maxVelocity))
+        : cruiseSpeed(actor.mass, kit.maxVelocity) * (1 + TERRAIN.CONTOUR_SPEED_BONUS)
     );
   }
 
@@ -234,8 +237,7 @@ export class PlayerMotionService {
       burstCredit: 0,
       burstAt: now,
       wasAlive: true,
-      boostAt: now,
-      boostRequested: false,
+      contourLockAt: now,
     };
     actor.velocity = capMotionVelocity(actor.velocity, this.legalSpeed(actor, now));
     this.sessions.set(actor.id, session);
@@ -277,11 +279,15 @@ export class PlayerMotionService {
       }
       return { ok: true, actor: session.actor, resumeToken: session.token };
     }
-    this.advanceBoost(session, now);
     const old = session.socket;
     if (old) {
       this.sockets.delete(old);
     }
+    session.actor.contourLock = null;
+    session.actor.velocity = capMotionVelocity(
+      session.actor.velocity,
+      this.legalSpeed(session.actor, now)
+    );
     session.socket = socket;
     session.actor.ws = socket;
     session.disconnectedUntil = undefined;
@@ -305,18 +311,16 @@ export class PlayerMotionService {
     if (!session) {
       return false;
     }
-    this.advanceBoost(session, now);
     this.sockets.delete(socket);
     session.socket = undefined;
     delete session.actor.ws;
     session.disconnectedUntil = now + PLAYER_MOTION.reconnectGraceMs;
     session.actor.thrusting = false;
-    stopShipBoost(session.actor.boost);
+    session.actor.contourLock = null;
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
       this.legalSpeed(session.actor, now)
     );
-    session.boostRequested = false;
     return true;
   }
 
@@ -327,11 +331,7 @@ export class PlayerMotionService {
   }
 
   private handoff(session: Session, now: number, poseCredit?: number): void {
-    this.advanceBoost(session, now);
-    if (session.actor.boost.phase === 'active') {
-      session.boostRequested = false;
-    }
-    stopShipBoost(session.actor.boost);
+    session.actor.contourLock = null;
     const speed = this.legalSpeed(session.actor, now);
     session.actor.velocity = capMotionVelocity(session.actor.velocity, speed);
     session.epoch += 1;
@@ -359,7 +359,6 @@ export class PlayerMotionService {
       return;
     }
     session.wasAlive = this.alive(session.actor);
-    session.boostRequested = false;
     delete session.knockback;
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
@@ -449,9 +448,7 @@ export class PlayerMotionService {
       !Number.isFinite(pose.angle) ||
       Math.abs(pose.angle) > Math.PI * 2 ||
       typeof pose.thrusting !== 'boolean' ||
-      (pose.boosting !== undefined && typeof pose.boosting !== 'boolean') ||
-      (pose.boostDepleted !== undefined && typeof pose.boostDepleted !== 'boolean') ||
-      (pose.boosting === true && pose.boostDepleted === true) ||
+      (pose.contourLock != null && !isContourLockState(pose.contourLock)) ||
       Object.keys(pose).some(
         (key) =>
           ![
@@ -461,34 +458,26 @@ export class PlayerMotionService {
             'velocity',
             'angle',
             'thrusting',
-            'boosting',
-            'boostDepleted',
+            'contourLock',
           ].includes(key)
       ) ||
       now < session.poseAt
     ) {
       return { ok: false, error: 'Invalid or stale enhanced movement pose' };
     }
-    this.advanceBoost(session, now);
-    const requested = pose.boosting === true;
-    const candidate = { ...session.actor.boost };
-    if (pose.boostDepleted && candidate.phase === 'active') {
-      // Prediction may reach zero one network frame before the server. This
-      // advisory can only spend remaining charge, never restore any.
-      candidate.phase = 'exhausted';
-      candidate.charge = 0;
-    }
-    if (!requested) {
-      stopShipBoost(candidate);
-    } else if (!session.boostRequested) {
-      startShipBoost(candidate);
+    const candidate = pose.contourLock ?? null;
+    const previousLock = session.actor.contourLock;
+    const acquiredAt = previousLock ? session.contourLockAt : now;
+    if (candidate && !this.validContourPose(session, pose, candidate, acquiredAt, now)) {
+      this.handoff(session, now, session.poseCredit);
+      return { ok: false, error: 'Movement left its authoritative contour rail' };
     }
     // The client samples terrain before its final movement step. Include that
     // point and the last accepted position so current exits and turns do not
     // trigger a correction; displacement is still bounded by server-time credit.
     const speed = Math.max(
-      this.legalSpeed(session.actor, now, candidate.phase === 'active'),
-      this.legalSpeed(session.actor, now, candidate.phase === 'active', {
+      this.legalSpeed(session.actor, now, candidate !== null),
+      this.legalSpeed(session.actor, now, candidate !== null, {
         x: pose.position.x - pose.velocity.x,
         y: pose.position.y - pose.velocity.y,
       })
@@ -496,7 +485,7 @@ export class PlayerMotionService {
     // Use the fastest legal terrain travel for elapsed distance credit. A local
     // endpoint current cannot bound a buffered route through stronger currents.
     // Velocity itself still uses the local ceiling above.
-    const travelSpeed = this.maximumTravelSpeed(session.actor, now, candidate.phase === 'active');
+    const travelSpeed = this.maximumTravelSpeed(session.actor, now, candidate !== null);
     const elapsedMs = now - session.poseAt;
     // Client silence is capped at the client's own bounded catch-up so it
     // cannot bank an arbitrary jump. Time the server loop spent blocked is
@@ -520,14 +509,32 @@ export class PlayerMotionService {
     const anchorReach =
       (travelSpeed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
     const hullRadius = hullRadiusForKit(session.actor.kitId);
-    const failed = this.failedEnvelopeCheck(session, pose, {
-      speed,
-      velocity,
-      displacement,
-      credit,
-      anchorReach,
-      hullRadius,
-    });
+    const failed =
+      candidate &&
+      !(previousLock
+        ? this.validContourRoute(
+            session.actor.position,
+            pose.position,
+            candidate,
+            travelSpeed,
+            credit
+          )
+        : this.validContourAcquisition(
+            session.actor,
+            pose.position,
+            candidate,
+            travelSpeed,
+            credit
+          ))
+        ? 'rail'
+        : this.failedEnvelopeCheck(session, pose, {
+            speed,
+            velocity,
+            displacement,
+            credit,
+            anchorReach,
+            hullRadius,
+          });
     if (failed) {
       session.actor.velocity = capMotionVelocity(session.actor.velocity, speed);
       // A fresh epoch makes the client adopt the last accepted pose. Preserve
@@ -575,8 +582,10 @@ export class PlayerMotionService {
     session.actor.velocity = { x: pose.velocity.x, y: pose.velocity.y };
     session.actor.angle = pose.angle;
     session.actor.thrusting = pose.thrusting;
-    session.actor.boost = candidate;
-    session.boostRequested = requested;
+    session.actor.contourLock = candidate
+      ? { height: candidate.height, direction: candidate.direction }
+      : null;
+    session.contourLockAt = acquiredAt;
     session.actor.lastUpdate = now;
     this.publish(session);
     return { ok: true, blockedMs };
@@ -589,6 +598,7 @@ export class PlayerMotionService {
     if (!session || !this.alive(session.actor)) {
       return;
     }
+    session.actor.contourLock = null;
     const speed = Math.hypot(session.actor.velocity.x, session.actor.velocity.y);
     session.knockback = { speed, at: now };
     session.epoch += 1;
@@ -609,7 +619,6 @@ export class PlayerMotionService {
     const session = this.sessions.get(actorId);
     if (session) {
       delete session.knockback;
-      session.boostRequested = false;
       this.handoff(session, now, 0);
     }
   }
@@ -638,24 +647,161 @@ export class PlayerMotionService {
     session.actor.position = { ...position };
     session.actor.velocity = { x: 0, y: 0 };
     session.actor.thrusting = false;
-    stopShipBoost(session.actor.boost);
-    session.boostRequested = false;
+    session.actor.contourLock = null;
     session.actor.lastUpdate = now;
     this.publish(session);
     return true;
   }
 
-  private advanceBoost(session: Session, now: number): void {
-    const elapsed = Math.max(0, now - session.boostAt);
-    session.boostAt = Math.max(session.boostAt, now);
-    const wasActive = session.actor.boost.phase === 'active';
-    advanceShipBoost(session.actor.boost, elapsed);
-    if (wasActive && session.actor.boost.phase !== 'active') {
-      session.actor.velocity = capMotionVelocity(
-        session.actor.velocity,
-        this.legalSpeed(session.actor, now)
-      );
+  /** Release at a physical contact even when protection prevents health loss. */
+  public releaseContourLock(actorId: string, now: number): void {
+    const session = this.sessions.get(actorId);
+    if (session?.actor.contourLock) {
+      this.handoff(session, now, session.poseCredit);
     }
+  }
+
+  private validContourAcquisition(
+    actor: GameEntity,
+    end: Position,
+    state: ContourLockState,
+    speed: number,
+    credit: number
+  ): boolean {
+    // The first locked packet can contain ordinary flight before the toggle.
+    // Search bounded switch points along the last accepted free-flight velocity,
+    // spending its distance before checking the remaining forward rail route.
+    // Subsequent packets never receive this acquisition allowance.
+    const freeSpeed = Math.hypot(actor.velocity.x, actor.velocity.y);
+    const frames = Math.min(MAX_CATCH_UP_TICKS + PLAYER_MOTION.poseLeadFrames, credit / speed);
+    for (let halfFrame = 0; halfFrame <= Math.ceil(frames * 2); halfFrame++) {
+      const elapsed = Math.min(frames, halfFrame / 2);
+      const spent = elapsed * freeSpeed;
+      const remaining = credit - spent;
+      if (remaining < 0) {
+        break;
+      }
+      const start = {
+        x: actor.position.x + actor.velocity.x * elapsed,
+        y: actor.position.y + actor.velocity.y * elapsed,
+      };
+      if (contourLockDistance(start, state) > CONTOUR_LOCK.captureRadius) {
+        continue;
+      }
+      const residual = Math.hypot(end.x - start.x, end.y - start.y);
+      if (
+        residual <= Math.min(remaining, PLAYER_MOTION.poseTolerance) ||
+        this.validContourRoute(start, end, state, speed, remaining)
+      ) {
+        return true;
+      }
+      if (freeSpeed < 1e-6) {
+        break;
+      }
+    }
+    return false;
+  }
+
+  private validContourRoute(
+    start: Position,
+    end: Position,
+    state: ContourLockState,
+    speed: number,
+    credit: number
+  ): boolean {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const displacement = Math.hypot(dx, dy);
+    if (displacement > credit + 1e-6) {
+      return false;
+    }
+    if (displacement < 1e-6) {
+      return true;
+    }
+    // The helper takes cruise, so remove its rail multiplier from the envelope speed.
+    const cruise = speed / contourLockSpeed(1);
+    const first = contourLockVelocity(start, state, cruise);
+    if (!first) {
+      return false;
+    }
+    if (displacement <= speed * 2) {
+      return (dx * first.x + dy * first.y) / (displacement * Math.hypot(first.x, first.y)) >= 0.92;
+    }
+    // Walk a bounded forward rail route. Checking only endpoints or the claimed
+    // velocity allows a client to fly backwards or jump across a contour bend.
+    const steps = Math.min(128, Math.max(1, Math.ceil(credit / speed)));
+    const stepDistance = credit / steps;
+    let cursor = start;
+    for (let step = 0; step < steps; step++) {
+      const velocity = contourLockVelocity(cursor, state, cruise);
+      if (!velocity) {
+        return false;
+      }
+      const scale = stepDistance / Math.hypot(velocity.x, velocity.y);
+      const vx = velocity.x * scale;
+      const vy = velocity.y * scale;
+      const fraction = Math.max(
+        0,
+        Math.min(1, ((end.x - cursor.x) * vx + (end.y - cursor.y) * vy) / (vx * vx + vy * vy))
+      );
+      const distance = Math.hypot(
+        end.x - cursor.x - vx * fraction,
+        end.y - cursor.y - vy * fraction
+      );
+      if (distance <= CONTOUR_LOCK.railTolerance) {
+        return true;
+      }
+      cursor = { x: cursor.x + vx, y: cursor.y + vy };
+    }
+    return false;
+  }
+
+  private validContourPose(
+    session: Session,
+    pose: EnhancedFreePose,
+    candidate: ContourLockState,
+    acquiredAt: number,
+    now: number
+  ): boolean {
+    const previous = session.actor.contourLock;
+    if (
+      previous &&
+      (previous.height !== candidate.height || previous.direction !== candidate.direction)
+    ) {
+      return false;
+    }
+    const allowedDistance =
+      now - acquiredAt >= CONTOUR_LOCK.acquisitionMs
+        ? CONTOUR_LOCK.railTolerance
+        : CONTOUR_LOCK.captureRadius;
+    if (contourLockDistance(pose.position, candidate) > allowedDistance) {
+      return false;
+    }
+    const kit = getShipKit(session.actor.kitId);
+    const cruise = cruiseSpeed(session.actor.mass, kit.maxVelocity);
+    // Client velocity is chosen just before integration. Sampling that point
+    // avoids rejecting a real curved rail at its post-step endpoint.
+    const expected = contourLockVelocity(
+      {
+        x: pose.position.x - pose.velocity.x,
+        y: pose.position.y - pose.velocity.y,
+      },
+      candidate,
+      cruise
+    );
+    if (!expected) {
+      return false;
+    }
+    const actualSpeed = Math.hypot(pose.velocity.x, pose.velocity.y);
+    const expectedSpeed = Math.hypot(expected.x, expected.y);
+    // Acceleration may report less than cruise speed, but cannot aim the rail's
+    // extra speed across the terrain or run against the selected direction.
+    return (
+      actualSpeed < 1e-6 ||
+      (pose.velocity.x * expected.x + pose.velocity.y * expected.y) /
+        (actualSpeed * expectedSpeed) >=
+        0.92
+    );
   }
 
   /** Advance session deadlines and lifecycle epochs; ship/asteroid physics stay elsewhere. */
@@ -663,7 +809,6 @@ export class PlayerMotionService {
     this.assertTime(now);
     const expired: string[] = [];
     for (const session of this.sessions.values()) {
-      this.advanceBoost(session, now);
       if (session.disconnectedUntil !== undefined && now >= session.disconnectedUntil) {
         expired.push(session.actor.id);
         this.removeSession(session);

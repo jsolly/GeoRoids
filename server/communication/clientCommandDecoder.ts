@@ -1,7 +1,9 @@
+import { isContourLockState } from '../../shared/contourLock';
 import { readReleaseId } from '../../shared/releaseId';
 import { storeOffer } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type {
+  ContourLockState,
   HaulerUtilityId,
   PingMessage,
   Position,
@@ -22,8 +24,7 @@ interface PlayerMovementUpdate {
   velocity?: Velocity;
   angle?: number;
   thrusting?: boolean;
-  boosting?: boolean;
-  boostDepleted?: boolean;
+  contourLock?: ContourLockState | null;
   overlayHold?: boolean;
 }
 
@@ -148,15 +149,14 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawVelocity = fields['velocity'];
   const rawAngle = fields['angle'];
   const rawThrusting = fields['thrusting'];
-  const rawBoosting = fields['boosting'];
-  const rawBoostDepleted = fields['boostDepleted'];
+  const rawContourLock = fields['contourLock'];
   const rawOverlayHold = fields['overlayHold'];
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
   const thrusting = typeof rawThrusting === 'boolean' ? rawThrusting : undefined;
-  const boosting = typeof rawBoosting === 'boolean' ? rawBoosting : undefined;
-  const boostDepleted = typeof rawBoostDepleted === 'boolean' ? rawBoostDepleted : undefined;
+  const contourLock =
+    rawContourLock === null || isContourLockState(rawContourLock) ? rawContourLock : undefined;
 
   if (
     !id ||
@@ -164,8 +164,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     (rawVelocity !== undefined && velocity === undefined) ||
     (rawAngle !== undefined && angle === undefined) ||
     (rawThrusting !== undefined && thrusting === undefined) ||
-    (rawBoosting !== undefined && boosting === undefined) ||
-    (rawBoostDepleted !== undefined && boostDepleted === undefined) ||
+    (rawContourLock !== undefined && contourLock === undefined) ||
     (rawOverlayHold !== undefined && typeof rawOverlayHold !== 'boolean')
   ) {
     return invalid('update', !id ? 'Missing player ID' : 'Invalid player movement update');
@@ -176,8 +175,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(velocity !== undefined ? { velocity } : {}),
     ...(angle !== undefined ? { angle } : {}),
     ...(thrusting !== undefined ? { thrusting } : {}),
-    ...(boosting !== undefined ? { boosting } : {}),
-    ...(boostDepleted !== undefined ? { boostDepleted } : {}),
+    ...(contourLock !== undefined ? { contourLock } : {}),
     ...(typeof rawOverlayHold === 'boolean' ? { overlayHold: rawOverlayHold } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);

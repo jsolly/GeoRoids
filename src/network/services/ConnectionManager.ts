@@ -1297,7 +1297,7 @@ export class ConnectionManager {
         playHarpoonRelease(entity.ship.position);
         if (isFinitePosition(data.boostIgnitionPosition)) {
           playFeedback('boostIgnite', data.boostIgnitionPosition);
-          playLocalHaptic(isLocalAbility, 'boost');
+          playLocalHaptic(isLocalAbility, 'asteroidIgnition');
         }
       } else {
         const targetPosition = isFinitePosition(data.harpoonLatchPos)

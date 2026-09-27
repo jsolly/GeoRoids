@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { applyLootMass, GROWTH } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
 import { ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -50,18 +50,20 @@ describe('destroy-drop shards on the #458 loot path', () => {
     expect(player.score).toBe(0);
   });
 
-  test('collecting a shard uses existing mass growth and a small score', () => {
+  test('collecting a shard awards cargo without changing hull mass or health', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', player.id, 'laser');
-    const beforeMass = player.mass ?? GROWTH.BASE_MASS;
+    const beforeMass = player.mass;
+    const beforeHealth = { health: player.health, maxHealth: player.maxHealth };
 
     const collected = engine.collectLoot();
 
     expect(collected).toHaveLength(2);
-    expect(player.mass).toBeCloseTo(applyLootMass(beforeMass, GROWTH.SHARD_MASS));
+    expect(player.mass).toBe(beforeMass);
+    expect(player).toMatchObject(beforeHealth);
     expect(player.cargo).toBe(ROID.POINTS_SMALL + GROWTH.SHARD_SCORE);
     expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
     const broadcaster = new GameStateBroadcaster(engine);

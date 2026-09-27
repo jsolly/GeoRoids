@@ -51,7 +51,7 @@ export class LootManager {
     return spawned;
   }
 
-  /** One shard at the break site. Collect uses the existing overlap/growth path. */
+  /** One shard at the break site. Collect uses the existing overlap collection path. */
   public spawnShard(
     position: Position,
     gameTime: number,

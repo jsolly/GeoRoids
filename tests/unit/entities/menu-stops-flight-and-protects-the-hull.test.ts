@@ -10,7 +10,7 @@ test('a menu stops momentum and collisions, then blinks when flight returns', ()
   ship.velocity = { x: 8, y: -4 };
   ship.angularVelocity = 0.1;
   ship.thrusting = true;
-  ship.toggleBoost();
+  ship.contourLock = { height: 0.1, direction: 1 };
   expect(applyLocalOverlayHold(ship, true)).toBe(true);
   expect(applyLocalOverlayHold(ship, true)).toBe(false);
   const angle = ship.angle;
@@ -22,6 +22,7 @@ test('a menu stops momentum and collisions, then blinks when flight returns', ()
   expect(ship.velocity).toEqual({ x: 0, y: 0 });
   expect(ship.angle).toBe(angle);
   expect(ship.thrusting).toBe(false);
+  expect(ship.contourLocked).toBe(false);
   expect(ship.abilityCooldownFrames).toBe(60);
   expect(isShipCollisionImmune(ship)).toBe(true);
   ship.takeDamage(25, 'asteroid');

@@ -2,10 +2,12 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
+import { togglePlayerContourLock } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   initializeTouchControls,
   readTouchControlDiagnostics,
+  setTouchHeading,
   tickTouchControls,
 } from '../../../src/input/touchControls';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
@@ -175,23 +177,29 @@ test('ability buttons do not create playfield shots or change steering', () => {
   expect(player.ship.thrusting).toBe(true);
 });
 
-test('Boost tap starts a stronger cruise and a second tap returns to cruise', () => {
-  const boost = document.querySelector('#touch-boost');
-  expect(boost).toBeTruthy();
-  if (!boost) {
-    throw new Error('Missing boost button');
+test('Contour Lock tap starts a stronger cruise and a second tap returns to cruise', () => {
+  vi.spyOn(player.ship, 'canLockContour').mockReturnValue(true);
+  vi.spyOn(player.ship, 'toggleContourLock').mockImplementation(() => {
+    player.ship.contourLock = player.ship.contourLocked ? null : { height: 0.1, direction: 1 };
+    return player.ship.contourLocked;
+  });
+  tickTouchControls(player);
+  const contourLock = document.querySelector('#touch-contour-lock');
+  expect(contourLock).toBeTruthy();
+  if (!contourLock) {
+    throw new Error('Missing contourLock button');
   }
-  boost.setPointerCapture = vi.fn();
-  boost.hasPointerCapture = () => false;
-  expect(player.ship.boosting).toBe(false);
-  pointer('pointerdown', 1, 0, 195, 780, boost);
-  pointer('pointerup', 1, 80, 195, 780, boost);
-  expect(player.ship.boosting).toBe(true);
-  expect(boost.getAttribute('aria-pressed')).toBe('true');
-  pointer('pointerdown', 2, 200, 195, 780, boost);
-  pointer('pointerup', 2, 280, 195, 780, boost);
-  expect(player.ship.boosting).toBe(false);
-  expect(boost.getAttribute('aria-pressed')).toBe('false');
+  contourLock.setPointerCapture = vi.fn();
+  contourLock.hasPointerCapture = () => false;
+  expect(player.ship.contourLocked).toBe(false);
+  pointer('pointerdown', 1, 0, 195, 780, contourLock);
+  pointer('pointerup', 1, 80, 195, 780, contourLock);
+  expect(player.ship.contourLocked).toBe(true);
+  expect(contourLock.getAttribute('aria-pressed')).toBe('true');
+  pointer('pointerdown', 2, 200, 195, 780, contourLock);
+  pointer('pointerup', 2, 280, 195, 780, contourLock);
+  expect(player.ship.contourLocked).toBe(false);
+  expect(contourLock.getAttribute('aria-pressed')).toBe('false');
 });
 
 test('a delayed pointer click cannot repeat an ability, while a following semantic click still works', () => {
@@ -504,4 +512,44 @@ test('furnace prompt entry waits for the completed click and survives touch-end 
   expect(openStore).not.toHaveBeenCalled();
   prompt.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
   expect(openStore).toHaveBeenCalledTimes(1);
+});
+
+test('touch steering stays ignored until the pilot explicitly releases the rail', () => {
+  setTouchHeading(player, 1);
+  player.ship.contourLock = { height: 0.1, direction: 1 };
+  tickTouchControls(player);
+  expect(player.ship.contourLocked).toBe(true);
+  expect(player.ship.angularVelocity).toBe(0);
+  setTouchHeading(player, null);
+  expect(player.ship.contourLocked).toBe(true);
+  setTouchHeading(player, 2);
+  expect(player.ship.contourLocked).toBe(true);
+  expect(controlSources.pointerHeading).toBeNull();
+  togglePlayerContourLock(player);
+  tickTouchControls(player);
+  expect(player.ship.angularVelocity).toBe(0);
+});
+
+test('a pending pre-lock hold cannot turn the ship after capture and release', () => {
+  vi.useFakeTimers();
+  try {
+    vi.spyOn(player.ship, 'toggleContourLock').mockImplementation(() => {
+      player.ship.contourLock = player.ship.contourLocked ? null : { height: 0.1, direction: 1 };
+      return player.ship.contourLocked;
+    });
+    pointer('pointerdown', 91, 0, 60, 200);
+    togglePlayerContourLock(player);
+    togglePlayerContourLock(player);
+    vi.advanceTimersByTime(250);
+    pointer('pointermove', 91, 260, 80, 220);
+    tickTouchControls(player);
+    expect(controlSources.pointerHeading).toBeNull();
+    expect(player.ship.angularVelocity).toBe(0);
+    pointer('pointerup', 91, 280, 80, 220);
+    pointer('pointerdown', 92, 300, 60, 200);
+    pointer('pointermove', 92, 320, 120, 230);
+    expect(controlSources.pointerHeading).not.toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });

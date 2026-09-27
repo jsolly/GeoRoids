@@ -24,6 +24,9 @@ export class CollisionManager {
    */
   checkBoundaryCollisions(ships: Ship[], localPlayerId: string): void {
     for (const ship of ships) {
+      if (ship.contourLocked && checkBoundaryCollision(ship.position, ship.r)) {
+        ship.releaseContourLock();
+      }
       // Same immunity as asteroid impacts: exploding, dead, or blinking.
       // Boundary previously skipped only exploding, so a dead or freshly
       // respawned hull kept sending 100-damage collisionDamage at 60 Hz.

@@ -34,7 +34,7 @@ async function expectFlightControlsReachable(page: Page, mobile: boolean): Promi
     const controls = [
       'ship-schematic-toggle',
       'universe-map-toggle',
-      'touch-boost',
+      'touch-contour-lock',
       'touch-ability',
       'debug-hud-toggle',
       'copy-debug-diagnostics',

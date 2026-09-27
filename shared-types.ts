@@ -82,8 +82,7 @@ export interface PlayerUpdate {
   velocity: Velocity;
   angle: number;
   thrusting: boolean;
-  boosting?: boolean;
-  boostDepleted?: boolean;
+  contourLock?: ContourLockState | null;
   /** True while the local map or schematic holds this hull still. */
   overlayHold?: boolean;
   /** Acknowledges the server's current movement ownership epoch. */
@@ -362,9 +361,9 @@ export interface ServerGameSnapshot extends ServerGameState {
   playerProjectiles: PlayerProjectileState[];
 }
 
-export interface ShipBoostState {
-  phase: 'idle' | 'active' | 'exhausted';
-  charge: number;
+export interface ContourLockState {
+  height: number;
+  direction: 1 | -1;
 }
 
 export interface FurnaceTransit {
@@ -388,8 +387,8 @@ export interface ServerEntityData {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
-  /** Omitted only by servers predating the independently deployed boost update. */
-  boost?: ShipBoostState;
+  /** Omission means the pilot is not following a contour rail. */
+  contourLock?: ContourLockState;
   color: string;
   cargo: number;
   purchases: string[];

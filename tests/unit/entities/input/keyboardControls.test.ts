@@ -81,16 +81,20 @@ test('held KeyE repeat does not re-fire the ability', () => {
   expect(activateSpy).not.toHaveBeenCalled();
 });
 
-test('Shift toggles Boost on and off without holding', () => {
-  expect(player.ship.boosting).toBe(false);
+test('Shift toggles Contour Lock on and off without holding', () => {
+  vi.spyOn(player.ship, 'toggleContourLock').mockImplementation(() => {
+    player.ship.contourLock = player.ship.contourLocked ? null : { height: 0.1, direction: 1 };
+    return player.ship.contourLocked;
+  });
+  expect(player.ship.contourLocked).toBe(false);
   press('ShiftLeft');
-  expect(player.ship.boosting).toBe(true);
+  expect(player.ship.contourLocked).toBe(true);
   release('ShiftLeft');
-  expect(player.ship.boosting).toBe(true);
+  expect(player.ship.contourLocked).toBe(true);
   press('ShiftRight');
-  expect(player.ship.boosting).toBe(false);
+  expect(player.ship.contourLocked).toBe(false);
   keyDown(new KeyboardEvent('keydown', { code: 'ShiftLeft', repeat: true }), player);
-  expect(player.ship.boosting).toBe(false);
+  expect(player.ship.contourLocked).toBe(false);
 });
 
 test('KeyE preserves the joined Scout when the title menu has a stale Hauler selection', () => {

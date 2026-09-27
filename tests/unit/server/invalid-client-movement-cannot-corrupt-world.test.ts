@@ -15,8 +15,8 @@ const invalidMovements: Array<{ label: string; movement: Record<string, unknown>
   { label: 'non-finite velocity', movement: { velocity: { x: 0, y: Number.NaN } } },
   { label: 'non-finite angle', movement: { angle: Number.POSITIVE_INFINITY } },
   { label: 'non-boolean thrust', movement: { thrusting: 'true' } },
-  { label: 'non-boolean boost', movement: { boosting: 'true' } },
-  { label: 'non-boolean boost depletion', movement: { boostDepleted: 'true' } },
+  { label: 'non-object rail', movement: { contourLock: true } },
+  { label: 'invalid rail direction', movement: { contourLock: { height: 0.2, direction: 0 } } },
   { label: 'non-boolean overlay hold', movement: { overlayHold: 'true' } },
 ];
 

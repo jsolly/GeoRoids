@@ -37,7 +37,7 @@ export function initTitleTerrain(): void {
   const contours = extractIsoContours(
     createHeightfield(TERRAIN.DEFAULT_SEED, bounds),
     VISUAL.TITLE_TERRAIN_GRID_SIZE,
-    VISUAL.TITLE_TERRAIN_LEVELS
+    VISUAL.TITLE_TERRAIN_INTERVAL
   );
   const resize = (): void => {
     const width = window.innerWidth;

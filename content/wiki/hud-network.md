@@ -14,7 +14,7 @@ media: []
 
 ## Read the HUD
 
-The HUD shows your bank, cargo capacity, kit, ability, shared settlement progress and resource requirements, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. On mobile, two compact lines show bank and cargo, then kit and settlement level progress; the detailed points and resource requirements remain in the desktop HUD. Pickup and death messages explain what just happened.
+The HUD shows your bank, cargo capacity, kit, ability, shared settlement progress and resource requirements, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Contour Lock button shows whether a contour is available or locked. On mobile, two compact lines show bank and cargo, then kit and settlement level progress; the detailed points and resource requirements remain in the desktop HUD. Pickup and death messages explain what just happened.
 
 ## Travel prompt
 

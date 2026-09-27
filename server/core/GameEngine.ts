@@ -54,8 +54,7 @@ import {
   LOOT_BLAST,
 } from '../../shared/lootBlast';
 import { readReleaseId, releaseField } from '../../shared/releaseId';
-import { advanceShipBoost, stopShipBoost } from '../../shared/shipBoost';
-import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
+import { GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import {
@@ -810,7 +809,6 @@ export class GameEngine {
       angle: arrival?.angle ?? actor.angle,
       mass: actor.mass,
       health: actor.health,
-      boost: { ...actor.boost },
       ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
@@ -1024,11 +1022,6 @@ export class GameEngine {
     flight: RestorableFlight,
     requestedKit: ShipKitId | undefined
   ): void {
-    if (flight.boost) {
-      actor.boost = { ...flight.boost };
-      stopShipBoost(actor.boost);
-      advanceShipBoost(actor.boost, Math.max(0, this.getServerTime() - flight.lastSeenAt));
-    }
     actor.angle = flight.angle;
     if (!requestedKit || requestedKit === flight.kitId) {
       actor.mass = flight.mass;
@@ -1404,7 +1397,7 @@ export class GameEngine {
       entity.velocity = { x: 0, y: 0 };
       entity.knockbackVelocityLimit = 0;
       entity.thrusting = false;
-      stopShipBoost(entity.boost);
+      entity.contourLock = null;
       return;
     }
     if (wasHeld) {
@@ -1722,6 +1715,7 @@ export class GameEngine {
     if (!existing) {
       return { applied: false, isDestroyed: false };
     }
+    this.playerMotion.releaseContourLock(existing.id, this.getServerTime());
     if (existing.furnaceTransit || isCombatantImmune(existing)) {
       return { applied: false, isDestroyed: false };
     }
@@ -1830,6 +1824,7 @@ export class GameEngine {
     const destroyedAsteroids = new Set<string>();
     const bumperKeys = this.resolveTowedAsteroidImpacts(entities, asteroids, destroyedAsteroids);
     for (const hit of ramHits) {
+      this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime());
       if (bumperKeys.has(`${hit.shipId}:${hit.asteroidId}`)) {
         continue;
       }
@@ -2142,7 +2137,7 @@ export class GameEngine {
     // that same current sample so a fast shot is not rejected after leaving a contour.
     const maxShipSpeed = Math.max(
       this.playerMotion.legalSpeed(shooter, now),
-      this.playerMotion.legalSpeed(shooter, now, shooter.boost.phase === 'active', {
+      this.playerMotion.legalSpeed(shooter, now, shooter.contourLock !== null, {
         x: shooter.position.x - shooter.velocity.x,
         y: shooter.position.y - shooter.velocity.y,
       })
@@ -2611,7 +2606,7 @@ export class GameEngine {
             angle: entity.angle,
             exploding: entity.exploding,
             thrusting: entity.thrusting,
-            boost: { ...entity.boost },
+            ...(entity.contourLock ? { contourLock: { ...entity.contourLock } } : {}),
             color: entity.color,
 
             score: entity.score,
@@ -2833,7 +2828,7 @@ export class GameEngine {
     this.cancelArmedBoost(actor.id, actor.harpoonTargetId);
     clearHaulerLatch(actor);
     actor.abilityActiveFrames = 0;
-    stopShipBoost(actor.boost);
+    actor.contourLock = null;
     actor.velocity = { x: 0, y: 0 };
     actor.thrusting = false;
     actor.overlayHold = true;
@@ -3312,7 +3307,6 @@ export class GameEngine {
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
         continue;
       }
-      applyShipMass(collector, applyLootMass(collector.mass ?? GROWTH.BASE_MASS, loot.mass));
       if (loot.kind === 'shard') {
         this.addCargo(collector, GROWTH.SHARD_SCORE);
       }

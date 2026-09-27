@@ -30,6 +30,7 @@ import {
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
+import { drawContourTrack } from './contourTrackRenderer';
 import { drawFurnaceFoundations, drawFurnacePipes, drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
@@ -69,6 +70,9 @@ export function drawGame(
 
   drawStarfield(currShip.position);
   drawIsoContours(currShip.position);
+  if (!currShip.exploding && currShip.health > 0 && !currShip.furnaceTransit) {
+    drawContourTrack(currShip.position, currShip.angle, currShip.contourLock);
+  }
   drawRicochetCourt(currShip.position);
   drawTerrainSpiders(currShip.position, currPlayer.id, currShip.health > 0 && !currShip.exploding);
 

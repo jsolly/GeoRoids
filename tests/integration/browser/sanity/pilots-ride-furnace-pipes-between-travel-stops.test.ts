@@ -191,11 +191,11 @@ for (const width of [1280, 390]) {
         const button = prompt.getByRole('button', { name: 'Tap to travel' });
         expect(await button.isVisible()).toBe(true);
         const travelBounds = await button.boundingBox();
-        const boostBounds = await page.locator('#touch-boost').boundingBox();
-        if (!travelBounds || !boostBounds) {
-          throw new Error('Missing travel or Boost control bounds');
+        const contourLockBounds = await page.locator('#touch-contour-lock').boundingBox();
+        if (!travelBounds || !contourLockBounds) {
+          throw new Error('Missing travel or Contour Lock control bounds');
         }
-        expect(travelBounds.y + travelBounds.height).toBeLessThan(boostBounds.y);
+        expect(travelBounds.y + travelBounds.height).toBeLessThan(contourLockBounds.y);
         await page.screenshot({
           path: screenshotManager.getScreenshotPath(`furnace-prompt-resized-${viewport.width}.png`),
         });

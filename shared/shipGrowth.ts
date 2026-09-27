@@ -2,10 +2,9 @@ import type { Position } from '../shared-types';
 import { GAME, SHIP } from '../src/constants';
 
 /**
- * Shared loot mass, health, and handling. Hull draw size and collision
+ * Shared salvage rules and persisted ship mass, health, and handling. Hull draw size and collision
  * radius stay at the kit base; mass does not scale the silhouette.
- * Soft max keeps multiplayer readable: extra mass still collects, but HP
- * and speed approach a cap instead of changing without bound.
+ * Existing ship mass is bounded; collecting salvage does not change it.
  */
 export const GROWTH = {
   BASE_MASS: 1,
@@ -15,7 +14,7 @@ export const GROWTH = {
   /** Fraction of growable mass (above BASE) converted to pellets. */
   DROP_FRACTION: 0.85,
   PELLET_MASS: 0.4,
-  /** Small nibble from a destroyed roid — uses the same collect/growth path. */
+  /** Small nibble from a destroyed roid — uses the same collection path. */
   SHARD_MASS: 0.25,
   SHARD_SCORE: 5,
   MAX_PELLETS: 7,
@@ -41,7 +40,6 @@ export const GROWTH = {
   MAX_HEALTH_SCALE: 2.2,
   MIN_THRUST_SCALE: 0.55,
   MIN_SPEED_SCALE: 0.6,
-  MASS_GAIN_K: 0.45,
 } as const;
 
 interface GrowableShip {
@@ -55,22 +53,6 @@ function clampMass(mass: number): number {
     return GROWTH.BASE_MASS;
   }
   return Math.max(GROWTH.BASE_MASS, mass);
-}
-
-export function applyLootMass(current: number, gain: number): number {
-  const cur = clampMass(current);
-  const added = Math.max(0, gain);
-  if (added === 0) {
-    return Math.min(cur, GROWTH.SOFT_MAX_MASS);
-  }
-  const headroom = GROWTH.SOFT_MAX_MASS - cur;
-  if (headroom <= 0) {
-    return GROWTH.SOFT_MAX_MASS;
-  }
-  return Math.min(
-    GROWTH.SOFT_MAX_MASS,
-    cur + headroom * (1 - Math.exp(-GROWTH.MASS_GAIN_K * added))
-  );
 }
 
 function massProgress(mass: number): number {

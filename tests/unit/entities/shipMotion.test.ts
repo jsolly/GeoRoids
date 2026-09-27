@@ -134,37 +134,6 @@ describe('shared ship motion helper', () => {
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
-  test('Boost raises cruise, and Scout outruns a boosting Hauler', () => {
-    const scout = new Ship({ kitId: 'scout', isLocalPlayer: true });
-    const hauler = new Ship({ kitId: 'hauler', isLocalPlayer: true });
-    scout.angle = 0;
-    hauler.angle = 0;
-    scout.velocity = { x: 20, y: 0 };
-    hauler.velocity = { x: 20, y: 0 };
-    scout.toggleBoost();
-    hauler.toggleBoost();
-    scout.update();
-    hauler.update();
-    const scoutBoost = cruiseSpeed(
-      scout.mass,
-      scout.maxVelocity,
-      getShipKit('scout').boostMultiplier
-    );
-    const haulerBoost = cruiseSpeed(
-      hauler.mass,
-      hauler.maxVelocity,
-      getShipKit('hauler').boostMultiplier
-    );
-    expect(scoutBoost).toBeGreaterThan(haulerBoost);
-    expect(Math.hypot(scout.velocity.x, scout.velocity.y)).toBeCloseTo(scoutBoost);
-    expect(Math.hypot(hauler.velocity.x, hauler.velocity.y)).toBeCloseTo(haulerBoost);
-    scout.toggleBoost();
-    scout.update();
-    expect(Math.hypot(scout.velocity.x, scout.velocity.y)).toBeCloseTo(
-      cruiseSpeed(scout.mass, scout.maxVelocity)
-    );
-  });
-
   test('an authoritative blast pushes the pilot before cruise regains the heading', () => {
     const ship = new Ship({ isLocalPlayer: true });
     ship.angle = 0;

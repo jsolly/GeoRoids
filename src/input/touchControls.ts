@@ -1,4 +1,3 @@
-import type { ShipBoostState } from '../../shared-types';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
@@ -8,27 +7,28 @@ import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
-import { reconcilePlayerInput } from './keybindings';
+import { reconcilePlayerInput, togglePlayerContourLock } from './keybindings';
 import { pointerHeadingFromCenter } from './pointerSteering';
 import { readAbilityChrome } from './touchAbility';
 
 const ABILITY_ID = 'touch-ability';
-const BOOST_ID = 'touch-boost';
+const CONTOUR_LOCK_ID = 'touch-contour-lock';
 const ROOT_ID = 'touch-controls';
 
 let initialized = false;
 const TAP_MAX_MS = 220;
 const TAP_SLOP_PX = 12;
 let steerPointerId: number | null = null;
+let steerEpoch = 0;
 let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
-let boostPointerId: number | null = null;
+let contourLockPointerId: number | null = null;
 let abilityButton: HTMLButtonElement | null = null;
-let boostButton: HTMLButtonElement | null = null;
+let contourLockButton: HTMLButtonElement | null = null;
 let lastAbilityChromeKey = '';
-let lastBoostChromeKey = '';
+let lastContourLockChromeKey = '';
 const TOUCH_BIND_SLOP_PX = 40;
 let touchListObserved = false;
 const liveTouchPoints = new Map<number, { x: number; y: number }>();
@@ -122,7 +122,7 @@ export function readTouchControlDiagnostics(): TouchControlDiagnostics {
 }
 
 export function setTouchHeading(player: Player, heading: number | null): void {
-  controlSources.pointerHeading = heading;
+  controlSources.pointerHeading = player.ship.contourLocked ? null : heading;
   reconcilePlayerInput(player);
 }
 
@@ -160,19 +160,19 @@ export function triggerTouchAbility(player: Player): boolean {
   return player.ship.activateAbility();
 }
 
-function triggerTouchBoost(player: Player): boolean {
-  if (!isInPlay() || isBoostMenuOpen() || player.ship.health <= 0 || player.ship.exploding) {
-    syncBoostChrome(player);
+function triggerTouchContourLock(player: Player): boolean {
+  if (!isInPlay() || isContourLockMenuOpen() || player.ship.health <= 0 || player.ship.exploding) {
+    syncContourLockChrome(player);
     return false;
   }
-  const active = player.ship.toggleBoost();
-  syncBoostChrome(player);
+  const active = togglePlayerContourLock(player);
+  syncContourLockChrome(player);
   return active;
 }
 
 export function tickTouchControls(player: Player): void {
   if (isInPlay()) {
-    syncBoostChrome(player);
+    syncContourLockChrome(player);
     if (isTouchChromeVisible()) {
       syncAbilityChrome(player);
     }
@@ -195,7 +195,7 @@ function isInPlay(): boolean {
   return typeof document !== 'undefined' && document.body.classList.contains('in-play');
 }
 
-function isBoostMenuOpen(): boolean {
+function isContourLockMenuOpen(): boolean {
   return isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
 }
 
@@ -218,12 +218,12 @@ export function syncTouchChrome(
   if (!inPlay) {
     resetTouchInteraction(requireLocalPlayer());
     lastAbilityChromeKey = '';
-    lastBoostChromeKey = '';
+    lastContourLockChromeKey = '';
     return;
   }
 
   if (!use) {
-    // The desktop boost button shares this overlay, while touch steering and
+    // The desktop contourLock button shares this overlay, while touch steering and
     // firing must release their pointer sources as soon as touch chrome hides.
     resetTouchInteraction(requireLocalPlayer());
   }
@@ -234,10 +234,10 @@ export function syncTouchChrome(
     if (use) {
       syncAbilityChrome(player);
     }
-    syncBoostChrome(player);
+    syncContourLockChrome(player);
   } else {
     lastAbilityChromeKey = '';
-    lastBoostChromeKey = '';
+    lastContourLockChromeKey = '';
   }
 }
 
@@ -245,8 +245,8 @@ function setAbilityPressed(pressed: boolean): void {
   document.querySelector(`#${ABILITY_ID}`)?.classList.toggle('is-pressed', pressed);
 }
 
-function setBoostPressed(pressed: boolean): void {
-  document.querySelector(`#${BOOST_ID}`)?.classList.toggle('is-pressed', pressed);
+function setContourLockPressed(pressed: boolean): void {
+  document.querySelector(`#${CONTOUR_LOCK_ID}`)?.classList.toggle('is-pressed', pressed);
 }
 
 function getAbilityButton(): HTMLButtonElement | null {
@@ -260,15 +260,15 @@ function getAbilityButton(): HTMLButtonElement | null {
   return abilityButton;
 }
 
-function getBoostButton(): HTMLButtonElement | null {
-  if (!boostButton?.isConnected) {
-    const next = document.querySelector<HTMLButtonElement>(`#${BOOST_ID}`);
-    if (next !== boostButton) {
-      boostButton = next;
-      lastBoostChromeKey = '';
+function getContourLockButton(): HTMLButtonElement | null {
+  if (!contourLockButton?.isConnected) {
+    const next = document.querySelector<HTMLButtonElement>(`#${CONTOUR_LOCK_ID}`);
+    if (next !== contourLockButton) {
+      contourLockButton = next;
+      lastContourLockChromeKey = '';
     }
   }
-  return boostButton;
+  return contourLockButton;
 }
 
 function syncAbilityChrome(player: Player): void {
@@ -293,58 +293,38 @@ function syncAbilityChrome(player: Player): void {
   button.style.setProperty('--action-cool', state.cooldownRatio.toFixed(3));
 }
 
-function syncBoostChrome(player: Player): void {
-  const button = getBoostButton();
+function syncContourLockChrome(player: Player): void {
+  const button = getContourLockButton();
   if (!button) {
     return;
   }
-  const state: ShipBoostState = player.ship.boost;
-  const charge = state.charge;
-  const percent = Math.round(charge * 100);
-  const inPlay = isInPlay();
   const alive = player.ship.health > 0 && !player.ship.exploding;
-  const menuOpen = isBoostMenuOpen();
-  const active = alive && state.phase === 'active' && player.ship.boosting;
-  const empty = charge <= 0;
-  const recharging = !active && charge < 1;
-  const disabled = !inPlay || !alive || menuOpen || empty;
-  const key = `${inPlay}|${alive}|${menuOpen}|${state.phase}|${charge.toFixed(3)}|${active}`;
-  if (key === lastBoostChromeKey) {
+  const menuOpen = isContourLockMenuOpen();
+  const active = alive && player.ship.contourLocked;
+  const ready = alive && !menuOpen && (active || player.ship.canLockContour());
+  const disabled = !isInPlay() || !ready;
+  const key = `${active}|${disabled}|${alive}|${menuOpen}`;
+  if (key === lastContourLockChromeKey) {
     return;
   }
-  lastBoostChromeKey = key;
-  const ready = state.phase === 'idle' && charge >= 1;
-  let text = ready ? 'BOOST' : `RECHARGING ${percent}%`;
-  let label = active
-    ? `Stop boost, ${percent}% charge remaining`
-    : ready
-      ? 'Start boost, fully charged'
-      : `Start boost, ${percent}% charge`;
-  if (active) {
-    text = `BOOSTING ${percent}%`;
-  }
-  if (!alive) {
-    text = 'BOOST OFF';
-    label = 'Boost unavailable while the ship is destroyed';
-  } else if (empty) {
-    label = 'Boost empty, recharging';
-  } else if (menuOpen) {
-    label = `Boost unavailable while a menu is open, ${percent}% charge`;
-  }
-  button.textContent = text;
+  lastContourLockChromeKey = key;
+  const label = active
+    ? 'Release lock'
+    : !alive
+      ? 'Contour Lock unavailable while the ship is destroyed'
+      : menuOpen
+        ? 'Contour Lock unavailable while a menu is open'
+        : !ready
+          ? 'Contour Lock unavailable: approach a contour'
+          : 'Contour Lock: lock onto the nearest contour';
+  button.textContent = active ? 'RELEASE LOCK' : 'CONTOUR LOCK';
   button.setAttribute('aria-label', label);
   button.setAttribute('aria-pressed', active ? 'true' : 'false');
   button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
   button.disabled = disabled;
   button.title = label;
-  button.dataset['boostPhase'] = state.phase;
-  button.dataset['boostCharge'] = charge.toFixed(3);
-  button.style.setProperty('--boost-charge', charge.toFixed(3));
   button.classList.toggle('is-active', active);
-  button.classList.toggle('is-idle', state.phase === 'idle' && alive);
-  button.classList.toggle('is-recharging', recharging);
-  button.classList.toggle('is-exhausted', empty);
-  button.classList.toggle('is-unavailable', !alive || menuOpen);
+  button.classList.toggle('is-unavailable', disabled);
 }
 
 function releasePointerCapture(element: HTMLElement | null, pointerId: number | null): void {
@@ -364,22 +344,22 @@ function clearSteerHoldTimer(): void {
 function resetTouchInteraction(player: Player | null, options?: { forgetTouches?: boolean }): void {
   const canvas = canvasManager.getCanvas();
   const ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
-  const boost = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
+  const contourLock = document.querySelector<HTMLElement>(`#${CONTOUR_LOCK_ID}`);
   const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
-  const activeBoostPointerId = boostPointerId;
+  const activeContourLockPointerId = contourLockPointerId;
   steerPointerId = null;
   steerTouchId = null;
   clearSteerHoldTimer();
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
-  boostPointerId = null;
+  contourLockPointerId = null;
   releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(canvas, activeFirePointerId);
   releasePointerCapture(ability, activeAbilityPointerId);
-  releasePointerCapture(boost, activeBoostPointerId);
+  releasePointerCapture(contourLock, activeContourLockPointerId);
   if (player) {
     setTouchHeading(player, null);
     setTouchFire(player, false);
@@ -387,7 +367,7 @@ function resetTouchInteraction(player: Player | null, options?: { forgetTouches?
     resetControlSources();
   }
   setAbilityPressed(false);
-  setBoostPressed(false);
+  setContourLockPressed(false);
   if (options?.forgetTouches !== false) {
     resetTouchListTracking();
   }
@@ -400,7 +380,7 @@ function requireLocalPlayer(): Player | null {
 function ensureTouchDom(): {
   root: HTMLElement;
   ability: HTMLButtonElement;
-  boost: HTMLButtonElement;
+  contourLock: HTMLButtonElement;
 } {
   let root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
   if (!root) {
@@ -428,29 +408,29 @@ function ensureTouchDom(): {
     ability.setAttribute('aria-label', 'Ability');
   }
 
-  let boost = document.querySelector<HTMLButtonElement>(`#${BOOST_ID}`);
-  if (!boost) {
-    boost = document.createElement('button');
-    boost.id = BOOST_ID;
-    boost.className = 'touch-boost';
-    boost.setAttribute('type', 'button');
-    boost.setAttribute('aria-label', 'Boost');
-    boost.setAttribute('aria-pressed', 'false');
-    boost.setAttribute('aria-disabled', 'true');
-    boost.disabled = true;
-    boost.textContent = 'BOOST';
-    root.appendChild(boost);
+  let contourLock = document.querySelector<HTMLButtonElement>(`#${CONTOUR_LOCK_ID}`);
+  if (!contourLock) {
+    contourLock = document.createElement('button');
+    contourLock.id = CONTOUR_LOCK_ID;
+    contourLock.className = 'touch-contour-lock';
+    contourLock.setAttribute('type', 'button');
+    contourLock.setAttribute('aria-label', 'Contour Lock');
+    contourLock.setAttribute('aria-pressed', 'false');
+    contourLock.setAttribute('aria-disabled', 'true');
+    contourLock.disabled = true;
+    contourLock.textContent = 'CONTOUR LOCK';
+    root.appendChild(contourLock);
   }
-  boost.setAttribute('type', 'button');
-  boost.disabled = true;
-  if (!boost.getAttribute('aria-disabled')) {
-    boost.setAttribute('aria-disabled', 'true');
+  contourLock.setAttribute('type', 'button');
+  contourLock.disabled = true;
+  if (!contourLock.getAttribute('aria-disabled')) {
+    contourLock.setAttribute('aria-disabled', 'true');
   }
-  if (!boost.getAttribute('aria-label')) {
-    boost.setAttribute('aria-label', 'Boost');
+  if (!contourLock.getAttribute('aria-label')) {
+    contourLock.setAttribute('aria-label', 'Contour Lock');
   }
 
-  return { root, ability, boost };
+  return { root, ability, contourLock };
 }
 
 function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): void {
@@ -465,6 +445,7 @@ function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): 
 
 function beginSteerPointer(ev: PointerEvent): void {
   steerPointerId = ev.pointerId;
+  steerEpoch = controlSources.steeringEpoch;
   steerClientX = ev.clientX;
   steerClientY = ev.clientY;
   bindSteerTouch();
@@ -579,7 +560,7 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
 function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
   const player = requireLocalPlayer();
   const canvas = canvasManager.getCanvas();
-  if (!player || !canvas) {
+  if (!player || !canvas || steerEpoch !== controlSources.steeringEpoch) {
     return;
   }
   steerClientX = ev.clientX;
@@ -666,8 +647,8 @@ function onAbilityClick(ev: MouseEvent): void {
   }
 }
 
-function onBoostPointerDown(ev: PointerEvent, boost: HTMLElement): void {
-  if (boostPointerId !== null || boost.matches(':disabled')) {
+function onContourLockPointerDown(ev: PointerEvent, contourLock: HTMLElement): void {
+  if (contourLockPointerId !== null || contourLock.matches(':disabled')) {
     return;
   }
   ev.preventDefault();
@@ -675,28 +656,28 @@ function onBoostPointerDown(ev: PointerEvent, boost: HTMLElement): void {
   if (steerTap) {
     steerTap.canFire = false;
   }
-  boostPointerId = ev.pointerId;
-  boost.setPointerCapture(ev.pointerId);
-  setBoostPressed(true);
+  contourLockPointerId = ev.pointerId;
+  contourLock.setPointerCapture(ev.pointerId);
+  setContourLockPressed(true);
   const player = requireLocalPlayer();
   if (player) {
-    triggerTouchBoost(player);
-    syncBoostChrome(player);
+    triggerTouchContourLock(player);
+    syncContourLockChrome(player);
   }
 }
 
-function onBoostPointerUp(ev: PointerEvent, boost: HTMLElement): void {
-  if (ev.pointerId !== boostPointerId) {
+function onContourLockPointerUp(ev: PointerEvent, contourLock: HTMLElement): void {
+  if (ev.pointerId !== contourLockPointerId) {
     return;
   }
   ev.preventDefault();
   ev.stopPropagation();
-  boostPointerId = null;
-  releasePointerCapture(boost, ev.pointerId);
-  setBoostPressed(false);
+  contourLockPointerId = null;
+  releasePointerCapture(contourLock, ev.pointerId);
+  setContourLockPressed(false);
 }
 
-function onBoostClick(ev: MouseEvent): void {
+function onContourLockClick(ev: MouseEvent): void {
   if (ev.detail !== 0) {
     return;
   }
@@ -704,8 +685,8 @@ function onBoostClick(ev: MouseEvent): void {
   ev.stopPropagation();
   const player = requireLocalPlayer();
   if (player) {
-    triggerTouchBoost(player);
-    syncBoostChrome(player);
+    triggerTouchContourLock(player);
+    syncContourLockChrome(player);
   }
   ev.stopPropagation();
 }
@@ -721,9 +702,9 @@ export function initializeTouchControls(): void {
     return;
   }
 
-  const { ability, boost } = ensureTouchDom();
+  const { ability, contourLock } = ensureTouchDom();
   abilityButton = ability;
-  boostButton = boost;
+  contourLockButton = contourLock;
 
   document.addEventListener('pointerdown', onPlayfieldPointerDown, {
     passive: false,
@@ -747,12 +728,12 @@ export function initializeTouchControls(): void {
     }
   });
 
-  boost.addEventListener('pointerdown', (ev) => onBoostPointerDown(ev, boost));
-  boost.addEventListener('pointerup', (ev) => onBoostPointerUp(ev, boost));
-  boost.addEventListener('pointercancel', (ev) => onBoostPointerUp(ev, boost));
-  boost.addEventListener('click', onBoostClick);
-  boost.addEventListener('lostpointercapture', () => {
-    if (boostPointerId !== null) {
+  contourLock.addEventListener('pointerdown', (ev) => onContourLockPointerDown(ev, contourLock));
+  contourLock.addEventListener('pointerup', (ev) => onContourLockPointerUp(ev, contourLock));
+  contourLock.addEventListener('pointercancel', (ev) => onContourLockPointerUp(ev, contourLock));
+  contourLock.addEventListener('click', onContourLockClick);
+  contourLock.addEventListener('lostpointercapture', () => {
+    if (contourLockPointerId !== null) {
       resetTouchInteraction(requireLocalPlayer());
     }
   });
@@ -765,26 +746,26 @@ export function initializeTouchControls(): void {
     resetTouchInteraction(requireLocalPlayer());
     const player = requireLocalPlayer();
     if (player) {
-      syncBoostChrome(player);
+      syncContourLockChrome(player);
     }
   });
   window.addEventListener('gameMapClose', () => {
     const player = requireLocalPlayer();
     if (player) {
-      syncBoostChrome(player);
+      syncContourLockChrome(player);
     }
   });
   window.addEventListener('gameSchematicOpen', () => {
     resetTouchInteraction(requireLocalPlayer());
     const player = requireLocalPlayer();
     if (player) {
-      syncBoostChrome(player);
+      syncContourLockChrome(player);
     }
   });
   window.addEventListener('gameSchematicClose', () => {
     const player = requireLocalPlayer();
     if (player) {
-      syncBoostChrome(player);
+      syncContourLockChrome(player);
     }
   });
   window.addEventListener('resize', () => syncTouchChrome());

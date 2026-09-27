@@ -3,18 +3,14 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
+import { contourLockVelocity } from '../../../shared/contourLock';
 import { scoutAbilityBuildsAt } from '../../../shared/furnaceField';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import {
-  advanceShipBoost,
-  fullShipBoost,
-  startShipBoost,
-  stopShipBoost,
-} from '../../../shared/shipBoost';
 import { cruiseSpeed } from '../../../shared/shipFlight';
-import { GROWTH } from '../../../shared/shipGrowth';
+import { GROWTH, thrustScaleFromMass } from '../../../shared/shipGrowth';
 import type {
+  ContourLockState,
   EquipmentId,
   FurnaceTransit,
   HaulerUtilityId,
@@ -25,11 +21,11 @@ import type {
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
-import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
 import { worldFurnaces } from '../../network/worldExploration';
-import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
+import { findContourCapture } from '../../physics/terrain/contourCapture';
+import { terrainCruiseVelocity, terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
@@ -83,12 +79,12 @@ class Ship {
   explodeTime = 0;
   angularVelocity = 0;
   thrusting: boolean = false;
-  boost = fullShipBoost();
+  contourLock: ContourLockState | null = null;
   /** Local input revision prevents lagging snapshots from undoing a new toggle. */
-  boostInputVersion = 0;
+  contourLockInputVersion = 0;
 
-  get boosting(): boolean {
-    return this.boost.phase === 'active';
+  get contourLocked(): boolean {
+    return this.contourLock !== null;
   }
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
@@ -190,7 +186,7 @@ class Ship {
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
-    this.stopBoost();
+    this.releaseContourLock();
     this.angularVelocity = 0;
     playExplosionSound(this.position);
     playLocalHaptic(this.isLocalPlayer, 'boom');
@@ -257,33 +253,43 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  /** Record every local stop, including menus and death, as new input intent. */
-  stopBoost(): void {
-    if (this.boosting) {
-      stopShipBoost(this.boost);
-      this.boostInputVersion++;
+  releaseContourLock(): void {
+    if (this.contourLock === null) {
+      return;
+    }
+    this.contourLock = null;
+    this.contourLockInputVersion++;
+    const speed = cruiseSpeed(this.mass, this.maxVelocity);
+    if (this.knockbackVelocityLimit <= speed) {
+      const target = terrainCruiseVelocity(this.position, this.angle, speed);
+      this.capVelocity(Math.hypot(target.x, target.y));
     }
   }
 
-  /** Toggle a stronger cruise using any charge currently available. */
-  toggleBoost(): boolean {
-    if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
-      this.stopBoost();
+  canLockContour(): boolean {
+    return (
+      !this.furnaceTransit &&
+      !this.serverOwnsMotion &&
+      !this.exploding &&
+      this.health > 0 &&
+      !this.movementLocked &&
+      this.knockbackVelocityLimit <= cruiseSpeed(this.mass, this.maxVelocity) &&
+      findContourCapture(this.position, this.angle) !== null
+    );
+  }
+
+  toggleContourLock(): boolean {
+    if (this.contourLocked) {
+      this.releaseContourLock();
       return false;
     }
-    if (this.boosting) {
-      this.stopBoost();
-      if (this.isLocalPlayer) {
-        playFeedback('boostEnd');
-      }
-    } else if (startShipBoost(this.boost)) {
-      this.boostInputVersion++;
-      if (this.isLocalPlayer) {
-        playFeedback('boostStart');
-        playLocalHaptic(true, 'boost');
-      }
+    if (!this.canLockContour()) {
+      return false;
     }
-    return this.boosting;
+    this.contourLock = findContourCapture(this.position, this.angle);
+    this.contourLockInputVersion++;
+    this.angularVelocity = 0;
+    return this.contourLocked;
   }
 
   /** Returns request submission when connected, or activation in offline play. */
@@ -361,6 +367,7 @@ class Ship {
   }
 
   takeDamage(amount: number, cause?: string): void {
+    this.releaseContourLock();
     if (this.exploding || this.movementLocked) {
       return;
     }
@@ -471,7 +478,7 @@ class Ship {
       this.velocity = { x: 0, y: 0 };
       this.angularVelocity = 0;
       this.thrusting = false;
-      this.stopBoost();
+      this.releaseContourLock();
       this.updateShootCooldown();
       this.moveLasers();
       return;
@@ -480,15 +487,7 @@ class Ship {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
     }
     if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
-      this.stopBoost();
-    }
-    const wasBoosting = this.boosting;
-    advanceShipBoost(this.boost, 1000 / GAME.FPS);
-    if (wasBoosting && !this.boosting) {
-      this.boostInputVersion++;
-      if (this.isLocalPlayer) {
-        playFeedback('boostEnd');
-      }
+      this.releaseContourLock();
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
@@ -512,8 +511,29 @@ class Ship {
       return;
     }
     this.angle += this.angularVelocity;
-    const boost = this.boosting ? getShipKit(this.kitId).boostMultiplier : 1;
-    const speed = cruiseSpeed(this.mass, this.maxVelocity, boost);
+    const speed = cruiseSpeed(this.mass, this.maxVelocity);
+    if (this.knockbackVelocityLimit > speed) {
+      this.releaseContourLock();
+    }
+    if (this.contourLock) {
+      const target = contourLockVelocity(this.position, this.contourLock, speed);
+      if (target) {
+        const targetSpeed = Math.hypot(target.x, target.y);
+        const acceleration = (this.thrust * thrustScaleFromMass(this.mass)) / GAME.FPS;
+        const actualSpeed = Math.min(
+          targetSpeed,
+          Math.hypot(this.velocity.x, this.velocity.y) + (acceleration * targetSpeed) / speed
+        );
+        this.velocity = {
+          x: (target.x * actualSpeed) / targetSpeed,
+          y: (target.y * actualSpeed) / targetSpeed,
+        };
+        this.angle = Math.atan2(-target.y, target.x);
+        this.position = addPositionAndVelocity(this.position, this.velocity);
+        return;
+      }
+      this.releaseContourLock();
+    }
     const velocityLimit = Math.max(
       terrainSpeedLimit(this.position, speed),
       this.knockbackVelocityLimit
@@ -521,14 +541,14 @@ class Ship {
     if (this.knockbackVelocityLimit <= speed) {
       // Contour alignment adds speed while cruise continues to follow the nose.
       // A server-granted blast keeps its motion until the excess speed decays.
-      advanceCruiseVelocity(this, speed, boost);
+      advanceCruiseVelocity(this, speed);
     } else {
       this.velocity = applyThrustOrFriction(
         this.velocity,
         this.angle,
         this.thrusting,
         this.frictionCoefficient,
-        this.thrust * boost,
+        this.thrust,
         this.mass,
         velocityLimit
       );

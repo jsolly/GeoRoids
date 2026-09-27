@@ -59,6 +59,15 @@ for (const viewport of [
     await expect
       .poll(() => page.evaluate(() => Number(document.documentElement.dataset['decodedAudio'])))
       .toBeGreaterThanOrEqual(16);
+    const readHull = () =>
+      page.evaluate(() => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        if (!ship) {
+          throw new Error('Missing canister collector');
+        }
+        return { mass: ship.mass, maxHealth: ship.maxHealth };
+      });
+    const hullBeforeCollection = await readHull();
     if (mobile) {
       await page.locator('#touch-ability').tap();
     } else {
@@ -104,6 +113,9 @@ for (const viewport of [
         .toBe(true);
     }
     await expect.poll(() => collected.size).toBeGreaterThanOrEqual(3);
+    await game.waitForAnimationFrames(12);
+    const hullAfterCollection = await readHull();
+    expect(hullAfterCollection).toEqual(hullBeforeCollection);
     const events: Array<{ duration: number; rate: number }> = await page.evaluate(() =>
       JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
     );
@@ -144,6 +156,7 @@ for (const viewport of [
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
       .toBe('suspended');
     await page.goto(new URL('/wiki/#loot-growth', page.url()).href);
+    await expect.poll(() => page.locator('body').textContent()).toContain('Loot and salvage');
     await expect
       .poll(() => page.locator('body').textContent())
       .toContain('quick pickups play successive notes of a short melody');
@@ -154,7 +167,15 @@ for (const viewport of [
     writeFileSync(
       screenshotManager.getScreenshotPath(`crystal-${viewport.name}-receipt.json`),
       JSON.stringify(
-        { ejected, collected: [...collected], ejectionRates, pickupRates, diagnostics },
+        {
+          ejected,
+          collected: [...collected],
+          ejectionRates,
+          pickupRates,
+          hullBeforeCollection,
+          hullAfterCollection,
+          diagnostics,
+        },
         null,
         2
       )

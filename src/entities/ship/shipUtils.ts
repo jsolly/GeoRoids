@@ -120,7 +120,7 @@ interface OverlayHoldShip extends ShipSpawnProtectionState {
   velocity: Velocity;
   angularVelocity: number;
   thrusting: boolean;
-  stopBoost(): void;
+  releaseContourLock(): void;
 }
 
 /** True when a ship must not report or receive collision damage. */
@@ -140,7 +140,7 @@ export function applyLocalOverlayHold(ship: OverlayHoldShip, held: boolean): boo
     ship.velocity = { x: 0, y: 0 };
     ship.angularVelocity = 0;
     ship.thrusting = false;
-    ship.stopBoost();
+    ship.releaseContourLock();
   } else if (wasHeld && !ship.exploding && ship.health > 0) {
     applyShipSpawnProtection(ship);
   }
@@ -238,7 +238,7 @@ export function calculateLaserStartPosition(
 /**
  * Thrust / friction step for ships carrying combat knockback.
  * Callers pass their own friction so local and server-owned policies stay explicit.
- * Scalar mass/kit arguments keep loot mass and Hauler thrust on the same
+ * Scalar mass/kit arguments keep saved ship mass and Hauler thrust on the same
  * formula without allocating an options object on every frame.
  */
 export function applyThrustOrFriction(

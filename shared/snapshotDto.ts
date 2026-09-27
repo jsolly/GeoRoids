@@ -25,12 +25,12 @@ import type {
 import type { BeltRecoveryWarning } from './asteroidBelt';
 import { ASTEROID_BELT } from './asteroidBelt';
 import { BELT_CRAWLER } from './beltCrawler';
+import { isContourLockState } from './contourLock';
 import { validSettlement } from './economy';
 import { validEquipment } from './equipment';
 import { validExploration } from './exploration';
 import { civicLot, TOWN_HEARTH, validCivicModules } from './furnaces';
 import { FURNACE_TRAVEL } from './furnaceTravel';
-import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
 
@@ -142,7 +142,7 @@ const entity = shape<ServerEntityData>({
   angle: number,
   exploding: boolean,
   thrusting: boolean,
-  boost: optional(isShipBoostState),
+  contourLock: optional(isContourLockState),
   color: string,
   cargo: counter,
   purchases: array(string),

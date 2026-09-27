@@ -6,8 +6,8 @@ export const TERRAIN = {
   DEFAULT_SEED: 0x7ec01d,
   /** Height samples across the arena diameter for marching squares. */
   GRID_SIZE: 224,
-  /** Evenly spaced contour levels of the shared current field. */
-  LEVELS: 18,
+  /** Fixed levels keep each visible rail stable across camera patches. */
+  CONTOUR_INTERVAL: 0.08,
   /** World units per noise cell — varied hills within the close gameplay view. */
   FEATURE_SCALE: 650,
   OCTAVES: 4,
@@ -30,6 +30,8 @@ export const TERRAIN = {
   TRAVEL_STEEP_GRADIENT: 0.0025,
   /** Maximum extra cruise speed when following a contour in either direction. */
   CONTOUR_SPEED_BONUS: 1.15,
+  /** Maximum time to shed the full contour bonus after turning across the grain. */
+  CONTOUR_RELEASE_SECONDS: 0.35,
   /** Below this, contour-laser ticks stay off (flat spawn saddle stays quiet). */
   CONTOUR_LASER_MIN_GRAD: 0.00045,
 } as const;

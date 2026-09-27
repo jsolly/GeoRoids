@@ -1,11 +1,15 @@
 import type { FurnaceTransit, Position } from '../../shared-types';
+import { CAMERA } from '../constants';
 
 /** Game headings are Y-up; Canvas rotations are clockwise in Y-down space. */
 type Traveler = { angle: number; velocity: Position; furnaceTransit?: FurnaceTransit | null };
 const courses = new WeakMap<Traveler, number>();
 
-/** Hold the last course while stopped. A new ship starts with its nose pointing up. */
+/** North-up by default; travel-up retains the last course while stopped. */
 export function travelCameraRotation(ship: Traveler): number {
+  if (!CAMERA.FOLLOW_TRAVEL) {
+    return 0;
+  }
   const moving = Math.hypot(ship.velocity.x, ship.velocity.y) > 0.01;
   // Pipe rides set the nose from the route tangent and zero free-flight velocity.
   const course = ship.furnaceTransit

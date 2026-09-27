@@ -62,6 +62,8 @@ test('a prepared fixture returns the authoritative placed motion epoch', async (
   try {
     await server.listening;
     server.gameEngine.stopGameLoop();
+    // This test counts explicit fixture snapshots, not timer broadcasts.
+    server.wsCore.stopPeriodicGameStateBroadcast();
     const transport = new RecordingSocket();
     server.wsCore.handleClientMessage(
       {

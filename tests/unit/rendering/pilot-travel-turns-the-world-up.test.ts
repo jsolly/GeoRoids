@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
+import { CAMERA } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
 import { reconcilePlayerInput } from '../../../src/input/keybindings';
@@ -16,7 +17,12 @@ import { mapWorldToCanvas } from '../../../src/ui/universeMap';
 const origin = { x: 0, y: 0 };
 const viewport = { width: 1280, height: 900 };
 
+beforeEach(() => {
+  CAMERA.FOLLOW_TRAVEL = true;
+});
+
 afterEach(() => {
+  CAMERA.FOLLOW_TRAVEL = false;
   canvasManager.destroy();
   resetControlSources();
 });
@@ -112,4 +118,14 @@ test('a pipe ride follows each route turn and retains its arrival direction', ()
   }
   player.ship.furnaceTransit = null;
   expect(travelCameraRotation(player.ship)).toBeCloseTo(-Math.PI);
+});
+
+test('north-up trial keeps the world fixed while the pilot turns or drifts', () => {
+  CAMERA.FOLLOW_TRAVEL = false;
+  for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const ship = { angle, velocity: { x: Math.cos(angle), y: Math.sin(angle) } };
+    expect(travelCameraRotation(ship)).toBe(0);
+    canvasManager.followTravel(ship);
+    expect(canvasManager.getCameraRotation()).toBe(0);
+  }
 });

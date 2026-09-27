@@ -56,7 +56,8 @@ test.each([
 
   // Real steering carries the hull through the same panel that reflected its shot.
   const before = await pilot.getShipHealth();
-  await page.mouse.move(viewport.width / 2, 20);
+  const east = await canvasPoint(page, 0.85, 0.5);
+  await page.mouse.move(east.x, east.y);
   await page.waitForFunction(
     () => {
       const ship = window.gameController?.getCurrPlayer()?.ship;

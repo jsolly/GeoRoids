@@ -48,11 +48,13 @@ function paintedCircles(page: Page) {
 }
 
 test.each([
-  { width: 1280, height: 900, touch: false },
-  { width: 390, height: 844, touch: true },
+  { width: 1280, height: 900, touch: false, followTravel: false },
+  { width: 1280, height: 900, touch: false, followTravel: true },
+  { width: 390, height: 844, touch: true, followTravel: false },
+  { width: 390, height: 844, touch: true, followTravel: true },
 ])(
-  'travel turns the viewport and both maps on $width × $height',
-  async ({ width, height, touch }) => {
+  'pilot steers and reads maps on $width × $height with followTravel=$followTravel',
+  async ({ width, height, touch, followTravel }) => {
     const page = touch
       ? await browserManager.recreatePage({ hasTouch: true })
       : browserManager.getCurrentPage();
@@ -63,6 +65,10 @@ test.each([
     await page.setViewportSize({ width, height });
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    await page.evaluate(
+      `import('/src/constants/index.ts').then(({ CAMERA }) => { CAMERA.FOLLOW_TRAVEL = ${followTravel}; })`
+    );
+    await game.waitForAnimationFrames(2);
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
     const readCamera = await page.evaluateHandle<
       () => { rotation: number; aheadX: number; aheadY: number; speed: number; angle: number }
@@ -90,10 +96,7 @@ test.each([
         .poll(async () => {
           const state = await readCamera.evaluate((read) => read());
           return Math.abs(
-            Math.atan2(
-              Math.sin(state.rotation - initial.rotation),
-              Math.cos(state.rotation - initial.rotation)
-            )
+            Math.atan2(Math.sin(state.angle - initial.angle), Math.cos(state.angle - initial.angle))
           );
         })
         .toBeGreaterThan(0.7);
@@ -109,12 +112,19 @@ test.each([
       const moving = await readCamera.evaluate((read) => read());
       // Rendering and simulation can straddle one frame; allow less than a ship-width of error.
       expect(Math.hypot(moving.aheadX, moving.aheadY)).toBeCloseTo(40, 5);
-      expect(Math.abs(moving.aheadX)).toBeLessThan(12);
-      expect(moving.aheadY).toBeLessThan(-5);
-      expect(Math.abs(moving.rotation - initial.rotation)).toBeGreaterThan(0.3);
+      if (followTravel) {
+        expect(Math.abs(moving.aheadX)).toBeLessThan(12);
+        expect(moving.aheadY).toBeLessThan(-5);
+        expect(Math.abs(moving.rotation - initial.rotation)).toBeGreaterThan(0.3);
+      } else {
+        expect(initial.rotation).toBe(0);
+        expect(moving.rotation).toBe(0);
+      }
       await page.keyboard.press('Space');
       await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`gps-flight-${touch ? 'mobile' : 'desktop'}.png`),
+        path: screenshotManager.getScreenshotPath(
+          `camera-${followTravel}-flight-${touch ? 'mobile' : 'desktop'}.png`
+        ),
       });
 
       if (touch) {
@@ -189,6 +199,7 @@ test.each([
           circle.canvas === 'universe-map-canvas' &&
           Math.abs(circle.radius - 7.7) < 0.1 &&
           Math.abs(circle.x - mapSize.width / 2) < 1 &&
+          circle.y >= 0 &&
           circle.y < mapSize.height / 2
       );
       expect(chartMark).toBeDefined();
@@ -202,6 +213,7 @@ test.each([
           circle.canvas === 'universe-map-canvas' &&
           Math.abs(circle.radius - 7.7) < 0.1 &&
           Math.abs(circle.x - mapSize.width / 2) < 1 &&
+          circle.y >= 0 &&
           circle.y < mapSize.height / 2
       );
       expect(zoomedMark).toBeDefined();
@@ -222,7 +234,9 @@ test.each([
       await page.locator('#universe-map-center').click();
       expect(await page.locator('#universe-map-center').getAttribute('aria-pressed')).toBe('true');
       await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`gps-map-${touch ? 'mobile' : 'desktop'}.png`),
+        path: screenshotManager.getScreenshotPath(
+          `camera-${followTravel}-map-${touch ? 'mobile' : 'desktop'}.png`
+        ),
       });
       await page.locator('#universe-map-close').click();
       await expect.poll(() => readCamera.evaluate((read) => read().speed)).toBeGreaterThan(0.1);

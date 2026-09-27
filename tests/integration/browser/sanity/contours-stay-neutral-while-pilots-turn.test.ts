@@ -78,26 +78,16 @@ for (const viewport of [
     const camera = await page.evaluateHandle<
       typeof import('../../../../src/rendering/canvasSurface').canvasManager
     >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
-    // Placement stops velocity; the travel camera holds its previous course
-    // until movement resumes. Establish the actual moving view before comparing.
     await expect
-      .poll(
-        () =>
-          camera.evaluate((surface) => {
-            const ship = window.gameController?.getCurrPlayer()?.ship;
-            if (!ship) {
-              throw new Error('Missing pilot while establishing the camera baseline');
-            }
-            const course = Math.atan2(-ship.velocity.y, ship.velocity.x);
-            const distance = (a: number, b: number) =>
-              Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-            return (
+      .poll(() =>
+        camera.evaluate((surface) => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          return Boolean(
+            ship &&
               Math.hypot(ship.velocity.x, ship.velocity.y) > 0.01 &&
-              distance(course, ship.angle) < 0.01 &&
-              distance(surface.getCameraRotation(), course - Math.PI / 2) < 0.01
-            );
-          }),
-        { timeout: 5000 }
+              surface.getCameraRotation() === 0
+          );
+        })
       )
       .toBe(true);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -135,18 +125,8 @@ for (const viewport of [
           Math.abs(Math.atan2(Math.sin(ship.angle - heading), Math.cos(ship.angle - heading))) > 1
         );
       }, start.angle);
-      // Nose movement alone does not prove the renderer has followed the new
-      // travel course. Observe the rendered camera before releasing steering.
-      await expect
-        .poll(
-          () =>
-            camera.evaluate((surface, initialRotation) => {
-              const delta = surface.getCameraRotation() - initialRotation;
-              return Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta)));
-            }, before.rotation),
-          { timeout: 5000 }
-        )
-        .toBeGreaterThan(1);
+      // Turning changes the ship heading without rotating the terrain.
+      expect(await camera.evaluate((surface) => surface.getCameraRotation())).toBe(0);
       if (session) {
         await dispatchTouch(session, 'touchEnd', []);
         touchActive = false;
@@ -162,7 +142,9 @@ for (const viewport of [
       expect(turned.chromatic).toBe(0);
       expect(turned.brightest).toBeGreaterThan(20);
       expect(turned.brightest).toBeLessThanOrEqual(104);
-      expect(turned.checksum).not.toBe(before.checksum);
+      // The pixel probe uses a fixed world position: changing ship heading
+      // must leave the north-up terrain projection identical.
+      expect(turned.checksum).toBe(before.checksum);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.waitForFunction(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
       const reduced = await page.evaluate<TerrainPixels>(readTerrainPixels);

@@ -1,5 +1,5 @@
 {
-  "note": "Boost Coupling: one coupling ignites a colossal deposit at 20% burn speed; a second coupling (armed, or joining while burning) restores full speed; a full burning crew refuses more couplings and Tow Cables; updated Hauler, Asteroids, generated reference. Haptics: hidden unless the browser can vibrate on a coarse-pointer device; updated HUD sound-and-haptics. Equipment loot: per-ship drops visible only to a matching kit lacking the tool, each eligible pilot takes a copy, pickup events are private, drops expire with the nest lifetime and are not evicted by the loot cap; updated Loot and growth. Furnace footprint: Scout Build, travel prompt, and Hauler 'Only Scouts can build furnaces' hint share one footprint rule (ship center inside the lot, matching the server) and one fading field-hint component with a screen-reader announcer; removed the 220-unit Build approach; updated Teamwork and generated Scout reference. Cargo: full hold shows a 4s bank reminder at most every 3 minutes; updated Loot and growth. Spiders: small/medium/large bodies with varied abdomen, head, leg span, and back markings in the infested-isoline red; hit, harpoon, and occupancy radius scale with size; updated Terrain. Lasers: shots render as round glowing balls (14-unit diameter); regenerated loot, pickups, reflection, and split GIFs with pinned Pillow 12.3.0 and inspected the reflection poster. Verified via unit/server tests, wiki:media:check, and live browser checks.",
+  "note": "Merged origin/main #713 (native ARM CI runners): only test-fixture placement and audio-probe timing changed in cited integration tests; no game rule, article, or demonstration impact. Prior review of this branch stands: Boost Coupling solo crawl and late second coupling; per-kit haptics visibility; per-ship equipment drops with private pickups and nest-lifetime expiry; shared furnace footprint rule and fading field hints with announcer; cargo-full reminder; spider size/silhouette variety with scaled radii; round laser shots with regenerated loot, pickups, reflection, and split GIFs.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:2b17b05dab0db84467afd3764244aa2eb1e570d194f6c262383bcbed80fd18b7",
@@ -338,7 +338,7 @@
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts": "sha256:b6d78d1ccb3a79b970ea0e786ef837649ca2d619cdc095ceba189effba5fd3e3",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:1e98534764d7f916269a67b7a84c14352efea871b55580292968e2a23aee9b3c",
     "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:c80b94854f033a6c8adfd0d7cf9ee3e65e9edc194b29181aa6c32fcc8f1e7742",
-    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:c803d9a2b2ba96d532d2289cef621daff4767973d26f0634fa86942112eca05e",
+    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:a288dcf97ec42b525f0b397efc0a225a8aefe87d2986895e10286ef8c7c007fc",
     "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts": "sha256:313aac0e502e730646753b6779a8b6a0371f51c43431384a47947451b7aad951",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:d5db2e525622efef4bcb16c6be007950367c9e5b031a955dd40be3ba96aae6f8",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:dbe7b3189b8658f2344a6397005d3b8897a5e2db8e6d7f5a9a40c710054e334b",
@@ -346,7 +346,7 @@
     "tests/integration/browser/sanity/pilots-ignore-steering-until-contour-lock-is-released.test.ts": "sha256:83353d8b94c9e4d99db397b2fdb4766d3518d0ec2cdc776bb8351e5f8cce4ce5",
     "tests/integration/browser/sanity/pilots-play-pinball-through-reflective-pockets.test.ts": "sha256:3b7d1ba705e9a2b40f230541d3ee43d540e2fbf3d18efcf0f073994552fca3f6",
     "tests/integration/browser/sanity/pilots-see-mostly-drifting-rocks-at-varied-speeds.test.ts": "sha256:7e9edb0c6491de036baa2a9ffda53a1f10ba283db8ec1facb75e138a1267412c",
-    "tests/integration/browser/sanity/pilots-toggle-contour-lock-without-charge.test.ts": "sha256:d6d2dbbadf960291eca939e5ebdbc0e6f6a53c43ee011e456783cff40977f703",
+    "tests/integration/browser/sanity/pilots-toggle-contour-lock-without-charge.test.ts": "sha256:47568521d38c660c681fa3669a5a8da5bbd367abdebec7a3b07070ecb89e8a4a",
     "tests/integration/browser/sanity/reflective-asteroids-leave-ordinary-salvage.test.ts": "sha256:08a17d5c5669012807d28b531b36cdafbb7f38b309ae4b7a3fd22a503eefbcd4",
     "tests/integration/browser/sanity/scout-radar-pulses-cover-the-viewport.test.ts": "sha256:b607833154cb0792eacf5f32ef9609e6c06ea8f7cc0aa1071306f108a0c29961",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:1c6991fb8f632d71bdad1e812b206c96a6e23eaf1cb3c77b60c60bfd378a94f4",

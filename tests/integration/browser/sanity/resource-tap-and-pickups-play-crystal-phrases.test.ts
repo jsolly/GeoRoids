@@ -1,6 +1,10 @@
 import { writeFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
+import {
+  installAudioProbe,
+  readSampleDuration,
+  readSamplePlaybackRates,
+} from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -47,15 +51,10 @@ for (const viewport of [
     await arrangeCrewField([id], 'tow');
     await game.waitForAnimationFrames(10);
     // Use native decoding to identify the actual sample buffers in the probe.
-    const durations = await page.evaluate(async () => {
-      const context = new OfflineAudioContext(1, 1, 48000);
-      const duration = async (name: string) => {
-        const response = await fetch(`/sounds/${name}.m4a`);
-        const buffer = await context.decodeAudioData(await response.arrayBuffer());
-        return buffer.duration;
-      };
-      return { ejection: await duration('tap-eject'), pickup: await duration('loot-pickup') };
-    });
+    const durations = {
+      ejection: await readSampleDuration(page, 'tap-eject'),
+      pickup: await readSampleDuration(page, 'loot-pickup'),
+    };
     await expect
       .poll(() => page.evaluate(() => Number(document.documentElement.dataset['decodedAudio'])))
       .toBeGreaterThanOrEqual(16);

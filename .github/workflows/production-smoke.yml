@@ -31,7 +31,7 @@ jobs:
        github.event.deployment.environment == 'GeoRoids / production' &&
        github.event.deployment.task == 'deploy' &&
        github.event.deployment.creator.login == 'railway-app[bot]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 18
     env:
       PRODUCTION_SMOKE_SHA: ${{ github.event.deployment.sha || inputs.release_sha }}

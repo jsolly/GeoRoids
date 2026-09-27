@@ -24,7 +24,9 @@
     "shared/townStore.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "src/ui/spawnFlyIn.ts",
+    "src/ui/universeMap.ts"
   ],
   "controls": [
     "src/input/keybindings.ts",
@@ -483,7 +485,9 @@
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
     "shared/economy.ts",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+    "src/rendering/canvasSurface.ts",
+    "src/rendering/canvas.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",

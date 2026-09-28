@@ -211,7 +211,7 @@ test('a mined deposit regrows in its home slot only after an interval and out of
   expect(manager.getAsteroid(second.id)).toBeDefined();
 });
 
-test('neither a pilot radar nor a survey probe watches a mined deposit reappear', () => {
+test('no pilot radar, survey probe or scanning corner watches a mined deposit reappear', () => {
   const observer = { x: -900, y: -900 };
   const { field, manager } = awakeField(observer);
   const [target] = hiddenSlots(manager, observer);
@@ -219,12 +219,17 @@ test('neither a pilot radar nor a survey probe watches a mined deposit reappear'
     throw new Error('Sector 0,0 needs a hidden ordinary slot');
   }
   manager.removeAsteroid(target.id);
-  // A pilot whose radar edge covers the slot, then a probe at the edge of a
-  // scanning pilot's zoomed-out view: both would see a rock appear.
+  // A pilot whose radar edge covers the slot, a probe at the edge of a
+  // scanning pilot's zoomed-out view, and a scanning pilot seeing the slot in
+  // a corner of that square view: each would see a rock appear.
   const radarPilot = { x: target.position.x - WORLD.asteroidInterestRadius, y: target.position.y };
   const probe = { x: target.position.x, y: target.position.y + WORLD.interestRadius - 1 };
+  const cornerScout = {
+    x: target.position.x - 0.9 * WORLD.interestRadius,
+    y: target.position.y - 0.9 * WORLD.interestRadius,
+  };
   let now = T0;
-  for (const watcher of [radarPilot, probe]) {
+  for (const watcher of [radarPilot, probe, cornerScout]) {
     for (let step = 0; step < 4; step++) {
       now += INTERVAL;
       field.update(manager, [observer, watcher], now);

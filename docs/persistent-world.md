@@ -30,7 +30,8 @@ sector (an in-memory ID index answers this without scanning world history).
 Each awake sector restores `DEPOSIT_FIELD.REGROWTH_FRACTION` of its missing
 slots (at least one) per `DEPOSIT_FIELD.REGROWTH_INTERVAL_MS`, so a stripped
 field refills with a half-life of a few minutes. A sector that wakes
-catches up on the intervals it slept through. Nothing regrows within a square
+catches up on the intervals it slept through for slots out of sight; slots a
+pilot can already see wait for the ordinary rate. Nothing regrows within a square
 of half-width `DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE` around a pilot or
 probe, which covers everything a pilot is sent. A restart is not a refill: time
 before the process started does not count, so saved sectors resume regrowing

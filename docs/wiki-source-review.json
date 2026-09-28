@@ -1,5 +1,5 @@
 {
-  "note": "Review-fix follow-up: regrowth now stays outside a square of half-width WORLD.interestRadius around each pilot and probe (the asteroids exact-values reference says so along either axis), matching every row a pilot is sent including a scanning pilot's view; metal health derives from ROID.METAL_HITS in both the generator and the reference. Pause and shutdown flushes write all deferred asteroid drift and damage. Player-facing asteroid, teamwork and field-manual copy re-read and still accurate; no demonstration changed.",
+  "note": "Final review-fix pass: regrowth hides by the full view square (including a scanning pilot's corners), pause and shutdown flushes write deferred asteroid drift and damage, and generated metal health derives from ROID.METAL_HITS. Player-facing asteroid, teamwork and field-manual pages and the exact-values reference re-read and accurate; no demonstration changed.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
@@ -95,7 +95,7 @@
     "server/world/AsteroidSpatialIndex.ts": "sha256:39ed9c7b8927fa65dfc4ea030fb9d1da2d586b92f0f230ccde504314c3c4ee83",
     "server/world/InlineWorldPersistence.ts": "sha256:c576b18dae284f2beac889cc7fb100d502be863728a7402d26b7218b5c7373b1",
     "server/world/MapAssets.ts": "sha256:9de7a3149e76615449195ed7edafc8530c983273f9e16b5e41f91aaf0a8c7e35",
-    "server/world/RegionalAsteroidField.ts": "sha256:882d10e9022a644d187583004f9e9ebe9f06ea0e6f4804fee76cb4a3fdd030f9",
+    "server/world/RegionalAsteroidField.ts": "sha256:7ba654740bf8f31f0d2791a6814c3383321715d09bed919b32239d553934d95e",
     "server/world/WorkerWorldPersistence.ts": "sha256:63a3c4a25be855a0f918da6f00e20cab1de7e631327b5f60352c9434d80aafc8",
     "server/world/WorldStore.ts": "sha256:107750b693d7f6c12cee54cd7cfce2c546bf9348c289dece13da90cb2c22138e",
     "server/world/depositLayout.ts": "sha256:ca51bd5c11760da10862f4afd199c4ff09274bd693e280ee31cba0a6720510cc",
@@ -430,7 +430,7 @@
     "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts": "sha256:208295d9bcd73a547bc7934dd3bb81346adcce113e32d6ffa2e28c5c8614b205",
     "tests/unit/server/loot-manager.test.ts": "sha256:2c32fd4511de04ca496b67ceb9e1bda5ad611e2a1c7ef007c2c49a7de9938de8",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts": "sha256:ef54d4836218c75cc4dfe8f3ccbec23cab05f554fd33cbd7a7349ad4461b2351",
-    "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts": "sha256:b7ca60b41bbd397d34ce882ae22e7b37416d11ae96dd488c3bc034b85f2f503b",
+    "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts": "sha256:ef38ebe27001af90f9d6a46609c6e770c33be7d49b03b5310293de033a30d28a",
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:a149f79253b367a31bdfc13c719604de0ebea3a2894cf7849a4e80b3d9fb0b65",
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:4a3dd8ec970c663d33a8d92dc6f5d17473ed68ba69c772acf4c9e0543bd0f4c1",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1b81bd9b23ec35804328671ee7323a555c1077a7ae0b0c82641881ed15d614f7",
@@ -441,7 +441,7 @@
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:4af2d0342d8ca485f7fb94c5f776badf7a01038afb79f9c8d7a503017bcfb24c",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts": "sha256:9d6c804f452c631ebf27d14ffe80b98f7940027d3a92c0c367c20e94b2820ee2",
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts": "sha256:a014fb3cc93e36091aa5b9cd17f25640270e08d9d63e9a102debceb69305b622",
-    "tests/unit/server/regional-asteroid-density.test.ts": "sha256:1b66a189c6ea4ffa8dbcb7677a541e4138549703e5405e3637548b7de01360e8",
+    "tests/unit/server/regional-asteroid-density.test.ts": "sha256:eac6101f8a00d0b9d5004c6838aa7736dc5b925120498d0a616ce8f07d919511",
     "tests/unit/server/satellite-pickup-scoring.test.ts": "sha256:203eb8a0a9024872edfe19225be2a3c89715458157598f398ed37cd91db0f063",
     "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:62d89df573648d6117baa4d1e9351e6061ad23395b1ef2640ce39cd16d6c8035",
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:9aae8e290313c557cd5b833817c79877192ee44fd5a3afb6eb9e81ec143f6c13",

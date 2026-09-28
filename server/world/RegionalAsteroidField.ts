@@ -109,13 +109,18 @@ export class RegionalAsteroidField {
 
   private load(id: string): AsteroidData[] {
     this.visited.add(id);
-    return this.dormant.get(id) ?? this.layout(id).map((slot) => structuredClone(slot));
+    return this.dormant.get(id) ?? this.freshRows(id);
+  }
+
+  /** A never-visited sector's generated rows, independent of the cached templates. */
+  private freshRows(id: string): AsteroidData[] {
+    return this.layout(id).map((slot) => structuredClone(slot));
   }
 
   /** Move a sector's rows into the simulation. Regrowth catch-up runs in update(). */
   private wake(manager: AsteroidManager, id: string): AsteroidData[] {
     this.visited.add(id);
-    const rows = this.takeDormant(id) ?? this.layout(id).map((slot) => structuredClone(slot));
+    const rows = this.takeDormant(id) ?? this.freshRows(id);
     const added: AsteroidData[] = [];
     for (const rock of rows) {
       if (manager.getAsteroid(rock.id)) {

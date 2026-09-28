@@ -90,6 +90,13 @@ second correlator. Filter Railway logs with the pasted value:
 @category:STATE AND @playerId:PASTE
 ```
 
+The same panel has a **Log level** selector. It applies only to that browser
+while Debug is on, persists across reloads, and needs no constants edit or
+deploy. Turning Debug off restores `LOGGING.GLOBAL_LOG_LEVEL`. `Debug` is
+verbose enough to stutter play; use it briefly. Server-side `DEBUG.*` world
+overrides stay compile-time on purpose so one player cannot reshape the shared
+world.
+
 The optional page session ID on that same Debug panel is the `sessionId` used
 for forwarded client records:
 

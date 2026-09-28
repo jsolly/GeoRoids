@@ -65,6 +65,13 @@ if (typeof window !== 'undefined') {
               <label class="sound-toggle-label" for="debugPref">Debug</label>
             </div>
             <div id="debug-identity" class="debug-identity" hidden>
+              <label for="debug-log-level">Log level</label>
+              <select id="debug-log-level">
+                <option value="error">Error</option>
+                <option value="warn">Warn</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+              </select>
               <div>
                 <label class="debug-id-label" for="debug-player-id">Player ID</label>
                 <div class="debug-id-row">

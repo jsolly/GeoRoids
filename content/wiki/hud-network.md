@@ -42,4 +42,4 @@ The game reconnects automatically; if it returns to the title screen, choose Ent
 
 ## Diagnostics
 
-Enable Advanced Debug for player and session IDs, frame rate, and connection health. Use Copy Diagnostics when reporting trouble, including silent audio.
+Enable Advanced Debug for player and session IDs, a per-browser log level, frame rate, and connection health. Use Copy Diagnostics when reporting trouble, including silent audio.

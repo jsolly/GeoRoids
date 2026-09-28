@@ -2,9 +2,8 @@
 name: CI
 run-name: >-
   ${{ (github.event_name != 'pull_request' ||
-  ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-  (github.event.pull_request.user.login != 'dependabot[bot]' ||
-  contains(github.event.pull_request.labels.*.name, 'ow-ci')))) && format('{0} validation', github.workflow) || 'Deferred validation' }}
+  (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+  (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && format('{0} validation', github.workflow) || 'Deferred validation' }}
 
 'on':
   workflow_dispatch:
@@ -21,27 +20,20 @@ permissions:
 concurrency:
   group: >-
     ${{ (github.event_name != 'pull_request' ||
-    ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-    (github.event.pull_request.user.login != 'dependabot[bot]' ||
-    contains(github.event.pull_request.labels.*.name, 'ow-ci')))) && format('ci-{0}-{1}-{2}', github.workflow, github.event.pull_request.number || github.ref, github.event_name) || format('deferred-{0}', github.run_id) }}
+    (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+    (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && format('ci-{0}-{1}-{2}', github.workflow, github.event.pull_request.number || github.ref, github.event_name) || format('deferred-{0}', github.run_id) }}
   cancel-in-progress: true
 
 jobs:
   behavioral-smoke:
     name: >-
       ${{ (github.event_name != 'pull_request' ||
-      ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-      (github.event.pull_request.user.login != 'dependabot[bot]' ||
-      contains(github.event.pull_request.labels.*.name, 'ow-ci')))) && 'behavioral-smoke' || 'behavioral-smoke-deferred' }}
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'behavioral-smoke' || 'behavioral-smoke-deferred' }}
     if: >-
       github.event_name != 'pull_request' ||
-      (
-        (github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-        (
-          github.event.pull_request.user.login != 'dependabot[bot]' ||
-          contains(github.event.pull_request.labels.*.name, 'ow-ci')
-        )
-      )
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
@@ -125,18 +117,12 @@ jobs:
   static-checks:
     name: >-
       ${{ (github.event_name != 'pull_request' ||
-      ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-      (github.event.pull_request.user.login != 'dependabot[bot]' ||
-      contains(github.event.pull_request.labels.*.name, 'ow-ci')))) && 'static-checks' || 'static-checks-deferred' }}
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'static-checks' || 'static-checks-deferred' }}
     if: >-
       github.event_name != 'pull_request' ||
-      (
-        (github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-        (
-          github.event.pull_request.user.login != 'dependabot[bot]' ||
-          contains(github.event.pull_request.labels.*.name, 'ow-ci')
-        )
-      )
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
@@ -194,17 +180,19 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Dependabot PRs skip until a provenanced optimize-workspaces drain applies
+  # `ow-ci`. Only that `labeled` event runs CI, so a later Dependabot push
+  # defers again until the drain re-kicks the new head. Deferred jobs use
+  # name `ci-deferred` so a skipped required `ci` check cannot look green.
   ci:
     name: >-
       ${{ (github.event_name != 'pull_request' ||
-      ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-      (github.event.pull_request.user.login != 'dependabot[bot]' ||
-      contains(github.event.pull_request.labels.*.name, 'ow-ci')))) && 'ci' || 'ci-deferred' }}
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'ci' || 'ci-deferred' }}
     if: >-
       always() && (github.event_name != 'pull_request' ||
-      ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-      (github.event.pull_request.user.login != 'dependabot[bot]' ||
-      contains(github.event.pull_request.labels.*.name, 'ow-ci'))))
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci'))
     needs: [static-checks, behavioral-smoke]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 1

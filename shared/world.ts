@@ -8,7 +8,8 @@ export const WORLD = {
   minimapRadius: 1_800,
   /**
    * Snapshots carry asteroids only inside this circle: the minimap radar plus
-   * a margin for rocks crossing its edge. Sectors still wake at interestRadius.
+   * a margin for rocks crossing its edge. A scanning pilot's zoomed-out camera
+   * gets the interestRadius square; sectors always wake at interestRadius.
    */
   asteroidInterestRadius: 1_950,
   /** Awake sectors whose rock set is unchanged persist drift every Nth checkpoint. */
@@ -61,11 +62,19 @@ export function nearbyWorldRows<T extends { position: Position }>(
   );
 }
 
-/** Asteroids a client can draw on its flight view or minimap radar. */
+/**
+ * Asteroids a client can draw on its flight view or minimap radar. A running
+ * Mineral Scan zooms the camera out past the radar, so a scanning pilot gets
+ * the full interest square for the pulse.
+ */
 export function nearbyAsteroidRows<T extends { position: Position }>(
   rows: readonly T[],
-  center: Position
+  center: Position,
+  scanning = false
 ): T[] {
+  if (scanning) {
+    return nearbyWorldRows(rows, center);
+  }
   return rows.filter(
     (row) =>
       Math.hypot(row.position.x - center.x, row.position.y - center.y) <=

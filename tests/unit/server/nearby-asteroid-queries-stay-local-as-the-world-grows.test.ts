@@ -4,6 +4,7 @@ import { CollisionAuthority } from '../../../server/core/CollisionAuthority';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
+import { nearbyAsteroidRows } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -104,4 +105,17 @@ test('one shared index follows mining, splits, edits and drift without being reb
       })
       .map((candidate) => candidate.id)
   ).toEqual(['drifter']);
+});
+
+test('a scanning Scout receives the rocks its zoomed-out camera shows, then only its radar again', () => {
+  const pilot = { x: 0, y: 0 };
+  const onRadar = rock('on-radar', 1_200, 900);
+  const scanEdge = rock('scan-edge', 2_450, 0);
+  const beyond = rock('beyond', 3_200, 0);
+  const rows = [onRadar, scanEdge, beyond];
+  expect(nearbyAsteroidRows(rows, pilot).map((candidate) => candidate.id)).toEqual(['on-radar']);
+  expect(nearbyAsteroidRows(rows, pilot, true).map((candidate) => candidate.id)).toEqual([
+    'on-radar',
+    'scan-edge',
+  ]);
 });

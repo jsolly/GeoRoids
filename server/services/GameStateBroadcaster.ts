@@ -11,6 +11,7 @@ import {
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
 import { nearbyAsteroidRows, nearbyWorldRows, WORLD } from '../../shared/world';
 import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
+import { isActiveScanner } from '../../src/entities/ship/surveyScan';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
@@ -184,14 +185,17 @@ export class GameStateBroadcaster {
         continue;
       }
       try {
+        const scanning = isActiveScanner(player);
+        const reach = scanning ? WORLD.interestRadius : WORLD.asteroidInterestRadius;
         const asteroids = nearbyAsteroidRows(
           asteroidIndex.query({
-            minX: player.position.x - WORLD.asteroidInterestRadius,
-            minY: player.position.y - WORLD.asteroidInterestRadius,
-            maxX: player.position.x + WORLD.asteroidInterestRadius,
-            maxY: player.position.y + WORLD.asteroidInterestRadius,
+            minX: player.position.x - reach,
+            minY: player.position.y - reach,
+            maxX: player.position.x + reach,
+            maxY: player.position.y + reach,
           }),
-          player.position
+          player.position,
+          scanning
         );
         const asteroidIds = new Set(asteroids.map((rock) => rock.id));
         const canonical = new SnapshotEncoder({
@@ -428,7 +432,7 @@ export class GameStateBroadcaster {
       if (!player.ws) {
         continue;
       }
-      const nearby = nearbyAsteroidRows(asteroids, player.position);
+      const nearby = nearbyAsteroidRows(asteroids, player.position, isActiveScanner(player));
       if (nearby.length > 0) {
         this.sendToWebSocket(player.ws, {
           type: 'asteroidCreateBatch',

@@ -7,6 +7,7 @@ import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyAsteroidRows } from '../../shared/world';
 import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
+import { isActiveScanner } from '../../src/entities/ship/surveyScan';
 import { sanitizePlayerName } from '../../src/utils/playerName';
 import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
@@ -670,7 +671,8 @@ export class MessageHandler {
 
     const existingAsteroids = nearbyAsteroidRows(
       this.gameEngine.getAllAsteroids(),
-      socketPlayer.position
+      socketPlayer.position,
+      isActiveScanner(socketPlayer)
     );
     this.broadcaster.sendToWebSocket(ws, {
       type: 'asteroidCreateBatch',

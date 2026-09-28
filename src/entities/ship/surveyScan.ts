@@ -9,7 +9,8 @@ type Scanner = {
   exploding: boolean;
 };
 
-function isActiveScanner(scanner: Scanner): boolean {
+/** A Scout's Mineral Scan is running; the client also widens its camera for it. */
+export function isActiveScanner(scanner: Scanner): boolean {
   return (
     scanner.kitId === 'scout' &&
     scanner.abilityActiveFrames > 0 &&

@@ -4,7 +4,7 @@
 
 Ship profile: `vercel-static`
 
-**Integration: branch → PR → CI-gated auto-merge (canonical).** Open a PR from your branch; `.github/workflows/auto-merge.yml` enables squash auto-merge once **`CI / ci`** is green. Direct push to `main` is break-glass only.
+**Integration: branch → PR → merge on green `CI / ci`.** `/ship` opens the PR and merges it once `ci` passes on the head — native auto-merge where the base branch's ruleset requires `ci`, otherwise a head-pinned manual squash (`~/code/dotagents/skills/ship/references/git-discipline.md` → Server-side gate). Agents never push to `main`, change rulesets, or admin-merge. Direct push to `main` is break-glass only.
 
 Verify the active branch immediately before committing and pushing. The
 `.git-hooks/pre-push` hook checks the actual destination ref and blocks direct
@@ -14,8 +14,8 @@ Verify the active branch immediately before committing and pushing. The
 GitHub protects `main`, including administrators: changes require a PR, an
 up-to-date branch, and the GitHub Actions `ci` check. Force pushes and branch
 deletion are blocked. Human approval and conversation resolution are optional so
-CI-gated auto-merge can run unattended. The local break-glass variable does not
-override these GitHub protections.
+`/ship` (and the wiki publisher's snapshot PRs) can merge once `ci` is green. The
+local break-glass variable does not override these GitHub protections.
 
 Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. Writes are write-behind through a worker thread (about a one-second loss window on a hard crash; asteroid drift, spin, and chip damage in sectors whose rock set did not change flush every `WORLD.driftFlushCheckpoints` seconds); the game loop never waits on the disk. See [world operations](docs/persistent-world.md).
 

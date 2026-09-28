@@ -154,3 +154,34 @@ test('a rock drifting into another keeps its collision priority, replacements ke
   manager.addAsteroid(fresh);
   expect(manager.spatialIndex().query(overlap)).toEqual([fresh]);
 });
+
+test('reflective pockets arranged in place are found where lasers and ships meet them', () => {
+  const engine = new GameEngine(82);
+  const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
+  pilot.spawnProtectionTimer = 999;
+  // A diagnostic field replaces the regional one; its pocket is arranged in place.
+  for (const existing of engine.getAllAsteroids()) {
+    engine.removeAsteroid(existing.id);
+  }
+  engine.createAsteroids(20);
+  let pocket: ReturnType<GameEngine['getAllAsteroids']> = [];
+  for (let frame = 0; frame < 120 && pocket.length === 0; frame++) {
+    engine.advanceOneFrame();
+    pocket = engine
+      .getAllAsteroids()
+      .filter((candidate) => candidate.phenomenon?.kind === 'reflective');
+  }
+  expect(pocket.length).toBeGreaterThan(0);
+  const index = engine.getAsteroidSpatialIndex();
+  for (const reflector of pocket) {
+    expect(
+      index.query({
+        minX: reflector.position.x - 1,
+        maxX: reflector.position.x + 1,
+        minY: reflector.position.y - 1,
+        maxY: reflector.position.y + 1,
+      })
+    ).toContain(reflector);
+  }
+  engine.stopGameLoop();
+});

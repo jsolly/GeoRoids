@@ -188,8 +188,7 @@ export function sectorDeposits(seed: number, x: number, y: number): AsteroidData
     const richness = fieldRichness(seed, position);
     const material = asteroidMaterialAt(index);
     const offsets = outline(material, random);
-    // Metal takes three shots; the wiki reference derives the same values.
-    const health = material === 'metal' ? DAMAGE.LASER_HIT * 3 : DAMAGE.LASER_HIT;
+    const health = DAMAGE.LASER_HIT * (material === 'metal' ? ROID.METAL_HITS : 1);
     const size =
       ROID.DEPOSIT_SIZE_MIN +
       (ROID.DEPOSIT_SIZE_MAX - ROID.DEPOSIT_SIZE_MIN) * random.random() ** ROID.DEPOSIT_SIZE_SKEW;

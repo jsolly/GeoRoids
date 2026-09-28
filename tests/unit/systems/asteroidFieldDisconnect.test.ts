@@ -36,7 +36,7 @@ test('disconnecting one of two players does not clear or pause the shared field'
   ).toEqual(idsBefore);
 });
 
-test('a depleted active field stays empty instead of regenerating harvested deposits', () => {
+test('a stripped active field does not refill within the next frame', () => {
   const engine = new GameEngine(7);
   const player = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
   const firstField = engine.getAllAsteroids();
@@ -51,7 +51,7 @@ test('a depleted active field stays empty instead of regenerating harvested depo
   }
   expect(engine.getAsteroidCount()).toBe(0);
 
-  // No reconnect or new player is involved. Depleted deposits remain depleted.
+  // No reconnect or new player is involved, and no regrowth interval elapses.
   engine.advanceOneFrame();
   const secondField = engine.getAllAsteroids();
   expect(secondField).toEqual([]);

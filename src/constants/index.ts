@@ -251,6 +251,8 @@ export const ROID = {
   /** Up to this many vertices beyond the material's base outline. */
   EXTRA_VERTICES: { crystal: 0, ice: 2, metal: 2, rubble: 3 },
   DEPOSIT_JAGGEDNESS: { rubble: 0.6, solid: 0.2 },
+  /** Laser hits that break a metal deposit; other materials break in one. */
+  METAL_HITS: 3,
   DEPOSIT_JAGGEDNESS_SPREAD: 0.15,
   SIZE: 50, // starting size in pixels
   VERTICES: 10, // average number of vertices
@@ -329,8 +331,9 @@ export const DEPOSIT_FIELD = {
   LAUNCH_CALM_INNER: 1_500,
   LAUNCH_CALM_OUTER: 4_000,
   /**
-   * Regrowth stays beyond anything a pilot is sent: the radar circle and a
-   * scanning pilot's zoomed-out view (all but that square's far corners).
+   * Half-width of the square around each pilot and probe where nothing
+   * regrows: everything a pilot is ever sent, including a scanning pilot's
+   * zoomed-out view.
    */
   REGROWTH_HIDDEN_DISTANCE: WORLD.interestRadius,
 } as const;

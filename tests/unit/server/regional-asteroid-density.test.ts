@@ -42,7 +42,7 @@ function awakeField(observer: Position, now = T0) {
   return { field, manager };
 }
 
-/** Ordinary home-sector slots of 0,0 at least this far from the observer. */
+/** Ordinary home-sector slots of 0,0 outside the observer's no-regrowth square. */
 function hiddenSlots(manager: AsteroidManager, observer: Position): AsteroidData[] {
   return manager
     .getAllAsteroids()
@@ -51,7 +51,7 @@ function hiddenSlots(manager: AsteroidManager, observer: Position): AsteroidData
         rock.id.startsWith(`deposit-${SEED}-0-0-`) &&
         !rock.phenomenon &&
         !rock.isCollabTarget &&
-        Math.hypot(rock.position.x - observer.x, rock.position.y - observer.y) >
+        Math.max(Math.abs(rock.position.x - observer.x), Math.abs(rock.position.y - observer.y)) >
           DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE + 50
     );
 }
@@ -283,11 +283,12 @@ test('a world saved under an older layout keeps its rocks and refills over a few
   };
   const field = new RegionalAsteroidField(SEED, new Map([['0,0', [survivor, retired]]]));
   const manager = new AsteroidManager(new RNGService(SEED));
-  const observer = { x: -900, y: -900 };
+  // Far enough that most of sector 0,0 is out of sight, close enough to keep it awake.
+  const observer = { x: -1_900, y: -1_900 };
   const hidden = layout.filter(
     (rock) =>
       rock.id !== survivor.id &&
-      Math.hypot(rock.position.x - observer.x, rock.position.y - observer.y) >=
+      Math.max(Math.abs(rock.position.x - observer.x), Math.abs(rock.position.y - observer.y)) >
         DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE
   );
   const regrown = () => hidden.filter((rock) => manager.getAsteroid(rock.id)).length;
@@ -357,11 +358,12 @@ test('a rock drifting between two awake sectors is saved once and never regrows 
   const { field, manager } = awakeField(observer);
   const saved = new Map(field.checkpoint(manager));
   field.saved();
-  const traveler = manager
-    .getAllAsteroids()
-    .find((rock) => rock.id.startsWith(`deposit-${SEED}-0-0-`) && !rock.phenomenon);
+  // Its home slot must be out of the reload observer's sight, or regrowth
+  // would skip it for visibility and never test the duplicate guard.
+  const reloadObserver = { x: -900, y: -900 };
+  const [traveler] = hiddenSlots(manager, reloadObserver);
   if (!traveler) {
-    throw new Error('Sector 0,0 needs an ordinary deposit');
+    throw new Error('Sector 0,0 needs a deposit hidden from the reload observer');
   }
   // Not a drift flush: only the two sectors whose rock sets changed are written.
   manager.updateAsteroid(traveler.id, { position: { x: 2_100, y: 500 } });
@@ -377,7 +379,7 @@ test('a rock drifting between two awake sectors is saved once and never regrows 
   const reloaded = new RegionalAsteroidField(SEED, structuredClone(saved));
   const reloadedManager = new AsteroidManager(new RNGService(SEED));
   for (let step = 0; step <= 20; step++) {
-    reloaded.update(reloadedManager, [{ x: -900, y: -900 }], T0 + step * INTERVAL);
+    reloaded.update(reloadedManager, [reloadObserver], T0 + step * INTERVAL);
   }
   expect(idCount(reloaded, reloadedManager, traveler.id)).toBe(1);
 });

@@ -200,15 +200,57 @@ test('a commit still in flight defers the next flush, which then carries everyth
   expect(engine.getDiagnostics().persistence).toMatchObject({ mode: 'worker', pendingBatches: 0 });
 });
 
+test('the last pilot leaving behind a busy writer still writes deferred chip damage', async () => {
+  const persistence = new InFlightPersistence();
+  const { engine, miner, frame } = world(persistence);
+  const chipped = metalDeposit('chipped-metal', { x: 40, y: 0 });
+  engine.addAsteroid(chipped);
+  for (let tick = 0; tick < GAME.FPS; tick++) {
+    frame();
+  }
+  expect(persistence.batches).toHaveLength(1);
+
+  // Chipping leaves the sector's rock set unchanged, so a periodic flush
+  // would defer it; the writer is still busy when the last pilot leaves.
+  persistence.pendingBatches = 1;
+  expect(engine.handleAsteroidHit(chipped.id, miner.id, 'laser').outcome).toBe('tagged');
+  const health = chipped.health;
+  expect(health).toBeLessThan(75);
+  engine.removePlayer(miner.id);
+  expect(persistence.batches).toHaveLength(1);
+
+  persistence.drain();
+  await Promise.resolve();
+  expect(persistence.batches).toHaveLength(2);
+  expect(
+    persistence.batches[1]?.sectors.get('0,0')?.find((rock) => rock.id === chipped.id)?.health
+  ).toBe(health);
+
+  // The full flush was a one-off: a later periodic flush skips the unchanged sector.
+  engine.checkpointWorld();
+  expect(persistence.batches).toHaveLength(3);
+  expect(persistence.batches[2]?.sectors.has('0,0')).toBe(false);
+});
+
 test('shutdown flushes the final state once the writer is idle and then releases it', async () => {
   const persistence = new InFlightPersistence();
-  const { engine, miner } = world(persistence);
+  const { engine, miner, frame } = world(persistence);
+  const chipped = metalDeposit('shutdown-chipped', { x: 40, y: 0 });
+  engine.addAsteroid(chipped);
+  for (let tick = 0; tick < GAME.FPS; tick++) {
+    frame();
+  }
   miner.score = 77;
+  // A chip without a rock-set change must not wait for the next drift flush.
+  expect(engine.handleAsteroidHit(chipped.id, miner.id, 'laser').outcome).toBe('tagged');
   await engine.shutdownPersistence();
   expect(persistence.shutdownCalls).toBe(1);
-  expect(persistence.batches.at(-1)?.pilots.map((pilot) => [pilot.id, pilot.score])).toEqual([
-    [miner.id, 77],
-  ]);
+  const last = persistence.batches.at(-1);
+  expect(last?.pilots.map((pilot) => [pilot.id, pilot.score])).toEqual([[miner.id, 77]]);
+  expect(last?.sectors.get('0,0')?.find((rock) => rock.id === chipped.id)?.health).toBe(
+    chipped.health
+  );
+  expect(chipped.health).toBeLessThan(75);
 });
 
 test('a deferred flush that fails while shutdown drains the writer still fails the shutdown', async () => {

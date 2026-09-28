@@ -56,6 +56,8 @@ export class RegionalAsteroidField {
   private readonly flushedMembership = new Map<string, string>();
   private pendingMembership = new Map<string, string>();
   private checkpoints = 0;
+  private fullFlushRequested = false;
+  private fullFlushInBatch = false;
 
   constructor(
     private readonly seed: number,
@@ -112,8 +114,8 @@ export class RegionalAsteroidField {
 
   /** Move a sector's rows into the simulation. Regrowth catch-up runs in update(). */
   private wake(manager: AsteroidManager, id: string): AsteroidData[] {
-    const rows = this.load(id);
-    this.takeDormant(id);
+    this.visited.add(id);
+    const rows = this.takeDormant(id) ?? this.layout(id).map((slot) => structuredClone(slot));
     const added: AsteroidData[] = [];
     for (const rock of rows) {
       if (manager.getAsteroid(rock.id)) {
@@ -150,10 +152,13 @@ export class RegionalAsteroidField {
       (slot) =>
         !manager.getAsteroid(slot.id) &&
         !this.dormantIds.has(slot.id) &&
+        // Square, like a scanning pilot's asteroid rows; it contains the radar circle.
         observers.every(
           (observer) =>
-            Math.hypot(observer.x - slot.position.x, observer.y - slot.position.y) >=
-            DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE
+            Math.max(
+              Math.abs(observer.x - slot.position.x),
+              Math.abs(observer.y - slot.position.y)
+            ) > DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE
         )
     );
     let remaining = missing.length;
@@ -367,8 +372,16 @@ export class RegionalAsteroidField {
     }
   }
 
-  /** `complete` writes every awake sector, including drift-only changes. */
-  checkpoint(manager: AsteroidManager, complete = false): ReadonlyMap<string, AsteroidData[]> {
+  /**
+   * The next checkpoint writes every awake sector, including drift and damage
+   * that periodic flushes defer. The request survives until a checkpoint is
+   * saved, so a flush deferred behind a busy writer still honors it.
+   */
+  requestFullFlush(): void {
+    this.fullFlushRequested = true;
+  }
+
+  checkpoint(manager: AsteroidManager): ReadonlyMap<string, AsteroidData[]> {
     // A powered rock may cross a sector edge between interest updates. Keep
     // its new sector awake before checkpointing can put it into dormancy.
     for (const rock of manager.getAllAsteroids()) {
@@ -393,7 +406,9 @@ export class RegionalAsteroidField {
     // Membership changes (mined, regrown, carried across an edge) leave within
     // a second. Drift alone is written every few checkpoints: a hard crash
     // rewinds rocks a few seconds along their paths, never loses or duplicates one.
-    const driftDue = complete || this.checkpoints % WORLD.driftFlushCheckpoints === 0;
+    const driftDue =
+      this.fullFlushRequested || this.checkpoints % WORLD.driftFlushCheckpoints === 0;
+    this.fullFlushInBatch = this.fullFlushRequested;
     const rows = new Map(this.changed);
     this.pendingMembership = new Map();
     for (const [id, sector] of awake) {
@@ -414,6 +429,10 @@ export class RegionalAsteroidField {
     }
     this.pendingMembership.clear();
     this.checkpoints += 1;
+    if (this.fullFlushInBatch) {
+      this.fullFlushRequested = false;
+      this.fullFlushInBatch = false;
+    }
   }
 
   reset(): void {
@@ -430,6 +449,8 @@ export class RegionalAsteroidField {
     this.flushedMembership.clear();
     this.pendingMembership.clear();
     this.checkpoints = 0;
+    this.fullFlushRequested = false;
+    this.fullFlushInBatch = false;
     this.belt = beltSlots().map((slot) => ({ slot, generation: 0, recoverAt: null }));
     for (const entry of this.belt) {
       const rock = beltAsteroid(this.seed, entry.slot, 0);

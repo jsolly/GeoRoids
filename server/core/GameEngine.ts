@@ -303,7 +303,6 @@ export class GameEngine {
   private readonly dirtyPilots = new Set<string>();
   private lastFlushedWorldRow: FlushedWorldRow | undefined;
   private flushWaitingForIdle = false;
-  private completeFlushWaiting = false;
   private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
@@ -586,7 +585,9 @@ export class GameEngine {
       this.clearPendingFeedback();
       this.spiderManager.suspend();
       this.pendingSpiderAttacks = [];
-      this.checkpointWorld({ complete: true });
+      // Nothing flushes while paused, so this write carries all deferred drift.
+      this.regionalField.requestFullFlush();
+      this.checkpointWorld();
     } else if (playerCount > 0 && this.isPaused) {
       this.isPaused = false;
       logger.info('▶️ Game resumed - players are back online');
@@ -1034,11 +1035,7 @@ export class GameEngine {
    * runs as soon as the writer is idle, so a slow disk can never queue up
    * more than one batch behind the one in flight.
    */
-  /**
-   * `complete` also writes asteroid drift and damage that periodic flushes
-   * defer; the final departure and shutdown flush use it so nothing rewinds.
-   */
-  public checkpointWorld({ complete = false }: { complete?: boolean } = {}): void {
+  public checkpointWorld(): void {
     if (this.managedField) {
       this.regionalField.reconcileBelt(this.asteroidManager, this.getServerTime());
     }
@@ -1049,7 +1046,7 @@ export class GameEngine {
       return;
     }
     if (!this.persistenceIdle()) {
-      this.flushWhenIdle(complete);
+      this.flushWhenIdle();
       return;
     }
     try {
@@ -1074,7 +1071,7 @@ export class GameEngine {
         ...(worldRow ? { world: worldRow.world } : {}),
         // Custom diagnostic belts do not belong to regional activation or sleep bookkeeping.
         sectors: this.managedField
-          ? this.regionalField.checkpoint(this.asteroidManager, complete)
+          ? this.regionalField.checkpoint(this.asteroidManager)
           : new Map(),
         pilots,
       });
@@ -1156,22 +1153,18 @@ export class GameEngine {
     return (this.persistence?.diagnostics().pendingBatches ?? 0) === 0;
   }
 
-  private flushWhenIdle(complete: boolean): void {
-    // A coalesced flush stays complete if any request asked for it.
-    this.completeFlushWaiting ||= complete;
+  private flushWhenIdle(): void {
     if (this.flushWaitingForIdle || !this.persistence) {
       return;
     }
     this.flushWaitingForIdle = true;
     void this.persistence.whenIdle().then(() => {
       this.flushWaitingForIdle = false;
-      const completeFlush = this.completeFlushWaiting;
-      this.completeFlushWaiting = false;
       if (this.persistenceFailure) {
         return;
       }
       try {
-        this.checkpointWorld({ complete: completeFlush });
+        this.checkpointWorld();
       } catch (error) {
         // Nothing awaits a deferred flush, so anything it throws is latched
         // here; the next tick is fatal.
@@ -1213,7 +1206,8 @@ export class GameEngine {
     try {
       drained = await this.whenPersistenceIdle(SHUTDOWN_IDLE_WAIT_MS);
       if (drained && !this.persistenceFailure) {
-        this.checkpointWorld({ complete: true });
+        this.regionalField.requestFullFlush();
+        this.checkpointWorld();
       }
     } finally {
       await this.persistence.shutdown();

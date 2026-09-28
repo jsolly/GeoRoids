@@ -1,4 +1,4 @@
-import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
+import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { scoutUtilityOf } from '../entities/ship/scoutUtility';
@@ -48,7 +48,7 @@ function scoutOffersBuild(host: AbilityChromeHost): boolean {
   return (
     getShipKit(host.kitId).id === 'scout' &&
     host.position !== undefined &&
-    scoutAbilityBuildsAt(host.position, (id) => worldFurnaces.isLit(id))
+    onDarkFurnaceFootprint(host.position, (id) => worldFurnaces.isLit(id))
   );
 }
 

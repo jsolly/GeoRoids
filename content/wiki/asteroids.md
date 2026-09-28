@@ -25,7 +25,7 @@ Two different pilots hitting a large ice rock in quick succession split it and l
 
 ## Colossal deposits
 
-These rare, stationary landmarks resist rams and need many laser hits to split. Move one with two Tow Cables or launch it with two armed Boost Couplings. Both Haulers earn delivery credit.
+These rare, stationary landmarks resist rams and need many laser hits to split. Move one with two Tow Cables, or launch it with a Boost Coupling: alone it crawls, and a second coupling brings it to full speed. Both Haulers earn delivery credit.
 
 ## Reflection and charge
 

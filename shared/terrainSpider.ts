@@ -41,3 +41,28 @@ export const SPIDER = {
   WORLD_INSET: 500,
   DESPAWN_DISTANCE: 5_600,
 } as const;
+
+/** Size classes: hit radius and drawing scale grow together. */
+const SPIDER_SIZES = [0.72, 1, 1.38] as const;
+
+/**
+ * Stable per-spider hash (FNV-1a over the ID) so the server and every client
+ * derive the same size and look without new wire fields.
+ */
+export function spiderHash(id: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Roughly 30% small, 45% medium, 25% large. */
+export function spiderScale(id: string): (typeof SPIDER_SIZES)[number] {
+  const roll = spiderHash(id) % 100;
+  return SPIDER_SIZES[roll < 30 ? 0 : roll < 75 ? 1 : 2];
+}
+
+export function spiderHitRadius(id: string): number {
+  return SPIDER.HIT_RADIUS * spiderScale(id);
+}

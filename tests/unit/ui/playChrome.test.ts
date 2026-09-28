@@ -37,7 +37,7 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionCss).not.toMatch(
     /\.preference-toggles \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/su
   );
-  expect(productionCss).toContain('.haptics-hint');
+  expect(productionHtml).toContain('id="hapticsRow" class="sound-toggle-row" hidden');
 });
 
 test('agents guide forbids CDN runtime CSS and JS', () => {
@@ -70,7 +70,6 @@ test('title menu uses first-party nickname and sound chrome', () => {
   expect(document.querySelector('label[for="musicPref"]')?.textContent).toBe('Music');
   expect(document.querySelector('#hapticsPref')?.classList.contains('sound-toggle')).toBe(true);
   expect(document.querySelector('label[for="hapticsPref"]')?.textContent).toBe('Haptics');
-  expect(document.querySelector('#hapticsHint')?.classList.contains('haptics-hint')).toBe(true);
   expect(document.querySelector('.form-control')).toBeNull();
   expect(document.querySelector('.form-label')).toBeNull();
   expect(document.querySelector('.form-check-input')).toBeNull();
@@ -100,7 +99,7 @@ test('title menu stacks Enter Game, preference toggles, and Advanced at one cont
     /\.start-actions,\s*\.settings \{[^}]*width: min\(100%, var\(--start-control-width, 280px\)\);/su
   );
   expect(productionCss).toMatch(
-    /\.enter-game,\s*\.preference-toggles,\s*\.sound-toggle-row,\s*\.haptics-hint,\s*\.advanced-settings \{[^}]*width: 100%;[^}]*max-width: none;/su
+    /\.enter-game,\s*\.preference-toggles,\s*\.sound-toggle-row,\s*\.advanced-settings \{[^}]*width: 100%;[^}]*max-width: none;/su
   );
   expect(productionCss).toMatch(/\.sound-toggle-row \{[^}]*justify-content: flex-start;/su);
   expect(productionCss).not.toMatch(/\.enter-game \{[^}]*max-width: (?:280px|320px|100%);/su);
@@ -108,7 +107,6 @@ test('title menu stacks Enter Game, preference toggles, and Advanced at one cont
   expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*justify-content: center;/su);
   expect(productionCss).not.toMatch(/\.preference-toggles \{[^}]*width: min\(100%, 40rem\);/su);
   expect(productionCss).not.toMatch(/\.advanced-settings \{[^}]*width: min\(100%, 260px\);/su);
-  expect(productionCss).not.toMatch(/\.haptics-hint \{[^}]*max-width: 260px;/su);
 });
 
 test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {

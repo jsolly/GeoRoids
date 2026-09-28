@@ -1,4 +1,5 @@
 /* @vitest-environment node */
+
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +19,7 @@ import {
   oreYield,
   settlementRecipe,
 } from '../../../shared/economy';
+import { isEquipmentId } from '../../../shared/equipment';
 import { TOWN_HEARTH } from '../../../shared/furnaces';
 import type { AsteroidData } from '../../../shared-types';
 import { SHIP } from '../../../src/constants';
@@ -70,7 +72,8 @@ test('both kits consume partial and full-hold pickups without exceeding capacity
     engine.handleAsteroidHit(ore.id, actor.id, 'laser');
     expect(engine.getLoot().length).toBeGreaterThan(0);
     engine.collectLoot();
-    expect(engine.getLoot()).toEqual([]);
+    // Rare equipment drops stay behind for other eligible ships.
+    expect(engine.getLoot().filter((drop) => !isEquipmentId(drop.kind))).toEqual([]);
     expect(actor.cargo).toBe(cargoCapacity(kit));
     expect(actor.score).toBe(0);
     expect(engine.getGameState().settlement.points).toBe(0);

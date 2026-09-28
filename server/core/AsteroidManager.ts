@@ -152,7 +152,7 @@ export class AsteroidManager {
     }
 
     for (const asteroid of this.asteroids.values()) {
-      tickAsteroidBoost(asteroid, this.furnaces);
+      tickAsteroidBoost(asteroid, asteroid.size, this.furnaces);
       const next = stepAsteroidMotion(asteroid.position, asteroid.velocity);
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;

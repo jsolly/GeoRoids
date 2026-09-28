@@ -4,7 +4,7 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
 import { contourLockVelocity } from '../../../shared/contourLock';
-import { scoutAbilityBuildsAt } from '../../../shared/furnaceField';
+import { onDarkFurnaceFootprint } from '../../../shared/furnaceField';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { cruiseSpeed } from '../../../shared/shipFlight';
@@ -312,7 +312,7 @@ class Ship {
   activateAbility(world?: AbilityWorld): boolean {
     const building =
       this.kitId === 'scout' &&
-      scoutAbilityBuildsAt(this.position, (id) => worldFurnaces.isLit(id));
+      onDarkFurnaceFootprint(this.position, (id) => worldFurnaces.isLit(id));
     if (
       this.furnaceTransit ||
       this.exploding ||

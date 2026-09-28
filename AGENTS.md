@@ -132,7 +132,7 @@ The former `geoasteroids-production-2403.up.railway.app` hostname returns a Rail
 
 ## CI (local pre-commit gate)
 
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. `npm run gate` also requires full integration + frame-work budget + constrained-client scenarios. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. `npm run gate` also requires full integration + frame-work budget + constrained-client scenarios. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
 ### Actions helper exception
 

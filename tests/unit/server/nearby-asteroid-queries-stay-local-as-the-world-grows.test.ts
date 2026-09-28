@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
+import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { CollisionAuthority } from '../../../server/core/CollisionAuthority';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { RNGService } from '../../../server/core/RNGService';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -34,17 +36,17 @@ test('distant sectors do not become collision candidates and large rocks retain 
   const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 510, y: 0 });
   pilot.spawnProtectionTimer = 0;
   const collisions = new CollisionAuthority();
-  expect(collisions.collectShipAsteroidHits([pilot], [spanning, small, ...distant])).toEqual([
+  expect(collisions.collectShipAsteroidHits([pilot], index)).toEqual([
     { shipId: pilot.id, asteroidId: 'spanning' },
   ]);
   expect(
     collisions.collectShipAsteroidHits(
       [pilot],
-      [spanning, small, ...distant],
-      (_pilot, id) => id === 'spanning'
+      index,
+      (_pilot, candidate) => candidate.id === 'spanning'
     )
   ).toEqual([{ shipId: pilot.id, asteroidId: 'small' }]);
-  expect(collisions.collectTowedAsteroidHits([small], [spanning, small, ...distant])).toEqual([
+  expect(collisions.collectTowedAsteroidHits([small], index)).toEqual([
     { towedId: 'small', otherId: 'spanning' },
   ]);
 });
@@ -58,4 +60,48 @@ test('a swept query covers every crossed cell and fragments enter the current fr
   const fragment = rock('fragment', -520, 0);
   index.add(fragment);
   expect(index.query({ minX: -530, maxX: -510, minY: -10, maxY: 10 })).toEqual([fragment]);
+});
+
+test('one shared index follows mining, splits, edits and drift without being rebuilt', () => {
+  const manager = new AsteroidManager(new RNGService(7));
+  const mined = rock('mined', 100, 0);
+  const drifter = { ...rock('drifter', 300, 0), velocity: { x: 40, y: 0 } };
+  manager.addAsteroid(mined);
+  manager.addAsteroid(drifter);
+  const near = { minX: 0, maxX: 400, minY: -50, maxY: 50 };
+  const index = manager.spatialIndex();
+  expect(manager.spatialIndex()).toBe(index);
+  expect(index.query(near).map((candidate) => candidate.id)).toEqual(['mined', 'drifter']);
+
+  // A mined rock leaves later queries this frame; a new fragment joins them.
+  manager.removeAsteroid(mined.id);
+  const fragment = rock('fragment', 200, 0, 10);
+  manager.addAsteroid(fragment);
+  expect(manager.spatialIndex()).toBe(index);
+  expect(index.query(near).map((candidate) => candidate.id)).toEqual(['drifter', 'fragment']);
+
+  // Edits and drift re-file rocks in place; the same index stays current.
+  manager.updateAsteroid(fragment.id, { position: { x: 5_000, y: 0 } });
+  expect(
+    manager
+      .spatialIndex()
+      .query(near)
+      .map((candidate) => candidate.id)
+  ).toEqual(['drifter']);
+  for (let frame = 0; frame < 10; frame++) {
+    manager.updateMotion();
+  }
+  const moved = manager.spatialIndex();
+  expect(moved).toBe(index);
+  expect(moved.query(near)).toEqual([]);
+  expect(
+    moved
+      .query({
+        minX: drifter.position.x - 1,
+        maxX: drifter.position.x + 1,
+        minY: -1,
+        maxY: 1,
+      })
+      .map((candidate) => candidate.id)
+  ).toEqual(['drifter']);
 });

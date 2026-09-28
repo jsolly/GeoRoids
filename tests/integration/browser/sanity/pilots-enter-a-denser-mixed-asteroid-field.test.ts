@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { DEPOSIT_FIELD } from '../../../../src/constants';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -18,8 +19,10 @@ for (const viewport of [
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    // The old even field held about 214 rocks inside this delivery circle;
+    // even the calm launch neighborhood is denser.
     await page.waitForFunction(
-      () => (window.gameController?.getCurrRoidBelt().getRoids().length ?? 0) >= 400,
+      () => (window.gameController?.getCurrRoidBelt().getRoids().length ?? 0) >= 240,
       undefined,
       { timeout: 10000 }
     );
@@ -32,7 +35,8 @@ for (const viewport of [
       };
     });
     expect(mix.stationary / mix.total).toBeGreaterThan(0.1);
-    expect(mix.stationary / mix.total).toBeLessThan(0.3);
+    // Rich cores hold more stationary reef rocks; drifters still dominate every field.
+    expect(mix.stationary / mix.total).toBeLessThan(DEPOSIT_FIELD.STATIONARY_FRACTION_PEAK);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`dense-field-${viewport.width}.png`),
     });

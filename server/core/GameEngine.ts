@@ -115,7 +115,7 @@ import { getVelocityMagnitude } from '../../src/utils/mathUtils';
 import { sanitizePlayerName } from '../../src/utils/playerName';
 import { serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
-import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
+import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
 import {
@@ -258,8 +258,6 @@ interface FlushedWorldRow {
   exploration: ExplorationTile[];
   civicModules: readonly CivicModule[];
   startedAt: number;
-  asteroidDensityVersion: number;
-  asteroidMotionVersion: number;
 }
 
 type PendingShockwave = {
@@ -363,12 +361,6 @@ export class GameEngine {
       this.settlement = loaded.economy?.settlement ?? emptySettlement();
       this.exploration.restore(loaded.world.exploration);
     }
-    if ((saved?.asteroidMotionVersion ?? 0) < WORLD.asteroidMotionVersion) {
-      this.regionalField.migrateSavedMotion();
-    }
-    if ((saved?.asteroidDensityVersion ?? 0) < WORLD.asteroidDensityVersion) {
-      this.regionalField.migrateSavedSectors();
-    }
     for (const pilot of loaded?.pilots ?? []) {
       this.pilots.set(pilot.id, pilot);
     }
@@ -381,7 +373,7 @@ export class GameEngine {
     this.asteroidManager = new AsteroidManager(this.rngService, this.furnaces, (rock) => {
       this.beltCrawlers.escapeDestroyedHost(
         rock,
-        this.asteroidManager.getAllAsteroids(),
+        this.asteroidManager.spatialIndex(),
         this.gameTime
       );
     });
@@ -545,7 +537,7 @@ export class GameEngine {
     this.flushExpiredCollabHits(serverNow);
     this.resolveAuthoritativeCombat();
     this.depositCargo();
-    // Activate newly reached sectors without replenishing harvested deposits.
+    // Activate newly reached sectors and regrow harvested slots out of sight.
     if (this.gameTime % 60 === 0) {
       this.ensureAsteroidField();
     }
@@ -1109,8 +1101,6 @@ export class GameEngine {
       exploration: this.exploration.snapshot(),
       civicModules: this.furnaces.litModules(),
       startedAt: this.worldStartedAt,
-      asteroidDensityVersion: WORLD.asteroidDensityVersion,
-      asteroidMotionVersion: WORLD.asteroidMotionVersion,
     };
     const last = this.lastFlushedWorldRow;
     if (
@@ -1118,9 +1108,7 @@ export class GameEngine {
       last.asteroidBelt === builtFrom.asteroidBelt &&
       last.exploration === builtFrom.exploration &&
       last.civicModules === builtFrom.civicModules &&
-      last.startedAt === builtFrom.startedAt &&
-      last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
-      last.asteroidMotionVersion === builtFrom.asteroidMotionVersion
+      last.startedAt === builtFrom.startedAt
     ) {
       return undefined;
     }
@@ -1130,8 +1118,6 @@ export class GameEngine {
         seed: this.worldSeed,
         startedAt: this.worldStartedAt,
         generation: WORLD.generation,
-        asteroidDensityVersion: WORLD.asteroidDensityVersion,
-        asteroidMotionVersion: WORLD.asteroidMotionVersion,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
         civicModules: [...this.furnaces.litModules()],
@@ -1353,6 +1339,7 @@ export class GameEngine {
       ...attacks,
       ...this.beltCrawlers.advance({
         rocks: this.asteroidManager.getAllAsteroids(),
+        index: this.asteroidManager.spatialIndex(),
         players: this.entityManager.getAllEntities().map((entity) => ({
           id: entity.id,
           position: entity.position,
@@ -1421,7 +1408,7 @@ export class GameEngine {
     if (removed) {
       this.beltCrawlers.escapeDestroyedHost(
         removed,
-        this.asteroidManager.getAllAsteroids(),
+        this.asteroidManager.spatialIndex(),
         this.gameTime
       );
     }
@@ -1507,12 +1494,16 @@ export class GameEngine {
     return this.pendingLootBlasts.splice(0);
   }
 
+  public getAsteroidSpatialIndex(): AsteroidSpatialIndex {
+    return this.asteroidManager.spatialIndex();
+  }
+
   public getAsteroidCount(): number {
     return this.asteroidManager.getAsteroidCount();
   }
 
   /**
-   * Activate nearby sectors, preserving depleted and previously visited regions.
+   * Activate nearby sectors and regrow missing deposit slots out of sight.
    * Return newly loaded rows so joining pilots can receive them immediately.
    */
   public ensureAsteroidField(): AsteroidData[] {
@@ -1818,11 +1809,12 @@ export class GameEngine {
 
     const ramHits = this.collisionAuthority.collectShipAsteroidHits(
       entities,
-      asteroids,
-      (shipId, asteroidId) => this.isActiveHarpoonTarget(shipId, asteroidId)
+      this.asteroidManager.spatialIndex(),
+      (shipId, rock) =>
+        rock.boost?.phase === 'burning' || this.isActiveHarpoonTarget(shipId, rock.id)
     );
     const destroyedAsteroids = new Set<string>();
-    const bumperKeys = this.resolveTowedAsteroidImpacts(entities, asteroids, destroyedAsteroids);
+    const bumperKeys = this.resolveTowedAsteroidImpacts(entities, destroyedAsteroids);
     for (const hit of ramHits) {
       this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime());
       if (bumperKeys.has(`${hit.shipId}:${hit.asteroidId}`)) {
@@ -1863,7 +1855,11 @@ export class GameEngine {
     for (const attack of this.pendingSpiderAttacks.splice(0)) {
       if (
         !this.spiderManager.isAttackActive(attack) &&
-        !this.beltCrawlers.isAttackActive(attack, this.asteroidManager.getAllAsteroids())
+        !this.beltCrawlers.isAttackActive(
+          attack,
+          this.asteroidManager.getAllAsteroids(),
+          this.asteroidManager.spatialIndex()
+        )
       ) {
         continue;
       }
@@ -1896,7 +1892,6 @@ export class GameEngine {
    */
   private resolveTowedAsteroidImpacts(
     entities: GameEntity[],
-    asteroids: AsteroidData[],
     destroyedAsteroids: Set<string>
   ): Set<string> {
     const towedOwners = new Map<string, string[]>();
@@ -1919,7 +1914,11 @@ export class GameEngine {
     }
     const bumperKeys = new Set<string>();
     const cargoBreaks: AppliedAsteroidHit[] = [];
-    for (const hit of this.collisionAuthority.collectTowedAsteroidHits(towedRocks, asteroids)) {
+    for (const hit of this.collisionAuthority.collectTowedAsteroidHits(
+      towedRocks,
+      this.asteroidManager.spatialIndex(),
+      (rock) => rock.boost?.phase !== 'burning'
+    )) {
       const haulerIds = towedOwners.get(hit.towedId);
       if (!haulerIds?.length) {
         continue;
@@ -2221,10 +2220,6 @@ export class GameEngine {
     if (this.lasers.length === 0) {
       return hits;
     }
-    const index = new AsteroidSpatialIndex(
-      this.getAllAsteroids().filter((rock) => rock.boost?.phase !== 'burning')
-    );
-
     for (let i = this.lasers.length - 1; i >= 0; i--) {
       const laser = this.lasers[i];
       if (laser === undefined) {
@@ -2252,12 +2247,11 @@ export class GameEngine {
         continue;
       }
 
-      const hit = this.resolveEnhancedLaser(laser, now, index);
+      // Powered cargo ignores ordinary laser traffic; fragments join the shared
+      // index as they split, before the next shot resolves.
+      const hit = this.resolveEnhancedLaser(laser, now, (rock) => rock.boost?.phase !== 'burning');
       if (hit) {
         hits.push(hit);
-        for (const fragment of hit.newAsteroids) {
-          index.add(fragment);
-        }
       }
       if (laser.hasExploded) {
         this.lasers.splice(i, 1);
@@ -2278,11 +2272,7 @@ export class GameEngine {
     if (!laser || laser.hasExploded || laser.age !== 0) {
       return [];
     }
-    const hit = this.resolveEnhancedLaser(
-      laser,
-      now,
-      new AsteroidSpatialIndex(this.getAllAsteroids())
-    );
+    const hit = this.resolveEnhancedLaser(laser, now);
     if (laser.hasExploded) {
       this.lasers.splice(index, 1);
     }
@@ -2303,8 +2293,9 @@ export class GameEngine {
   private resolveEnhancedLaser(
     laser: ServerLaser,
     now: number,
-    index: AsteroidSpatialIndex
+    include: (rock: AsteroidData) => boolean = () => true
   ): AppliedAsteroidHit | null {
+    const index = this.asteroidManager.spatialIndex();
     let start = { ...laser.prevPosition };
     let end = { ...laser.position };
     const cargo = new Set(
@@ -2318,7 +2309,7 @@ export class GameEngine {
           maxX: Math.max(start.x, end.x) + SURVEY_PROBE.RADIUS * 2,
           maxY: Math.max(start.y, end.y) + SURVEY_PROBE.RADIUS * 2,
         })
-        .filter((nearbyRock) => this.getAsteroid(nearbyRock.id) === nearbyRock);
+        .filter(include);
       const rocks = nearbyRocks.filter((nearbyRock) => !cargo.has(nearbyRock.id));
       const impact = findNearestAsteroidImpact(start, end, rocks, laser.lastAsteroidId);
       const surface = findLaserSurfaceImpact(start, end);
@@ -2762,7 +2753,7 @@ export class GameEngine {
   private tickSurveyProbes(now: number): void {
     this.surveyProbeManager.tick(
       now,
-      () => this.getAllAsteroids(),
+      () => this.asteroidManager.spatialIndex(),
       (hostId) => this.getAsteroid(hostId) ?? this.spiderManager.getBody(hostId),
       ({ ownerId, position, asteroids }) =>
         this.surveyFromPosition(ownerId, position, asteroids, SURVEY_PROBE.RANGE)
@@ -2952,10 +2943,9 @@ export class GameEngine {
       now,
       (hostId) => this.getAsteroid(hostId) ?? this.spiderManager.getBody(hostId)
     );
-    const asteroids = this.getAllAsteroids();
     const result = this.surveyProbeManager.launch(
       scout,
-      asteroids,
+      this.asteroidManager.spatialIndex(),
       now,
       this.spiderManager.getBodies()
     );
@@ -2966,7 +2956,7 @@ export class GameEngine {
     this.surveyProbeManager.pulseNow(
       result.host,
       result.probe,
-      asteroids,
+      this.asteroidManager.spatialIndex(),
       ({ ownerId, position, asteroids: nearby }) =>
         this.surveyFromPosition(ownerId, position, nearby, SURVEY_PROBE.RANGE)
     );
@@ -2986,7 +2976,6 @@ export class GameEngine {
   public tickAbilities(): void {
     this.entityManager.tickAbilityState();
     const rocks = this.getAllAsteroids();
-    const asteroidIndex = new AsteroidSpatialIndex(rocks);
     const towCrew = new Map<string, number>();
     for (const actor of this.entityManager.getAllEntities()) {
       if (
@@ -3020,7 +3009,7 @@ export class GameEngine {
         entity.health > 0 &&
         entity.respawnTimer === undefined
       ) {
-        const nearbyAsteroids = asteroidIndex.query({
+        const nearbyAsteroids = this.asteroidManager.spatialIndex().query({
           minX: entity.position.x - scanRange,
           minY: entity.position.y - scanRange,
           maxX: entity.position.x + scanRange,

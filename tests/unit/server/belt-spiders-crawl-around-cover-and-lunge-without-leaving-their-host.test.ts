@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { BeltCrawlerManager } from '../../../server/core/BeltCrawlerManager';
 import type { SpiderAttack } from '../../../server/core/TerrainSpiderManager';
+import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import { beltAsteroid, beltSlots } from '../../../shared/asteroidBelt';
 import { BELT_CRAWLER } from '../../../shared/beltCrawler';
 import type { AsteroidData, Position } from '../../../shared-types';
@@ -20,6 +21,10 @@ function host(): AsteroidData {
     offsets: [1, 1, 1, 1],
   };
 }
+/** A crawler frame reads rocks through the caller's broad phase over the same rows. */
+function field(rocks: readonly AsteroidData[]) {
+  return { rocks, index: new AsteroidSpatialIndex(rocks) };
+}
 function pilot(position: Position) {
   return { id: 'pilot', position, health: 100, exploding: false, radius: 18 };
 }
@@ -28,17 +33,17 @@ describe('belt surface predators', () => {
   test('a lone spider follows its towed rotating host', () => {
     const manager = new BeltCrawlerManager();
     const rock = host();
-    manager.advance({ rocks: [rock], players: [], nowFrame: 0 });
+    manager.advance({ ...field([rock]), players: [], nowFrame: 0 });
     const before = manager.snapshot();
     expect(before).toHaveLength(1);
     expect(before[0]?.position.x).toBeGreaterThan(100);
     rock.position = { x: 500, y: 200 };
     rock.rotation = Math.PI / 2;
-    manager.advance({ rocks: [rock], players: [], nowFrame: 1 });
+    manager.advance({ ...field([rock]), players: [], nowFrame: 1 });
     const moved = manager.snapshot()[0];
     expect(moved?.crawler?.anchor.x).toBeCloseTo(500);
     expect(moved?.crawler?.anchor.y).toBeCloseTo(300);
-    manager.advance({ rocks: [], players: [], nowFrame: 2 });
+    manager.advance({ ...field([]), players: [], nowFrame: 2 });
     expect(manager.snapshot()).toEqual([]);
   });
 
@@ -48,7 +53,7 @@ describe('belt surface predators', () => {
     const player = pilot({ x: -165, y: -10 });
     const attacks: SpiderAttack[] = [];
     for (let frame = 0; frame < 80; frame++) {
-      attacks.push(...manager.advance({ rocks: [rock], players: [player], nowFrame: frame }));
+      attacks.push(...manager.advance({ ...field([rock]), players: [player], nowFrame: frame }));
     }
     expect(attacks).toEqual([]);
     const far = manager.snapshot().find((body) => body.id.endsWith(':0'));
@@ -62,7 +67,7 @@ describe('belt surface predators', () => {
     const player = pilot({ x: 165, y: -10 });
     let strikes = 0;
     for (let frame = 0; frame < BELT_CRAWLER.WINDUP_FRAMES; frame++) {
-      strikes += manager.advance({ rocks: [rock], players: [player], nowFrame: frame }).length;
+      strikes += manager.advance({ ...field([rock]), players: [player], nowFrame: frame }).length;
     }
     expect(strikes).toBe(0);
     expect(manager.snapshot()[0]?.crawler?.phase).toBe('winding');
@@ -71,7 +76,7 @@ describe('belt surface predators', () => {
       frame <= BELT_CRAWLER.WINDUP_FRAMES + BELT_CRAWLER.LUNGE_FRAMES;
       frame++
     ) {
-      strikes += manager.advance({ rocks: [rock], players: [player], nowFrame: frame }).length;
+      strikes += manager.advance({ ...field([rock]), players: [player], nowFrame: frame }).length;
     }
     expect(strikes).toBe(1);
     const body = manager.snapshot()[0];
@@ -88,7 +93,7 @@ describe('belt surface predators', () => {
     const manager = new BeltCrawlerManager();
     const rock = host();
     rock.beltCrawlerHealth = [BELT_CRAWLER.MAX_HEALTH];
-    manager.advance({ rocks: [rock], players: [], nowFrame: 0 });
+    manager.advance({ ...field([rock]), players: [], nowFrame: 0 });
     const body = manager.snapshot()[0];
     expect(body).toBeDefined();
     const y = body?.position.y ?? 0;
@@ -98,7 +103,7 @@ describe('belt surface predators', () => {
     ).not.toBeNull();
     expect(rock.beltCrawlerHealth).toEqual([0]);
     manager.clear();
-    manager.advance({ rocks: [structuredClone(rock)], players: [], nowFrame: 1 });
+    manager.advance({ ...field([structuredClone(rock)]), players: [], nowFrame: 1 });
     expect(manager.snapshot()).toEqual([]);
   });
 
@@ -109,14 +114,14 @@ describe('belt surface predators', () => {
     const player = pilot({ x: 165, y: -10 });
     for (let frame = 0; frame < 90; frame++) {
       expect(
-        manager.advance({ rocks: [rock, shield], players: [player], nowFrame: frame })
+        manager.advance({ ...field([rock, shield]), players: [player], nowFrame: frame })
       ).toEqual([]);
     }
     manager.clear();
     rock.beltCrawlerHealth = [BELT_CRAWLER.MAX_HEALTH];
     let attack: SpiderAttack | undefined;
     for (let frame = 90; frame < 160; frame++) {
-      attack = manager.advance({ rocks: [rock], players: [player], nowFrame: frame })[0];
+      attack = manager.advance({ ...field([rock]), players: [player], nowFrame: frame })[0];
       if (attack) {
         break;
       }
@@ -125,8 +130,8 @@ describe('belt surface predators', () => {
     if (!attack) {
       throw new Error('Expected lunge');
     }
-    expect(manager.isAttackActive(attack, [rock])).toBe(true);
-    expect(manager.isAttackActive(attack, [])).toBe(false);
+    expect(manager.isAttackActive(attack, [rock], new AsteroidSpatialIndex([rock]))).toBe(true);
+    expect(manager.isAttackActive(attack, [], new AsteroidSpatialIndex([]))).toBe(false);
   });
 });
 
@@ -140,9 +145,9 @@ test('dense active sectors and overlapping rock piles never overflow the geometr
     position: { x: 142, y: -10 },
   }));
   const player = pilot({ x: 165, y: -10 });
-  expect(manager.advance({ rocks: [rock, ...blockers], players: [player], nowFrame: 0 })).toEqual(
-    []
-  );
+  expect(
+    manager.advance({ ...field([rock, ...blockers]), players: [player], nowFrame: 0 })
+  ).toEqual([]);
   expect(() => manager.findLaserHit({ x: 200, y: -10 }, { x: 90, y: -10 })).not.toThrow();
   expect(manager.findLaserHit({ x: 200, y: -10 }, { x: 90, y: -10 })).toBeNull();
 });
@@ -155,7 +160,7 @@ test('a later shot ignores a host and cover destroyed earlier in the same frame'
     [shield.id, shield],
   ]);
   const manager = new BeltCrawlerManager((id) => live.get(id));
-  manager.advance({ rocks: [...live.values()], players: [], nowFrame: 0 });
+  manager.advance({ ...field([...live.values()]), players: [], nowFrame: 0 });
   const start = { x: 200, y: 10 };
   const end = { x: 95, y: 10 };
   expect(manager.findLaserHit(start, end)).toBeNull();
@@ -171,7 +176,7 @@ test('a whole belt has eighteen lone guards and discards old paired guard state'
     ...beltAsteroid(1, slot, 0),
     beltCrawlerHealth: [75, 75],
   }));
-  manager.advance({ rocks, players: [], nowFrame: 0 });
+  manager.advance({ ...field(rocks), players: [], nowFrame: 0 });
   const spiders = manager.snapshot();
   expect(spiders).toHaveLength(18);
   expect(new Set(spiders.map((s) => s.crawler?.hostId)).size).toBe(18);
@@ -183,7 +188,7 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
   const rock = host();
   rock.health = 150;
   const destination = { ...host(), id: 'ordinary-destination', position: { x: 300, y: 0 } };
-  manager.advance({ rocks: [rock, destination], players: [], nowFrame: 0 });
+  manager.advance({ ...field([rock, destination]), players: [], nowFrame: 0 });
   const original = manager.snapshot()[0];
   if (!original) {
     throw new Error('Expected crawler');
@@ -192,7 +197,7 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
   const graze = BELT_CRAWLER.MAX_HEALTH / 2;
   manager.resolveLaserHit({ x: 180, y }, { x: 100, y }, graze);
   expect(rock.health).toBe(150);
-  manager.escapeDestroyedHost(rock, [destination], 1);
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([destination]), 1);
   expect(manager.snapshot()[0]).toMatchObject({
     id: original.id,
     health: BELT_CRAWLER.MAX_HEALTH - graze,
@@ -200,7 +205,7 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
   });
   expect(rock.beltCrawlerHealth).toEqual([0]);
   expect(destination.beltCrawlerHealth).toEqual([BELT_CRAWLER.MAX_HEALTH - graze]);
-  manager.advance({ rocks: [destination], players: [pilot({ x: 160, y: 0 })], nowFrame: 19 });
+  manager.advance({ ...field([destination]), players: [pilot({ x: 160, y: 0 })], nowFrame: 19 });
   const airborne = manager.snapshot()[0];
   expect(airborne?.position.x).toBeGreaterThan(original.position.x);
   expect(airborne?.crawler?.progress).toBeCloseTo(0.5);
@@ -211,9 +216,9 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
     manager.findLaserHit({ x: airborne.position.x, y: -100 }, { x: airborne.position.x, y: 100 })
       ?.spiderId
   ).toBe(original.id);
-  manager.advance({ rocks: [], players: [], nowFrame: 20 });
+  manager.advance({ ...field([]), players: [], nowFrame: 20 });
   expect(manager.snapshot()).toEqual([]);
-  manager.advance({ rocks: [structuredClone(destination)], players: [], nowFrame: 21 });
+  manager.advance({ ...field([structuredClone(destination)]), players: [], nowFrame: 21 });
   expect(manager.snapshot()).toHaveLength(1);
   expect(manager.snapshot()[0]).toMatchObject({
     id: original.id,
@@ -221,7 +226,7 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
     crawler: { hostId: destination.id, phase: 'crawling' },
   });
   manager.clear();
-  manager.advance({ rocks: [structuredClone(destination)], players: [], nowFrame: 22 });
+  manager.advance({ ...field([structuredClone(destination)]), players: [], nowFrame: 22 });
   expect(manager.snapshot()[0]?.health).toBe(BELT_CRAWLER.MAX_HEALTH - graze);
 });
 
@@ -229,9 +234,9 @@ test('escape preserves the destination native guard and does not resurrect a kil
   const manager = new BeltCrawlerManager();
   const rock = host();
   const destination = { ...host(), id: 'belt-1-6-0', position: { x: 300, y: 0 } };
-  manager.advance({ rocks: [rock, destination], players: [], nowFrame: 0 });
-  manager.escapeDestroyedHost(rock, [destination], 1);
-  manager.advance({ rocks: [destination], players: [], nowFrame: 37 });
+  manager.advance({ ...field([rock, destination]), players: [], nowFrame: 0 });
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([destination]), 1);
+  manager.advance({ ...field([destination]), players: [], nowFrame: 37 });
   expect(manager.snapshot()).toHaveLength(2);
   const migrant = manager.snapshot().find((body) => body.id === `belt-crawler:${rock.id}:0`);
   if (!migrant) {
@@ -239,7 +244,7 @@ test('escape preserves the destination native guard and does not resurrect a kil
   }
   manager.resolveLaserHit({ x: 140, y: migrant.position.y }, { x: 210, y: migrant.position.y }, 75);
   manager.clear();
-  manager.advance({ rocks: [structuredClone(destination)], players: [], nowFrame: 38 });
+  manager.advance({ ...field([structuredClone(destination)]), players: [], nowFrame: 38 });
   expect(manager.snapshot()).toHaveLength(1);
   expect(manager.snapshot()[0]?.id).toBe(`belt-crawler:${destination.id}:0`);
 });
@@ -248,12 +253,12 @@ test('destroyed hosts without a reachable landing kill their spiders, while slee
   const manager = new BeltCrawlerManager();
   const rock = host();
   const distant = { ...host(), id: 'distant', position: { x: 1000, y: 0 } };
-  manager.advance({ rocks: [rock, distant], players: [], nowFrame: 0 });
-  manager.advance({ rocks: [distant], players: [], nowFrame: 1 });
+  manager.advance({ ...field([rock, distant]), players: [], nowFrame: 0 });
+  manager.advance({ ...field([distant]), players: [], nowFrame: 1 });
   expect(manager.snapshot()).toEqual([]);
   expect(rock.beltCrawlerHealth).toEqual([BELT_CRAWLER.MAX_HEALTH]);
-  manager.advance({ rocks: [rock, distant], players: [], nowFrame: 2 });
-  manager.escapeDestroyedHost(rock, [distant], 3);
+  manager.advance({ ...field([rock, distant]), players: [], nowFrame: 2 });
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([distant]), 3);
   expect(manager.snapshot()).toEqual([]);
   expect(rock.beltCrawlerHealth).toEqual([0]);
 });
@@ -262,10 +267,10 @@ test('a moving rock that blocks an escape kills the airborne spider instead of a
   const manager = new BeltCrawlerManager();
   const rock = host();
   const destination = { ...host(), id: 'destination', position: { x: 400, y: 0 } };
-  manager.advance({ rocks: [rock, destination], players: [], nowFrame: 0 });
-  manager.escapeDestroyedHost(rock, [destination], 1);
+  manager.advance({ ...field([rock, destination]), players: [], nowFrame: 0 });
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([destination]), 1);
   const blocker = { ...host(), id: 'blocker', size: 20, position: { x: 170, y: 0 } };
-  manager.advance({ rocks: [destination, blocker], players: [], nowFrame: 20 });
+  manager.advance({ ...field([destination, blocker]), players: [], nowFrame: 20 });
   expect(manager.snapshot()).toEqual([]);
   expect(destination.beltCrawlerHealth).toEqual([0]);
 });
@@ -274,15 +279,15 @@ test('towing the destination beyond escape reach kills the spider without extend
   const manager = new BeltCrawlerManager();
   const rock = host();
   const destination = { ...host(), id: 'moving-destination', position: { x: 300, y: 0 } };
-  manager.advance({ rocks: [rock, destination], players: [], nowFrame: 0 });
-  manager.escapeDestroyedHost(rock, [destination], 1);
+  manager.advance({ ...field([rock, destination]), players: [], nowFrame: 0 });
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([destination]), 1);
   expect(manager.snapshot()[0]?.crawler?.phase).toBe('escaping');
   destination.position.x = 1000;
-  manager.advance({ rocks: [destination], players: [], nowFrame: 2 });
+  manager.advance({ ...field([destination]), players: [], nowFrame: 2 });
   expect(manager.snapshot()).toEqual([]);
   expect(destination.beltCrawlerHealth).toEqual([0]);
   manager.clear();
-  manager.advance({ rocks: [structuredClone(destination)], players: [], nowFrame: 3 });
+  manager.advance({ ...field([structuredClone(destination)]), players: [], nowFrame: 3 });
   expect(manager.snapshot()).toEqual([]);
 });
 
@@ -290,15 +295,15 @@ test('a rock engulfing the entire airborne segment kills the spider and persists
   const manager = new BeltCrawlerManager();
   const rock = { ...host(), size: 30 };
   const destination = { ...host(), id: 'destination', size: 30, position: { x: 200, y: 0 } };
-  manager.advance({ rocks: [rock, destination], players: [], nowFrame: 0 });
-  manager.escapeDestroyedHost(rock, [destination], 1);
+  manager.advance({ ...field([rock, destination]), players: [], nowFrame: 0 });
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([destination]), 1);
   expect(manager.snapshot()[0]?.crawler?.phase).toBe('escaping');
   const blocker = { ...host(), id: 'engulfing-blocker', size: 150, position: { x: 100, y: 0 } };
-  manager.advance({ rocks: [destination, blocker], players: [], nowFrame: 2 });
+  manager.advance({ ...field([destination, blocker]), players: [], nowFrame: 2 });
   expect(manager.snapshot()).toEqual([]);
   expect(destination.beltCrawlerHealth).toEqual([0]);
   manager.clear();
-  manager.advance({ rocks: [structuredClone(destination)], players: [], nowFrame: 3 });
+  manager.advance({ ...field([structuredClone(destination)]), players: [], nowFrame: 3 });
   expect(manager.snapshot()).toEqual([]);
 });
 
@@ -314,7 +319,7 @@ test('a wounded hunter pursues across living rocks and repeatedly returns withou
   for (let cycle = 0; cycle < 8; cycle++) {
     player.position.x = cycle % 2 === 0 ? 700 : -250;
     for (let step = 0; step < 700; step++, frame++) {
-      manager.advance({ rocks, players: [player], nowFrame: frame });
+      manager.advance({ ...field(rocks), players: [player], nowFrame: frame });
       const bodies = manager.snapshot();
       expect(bodies).toHaveLength(1);
       expect(bodies[0]?.id).toBe(`belt-crawler:${source.id}:0`);
@@ -330,7 +335,7 @@ test('a wounded hunter pursues across living rocks and repeatedly returns withou
     rocks.flatMap((rock) => rock.beltCrawlerHealth ?? []).filter((health) => health > 0)
   ).toEqual([BELT_CRAWLER.MAX_HEALTH]);
   manager.clear();
-  manager.advance({ rocks: structuredClone(rocks), players: [], nowFrame: frame + 1 });
+  manager.advance({ ...field(structuredClone(rocks)), players: [], nowFrame: frame + 1 });
   expect(manager.snapshot()).toHaveLength(1);
   expect(manager.snapshot()[0]).toMatchObject({
     health: BELT_CRAWLER.MAX_HEALTH,
@@ -343,11 +348,11 @@ test('a hunter crawls around its host to a departure edge before hopping toward 
   const source = { ...host(), size: 60 };
   const next = { ...host(), id: 'next', size: 30, position: { x: -240, y: 0 } };
   const player = pilot({ x: -500, y: 0 });
-  manager.advance({ rocks: [source, next], players: [player], nowFrame: 0 });
+  manager.advance({ ...field([source, next]), players: [player], nowFrame: 0 });
   expect(manager.snapshot()[0]?.crawler?.phase).toBe('crawling');
   let hopped = false;
   for (let frame = 1; frame < 500; frame++) {
-    manager.advance({ rocks: [source, next], players: [player], nowFrame: frame });
+    manager.advance({ ...field([source, next]), players: [player], nowFrame: frame });
     const spider = manager.snapshot()[0];
     if (spider?.crawler?.phase === 'escaping') {
       expect(spider.position.x).toBeLessThan(-40);
@@ -364,7 +369,7 @@ test('the longer anchored lunge strikes a pilot beyond the old bite reach', () =
   const player = pilot({ x: 230, y: 0 });
   let strikes = 0;
   for (let frame = 0; frame < 100; frame++) {
-    strikes += manager.advance({ rocks: [source], players: [player], nowFrame: frame }).length;
+    strikes += manager.advance({ ...field([source]), players: [player], nowFrame: frame }).length;
   }
   expect(strikes).toBeGreaterThan(0);
   expect(manager.snapshot()[0]?.crawler?.hostId).toBe(source.id);

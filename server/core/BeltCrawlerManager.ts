@@ -21,6 +21,8 @@ interface Actor {
 }
 interface AdvanceOptions {
   rocks: readonly AsteroidData[];
+  /** The caller's broad phase over exactly these rocks. */
+  index: AsteroidSpatialIndex;
   players: readonly Actor[];
   nowFrame: number;
 }
@@ -153,7 +155,7 @@ export class BeltCrawlerManager {
     }));
   }
 
-  public isAttackActive(attack: SpiderAttack, rocks = this.rocks): boolean {
+  public isAttackActive(attack: SpiderAttack, rocks = this.rocks, index = this.spatial): boolean {
     const body = this.bodies.get(attack.spiderId);
     const target = this.players.find((player) => player.id === attack.targetId);
     return (
@@ -162,13 +164,13 @@ export class BeltCrawlerManager {
       rocks.some((rock) => rock.id === body.host.id && rock.health > 0) &&
       body.crawler.phase === 'lunging' &&
       body.targetId === attack.targetId &&
-      !this.impact(body.position, target.position, new AsteroidSpatialIndex(rocks))
+      !this.impact(body.position, target.position, index)
     );
   }
 
-  public advance({ rocks, players, nowFrame }: AdvanceOptions): SpiderAttack[] {
+  public advance({ rocks, index: rockIndex, players, nowFrame }: AdvanceOptions): SpiderAttack[] {
     this.rocks = rocks;
-    this.spatial = new AsteroidSpatialIndex(rocks);
+    this.spatial = rockIndex;
     this.players = players;
     const hosts = new Map(rocks.map((rock) => [rock.id, rock]));
     for (const [id, body] of this.bodies) {
@@ -403,10 +405,10 @@ export class BeltCrawlerManager {
   /** Called by destruction, never by sector eviction. Ownership moves before the animation. */
   public escapeDestroyedHost(
     destroyed: AsteroidData,
-    rocks: readonly AsteroidData[],
+    index: AsteroidSpatialIndex,
     nowFrame: number
   ): void {
-    this.spatial = new AsteroidSpatialIndex(rocks);
+    this.spatial = index;
     for (const body of this.bodies.values()) {
       if (body.host.id !== destroyed.id) {
         continue;

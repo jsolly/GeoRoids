@@ -8,12 +8,11 @@ import {
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
-import { nearbyWorldRows, WORLD } from '../../shared/world';
+import { nearbyAsteroidRows, nearbyWorldRows, WORLD } from '../../shared/world';
 import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
-import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 
 interface SnapshotRecipient {
   baseline?: SnapshotBaseline;
@@ -141,7 +140,8 @@ export class GameStateBroadcaster {
       this.broadcastToAll({ type: 'lootCollected', data, timestamp: Date.now() });
     }
     const gameState = this.gameEngine.getGameState();
-    const asteroidIndex = new AsteroidSpatialIndex(gameState.asteroids);
+    // Snapshot rows are the engine's live rows, so the engine's frame index covers them.
+    const asteroidIndex = this.gameEngine.getAsteroidSpatialIndex();
     const timestamp = Date.now();
 
     for (const blast of this.gameEngine.drainLootBlasts()) {
@@ -174,12 +174,12 @@ export class GameStateBroadcaster {
         continue;
       }
       try {
-        const asteroids = nearbyWorldRows(
+        const asteroids = nearbyAsteroidRows(
           asteroidIndex.query({
-            minX: player.position.x - WORLD.interestRadius,
-            minY: player.position.y - WORLD.interestRadius,
-            maxX: player.position.x + WORLD.interestRadius,
-            maxY: player.position.y + WORLD.interestRadius,
+            minX: player.position.x - WORLD.asteroidInterestRadius,
+            minY: player.position.y - WORLD.asteroidInterestRadius,
+            maxX: player.position.x + WORLD.asteroidInterestRadius,
+            maxY: player.position.y + WORLD.asteroidInterestRadius,
           }),
           player.position
         );
@@ -416,7 +416,7 @@ export class GameStateBroadcaster {
       if (!player.ws) {
         continue;
       }
-      const nearby = nearbyWorldRows(asteroids, player.position);
+      const nearby = nearbyAsteroidRows(asteroids, player.position);
       if (nearby.length > 0) {
         this.sendToWebSocket(player.ws, {
           type: 'asteroidCreateBatch',

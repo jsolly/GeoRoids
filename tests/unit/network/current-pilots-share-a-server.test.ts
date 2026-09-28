@@ -14,6 +14,7 @@ import {
   SnapshotDecoder,
   SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
+import { nearbyAsteroidRows } from '../../../shared/world';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -245,7 +246,7 @@ describe('current pilots share the production handler and broadcaster', () => {
             Math.abs(row.position.x - viewer.position.x) <= 2800 &&
             Math.abs(row.position.y - viewer.position.y) <= 2800
         );
-      const asteroids = nearby(state.asteroids);
+      const asteroids = nearbyAsteroidRows(state.asteroids, viewer.position);
       return new SnapshotEncoder({
         ...state,
         asteroids,

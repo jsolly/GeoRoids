@@ -109,9 +109,6 @@ export interface SavedWorld {
   seed: number;
   startedAt: number;
   generation: number;
-  /** Density schema for additive asteroid slots; absent in pre-migration worlds. */
-  asteroidDensityVersion?: number;
-  asteroidMotionVersion?: number;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
 }
@@ -478,18 +475,6 @@ export class WorldStore {
         Number.isSafeInteger(value.generation)
           ? value.generation
           : 0,
-      ...('asteroidDensityVersion' in value &&
-      typeof value.asteroidDensityVersion === 'number' &&
-      Number.isSafeInteger(value.asteroidDensityVersion) &&
-      value.asteroidDensityVersion >= 0
-        ? { asteroidDensityVersion: value.asteroidDensityVersion }
-        : {}),
-      ...('asteroidMotionVersion' in value &&
-      typeof value.asteroidMotionVersion === 'number' &&
-      Number.isSafeInteger(value.asteroidMotionVersion) &&
-      value.asteroidMotionVersion >= 0
-        ? { asteroidMotionVersion: value.asteroidMotionVersion }
-        : {}),
       ...releaseField(
         'writtenReleaseId',
         'writtenReleaseId' in value ? value.writtenReleaseId : undefined

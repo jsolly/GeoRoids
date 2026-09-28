@@ -50,6 +50,17 @@ export function beltSlotPosition(slot: number): Position {
   return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
 }
 
+/** The belt's rows plus a lane margin; generated field deposits stay out of it. */
+export function isInBeltFootprint(position: Position): boolean {
+  const margin = ASTEROID_BELT.rowSpacing * 2;
+  const radius = Math.hypot(position.x, position.y);
+  const angle = Math.atan2(position.y, position.x);
+  return (
+    Math.abs(radius - ASTEROID_BELT.radius) <= ASTEROID_BELT.rowSpacing + margin &&
+    Math.abs(angle) <= ASTEROID_BELT.halfAngle + margin / ASTEROID_BELT.radius
+  );
+}
+
 export function beltAsteroid(seed: number, slot: number, generation: number): AsteroidData {
   const variation = ((Math.imul(seed ^ slot, 1597334677) >>> 0) % 1000) / 1000;
   const size = 72 + variation * 28;

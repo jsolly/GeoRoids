@@ -4,7 +4,7 @@ import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
-import { nearbyWorldRows } from '../../shared/world';
+import { nearbyAsteroidRows } from '../../shared/world';
 import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
 import { sanitizePlayerName } from '../../src/utils/playerName';
@@ -668,7 +668,7 @@ export class MessageHandler {
       return;
     }
 
-    const existingAsteroids = nearbyWorldRows(
+    const existingAsteroids = nearbyAsteroidRows(
       this.gameEngine.getAllAsteroids(),
       socketPlayer.position
     );

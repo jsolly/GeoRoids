@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import { sectorDeposits } from '../../../server/world/depositLayout';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
@@ -14,6 +15,7 @@ import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
 import { nearbyWorldRows, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
+import { DEPOSIT_FIELD } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
@@ -108,7 +110,7 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   expect(second.resumePilot(scout.token, new RecordingSocket()).ok).toBe(false);
 });
 
-test('travelling far across the world loads local ore and returning does not replenish mined deposits', () => {
+test('travelling far across the world loads local ore and a quick return finds mined deposits still missing', () => {
   const engine = new GameEngine(82);
   const traveller = pilot(engine, 'traveller', 'scout');
   const original = engine
@@ -118,7 +120,7 @@ test('travelling far across the world loads local ore and returning does not rep
   engine.removeAsteroid(original.id);
   traveller.actor.position = { x: 40_000, y: 24_000 };
   engine.ensureAsteroidField();
-  expect(engine.getAllAsteroids().length).toBeLessThan(25 * WORLD.depositsPerSector);
+  expect(engine.getAllAsteroids().length).toBeLessThan(25 * DEPOSIT_FIELD.PEAK_DEPOSITS);
   expect(
     nearbyWorldRows(engine.getAllAsteroids(), traveller.actor.position).length
   ).toBeGreaterThan(80);
@@ -163,7 +165,7 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
   const sleeping = store.loadSector('4,0');
   assert(sleeping);
   expect(sleeping.filter((rock) => rock.id === drift.id)).toHaveLength(1);
-  expect(sleeping).toHaveLength(WORLD.depositsPerSector + 1);
+  expect(sleeping).toHaveLength(sectorDeposits(82, 4, 0).length + 1);
 
   field.update(manager, [{ x: 8_200, y: 200 }]);
   const arrived = manager.getAsteroid(drift.id);

@@ -1,7 +1,7 @@
 import { type CombatCircle, circlesOverlap, isCombatantImmune } from '../../shared/combat';
 import type { AsteroidData, Position, SatellitePickupData, Velocity } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
-import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
+import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { GameEntity } from './EntityManager';
 
 function toCombatCircle(entity: GameEntity): CombatCircle {
@@ -45,10 +45,9 @@ export function separateShipFromAsteroid(
 export class CollisionAuthority {
   public collectShipAsteroidHits(
     entities: GameEntity[],
-    asteroids: AsteroidData[],
-    shouldSkip?: (shipId: string, asteroidId: string) => boolean
+    index: AsteroidSpatialIndex,
+    shouldSkip?: (shipId: string, rock: AsteroidData) => boolean
   ): Array<{ shipId: string; asteroidId: string }> {
-    const index = new AsteroidSpatialIndex(asteroids);
     const hits: Array<{ shipId: string; asteroidId: string }> = [];
     for (const entity of entities) {
       const ship = toCombatCircle(entity);
@@ -63,7 +62,7 @@ export class CollisionAuthority {
       });
       const rock = nearby.find(
         (candidate) =>
-          !shouldSkip?.(ship.id, candidate.id) &&
+          !shouldSkip?.(ship.id, candidate) &&
           circlesOverlap(ship.position, ship.radius, candidate.position, candidate.size)
       );
       if (rock) {
@@ -75,12 +74,9 @@ export class CollisionAuthority {
 
   public collectTowedAsteroidHits(
     towed: readonly AsteroidData[],
-    asteroids: readonly AsteroidData[]
+    index: AsteroidSpatialIndex,
+    include: (rock: AsteroidData) => boolean = () => true
   ): Array<{ towedId: string; otherId: string }> {
-    if (towed.length === 0) {
-      return [];
-    }
-    const index = new AsteroidSpatialIndex(asteroids);
     const hits: Array<{ towedId: string; otherId: string }> = [];
     const seen = new Set<string>();
     for (const cargo of towed) {
@@ -92,7 +88,7 @@ export class CollisionAuthority {
         maxY: cargo.position.y + radius,
       });
       for (const other of nearby) {
-        if (other.id === cargo.id || cargo.health <= 0 || other.health <= 0) {
+        if (other.id === cargo.id || cargo.health <= 0 || other.health <= 0 || !include(other)) {
           continue;
         }
         if (

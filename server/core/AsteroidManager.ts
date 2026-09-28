@@ -16,6 +16,7 @@ import {
 } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import { isDebugMode } from '../../src/utils/debugUtils';
+import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { RNGService } from './RNGService';
 
 export type AsteroidHitCause = 'laser' | 'collision';
@@ -48,6 +49,7 @@ type LaserHitRecord = {
 export class AsteroidManager {
   private asteroids = new Map<string, AsteroidData>();
   private laserHits = new Map<string, LaserHitRecord[]>();
+  private index: AsteroidSpatialIndex | undefined;
   private rng: RNGService;
   /** Per-manager identity prevents delayed reports surviving a server restart. */
   private readonly managerNonce = randomUUID();
@@ -77,6 +79,12 @@ export class AsteroidManager {
   }
 
   public addAsteroid(asteroid: AsteroidData): void {
+    // A replaced row keeps its map order, so the index is rebuilt to match.
+    if (this.asteroids.has(asteroid.id)) {
+      this.index = undefined;
+    } else {
+      this.index?.add(asteroid);
+    }
     this.asteroids.set(asteroid.id, asteroid);
   }
 
@@ -85,8 +93,19 @@ export class AsteroidManager {
     if (asteroid) {
       this.asteroids.delete(asteroidId);
       this.laserHits.delete(asteroidId);
+      this.index?.remove(asteroidId);
     }
     return asteroid;
+  }
+
+  /**
+   * The one broad phase shared by lasers, collisions, crawlers, scans and
+   * snapshots. It is built once and kept exact: additions, removals, edits and
+   * each motion step update it in place, preserving row order.
+   */
+  public spatialIndex(): AsteroidSpatialIndex {
+    this.index ??= new AsteroidSpatialIndex(this.asteroids.values());
+    return this.index;
   }
 
   public updateAsteroid(
@@ -96,6 +115,8 @@ export class AsteroidManager {
     const asteroid = this.asteroids.get(asteroidId);
     if (asteroid) {
       Object.assign(asteroid, updates);
+      // Position, size or outline may have changed the rock's cells.
+      this.index?.move(asteroid);
     }
     return asteroid;
   }
@@ -139,6 +160,7 @@ export class AsteroidManager {
       this.removeAsteroid(id);
     }
     this.laserHits.clear();
+    this.index = undefined;
   }
 
   /**
@@ -157,6 +179,7 @@ export class AsteroidManager {
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;
       asteroid.rotation += asteroid.angularVelocity;
+      this.index?.move(asteroid);
     }
   }
 
@@ -291,7 +314,7 @@ export class AsteroidManager {
         asteroid.maxHealth = 100;
       }
 
-      this.asteroids.set(asteroidId, asteroid);
+      this.addAsteroid(asteroid);
       newAsteroids.push(asteroid);
     }
 
@@ -503,20 +526,27 @@ export class AsteroidManager {
       destroyed.material === 'rubble' && !isColossalAsteroid(destroyed.size)
         ? destroyed.size > this.minAsteroidSize * 2
         : isBiggestAsteroid(destroyed.size);
-    const nearbyCount = [...this.asteroids.values()].filter(
-      (rock) =>
-        Math.hypot(
-          rock.position.x - destroyed.position.x,
-          rock.position.y - destroyed.position.y
-        ) <= WORLD.sectorSize
-    ).length;
+    const nearbyCount = this.spatialIndex()
+      .query({
+        minX: destroyed.position.x - WORLD.sectorSize,
+        minY: destroyed.position.y - WORLD.sectorSize,
+        maxX: destroyed.position.x + WORLD.sectorSize,
+        maxY: destroyed.position.y + WORLD.sectorSize,
+      })
+      .filter(
+        (rock) =>
+          Math.hypot(
+            rock.position.x - destroyed.position.x,
+            rock.position.y - destroyed.position.y
+          ) <= WORLD.sectorSize
+      ).length;
     const newAsteroids =
-      split && canSplit && nearbyCount + fragmentCount <= WORLD.depositsPerSector * 6
+      split && canSplit && nearbyCount + fragmentCount <= ROID.SPLIT_NEARBY_LIMIT
         ? this.createSplitFragments(destroyed)
         : [];
 
     for (const fragment of newAsteroids) {
-      this.asteroids.set(fragment.id, fragment);
+      this.addAsteroid(fragment);
     }
 
     this.onDestroyed?.(destroyed);

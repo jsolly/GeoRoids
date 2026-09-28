@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { CollisionAuthority } from '../../../../server/core/CollisionAuthority';
 import { GameEngine } from '../../../../server/core/GameEngine';
+import { AsteroidSpatialIndex } from '../../../../server/world/AsteroidSpatialIndex';
 import type { AsteroidData } from '../../../../shared-types';
 import { hullRadiusForKit } from '../../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../../support/recordingSocket';
@@ -49,10 +50,12 @@ test('a Hauler collides with a rock that a same-mass Scout still clears', () => 
     const candidate = rock('near-miss', gapPastScout, rockSize);
     const collisions = new CollisionAuthority();
 
-    expect(collisions.collectShipAsteroidHits([scout], [candidate])).toEqual([]);
-    expect(collisions.collectShipAsteroidHits([hauler], [candidate])).toEqual([
-      { shipId: hauler.id, asteroidId: candidate.id },
-    ]);
+    expect(
+      collisions.collectShipAsteroidHits([scout], new AsteroidSpatialIndex([candidate]))
+    ).toEqual([]);
+    expect(
+      collisions.collectShipAsteroidHits([hauler], new AsteroidSpatialIndex([candidate]))
+    ).toEqual([{ shipId: hauler.id, asteroidId: candidate.id }]);
   } finally {
     engine.stopGameLoop();
   }

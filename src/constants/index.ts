@@ -226,9 +226,21 @@ export const ROID = {
   SPEED: 50 * GAME.MOTION_SCALE, // starting speed in pixels per second
   /** Server asteroid velocity uses pixels per 60 Hz tick, unlike SPEED. */
   SERVER_VELOCITY_MAX: 4 * GAME.MOTION_SCALE,
-  STATIONARY_FRACTION: 0.2,
-  DRIFT_SPEED_MIN: 0.3 * GAME.MOTION_SCALE,
-  DRIFT_SPEED_MAX: 3 * GAME.MOTION_SCALE,
+  // Generated deposits: most drift slowly, small rocks drift and spin faster,
+  // and a few streak across a field near the server speed limit.
+  DRIFT_SPEED_MIN: 0.2 * GAME.MOTION_SCALE,
+  DRIFT_SPEED_MAX: 2.4 * GAME.MOTION_SCALE,
+  FAST_DRIFT_CHANCE: 0.07,
+  /** Above the fastest ordinary drift, so streakers read as their own class. */
+  FAST_DRIFT_SPEED_MIN: 3.2 * GAME.MOTION_SCALE,
+  /** Radians per server frame; heavy-tailed so most rocks turn slowly. */
+  SPIN_MIN: 0.0008,
+  SPIN_MAX: 0.024,
+  /** Ordinary deposits stay below the colossal class. */
+  DEPOSIT_SIZE_MIN: 12,
+  DEPOSIT_SIZE_MAX: 84,
+  /** Above 1 favors small rocks; large ones stay common enough to fill a field. */
+  DEPOSIT_SIZE_SKEW: 1.7,
   SIZE: 50, // starting size in pixels
   VERTICES: 10, // average number of vertices
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged
@@ -263,6 +275,43 @@ export const ROID = {
 
   // Procedural deposits fill nearby sectors throughout the playable world.
   FIELD_RADIUS: WORLD.radius,
+  /** Splits stop adding fragments when this many rocks crowd one sector-wide circle. */
+  SPLIT_NEARBY_LIMIT: 1_600,
+} as const;
+
+// ============================================================================
+// DEPOSIT FIELDS
+// ============================================================================
+// A deterministic density field decides how many real deposits each sector
+// owns and where they sit: sweeping rich fields and quiet voids instead of an
+// even sprinkle. A harvested deposit slot regrows out of sight.
+export const DEPOSIT_FIELD = {
+  /** Deposits per 2,000-unit sector in the quietest void and the richest field core. */
+  VOID_DEPOSITS: 26,
+  PEAK_DEPOSITS: 360,
+  /** Noise wavelengths for sweeping fields and the clumps inside them. */
+  FIELD_SCALE: 9_000,
+  CLUMP_SCALE: 1_400,
+  /** Rich cores hold more stationary reef rocks. */
+  STATIONARY_FRACTION_VOID: 0.2,
+  STATIONARY_FRACTION_PEAK: 0.55,
+  /**
+   * Each interval restores this share of a sector's missing deposits, at least
+   * one: a stripped field refills with a half-life of a few minutes.
+   */
+  REGROWTH_INTERVAL_MS: 12_000,
+  REGROWTH_FRACTION: 0.05,
+  /** Generated deposits keep this far from the launch point. */
+  LAUNCH_CLEARANCE: 240,
+  /**
+   * Richness is capped near launch and blends to full strength between these
+   * radii; fast drifters stay out of the launch neighborhood.
+   */
+  LAUNCH_RICHNESS: 0.2,
+  LAUNCH_CALM_INNER: 1_500,
+  LAUNCH_CALM_OUTER: 4_000,
+  /** Regrowth never happens where a pilot or probe could see it. */
+  REGROWTH_HIDDEN_DISTANCE: 1_400,
 } as const;
 
 // Collectible Earth-observation hardware.

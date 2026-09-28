@@ -363,13 +363,12 @@ function observeField(page: BrowserPage): Promise<FieldObservation> {
 
 function compareSharedField(first: FieldObservation, second: FieldObservation) {
   const poseTolerance = 80;
-  // Each recipient has its own interest square. Stay one pose tolerance inside
-  // both edges so movement between snapshots cannot change expected membership.
+  // Each recipient has its own asteroid interest circle. Stay one pose tolerance
+  // inside both edges so movement between snapshots cannot change expected membership.
   const insideSharedRegion = (rock: FieldObservation['rocks'][number]) =>
     [first.ship, second.ship].every(
       (ship) =>
-        Math.abs(rock.x - ship.x) < WORLD.interestRadius - poseTolerance &&
-        Math.abs(rock.y - ship.y) < WORLD.interestRadius - poseTolerance
+        Math.hypot(rock.x - ship.x, rock.y - ship.y) < WORLD.asteroidInterestRadius - poseTolerance
     );
   const firstShared = first.rocks.filter(insideSharedRegion);
   const secondShared = second.rocks.filter(insideSharedRegion);
@@ -448,8 +447,9 @@ test(
         })
         .toBe(true);
 
-      // Place both cameras near the same surviving rock, choosing the greatest
-      // clearance from live NPCs and leaving space outside its hull.
+      // Place both cameras near the same surviving stationary rock, choosing the
+      // greatest clearance from live NPCs and leaving space outside its hull.
+      // A drifting target can leave a small viewport before the frame is captured.
       const [field, pickups, radius1, radius2] = await Promise.all([
         game1.getAsteroidPositions(),
         game1.getSatellitePickups(),
@@ -461,7 +461,9 @@ test(
       );
       const clearance = (rock: Field[number]) =>
         Math.min(...nearbyPilots.map((pilot) => Math.hypot(pilot.x - rock.x, pilot.y - rock.y)));
-      const focus = [...field].sort((a, b) => clearance(b) - clearance(a))[0];
+      const focus = field
+        .filter((rock) => rock.speed === 0)
+        .sort((a, b) => clearance(b) - clearance(a))[0];
       expect(focus, 'a surviving shared rock should be available for camera focus').toBeDefined();
       if (!focus) {
         throw new Error('No surviving shared rock was available for camera focus');

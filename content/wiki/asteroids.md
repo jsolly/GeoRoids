@@ -17,7 +17,7 @@ media:
 
 ## Field and materials
 
-Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Outside the asteroid belt, deposits stay harvested when you return to a region.
+Rocks gather in rich fields separated by quiet voids, and they come in every size, speed, and spin. Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Harvested deposits slowly regrow out of sight, so a mined field fills back in.
 
 ## Cooperative splits and score
 

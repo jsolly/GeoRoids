@@ -4,34 +4,45 @@ GeoRoids has one cooperative world with a 60,000-unit radius. It survives empty 
 
 ## Active regions
 
-The server generates deterministic ore deposits in 2,000-unit sectors. It activates sectors around connected pilots and pauses distant sectors. Each client receives nearby asteroid, loot, and projectile rows, plus the shared crew roster and exploration changes. Returning to a harvested sector does not replenish its resources, and ships, lasers, and new flights can still cross that ground. Saved worlds store a generation number; a mismatch resets the database instead of loading stale progress.
+The server generates deterministic ore deposits in 2,000-unit sectors. It activates sectors around connected pilots and pauses distant sectors. Each client receives asteroids inside its minimap radar plus a small margin (`WORLD.asteroidInterestRadius`), nearby loot and projectile rows, the shared crew roster, and exploration changes. Harvested deposits regrow out of sight (see below). Saved worlds store a generation number; a mismatch resets the database instead of loading stale progress.
 
 The local radar spans 3,600 units. Its 125-unit survey cells are permanent shared discoveries. Town Square is the only hearth that starts lit. Dark furnace foundations stay on the universe map, and on the local radar while they are inside it. Lit hearths appear on the local radar after the crew reveals them. Built furnaces keep the Scout's name and the public id of the pilot who paid. They survive death, reconnects, and server restarts; changing `WORLD.generation` clears them on the next start. Scouts pay for a furnace with their own score. Every delivery contributor receives the same size-scaled material reward. The Town Square store sells placeholder receipts for banked points, gated by shared settlement level. Scouts passively explore farther and can scan a larger area. Scanned cargo records its Scout contributors until consumption.
 
 ## Database and credentials
 
-Asteroid density version 2 expands fresh sectors from 24 to 72 deposit slots,
-with 14 stationary and 58 drifting rocks per fresh interior sector. On startup, an older saved
-world receives only the new slots 24 through 71 in nonempty saved
-sectors. Existing rocks retain their positions, velocities, damage, and IDs;
-missing legacy slots stay missing. Empty saved sectors
-receive no additions. The migration checks IDs across all saved sectors so a
-rock that moved across a boundary cannot be duplicated. The first persistence
-batch commits the changed sectors and density version together. Subsequent
-restarts do not replenish mined additions. This migration preserves the world
-generation, exploration, and saved scores.
+## Deposit fields and regrowth
 
-Asteroid motion version 1 wakes saved stationary native deposits whose slots
-now drift. It runs once at startup before the additive density migration and
-commits its marker with the changed sectors. Existing moving rocks retain their
-momentum; boosted cargo, reflective targets, missing deposits, and empty rows
-are preserved. Intact, stationary three-rock reflective groups
-are repositioned into compact pinball pockets within their sector; existing
-charge, health, and identity are retained. Partial or boosted groups stay as
-they were. Fresh moving slots draw seeded speeds from a
-broad range weighted toward slow drift. Terrain forces apply only to ships.
+`server/world/depositLayout.ts` owns the deterministic layout. A continuous
+two-scale value-noise field (`fieldRichness`) sets how many deposit slots each
+sector owns, from `DEPOSIT_FIELD.VOID_DEPOSITS` in quiet voids to
+`DEPOSIT_FIELD.PEAK_DEPOSITS` in rich field cores, and rejection sampling
+places each slot along that field so clumps cross sector edges. Rich cores hold
+more stationary rocks. Size, drift speed, spin, and outline vary per slot;
+small rocks drift and spin faster and a few streak near the server speed limit.
+Every property is a pure function of seed, sector, and slot index. The launch
+neighborhood caps richness at `DEPOSIT_FIELD.LAUNCH_RICHNESS` inside
+`LAUNCH_CALM_INNER`, blends to full strength by `LAUNCH_CALM_OUTER`, and has no
+fast drifters, so new pilots start in a busy but survivable field. Generated
+deposits skip the eastern belt's footprint so its rows keep clear lanes.
 
-`server/world/WorldStore.ts` uses SQLite with WAL and full synchronous transactions, and the game loop never waits on it. The whole saved world is read once at startup and kept in memory; after that the loop only hands write batches to `server/world/WorkerWorldPersistence.ts`, whose worker thread owns the single writable connection (`server/world/worldStoreWorker.ts`). The integration runners' `:memory:` world cannot cross threads, so `openWorldPersistence` commits it inline instead. The database stores world seed, start time, generation, the server release that last wrote the world row, shared exploration, named furnaces, visited sector contents, and pilots (public id, last nickname, banked score, cargo, purchase receipts, silk, salvaged equipment, optional catalog hull paint, token digest, optional recent flight, and release stamps). A recent flight includes last-seen time, kit, pose, mass, and health. Existing saved mass and its flight rules remain intact; pickups no longer change mass or hull stats, and this change requires no saved-data migration. Returning to a recent flight releases contour lock; there is no stored charge or recharge timer. Each pilot row records which client and server releases issued the current resume token, which releases last wrote that score, and the server times of those writes. Live score writes also stamp the connected client. Server-only score writes (offline delivery credit) stamp the current server release and omit a client release so later migration can tell a browser was not present. Persistence is write-behind: once a second while the world is running, everything that changed since the last flush (moved or mined deposits, scores, credentials, exploration, and named furnaces) leaves the loop as one batch and is committed in one transaction, so a batch is never half-applied. The final player's departure and graceful shutdown flush at once; shutdown waits for the last commit before the process exits, within a fixed budget inside Railway's ten-second SIGTERM window (1.5 s for an in-flight commit to finish, 3.5 s for the worker to commit and close). A writer that cannot keep that budget forfeits the final flush; the skipped flush is logged, and if the writer thread never releases the database (a thread inside a native SQLite call cannot be interrupted, and a normal exit would wait for it) the process ends itself with SIGKILL once the logs are flushed, so a hung disk can never hold a restart hostage. A hard crash therefore loses at most about the last second of play, including a terminal break, delivery, or loot pickup that had not been flushed yet; on restart the world resumes from the last committed batch and the clients rebase to it.
+A slot regrows when its ID exists nowhere: not awake, not in any dormant
+sector (an in-memory ID index answers this without scanning world history).
+Each awake sector restores one missing slot per
+`DEPOSIT_FIELD.REGROWTH_INTERVAL_MS`, skipping slots within
+`DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE` of any pilot or probe. A sector that
+wakes catches up on the intervals it slept through this process; after a
+restart, a waking sector restores every missing slot that is out of sight.
+The regrown rock is the slot's original deposit: same ID, position, size, and
+material. A world saved under an older layout keeps its surviving rocks and
+fills missing slots the same way, so layout changes need no migration or reset.
+Split fragments are not slots and never regrow.
+
+Checkpoints send an awake sector every second when its set of rock IDs
+changed (mined, regrown, or carried across an edge). Drift alone is written
+every `WORLD.driftFlushCheckpoints` checkpoints, so a hard crash can rewind
+rocks a few seconds along their paths but never loses or duplicates one.
+
+`server/world/WorldStore.ts` uses SQLite with WAL and full synchronous transactions, and the game loop never waits on it. The whole saved world is read once at startup and kept in memory; after that the loop only hands write batches to `server/world/WorkerWorldPersistence.ts`, whose worker thread owns the single writable connection (`server/world/worldStoreWorker.ts`). The integration runners' `:memory:` world cannot cross threads, so `openWorldPersistence` commits it inline instead. The database stores world seed, start time, generation, the server release that last wrote the world row, shared exploration, named furnaces, visited sector contents, and pilots (public id, last nickname, banked score, cargo, purchase receipts, silk, salvaged equipment, optional catalog hull paint, token digest, optional recent flight, and release stamps). A recent flight includes last-seen time, kit, pose, mass, and health. Existing saved mass and its flight rules remain intact; pickups no longer change mass or hull stats, and this change requires no saved-data migration. Returning to a recent flight releases contour lock; there is no stored charge or recharge timer. Each pilot row records which client and server releases issued the current resume token, which releases last wrote that score, and the server times of those writes. Live score writes also stamp the connected client. Server-only score writes (offline delivery credit) stamp the current server release and omit a client release so later migration can tell a browser was not present. Persistence is write-behind: once a second while the world is running, everything that changed since the last flush (moved or mined deposits, scores, credentials, exploration, and named furnaces) leaves the loop as one batch and is committed in one transaction, so a batch is never half-applied. Asteroid drift within an unchanged sector is the exception and follows the slower drift cadence described above. The final player's departure and graceful shutdown flush at once; shutdown waits for the last commit before the process exits, within a fixed budget inside Railway's ten-second SIGTERM window (1.5 s for an in-flight commit to finish, 3.5 s for the worker to commit and close). A writer that cannot keep that budget forfeits the final flush; the skipped flush is logged, and if the writer thread never releases the database (a thread inside a native SQLite call cannot be interrupted, and a normal exit would wait for it) the process ends itself with SIGKILL once the logs are flushed, so a hung disk can never hold a restart hostage. A hard crash therefore loses at most about the last second of play, including a terminal break, delivery, or loot pickup that had not been flushed yet; on restart the world resumes from the last committed batch and the clients rebase to it.
 
 Furnace IDs retain their historical `street-<ring>-<slot>` addresses so existing saved sites and pipe routes stay intact. Builder names and public IDs remain construction attribution; they do not affect rewards.
 
@@ -65,7 +76,7 @@ Do not run multiple server replicas against the same world. The game loop has on
 
 The world row stores a finite `asteroidBelt` ledger with a generation and
 absolute recovery deadline per belt location. Existing worlds receive the new
-belt additively; ordinary harvested deposits stay harvested. Destroying a belt
+belt additively; ordinary deposits regrow through their own slots. Destroying a belt
 host or carrying it away starts the configured five-minute timer. The deadline
 continues through pauses, sleeping sectors and restarts; due deposits are
 reconstructed in memory when the simulation reconciles the belt. Replacement

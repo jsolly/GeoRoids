@@ -18,7 +18,7 @@ Choose Scout to explore with Mineral Scan, or Hauler to deliver ore with Tow Cab
 
 ## Your expedition
 
-Everyone shares one crew, one chart, and a persistent world. Mine rocks, collect loot, and deliver ore to lit furnaces for score; harvested ground stays empty and flyable.
+Everyone shares one crew, one chart, and a persistent world. Mine rocks, collect loot, and deliver ore to lit furnaces for score; harvested fields slowly regrow.
 
 ## Your next life
 

@@ -5,22 +5,11 @@ import {
   beltAsteroid,
   beltSlots,
 } from '../../shared/asteroidBelt';
-import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
-import {
-  ASTEROID_INTERACTIONS,
-  layoutReflectiveCluster,
-  seedAsteroidPhenomena,
-} from '../../shared/asteroidPhenomena';
-import { applyColossalDeposit, sectorHostsColossal } from '../../shared/asteroidScale';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, Position } from '../../shared-types';
-import { ROID } from '../../src/constants';
+import { DEPOSIT_FIELD } from '../../src/constants';
 import type { AsteroidManager } from '../core/AsteroidManager';
-import { RNGService } from '../core/RNGService';
-
-const DEPOSIT_ID = /^deposit-(\d+)-(-?\d+)-(-?\d+)-(\d+)$/u;
-const SECTOR_EDGE_EPSILON = 1e-6;
-const STATIONARY_SLOTS = Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION);
+import { sectorDeposits } from './depositLayout';
 
 /** Probes are live hardware, not part of the durable asteroid field. */
 function stripTransientProbe(rock: AsteroidData): AsteroidData {
@@ -31,40 +20,52 @@ function stripTransientProbe(rock: AsteroidData): AsteroidData {
   return persisted;
 }
 
-function stationarySlot(index: number): boolean {
-  return index < STATIONARY_SLOTS;
-}
-
 /**
- * Distant sectors sleep; visited empty sectors never regenerate harvested deposits.
+ * Distant sectors sleep; harvested deposit slots regrow out of sight.
  *
  * Every saved sector stays in memory as a dormant sector, so activating,
  * sleeping and counting sectors never reads the database while the game runs.
  * At the world's full 60,000-unit radius that is at most a few thousand
  * sectors of deposit rows, well within a game server's memory.
+ *
+ * A generated slot regrows only when its ID exists nowhere: not awake and not
+ * in any dormant sector (rocks drift across edges). Each interval restores a
+ * share of a sector's missing slots, at least one, so a few mined rocks return
+ * one at a time and a stripped field refills quickly. A sector waking from
+ * sleep catches up on the intervals it slept through; time before this
+ * process started does not count. A world saved with an older layout keeps its
+ * surviving rocks and fills the missing slots the same way.
  */
 export class RegionalAsteroidField {
   private active = new Set<string>();
   private belt: BeltSlotState[];
-  private readonly dormant: Map<string, AsteroidData[]>;
+  private readonly dormant = new Map<string, AsteroidData[]>();
+  /** Every dormant rock ID, so slot existence never scans world history. */
+  private readonly dormantIds = new Set<string>();
   private changed = new Map<string, AsteroidData[]>();
   private visited = new Set<string>();
-  private savedDensityMigrationApplied = false;
-  private readonly densityMigrationSectors = new Set<string>();
-  private savedMotionMigrationApplied = false;
   private readonly savedPoweredSectors = new Set<string>();
+  /** Generated slots for awake sectors; dropped when the sector sleeps. */
+  private readonly layouts = new Map<string, AsteroidData[]>();
+  private readonly nextRegrowth = new Map<string, number>();
+  /** When this process put an awake sector to sleep. */
+  private readonly sleptAt = new Map<string, number>();
+  /** Sectors saved before this process started have slept since its first update. */
+  private clockStart: number | undefined;
+  /** Rock IDs per awake sector at the last committed checkpoint. */
+  private readonly flushedMembership = new Map<string, string>();
+  private pendingMembership = new Map<string, string>();
+  private checkpoints = 0;
 
   constructor(
     private readonly seed: number,
     saved: ReadonlyMap<string, AsteroidData[]> = new Map(),
     savedBelt?: readonly BeltSlotState[]
   ) {
-    this.dormant = new Map(
-      [...saved].map(([id, rocks]) => [id, rocks.map(stripTransientProbe)] as const)
-    );
     for (const [id, rocks] of saved) {
-      if (rocks.length > 0) {
-        this.densityMigrationSectors.add(id);
+      this.putDormant(id, rocks.map(stripTransientProbe));
+      if (rocks.some((rock) => rock.boost?.phase === 'burning')) {
+        this.savedPoweredSectors.add(id);
       }
     }
     this.belt =
@@ -75,252 +76,33 @@ export class RegionalAsteroidField {
     for (const entry of this.belt) {
       const rock = beltAsteroid(this.seed, entry.slot, entry.generation);
       const sector = sectorAt(rock.position);
-      let rows = this.dormant.get(sector.id);
-      if (!rows) {
-        rows = this.generate(sector.x, sector.y);
-        this.dormant.set(sector.id, rows);
-      }
+      const rows = this.dormant.get(sector.id) ?? sectorDeposits(this.seed, sector.x, sector.y);
       if (!savedBelt && !rows.some((existing) => existing.id === rock.id)) {
-        rows.push(rock);
-        this.changed.set(sector.id, rows);
-      }
-    }
-    for (const [id, rocks] of saved) {
-      if (rocks.some((rock) => rock.boost?.phase === 'burning')) {
-        this.savedPoweredSectors.add(id);
+        this.putDormant(sector.id, [...rows, rock]);
+        this.changed.set(sector.id, this.dormant.get(sector.id) ?? []);
+      } else if (!this.dormant.has(sector.id)) {
+        this.putDormant(sector.id, rows);
       }
     }
   }
 
-  private generate(x: number, y: number): AsteroidData[] {
-    const random = new RNGService(this.seed ^ Math.imul(x, 73856093) ^ Math.imul(y, 19349663));
-    const rocks: AsteroidData[] = [];
-    for (let index = 0; index < WORLD.depositsPerSector; index++) {
-      const position = {
-        x: (x + random.random()) * WORLD.sectorSize,
-        y: (y + random.random()) * WORLD.sectorSize,
-      };
-      if (Math.hypot(position.x, position.y) > WORLD.radius - 100) {
-        continue;
-      }
-      // Keep the launch area navigable; nearby deposits still fit inside the first scan.
-      if (Math.hypot(position.x, position.y) < 160) {
-        position.x += 240;
-      }
-      const material = asteroidMaterialAt(index);
-      const offsets = [...MATERIAL_OUTLINES[material]];
-      const health = material === 'metal' ? 75 : 25;
-      // Keep drawing every random value for every slot, including stationary
-      // slots, so positions and all later slot metadata remain seed-stable.
-      const direction = random.random() * Math.PI * 2;
-      const speed =
-        ROID.DRIFT_SPEED_MIN + (ROID.DRIFT_SPEED_MAX - ROID.DRIFT_SPEED_MIN) * random.random() ** 2;
-      const generatedVelocity = { x: Math.cos(direction) * speed, y: Math.sin(direction) * speed };
-      rocks.push({
-        id: `deposit-${this.seed}-${x}-${y}-${index}`,
-        position,
-        velocity: stationarySlot(index) ? { x: 0, y: 0 } : generatedVelocity,
-        size: 18 + random.random() * 30,
-        material,
-        health,
-        maxHealth: health,
-        rotation: random.random() * Math.PI * 2,
-        angularVelocity: (random.random() - 0.5) * 0.005,
-        jaggedness: material === 'rubble' ? 0.7 : 0.25,
-        vertices: offsets.length,
-        offsets,
-      });
-    }
-    const collab = rocks[0];
-    if (collab) {
-      collab.size = Math.max(collab.size, ROID.COLLAB_SPLIT_MIN_SIZE);
-      collab.isCollabTarget = true;
-      collab.health = 100;
-      collab.maxHealth = 100;
-    }
-    seedAsteroidPhenomena(rocks);
-    this.placeReflectiveClusters(rocks, x, y);
-    this.placeColossalDeposit(rocks, x, y);
-    // Phenomenon clusters and the launch-area offset may move a generated
-    // slot across an edge. Keep the slot owned by its deterministic sector;
-    // later simulation drift is what transfers ownership during checkpointing.
-    const minX = x * WORLD.sectorSize;
-    const minY = y * WORLD.sectorSize;
-    const maxX = (x + 1) * WORLD.sectorSize - SECTOR_EDGE_EPSILON;
-    const maxY = (y + 1) * WORLD.sectorSize - SECTOR_EDGE_EPSILON;
-    for (const rock of rocks) {
-      rock.position = {
-        x: Math.min(maxX, Math.max(minX, rock.position.x)),
-        y: Math.min(maxY, Math.max(minY, rock.position.y)),
-      };
-    }
-    // Clusters can extend beyond the circular world even when their anchor is inside.
-    return rocks.filter((rock) => Math.hypot(rock.position.x, rock.position.y) <= WORLD.radius);
-  }
-
-  /**
-   * Add the new deterministic slots to rows written by the 24-slot world.
-   *
-   * A row is migrated once per process startup, and the caller persists the
-   * resulting rows atomically with WORLD.asteroidDensityVersion. Missing
-   * legacy IDs are intentionally never regenerated: they may have been
-   * harvested, destroyed, or carried into another sector.
-   */
-  private migrateSector(
-    id: string,
-    saved: readonly AsteroidData[],
-    persistedIds: ReadonlySet<string>
-  ): AsteroidData[] {
-    const parsed = parseSectorId(id);
-    if (!parsed) {
-      throw new Error('Invalid sector identity');
-    }
-    const generated = this.generate(parsed.x, parsed.y);
-    const additions = generated.filter((rock) => {
-      const prefix = `deposit-${this.seed}-${parsed.x}-${parsed.y}-`;
-      if (!rock.id.startsWith(prefix) || persistedIds.has(rock.id)) {
-        return false;
-      }
-      const slot = Number(rock.id.slice(prefix.length));
-      return (
-        Number.isSafeInteger(slot) &&
-        slot >= WORLD.legacyDepositsPerSector &&
-        slot < WORLD.depositsPerSector
-      );
-    });
-    // A pre-density sector has six stationary reflective rocks and 18 moving
-    // rocks. Fill the stationary target from the additive slots while preserving
-    // the exact saved velocities (including sectors that were partly mined or
-    // carried across a boundary before this migration).
-    const existingStationary = saved.filter(
-      (rock) => rock.velocity.x === 0 && rock.velocity.y === 0
-    ).length;
-    const stationaryNeeded = Math.max(0, STATIONARY_SLOTS - existingStationary);
-    for (const [index, rock] of additions.entries()) {
-      if (index >= stationaryNeeded) {
-        break;
-      }
-      rock.velocity = { x: 0, y: 0 };
-    }
-    return additions.length === 0 ? [...saved] : [...saved, ...additions];
-  }
-
-  /** Keep intact pinball pockets off sector edges without restoring mined members. */
-  private placeReflectiveClusters(rocks: AsteroidData[], x: number, y: number): boolean {
-    const groups = new Map<string, AsteroidData[]>();
-    for (const rock of rocks) {
-      if (rock.phenomenon?.kind === 'reflective') {
-        const group = groups.get(rock.phenomenon.clusterId) ?? [];
-        group.push(rock);
-        groups.set(rock.phenomenon.clusterId, group);
-      }
-    }
-    let changed = false;
-    const extent = ASTEROID_INTERACTIONS.clusterRadius + ASTEROID_INTERACTIONS.reflectiveSize + 1;
-    for (const group of groups.values()) {
-      if (
-        group.length !== ASTEROID_INTERACTIONS.rocksPerCluster ||
-        group.some((rock) => rock.boost || rock.velocity.x !== 0 || rock.velocity.y !== 0)
-      ) {
-        continue;
-      }
-      const center = {
-        x: Math.min(
-          (x + 1) * WORLD.sectorSize - extent,
-          Math.max(
-            x * WORLD.sectorSize + extent,
-            group.reduce((sum, rock) => sum + rock.position.x, 0) / group.length
-          )
-        ),
-        y: Math.min(
-          (y + 1) * WORLD.sectorSize - extent,
-          Math.max(
-            y * WORLD.sectorSize + extent,
-            group.reduce((sum, rock) => sum + rock.position.y, 0) / group.length
-          )
-        ),
-      };
-      // At the circular rim, preserve the original group rather than placing
-      // a pocket partly outside the playable world.
-      if (Math.hypot(center.x, center.y) + extent > WORLD.radius) {
-        continue;
-      }
-      const placements = layoutReflectiveCluster(center);
-      for (const [index, rock] of group.entries()) {
-        const placement = placements[index];
-        if (
-          placement &&
-          (rock.position.x !== placement.position.x ||
-            rock.position.y !== placement.position.y ||
-            rock.rotation !== placement.rotation)
-        ) {
-          rock.position = { ...placement.position };
-          rock.rotation = placement.rotation;
-          changed = true;
-        }
-      }
-    }
-    return changed;
-  }
-
-  /** Resize one ordinary slot; keep collab rocks and pinball clusters intact. */
-  private placeColossalDeposit(rocks: AsteroidData[], x: number, y: number): void {
-    if (!sectorHostsColossal(x, y, this.seed)) {
-      return;
-    }
-    const slot =
-      rocks.find(
-        (rock) =>
-          !rock.isCollabTarget && !rock.phenomenon && rock.velocity.x === 0 && rock.velocity.y === 0
-      ) ?? rocks.find((rock) => !rock.isCollabTarget && !rock.phenomenon);
-    if (slot) {
-      applyColossalDeposit(slot);
+  private putDormant(id: string, rows: AsteroidData[]): void {
+    this.takeDormant(id);
+    this.dormant.set(id, rows);
+    for (const rock of rows) {
+      this.dormantIds.add(rock.id);
     }
   }
 
-  /** Wake newly drifting slots once at startup; never restore missing deposits. */
-  migrateSavedMotion(): void {
-    if (this.savedMotionMigrationApplied) {
-      return;
-    }
-    this.savedMotionMigrationApplied = true;
-    const generated = new Map<string, Map<string, AsteroidData>>();
-    for (const [sector, saved] of this.dormant) {
-      let changed = false;
-      const rows = saved.map((rock) => {
-        if (rock.boost || rock.phenomenon || rock.velocity.x !== 0 || rock.velocity.y !== 0) {
-          return rock;
-        }
-        const match = DEPOSIT_ID.exec(rock.id);
-        if (!match || Number(match[1]) !== this.seed) {
-          return rock;
-        }
-        const x = Number(match[2]);
-        const y = Number(match[3]);
-        const origin = `${x},${y}`;
-        let originals = generated.get(origin);
-        if (!originals) {
-          originals = new Map(this.generate(x, y).map((entry) => [entry.id, entry]));
-          generated.set(origin, originals);
-        }
-        const velocity = originals.get(rock.id)?.velocity;
-        if (!velocity || (velocity.x === 0 && velocity.y === 0)) {
-          return rock;
-        }
-        changed = true;
-        return { ...rock, velocity: { ...velocity } };
-      });
-      const parsed = parseSectorId(sector);
-      // Clone rows before changing cluster poses; the saved input is a snapshot.
-      const arranged = rows.map((rock) => ({ ...rock }));
-      const layoutChanged = parsed
-        ? this.placeReflectiveClusters(arranged, parsed.x, parsed.y)
-        : false;
-      if (changed || layoutChanged) {
-        this.dormant.set(sector, arranged);
-        this.changed.set(sector, arranged);
+  private takeDormant(id: string): AsteroidData[] | undefined {
+    const rows = this.dormant.get(id);
+    if (rows) {
+      this.dormant.delete(id);
+      for (const rock of rows) {
+        this.dormantIds.delete(rock.id);
       }
     }
+    return rows;
   }
 
   private load(id: string): AsteroidData[] {
@@ -333,44 +115,50 @@ export class RegionalAsteroidField {
     if (!parsed) {
       throw new Error('Invalid sector identity');
     }
-    return this.generate(parsed.x, parsed.y);
+    return sectorDeposits(this.seed, parsed.x, parsed.y);
   }
 
-  /**
-   * Expand persisted sectors exactly once for the density migration. This is
-   * deliberately separate from load(): a missing row means an unvisited
-   * sector, while a missing asteroid in a saved row may be a legitimate
-   * harvest. The world-row density marker makes this operation durable across
-   * restarts, including when every newly added slot is later destroyed.
-   */
-  migrateSavedSectors(): ReadonlyMap<string, AsteroidData[]> {
-    if (this.savedDensityMigrationApplied) {
-      return new Map();
-    }
-    this.savedDensityMigrationApplied = true;
-    const migrated = new Map<string, AsteroidData[]>();
-    const persistedIds = new Set<string>();
-    for (const saved of this.dormant.values()) {
-      for (const rock of saved) {
-        persistedIds.add(rock.id);
+  private layout(id: string): AsteroidData[] {
+    let slots = this.layouts.get(id);
+    if (!slots) {
+      const parsed = parseSectorId(id);
+      if (!parsed) {
+        throw new Error('Invalid sector identity');
       }
+      slots = sectorDeposits(this.seed, parsed.x, parsed.y);
+      this.layouts.set(id, slots);
     }
-    for (const [id, saved] of this.dormant) {
-      // An empty saved row is a durable harvest tombstone.
-      if (!this.densityMigrationSectors.has(id)) {
-        continue;
-      }
-      const rows = this.migrateSector(id, saved, persistedIds);
-      if (rows.length !== saved.length) {
-        this.dormant.set(id, rows);
-        for (const rock of rows.slice(saved.length)) {
-          persistedIds.add(rock.id);
-        }
-        this.changed.set(id, rows);
-        migrated.set(id, rows);
-      }
+    return slots;
+  }
+
+  /** Restore missing slots of an awake sector for elapsed intervals, where no observer can see them. */
+  private regrow(
+    manager: AsteroidManager,
+    id: string,
+    intervals: number,
+    observers: readonly Position[]
+  ): AsteroidData[] {
+    const missing = this.layout(id).filter(
+      (slot) =>
+        !manager.getAsteroid(slot.id) &&
+        !this.dormantIds.has(slot.id) &&
+        observers.every(
+          (observer) =>
+            Math.hypot(observer.x - slot.position.x, observer.y - slot.position.y) >=
+            DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE
+        )
+    );
+    let remaining = missing.length;
+    for (let interval = 0; interval < intervals && remaining > 0; interval++) {
+      remaining -= Math.max(1, Math.ceil(remaining * DEPOSIT_FIELD.REGROWTH_FRACTION));
     }
-    return migrated;
+    const grown = missing
+      .slice(0, missing.length - Math.max(0, remaining))
+      .map((slot) => structuredClone(slot));
+    for (const rock of grown) {
+      manager.addAsteroid(rock);
+    }
+    return grown;
   }
 
   update(
@@ -378,6 +166,8 @@ export class RegionalAsteroidField {
     observers: readonly Position[],
     now = Date.now()
   ): AsteroidData[] {
+    this.clockStart ??= now;
+    const clockStart = this.clockStart;
     const wanted = new Map<string, { x: number; y: number }>();
     for (const observer of observers) {
       const start = sectorAt({
@@ -416,14 +206,18 @@ export class RegionalAsteroidField {
       }
     }
     this.savedPoweredSectors.clear();
-    this.sleepDistantSectors(manager, new Set(wanted.keys()));
+    this.sleepDistantSectors(manager, new Set(wanted.keys()), now);
     const created: AsteroidData[] = [];
     for (const id of wanted.keys()) {
       if (this.active.has(id)) {
+        if (now >= (this.nextRegrowth.get(id) ?? now)) {
+          created.push(...this.regrow(manager, id, 1, observers));
+          this.nextRegrowth.set(id, now + DEPOSIT_FIELD.REGROWTH_INTERVAL_MS);
+        }
         continue;
       }
       const rows = this.load(id);
-      this.dormant.delete(id);
+      this.takeDormant(id);
       for (const rock of rows) {
         if (manager.getAsteroid(rock.id)) {
           continue;
@@ -431,6 +225,17 @@ export class RegionalAsteroidField {
         manager.addAsteroid(rock);
         created.push(rock);
       }
+      const slept = this.sleptAt.get(id) ?? clockStart;
+      this.sleptAt.delete(id);
+      created.push(
+        ...this.regrow(
+          manager,
+          id,
+          Math.floor((now - slept) / DEPOSIT_FIELD.REGROWTH_INTERVAL_MS),
+          observers
+        )
+      );
+      this.nextRegrowth.set(id, now + DEPOSIT_FIELD.REGROWTH_INTERVAL_MS);
     }
     this.active = new Set(wanted.keys());
     created.push(...this.reconcileBelt(manager, now));
@@ -487,7 +292,7 @@ export class RegionalAsteroidField {
         created.push(rock);
       } else {
         const rows = [...(this.dormant.get(sector) ?? []), rock];
-        this.dormant.set(sector, rows);
+        this.putDormant(sector, rows);
         this.changed.set(sector, rows);
       }
       changed = true;
@@ -516,7 +321,11 @@ export class RegionalAsteroidField {
     });
   }
 
-  private sleepDistantSectors(manager: AsteroidManager, wanted: ReadonlySet<string>): void {
+  private sleepDistantSectors(
+    manager: AsteroidManager,
+    wanted: ReadonlySet<string>,
+    now?: number
+  ): void {
     const probeSectors = new Set<string>();
     for (const rock of manager.getAllAsteroids()) {
       if (rock.probe) {
@@ -542,10 +351,17 @@ export class RegionalAsteroidField {
       if (retained.has(id)) {
         continue;
       }
-      const prior = this.active.has(id) ? [] : this.load(id);
+      const wasActive = this.active.has(id);
+      const prior = wasActive ? [] : this.load(id);
       const saved = [...new Map([...prior, ...rows].map((rock) => [rock.id, rock])).values()];
-      this.dormant.set(id, saved);
+      this.putDormant(id, saved);
       this.changed.set(id, saved);
+      this.layouts.delete(id);
+      this.nextRegrowth.delete(id);
+      this.flushedMembership.delete(id);
+      if (wasActive && now !== undefined) {
+        this.sleptAt.set(id, now);
+      }
       for (const rock of rows) {
         manager.removeAsteroid(rock.id);
       }
@@ -566,22 +382,32 @@ export class RegionalAsteroidField {
             manager.addAsteroid(native);
           }
         }
-        this.dormant.delete(id);
+        this.takeDormant(id);
         this.active.add(id);
       }
     }
     this.sleepDistantSectors(manager, this.active);
-    const rows = new Map(this.changed);
-    for (const id of this.active) {
-      rows.set(id, []);
-    }
+    const awake = new Map<string, AsteroidData[]>([...this.active].map((id) => [id, []]));
     for (const rock of manager.getAllAsteroids()) {
       const id = sectorAt(rock.position).id;
-      const sector = rows.get(id);
+      const sector = awake.get(id);
       if (!sector) {
         throw new Error(`Active asteroid ${rock.id} has no sector ${id}`);
       }
       sector.push(stripTransientProbe(rock));
+    }
+    // Membership changes (mined, regrown, carried across an edge) leave within
+    // a second. Drift alone is written every few checkpoints: a hard crash
+    // rewinds rocks a few seconds along their paths, never loses or duplicates one.
+    const driftDue = this.checkpoints % WORLD.driftFlushCheckpoints === 0;
+    const rows = new Map(this.changed);
+    this.pendingMembership = new Map();
+    for (const [id, sector] of awake) {
+      const membership = sector.map((rock) => rock.id).join(',');
+      if (driftDue || this.flushedMembership.get(id) !== membership) {
+        rows.set(id, sector);
+        this.pendingMembership.set(id, membership);
+      }
     }
     return rows;
   }
@@ -589,23 +415,36 @@ export class RegionalAsteroidField {
   /** The pending changes were handed to persistence; dormant rows stay as the in-memory world. */
   saved(): void {
     this.changed.clear();
+    for (const [id, membership] of this.pendingMembership) {
+      this.flushedMembership.set(id, membership);
+    }
+    this.pendingMembership.clear();
+    this.checkpoints += 1;
   }
 
   reset(): void {
     this.active.clear();
     this.dormant.clear();
+    this.dormantIds.clear();
     this.changed.clear();
     this.visited.clear();
     this.savedPoweredSectors.clear();
-    this.densityMigrationSectors.clear();
-    this.savedDensityMigrationApplied = false;
+    this.layouts.clear();
+    this.nextRegrowth.clear();
+    this.sleptAt.clear();
+    this.clockStart = undefined;
+    this.flushedMembership.clear();
+    this.pendingMembership.clear();
+    this.checkpoints = 0;
     this.belt = beltSlots().map((slot) => ({ slot, generation: 0, recoverAt: null }));
     for (const entry of this.belt) {
       const rock = beltAsteroid(this.seed, entry.slot, 0);
       const sector = sectorAt(rock.position);
-      const rows = this.dormant.get(sector.id) ?? this.generate(sector.x, sector.y);
-      rows.push(rock);
-      this.dormant.set(sector.id, rows);
+      const rows = [
+        ...(this.dormant.get(sector.id) ?? sectorDeposits(this.seed, sector.x, sector.y)),
+        rock,
+      ];
+      this.putDormant(sector.id, rows);
       this.changed.set(sector.id, rows);
     }
   }

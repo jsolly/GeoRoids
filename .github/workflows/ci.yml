@@ -129,10 +129,14 @@ jobs:
       (github.event.pull_request.user.login != 'dependabot[bot]' ||
       contains(github.event.pull_request.labels.*.name, 'ow-ci')))) && 'static-checks' || 'static-checks-deferred' }}
     if: >-
-      always() && (github.event_name != 'pull_request' ||
-      ((github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
-      (github.event.pull_request.user.login != 'dependabot[bot]' ||
-      contains(github.event.pull_request.labels.*.name, 'ow-ci'))))
+      github.event_name != 'pull_request' ||
+      (
+        (github.event.action != 'labeled' || github.event.label.name == 'ow-ci') &&
+        (
+          github.event.pull_request.user.login != 'dependabot[bot]' ||
+          contains(github.event.pull_request.labels.*.name, 'ow-ci')
+        )
+      )
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:

@@ -390,11 +390,14 @@ const PREFERENCES = {
 // ============================================================================
 // LOGGING CONFIGURATION
 // ============================================================================
+export const LOG_LEVEL_NAMES = ['error', 'warn', 'info', 'debug'] as const;
+export type LogLevelName = (typeof LOG_LEVEL_NAMES)[number];
+
 export const LOGGING = {
   // Opt in to `debug` locally when chasing a bug. Production must stay
   // `info` or quieter — per-frame `logger.debug` at 60 FPS stalls the
   // main thread, misses heartbeats, and disconnects both tabs.
-  GLOBAL_LOG_LEVEL: 'info' as 'error' | 'warn' | 'info' | 'debug',
+  GLOBAL_LOG_LEVEL: 'info' as LogLevelName,
 
   // Forward warnings/errors and selected STATE info events to the server.
   FORWARD_TO_SERVER: true,

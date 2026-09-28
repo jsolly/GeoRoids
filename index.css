@@ -1167,6 +1167,12 @@
     border-radius: 4px;
   }
 
+  select.debug-id-input,
+  select.debug-id-input option {
+    color-scheme: dark;
+    background: var(--palette-bg, #000011);
+  }
+
   .debug-id-input:focus {
     outline: none;
     border-color: var(--palette-local, #5eead4);

@@ -1,7 +1,14 @@
-import { debugIsOn, setDebugPreference } from '../constants/user-preferences';
+import { LOG_LEVEL_NAMES, LOGGING } from '../constants';
+import {
+  debugIsOn,
+  setDebugPreference,
+  setLogLevelPreference,
+  storedLogLevel,
+} from '../constants/user-preferences';
 import { buildClientDiagnostics } from '../diagnostics/clientDiagnostics';
 import { getClientLogContext } from '../utils/clientLogContext';
 import { attachEventListener } from '../utils/dom';
+import { logger } from '../utils/Logger';
 import { syncDebugHudVisibility } from './debugHud';
 
 const COPY_LABEL = 'Copy';
@@ -108,6 +115,11 @@ export function applyDebugPreference(enabled: boolean): void {
     details.open = true;
   }
   setHidden(document.querySelector('#debug-identity'), !enabled);
+  const logLevelSelect = document.querySelector<HTMLSelectElement>('#debug-log-level');
+  if (logLevelSelect) {
+    logLevelSelect.value = storedLogLevel() ?? LOGGING.GLOBAL_LOG_LEVEL;
+  }
+  logger.applyConfiguredLogLevel();
   syncDebugIdentity();
   syncDebugHudVisibility();
   if (enabled) {
@@ -155,6 +167,15 @@ export function mountDebugIdentity(): void {
   const checkbox = document.querySelector<HTMLInputElement>('#debugPref');
   attachEventListener(checkbox, 'change', () => {
     applyDebugPreference(Boolean(checkbox?.checked));
+  });
+
+  const logLevelSelect = document.querySelector<HTMLSelectElement>('#debug-log-level');
+  attachEventListener(logLevelSelect, 'change', () => {
+    const level = LOG_LEVEL_NAMES.find((name) => name === logLevelSelect?.value);
+    if (level) {
+      setLogLevelPreference(level);
+      logger.applyConfiguredLogLevel();
+    }
   });
 
   const playerInput = document.querySelector<HTMLInputElement>('#debug-player-id');

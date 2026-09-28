@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-
+import { LOGGING } from '../../../src/constants';
 import { debugIsOn, LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 import {
   applyDebugPreference,
@@ -8,6 +8,8 @@ import {
 } from '../../../src/ui/debugIdentity';
 import { setPlayView } from '../../../src/ui/uiUtils';
 import { getClientLogContext } from '../../../src/utils/clientLogContext';
+import { logger } from '../../../src/utils/Logger';
+import { LogLevel } from '../../../src/utils/logLevel';
 import { resetSafeStorage } from '../../../src/utils/safeStorage';
 
 const JOINED_ID = 'client-joined-ship';
@@ -40,6 +42,8 @@ beforeEach(() => {
   resetDebugIdentityForTests();
   resetSafeStorage();
   localStorage.removeItem(LOCAL_STORAGE_KEYS.debugOn);
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.debugLogLevel);
+  logger.applyConfiguredLogLevel();
   document.body.classList.remove('debug-on', 'in-play');
   setPlayView(false);
   debugCheckbox().checked = false;
@@ -119,4 +123,27 @@ test('a joined playerId is the copyable Debug value agents filter in Railway log
   await vi.waitFor(() => {
     expect(writeText).toHaveBeenCalledWith(JOINED_ID);
   });
+});
+
+test('ops raise the client log level from Advanced Debug without a code change', () => {
+  applyDebugPreference(false);
+  const defaultLevel = logger.getLogLevel();
+  applyDebugPreference(true);
+  const select = document.querySelector<HTMLSelectElement>('#debug-log-level');
+  if (!select) {
+    throw new Error('expected #debug-log-level');
+  }
+  expect(select.value).toBe(LOGGING.GLOBAL_LOG_LEVEL);
+
+  select.value = 'debug';
+  select.dispatchEvent(new Event('change'));
+  expect(logger.getLogLevel()).toBe(LogLevel.DEBUG);
+  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugLogLevel)).toBe('debug');
+
+  applyDebugPreference(false);
+  expect(logger.getLogLevel()).toBe(defaultLevel);
+
+  applyDebugPreference(true);
+  expect(select.value).toBe('debug');
+  expect(logger.getLogLevel()).toBe(LogLevel.DEBUG);
 });

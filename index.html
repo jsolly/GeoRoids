@@ -101,6 +101,16 @@
             </div>
             <div id="debug-identity" class="debug-identity" hidden>
               <div>
+                <label class="debug-id-label" for="debug-log-level">Log level</label>
+                <select id="debug-log-level" class="debug-id-input" aria-describedby="debug-log-level-hint">
+                  <option value="error">Error</option>
+                  <option value="warn">Warn</option>
+                  <option value="info">Info</option>
+                  <option value="debug">Debug</option>
+                </select>
+                <p id="debug-log-level-hint" class="debug-id-hint">This browser only. Debug is verbose and can stutter play.</p>
+              </div>
+              <div>
                 <label class="debug-id-label" for="debug-player-id">Player ID</label>
                 <div class="debug-id-row">
                   <input

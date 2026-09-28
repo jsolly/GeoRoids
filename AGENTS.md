@@ -4,12 +4,13 @@
 
 Ship profile: `vercel-static`
 
-**Integration: branch → PR → merge on green `CI / ci`.** `/ship` opens the PR and merges it once `ci` passes on the head — native auto-merge where the base branch's ruleset requires `ci`, otherwise a head-pinned manual squash (`~/code/dotagents/skills/ship/references/git-discipline.md` → Server-side gate). Agents never push to `main`, change rulesets, or admin-merge. Direct push to `main` is break-glass only.
+**Integration: branch → PR → merge on green `CI / ci`.** `/ship` opens the PR and merges it once `ci` passes on the head — native auto-merge where the base branch's ruleset requires `ci`, otherwise a head-pinned manual squash (`~/code/dotagents/skills/ship/references/git-discipline.md` → Server-side gate). Agents never push to `main`, change rulesets, or admin-merge.
 
 Verify the active branch immediately before committing and pushing. The
 `.git-hooks/pre-push` hook checks the actual destination ref and blocks direct
-`main` updates. Only an explicitly authorized emergency may set
-`GEOROIDS_BREAK_GLASS_PUSH=1`; routine `/ship` runs must use a feature branch.
+`main` updates. `GEOROIDS_BREAK_GLASS_PUSH=1` is John's escape hatch for an
+emergency he explicitly authorizes; agents never set it, and every `/ship` run
+uses a feature branch.
 
 GitHub protects `main`, including administrators: changes require a PR, an
 up-to-date branch, and the GitHub Actions `ci` check. Force pushes and branch

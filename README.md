@@ -75,7 +75,7 @@ Verify the deployed commit using each service's `x-release-id` header. Full depl
 
 The recovered reference sheets, canonical vector assets, palette and provenance are indexed in [georoids-art/README.md](georoids-art/README.md). Runtime ship, EO satellite and mineral geometry generates the matching SVG assets.
 
-Contributions use topic branches and pull requests with green `CI / ci`; direct pushes to `main` are reserved for emergencies. Use Conventional Commits with a scope and include relevant validation.
+Contributions use topic branches and pull requests that merge on green `CI / ci`; direct pushes to `main` are reserved for an emergency the maintainer explicitly authorizes. Use Conventional Commits with a scope and include relevant validation.
 
 [MIT license](LICENSE)
 

@@ -175,9 +175,8 @@ The workflow also writes the full `GeoRoids wiki draft snapshot: <draft-sha>`
 marker into the squash commit body. The marker lets a later publish distinguish
 the last publisher snapshot from an independent main edit or rollback. The merge
 remains subject to protected `main` and its required `CI / ci` check.
-The publisher-owned `codex/wiki-publish/*` branches are excluded from the
-general `auto-merge.yml` workflow, so one workflow owns each snapshot PR. Human
-PRs continue to use the general auto-merge path.
+The publisher owns the merge of each `codex/wiki-publish/*` snapshot PR. Human
+and agent PRs merge through `/ship` instead.
 
 ## Recover from a failed publish
 

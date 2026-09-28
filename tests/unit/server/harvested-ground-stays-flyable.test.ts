@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { ServerClock } from '../../../server/core/ServerClock';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { WORLD } from '../../../shared/world';
@@ -49,7 +50,7 @@ function writeCompletedSectors(path: string, completedSectors: unknown): void {
   }
 }
 
-test('an old completed-sector list does not wall harvested ground or refill it', () => {
+test('an old completed-sector list neither walls harvested ground nor refills it on restart', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-harvested-ground-'));
   const path = join(directory, 'world.sqlite');
   const now = Date.now();
@@ -82,7 +83,9 @@ test('an old completed-sector list does not wall harvested ground or refill it',
 
     writeCompletedSectors(path, ['1,0']);
     store = new WorldStore(path);
-    engine = new GameEngine(seed, undefined, new InlineWorldPersistence(store));
+    // A frozen clock keeps regrowth intervals from elapsing on a slow machine.
+    const clock = new ServerClock({ wallNow: () => now, monotonicNow: () => 0 });
+    engine = new GameEngine(seed, clock, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const outside = { x: 1_980, y: 800 };
     const pilot = engine.addPlayer('pilot', 'Pilot', socket, outside);
@@ -124,7 +127,7 @@ test('an old completed-sector list does not wall harvested ground or refill it',
     engine.revealArea({ x: 2_500, y: 200 }, 100);
     engine.checkpointWorld();
     // Only the additive belt rollout may populate this old harvest tombstone.
-    // Ordinary harvested deposits remain absent; no extra rows are tolerated.
+    // A restart is not a refill: ordinary slots regrow only as intervals pass.
     expect(
       store
         .loadSector('1,0')

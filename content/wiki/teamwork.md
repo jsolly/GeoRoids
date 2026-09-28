@@ -3,7 +3,7 @@ title: Teamwork
 category: Systems
 summary: Every player shares one crew. Scan, tow, and deliver together.
   Direct weapons and collisions leave teammates unharmed; bounced lasers
-  become ricochets. Harvested ground stays open for later expeditions.
+  become ricochets. Harvested fields regrow while the crew is away.
 order: 140
 related:
   - content/wiki/scout.md
@@ -32,7 +32,7 @@ Town Square starts lit; Scouts spend score to build outward through dark furnace
 
 ## Persistent world
 
-Exploration, built furnaces, and harvested deposits survive server restarts until the expedition resets. Empty ground stays open for travel, so follow the chart toward fresh resources.
+Exploration, built furnaces, and the asteroid field survive server restarts until the expedition resets. Harvested deposits regrow out of sight, so a mined field is worth revisiting.
 
 ## Build the settlement
 

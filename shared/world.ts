@@ -6,14 +6,14 @@ export const WORLD = {
   sectorSize: 2_000,
   interestRadius: 2_800,
   minimapRadius: 1_800,
-  /** Current deterministic field width. Keep legacy slots stable during migrations. */
-  depositsPerSector: 72,
-  /** Slots present in worlds generated before the density increase. */
-  legacyDepositsPerSector: 24,
-  /** Persisted marker for the additive sector migration. */
-  asteroidDensityVersion: 2,
-  /** One-time wake-up of saved deposits for the mostly drifting field. */
-  asteroidMotionVersion: 1,
+  /**
+   * Snapshots carry asteroids only inside this circle: the minimap radar plus
+   * a margin for rocks crossing its edge. A scanning pilot's zoomed-out camera
+   * gets the interestRadius square; sectors always wake at interestRadius.
+   */
+  asteroidInterestRadius: 1_950,
+  /** Awake sectors whose rock set is unchanged persist drift every Nth checkpoint. */
+  driftFlushCheckpoints: 5,
   /** Saved worlds with a different generation reset instead of loading stale progress. */
   generation: 1,
   spawnClusterRadius: 150,
@@ -59,5 +59,30 @@ export function nearbyWorldRows<T extends { position: Position }>(
     (row) =>
       Math.abs(row.position.x - center.x) <= WORLD.interestRadius &&
       Math.abs(row.position.y - center.y) <= WORLD.interestRadius
+  );
+}
+
+/** Half-width of the square that bounds a pilot's asteroid rows. */
+export function asteroidReach(scanning: boolean) {
+  return scanning ? WORLD.interestRadius : WORLD.asteroidInterestRadius;
+}
+
+/**
+ * Asteroids a client can draw on its flight view or minimap radar. A running
+ * Mineral Scan zooms the camera out past the radar, so a scanning pilot gets
+ * the full interest square for the pulse.
+ */
+export function nearbyAsteroidRows<T extends { position: Position }>(
+  rows: readonly T[],
+  center: Position,
+  scanning = false
+): T[] {
+  if (scanning) {
+    return nearbyWorldRows(rows, center);
+  }
+  return rows.filter(
+    (row) =>
+      Math.hypot(row.position.x - center.x, row.position.y - center.y) <=
+      WORLD.asteroidInterestRadius
   );
 }

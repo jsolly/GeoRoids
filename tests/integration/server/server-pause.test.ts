@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('a depleted field stays empty across the last departure and the next join', () => {
+test('a stripped field does not refill across the last departure and an immediate rejoin', () => {
   const engine = new GameEngine(731);
   try {
     engine.updatePauseState();

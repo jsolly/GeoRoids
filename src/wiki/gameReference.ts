@@ -28,7 +28,16 @@ import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
-import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
+import {
+  DAMAGE,
+  DEPOSIT_FIELD,
+  GAME,
+  LASER,
+  ROID,
+  SATELLITE_PICKUP,
+  SHIP,
+  SHOCKWAVE,
+} from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
@@ -151,7 +160,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Field and material values',
       paragraphs: [
-        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Fresh interior sectors have ${Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} stationary deposits and ${WORLD.depositsPerSector - Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} drifting deposits. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.DRIFT_SPEED_MAX * GAME.FPS).toFixed(1)} world units per second. Ice, rubble, and crystal have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. A colossal deposit is size ${ROID.COLOSSAL_SIZE} with ${colossalMiningHealth()} mining health.`,
+        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Rich fields hold up to ${DEPOSIT_FIELD.PEAK_DEPOSITS} deterministic deposits per sector and quiet voids about ${DEPOSIT_FIELD.VOID_DEPOSITS}; within ${DEPOSIT_FIELD.LAUNCH_CALM_INNER.toLocaleString('en-US')} units of launch the field stays calm and has no fast drifters, and ordinary deposits keep clear of the belt lanes; ${Math.round(DEPOSIT_FIELD.STATIONARY_FRACTION_VOID * 100)}% of void deposits and ${Math.round(DEPOSIT_FIELD.STATIONARY_FRACTION_PEAK * 100)}% of rich-field deposits are stationary. Deposit sizes range from ${ROID.DEPOSIT_SIZE_MIN} to ${ROID.DEPOSIT_SIZE_MAX}. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.SERVER_VELOCITY_MAX * GAME.FPS).toFixed(1)} world units per second; small rocks drift and spin faster. Every ${DEPOSIT_FIELD.REGROWTH_INTERVAL_MS / 1000} seconds each nearby sector regrows ${Math.round(DEPOSIT_FIELD.REGROWTH_FRACTION * 100)}% of its missing deposits (at least one), never within ${DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE.toLocaleString('en-US')} units of a pilot or probe along either axis; a sleeping sector catches up when a pilot returns. Ice, rubble, and crystal have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * ROID.METAL_HITS}. A colossal deposit is size ${ROID.COLOSSAL_SIZE} with ${colossalMiningHealth()} mining health.`,
       ],
     },
     {
@@ -235,7 +244,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Shared field values',
       paragraphs: [
-        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Scout ${EXPLORATION_RANGE.scout} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Scout scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited region with no asteroids left stays empty, and ships can still fly through it.`,
+        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Scout ${EXPLORATION_RANGE.scout} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Scout scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. Mined regions stay flyable while their harvested deposits regrow out of sight.`,
         `Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}. The next settlement tier costs the current level times ${settlementRecipe(1).points} banked deliveries, ${settlementRecipe(1).resources.ice} ice, ${settlementRecipe(1).resources.metal} metal, ${settlementRecipe(1).resources.rubble} rubble, and ${settlementRecipe(1).resources.crystal} crystal. All five requirements must be met; surplus carries forward.`,
         `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${furnaceLots(1).length} furnace lots sit in the first band, then ${furnaceLots(2).length} and ${furnaceLots(3).length} farther lots scattered through outer bands. A Scout builds the next dark foundation with their own score once its inward parent lot is burning and that score covers ${furnaceCost(1)}, ${furnaceCost(2)}, or ${furnaceCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Scout receives the size-scaled material reward. Size-25 base values are ice ${furnaceReward({ id: 'reference', ore: 'ice', material: 'ice', size: 25 })}, metal ${furnaceReward({ id: 'reference', ore: 'metal', material: 'metal', size: 25 })}, and rubble ${furnaceReward({ id: 'reference', ore: 'rubble', material: 'rubble', size: 25 })}. The Town Square store sells level-gated placeholders with no gameplay effect.`,
       ],

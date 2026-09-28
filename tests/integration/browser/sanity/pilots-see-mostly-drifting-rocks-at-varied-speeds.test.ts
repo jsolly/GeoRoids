@@ -75,7 +75,7 @@ test.each([
     });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#asteroids`);
     await page.locator('.game-reference summary').click();
-    await page.getByText('Fresh interior sectors have', { exact: false }).waitFor();
+    await page.getByText('Rich fields hold up to', { exact: false }).waitFor();
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`drifting-roids-wiki-${viewport.width}.png`),
       fullPage: true,

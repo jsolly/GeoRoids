@@ -385,6 +385,7 @@ export class GameInteractions {
       y: number;
       radius: number;
       id: string;
+      speed: number;
       isCollabTarget?: boolean;
       material?: string;
     }>
@@ -402,6 +403,7 @@ export class GameInteractions {
           y: roid.position.y,
           radius: roid.r,
           id: roid.id,
+          speed: Math.hypot(roid.velocity.x, roid.velocity.y),
           isCollabTarget: roid.isCollabTarget === true,
           ...(roid.material !== undefined ? { material: roid.material } : {}),
         }));

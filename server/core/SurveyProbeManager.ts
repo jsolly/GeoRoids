@@ -6,7 +6,7 @@ import { spiderHitRadius } from '../../shared/terrainSpider';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type { AsteroidData, AsteroidProbe, Position, TerrainSpider } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
-import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
+import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 
 interface SurveyProbeLaunchHost {
   id: string;
@@ -85,7 +85,7 @@ export class SurveyProbeManager {
 
   public launch(
     scout: SurveyProbeLaunchHost,
-    asteroids: readonly AsteroidData[],
+    index: AsteroidSpatialIndex,
     now: number,
     spiders: readonly TerrainSpider[] = []
   ): { host: ProbeHost; probe: AsteroidProbe } | null {
@@ -109,7 +109,6 @@ export class SurveyProbeManager {
       x: start.x + direction.x * SURVEY_PROBE.LAUNCH_RANGE,
       y: start.y + direction.y * SURVEY_PROBE.LAUNCH_RANGE,
     };
-    const index = new AsteroidSpatialIndex(asteroids);
     const candidates = index.query({
       minX: Math.min(start.x, end.x),
       minY: Math.min(start.y, end.y),
@@ -119,7 +118,7 @@ export class SurveyProbeManager {
     const asteroidImpact = findNearestAsteroidImpact(start, end, candidates);
     let impact: { host: ProbeHost; point: Position; distance: number } | undefined;
     if (asteroidImpact) {
-      const host = asteroids.find((candidate) => candidate.id === asteroidImpact.asteroidId);
+      const host = candidates.find((candidate) => candidate.id === asteroidImpact.asteroidId);
       if (host) {
         impact = { host, point: asteroidImpact.point, distance: asteroidImpact.distance };
       }
@@ -202,13 +201,11 @@ export class SurveyProbeManager {
 
   public tick(
     now: number,
-    getAsteroids: () => readonly AsteroidData[],
+    asteroidIndex: () => AsteroidSpatialIndex,
     lookup: HostLookup,
     scan: ProbeScan
   ): void {
     this.prune(now, lookup);
-    let index: AsteroidSpatialIndex | undefined;
-    let asteroids: readonly AsteroidData[] | undefined;
     for (const [asteroidId, host] of this.hosts) {
       const probe = host.probe;
       if (!probe) {
@@ -218,9 +215,7 @@ export class SurveyProbeManager {
       if (now - lastPulseAt < SURVEY_PROBE.PULSE_MS) {
         continue;
       }
-      asteroids ??= getAsteroids();
-      index ??= new AsteroidSpatialIndex(asteroids);
-      this.emitPulse(host, probe, index, scan);
+      this.emitPulse(host, probe, asteroidIndex(), scan);
       this.pulseAt.set(asteroidId, now);
     }
   }
@@ -228,10 +223,10 @@ export class SurveyProbeManager {
   public pulseNow(
     host: ProbeHost,
     probe: AsteroidProbe,
-    asteroids: readonly AsteroidData[],
+    index: AsteroidSpatialIndex,
     scan: ProbeScan
   ): void {
-    this.emitPulse(host, probe, new AsteroidSpatialIndex(asteroids), scan);
+    this.emitPulse(host, probe, index, scan);
   }
 
   private emitPulse(

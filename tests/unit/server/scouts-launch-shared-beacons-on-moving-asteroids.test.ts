@@ -7,6 +7,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
+import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type { AsteroidData } from '../../../shared-types';
@@ -131,32 +132,36 @@ describe('authoritative Scout probes', () => {
     const near = asteroidAt('near-host', { x: 300, y: 0 });
     const far = asteroidAt('far-host', { x: 500, y: 0 });
 
-    expect(manager.launch(pilot, [near, far], 1_000)).toMatchObject({ host: near });
+    expect(manager.launch(pilot, new AsteroidSpatialIndex([near, far]), 1_000)).toMatchObject({
+      host: near,
+    });
     expect(far.probe).toBeUndefined();
 
     pilot.abilityCooldownFrames = 0;
-    expect(manager.launch(pilot, [near], 1_001)).toBeNull();
+    expect(manager.launch(pilot, new AsteroidSpatialIndex([near]), 1_001)).toBeNull();
 
     pilot.position = { x: 0, y: 1_000 };
     pilot.abilityCooldownFrames = 0;
     const outside = asteroidAt('outside-launch-range', { x: 800, y: 1_000 });
-    expect(manager.launch(pilot, [outside], 1_002)).toBeNull();
+    expect(manager.launch(pilot, new AsteroidSpatialIndex([outside]), 1_002)).toBeNull();
 
     pilot.position = { x: 1_800, y: 1_000 };
     pilot.abilityCooldownFrames = 0;
     const distantHost = asteroidAt('distant-host', { x: 2_100, y: 1_000 });
-    expect(manager.launch(pilot, [distantHost], 1_003)).toMatchObject({ host: distantHost });
+    expect(manager.launch(pilot, new AsteroidSpatialIndex([distantHost]), 1_003)).toMatchObject({
+      host: distantHost,
+    });
   });
 
   test('idle pulse ticks do not materialize the asteroid source before a due pulse', () => {
     const manager = new SurveyProbeManager();
     const pilot = probePilot({ x: 0, y: 0 });
     const host = asteroidAt('lazy-host', { x: 300, y: 0 });
-    expect(manager.launch(pilot, [host], 1_000)).not.toBeNull();
+    expect(manager.launch(pilot, new AsteroidSpatialIndex([host]), 1_000)).not.toBeNull();
     let materializations = 0;
     const source = () => {
       materializations++;
-      return [host];
+      return new AsteroidSpatialIndex([host]);
     };
     const lookup = (asteroidId: string) => (asteroidId === host.id ? host : undefined);
 

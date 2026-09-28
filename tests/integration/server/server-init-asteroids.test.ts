@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it as test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
-import { nearbyWorldRows } from '../../../shared/world';
+import { nearbyAsteroidRows } from '../../../shared/world';
 import type { AsteroidData, Position } from '../../../shared-types';
 
 import { WireClient, type WireMessage } from '../../support/wireClient';
@@ -184,7 +184,7 @@ describe('Server initAsteroids sync', () => {
 
     expect(secondBatch).toEqual(firstBatch);
     expect(
-      nearbyWorldRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 }).map(
+      nearbyAsteroidRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 }).map(
         (asteroid) => asteroid.id
       )
     ).toEqual(firstBatch.map((asteroid) => asteroid.id));
@@ -220,7 +220,7 @@ describe('Server initAsteroids sync', () => {
     const lateBatch = await requestAsteroids(playerTwo, 'motion-two');
     const liveAfterJoin = snapshotField(current);
 
-    expect(lateBatch).toEqual(nearbyWorldRows(liveAfterJoin, { x: 0, y: 0 }));
+    expect(lateBatch).toEqual(nearbyAsteroidRows(liveAfterJoin, { x: 0, y: 0 }));
     const lateTracked = lateBatch.find((asteroid) => asteroid.id === tracked.id);
     if (!lateTracked) {
       throw new Error(`Late batch omitted tracked asteroid ${tracked.id}`);
@@ -252,7 +252,7 @@ describe('Server initAsteroids sync', () => {
     expect(current.gameEngine.getPlayerCount()).toBe(1);
     expect(current.gameEngine.isGamePaused()).toBe(false);
     expect(
-      nearbyWorldRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 })
+      nearbyAsteroidRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 })
         .map((asteroid) => asteroid.id)
         .sort((left, right) => left.localeCompare(right))
     ).toEqual(

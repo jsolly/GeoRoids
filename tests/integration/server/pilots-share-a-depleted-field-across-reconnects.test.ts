@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
-import { nearbyWorldRows } from '../../../shared/world';
+import { nearbyAsteroidRows } from '../../../shared/world';
 import { WireClient, type WireMessage } from '../../support/wireClient';
 
 let server: ReturnType<typeof createServerInstance>;
@@ -130,7 +130,7 @@ async function join(id: string, resumeToken?: string): Promise<WireClient> {
   return client;
 }
 
-test('two pilots see a depleted belt stay empty without sending asteroid initialization', async () => {
+test('two pilots watch a stripped field empty out without sending asteroid initialization', async () => {
   const first = await join('belt-pilot-a');
   const second = await join('belt-pilot-b');
   const initial = server.gameEngine.getAllAsteroids();
@@ -157,7 +157,7 @@ test('a pilot briefly disconnects and resumes the same live field while its peer
   const first = await join('rejoin-pilot-a');
   await join('rejoin-pilot-b');
   const originalIds = new Set(server.gameEngine.getAllAsteroids().map((rock) => rock.id));
-  const stationaryIds = nearbyWorldRows(
+  const stationaryIds = nearbyAsteroidRows(
     server.gameEngine.getAllAsteroids(),
     server.gameEngine.getPlayer('rejoin-pilot-a')?.position ?? { x: 0, y: 0 }
   )

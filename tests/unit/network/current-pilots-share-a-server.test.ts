@@ -14,6 +14,7 @@ import {
   SnapshotDecoder,
   SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
+import { nearbyAsteroidRows } from '../../../shared/world';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -245,7 +246,7 @@ describe('current pilots share the production handler and broadcaster', () => {
             Math.abs(row.position.x - viewer.position.x) <= 2800 &&
             Math.abs(row.position.y - viewer.position.y) <= 2800
         );
-      const asteroids = nearby(state.asteroids);
+      const asteroids = nearbyAsteroidRows(state.asteroids, viewer.position);
       return new SnapshotEncoder({
         ...state,
         asteroids,
@@ -942,4 +943,41 @@ describe('current pilots share the production handler and broadcaster', () => {
       ).toBe(actor.position.x);
     }
   );
+  test('a Scout sees scan-edge rocks in snapshots only while the Mineral Scan zooms the camera out', () => {
+    const scout = socket();
+    joinPilot(handler, scout.ws, 'scout');
+    const actor = engine.getPlayer('scout');
+    assert.ok(actor);
+    actor.kitId = 'scout';
+    const edge = {
+      id: 'scan-edge-ice',
+      position: { x: actor.position.x + 2_450, y: actor.position.y },
+      velocity: { x: 0, y: 0 },
+      size: 31,
+      jaggedness: 0.25,
+      rotation: 0,
+      angularVelocity: 0,
+      health: 25,
+      maxHealth: 25,
+      vertices: 6,
+      offsets: [1, 0.76, 1.08, 0.84, 1, 0.72],
+      material: 'ice' as const,
+    };
+    engine.addAsteroid(edge);
+    const latestRockIds = () =>
+      decodedSnapshots(scout)
+        .at(-1)
+        ?.asteroids.map(({ id }) => id) ?? [];
+
+    broadcaster.broadcastGameState();
+    expect(latestRockIds()).not.toContain(edge.id);
+
+    actor.abilityActiveFrames = 30;
+    broadcaster.broadcastGameState();
+    expect(latestRockIds()).toContain(edge.id);
+
+    actor.abilityActiveFrames = 0;
+    broadcaster.broadcastGameState();
+    expect(latestRockIds()).not.toContain(edge.id);
+  });
 });

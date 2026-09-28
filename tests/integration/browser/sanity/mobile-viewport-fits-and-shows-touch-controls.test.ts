@@ -8,6 +8,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { placePilotNearContour } from '../../utils/contour-lock';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 import { canvasPoint, readTouchControlState } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
@@ -234,6 +235,7 @@ test(
     expect(chrome.contourLock?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.contourLock?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
 
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
     await placePilotNearContour(page, game);
     expect((await readTouchControlState(page)).contourLocked).toBe(false);
     await page.locator('#touch-contour-lock').tap();

@@ -1,7 +1,12 @@
 import type { Page } from 'playwright';
 import type { GameInteractions } from './game-interactions';
 
-/** Place the pilot beside an actual rendered contour, using the normal server test route. */
+/**
+ * Place the pilot beside an actual rendered contour, using the normal server
+ * test route. A contour-locked ship is not spawn-protected, so callers first
+ * arrange the `empty` crew fixture, which removes every asteroid and stops
+ * regrowth for the scenario.
+ */
 export async function placePilotNearContour(page: Page, game: GameInteractions): Promise<void> {
   const capture = await page.evaluateHandle<
     typeof import('../../../src/physics/terrain/contourCapture')

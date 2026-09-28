@@ -6,7 +6,7 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
-import { nearbyWorldRows } from '../../../shared/world';
+import { nearbyAsteroidRows, nearbyWorldRows } from '../../../shared/world';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
@@ -121,7 +121,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   const second = await pilot('second');
   const expectedWorld = (position: { x: number; y: number }) => {
     const gameState = engine.getGameState();
-    const asteroids = nearbyWorldRows(gameState.asteroids, position);
+    const asteroids = nearbyAsteroidRows(gameState.asteroids, position);
     const asteroidIds = new Set(asteroids.map((asteroid) => asteroid.id));
     return new SnapshotEncoder({
       ...gameState,

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
 import {
@@ -101,7 +102,7 @@ describe('Colossal asteroids need a crew', () => {
       .getAllAsteroids()
       .filter((rock) => rock.id.startsWith(`deposit-${seed}-${hosted.x}-${hosted.y}-`));
     const colossal = rocks.filter((rock) => isColossalAsteroid(rock.size));
-    expect(rocks).toHaveLength(WORLD.depositsPerSector);
+    expect(rocks).toHaveLength(sectorDeposits(seed, hosted.x, hosted.y).length);
     expect(colossal).toHaveLength(1);
     expect(colossal[0]?.id).toMatch(
       new RegExp(`^deposit-${seed}-${hosted.x}-${hosted.y}-\\d+$`, 'u')

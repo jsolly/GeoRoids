@@ -4,9 +4,10 @@ import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
-import { nearbyWorldRows } from '../../shared/world';
+import { asteroidReach, nearbyAsteroidRows } from '../../shared/world';
 import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
+import { isActiveScanner } from '../../src/entities/ship/surveyScan';
 import { sanitizePlayerName } from '../../src/utils/playerName';
 import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
@@ -668,9 +669,17 @@ export class MessageHandler {
       return;
     }
 
-    const existingAsteroids = nearbyWorldRows(
-      this.gameEngine.getAllAsteroids(),
-      socketPlayer.position
+    const scanning = isActiveScanner(socketPlayer);
+    const reach = asteroidReach(scanning);
+    const existingAsteroids = nearbyAsteroidRows(
+      this.gameEngine.getAsteroidSpatialIndex().query({
+        minX: socketPlayer.position.x - reach,
+        minY: socketPlayer.position.y - reach,
+        maxX: socketPlayer.position.x + reach,
+        maxY: socketPlayer.position.y + reach,
+      }),
+      socketPlayer.position,
+      scanning
     );
     this.broadcaster.sendToWebSocket(ws, {
       type: 'asteroidCreateBatch',

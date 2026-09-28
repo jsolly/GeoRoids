@@ -1,10 +1,13 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['tests/viteSetup.ts'],
     globals: true,
+    // Vitest does not read .gitignore; keep default discovery out of nested
+    // Claude desktop worktrees (other branches' test files).
+    exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],

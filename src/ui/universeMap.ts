@@ -1392,3 +1392,35 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
 export function closeUniverseMap(): void {
   closeMap();
 }
+
+/** Unlabelled chart layers at an arbitrary scale, centered on `center`, for the spawn fly-in. */
+export function drawSpawnChart(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  center: Position,
+  scale: number
+): void {
+  const size = Math.min(width, height);
+  const frame: MapFrame = {
+    x: (width - size) / 2,
+    y: (height - size) / 2,
+    size,
+    scale,
+    zoom: (scale * WORLD_DIAMETER) / size,
+  };
+  const exploration = getWorldExploration();
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.scale(scale, scale);
+  context.translate(-center.x, -center.y);
+  drawMapBackground(context, frame);
+  drawLitFurnacePipes(context, frame);
+  drawDiscoveredBelt(context, frame, exploration);
+  for (const asset of getWorldMapAssets()) {
+    if (chartShowsAsset(asset, exploration)) {
+      drawMapAsset(context, asset, frame, false);
+    }
+  }
+  context.restore();
+}

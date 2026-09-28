@@ -60,6 +60,7 @@ import { syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
+import { playSpawnFlyIn } from '../ui/spawnFlyIn';
 import { syncTownStoreChrome } from '../ui/townStore';
 import { setPlayView } from '../ui/uiUtils';
 import { bindUniverseMapField } from '../ui/universeMap';
@@ -200,6 +201,7 @@ export class GameController {
       PlayerNetwork.getInstance().startNetworkUpdates();
 
       playRespawn();
+      playSpawnFlyIn();
       window.dispatchEvent(new CustomEvent('gameStart'));
     } catch (error) {
       clientPerformance.joinFailed();

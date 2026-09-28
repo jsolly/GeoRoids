@@ -1,0 +1,80 @@
+@layer georoids {
+  .field-hint {
+    position: fixed;
+    z-index: 12;
+    left: 50%;
+    max-width: calc(100vw - 32px);
+    transform: translateX(-50%);
+    color: #ffe29a;
+    font: 700 12px / 1.6 var(--font-mono, monospace);
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    /* Stay rendered while fading out, then leave the hit-test and focus order. */
+    transition:
+      opacity 400ms ease-out,
+      visibility 0s linear 400ms;
+  }
+
+  .field-hint.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 150ms ease-out,
+      visibility 0s;
+  }
+
+  .field-hint-announcer {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .field-hint button,
+  .field-hint span {
+    display: block;
+    padding: 10px 14px;
+    border: 1px solid #ffe29a;
+    border-radius: 6px;
+    background: rgb(0 0 17 / 92%);
+    color: inherit;
+    font: inherit;
+  }
+
+  .field-hint button {
+    min-height: 44px;
+    pointer-events: auto;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  .field-hint button:focus-visible {
+    outline: 2px solid #ffe29a;
+    outline-offset: 3px;
+  }
+
+  .field-hint [hidden] {
+    display: none;
+  }
+
+  /* Footprint prompts share one slot below the ship; they never overlap. */
+  #furnace-travel-prompt,
+  #furnace-build-hint {
+    top: min(calc(50% + 84px), calc(100% - max(20px, env(safe-area-inset-bottom, 0px)) - 112px));
+  }
+
+  #cargo-full-hint {
+    top: max(calc(50% - 150px), calc(env(safe-area-inset-top, 0px) + 96px));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .field-hint,
+    .field-hint.is-visible {
+      transition: none;
+    }
+  }
+}

@@ -11,6 +11,10 @@ import { WorldStore } from '../../../server/world/WorldStore';
 import { EQUIPMENT_DROPS, EQUIPMENT_IDS, isEquipmentId } from '../../../shared/equipment';
 import { GROWTH } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { GameServerWorld, type Pilot } from '../scenarios/support/gameServerWorld';
+
+/** Survey Probe is Scout-only, so a Hauler salvages just these. */
+const HAULER_TOOLS = ['resource_tap', 'boost_coupling'];
 
 test('fresh pilots can use their starter tool but cannot equip rare tools before collecting them', () => {
   const engine = new GameEngine(82);
@@ -54,14 +58,49 @@ test('a duplicate tool stays available for a different pilot', () => {
   expect(bob.equipment).toEqual(['resource_tap']);
 });
 
-test('two identical tools collected in the same frame unlock once and leave the spare', () => {
+test('two identical tools collected in the same frame unlock once and leave both for others', () => {
   const engine = new GameEngine(82);
   const actor = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), undefined, 'hauler');
   engine.dropEquipmentAt(actor.position, 'resource_tap');
   engine.dropEquipmentAt(actor.position, 'resource_tap');
   expect(engine.collectLoot()).toHaveLength(1);
   expect(actor.equipment).toEqual(['resource_tap']);
-  expect(engine.getLoot().filter((loot) => loot.kind === 'resource_tap')).toHaveLength(1);
+  expect(engine.getLoot().filter((loot) => loot.kind === 'resource_tap')).toHaveLength(2);
+});
+
+test('each Hauler takes its own Boost Coupling from one drop while a Scout never sees it', () => {
+  const world = new GameServerWorld();
+  try {
+    const maya = world.join('Maya Okafor', { x: 0, y: 0 }, { kitId: 'hauler' });
+    const theo = world.join('Theo Lindqvist', { x: 0, y: 0 }, { kitId: 'hauler' });
+    const rin = world.join('Rin Takahashi', { x: 0, y: 0 }, { kitId: 'scout' });
+    const at = { ...world.entity(maya).position };
+    world.entity(theo).position = { ...at };
+    world.entity(rin).position = { ...at };
+    const drop = world.engine.dropEquipmentAt(at, 'boost_coupling');
+    world.broadcastGameState();
+    const seen = (pilot: Pilot) => world.snapshot(pilot).loot.map((loot) => loot.id);
+    expect(seen(maya)).toContain(drop.id);
+    expect(seen(theo)).toContain(drop.id);
+    expect(seen(rin)).not.toContain(drop.id);
+
+    world.engine.collectLoot();
+    world.engine.collectLoot();
+    world.engine.collectLoot();
+    expect(world.entity(maya).equipment).toEqual(['boost_coupling']);
+    expect(world.entity(theo).equipment).toEqual(['boost_coupling']);
+    expect(world.entity(rin).equipment ?? []).toEqual([]);
+    world.broadcastGameState();
+    expect(seen(maya)).not.toContain(drop.id);
+    expect(seen(theo)).not.toContain(drop.id);
+    // Pickup news stays private too: only each collector heard its own pickup.
+    const pickups = (pilot: Pilot) =>
+      pilot.socket.received('lootCollected').map((message) => message.data);
+    expect(pickups(rin)).toEqual([]);
+    expect(pickups(maya)).toEqual([expect.objectContaining({ collectorId: maya.id })]);
+  } finally {
+    world.dispose();
+  }
 });
 
 test('salvaged tools survive an ordinary death, reconnect, and a server restart', () => {
@@ -77,6 +116,8 @@ test('salvaged tools survive an ordinary death, reconnect, and a server restart'
       engine.dropEquipmentAt(actor.position, equipment);
     }
     engine.collectLoot();
+    engine.collectLoot();
+    expect(actor.equipment).toEqual(HAULER_TOOLS);
     actor.silk = 12;
     actor.color = '#FBBF24';
     actor.score = 400;
@@ -84,19 +125,19 @@ test('salvaged tools survive an ordinary death, reconnect, and a server restart'
     expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
     const continued = engine.resumePilot(registered.resumeToken, new RecordingSocket(), 'hauler');
     assert(continued.ok);
-    expect(continued.actor.equipment).toEqual([...EQUIPMENT_IDS]);
+    expect(continued.actor.equipment).toEqual(HAULER_TOOLS);
     expect(continued.actor).toMatchObject({ silk: 12, score: 400, color: '#FBBF24' });
     expect(engine.setHaulerUtility(actor.id, 'boost_coupling')).toBe(true);
     engine.removePlayer(actor.id);
     const reconnected = engine.resumePilot(continued.resumeToken, new RecordingSocket(), 'scout');
     assert(reconnected.ok);
-    expect(reconnected.actor.equipment).toEqual([...EQUIPMENT_IDS]);
-    expect(engine.setScoutUtility(actor.id, 'survey_probe')).toBe(true);
+    expect(reconnected.actor.equipment).toEqual(HAULER_TOOLS);
+    expect(engine.setScoutUtility(actor.id, 'survey_probe')).toBe(false);
     engine.checkpointWorld();
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
     const resumed = restarted.resumePilot(reconnected.resumeToken, new RecordingSocket(), 'hauler');
     assert(resumed.ok);
-    expect(resumed.actor.equipment).toEqual([...EQUIPMENT_IDS]);
+    expect(resumed.actor.equipment).toEqual(HAULER_TOOLS);
     expect(resumed.actor).toMatchObject({ silk: 12, score: 400, color: '#FBBF24' });
     expect(restarted.setHaulerUtility(actor.id, 'resource_tap')).toBe(true);
   } finally {
@@ -202,6 +243,7 @@ test('death preserves bank and equipment through a restart', () => {
       engine.dropEquipmentAt(actor.position, equipment);
     }
     engine.collectLoot();
+    engine.collectLoot();
     actor.silk = 20;
     actor.score = 900;
     actor.color = '#FBBF24';
@@ -211,7 +253,7 @@ test('death preserves bank and equipment through a restart', () => {
     expect(actor).toMatchObject({
       score: 900,
       silk: 20,
-      equipment: [...EQUIPMENT_IDS],
+      equipment: HAULER_TOOLS,
       color: '#FBBF24',
       haulerUtility: 'resource_tap',
     });
@@ -219,7 +261,7 @@ test('death preserves bank and equipment through a restart', () => {
     expect(store.loadPilots()[0]).toMatchObject({
       score: 900,
       silk: 20,
-      equipment: [...EQUIPMENT_IDS],
+      equipment: HAULER_TOOLS,
     });
     expect(store.loadPilots()[0]?.hullColor).toBe('#FBBF24');
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
@@ -228,7 +270,7 @@ test('death preserves bank and equipment through a restart', () => {
     expect(resumed.actor).toMatchObject({
       score: 900,
       silk: 20,
-      equipment: [...EQUIPMENT_IDS],
+      equipment: HAULER_TOOLS,
       color: '#FBBF24',
     });
     expect(restarted.setHaulerUtility(actor.id, 'resource_tap')).toBe(true);
@@ -272,4 +314,13 @@ test('a dead saved flight retains bank, equipment, paint, and silk', () => {
   } finally {
     store.close();
   }
+});
+
+test('a tool left behind for other pilots still expires with the nest lifetime', () => {
+  const loot = new LootManager(new RNGService(82));
+  const drop = loot.spawnEquipment({ x: 400, y: 300 }, 1_000, 'boost_coupling');
+  loot.expire(1_000 + EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES - 1);
+  expect(loot.getAll().map((item) => item.id)).toContain(drop.id);
+  loot.expire(1_000 + EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES);
+  expect(loot.getAll().map((item) => item.id)).not.toContain(drop.id);
 });

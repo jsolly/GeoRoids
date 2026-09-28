@@ -85,6 +85,17 @@ test('near a dark furnace lot the Scout ability chrome becomes Build', () => {
   });
   expect(far.label).toBe('SCAN');
   expect(far.name).toBe('Mineral scan');
+  // Beside the grate but off it: the server would reject a build, so E stays Scan.
+  const beside = readAbilityChrome({
+    kitId: 'scout',
+    scoutUtility: 'mineral_scan',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    position: { x: furnace.position.x + furnace.radius + 40, y: furnace.position.y },
+  });
+  expect(beside.label).toBe('SCAN');
 });
 
 test('Survey Probe changes the mobile ability label, name, and cooldown scale', () => {

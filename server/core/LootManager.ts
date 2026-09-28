@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { cargoCapacity, ECONOMY } from '../../shared/economy';
-import { EQUIPMENT_DROPS, EQUIPMENT_IDS, isEquipmentId } from '../../shared/equipment';
+import {
+  canCollectEquipment,
+  EQUIPMENT_DROPS,
+  EQUIPMENT_IDS,
+  isEquipmentId,
+} from '../../shared/equipment';
 import {
   addLootMagnetPull,
   canCollectLoot,
@@ -233,7 +238,8 @@ export class LootManager {
       const winner = collectors.find((entity) => {
         if (
           isEquipmentId(drop.kind) &&
-          (entity.equipment?.includes(drop.kind) || claimedEquipment.get(entity.id)?.has(drop.kind))
+          (!canCollectEquipment(entity, drop.kind) ||
+            claimedEquipment.get(entity.id)?.has(drop.kind))
         ) {
           return false;
         }
@@ -252,6 +258,9 @@ export class LootManager {
         const claimed = claimedEquipment.get(winner.id) ?? new Set<EquipmentId>();
         claimed.add(drop.kind);
         claimedEquipment.set(winner.id, claimed);
+        // Each eligible ship takes its own copy; the drop stays for the others.
+        collected.push({ collector: winner, loot: this.toPublic(drop) });
+        continue;
       }
       if (drop.kind === 'points') {
         winner.cargo = Math.min(cargoCapacity(winner.kitId), winner.cargo + (drop.points ?? 0));
@@ -284,7 +293,7 @@ export class LootManager {
         addLootMagnetPull(
           drop,
           liveCollectors
-            .filter((entity) => !entity.equipment?.includes(equipment))
+            .filter((entity) => canCollectEquipment(entity, equipment))
             .map((entity) => entity.position)
         );
       } else {
@@ -346,7 +355,10 @@ export class LootManager {
   }
 
   private enforceCap(): void {
-    const disposable = [...this.loot.values()].filter((drop) => drop.kind !== 'points');
+    // Rare equipment waits out its own lifetime for every eligible ship.
+    const disposable = [...this.loot.values()].filter(
+      (drop) => drop.kind !== 'points' && !isEquipmentId(drop.kind)
+    );
     if (disposable.length <= GROWTH.MAX_LOOT) {
       return;
     }

@@ -18,9 +18,15 @@ beforeEach(() => {
   resetSafeStorage();
   resetHapticsForTests();
   localStorage.removeItem(LOCAL_STORAGE_KEYS.hapticsOn);
+  // Haptics only exist on touch devices.
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(pointer: coarse)',
+    media: query,
+  }));
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   if (typeof originalVibrate === 'function') {
     installVibrate(originalVibrate);
   }

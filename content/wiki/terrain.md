@@ -34,7 +34,7 @@ Each new nest has ten guards and mixed salvage, often including [rare equipment]
 
 ## Guard patrols
 
-Guards chase briefly and return home, while rare roaming hunters pursue farther. A bright red wash on nearby lines marks spiders. A red screen edge means one is hunting you. Killing guards clears that nest for the server session, but collecting its resource does not remove surviving guards.
+Guards chase briefly and return home, while rare roaming hunters pursue farther. Spiders come in small, medium, and large bodies with varied legs and markings; larger ones are easier to hit. A bright red wash on nearby lines marks spiders. A red screen edge means one is hunting you. Killing guards clears that nest for the server session, but collecting its resource does not remove surviving guards.
 
 ## Survive a hunt
 

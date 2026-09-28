@@ -334,11 +334,7 @@ function canLatchBoostedBody(host: AbilityHost, body: AbilityBody): boolean {
   if (!body.boost) {
     return true;
   }
-  if (
-    body.boost.phase !== 'armed' ||
-    haulerUtilityOf(host) !== 'boost_coupling' ||
-    !isColossalAsteroid(abilityBodySize(body))
-  ) {
+  if (haulerUtilityOf(host) !== 'boost_coupling' || !isColossalAsteroid(abilityBodySize(body))) {
     return false;
   }
   const owners = boostOwnerIds(body.boost);
@@ -424,9 +420,6 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
         armed &&
         latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE * 3)
       ) {
-        if (boostOwnerIds(armed).length < asteroidCrewNeeded(abilityBodySize(target))) {
-          return { activated: true, abilityId: 'harpoon' };
-        }
         target.boost = igniteBoost(armed, furnaceHeading(target.position, world?.furnaces));
         host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
       } else if (world) {
@@ -469,14 +462,19 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       if (!host.id) {
         return { activated: false };
       }
-      target.boost =
-        target.boost?.phase === 'armed'
-          ? addBoostOwner(target.boost, host.id)
-          : {
-              phase: 'armed',
-              ownerId: host.id,
-              angle: furnaceHeading(target.position, world?.furnaces),
-            };
+      if (target.boost?.phase === 'burning') {
+        // A late coupling joins the burn instead of holding a latch.
+        target.boost = addBoostOwner(target.boost, host.id);
+        host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
+        return { activated: true, abilityId: 'harpoon' };
+      }
+      target.boost = target.boost
+        ? addBoostOwner(target.boost, host.id)
+        : {
+            phase: 'armed',
+            ownerId: host.id,
+            angle: furnaceHeading(target.position, world?.furnaces),
+          };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;

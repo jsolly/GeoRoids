@@ -1,7 +1,7 @@
 import type { CivicModule, Position } from '../shared-types';
 import {
   civicLot,
-  civicLotWithin,
+  civicLotAt,
   civicModuleName,
   FURNACES,
   nearestFurnace,
@@ -10,8 +10,6 @@ import {
 
 export const FURNACE_BUILD = {
   RADIUS: TOWN_HEARTH.radius,
-  /** World units from a dark lot where Scout E becomes Build. */
-  APPROACH: 220,
   ISSUE: {
     STAND: 'Stand inside a furnace foundation',
     LIT: 'This furnace is already burning',
@@ -19,12 +17,15 @@ export const FURNACE_BUILD = {
   },
 } as const;
 
-/** Scout E builds instead of scan/probe while a dark furnace lot is this close. */
-export function scoutAbilityBuildsAt(
+/**
+ * The one "on a dark furnace footprint" test: the ship's center is inside an
+ * unlit lot. Scout Build, the Hauler hint, and the server build check agree.
+ */
+export function onDarkFurnaceFootprint(
   position: Position,
   isLit: (lotId: string) => boolean
 ): boolean {
-  const lot = civicLotWithin(position, FURNACE_BUILD.APPROACH);
+  const lot = civicLotAt(position);
   return Boolean(lot && !isLit(lot.id));
 }
 

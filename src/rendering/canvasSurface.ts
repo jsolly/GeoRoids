@@ -14,6 +14,9 @@ import { configureRenderQuality } from './renderQuality';
 import { rotateVectorInto, travelCameraRotation } from './travelCamera';
 
 const TOGGLE_STEP_PX = 52;
+/** Time constants for the camera easing out to a wide view and back to flight. */
+const CAMERA_ZOOM_OUT_SECONDS = 0.14;
+const CAMERA_ZOOM_IN_SECONDS = 0.2;
 
 /** Map, Inventory, and Store tops. Short touch screens keep Inventory under the radar. */
 export function playfieldToggleOffsets(
@@ -48,6 +51,10 @@ class CanvasManager {
   private readonly viewport = { width: 1, height: 1 };
   private devicePixelRatio = 1;
   private cameraRotation = 0;
+  private zoom = 1;
+  private zoomUpdatedAt: number | null = null;
+  private readonly screenViewport = { width: 1, height: 1 };
+  private worldLayersZoomed = false;
   private readonly screenPos = { x: 0, y: 0 };
 
   initialize(): void {
@@ -222,6 +229,9 @@ class CanvasManager {
     this.viewport.height = 1;
     this.devicePixelRatio = 1;
     this.cameraRotation = 0;
+    this.zoom = 1;
+    this.zoomUpdatedAt = null;
+    this.worldLayersZoomed = false;
     configureRenderQuality('', false);
   }
 
@@ -277,6 +287,47 @@ class CanvasManager {
     ctx.rotate(this.cameraRotation);
     ctx.scale(scale, scale);
     ctx.translate(-center.x, -center.y);
+  }
+
+  /** Ease the camera toward `target` (1 = flight view, below 1 = zoomed out) in log space. */
+  easeZoomToward(target: number, now: number): void {
+    const dtSeconds = this.zoomUpdatedAt === null ? 0 : (now - this.zoomUpdatedAt) / 1000;
+    this.zoomUpdatedAt = now;
+    const seconds = target < this.zoom ? CAMERA_ZOOM_OUT_SECONDS : CAMERA_ZOOM_IN_SECONDS;
+    const blend = 1 - Math.exp(-Math.min(dtSeconds, 0.1) / seconds);
+    const next = Math.exp(Math.log(this.zoom) + (Math.log(target) - Math.log(this.zoom)) * blend);
+    this.zoom = Math.abs(next - target) < 0.002 ? target : next;
+  }
+
+  /**
+   * World painters keep drawing at scale 1 into a larger virtual viewport; the context
+   * transform shrinks it onto the real screen. Pair with `endWorldLayers` before the HUD.
+   * The zoom is presentation only: update-time rules that read the viewport (laser reach,
+   * contour capture, audio culling) deliberately stay at flight scale during a scan.
+   */
+  beginWorldLayers(ctx: CanvasRenderingContext2D): void {
+    if (this.zoom === 1) {
+      return;
+    }
+    this.worldLayersZoomed = true;
+    this.screenViewport.width = this.viewport.width;
+    this.screenViewport.height = this.viewport.height;
+    this.viewport.width = this.screenViewport.width / this.zoom;
+    this.viewport.height = this.screenViewport.height / this.zoom;
+    ctx.save();
+    ctx.translate(this.screenViewport.width / 2, this.screenViewport.height / 2);
+    ctx.scale(this.zoom, this.zoom);
+    ctx.translate(-this.viewport.width / 2, -this.viewport.height / 2);
+  }
+
+  endWorldLayers(ctx: CanvasRenderingContext2D): void {
+    if (!this.worldLayersZoomed) {
+      return;
+    }
+    this.worldLayersZoomed = false;
+    ctx.restore();
+    this.viewport.width = this.screenViewport.width;
+    this.viewport.height = this.screenViewport.height;
   }
 
   getPlayfieldScale(): number {

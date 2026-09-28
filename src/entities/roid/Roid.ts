@@ -91,7 +91,7 @@ class RoidBelt {
     }
 
     for (const roid of this.roids) {
-      tickAsteroidBoost(roid, worldFurnaces);
+      tickAsteroidBoost(roid, roid.r, worldFurnaces);
       stepAsteroidMotionInto(roid.position, roid.velocity, 1, roid.position, roid.velocity);
     }
   }

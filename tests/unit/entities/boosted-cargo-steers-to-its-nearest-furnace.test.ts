@@ -18,7 +18,7 @@ test.each([
     const furnace = nearestFurnace(position);
     let distance = Infinity;
     for (let frame = 0; frame < 1600; frame++) {
-      tickAsteroidBoost(body);
+      tickAsteroidBoost(body, 40);
       body.position.x += body.velocity.x;
       body.position.y += body.velocity.y;
       expect(Math.hypot(body.velocity.x, body.velocity.y)).toBeLessThanOrEqual(
@@ -40,20 +40,20 @@ test.each([
 test('an armed rock points at its nearest furnace without applying thrust', () => {
   const body = cargo({ x: 150, y: 0 }, 'armed');
   const velocity = { ...body.velocity };
-  tickAsteroidBoost(body);
+  tickAsteroidBoost(body, 40);
   expect(body.boost.angle).toBe(furnaceHeading(body.position));
   expect(body.velocity).toEqual(velocity);
   body.position = { x: -4100, y: 0 };
-  tickAsteroidBoost(body);
+  tickAsteroidBoost(body, 40);
   expect(body.boost.angle).toBe(furnaceHeading(body.position));
 });
 
 test('guidance reacquires the nearest furnace after displacement', () => {
   const body = cargo({ x: 150, y: 0 });
-  tickAsteroidBoost(body);
+  tickAsteroidBoost(body, 40);
   const first = body.boost.angle;
   body.position = { x: -4100, y: 0 };
-  tickAsteroidBoost(body);
+  tickAsteroidBoost(body, 40);
   expect(body.boost.angle).not.toBe(first);
   expect(body.boost.angle).toBe(furnaceHeading(body.position));
 });

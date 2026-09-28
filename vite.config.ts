@@ -10,11 +10,7 @@ const GIT_COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
 /** Hosted platforms may set an empty SHA; `??` does not fall through that. */
 function firstHostedCommitSha(): string | undefined {
-  const candidates = [
-    process.env['VERCEL_GIT_COMMIT_SHA'],
-    process.env['RAILWAY_GIT_COMMIT_SHA'],
-    process.env['GEOROIDS_COMMIT_SHA'],
-  ];
+  const candidates = [process.env['VERCEL_GIT_COMMIT_SHA'], process.env['RAILWAY_GIT_COMMIT_SHA']];
   for (const value of candidates) {
     if (typeof value === 'string' && GIT_COMMIT_SHA_PATTERN.test(value)) {
       return value;
@@ -67,7 +63,6 @@ export default defineConfig(() => {
   define['import.meta.env.VITE_BUILD_TIME'] = JSON.stringify(new Date().toISOString());
 
   // Hosted builds may omit .git; release polling still needs the deployed identity.
-  // CLI /preview deploys are not Git-integration builds, so they set GEOROIDS_COMMIT_SHA.
   const commitHash =
     firstHostedCommitSha() ??
     execFileSync('git', ['rev-parse', 'HEAD'], {

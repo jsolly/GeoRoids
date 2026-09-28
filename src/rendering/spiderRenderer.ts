@@ -1,5 +1,5 @@
 import { probePosition } from '../../shared/surveyProbe';
-import { SPIDER } from '../../shared/terrainSpider';
+import { SPIDER, spiderHash, spiderScale } from '../../shared/terrainSpider';
 import type { Position, TerrainSpider } from '../../shared-types';
 import { updateSpiderScore } from '../audio/spiderScore';
 import { drawSurveyProbe } from '../entities/roid/surveyProbeRenderer';
@@ -50,6 +50,65 @@ function drawInfestedContours(
   ctx.restore();
 }
 
+/** Back markings, drawn in the same red as the infested isolines. */
+const SPIDER_MARKINGS = ['none', 'stripe', 'chevrons', 'spots'] as const;
+type SpiderMarking = (typeof SPIDER_MARKINGS)[number];
+
+/** Render-only silhouette; size comes from the shared hit-radius scale. */
+export function spiderLook(id: string) {
+  const hash = spiderHash(id);
+  return {
+    scale: spiderScale(id),
+    abdomen: 0.8 + ((hash >>> 7) % 41) / 100,
+    head: 0.85 + ((hash >>> 13) % 31) / 100,
+    legSpan: 0.85 + ((hash >>> 19) % 36) / 100,
+    marking: SPIDER_MARKINGS[(hash >>> 25) % SPIDER_MARKINGS.length] ?? 'none',
+  };
+}
+
+/** Abdomen markings vary the silhouette; the red always matches the infested isolines. */
+function drawBackMarking(
+  ctx: CanvasRenderingContext2D,
+  marking: SpiderMarking,
+  abdomen: number,
+  lineWidth: number
+): void {
+  if (marking === 'none') {
+    return;
+  }
+  const center = -10 * abdomen;
+  const half = 16 * abdomen;
+  ctx.save();
+  ctx.strokeStyle = '#d04c66';
+  ctx.fillStyle = '#d04c66';
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  if (marking === 'stripe') {
+    ctx.moveTo(center + half * 0.7, 0);
+    ctx.lineTo(center - half * 0.7, 0);
+    ctx.stroke();
+  } else if (marking === 'chevrons') {
+    for (const offset of [0.35, -0.05, -0.45]) {
+      const x = center + half * offset;
+      ctx.moveTo(x - 4, -5);
+      ctx.lineTo(x, 0);
+      ctx.lineTo(x - 4, 5);
+    }
+    ctx.stroke();
+  } else {
+    for (const [dx, dy] of [
+      [0.3, -4],
+      [0.3, 4],
+      [-0.25, 0],
+    ] as const) {
+      ctx.moveTo(center + half * dx + 1.8, dy);
+      ctx.arc(center + half * dx, dy, 1.8, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawSpider(
   ctx: CanvasRenderingContext2D,
   spider: TerrainSpider,
@@ -63,10 +122,14 @@ function drawSpider(
   const shudder = Math.min(1, (spider.shudderFrames ?? 0) / 12);
   ctx.translate(Math.sin(time * 95) * 4 * shudder, Math.cos(time * 77) * 3 * shudder);
   ctx.rotate(Math.sin(time * 85) * 0.13 * shudder);
+  const variant = spiderLook(spider.id);
+  ctx.scale(variant.scale, variant.scale);
+  // Keep strokes a steady screen weight across size classes.
+  const stroke = 1 / variant.scale;
   const speed = spider.phase === 'hunting' ? 24 : 12;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const feet = spiderFootContacts(spider, levels, time);
+  const feet = spiderFootContacts(spider, levels, time, variant.scale * variant.legSpan);
   const cosine = Math.cos(spider.angle);
   const sine = Math.sin(spider.angle);
   // The toes slide along existing isolines; only the knees flex above them.
@@ -80,8 +143,8 @@ function drawSpider(
       }
       const dx = foot.x - spider.position.x;
       const dy = foot.y - spider.position.y;
-      const footX = dx * cosine + dy * sine;
-      const footY = -dx * sine + dy * cosine;
+      const footX = (dx * cosine + dy * sine) / variant.scale;
+      const footY = (-dx * sine + dy * cosine) / variant.scale;
       const kneeX = (rootX + footX) / 2 + (1.5 - leg) * 5 + gait;
       const kneeY = (side * 5 + footY) / 2 + side * (12 + Math.abs(gait));
       ctx.beginPath();
@@ -89,10 +152,10 @@ function drawSpider(
       ctx.lineTo(kneeX, kneeY);
       ctx.lineTo(footX, footY);
       ctx.strokeStyle = '#170d19';
-      ctx.lineWidth = 5 / Math.sqrt(scale);
+      ctx.lineWidth = (5 * stroke) / Math.sqrt(scale);
       ctx.stroke();
       ctx.strokeStyle = spider.phase === 'hunting' ? '#ff6075' : '#bd596a';
-      ctx.lineWidth = 1.6 / Math.sqrt(scale);
+      ctx.lineWidth = (1.6 * stroke) / Math.sqrt(scale);
       ctx.stroke();
     }
   }
@@ -102,26 +165,27 @@ function drawSpider(
   healthHistory.set(spider.id, { health: spider.health, flashUntil });
   ctx.fillStyle = time < flashUntil ? '#fff0da' : shudder > 0 ? '#8c254e' : '#200e20';
   ctx.strokeStyle = '#d04c66';
-  ctx.lineWidth = 1.5 / scale;
+  ctx.lineWidth = (1.5 * stroke) / scale;
   ctx.beginPath();
-  ctx.ellipse(-10, 0, 16, 12, 0, 0, Math.PI * 2);
+  ctx.ellipse(-10 * variant.abdomen, 0, 16 * variant.abdomen, 12, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  drawBackMarking(ctx, variant.marking, variant.abdomen, stroke / scale);
   ctx.beginPath();
-  ctx.ellipse(9, 0, 11, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(9 * variant.head, 0, 11 * variant.head, 9 * variant.head, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = '#ffb0b5';
   for (const side of [-1, 1]) {
     ctx.beginPath();
-    ctx.arc(15, side * 4, 2.1, 0, Math.PI * 2);
+    ctx.arc(15 * variant.head, side * 4 * variant.head, 2.1, 0, Math.PI * 2);
     ctx.fill();
   }
   if (spider.health < spider.maxHealth) {
     ctx.fillStyle = '#3b1327';
-    ctx.fillRect(-25, -25, 50, 3 / scale);
+    ctx.fillRect(-25, -25, 50, (3 * stroke) / scale);
     ctx.fillStyle = '#ff6075';
-    ctx.fillRect(-25, -25, (50 * spider.health) / spider.maxHealth, 3 / scale);
+    ctx.fillRect(-25, -25, (50 * spider.health) / spider.maxHealth, (3 * stroke) / scale);
   }
   ctx.restore();
 }

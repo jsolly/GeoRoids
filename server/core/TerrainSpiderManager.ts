@@ -1,6 +1,6 @@
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
 import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
-import { SPIDER } from '../../shared/terrainSpider';
+import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-types';
 import { SHIP_ABILITY } from '../../src/entities/ship/shipKits';
@@ -199,8 +199,9 @@ export class TerrainSpiderManager {
     ) {
       return null;
     }
+    const id = `spider-${++this.spiderSequence}`;
     const spider: RuntimeSpider = {
-      id: `spider-${++this.spiderSequence}`,
+      id,
       position: copyPosition(position),
       angle: normalizeAngle(angle),
       health: SPIDER.MAX_HEALTH,
@@ -208,7 +209,7 @@ export class TerrainSpiderManager {
       phase: 'scuttling',
       targetId: null,
       kind: 'spider',
-      size: SPIDER.HIT_RADIUS,
+      size: spiderHitRadius(id),
       velocity: { x: 0, y: 0 },
       silkBursts: SPIDER.SILK_BURSTS,
       displaced: false,
@@ -377,7 +378,12 @@ export class TerrainSpiderManager {
   public findLaserHit(start: Position, end: Position): SpiderBodyHit | null {
     const candidates: SpiderBodyHit[] = [];
     for (const spider of this.spiders.values()) {
-      const fraction = segmentCircleContact(start, end, spider.position, SPIDER.HIT_RADIUS);
+      const fraction = segmentCircleContact(
+        start,
+        end,
+        spider.position,
+        spiderHitRadius(spider.id)
+      );
       if (fraction === undefined) {
         continue;
       }
@@ -433,7 +439,7 @@ export class TerrainSpiderManager {
         spider.targetId = null;
         spider.phase = 'scuttling';
       }
-      if (!spider.displaced && !this.canOccupy(spider.position, SPIDER.HIT_RADIUS)) {
+      if (!spider.displaced && !this.canOccupy(spider.position, spider.size)) {
         this.retreatFromProtection(spider, false);
       }
     }
@@ -565,7 +571,7 @@ export class TerrainSpiderManager {
           nest.guards = nest.guards.filter(
             (guard) =>
               this.canOccupy(nest.home, SPIDER.HIT_RADIUS) &&
-              (guard.displaced || this.canOccupy(guard.position, SPIDER.HIT_RADIUS))
+              (guard.displaced || this.canOccupy(guard.position, guard.size))
           );
           for (const guard of nest.guards) {
             if (this.spiders.size >= SPIDER.MAX_ACTIVE) {
@@ -689,7 +695,7 @@ export class TerrainSpiderManager {
         x: spider.position.x + (dx / distance) * stride,
         y: spider.position.y + (dy / distance) * stride,
       });
-      if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+      if (!this.canOccupy(next, spider.size)) {
         spider.targetId = null;
         spider.phase = 'scuttling';
         return;
@@ -710,7 +716,7 @@ export class TerrainSpiderManager {
     spider.phase = 'scuttling';
     spider.targetId = null;
     if (
-      !this.canOccupy(spider.position, SPIDER.HIT_RADIUS) ||
+      !this.canOccupy(spider.position, spider.size) ||
       players.some(
         (player) =>
           player.scanning &&
@@ -763,7 +769,7 @@ export class TerrainSpiderManager {
       this.spiders.has(friend.id) &&
       friend.health > 0 &&
       this.canOccupy(owner.position, owner.radius ?? 0) &&
-      this.canOccupy(friend.position, SPIDER.HIT_RADIUS)
+      this.canOccupy(friend.position, friend.size)
     );
   }
 
@@ -788,7 +794,7 @@ export class TerrainSpiderManager {
       x: spider.position.x + Math.cos(angle) * stride,
       y: spider.position.y + Math.sin(angle) * stride,
     };
-    if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+    if (!this.canOccupy(next, spider.size)) {
       return false;
     }
     if (spider.territory.kind === 'guard' && spider.phase !== 'hunting') {
@@ -827,7 +833,7 @@ export class TerrainSpiderManager {
         x: spider.position.x + Math.cos(angle) * SPIDER.HUNT_SPEED,
         y: spider.position.y + Math.sin(angle) * SPIDER.HUNT_SPEED,
       };
-      if (this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+      if (this.canOccupy(next, spider.size)) {
         spider.angle = normalizeAngle(angle);
         spider.position = next;
         break;
@@ -860,15 +866,13 @@ export class TerrainSpiderManager {
   /** Released cargo walks out of safe areas instead of freezing or attacking inside them. */
   private retreatFromProtection(spider: RuntimeSpider, consume = true): boolean {
     const furnace = this.furnaces
-      .nearby(spider.position, SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS)
+      .nearby(spider.position, SPIDER.FURNACE_SAFE_RADIUS + spider.size)
       .find(
         (site) =>
-          distanceBetween(spider.position, site.position) <
-          SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
+          distanceBetween(spider.position, site.position) < SPIDER.FURNACE_SAFE_RADIUS + spider.size
       );
     const inStarter =
-      Math.hypot(spider.position.x, spider.position.y) <
-      SPIDER.STARTER_SAFE_RADIUS + SPIDER.HIT_RADIUS;
+      Math.hypot(spider.position.x, spider.position.y) < SPIDER.STARTER_SAFE_RADIUS + spider.size;
     const origin = inStarter ? { x: 0, y: 0 } : furnace?.position;
     if (!origin) {
       return false;
@@ -907,7 +911,7 @@ export class TerrainSpiderManager {
       x: spider.position.x + Math.cos(angle) * stride,
       y: spider.position.y + Math.sin(angle) * stride,
     };
-    if (this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+    if (this.canOccupy(next, spider.size)) {
       spider.angle = normalizeAngle(angle);
       spider.position = next;
     }
@@ -934,7 +938,7 @@ export class TerrainSpiderManager {
       x: spider.position.x + Math.cos(spider.angle) * SPIDER.SCUTTLE_SPEED,
       y: spider.position.y + Math.sin(spider.angle) * SPIDER.SCUTTLE_SPEED,
     });
-    if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+    if (!this.canOccupy(next, spider.size)) {
       spider.angle = normalizeAngle(spider.angle + Math.PI);
       return;
     }

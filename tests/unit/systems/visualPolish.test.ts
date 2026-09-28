@@ -281,10 +281,13 @@ test('local and remote shots retain their glowing artwork and direction, then hi
       1
     ).data;
     expect(pastBolt[3]).toBe(0);
-    const edge = sprite.getImageData(x, y + VISUAL.LASER_STROKE_WIDTH / 2, 1, 1).data;
-    expect(edge[3]).toBeGreaterThan(0);
-    expect(edge[3]).toBeLessThan(80);
-    expect(sprite.getImageData(x, y + VISUAL.LASER_STROKE_WIDTH / 2 + 1, 1, 1).data[3]).toBe(0);
+    const radius = VISUAL.LASER_LENGTH / 2;
+    // A ball: lit just inside its radius along and across the flight axis...
+    expect(sprite.getImageData(x + radius - 2, y, 1, 1).data[3]).toBeGreaterThan(200);
+    expect(sprite.getImageData(x, y + radius - 2, 1, 1).data[3]).toBeGreaterThan(200);
+    expect(sprite.getImageData(x, y + radius + 1, 1, 1).data[3]).toBe(0);
+    // ...but empty at the corners a square bolt would fill.
+    expect(sprite.getImageData(x + radius - 1, y + radius - 1, 1, 1).data[3]).toBe(0);
   }
   expect(fill).not.toHaveBeenCalled();
 

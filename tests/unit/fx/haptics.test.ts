@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 import {
-  HAPTICS_UNSUPPORTED_HINT,
   hapticsApiAvailable,
   hapticsIsEnabled,
   playHaptic,
@@ -14,6 +13,13 @@ import {
 import { resetSafeStorage } from '../../../src/utils/safeStorage';
 
 const originalVibrate = navigator.vibrate;
+
+function installPointer(coarse: boolean): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: coarse && query === '(pointer: coarse)',
+    media: query,
+  }));
+}
 
 function installVibrate(impl: ((pattern: VibratePattern) => boolean) | undefined): void {
   if (impl) {
@@ -36,16 +42,12 @@ function installVibrate(impl: ((pattern: VibratePattern) => boolean) | undefined
 function resetHapticsPreferenceUi(): void {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.hapticsOn);
   const checkbox = document.querySelector<HTMLInputElement>('#hapticsPref');
-  const hint = document.querySelector<HTMLElement>('#hapticsHint');
   if (checkbox) {
-    checkbox.disabled = false;
     checkbox.checked = false;
-    checkbox.setAttribute('aria-disabled', 'false');
-    checkbox.removeAttribute('aria-describedby');
   }
-  if (hint) {
-    hint.hidden = true;
-    hint.textContent = '';
+  const row = document.querySelector<HTMLElement>('#hapticsRow');
+  if (row) {
+    row.hidden = true;
   }
 }
 
@@ -54,10 +56,12 @@ beforeEach(() => {
   resetHapticsForTests();
   resetHapticsPreferenceUi();
   installVibrate(undefined);
+  installPointer(true);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   if (typeof originalVibrate === 'function') {
     installVibrate(originalVibrate);
   } else {
@@ -81,30 +85,25 @@ test('enabling haptics stores the preference and plays a preview pulse', () => {
   expect(localStorage.getItem(LOCAL_STORAGE_KEYS.hapticsOn)).toBe('true');
   expect(hapticsIsEnabled()).toBe(true);
   expect(vibrate).toHaveBeenCalledWith(24);
-  const checkbox = document.querySelector<HTMLInputElement>('#hapticsPref');
-  const hint = document.querySelector<HTMLElement>('#hapticsHint');
-  expect(checkbox?.disabled).toBe(false);
-  expect(checkbox?.checked).toBe(true);
-  expect(checkbox?.getAttribute('aria-disabled')).toBe('false');
-  expect(checkbox?.hasAttribute('aria-describedby')).toBe(false);
-  expect(hint?.hidden).toBe(true);
-  expect(hint?.textContent).toBe('');
+  expect(document.querySelector<HTMLElement>('#hapticsRow')?.hidden).toBe(false);
+  expect(document.querySelector<HTMLInputElement>('#hapticsPref')?.checked).toBe(true);
 });
 
-test('a missing vibration API leaves Haptics off, focusable, and explained', () => {
+test('a browser without vibration hides the Haptics toggle and stores nothing', () => {
   installVibrate(undefined);
   setHaptics(true);
   syncHapticsControl();
-  const checkbox = document.querySelector<HTMLInputElement>('#hapticsPref');
-  const hint = document.querySelector<HTMLElement>('#hapticsHint');
   expect(hapticsApiAvailable()).toBe(false);
   expect(localStorage.getItem(LOCAL_STORAGE_KEYS.hapticsOn)).toBeNull();
-  expect(checkbox?.disabled).toBe(false);
-  expect(checkbox?.checked).toBe(false);
-  expect(checkbox?.getAttribute('aria-disabled')).toBe('true');
-  expect(checkbox?.getAttribute('aria-describedby')).toBe('hapticsHint');
-  expect(hint?.hidden).toBe(false);
-  expect(hint?.textContent).toBe(HAPTICS_UNSUPPORTED_HINT);
+  expect(document.querySelector<HTMLElement>('#hapticsRow')?.hidden).toBe(true);
+});
+
+test('a desktop browser that exposes vibrate without a touch screen hides Haptics', () => {
+  installVibrate(vi.fn(() => true));
+  installPointer(false);
+  syncHapticsControl();
+  expect(hapticsApiAvailable()).toBe(false);
+  expect(document.querySelector<HTMLElement>('#hapticsRow')?.hidden).toBe(true);
 });
 
 test('turning haptics off cancels vibration and unchecks the control', () => {

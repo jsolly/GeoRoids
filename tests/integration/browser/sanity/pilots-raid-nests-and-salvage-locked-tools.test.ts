@@ -79,7 +79,8 @@ for (const width of [1280, 390]) {
       path: screenshotManager.getScreenshotPath(`hardware-and-arcade-lasers-${width}.png`),
     });
     await page.keyboard.up('Space');
-    await game.collectEquipment(['resource_tap', 'boost_coupling', 'survey_probe']);
+    // A Hauler only sees and takes Hauler tools; Survey Probe drops are Scout-only.
+    await game.collectEquipment(['resource_tap', 'boost_coupling']);
     await page.locator('#ship-schematic-toggle').click();
     await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     expect(await tap.isEnabled()).toBe(true);
@@ -94,7 +95,7 @@ for (const width of [1280, 390]) {
     await game.startGame();
     await game.waitForServerJoin();
     await page.waitForFunction(
-      () => window.gameController?.getCurrPlayer()?.ship.equipment.length === 3
+      () => window.gameController?.getCurrPlayer()?.ship.equipment.length === 2
     );
     assertNoBrowserDiagnostics(diagnostics);
   }, 45000);

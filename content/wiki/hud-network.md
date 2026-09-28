@@ -34,7 +34,7 @@ A pulsing cyan radar marker identifies a live Survey Probe. Follow its moving ho
 
 ## Sound and haptics
 
-The title screen has separate Sound Effects, Music, and Haptics settings, saved in this browser. Haptics require browser vibration support and are unavailable on iPhone browsers. If sound stops, tap the game to let automatic audio recovery retry, and check your device volume and output.
+The title screen has separate Sound Effects, Music, and Haptics settings, saved in this browser. Haptics appears only on touch devices whose browser can vibrate, so it is hidden on desktop and iPhone. If sound stops, tap the game to let automatic audio recovery retry, and check your device volume and output.
 
 ## Connection interruptions
 

@@ -3,9 +3,6 @@ import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
 type HapticKind = 'asteroidIgnition' | 'preview' | 'shot' | 'hit' | 'boom' | 'ability' | 'pickup';
 
-export const HAPTICS_UNSUPPORTED_HINT =
-  'This browser cannot vibrate. Android Chrome usually can; iPhone cannot.';
-
 const PATTERNS: Record<HapticKind, number | number[]> = {
   asteroidIgnition: 20,
   preview: 24,
@@ -28,8 +25,14 @@ const MIN_GAP_MS: Record<HapticKind, number> = {
 
 const lastPlayedAt = new Map<HapticKind, number>();
 
+/** Desktop Chrome exposes `vibrate` without a motor; require a touch device too. */
 export function hapticsApiAvailable(): boolean {
-  return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+  return (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.vibrate === 'function' &&
+    typeof matchMedia === 'function' &&
+    matchMedia('(pointer: coarse)').matches
+  );
 }
 
 export function hapticsPreferenceOn(): boolean {
@@ -95,22 +98,13 @@ export function syncHapticsControl(): void {
   if (typeof document === 'undefined') {
     return;
   }
+  const row = document.querySelector<HTMLElement>('#hapticsRow');
   const checkbox = document.querySelector<HTMLInputElement>('#hapticsPref');
-  const hint = document.querySelector<HTMLElement>('#hapticsHint');
-  if (!checkbox) {
-    return;
-  }
   const supported = hapticsApiAvailable();
-  checkbox.disabled = false;
-  checkbox.checked = supported && hapticsPreferenceOn();
-  checkbox.setAttribute('aria-disabled', supported ? 'false' : 'true');
-  if (supported) {
-    checkbox.removeAttribute('aria-describedby');
-  } else {
-    checkbox.setAttribute('aria-describedby', 'hapticsHint');
+  if (row) {
+    row.hidden = !supported;
   }
-  if (hint) {
-    hint.hidden = supported;
-    hint.textContent = supported ? '' : HAPTICS_UNSUPPORTED_HINT;
+  if (checkbox) {
+    checkbox.checked = supported && hapticsPreferenceOn();
   }
 }

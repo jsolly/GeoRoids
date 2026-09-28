@@ -14,7 +14,7 @@ related:
 
 ## Start flying
 
-Choose Scout to explore with Mineral Scan, or Hauler to deliver ore with Tow Cable, then select Enter Game. Other tools must be salvaged before you can equip them. Thrust is automatic; learn [steering and firing](/wiki/#controls) before heading out.
+Choose Scout to explore with Mineral Scan, or Hauler to deliver ore with Tow Cable, then select Enter Game; the camera dives from the whole world to your ship (any key or tap skips). Other tools must be salvaged before you can equip them. Thrust is automatic; learn [steering and firing](/wiki/#controls) before heading out.
 
 ## Your expedition
 

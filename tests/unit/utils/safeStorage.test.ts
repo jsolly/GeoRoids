@@ -163,6 +163,10 @@ test('haptics preference read/write does not throw when storage is blocked', () 
     value: () => true,
     writable: true,
   });
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(pointer: coarse)',
+    media: query,
+  }));
   installStorage(throwingStorage());
   resetSafeStorage();
 
@@ -172,6 +176,7 @@ test('haptics preference read/write does not throw when storage is blocked', () 
     expect(() => setHaptics(false)).not.toThrow();
     expect(hapticsPreferenceOn()).toBe(false);
   } finally {
+    vi.unstubAllGlobals();
     Object.defineProperty(navigator, 'vibrate', {
       configurable: true,
       value: originalVibrate,

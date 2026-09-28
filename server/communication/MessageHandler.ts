@@ -1,7 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
-import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
+import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyAsteroidRows } from '../../shared/world';
@@ -561,7 +561,7 @@ export class MessageHandler {
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const offeringBuild =
       socketPlayer.kitId === 'scout' &&
-      scoutAbilityBuildsAt(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
+      onDarkFurnaceFootprint(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
     if (offeringBuild) {
       ws.send(

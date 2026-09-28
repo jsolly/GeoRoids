@@ -29,7 +29,7 @@ import {
   isEquipmentId,
 } from '../../shared/equipment';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD, FurnaceField, scoutAbilityBuildsAt } from '../../shared/furnaceField';
+import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import {
   civicLot,
   civicLotAt,
@@ -2654,7 +2654,7 @@ export class GameEngine {
       return false;
     }
     if (entity.kitId === 'scout') {
-      if (scoutAbilityBuildsAt(entity.position, (id) => this.furnaces.isLit(id))) {
+      if (onDarkFurnaceFootprint(entity.position, (id) => this.furnaces.isLit(id))) {
         return this.buildFurnace(entity);
       }
       if (scoutUtilityOf(entity) === 'survey_probe') {
@@ -2699,7 +2699,7 @@ export class GameEngine {
     return activation.activated;
   }
 
-  /** Ordinary cargo is exclusive; a colossal deposit can share tows or armed couplings. */
+  /** Ordinary cargo is exclusive; a colossal deposit can share tows or couplings. */
   private haulerCanTarget(
     entity: GameEntity,
     asteroid: AsteroidData,
@@ -2708,10 +2708,10 @@ export class GameEngine {
     if (asteroid.id === entity.harpoonTargetId || !cargo.has(asteroid.id)) {
       return true;
     }
-    if (!isColossalAsteroid(asteroid.size) || asteroid.boost?.phase === 'burning') {
+    if (!isColossalAsteroid(asteroid.size)) {
       return false;
     }
-    if (asteroid.boost?.phase === 'armed') {
+    if (asteroid.boost) {
       return (
         haulerUtilityOf(entity) === 'boost_coupling' &&
         boostOwnerIds(asteroid.boost).length < asteroidCrewNeeded(asteroid.size)

@@ -8,7 +8,6 @@ vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 beforeEach(() => {
   vi.stubEnv('VERCEL_GIT_COMMIT_SHA', undefined);
   vi.stubEnv('RAILWAY_GIT_COMMIT_SHA', undefined);
-  vi.stubEnv('GEOROIDS_COMMIT_SHA', undefined);
 });
 
 afterEach(() => {
@@ -23,7 +22,7 @@ function buildConfig() {
   return config({ command: 'build', mode: 'production' });
 }
 
-test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA', 'GEOROIDS_COMMIT_SHA'])(
+test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA'])(
   'hosted builds retain %s when the Git checkout is absent',
   async (variable) => {
     const release = 'a'.repeat(40);
@@ -67,10 +66,10 @@ test('a failed Git lookup stops the build instead of disabling release refresh',
   expect(buildConfig).toThrow(failure);
 });
 
-test('empty VERCEL_GIT_COMMIT_SHA still uses a valid GEOROIDS_COMMIT_SHA', async () => {
+test('empty VERCEL_GIT_COMMIT_SHA still uses a valid RAILWAY_GIT_COMMIT_SHA', async () => {
   const release = 'c'.repeat(40);
   vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
-  vi.stubEnv('GEOROIDS_COMMIT_SHA', release);
+  vi.stubEnv('RAILWAY_GIT_COMMIT_SHA', release);
   vi.mocked(execFileSync).mockImplementation(() => {
     throw new Error('Git checkout unavailable');
   });

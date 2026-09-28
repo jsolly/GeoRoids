@@ -6,7 +6,8 @@ import { contourCandidates } from './contourSpatialIndex';
 export function spiderFootContacts(
   spider: Pick<TerrainSpider, 'position' | 'angle'>,
   levels: readonly ContourLevel[],
-  time: number
+  time: number,
+  reach = 1
 ): Position[] {
   const segments = levels.flatMap((_, ordinal) =>
     contourCandidates(levels, ordinal, {
@@ -28,8 +29,8 @@ export function spiderFootContacts(
   for (const side of [-1, 1]) {
     for (let leg = 0; leg < 4; leg++) {
       const gait = Math.sin(time * 8 + leg * Math.PI + side) * 9;
-      const localX = (1.5 - leg) * 30 + gait;
-      const localY = side * (48 + Math.abs(gait));
+      const localX = ((1.5 - leg) * 30 + gait) * reach;
+      const localY = side * (48 + Math.abs(gait)) * reach;
       const desired = {
         x: spider.position.x + localX * cosine - localY * sine,
         y: spider.position.y + localX * sine + localY * cosine,

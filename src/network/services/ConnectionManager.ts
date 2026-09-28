@@ -1550,7 +1550,9 @@ export class ConnectionManager {
     if (!isLootCollectedEvent(data)) {
       return;
     }
-    if (this.playedLootCollectionIds.has(data.lootId)) {
+    const isLocal = data.collectorId === this.getLocalPlayerId();
+    const collectionId = `${data.lootId}:${data.collectorId}`;
+    if (this.playedLootCollectionIds.has(collectionId)) {
       return;
     }
     if (this.playedLootCollectionIds.size >= MAX_PLAYED_LOOT_COLLECTION_IDS) {
@@ -1559,9 +1561,9 @@ export class ConnectionManager {
         this.playedLootCollectionIds.delete(oldestId);
       }
     }
-    this.playedLootCollectionIds.add(data.lootId);
+    this.playedLootCollectionIds.add(collectionId);
     playLootPickup(data.position);
-    playLocalHaptic(data.collectorId === this.getLocalPlayerId(), 'pickup');
+    playLocalHaptic(isLocal, 'pickup');
   }
 
   private handleFurnaceDelivery(data: FurnaceDelivery): void {

@@ -80,7 +80,7 @@
               />
               <label class="sound-toggle-label" for="musicPref">Music</label>
             </div>
-            <div class="sound-toggle-row">
+            <div id="hapticsRow" class="sound-toggle-row" hidden>
               <input
                 class="sound-toggle"
                 type="checkbox"
@@ -89,7 +89,6 @@
               <label class="sound-toggle-label" for="hapticsPref">Haptics</label>
             </div>
           </div>
-          <p id="hapticsHint" class="haptics-hint" hidden></p>
           <details id="advanced-settings" class="advanced-settings">
             <summary>Advanced</summary>
             <div class="debug-toggle-row">
@@ -101,6 +100,16 @@
               <label class="sound-toggle-label" for="debugPref">Debug</label>
             </div>
             <div id="debug-identity" class="debug-identity" hidden>
+              <div>
+                <label class="debug-id-label" for="debug-log-level">Log level</label>
+                <select id="debug-log-level" class="debug-id-input" aria-describedby="debug-log-level-hint">
+                  <option value="error">Error</option>
+                  <option value="warn">Warn</option>
+                  <option value="info">Info</option>
+                  <option value="debug">Debug</option>
+                </select>
+                <p id="debug-log-level-hint" class="debug-id-hint">This browser only. Debug is verbose and can stutter play.</p>
+              </div>
               <div>
                 <label class="debug-id-label" for="debug-player-id">Player ID</label>
                 <div class="debug-id-row">

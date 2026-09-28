@@ -29,6 +29,14 @@ export function validEquipment(value: unknown): value is EquipmentId[] {
   );
 }
 
+/** Equipment drops are per-ship: only a matching kit that lacks the tool sees or takes one. */
+export function canCollectEquipment(
+  host: { kitId?: string; equipment?: readonly EquipmentId[] },
+  equipment: EquipmentId
+): boolean {
+  return EQUIPMENT[equipment].kitId === host.kitId && !host.equipment?.includes(equipment);
+}
+
 export function canEquipUtility(
   host: { kitId?: string; equipment?: readonly EquipmentId[] },
   utility: unknown

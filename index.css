@@ -930,7 +930,6 @@
   .enter-game,
   .preference-toggles,
   .sound-toggle-row,
-  .haptics-hint,
   .advanced-settings {
     box-sizing: border-box;
     width: 100%;
@@ -1078,12 +1077,8 @@
     max-width: none;
   }
 
-  .haptics-hint {
-    margin: 0;
-    color: color-mix(in srgb, var(--palette-hud, #e2e8f0) 78%, var(--palette-hud-muted, #64748b));
-    font-size: 0.68rem;
-    line-height: 1.35;
-    text-align: left;
+  .sound-toggle-row[hidden] {
+    display: none;
   }
 
   .advanced-settings {
@@ -1170,6 +1165,12 @@
     background: transparent;
     border: 1px solid color-mix(in srgb, var(--palette-local, #5eead4) 32%, transparent);
     border-radius: 4px;
+  }
+
+  select.debug-id-input,
+  select.debug-id-input option {
+    color-scheme: dark;
+    background: var(--palette-bg, #000011);
   }
 
   .debug-id-input:focus {

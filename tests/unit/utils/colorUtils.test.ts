@@ -78,7 +78,7 @@ test('roid stroke weights follow four size tiers', () => {
   expect(getRoidStrokeWidth(ROID.SIZE * 0.2)).toBe(VISUAL.ROID_STROKE_SMALL);
 });
 
-test('arcade shots are thick bolts with a gap between Scout-cadence shots', () => {
+test('arcade shots are round glowing balls with a gap between Scout-cadence shots', () => {
   expect(VISUAL.LASER_STROKE_WIDTH).toBeGreaterThan(VISUAL.SHIP_STROKE_WIDTH);
   expect(VISUAL.LASER_STROKE_WIDTH).toBeGreaterThanOrEqual(14);
   expect(VISUAL.LASER_CORE_WIDTH).toBeLessThan(VISUAL.LASER_STROKE_WIDTH / 2);
@@ -87,7 +87,7 @@ test('arcade shots are thick bolts with a gap between Scout-cadence shots', () =
   expect(VISUAL.LASER_GLOW).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH / 4);
   expect(VISUAL.LASER_EXPLODE_RADIUS).toBeLessThanOrEqual(VISUAL.LASER_LENGTH);
   const scoutSpacing = (LASER.SPEED * getShipKit('scout').shotCooldown) / 1000;
-  // paintLaserBolt uses butt caps, so thickness does not add flight-axis length.
+  // paintLaserBolt draws a ball whose diameter is LASER_LENGTH.
   // Chromium truncates shadowBlur near 3 sigma, and sigma is blur / 2.
   const paintedSpan = VISUAL.LASER_LENGTH + VISUAL.LASER_TRAIL_LENGTH;
   const haloSpan = paintedSpan + VISUAL.LASER_GLOW * 3;

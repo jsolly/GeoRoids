@@ -20,8 +20,7 @@ interface Actor {
   radius?: number;
 }
 interface AdvanceOptions {
-  rocks: readonly AsteroidData[];
-  /** The caller's broad phase over exactly these rocks. */
+  /** The live rock field: host lookup, host iteration and spatial queries. */
   index: AsteroidSpatialIndex;
   players: readonly Actor[];
   nowFrame: number;
@@ -125,7 +124,6 @@ function nearestDistance(edges: readonly Edge[], target: Position): number {
 /** Sparse surface predators pursue across nearby rocks with short, unobstructed hops. */
 export class BeltCrawlerManager {
   private readonly bodies = new Map<string, Crawler>();
-  private rocks: readonly AsteroidData[] = [];
   private spatial = new AsteroidSpatialIndex([]);
   private players: readonly Actor[] = [];
 
@@ -133,7 +131,6 @@ export class BeltCrawlerManager {
 
   public clear(): void {
     this.bodies.clear();
-    this.rocks = [];
     this.spatial = new AsteroidSpatialIndex([]);
     this.players = [];
   }
@@ -155,26 +152,24 @@ export class BeltCrawlerManager {
     }));
   }
 
-  public isAttackActive(attack: SpiderAttack, rocks = this.rocks, index = this.spatial): boolean {
+  public isAttackActive(attack: SpiderAttack, index = this.spatial): boolean {
     const body = this.bodies.get(attack.spiderId);
     const target = this.players.find((player) => player.id === attack.targetId);
     return (
       body !== undefined &&
       target !== undefined &&
-      rocks.some((rock) => rock.id === body.host.id && rock.health > 0) &&
+      (index.get(body.host.id)?.health ?? 0) > 0 &&
       body.crawler.phase === 'lunging' &&
       body.targetId === attack.targetId &&
       !this.impact(body.position, target.position, index)
     );
   }
 
-  public advance({ rocks, index: rockIndex, players, nowFrame }: AdvanceOptions): SpiderAttack[] {
-    this.rocks = rocks;
+  public advance({ index: rockIndex, players, nowFrame }: AdvanceOptions): SpiderAttack[] {
     this.spatial = rockIndex;
     this.players = players;
-    const hosts = new Map(rocks.map((rock) => [rock.id, rock]));
     for (const [id, body] of this.bodies) {
-      if (!hosts.has(body.host.id) || (hosts.get(body.host.id)?.health ?? 0) <= 0) {
+      if ((rockIndex.get(body.host.id)?.health ?? 0) <= 0) {
         this.bodies.delete(id);
       }
     }
@@ -183,7 +178,7 @@ export class BeltCrawlerManager {
       (player) => player.health > 0 && !player.exploding && player.respawnTimer === undefined
     );
     const processed = new Set<string>();
-    for (const host of rocks) {
+    for (const host of rockIndex.values()) {
       const slot = beltSlotForAsteroid(host.id);
       if (host.health <= 0 || (!host.beltCrawlerIds && (slot === undefined || slot % 6 !== 0))) {
         continue;
@@ -309,7 +304,7 @@ export class BeltCrawlerManager {
             body.crawler.phase = 'winding';
             body.phaseStart = nowFrame;
           } else if (target && body.pursuit) {
-            const destination = hosts.get(body.pursuit.hostId);
+            const destination = rockIndex.get(body.pursuit.hostId);
             const departure = surface(shape.edges, body.pursuit.departureFraction * shape.length);
             if (
               destination &&

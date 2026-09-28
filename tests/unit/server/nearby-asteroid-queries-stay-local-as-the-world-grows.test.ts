@@ -44,7 +44,7 @@ test('distant sectors do not become collision candidates and large rocks retain 
     collisions.collectShipAsteroidHits(
       [pilot],
       index,
-      (_pilot, candidate) => candidate.id === 'spanning'
+      (_pilot, candidate) => candidate.id !== 'spanning'
     )
   ).toEqual([{ shipId: pilot.id, asteroidId: 'small' }]);
   expect(collisions.collectTowedAsteroidHits([small], index)).toEqual([
@@ -118,4 +118,39 @@ test('a scanning Scout receives the rocks its zoomed-out camera shows, then only
     'on-radar',
     'scan-edge',
   ]);
+});
+
+test('a rock drifting into another keeps its collision priority, replacements keep their slot, and clearing empties the field', () => {
+  const manager = new AsteroidManager(new RNGService(7));
+  const first = { ...rock('first-ice', 480, 0, 20), velocity: { x: 50, y: 0 } };
+  const second = rock('second-ice', 540, 0, 20);
+  manager.addAsteroid(first);
+  manager.addAsteroid(second);
+  // First drifts across the 512-unit cell edge onto second's hull.
+  manager.updateMotion();
+  expect(first.position.x).toBeGreaterThan(512);
+  const index = manager.spatialIndex();
+  const overlap = { minX: 520, maxX: 560, minY: -5, maxY: 5 };
+  expect(index.query(overlap).map((candidate) => candidate.id)).toEqual([
+    'first-ice',
+    'second-ice',
+  ]);
+  const engine = new GameEngine(82);
+  const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 540, y: 0 });
+  pilot.spawnProtectionTimer = 0;
+  expect(new CollisionAuthority().collectShipAsteroidHits([pilot], index)).toEqual([
+    { shipId: pilot.id, asteroidId: 'first-ice' },
+  ]);
+  engine.stopGameLoop();
+
+  // Re-adding the same ID keeps one copy in its original slot.
+  const replacement = { ...first, health: 5 };
+  manager.addAsteroid(replacement);
+  expect(index.query(overlap)).toEqual([replacement, second]);
+
+  manager.clearAsteroids();
+  expect(index.query({ minX: -5_000, maxX: 5_000, minY: -5_000, maxY: 5_000 })).toEqual([]);
+  const fresh = rock('fresh-ice', 530, 0);
+  manager.addAsteroid(fresh);
+  expect(manager.spatialIndex().query(overlap)).toEqual([fresh]);
 });

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { ServerClock } from '../../../server/core/ServerClock';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { WORLD } from '../../../shared/world';
@@ -82,7 +83,9 @@ test('an old completed-sector list neither walls harvested ground nor refills it
 
     writeCompletedSectors(path, ['1,0']);
     store = new WorldStore(path);
-    engine = new GameEngine(seed, undefined, new InlineWorldPersistence(store));
+    // A frozen clock keeps regrowth intervals from elapsing on a slow machine.
+    const clock = new ServerClock({ wallNow: () => now, monotonicNow: () => 0 });
+    engine = new GameEngine(seed, clock, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const outside = { x: 1_980, y: 800 };
     const pilot = engine.addPlayer('pilot', 'Pilot', socket, outside);

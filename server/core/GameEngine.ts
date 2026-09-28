@@ -303,6 +303,7 @@ export class GameEngine {
   private readonly dirtyPilots = new Set<string>();
   private lastFlushedWorldRow: FlushedWorldRow | undefined;
   private flushWaitingForIdle = false;
+  private completeFlushWaiting = false;
   private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
@@ -585,7 +586,7 @@ export class GameEngine {
       this.clearPendingFeedback();
       this.spiderManager.suspend();
       this.pendingSpiderAttacks = [];
-      this.checkpointWorld();
+      this.checkpointWorld({ complete: true });
     } else if (playerCount > 0 && this.isPaused) {
       this.isPaused = false;
       logger.info('▶️ Game resumed - players are back online');
@@ -1033,7 +1034,11 @@ export class GameEngine {
    * runs as soon as the writer is idle, so a slow disk can never queue up
    * more than one batch behind the one in flight.
    */
-  public checkpointWorld(): void {
+  /**
+   * `complete` also writes asteroid drift and damage that periodic flushes
+   * defer; the final departure and shutdown flush use it so nothing rewinds.
+   */
+  public checkpointWorld({ complete = false }: { complete?: boolean } = {}): void {
     if (this.managedField) {
       this.regionalField.reconcileBelt(this.asteroidManager, this.getServerTime());
     }
@@ -1044,7 +1049,7 @@ export class GameEngine {
       return;
     }
     if (!this.persistenceIdle()) {
-      this.flushWhenIdle();
+      this.flushWhenIdle(complete);
       return;
     }
     try {
@@ -1069,7 +1074,7 @@ export class GameEngine {
         ...(worldRow ? { world: worldRow.world } : {}),
         // Custom diagnostic belts do not belong to regional activation or sleep bookkeeping.
         sectors: this.managedField
-          ? this.regionalField.checkpoint(this.asteroidManager)
+          ? this.regionalField.checkpoint(this.asteroidManager, complete)
           : new Map(),
         pilots,
       });
@@ -1151,18 +1156,22 @@ export class GameEngine {
     return (this.persistence?.diagnostics().pendingBatches ?? 0) === 0;
   }
 
-  private flushWhenIdle(): void {
+  private flushWhenIdle(complete: boolean): void {
+    // A coalesced flush stays complete if any request asked for it.
+    this.completeFlushWaiting ||= complete;
     if (this.flushWaitingForIdle || !this.persistence) {
       return;
     }
     this.flushWaitingForIdle = true;
     void this.persistence.whenIdle().then(() => {
       this.flushWaitingForIdle = false;
+      const completeFlush = this.completeFlushWaiting;
+      this.completeFlushWaiting = false;
       if (this.persistenceFailure) {
         return;
       }
       try {
-        this.checkpointWorld();
+        this.checkpointWorld({ complete: completeFlush });
       } catch (error) {
         // Nothing awaits a deferred flush, so anything it throws is latched
         // here; the next tick is fatal.
@@ -1204,7 +1213,7 @@ export class GameEngine {
     try {
       drained = await this.whenPersistenceIdle(SHUTDOWN_IDLE_WAIT_MS);
       if (drained && !this.persistenceFailure) {
-        this.checkpointWorld();
+        this.checkpointWorld({ complete: true });
       }
     } finally {
       await this.persistence.shutdown();
@@ -1338,7 +1347,6 @@ export class GameEngine {
     this.pendingSpiderAttacks.push(
       ...attacks,
       ...this.beltCrawlers.advance({
-        rocks: this.asteroidManager.getAllAsteroids(),
         index: this.asteroidManager.spatialIndex(),
         players: this.entityManager.getAllEntities().map((entity) => ({
           id: entity.id,
@@ -1456,6 +1464,8 @@ export class GameEngine {
     }
     if (!this.decoratedFieldId) {
       seedAsteroidPhenomena(rocks);
+      // Phenomena reshape and move live rows in place.
+      this.asteroidManager.refile(rocks);
       this.decoratedFieldId = firstRock.id;
     }
   }
@@ -1811,7 +1821,7 @@ export class GameEngine {
       entities,
       this.asteroidManager.spatialIndex(),
       (shipId, rock) =>
-        rock.boost?.phase === 'burning' || this.isActiveHarpoonTarget(shipId, rock.id)
+        rock.boost?.phase !== 'burning' && !this.isActiveHarpoonTarget(shipId, rock.id)
     );
     const destroyedAsteroids = new Set<string>();
     const bumperKeys = this.resolveTowedAsteroidImpacts(entities, destroyedAsteroids);
@@ -1855,11 +1865,7 @@ export class GameEngine {
     for (const attack of this.pendingSpiderAttacks.splice(0)) {
       if (
         !this.spiderManager.isAttackActive(attack) &&
-        !this.beltCrawlers.isAttackActive(
-          attack,
-          this.asteroidManager.getAllAsteroids(),
-          this.asteroidManager.spatialIndex()
-        )
+        !this.beltCrawlers.isAttackActive(attack, this.asteroidManager.spatialIndex())
       ) {
         continue;
       }

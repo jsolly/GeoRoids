@@ -46,7 +46,7 @@ export class CollisionAuthority {
   public collectShipAsteroidHits(
     entities: GameEntity[],
     index: AsteroidSpatialIndex,
-    shouldSkip?: (shipId: string, rock: AsteroidData) => boolean
+    canHit: (shipId: string, rock: AsteroidData) => boolean = () => true
   ): Array<{ shipId: string; asteroidId: string }> {
     const hits: Array<{ shipId: string; asteroidId: string }> = [];
     for (const entity of entities) {
@@ -62,7 +62,7 @@ export class CollisionAuthority {
       });
       const rock = nearby.find(
         (candidate) =>
-          !shouldSkip?.(ship.id, candidate) &&
+          canHit(ship.id, candidate) &&
           circlesOverlap(ship.position, ship.radius, candidate.position, candidate.size)
       );
       if (rock) {

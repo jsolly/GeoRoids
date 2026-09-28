@@ -62,6 +62,11 @@ export function nearbyWorldRows<T extends { position: Position }>(
   );
 }
 
+/** Half-width of the square that bounds a pilot's asteroid rows. */
+export function asteroidReach(scanning: boolean) {
+  return scanning ? WORLD.interestRadius : WORLD.asteroidInterestRadius;
+}
+
 /**
  * Asteroids a client can draw on its flight view or minimap radar. A running
  * Mineral Scan zooms the camera out past the radar, so a scanning pilot gets

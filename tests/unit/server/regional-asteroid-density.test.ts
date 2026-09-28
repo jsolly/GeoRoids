@@ -1,16 +1,25 @@
 /* @vitest-environment node */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
+import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { fieldRichness, sectorDeposits } from '../../../server/world/depositLayout';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
+import { WorldStore } from '../../../server/world/WorldStore';
 import { isInBeltFootprint } from '../../../shared/asteroidBelt';
 import { sectorAt, WORLD } from '../../../shared/world';
 import type { AsteroidData, Position } from '../../../shared-types';
 import { DEPOSIT_FIELD, ROID } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 const SEED = 82;
 const INTERVAL = DEPOSIT_FIELD.REGROWTH_INTERVAL_MS;
+/** Production passes epoch-scale server time; small clocks would hide restart bugs. */
+const T0 = 1_790_000_000_000;
 
 function isStationary(rock: AsteroidData): boolean {
   return rock.velocity.x === 0 && rock.velocity.y === 0;
@@ -26,7 +35,7 @@ function sectorSample(seed: number): AsteroidData[][] {
   return sectors;
 }
 
-function awakeField(observer: Position, now = 0) {
+function awakeField(observer: Position, now = T0) {
   const field = new RegionalAsteroidField(SEED);
   const manager = new AsteroidManager(new RNGService(SEED));
   field.update(manager, [observer], now);
@@ -192,17 +201,17 @@ test('a mined deposit regrows in its home slot only after an interval and out of
   manager.removeAsteroid(second.id);
 
   // Nothing regrows before the sector's next interval.
-  expect(field.update(manager, [observer], INTERVAL - 1)).toEqual([]);
+  expect(field.update(manager, [observer], T0 + INTERVAL - 1)).toEqual([]);
   // One slot per interval, restored exactly as generated.
-  const grown = field.update(manager, [observer], INTERVAL);
+  const grown = field.update(manager, [observer], T0 + INTERVAL);
   expect(grown).toHaveLength(1);
   expect(manager.getAsteroid(first.id)).toEqual(home);
   expect(manager.getAsteroid(second.id)).toBeUndefined();
-  field.update(manager, [observer], INTERVAL * 2);
+  field.update(manager, [observer], T0 + INTERVAL * 2);
   expect(manager.getAsteroid(second.id)).toBeDefined();
 });
 
-test('a pilot never watches a mined deposit reappear', () => {
+test('neither a pilot radar nor a survey probe watches a mined deposit reappear', () => {
   const observer = { x: -900, y: -900 };
   const { field, manager } = awakeField(observer);
   const [target] = hiddenSlots(manager, observer);
@@ -210,14 +219,20 @@ test('a pilot never watches a mined deposit reappear', () => {
     throw new Error('Sector 0,0 needs a hidden ordinary slot');
   }
   manager.removeAsteroid(target.id);
-  // Park a second pilot on the empty slot for many intervals.
-  const watcher = { ...target.position };
-  for (let step = 1; step <= 5; step++) {
-    field.update(manager, [observer, watcher], INTERVAL * step);
+  // A pilot whose radar edge covers the slot, then a probe at the edge of a
+  // scanning pilot's zoomed-out view: both would see a rock appear.
+  const radarPilot = { x: target.position.x - WORLD.asteroidInterestRadius, y: target.position.y };
+  const probe = { x: target.position.x, y: target.position.y + WORLD.interestRadius - 1 };
+  let now = T0;
+  for (const watcher of [radarPilot, probe]) {
+    for (let step = 0; step < 4; step++) {
+      now += INTERVAL;
+      field.update(manager, [observer, watcher], now);
+    }
+    expect(manager.getAsteroid(target.id)).toBeUndefined();
   }
-  expect(manager.getAsteroid(target.id)).toBeUndefined();
   // Once nobody can see it, the slot fills on the next interval.
-  field.update(manager, [observer], INTERVAL * 6);
+  field.update(manager, [observer], now + INTERVAL);
   expect(manager.getAsteroid(target.id)).toBeDefined();
 });
 
@@ -235,7 +250,7 @@ test('a deposit carried into a sleeping sector is never duplicated by regrowth',
   expect(manager.getAsteroid(traveler.id)).toBeUndefined();
 
   for (let step = 1; step <= 4; step++) {
-    field.update(manager, [observer], INTERVAL * step);
+    field.update(manager, [observer], T0 + INTERVAL * step);
   }
   expect(idCount(field, manager, traveler.id)).toBe(1);
 });
@@ -248,9 +263,9 @@ test('a sector that slept catches up on the regrowth it missed', () => {
     manager.removeAsteroid(rock.id);
   }
   // Leave for three intervals; the sector sleeps while the crew is away.
-  field.update(manager, [{ x: -30_000, y: 0 }], 1);
+  field.update(manager, [{ x: -30_000, y: 0 }], T0 + 1);
   expect(field.dormantSectors().has('0,0')).toBe(true);
-  field.update(manager, [observer], 1 + INTERVAL * 3);
+  field.update(manager, [observer], T0 + 1 + INTERVAL * 3);
   expect(mined.filter((rock) => manager.getAsteroid(rock.id))).toHaveLength(3);
 });
 
@@ -279,20 +294,20 @@ test('a world saved under an older layout keeps its rocks and refills over a few
   expect(hidden.length).toBeGreaterThan(20);
 
   // A restart is not a refill: saved rows load exactly as they were.
-  field.update(manager, [observer], 0);
+  field.update(manager, [observer], T0);
   expect(manager.getAsteroid(survivor.id)).toEqual(survivor);
   expect(manager.getAsteroid(retired.id)).toEqual(retired);
   expect(regrown()).toBe(0);
 
   // Three minutes of play restores roughly half of a stripped sector.
   const minute = 60_000;
-  for (let now = INTERVAL; now <= 3 * minute; now += INTERVAL) {
+  for (let now = T0 + INTERVAL; now <= T0 + 3 * minute; now += INTERVAL) {
     field.update(manager, [observer], now);
   }
   expect(regrown()).toBeGreaterThan(hidden.length * 0.4);
   expect(regrown()).toBeLessThan(hidden.length * 0.8);
 
-  for (let now = 3 * minute + INTERVAL; now <= 30 * minute; now += INTERVAL) {
+  for (let now = T0 + 3 * minute + INTERVAL; now <= T0 + 30 * minute; now += INTERVAL) {
     field.update(manager, [observer], now);
   }
   expect(regrown()).toBe(hidden.length);
@@ -334,5 +349,73 @@ test('checkpoints persist mined sectors at once and drift-only sectors on a slow
   expect(awake.size).toBeGreaterThan(1);
   for (const id of awake) {
     expect(drift.has(id)).toBe(true);
+  }
+});
+
+test('a rock drifting between two awake sectors is saved once and never regrows twice after a reload', () => {
+  const observer = { x: 1_000, y: 1_000 };
+  const { field, manager } = awakeField(observer);
+  const saved = new Map(field.checkpoint(manager));
+  field.saved();
+  const traveler = manager
+    .getAllAsteroids()
+    .find((rock) => rock.id.startsWith(`deposit-${SEED}-0-0-`) && !rock.phenomenon);
+  if (!traveler) {
+    throw new Error('Sector 0,0 needs an ordinary deposit');
+  }
+  // Not a drift flush: only the two sectors whose rock sets changed are written.
+  manager.updateAsteroid(traveler.id, { position: { x: 2_100, y: 500 } });
+  const batch = field.checkpoint(manager);
+  field.saved();
+  expect([...batch.keys()].sort()).toEqual(['0,0', '1,0']);
+  expect(batch.get('0,0')?.some((rock) => rock.id === traveler.id)).toBe(false);
+  expect(batch.get('1,0')?.filter((rock) => rock.id === traveler.id)).toHaveLength(1);
+
+  for (const [id, rows] of batch) {
+    saved.set(id, rows);
+  }
+  const reloaded = new RegionalAsteroidField(SEED, structuredClone(saved));
+  const reloadedManager = new AsteroidManager(new RNGService(SEED));
+  for (let step = 0; step <= 20; step++) {
+    reloaded.update(reloadedManager, [{ x: -900, y: -900 }], T0 + step * INTERVAL);
+  }
+  expect(idCount(reloaded, reloadedManager, traveler.id)).toBe(1);
+});
+
+test('the last pilot leaving writes chip damage that periodic flushes defer', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-drift-flush-'));
+  try {
+    const path = join(directory, 'world.sqlite');
+    const store = new WorldStore(path);
+    const engine = new GameEngine(SEED, undefined, new InlineWorldPersistence(store));
+    const socket = new RecordingSocket();
+    engine.addPlayer('miner', 'Miner', socket, { x: 900, y: 900 }, 'scout');
+    engine.ensureAsteroidField();
+    engine.checkpointWorld();
+    const chipped = engine
+      .getAllAsteroids()
+      .find((rock) => rock.material === 'metal' && !rock.phenomenon && rock.health > 25);
+    if (!chipped) {
+      throw new Error('The field needs an intact metal deposit');
+    }
+    const home = sectorAt(chipped.position).id;
+    engine.updateAsteroid(chipped.id, { health: chipped.health - 25 });
+    // The next periodic flush is not a drift flush, so the chip would wait.
+    engine.checkpointWorld();
+    expect(store.loadSector(home)?.find((rock) => rock.id === chipped.id)?.health).toBe(
+      chipped.health + 25
+    );
+    engine.removePlayer('miner');
+    expect(engine.isGamePaused()).toBe(true);
+    engine.stopGameLoop();
+    store.close();
+
+    const reopened = new WorldStore(path);
+    expect(reopened.loadSector(home)?.find((rock) => rock.id === chipped.id)?.health).toBe(
+      chipped.health
+    );
+    reopened.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });

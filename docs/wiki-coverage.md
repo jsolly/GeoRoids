@@ -17,7 +17,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Broad gentle plains, neutral gray contours, bidirectional contour speed bonus, guided Contour Lock with ignored steering and physical contact release during protection, with lasers passing through invulnerable hulls, normal-speed crossings, no terrain drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and one-shot spider kills |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, cargo loss, unlimited respawn, brief-disconnect return, and score |
-| teamwork | Systems | One shared crew, scan-to-tow furnace loop, equal contributor delivery rewards, Town Square store, scattered furnace lots with right-angle fire trails only after a furnace is lit, harvested ground that stays empty and flyable, and persistent exploration |
+| teamwork | Systems | One shared crew, scan-to-tow furnace loop, equal contributor delivery rewards, Town Square store, scattered furnace lots with right-angle fire trails only after a furnace is lit, harvested fields that regrow out of sight while staying flyable, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, furnace names only when the chart is zoomed in close, right-angle furnace fire trails only after a furnace is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
 ## Coverage matrix
@@ -44,7 +44,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | How do contours give my ship a speed bonus? | terrain | src/physics/terrain/, terrain and contour tests |
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
-| How does harvested ground stay open while the shared field continues? | teamwork, hud-network | shared/exploration.ts, shared/world.ts, shared/crewSpawn.ts, GameEngine.ts |
+| How do harvested fields regrow while the shared field continues? | teamwork, hud-network | shared/exploration.ts, shared/world.ts, shared/crewSpawn.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
 | How do I mute sound effects and music or recover interrupted audio? | hud-network | src/constants/user-preferences.ts, src/ui/mainMenu.ts, src/audio/audioRuntime.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
 | How do I copy a Player ID so an agent can filter Railway logs? | hud-network | src/ui/debugIdentity.ts, src/utils/clientLogContext.ts, docs/diagnostics.md |
@@ -154,10 +154,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
   pickups take damage from asteroid impacts and ricochets while deployed;
   ordinary crew shots pass through owned hardware.
-- A visited region that no longer holds asteroids stays empty. Ships, lasers,
-  and new flights can still cross it. An empty saved row is the harvest
-  record; historical `completedSectors` values on an old world row are ignored
-  and omitted from the next world save. Respawn uses the nearest furnace. The
+- Asteroids gather in rich fields and quiet voids. A mined region stays
+  flyable, and its harvested deposit slots regrow out of sight over a few
+  minutes; a restart is not a refill. Historical `completedSectors` values on
+  an old world row are ignored and omitted from the next world save. Respawn uses the nearest furnace. The
   universe map keeps its alignment grid and counts explored cells.
 - Pickups preserve ship mass, health capacity, current health, hull size, and flight
   tuning. Cargo, silk, equipment, and satellite collection keep their existing rewards

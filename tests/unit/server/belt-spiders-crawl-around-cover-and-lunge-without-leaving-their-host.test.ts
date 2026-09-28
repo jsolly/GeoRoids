@@ -21,9 +21,9 @@ function host(): AsteroidData {
     offsets: [1, 1, 1, 1],
   };
 }
-/** A crawler frame reads rocks through the caller's broad phase over the same rows. */
+/** A crawler frame reads its rock field through the caller's spatial index. */
 function field(rocks: readonly AsteroidData[]) {
-  return { rocks, index: new AsteroidSpatialIndex(rocks) };
+  return { index: new AsteroidSpatialIndex(rocks) };
 }
 function pilot(position: Position) {
   return { id: 'pilot', position, health: 100, exploding: false, radius: 18 };
@@ -130,8 +130,8 @@ describe('belt surface predators', () => {
     if (!attack) {
       throw new Error('Expected lunge');
     }
-    expect(manager.isAttackActive(attack, [rock], new AsteroidSpatialIndex([rock]))).toBe(true);
-    expect(manager.isAttackActive(attack, [], new AsteroidSpatialIndex([]))).toBe(false);
+    expect(manager.isAttackActive(attack, new AsteroidSpatialIndex([rock]))).toBe(true);
+    expect(manager.isAttackActive(attack, new AsteroidSpatialIndex([]))).toBe(false);
   });
 });
 

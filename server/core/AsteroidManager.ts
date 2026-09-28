@@ -49,7 +49,7 @@ type LaserHitRecord = {
 export class AsteroidManager {
   private asteroids = new Map<string, AsteroidData>();
   private laserHits = new Map<string, LaserHitRecord[]>();
-  private index: AsteroidSpatialIndex | undefined;
+  private readonly index = new AsteroidSpatialIndex([]);
   private rng: RNGService;
   /** Per-manager identity prevents delayed reports surviving a server restart. */
   private readonly managerNonce = randomUUID();
@@ -79,13 +79,8 @@ export class AsteroidManager {
   }
 
   public addAsteroid(asteroid: AsteroidData): void {
-    // A replaced row keeps its map order, so the index is rebuilt to match.
-    if (this.asteroids.has(asteroid.id)) {
-      this.index = undefined;
-    } else {
-      this.index?.add(asteroid);
-    }
     this.asteroids.set(asteroid.id, asteroid);
+    this.index.add(asteroid);
   }
 
   public removeAsteroid(asteroidId: string): AsteroidData | undefined {
@@ -93,19 +88,29 @@ export class AsteroidManager {
     if (asteroid) {
       this.asteroids.delete(asteroidId);
       this.laserHits.delete(asteroidId);
-      this.index?.remove(asteroidId);
+      this.index.remove(asteroidId);
     }
     return asteroid;
   }
 
   /**
    * The one broad phase shared by lasers, collisions, crawlers, scans and
-   * snapshots. It is built once and kept exact: additions, removals, edits and
-   * each motion step update it in place, preserving row order.
+   * snapshots. It lives as long as the manager and stays exact: additions,
+   * removals, edits and each motion step update it in place, preserving row
+   * order. Rows are live objects, so direct geometry edits must `refile`.
    */
   public spatialIndex(): AsteroidSpatialIndex {
-    this.index ??= new AsteroidSpatialIndex(this.asteroids.values());
     return this.index;
+  }
+
+  /**
+   * Re-file rows whose geometry was rewritten in place. Rows are live objects;
+   * code that edits position, size or outline directly must call this.
+   */
+  public refile(rocks: Iterable<AsteroidData>): void {
+    for (const rock of rocks) {
+      this.index.move(rock);
+    }
   }
 
   public updateAsteroid(
@@ -116,7 +121,7 @@ export class AsteroidManager {
     if (asteroid) {
       Object.assign(asteroid, updates);
       // Position, size or outline may have changed the rock's cells.
-      this.index?.move(asteroid);
+      this.index.move(asteroid);
     }
     return asteroid;
   }
@@ -160,7 +165,7 @@ export class AsteroidManager {
       this.removeAsteroid(id);
     }
     this.laserHits.clear();
-    this.index = undefined;
+    this.index.clear();
   }
 
   /**
@@ -179,7 +184,7 @@ export class AsteroidManager {
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;
       asteroid.rotation += asteroid.angularVelocity;
-      this.index?.move(asteroid);
+      this.index.move(asteroid);
     }
   }
 

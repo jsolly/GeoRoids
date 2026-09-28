@@ -9,7 +9,7 @@ import {
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
-import { nearbyAsteroidRows, nearbyWorldRows, WORLD } from '../../shared/world';
+import { asteroidReach, nearbyAsteroidRows, nearbyWorldRows } from '../../shared/world';
 import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
 import { isActiveScanner } from '../../src/entities/ship/surveyScan';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
@@ -186,7 +186,7 @@ export class GameStateBroadcaster {
       }
       try {
         const scanning = isActiveScanner(player);
-        const reach = scanning ? WORLD.interestRadius : WORLD.asteroidInterestRadius;
+        const reach = asteroidReach(scanning);
         const asteroids = nearbyAsteroidRows(
           asteroidIndex.query({
             minX: player.position.x - reach,

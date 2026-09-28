@@ -27,20 +27,24 @@ deposits skip the eastern belt's footprint so its rows keep clear lanes.
 
 A slot regrows when its ID exists nowhere: not awake, not in any dormant
 sector (an in-memory ID index answers this without scanning world history).
-Each awake sector restores one missing slot per
-`DEPOSIT_FIELD.REGROWTH_INTERVAL_MS`, skipping slots within
-`DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE` of any pilot or probe. A sector that
-wakes catches up on the intervals it slept through this process; after a
-restart, a waking sector restores every missing slot that is out of sight.
+Each awake sector restores `DEPOSIT_FIELD.REGROWTH_FRACTION` of its missing
+slots (at least one) per `DEPOSIT_FIELD.REGROWTH_INTERVAL_MS`, skipping slots
+within `DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE` of any pilot or probe, so a
+stripped field refills with a half-life of a few minutes. A sector that wakes
+catches up on the intervals it slept through. A restart is not a refill: time
+before the process started does not count, so saved sectors resume regrowing
+from startup.
 The regrown rock is the slot's original deposit: same ID, position, size, and
 material. A world saved under an older layout keeps its surviving rocks and
 fills missing slots the same way, so layout changes need no migration or reset.
 Split fragments are not slots and never regrow.
 
 Checkpoints send an awake sector every second when its set of rock IDs
-changed (mined, regrown, or carried across an edge). Drift alone is written
-every `WORLD.driftFlushCheckpoints` checkpoints, so a hard crash can rewind
-rocks a few seconds along their paths but never loses or duplicates one.
+changed (mined, regrown, or carried across an edge). Other asteroid state in
+an unchanged sector (drift, spin, chip damage) is written every
+`WORLD.driftFlushCheckpoints` checkpoints, so a hard crash can rewind rocks a
+few seconds along their paths or undo a few seconds of chipping, but never
+loses or duplicates a rock.
 
 `server/world/WorldStore.ts` uses SQLite with WAL and full synchronous transactions, and the game loop never waits on it. The whole saved world is read once at startup and kept in memory; after that the loop only hands write batches to `server/world/WorkerWorldPersistence.ts`, whose worker thread owns the single writable connection (`server/world/worldStoreWorker.ts`). The integration runners' `:memory:` world cannot cross threads, so `openWorldPersistence` commits it inline instead. The database stores world seed, start time, generation, the server release that last wrote the world row, shared exploration, named furnaces, visited sector contents, and pilots (public id, last nickname, banked score, cargo, purchase receipts, silk, salvaged equipment, optional catalog hull paint, token digest, optional recent flight, and release stamps). A recent flight includes last-seen time, kit, pose, mass, and health. Existing saved mass and its flight rules remain intact; pickups no longer change mass or hull stats, and this change requires no saved-data migration. Returning to a recent flight releases contour lock; there is no stored charge or recharge timer. Each pilot row records which client and server releases issued the current resume token, which releases last wrote that score, and the server times of those writes. Live score writes also stamp the connected client. Server-only score writes (offline delivery credit) stamp the current server release and omit a client release so later migration can tell a browser was not present. Persistence is write-behind: once a second while the world is running, everything that changed since the last flush (moved or mined deposits, scores, credentials, exploration, and named furnaces) leaves the loop as one batch and is committed in one transaction, so a batch is never half-applied. Asteroid drift within an unchanged sector is the exception and follows the slower drift cadence described above. The final player's departure and graceful shutdown flush at once; shutdown waits for the last commit before the process exits, within a fixed budget inside Railway's ten-second SIGTERM window (1.5 s for an in-flight commit to finish, 3.5 s for the worker to commit and close). A writer that cannot keep that budget forfeits the final flush; the skipped flush is logged, and if the writer thread never releases the database (a thread inside a native SQLite call cannot be interrupted, and a normal exit would wait for it) the process ends itself with SIGKILL once the logs are flushed, so a hung disk can never hold a restart hostage. A hard crash therefore loses at most about the last second of play, including a terminal break, delivery, or loot pickup that had not been flushed yet; on restart the world resumes from the last committed batch and the clients rebase to it.
 

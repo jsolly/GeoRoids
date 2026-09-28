@@ -8,27 +8,13 @@ import {
 import { applyColossalDeposit, sectorHostsColossal } from '../../shared/asteroidScale';
 import { WORLD } from '../../shared/world';
 import type { AsteroidData, AsteroidMaterial, Position } from '../../shared-types';
-import { DEPOSIT_FIELD, ROID } from '../../src/constants';
+import { DAMAGE, DEPOSIT_FIELD, ROID } from '../../src/constants';
 import { RNGService } from '../core/RNGService';
 
 const SECTOR_EDGE_EPSILON = 1e-6;
 /** Richness samples per sector axis; the mean sets the sector's slot count. */
 const DENSITY_SAMPLES = 4;
 const PLACEMENT_TRIES = 8;
-/** Relative outline jitter; crystal keeps its faceted symmetry. */
-const OUTLINE_JITTER: Record<AsteroidMaterial, number> = {
-  crystal: 0.08,
-  ice: 0.14,
-  metal: 0.06,
-  rubble: 0.2,
-};
-const EXTRA_VERTICES: Record<AsteroidMaterial, number> = {
-  crystal: 0,
-  ice: 2,
-  metal: 2,
-  rubble: 3,
-};
-
 function lattice(seed: number, x: number, y: number): number {
   let hash = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 1274126177);
   hash = Math.imul(hash ^ (hash >>> 13), 1103515245);
@@ -77,7 +63,9 @@ function launchCalm(position: Position): number {
 export function fieldRichness(seed: number, position: Position): number {
   const field = valueNoise(seed ^ 0x5bd1e995, position.x, position.y, DEPOSIT_FIELD.FIELD_SCALE);
   const clump = valueNoise(seed ^ 0x27d4eb2d, position.x, position.y, DEPOSIT_FIELD.CLUMP_SCALE);
-  const richness = smoothstep(0.3, 0.85, field) * (0.3 + 0.7 * clump);
+  const richness =
+    smoothstep(DEPOSIT_FIELD.FIELD_EDGE_LOW, DEPOSIT_FIELD.FIELD_EDGE_HIGH, field) *
+    lerp(DEPOSIT_FIELD.CLUMP_FLOOR, 1, clump);
   return Math.min(richness, lerp(DEPOSIT_FIELD.LAUNCH_RICHNESS, 1, launchCalm(position)));
 }
 
@@ -87,8 +75,8 @@ function depositsPerSectorAt(richness: number): number {
 
 function outline(material: AsteroidMaterial, random: RNGService): number[] {
   const base = MATERIAL_OUTLINES[material];
-  const count = base.length + Math.floor(random.random() * (EXTRA_VERTICES[material] + 1));
-  const jitter = OUTLINE_JITTER[material];
+  const count = base.length + Math.floor(random.random() * (ROID.EXTRA_VERTICES[material] + 1));
+  const jitter = ROID.OUTLINE_JITTER[material];
   return Array.from(
     { length: count },
     // Two decimals keep keyframes compact; the silhouette difference is invisible.
@@ -200,7 +188,8 @@ export function sectorDeposits(seed: number, x: number, y: number): AsteroidData
     const richness = fieldRichness(seed, position);
     const material = asteroidMaterialAt(index);
     const offsets = outline(material, random);
-    const health = material === 'metal' ? 75 : 25;
+    // Metal takes three shots; the wiki reference derives the same values.
+    const health = material === 'metal' ? DAMAGE.LASER_HIT * 3 : DAMAGE.LASER_HIT;
     const size =
       ROID.DEPOSIT_SIZE_MIN +
       (ROID.DEPOSIT_SIZE_MAX - ROID.DEPOSIT_SIZE_MIN) * random.random() ** ROID.DEPOSIT_SIZE_SKEW;
@@ -219,18 +208,24 @@ export function sectorDeposits(seed: number, x: number, y: number): AsteroidData
       ROID.SERVER_VELOCITY_MAX,
       fast
         ? lerp(ROID.FAST_DRIFT_SPEED_MIN, ROID.SERVER_VELOCITY_MAX, pace)
-        : lerp(ROID.DRIFT_SPEED_MIN, ROID.DRIFT_SPEED_MAX, pace ** 2) * lerp(0.6, 1.3, smallness)
+        : lerp(ROID.DRIFT_SPEED_MIN, ROID.DRIFT_SPEED_MAX, pace ** 2) *
+            lerp(ROID.LARGE_ROCK_PACE, ROID.SMALL_ROCK_PACE, smallness)
     );
     const direction = random.random() * Math.PI * 2;
     const spin =
       lerp(ROID.SPIN_MIN, ROID.SPIN_MAX, random.random() ** 3) *
-      lerp(0.5, 1.5, smallness) *
+      lerp(ROID.LARGE_ROCK_SPIN, ROID.SMALL_ROCK_SPIN, smallness) *
       (random.random() < 0.5 ? -1 : 1);
     const rotation = random.random() * Math.PI * 2;
-    const jaggedness = (material === 'rubble' ? 0.6 : 0.2) + random.random() * 0.15;
+    const jaggedness =
+      ROID.DEPOSIT_JAGGEDNESS[material === 'rubble' ? 'rubble' : 'solid'] +
+      random.random() * ROID.DEPOSIT_JAGGEDNESS_SPREAD;
     // The belt keeps its clear lanes; the rim keeps a margin. Skipped slot
     // indices stay unused, so later slots keep their identity.
-    if (Math.hypot(position.x, position.y) > WORLD.radius - 100 || isInBeltFootprint(position)) {
+    if (
+      Math.hypot(position.x, position.y) > WORLD.radius - DEPOSIT_FIELD.RIM_MARGIN ||
+      isInBeltFootprint(position)
+    ) {
       continue;
     }
     // Keep the launch area navigable; nearby deposits still fit inside the first

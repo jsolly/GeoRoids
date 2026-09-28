@@ -107,15 +107,23 @@ export class RegionalAsteroidField {
 
   private load(id: string): AsteroidData[] {
     this.visited.add(id);
-    const cached = this.dormant.get(id);
-    if (cached) {
-      return cached;
+    return this.dormant.get(id) ?? this.layout(id).map((slot) => structuredClone(slot));
+  }
+
+  /** Move a sector's rows into the simulation. Regrowth catch-up runs in update(). */
+  private wake(manager: AsteroidManager, id: string): AsteroidData[] {
+    const rows = this.load(id);
+    this.takeDormant(id);
+    const added: AsteroidData[] = [];
+    for (const rock of rows) {
+      if (manager.getAsteroid(rock.id)) {
+        continue;
+      }
+      manager.addAsteroid(rock);
+      added.push(rock);
     }
-    const parsed = parseSectorId(id);
-    if (!parsed) {
-      throw new Error('Invalid sector identity');
-    }
-    return sectorDeposits(this.seed, parsed.x, parsed.y);
+    this.active.add(id);
+    return added;
   }
 
   private layout(id: string): AsteroidData[] {
@@ -209,32 +217,23 @@ export class RegionalAsteroidField {
     this.sleepDistantSectors(manager, new Set(wanted.keys()), now);
     const created: AsteroidData[] = [];
     for (const id of wanted.keys()) {
-      if (this.active.has(id)) {
-        if (now >= (this.nextRegrowth.get(id) ?? now)) {
-          created.push(...this.regrow(manager, id, 1, observers));
-          this.nextRegrowth.set(id, now + DEPOSIT_FIELD.REGROWTH_INTERVAL_MS);
-        }
+      if (!this.active.has(id)) {
+        created.push(...this.wake(manager, id));
+      }
+      const next = this.nextRegrowth.get(id);
+      let intervals: number;
+      if (next === undefined) {
+        // Newly awake, here or by a powered rock during a checkpoint: catch up
+        // on the intervals it slept through.
+        const slept = this.sleptAt.get(id) ?? clockStart;
+        this.sleptAt.delete(id);
+        intervals = Math.floor((now - slept) / DEPOSIT_FIELD.REGROWTH_INTERVAL_MS);
+      } else if (now >= next) {
+        intervals = 1;
+      } else {
         continue;
       }
-      const rows = this.load(id);
-      this.takeDormant(id);
-      for (const rock of rows) {
-        if (manager.getAsteroid(rock.id)) {
-          continue;
-        }
-        manager.addAsteroid(rock);
-        created.push(rock);
-      }
-      const slept = this.sleptAt.get(id) ?? clockStart;
-      this.sleptAt.delete(id);
-      created.push(
-        ...this.regrow(
-          manager,
-          id,
-          Math.floor((now - slept) / DEPOSIT_FIELD.REGROWTH_INTERVAL_MS),
-          observers
-        )
-      );
+      created.push(...this.regrow(manager, id, intervals, observers));
       this.nextRegrowth.set(id, now + DEPOSIT_FIELD.REGROWTH_INTERVAL_MS);
     }
     this.active = new Set(wanted.keys());
@@ -368,7 +367,8 @@ export class RegionalAsteroidField {
     }
   }
 
-  checkpoint(manager: AsteroidManager): ReadonlyMap<string, AsteroidData[]> {
+  /** `complete` writes every awake sector, including drift-only changes. */
+  checkpoint(manager: AsteroidManager, complete = false): ReadonlyMap<string, AsteroidData[]> {
     // A powered rock may cross a sector edge between interest updates. Keep
     // its new sector awake before checkpointing can put it into dormancy.
     for (const rock of manager.getAllAsteroids()) {
@@ -377,13 +377,7 @@ export class RegionalAsteroidField {
       }
       const id = sectorAt(rock.position).id;
       if (!this.active.has(id)) {
-        for (const native of this.load(id)) {
-          if (!manager.getAsteroid(native.id)) {
-            manager.addAsteroid(native);
-          }
-        }
-        this.takeDormant(id);
-        this.active.add(id);
+        this.wake(manager, id);
       }
     }
     this.sleepDistantSectors(manager, this.active);
@@ -399,7 +393,7 @@ export class RegionalAsteroidField {
     // Membership changes (mined, regrown, carried across an edge) leave within
     // a second. Drift alone is written every few checkpoints: a hard crash
     // rewinds rocks a few seconds along their paths, never loses or duplicates one.
-    const driftDue = this.checkpoints % WORLD.driftFlushCheckpoints === 0;
+    const driftDue = complete || this.checkpoints % WORLD.driftFlushCheckpoints === 0;
     const rows = new Map(this.changed);
     this.pendingMembership = new Map();
     for (const [id, sector] of awake) {

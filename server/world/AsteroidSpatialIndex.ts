@@ -52,12 +52,34 @@ export class AsteroidSpatialIndex {
     }
   }
 
-  /** A re-added ID moves to the end, like a new row. */
+  /** A replaced row keeps its original order, like `Map.set`. */
   add(rock: AsteroidData): void {
-    this.remove(rock.id);
+    const existing = this.entries.get(rock.id);
+    if (existing) {
+      this.unplace(existing);
+      existing.rock = rock;
+      this.place(existing);
+      return;
+    }
     const entry: Entry = { rock, order: this.nextOrder++, x0: 0, x1: -1, y0: 0, y1: -1 };
     this.place(entry);
     this.entries.set(rock.id, entry);
+  }
+
+  get(id: string): AsteroidData | undefined {
+    return this.entries.get(id)?.rock;
+  }
+
+  /** Every indexed row in source order: new rows append, replaced rows keep their slot. */
+  *values(): IterableIterator<AsteroidData> {
+    for (const entry of this.entries.values()) {
+      yield entry.rock;
+    }
+  }
+
+  clear(): void {
+    this.cells.clear();
+    this.entries.clear();
   }
 
   /** Re-file a rock whose position changed; most drift stays inside its cells. */

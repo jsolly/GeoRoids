@@ -3,9 +3,9 @@ import type { GameInteractions } from './game-interactions';
 
 /**
  * Place the pilot beside an actual rendered contour, using the normal server
- * test route. The spot is inside the area the `empty` crew
- * fixture clears, so no asteroid can ram the locked ship (a locked ship is
- * not spawn-protected). Callers arrange the `empty` field first.
+ * test route. A contour-locked ship is not spawn-protected, so callers first
+ * arrange the `empty` crew fixture, which removes every asteroid and stops
+ * regrowth for the scenario.
  */
 export async function placePilotNearContour(page: Page, game: GameInteractions): Promise<void> {
   const capture = await page.evaluateHandle<
@@ -13,12 +13,8 @@ export async function placePilotNearContour(page: Page, game: GameInteractions):
   >("import('/src/physics/terrain/contourCapture.ts')");
   try {
     const point = await capture.evaluate((terrain) => {
-      // Spiral out from a point well south of Town Square.
-      for (let radius = 0; radius <= 600; radius += 10) {
-        for (let turn = 0; turn < 48; turn++) {
-          const angle = (turn / 48) * Math.PI * 2;
-          const x = Math.round(Math.cos(angle) * radius);
-          const y = Math.round(-1_300 + Math.sin(angle) * radius);
+      for (let y = 3500; y <= 3700; y += 10) {
+        for (let x = 1600; x <= 1800; x += 10) {
           if (terrain.findContourCapture({ x, y }, 0)) {
             return { x, y };
           }

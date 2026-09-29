@@ -121,7 +121,6 @@ const sourcePaths = new Set([
   'scripts/wiki-check.ts',
   'scripts/wiki-content.ts',
   'scripts/wiki-vite.ts',
-  '.pages.yml',
   'scripts/wiki-satellite-demo.ts',
   'shared-types.ts',
   'server/configuration.ts',

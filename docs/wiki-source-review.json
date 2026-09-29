@@ -1,7 +1,6 @@
 {
-  "note": "Final review-fix pass: regrowth hides by the full view square (including a scanning pilot's corners), pause and shutdown flushes write deferred asteroid drift and damage, and generated metal health derives from ROID.METAL_HITS. Player-facing asteroid, teamwork and field-manual pages and the exact-values reference re-read and accurate; no demonstration changed.",
+  "note": "Retired the Pages CMS publish path: wiki-check no longer hashes .pages.yml. No article, game rule, or demonstration changed; nothing to re-read.",
   "hashes": {
-    ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
     "docs/protocol/snapshot-v1.md": "sha256:5dce0d4d4fa17b41d2498664a40f6719d53b4d169b91cfe670d71d0a6aa56394",
     "docs/sounds.md": "sha256:a35715e58266ec6919f54784c484038fb042bc086d7902b7f0e2f6d9297a1b69",
@@ -59,7 +58,7 @@
     "public/wiki/media/terrain.gif": "sha256:dcaebe9bf2bf9e9c1ef6d5fd5555dc1f06b3f15d3344a8520c8da7ad2796a663",
     "public/wiki/media/terrain.png": "sha256:96426cda4ad69680b231e1b9b653c51d695fa709cdcd79bf7b2048728745a107",
     "scripts/generate-sounds.ts": "sha256:7aa65b0caa7873259dd249990054a74c503faf98839bf2196096ffd5425ec7d0",
-    "scripts/wiki-check.ts": "sha256:58ca41a24d4844983fe5b0cfc4b5a608aa731246e6bb6dd2727f9e62ff5fb11a",
+    "scripts/wiki-check.ts": "sha256:358bb5f35fcbaf4a033a64b11d70e61a28d2916f83b07efacc02bfc8fc08e01d",
     "scripts/wiki-content.ts": "sha256:d7006a811d3fee2b623e6b3fdbc921ef3142d968e58bd5aaed89c21b8f40ee1d",
     "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",

@@ -181,9 +181,7 @@ assert_no_workdirs
 [ -f "$SHELLCHECK_ARCHIVE" ] || fail "ShellCheck archive was not promoted"
 [ -f "$ACTIONLINT_ARCHIVE" ] || fail "actionlint archive was not promoted"
 grep -Fxq -- '-shellcheck' "$ARGS_FILE" || fail "actionlint did not receive ShellCheck"
-grep -Fxq -- '-ignore' "$ARGS_FILE" || fail "actionlint did not receive the ignore option"
-grep -Fqx -- 'input "client-id" is not defined in action "actions/create-github-app-token@' "$ARGS_FILE" || \
-	fail "actionlint ignore value changed"
+! grep -Fxq -- '-ignore' "$ARGS_FILE" || fail "actionlint received an -ignore option"
 grep -Fxq -- '.github/workflows/check.yml' "$ARGS_FILE" || fail "actionlint did not receive the workflow path"
 
 rm -f "$ARGS_FILE"

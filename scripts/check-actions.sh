@@ -108,10 +108,4 @@ if [[ "$actionlint_source" == "$actionlint_work/download.tar.gz" ]]; then
   mv "$actionlint_source" "$actionlint_archive"
 fi
 
-# actionlint v1.7.12 bundles pre-v3.1 create-github-app-token metadata (no
-# client-id; app-id still required). Workflows retain app-id alongside client-id.
-# Drop this -ignore flag when actionlint's popular-actions registry catches up
-# (rhysd/actionlint#652 / #668).
-"$ACTIONLINT" -shellcheck "$SHELLCHECK" \
-	-ignore 'input "client-id" is not defined in action "actions/create-github-app-token@' \
-	.github/workflows/*.yml
+"$ACTIONLINT" -shellcheck "$SHELLCHECK" .github/workflows/*.yml

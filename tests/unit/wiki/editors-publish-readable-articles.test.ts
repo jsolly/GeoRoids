@@ -84,7 +84,7 @@ test('an editor keeps the old URL when renaming an article title', () => {
   );
 });
 
-test('the compiler accepts Pages CMS frontmatter serialization', () => {
+test('the compiler accepts frontmatter without a blank line or trailing newline', () => {
   const root = fixture();
   const file = join(root, 'content/wiki/field-manual.md');
   const saved = readFileSync(file, 'utf8')

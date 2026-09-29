@@ -12,11 +12,13 @@ Verify the active branch immediately before committing and pushing. The
 emergency he explicitly authorizes; agents never set it, and every `/ship` run
 uses a feature branch.
 
-GitHub protects `main`, including administrators: changes require a PR, an
-up-to-date branch, and the GitHub Actions `ci` check. Force pushes and branch
-deletion are blocked. Human approval and conversation resolution are optional so
-`/ship` can merge once `ci` is green. The
-local break-glass variable does not override these GitHub protections.
+The GitHub `main` ruleset has no bypass actors: changes require a PR, merge by
+squash only, and need the GitHub Actions `ci` check on the PR head; the branch
+need not be up to date with `main`. Force pushes and branch deletion are
+blocked. Human approval and conversation resolution are optional so `/ship` can
+merge once `ci` is green. The local break-glass variable does not override the
+ruleset; an emergency direct push follows
+`~/code/dotagents/skills/ship/references/git-discipline.md` → Server-side gate.
 
 Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. Writes are write-behind through a worker thread (about a one-second loss window on a hard crash; asteroid drift, spin, and chip damage in sectors whose rock set did not change flush every `WORLD.driftFlushCheckpoints` seconds); the game loop never waits on the disk. See [world operations](docs/persistent-world.md).
 

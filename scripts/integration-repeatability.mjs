@@ -28,6 +28,10 @@ export const focusedScenarios = [
     path: 'tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts',
     count: 2,
   },
+  {
+    path: 'tests/integration/browser/sanity/muted-pilot-stops-sample-after-howler-wall-clock-end.test.ts',
+    count: 3,
+  },
 ];
 const focusedPaths = focusedScenarios.map(({ path }) => path);
 const focusedTestCount = focusedScenarios.reduce((total, { count }) => total + count, 0);

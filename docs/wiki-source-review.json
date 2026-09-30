@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed HUD sound and haptics, diagnostics, cargo and combat-survival guidance against native audio instrumentation and title/crew fixture changes. Native trusted gestures, playback, player input/session/preferences, cargo/mining/death behavior and all media are unchanged. package.json only wires repeatability script contracts into check:actions. No article or demonstration changes apply. Retained main's accepted authoritative-bolt source review and firing-proof validation; that source and its hash are unchanged.",
+  "note": "Reviewed HUD Sound and haptics and docs/sounds.md playback against native source ownership: mute stops/disconnects active samples even after an early Howler wall-clock end; native completion releases resources and retires backend bookkeeping; still-active native voices reserve their backend pool rows so overlapping cues keep independent gain and panner nodes. Existing controls, trusted-gesture authorization, pitch, spatial playback and demonstrations remain accurate. Audio units, native-source fault regression, visible desktop/touch mute controls with clean console receipts, and desktop/mobile field-manual browser checks passed. Accepted only the changed Sound.ts and explicitly cited title-audio test digests. The test adapts its native-source mock without changing title music assertions; all unrelated accepted source hashes are unchanged.",
   "hashes": {
     "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
     "docs/protocol/snapshot-v1.md": "sha256:5dce0d4d4fa17b41d2498664a40f6719d53b4d169b91cfe670d71d0a6aa56394",
@@ -140,7 +140,7 @@
     "shared/townStore.ts": "sha256:190b08a53716545d64c486523717380c8a64d89ff91e5af4a124ccc72bf9c146",
     "shared/world.ts": "sha256:e6f4d70ca8c42f18b6a105aef37c982d4390df07e935ba7a2579ec17240948fc",
     "shared/worldBoundary.ts": "sha256:124867307d89929a670c033c6e18f51d0dd7032833913af23e6a26151927cdba",
-    "src/audio/Sound.ts": "sha256:2de71c244677b01700666d48571ea394fac5b6c08341e253fc7d77382a1e6ea1",
+    "src/audio/Sound.ts": "sha256:efd54395e31e5c0614250ebcad6744e12bd7035d1c5da70fc4aa3be6505d8f02",
     "src/audio/audioRuntime.ts": "sha256:008868ac87814aad51c2e87aeedd8fd8664ec09d2ad05f0506a4f59523d9f4c2",
     "src/audio/destructionSounds.ts": "sha256:7f268ee7331b440339510b24702f0338fdc1ce5f44c4a92ab697e51e07d475f4",
     "src/audio/explosionSound.ts": "sha256:cb4c89bcd69c7b1b337e0c8360cbb415b9d9ccb97e810f55565249494efcf615",
@@ -357,7 +357,7 @@
     "tests/integration/entities/input/mouse.test.ts": "sha256:622e8cb4a162a8771934519c131561a0044531118cf8a7b36a05c26377820fe1",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:363eba19780882950818c5a68647315713ac938321eca197641eb642f7ff07c2",
     "tests/unit/audio/spiders-whimper-once-when-the-furnace-consumes-them.test.ts": "sha256:bf350fcbc82aafd1b2cf430aa09da738afb96bb012bc1e8ee8786a3f82acd274",
-    "tests/unit/audio/title-and-play-loop-music-beds.test.ts": "sha256:f9a8faa29761823144ded2d4d0445b641361a0d497370cfde54d7101d5e4fd93",
+    "tests/unit/audio/title-and-play-loop-music-beds.test.ts": "sha256:99a42504808ea6494966f9767c03cea44ec68c60cf8342352a6027632600f5f5",
     "tests/unit/diagnostics/debugHudMetrics.test.ts": "sha256:30bef1e4766b95b7c5923bb6816b958581d68ec2f7cf79194ef132adf28216e0",
     "tests/unit/entities/asteroidSplitting.test.ts": "sha256:f8c49a25d4cbc8c8da1ae5b5bda3a7a789e8423e6b2afb896efa9a713220aadf",
     "tests/unit/entities/asteroids.test.ts": "sha256:62dc849ff1583c360a13b467e09b07ccfdb5261e8b4806f6413ee4487e7444d6",

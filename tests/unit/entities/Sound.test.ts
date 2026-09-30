@@ -7,9 +7,23 @@ vi.mock('../../../src/utils/logForwarder', () => ({
   forwardLogToServer: vi.fn(),
 }));
 
+class FakeSource extends EventTarget {
+  stop = vi.fn();
+  disconnect = vi.fn();
+}
+
 class FakeHowl {
   static instances: FakeHowl[] = [];
   readonly voices = new Map<number, { volume: number; rate: number }>();
+  readonly sources = new Map<number, FakeSource>();
+  readonly nodes = new Map<number, { bufferSource: FakeSource | null }>();
+  readonly rows = new Map<
+    number,
+    { _node: { bufferSource: FakeSource | null }; _ended: boolean; _paused: boolean }
+  >();
+  _soundById(id: number) {
+    return this.rows.get(id);
+  }
   private nextId = 0;
   loaded = true;
   _webAudio = true;
@@ -21,11 +35,28 @@ class FakeHowl {
   }
   play = vi.fn(() => {
     const id = ++this.nextId;
+    const source = new FakeSource();
+    this.sources.set(id, source);
+    const inactive = [...this.rows].find(([, candidate]) => candidate._ended);
+    const row = inactive?.[1] ?? { _node: { bufferSource: null }, _ended: false, _paused: false };
+    if (inactive) {
+      this.rows.delete(inactive[0]);
+    }
+    row._ended = false;
+    row._paused = false;
+    row._node.bufferSource = source;
+    this.rows.set(id, row);
+    this.nodes.set(id, row._node);
     this.voices.set(id, { volume: 1, rate: 1 });
     return id;
   });
   stop = vi.fn((id: number) => {
     this.voices.delete(id);
+    const row = this.rows.get(id);
+    if (row) {
+      row._ended = true;
+      row._paused = true;
+    }
     this.options.onstop?.(id);
   });
   volume(value: number, id: number) {
@@ -50,6 +81,7 @@ class FakeHowl {
     if (!this.options.loop) {
       this.voices.delete(id);
     }
+    this.sources.get(id)?.dispatchEvent(new Event('ended'));
     this.options.onend?.(id);
   }
 }
@@ -152,6 +184,7 @@ beforeEach(async () => {
   FakeHowl.instances = [];
   FakeContext.instances = [];
   vi.stubGlobal('AudioContext', FakeContext);
+  vi.stubGlobal('AudioBufferSourceNode', FakeSource);
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const addEventListener = document.addEventListener.bind(document);
   vi.spyOn(document, 'addEventListener').mockImplementation((...args) => {
@@ -200,6 +233,8 @@ test('a stalled clock ignores synthetic input and trusted recovery drops old sho
   expect(oldContext.close).toHaveBeenCalledOnce();
   expect(oldHowl.unload).toHaveBeenCalledOnce();
   expect(oldHowl.voices.size).toBe(0);
+  expect(oldHowl.sources.get(1)?.stop).toHaveBeenCalledOnce();
+  expect(oldHowl.sources.get(1)?.disconnect).toHaveBeenCalledOnce();
   expect(FakeContext.instances).toHaveLength(2);
   const nextHowl = FakeHowl.instances[1];
   expect(nextHowl?.play).not.toHaveBeenCalled();
@@ -303,6 +338,129 @@ test('active voice cap drops overflow and releases capacity when a shot ends', a
   await sound.play();
   expect(howl().play).toHaveBeenCalledTimes(3);
   expect(howl().voices.size).toBe(2);
+});
+
+test('an early Howler wall end keeps the native voice bounded until mute stops it', async () => {
+  const sound = new Sound('sounds/laser.m4a', 1);
+  setSound(true);
+  await settle();
+  sound.play();
+  const source = howl().sources.get(1);
+  const node = howl().nodes.get(1);
+  if (!source || !node) {
+    throw new Error('Expected owned native source');
+  }
+  node.bufferSource = null;
+  howl().options.onend?.(1);
+  expect(sound.isPlaying()).toBe(true);
+  sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(1);
+  setSound(false);
+  expect(source.stop).toHaveBeenCalledOnce();
+  expect(source.disconnect).toHaveBeenCalledOnce();
+  expect(sound.isPlaying()).toBe(false);
+});
+
+test('native sample completion releases a slot independently of the Howler wall timer', async () => {
+  const sound = new Sound('sounds/laser.m4a', 1);
+  setSound(true);
+  await settle();
+  sound.play();
+  const source = howl().sources.get(1);
+  if (!source) {
+    throw new Error('Expected owned native source');
+  }
+  source.dispatchEvent(new Event('ended'));
+  expect(source.stop).not.toHaveBeenCalled();
+  expect(source.disconnect).toHaveBeenCalledOnce();
+  expect(howl().stop).toHaveBeenCalledWith(1);
+  expect(howl().voices.size).toBe(0);
+  sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(2);
+});
+
+test('a wall-ended native cue reserves its pool node until native completion', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  sound.play();
+  const first = howl().sources.get(1);
+  const row = howl().rows.get(1);
+  if (!first || !row) {
+    throw new Error('Expected first pooled native source');
+  }
+  const node = row._node;
+  row._ended = true;
+  row._paused = true;
+  node.bufferSource = null;
+  howl().options.onend?.(1);
+  sound.play(0.5, { x: 200, y: 50 });
+  expect(howl().nodes.get(2)).not.toBe(node);
+  expect(row._ended).toBe(false);
+  expect(row._paused).toBe(false);
+  sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(2);
+  first.dispatchEvent(new Event('ended'));
+  expect(row._ended).toBe(true);
+  sound.play();
+  expect(howl().nodes.get(3)).toBe(node);
+  context().changeState('interrupted');
+  expect(howl().sources.get(2)?.stop).toHaveBeenCalledOnce();
+  expect(howl().sources.get(2)?.disconnect).toHaveBeenCalledOnce();
+  expect(howl().sources.get(3)?.stop).toHaveBeenCalledOnce();
+  expect(howl().sources.get(3)?.disconnect).toHaveBeenCalledOnce();
+  expect(sound.isPlaying()).toBe(false);
+});
+
+test('one failed native stop still disconnects that source and stops the other cue', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  sound.play();
+  sound.play();
+  const first = howl().sources.get(1);
+  const second = howl().sources.get(2);
+  if (!first || !second) {
+    throw new Error('Expected two native sources');
+  }
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  first.stop.mockImplementationOnce(() => {
+    throw new Error('Device source stop failed');
+  });
+  sound.stop();
+  expect(first.disconnect).toHaveBeenCalledOnce();
+  expect(second.stop).toHaveBeenCalledOnce();
+  expect(second.disconnect).toHaveBeenCalledOnce();
+  expect(sound.isPlaying()).toBe(false);
+  expect(logger.error).toHaveBeenCalled();
+});
+
+test('a backend play without a native handle is rejected and stopped', async () => {
+  const sound = new Sound('sounds/laser.m4a', 1);
+  setSound(true);
+  await settle();
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  howl().play.mockImplementationOnce(() => 1);
+  expect(sound.playNote(1, 7)).toBe(false);
+  expect(howl().stop).toHaveBeenCalledWith(1);
+  expect(sound.isPlaying()).toBe(false);
+  expect(logger.error).toHaveBeenCalled();
+});
+
+test('a playback error releases and disconnects its owned native source', async () => {
+  const sound = new Sound('sounds/laser.m4a', 1);
+  setSound(true);
+  await settle();
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  sound.play();
+  const source = howl().sources.get(1);
+  if (!source) {
+    throw new Error('Expected owned native source');
+  }
+  howl().options.onplayerror?.(1, 'Device interrupted');
+  expect(source.stop).toHaveBeenCalledOnce();
+  expect(source.disconnect).toHaveBeenCalledOnce();
+  expect(sound.isPlaying()).toBe(false);
 });
 
 test('overlapping cues preserve tuning and per-voice volume; melody uses exact intervals', async () => {

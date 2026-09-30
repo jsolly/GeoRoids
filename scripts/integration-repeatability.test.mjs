@@ -123,19 +123,19 @@ test('skips, incomplete discovery and failed suites cannot masquerade as a compl
   }
 });
 
-test('each focused attempt proves all three reviewed files and all six audio combinations', () => {
+test('each focused attempt proves all four reviewed files and all six audio combinations', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-focused-coverage-'));
   try {
     const path = join(directory, 'vitest.json');
     assert.deepEqual(
       focusedScenarios.map(({ count }) => count),
-      [6, 7, 2]
+      [6, 7, 2, 3]
     );
     const files = focusedScenarios.map(({ path: file }) => file);
     const passed = {
       success: true,
-      numTotalTests: 15,
-      numPassedTests: 15,
+      numTotalTests: 18,
+      numPassedTests: 18,
       numFailedTests: 0,
       numPendingTests: 0,
       numTodoTests: 0,
@@ -151,12 +151,12 @@ test('each focused attempt proves all three reviewed files and all six audio com
       writeFileSync(path, JSON.stringify(evidence));
       return readTestEvidence(path, files, focusedScenarios);
     };
-    assert.deepEqual(read(passed), { total: 15, passed: 15, files: 3 });
-    assert.throws(() => read({ ...passed, testResults: passed.testResults.slice(0, 2) }));
+    assert.deepEqual(read(passed), { total: 18, passed: 18, files: 4 });
+    assert.throws(() => read({ ...passed, testResults: passed.testResults.slice(0, 3) }));
     assert.throws(() =>
       read({ ...passed, testResults: [...passed.testResults, passed.testResults[0]] })
     );
-    assert.throws(() => read({ ...passed, numTotalTests: 14, numPassedTests: 14 }));
+    assert.throws(() => read({ ...passed, numTotalTests: 17, numPassedTests: 17 }));
     const skipped = structuredClone(passed);
     skipped.testResults[2].assertionResults[0].status = 'pending';
     assert.throws(() => read(skipped));

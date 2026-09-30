@@ -175,3 +175,15 @@ Count bounces only on that accepted projectile ID. Retain selected authoritative
 rock rows and rejected receipts; a later passing sample does not establish the
 cause of an earlier failure. Capture artifacts before disposing browser handles,
 but attempt every restoration even when capture or the scenario fails.
+
+## Native lifecycle repeatability
+
+Use the [pinned native repeatability runner](../docs/integration-repeatability.md)
+when investigating browser lifecycle flakiness. Retain every attempt and its native
+architecture, versions, seed/order inputs, exit, timing and failure evidence. Read
+native state alongside event-published observations; cached diagnostic state alone
+cannot distinguish a native failure from an observation failure. Capture native
+control calls, settlements and trusted gestures before browser cleanup. Preserve
+browser authorization, existing behavior budgets and real playback assertions.
+A smaller diagnostic sample or an incomplete run never satisfies the approved full
+sample. Do not retry a failed attempt until it disappears from the report.

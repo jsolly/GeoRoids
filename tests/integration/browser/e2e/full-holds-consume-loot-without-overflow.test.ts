@@ -22,12 +22,13 @@ for (const viewport of [
     const peerDiagnostics = watchBrowserDiagnostics(peerPage);
     const game = new GameInteractions(page);
     const peer = new GameInteractions(peerPage);
-    await game.bootGame({ kitId: viewport.kitId });
-    await peer.bootGame();
-    await arrangeCrewField(
-      [await game.getLocalPlayerId(), await peer.getLocalPlayerId()],
-      'full-cargo'
-    );
+    await game.bootGame({ kitId: viewport.kitId, waitForCombatReady: false });
+    await peer.bootGame({ waitForCombatReady: false });
+    const playerId = await game.getLocalPlayerId();
+    const peerId = await peer.getLocalPlayerId();
+    const epochs = await arrangeCrewField([playerId, peerId], 'full-cargo');
+    await game.waitForControlledFixture(epochs.get(playerId));
+    await peer.waitForControlledFixture(epochs.get(peerId));
     await peer.placeShipAt(400, -500);
     await game.waitForCombatReady();
     await game.placeShipAt(0, -500);

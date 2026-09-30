@@ -16,9 +16,9 @@ only after fresh evidence covers the PR's acceptance criteria.
 | PR | Work and required proof | Status | Todoist IDs |
 | --- | --- | --- | --- |
 | 1 | Reconcile verified completions and engineering decisions. Keep relative imports, no barrels and Canvas2D; verify existing regeneration and survey sharing. Distinguish historical performance from physical-phone proof. | Shipped [#737](https://github.com/jsolly/GeoRoids/pull/737) | Alias `6hcHJJpqRp2MmcMv`; GPU `6hcHJJxRJgM4GwWM`; regeneration `6hfGfxp2c6wf2gmM`; survey `6hfFGqgFPxC28f9v`; archived work `6hRVg8qpghM6Qv22` |
-| 2 | Fix fixture determinism and retain actionable failure evidence for #715 and #716. Prove failures expose the cause without retries or weaker assertions. | In progress | Triage `6hfFQfq4PP367Vxv`; harness parent `6hfFQcvww7gHj4Mv`; human schedule `6hf8pMC4JVjgvgQv` |
+| 2 | Fix fixture determinism and retain actionable failure evidence for #715 and #716. Prove failures expose the cause without retries or weaker assertions. | Shipped [#738](https://github.com/jsolly/GeoRoids/pull/738), `e0ef52be` | Triage `6hfFQfq4PP367Vxv`; harness parent `6hfFQcvww7gHj4Mv`; human schedule `6hf8pMC4JVjgvgQv` |
 | 3 | Fix WebKit audio and obtain cross-architecture proof for #714 and #717. Run 20 focused repetitions and three full suites on native ARM and x64. | In progress in an isolated checkout | Same triage, harness parent and human schedule as PR 2 |
-| 4 | Prove authoritative firing in production. A correlated non-null `shotAcknowledged` is sufficient even if a collision consumes the bolt before a snapshot. Reject missing, null, wrong or stale acknowledgements; malformed snapshots still fail. | Planned | Projectile `6hfP8334Q638373M` |
+| 4 | Prove authoritative firing in production. A correlated non-null `shotAcknowledged` is sufficient even if a collision consumes the bolt before a snapshot. Reject missing, null, wrong or stale acknowledgements; malformed snapshots still fail. | Shipped [#739](https://github.com/jsolly/GeoRoids/pull/739) | Projectile `6hfP8334Q638373M` |
 | 5 | Run six isolated integration shards three times, each run under 300 seconds. Preserve isolation and failure evidence. | Planned | Shards `6hcHJM3WrR7Hh9CM` |
 | 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | Planned | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
 | 7 | Audit targeted dependency injection and indexes. Use measured ownership and query needs to choose changes. | Planned | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
@@ -256,3 +256,118 @@ player rules/assets required no article or media edits. The documented review
 accepted those current sources, then Wiki validation passed. No owned development
 session remains. These are native arm64 dirty-tree samples; gate four, shipping
 and clean-release verification remain root-owned and pending.
+
+PR 2 shipped through #738 at `e0ef52be13a62e02b27590995cc4c2d612a57c67`.
+Its final complete local gate passed 207 integration tests across 90 files in
+847.15 seconds, then frame-work passed 120 samples and both constrained-client
+cases passed. This supersedes the pending gate-four status above. Deployment
+verification remains root-owned.
+
+PR 3 integrated that exact main revision without discarding its empty live audio
+fixture or canonical fixture helpers. The two remaining initial two-pilot setups,
+full cargo holds and score after respawn, now join without waiting for combat
+protection to expire and await named pilot epochs immediately after arrangement.
+The later mining combat wait, intentional impact, death, respawn, cargo and score
+assertions and timeouts remain intact. Their three focused cases passed.
+
+The first merged PR 3 native Mac arm64 diagnostic failed with runner exit 1:
+four of nine intended cases passed, five audio cases failed in 64.55 seconds.
+Retain `/tmp/georoids-pr3-merged-focused.log` and
+`.performance/pr3-merged-focused-failed`. Chromium landscape and all three
+WebKit cases observed the old native context closed and replacement running,
+but the native replacement clock did not advance within the existing poll.
+WebKit's initial native clock was already zero before the forced diagnostic
+stall. This proves the observed native clock failure in this attempt, but does
+not identify its cause or reproduce the historical cached-state mismatch.
+Chromium mobile completed its audio scenario and then failed in the shared
+post-test fixture evidence capture because navigation destroyed the evaluation
+context. No behavior change or retry was made after these failures.
+Vitest also discovered an ignored integration-backup test copy and rejected its
+relative import. That copy is preserved outside test discovery at
+`/tmp/georoids-pr3-main-integration-backup-20260930`; its failed suite remains in
+the original log. The first receipt unit command likewise discovered the backup
+unit copy and passed six tests across two files, rather than the intended three.
+The seven repeatability Node contracts and TypeScript check independently exited
+zero. The runner terminated its owned services normally after the failed sample.
+Clean pinned native ARM/x64 twenty-attempt and three-full-suite acceptance,
+round-two review and the full local gate remain outstanding. Instrumentation and
+fixture setup change no player controls or Wiki topic; no article changes apply.
+
+The corrected receipt unit discovery passed its intended three tests in one file
+with exit zero. Markdown, changed-file Biome and the automated `check:actions`
+command also exited zero. Two bounded independent native clock controls then
+completed with exit zero. Fresh trusted mouse/touch controls on Chromium and
+WebKit compared the raw `BaseAudioContext.currentTime` getter with ordinary
+reads, both with and without the probe. The second control exercised 24 looping
+buffer contexts with repeated page-owned disposal in shared browser instances;
+all clocks advanced about 0.47–0.51 seconds across their observations. Retain
+`/tmp/georoids-pr3-native-clock-control.log`,
+`/tmp/georoids-pr3-native-clock-control-disposal.log` and
+`.performance/native-clock-control-disposal`. These later controls do not prove
+why the game scenario's initial clocks stalled in the earlier failed sample.
+No playback emulation, launch authorization bypass or runtime fix was introduced.
+The diagnostic source is preserved outside test discovery at
+`/tmp/georoids-pr3-native-clock-control-diagnostic.ts`.
+
+The native probe now also reads the original base-class clock getter, and the
+scenario requires initial native clock progress before deliberately freezing its
+observed clock. Its final Wiki navigation records main-frame navigation events
+and awaits the intended URL, load and complete document before finishing. This
+is a guarded observation/barrier change, not proof of a navigation root cause;
+its focused native validation is pending while PR 4 owns the machine. Original
+capture errors are still propagated and independently retain server evidence.
+The added getter initially failed TypeScript narrowing; correcting its bound
+reader made the final TypeScript check exit zero. Changed-file Biome then exited
+zero. No browser/integration/performance process remains owned by PR 3.
+
+The latest frozen PR 3 native Mac arm64 audio diagnostic passed all six cases in
+one file in 35.92 seconds with runner exit zero. Retain
+`/tmp/georoids-pr3-native-focused-initial-raw.log` and
+`.performance/native-focused-initial-raw`, including revision/diff/native metadata,
+logs and current lifecycle receipts. Initial and replacement native clocks
+advanced, raw base-class and superclass values agreed, capture/scenario errors
+were null and every trace reported zero dropped entries. All existing playback,
+trusted gesture, player/session/socket/input, no-shot and preference assertions
+completed. Wiki navigation completion barriers passed, and receipts retained
+both main-frame URL events. This is one frozen dirty-tree diagnostic success,
+not an explanation for the earlier failed sample or the historical #714 mismatch,
+and not the clean native ARM/x64 20+3 acceptance sample. Owned services stopped;
+PR 4 received machine ownership immediately after cleanup.
+
+Scoped Wiki review covered HUD/audio/haptics/diagnostics, cargo capacity and
+banking, death and respawn guidance against the changed title and crew fixtures
+and native probe. Player-visible behavior and media are unchanged. Wiki review
+initially reported precisely two changed source hashes, `package.json` and the
+title-music scenario. Accepting those reviewed sources changed only those hashes
+and the review note; the next Wiki check passed. No unrelated source hash or
+article/media baseline was regenerated. PR 3 round-two review, full gate and
+post-merge repeated native acceptance remain outstanding.
+
+PR 4 shipped through [#739](https://github.com/jsolly/GeoRoids/pull/739) at
+`7fb51d985dff87d6429d2a6037509afa47998e96`. Its verified staged tree was
+`4bcd470b47161dc58cd81c3f342ada3d3eb6805c`. The first gate passed 1741 of 1742
+unit tests and failed the Wiki source digest contract. Scoped review of the
+changed authoritative-bolt test repaired that baseline; the subsequent complete
+gate passed static checks, units, build and all 207 integration tests across 90
+files in 933.39 seconds, followed by 120 frame-work vectors and both constrained
+cases. Owned runner processes cleaned up. The first failure remains part of the
+record rather than being replaced by the later success.
+
+[CI 36745568279](https://github.com/jsolly/GeoRoids/actions/runs/36745568279)
+passed on exact head `d2be0702786fe17f59831c413c0806976c0568c4` before merge.
+Vercel deployment `dpl_fWQX1Nnm7gi49zw3CGMTbAweiNP8` reached READY and its
+release header matched the merge. Railway deployment `6764872994` succeeded at
+that exact merge, with healthy worker persistence, `failed: false` and zero
+simulation stalls. [Production smoke 36746083077](https://github.com/jsolly/GeoRoids/actions/runs/36746083077)
+completed exact request `6764872994`; its receipt reported client and server
+release `7fb51d985dff87d6429d2a6037509afa47998e96`, `errors: []` and
+`success: true`. Gameplay received 76 snapshots and fired through the real UI
+with request `33e7c734-e5a3-4eb0-ba51-1404bf2c9522` and a non-null acknowledged
+projectile. Client, server and production firing are verified for that release.
+
+The production-follow helper's workflow-title matcher was corrected. Its failed
+artifact lookup still expects `production-smoke-ID` while the actual name is
+`release-ID`; this separate helper repair remains on existing external Todoist
+`6hfmw9hqc4jw9Qvc`. PR 3's six affected round-two semantic review lenses completed
+without findings or fingerprint change. Its full gate and clean native ARM/x64
+20+3 acceptance remain pending; no historical #714 cause is declared fixed.

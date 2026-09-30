@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed only the changed authoritative-bolt client unit source against combat-survival firing instructions and ConnectionManager.sendShootEvent. The added test verifies the existing top-level player identity and correlated shot payload; no gameplay behavior, controls, Wiki article, illustration, or media generator changes. Focused client reconciliation tests passed seven cases; production smoke scenario contract passed 22 cases with zero skips.",
+  "note": "Reviewed HUD sound and haptics, diagnostics, cargo and combat-survival guidance against native audio instrumentation and title/crew fixture changes. Native trusted gestures, playback, player input/session/preferences, cargo/mining/death behavior and all media are unchanged. package.json only wires repeatability script contracts into check:actions. No article or demonstration changes apply. Retained main's accepted authoritative-bolt source review and firing-proof validation; that source and its hash are unchanged.",
   "hashes": {
     "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
     "docs/protocol/snapshot-v1.md": "sha256:5dce0d4d4fa17b41d2498664a40f6719d53b4d169b91cfe670d71d0a6aa56394",
@@ -7,7 +7,7 @@
     "index.css": "sha256:266f8e48116cf1dd6940e73d06fe52fee0f095df144feab67c90c99c4cb6eb4e",
     "index.html": "sha256:45c944e4f6bbe66762fa78af529253fb536a1cc72d0bce64e9823c50902bb56f",
     "middleware.ts": "sha256:0acf90e66e33c6369a952e09cc281f79b1a0b8239b9c7a0a07f266487dbf08da",
-    "package.json": "sha256:99634bb0b76bf9751b1fd6f1a41e1ef58eee509651bd387278db2ded86407e65",
+    "package.json": "sha256:e830cd4197c50dc0a5543e30d36f4873219953ea1ea895a7b18acbad48765df2",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -351,7 +351,7 @@
     "tests/integration/browser/sanity/reflective-asteroids-leave-ordinary-salvage.test.ts": "sha256:08a17d5c5669012807d28b531b36cdafbb7f38b309ae4b7a3fd22a503eefbcd4",
     "tests/integration/browser/sanity/scout-radar-pulses-cover-the-viewport.test.ts": "sha256:d47bd95eaaf78393acd464b28ce7db600ae22fed43f4508cd4d6426985b634bc",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:1c6991fb8f632d71bdad1e812b206c96a6e23eaf1cb3c77b60c60bfd378a94f4",
-    "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:694f0c9073b9fdfd7bd391ffa64d5a1f9212b9072f9cad263b3dedbc185d2cb9",
+    "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:d11cbaf1e6a320fb861ee15ddb19aadeaa45a5d3e9c0e2d9ee19071d83c5fb50",
     "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:0cd117dd0817aeb75a22af83f473b4c03521f5490a8f41a273a24c8c17e73dd1",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:d7c87bc468f141449e4b4765b2cf497e9613f3d720928126aaae31b096cf74ab",
     "tests/integration/entities/input/mouse.test.ts": "sha256:622e8cb4a162a8771934519c131561a0044531118cf8a7b36a05c26377820fe1",

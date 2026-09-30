@@ -1,11 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import { chromium, type Page, webkit } from 'playwright';
 import { describe, expect, test } from 'vitest';
-import { installAudioProbe } from '../../utils/audio-probe';
+import { installAudioProbe, readNativeAudioSnapshot } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
 import { readTouchControlState } from '../../utils/touch-input';
+import { writeScenarioReceipt } from '../../utils/write-scenario-receipt';
 
 function readLoops(page: Page): Promise<Array<{ duration: number; contextId: number }>> {
   return page.evaluate(() => {
@@ -21,8 +22,11 @@ async function expectOnlyCurrentLoop(page: Page, count: number): Promise<void> {
     .poll(() => page.evaluate(() => document.documentElement.dataset['audioContexts']))
     .toBe(String(count));
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextStates']))
-    .toBe(JSON.stringify([...Array.from({ length: count - 1 }, () => 'closed'), 'running']));
+    .poll(async () => {
+      const snapshot = await readNativeAudioSnapshot(page);
+      return snapshot.contexts.map((context) => context.state);
+    })
+    .toEqual([...Array.from({ length: count - 1 }, () => 'closed'), 'running']);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset['activeLoopContexts']), {
       timeout: 30000,
@@ -104,183 +108,289 @@ for (const browserType of [chromium, webkit]) {
         const page = await browserManager.recreatePage({ music: true, hasTouch: mobile });
         await page.setViewportSize(viewport);
         await installAudioProbe(page, true, { music: true });
-        const errors: string[] = [];
-        const warnings: string[] = [];
-        const gameplaySockets: string[] = [];
-        page.on('pageerror', (error) => errors.push(error.message));
-        page.on('console', (message) => {
-          if (message.type() === 'error') {
-            errors.push(message.text());
-          }
-          if (message.type() === 'warning') {
-            warnings.push(message.text());
-          }
-        });
-        page.on('websocket', (socket) => {
-          if (new URL(socket.url()).pathname === '/ws') {
-            gameplaySockets.push(socket.url());
-          }
-        });
-        const game = new GameInteractions(page);
-        await game.navigateToGame();
-        expect(await page.locator('label[for="soundPref"]').textContent()).toBe('Sound Effects');
-        expect(await page.locator('#musicPref').isChecked()).toBe(true);
-        expect(await page.locator('label[for="musicPref"]').textContent()).toBe('Music');
-        await page.locator('#ship-kit-grid [aria-pressed="true"]').click();
-        await expectOnlyCurrentLoop(page, 1);
-        const titleLoop = (await readLoops(page)).at(-1);
-        expect(titleLoop).toBeDefined();
-
-        const titleScreenshot = screenshotManager.getScreenshotPath(
-          `audio-recovery-title-${browserType.name()}-${viewport.name}.png`
-        );
-        await page.screenshot({ path: titleScreenshot, fullPage: true });
-
-        await game.startGame();
-        await game.waitForServerJoin();
-        const playerId = await game.getLocalPlayerId();
-        // Keep this native audio/input scenario free of unrelated asteroid deaths.
-        // Arrange only a live joined pilot; the fixture rejects death rather than reviving it.
-        const epochs = await arrangeCrewField([playerId], 'empty');
-        const fixtureEpoch = epochs.get(playerId);
-        await game.waitForControlledFixture(fixtureEpoch);
-        await game.waitForGameReady();
-        expect(await game.getAsteroidCount()).toBe(0);
-        await expect
-          .poll(async () => (await readLoops(page)).at(-1)?.duration, { timeout: 30000 })
-          .not.toBe(titleLoop?.duration);
-        await expectOnlyCurrentLoop(page, 1);
-        const flightLoop = (await readLoops(page)).at(-1);
-        const socketsBefore = gameplaySockets.length;
-        expect(socketsBefore).toBe(1);
-        expect(
-          await page.locator('body').evaluate((body) => body.classList.contains('debug-on'))
-        ).toBe(false);
-        await expectFlightControlsReachable(page, mobile);
-        const flightScreenshot = screenshotManager.getScreenshotPath(
-          `audio-recovery-play-${browserType.name()}-${viewport.name}.png`
-        );
-        await page.screenshot({ path: flightScreenshot });
-        const debugScreenshots: string[] = [];
-        await page.evaluate(
-          "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
-        );
-        for (const debugState of ['expanded', 'collapsed']) {
-          const toggle = page.locator('#debug-hud-toggle');
-          if ((await toggle.getAttribute('aria-expanded')) !== String(debugState === 'expanded')) {
-            if (mobile) {
-              await toggle.tap();
-            } else {
-              await toggle.click();
+        let stage = 'title';
+        const snapshots: Array<{
+          stage: string;
+          audio: Awaited<ReturnType<typeof readNativeAudioSnapshot>>;
+        }> = [];
+        const capture = async () =>
+          snapshots.push({ stage, audio: await readNativeAudioSnapshot(page) });
+        const failures: unknown[] = [];
+        let scenarioError: unknown;
+        let evidenceError: unknown;
+        const navigations: Array<{ at: number; url: string }> = [];
+        try {
+          const errors: string[] = [];
+          const warnings: string[] = [];
+          const gameplaySockets: string[] = [];
+          page.on('framenavigated', (frame) => {
+            if (frame === page.mainFrame()) {
+              navigations.push({ at: Date.now(), url: frame.url() });
             }
+          });
+          page.on('pageerror', (error) => errors.push(error.message));
+          page.on('console', (message) => {
+            if (message.type() === 'error') {
+              errors.push(message.text());
+            }
+            if (message.type() === 'warning') {
+              warnings.push(message.text());
+            }
+          });
+          page.on('websocket', (socket) => {
+            if (new URL(socket.url()).pathname === '/ws') {
+              gameplaySockets.push(socket.url());
+            }
+          });
+          const game = new GameInteractions(page);
+          await game.navigateToGame();
+          expect(await page.locator('label[for="soundPref"]').textContent()).toBe('Sound Effects');
+          expect(await page.locator('#musicPref').isChecked()).toBe(true);
+          expect(await page.locator('label[for="musicPref"]').textContent()).toBe('Music');
+          await page.locator('#ship-kit-grid [aria-pressed="true"]').click();
+          await expectOnlyCurrentLoop(page, 1);
+          stage = 'initial-native-clock';
+          await capture();
+          const initialTime = (await readNativeAudioSnapshot(page)).contexts.at(-1)?.time;
+          if (initialTime === undefined) {
+            throw new Error('Initial native audio context missing');
           }
-          await expectFlightControlsReachable(page, mobile);
-          const screenshot = screenshotManager.getScreenshotPath(
-            `audio-recovery-debug-${debugState}-${browserType.name()}-${viewport.name}.png`
-          );
-          await page.screenshot({ path: screenshot });
-          debugScreenshots.push(screenshot);
-        }
-        expect(errors).toEqual([]);
-        expect(warnings).toEqual([]);
+          await expect
+            .poll(async () => (await readNativeAudioSnapshot(page)).contexts.at(-1)?.time)
+            .toBeGreaterThan(initialTime);
+          await capture();
+          stage = 'title';
+          // Prove that the native snapshot is independent of an obsolete event cache.
+          // This diagnostic fault does not alter native audio state or user activation.
+          const staleObservation = await page.evaluate(() => {
+            const data = document.documentElement.dataset;
+            const previous = data['audioContextStates'];
+            try {
+              data['audioContextStates'] = '["suspended"]';
+              document.dispatchEvent(new Event('georoids-audio-probe-snapshot'));
+              return { cached: data['audioContextStates'], native: data['nativeAudioContexts'] };
+            } finally {
+              if (previous === undefined) {
+                delete data['audioContextStates'];
+              } else {
+                data['audioContextStates'] = previous;
+              }
+            }
+          });
+          expect(staleObservation.cached).toBe('["suspended"]');
+          expect(
+            JSON.parse(staleObservation.native ?? '[]').map((row: { state: string }) => row.state)
+          ).toEqual(['running']);
+          const titleLoop = (await readLoops(page)).at(-1);
+          expect(titleLoop).toBeDefined();
 
-        const beforeInput = await readTouchControlState(page);
-        // Inject only the observed clock stall. Playback remains native Web Audio.
-        await page.evaluate(() => {
-          document.documentElement.dataset['freezeAudioContext'] = '1';
-        });
-        await expect
-          .poll(
-            () =>
-              page.evaluate(`(async () => {
+          const titleScreenshot = screenshotManager.getScreenshotPath(
+            `audio-recovery-title-${browserType.name()}-${viewport.name}.png`
+          );
+          await page.screenshot({ path: titleScreenshot, fullPage: true });
+
+          await capture();
+          stage = 'flight';
+          await game.startGame();
+          await game.waitForServerJoin();
+          const playerId = await game.getLocalPlayerId();
+          // This audio/input fixture requires a live pilot and never revives a dead one.
+          const epochs = await arrangeCrewField([playerId], 'empty');
+          const fixtureEpoch = epochs.get(playerId);
+          await game.waitForControlledFixture(fixtureEpoch);
+          await game.waitForGameReady();
+          expect(await game.getAsteroidCount()).toBe(0);
+          await expect
+            .poll(async () => (await readLoops(page)).at(-1)?.duration, { timeout: 30000 })
+            .not.toBe(titleLoop?.duration);
+          await expectOnlyCurrentLoop(page, 1);
+          const flightLoop = (await readLoops(page)).at(-1);
+          const socketsBefore = gameplaySockets.length;
+          expect(socketsBefore).toBe(1);
+          expect(
+            await page.locator('body').evaluate((body) => body.classList.contains('debug-on'))
+          ).toBe(false);
+          await expectFlightControlsReachable(page, mobile);
+          const flightScreenshot = screenshotManager.getScreenshotPath(
+            `audio-recovery-play-${browserType.name()}-${viewport.name}.png`
+          );
+          await page.screenshot({ path: flightScreenshot });
+          const debugScreenshots: string[] = [];
+          await page.evaluate(
+            "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
+          );
+          for (const debugState of ['expanded', 'collapsed']) {
+            const toggle = page.locator('#debug-hud-toggle');
+            if (
+              (await toggle.getAttribute('aria-expanded')) !== String(debugState === 'expanded')
+            ) {
+              if (mobile) {
+                await toggle.tap();
+              } else {
+                await toggle.click();
+              }
+            }
+            await expectFlightControlsReachable(page, mobile);
+            const screenshot = screenshotManager.getScreenshotPath(
+              `audio-recovery-debug-${debugState}-${browserType.name()}-${viewport.name}.png`
+            );
+            await page.screenshot({ path: screenshot });
+            debugScreenshots.push(screenshot);
+          }
+          expect(errors).toEqual([]);
+          expect(warnings).toEqual([]);
+
+          await capture();
+          stage = 'stall';
+          const beforeInput = await readTouchControlState(page);
+          // Inject only the observed clock stall. Playback remains native Web Audio.
+          await page.evaluate(() => {
+            document.documentElement.dataset['freezeAudioContext'] = '1';
+          });
+          await expect
+            .poll(
+              () =>
+                page.evaluate(`(async () => {
       const { readAudioDiagnostics } = await import('/src/audio/audioRuntime.ts');
       return readAudioDiagnostics().clockProgress;
     })()`),
-            { timeout: 10000 }
-          )
-          .toBe('stalled');
-        expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe(
-          '1'
-        );
-        await page.evaluate(() => {
-          document.dispatchEvent(new Event('pointerdown'));
-          document.dispatchEvent(new Event('keydown'));
-        });
-        expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe(
-          '1'
-        );
-        if (mobile) {
-          // Use a native UI tap so recovery does not also request a shot.
-          await page.locator('#debug-hud-toggle').tap();
-        } else {
-          await page.locator('#universe-map-toggle').focus();
-          await page.keyboard.press('Tab');
-        }
-        await expectOnlyCurrentLoop(page, 2);
-        expect((await readLoops(page)).at(-1)?.duration).toBe(flightLoop?.duration);
-        expect(await game.getLocalPlayerId()).toBe(playerId);
-        expect(gameplaySockets.length).toBe(socketsBefore);
-        expect(
-          await page.evaluate(() => window.gameController?.getNetworkManager().isConnected)
-        ).toBe(true);
-        expect(
-          await page.evaluate(() => ({
-            sound: localStorage.getItem('soundOn'),
-            music: localStorage.getItem('musicOn'),
-          }))
-        ).toEqual({ sound: 'true', music: 'true' });
-        const afterInput = await readTouchControlState(page);
-        expect(afterInput.lastShotTime).toBe(beforeInput.lastShotTime);
-        expect(afterInput.thrusting).toBe(true);
-        await page.evaluate(
-          "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(false))"
-        );
-
-        // The title setting is hidden during flight; exercise its real change handler.
-        await page.locator('#musicPref').evaluate((input) => {
-          if (!(input instanceof HTMLInputElement)) {
-            throw new Error('Music preference checkbox missing');
+              { timeout: 10000 }
+            )
+            .toBe('stalled');
+          expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe(
+            '1'
+          );
+          await capture();
+          stage = 'synthetic-events';
+          await page.evaluate(() => {
+            document.dispatchEvent(new Event('pointerdown'));
+            document.dispatchEvent(new Event('keydown'));
+          });
+          expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe(
+            '1'
+          );
+          await capture();
+          stage = 'trusted-recovery';
+          if (mobile) {
+            // Use a native UI tap so recovery does not also request a shot.
+            await page.locator('#debug-hud-toggle').tap();
+          } else {
+            await page.locator('#universe-map-toggle').focus();
+            await page.keyboard.press('Tab');
           }
-          input.checked = false;
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        await expect.poll(() => page.evaluate(() => localStorage.getItem('musicOn'))).toBe('false');
-        await expect
-          .poll(() => page.evaluate(() => document.documentElement.dataset['activeLoops']))
-          .toBe('0');
-        await page.goto(new URL('/wiki/#hud-network', page.url()).href);
-        await expect
-          .poll(() => page.locator('body').textContent())
-          .toContain('separate Sound Effects, Music, and Haptics settings');
-        const wikiScreenshot = screenshotManager.getScreenshotPath(
-          `audio-recovery-wiki-${browserType.name()}-${viewport.name}.png`
-        );
-        await page.screenshot({ path: wikiScreenshot });
-        writeFileSync(
-          screenshotManager.getScreenshotPath(
-            `audio-recovery-${browserType.name()}-${viewport.name}-receipt.json`
+          await expectOnlyCurrentLoop(page, 2);
+          const replacementTime = (await readNativeAudioSnapshot(page)).contexts.at(-1)?.time;
+          if (replacementTime === undefined) {
+            throw new Error('Replacement audio context missing');
+          }
+          await expect
+            .poll(async () => (await readNativeAudioSnapshot(page)).contexts.at(-1)?.time)
+            .toBeGreaterThan(replacementTime);
+          expect((await readLoops(page)).at(-1)?.duration).toBe(flightLoop?.duration);
+          expect(await game.getLocalPlayerId()).toBe(playerId);
+          expect(gameplaySockets.length).toBe(socketsBefore);
+          expect(
+            await page.evaluate(() => window.gameController?.getNetworkManager().isConnected)
+          ).toBe(true);
+          expect(
+            await page.evaluate(() => ({
+              sound: localStorage.getItem('soundOn'),
+              music: localStorage.getItem('musicOn'),
+            }))
+          ).toEqual({ sound: 'true', music: 'true' });
+          const afterInput = await readTouchControlState(page);
+          expect(afterInput.lastShotTime).toBe(beforeInput.lastShotTime);
+          expect(afterInput.thrusting).toBe(true);
+          await page.evaluate(
+            "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(false))"
+          );
+
+          await capture();
+          stage = 'music-preference';
+          // The title setting is hidden during flight; exercise its real change handler.
+          await page.locator('#musicPref').evaluate((input) => {
+            if (!(input instanceof HTMLInputElement)) {
+              throw new Error('Music preference checkbox missing');
+            }
+            input.checked = false;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          await expect
+            .poll(() => page.evaluate(() => localStorage.getItem('musicOn')))
+            .toBe('false');
+          await expect
+            .poll(() => page.evaluate(() => document.documentElement.dataset['activeLoops']))
+            .toBe('0');
+          await capture();
+          stage = 'wiki';
+          const wikiUrl = new URL('/wiki/#hud-network', page.url()).href;
+          await page.goto(wikiUrl, { waitUntil: 'load' });
+          await page.waitForURL(wikiUrl, { waitUntil: 'load' });
+          await page.waitForFunction(() => document.readyState === 'complete');
+          await expect
+            .poll(() => page.locator('body').textContent())
+            .toContain('separate Sound Effects, Music, and Haptics settings');
+          const wikiScreenshot = screenshotManager.getScreenshotPath(
+            `audio-recovery-wiki-${browserType.name()}-${viewport.name}.png`
+          );
+          await page.screenshot({ path: wikiScreenshot });
+          writeFileSync(
+            screenshotManager.getScreenshotPath(
+              `audio-recovery-${browserType.name()}-${viewport.name}-receipt.json`
+            ),
+            JSON.stringify(
+              {
+                navigations,
+                routes: ['/', '/wiki/#hud-network'],
+                titleScreenshot,
+                flightScreenshot,
+                debugScreenshots,
+                wikiScreenshot,
+                playerId,
+                fixture: { scenario: 'empty', motionEpoch: fixtureEpoch },
+                socketsBefore,
+                errors,
+                warnings,
+              },
+              null,
+              2
+            )
+          );
+          expect(errors).toEqual([]);
+          expect(warnings).toEqual([
+            expect.stringContaining('Audio clock stalled; next gesture will restart audio'),
+          ]);
+        } catch (error) {
+          scenarioError = error;
+          failures.push(error);
+        } finally {
+          // Capture before scenario hooks close the page, including failed assertions.
+          try {
+            if (stage !== 'wiki') {
+              await capture();
+            }
+          } catch (error) {
+            evidenceError = error;
+            failures.push(error);
+          }
+        }
+        writeScenarioReceipt({
+          path: screenshotManager.getScreenshotPath(
+            `audio-lifecycle-${browserType.name()}-${viewport.name}.json`
           ),
-          JSON.stringify(
-            {
-              routes: ['/', '/wiki/#hud-network'],
-              titleScreenshot,
-              flightScreenshot,
-              debugScreenshots,
-              wikiScreenshot,
-              playerId,
-              fixture: { scenario: 'empty', motionEpoch: fixtureEpoch },
-              socketsBefore,
-              errors,
-              warnings,
-            },
-            null,
-            2
-          )
-        );
-        expect(errors).toEqual([]);
-        expect(warnings).toEqual([
-          expect.stringContaining('Audio clock stalled; next gesture will restart audio'),
-        ]);
+          receipt: () => ({
+            stage,
+            browser: browserType.name(),
+            browserVersion: page.context().browser()?.version() ?? null,
+            viewport,
+            navigations,
+            snapshots,
+            scenarioError: scenarioError ? String(scenarioError) : null,
+            evidenceError: evidenceError ? String(evidenceError) : null,
+          }),
+          failures,
+          message: `Audio lifecycle scenario failed during ${stage}`,
+        });
       }, 120000);
     }
   });

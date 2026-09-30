@@ -23,7 +23,7 @@ only after fresh evidence covers the PR's acceptance criteria.
 | 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | Planned | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
 | 7 | Audit targeted dependency injection and indexes. Use measured ownership and query needs to choose changes. | Planned | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
 | 8 | Improve furnace travel and delivery feedback, including pinching, drop-off and shortage feedback. | Planned | Pinch `6hfFVMfQvxvm7JHv`; drop-off `6hfG7J5m99CC75mM`; shortage `6hfGfjj459h5v7Wv` |
-| 9 | Add cargo shielding and hauling pressure. Consume 10 cargo points per HP; apply immunity first. Cargo speed scales from 1 empty to 0.7 full. Prove conservation, no loot consumption for full-cargo ships, retention of partial remainders and cargo drops on death. | Planned | Cargo `6hfGfwppj5j2hPmv`; roles `6hfFGqVW7vrcCWhv` |
+| 9 | Add cargo shielding and hauling pressure. Apply immunity first, then eject recoverable loot at 10 cargo points per HP. Hull health falls only for residual damage after cargo reaches zero. Cargo speed scales from 1 empty to 0.7 full. Reduce loot magnetic pull and give spills outward motion beyond immediate pickup reach; tune against current values during implementation. Prove physical conservation of recoverable hit spills, concurrent pickup, identity and expiry, no loot consumption for full-cargo ships, retention of partial remainders and remaining cargo dropping once on death. Use a bounded temporary own-spill recollection lockout only if the spatial kick and reduced pull still allow automatic overlap to negate the hit. | Planned | Cargo `6hfGfwppj5j2hPmv`; roles `6hfFGqVW7vrcCWhv` |
 | 10 | Add travelling tow/probe behavior at speed 1200. Preserve solo Hauler Tow Cable access to hives. Misses retract; each attempt incurs cooldown, enforced by the authoritative server. | Planned | Tow `6hfG7XPr4P73WcwM` |
 | 11 | Add storage and encounter foundations plus an additive migration tool. Keep activation disabled until John applies the reviewed production database migration. | Planned | Foundation for cooperative parent `6hfFGm8JJVJ5JRmM` |
 | 12 | Add crew signals and rescue. Downed state lasts 30 seconds; rescue range is 100, revive takes three seconds and restores 35% health. Preserve shared surveys. | Planned | Pings `6hfFGqhXJMf6Pc7v`; downed `6hfFGqGxgCjxFmxM`; survey `6hfFGqgFPxC28f9v` |
@@ -34,7 +34,14 @@ only after fresh evidence covers the PR's acceptance criteria.
 
 ## Locked decisions and human hand-off
 
-Cargo is consumed as a shield at 10 points per HP. A solo Hauler uses Tow Cable
+Cargo ejects as recoverable loot before hull damage, at 10 points per HP. Apply
+immunity first; hull health falls only for residual damage after cargo reaches
+zero. Reduce loot magnetic pull and eject spills outward beyond immediate pickup
+reach. Tune against current values during implementation, preserving physical
+conservation, concurrent pickup, identity and expiry. Add a bounded temporary
+own-spill recollection lockout only if the spatial kick and reduced pull still
+allow automatic overlap to negate the hit. Remaining cargo drops once on death, and full-cargo
+ships cannot consume loot. A solo Hauler uses Tow Cable
 for hives. Queens keep birthing until death; death permanently clears their owned
 spiders and marker. Ruin restoration only advances and never triggers furnace
 counterattacks. The counterattack task `6hfFGqPMFqCMJfpM` is explicitly rejected

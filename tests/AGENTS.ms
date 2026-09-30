@@ -51,6 +51,29 @@ operation and its assertion; cleanup must also complete.
 - Reuse existing geometry or simulation functions when arranging a scene. Do
   not implement a second physics engine in test helpers.
 
+Crew arrangement preflights every requested live pilot, OPEN transport and motion
+session before changing the shared field. Await the returned motion epoch with
+`waitForControlledFixture` for controlled scenes; use `placeControlledShipAt`
+for safe placement. Shared-field rendering scenes identify their stationary and
+moving targets and place pilots clear of both; generated drift-mix statistics stay
+in their natural-world rule tests. Bitmap checks distinguish CSS viewport size
+from device-pixel backing dimensions on touch contexts. A newer epoch or dead pilot is a setup failure, never an
+invitation to revive or retry. Keep `placeShipAt` for intentionally lethal
+scenarios that assert the actual death cause and resulting lifecycle.
+
+The reset barrier requires both an empty paused world and departed owned sockets.
+Teardown still attempts reset when page closing fails, and propagates both errors.
+Use `withFixtureEvidence` for lifecycle-sensitive scenes: its retained JSON records
+revision, dirty-tree digest, architecture, Node/Playwright/browser versions, seed,
+stage durations, socket membership, health, pose, motion epoch and transit. HTTP
+fixture failures retain their actual status and response body. Server/client
+capture runs independently so a failed read cannot erase its available counterpart.
+Nested teardown failures and causes are retained within bounded, cycle-safe error
+evidence. Controlled alignment rechecks liveness and the epoch in the same browser
+task as its pose writes. Never serialize
+storage or resume credentials. A dirty-tree run is development evidence, not a
+pinned-release repeatability result.
+
 Browser scenarios use the running game's animation clock. Use
 `waitForAnimationFrames` or wait for the expected state; never call `updateGame`
 alongside the active loop. Hold real keyboard, mouse, or touch input to test
@@ -145,3 +168,10 @@ samples, declared participants, final game state, and exact work counts. A faste
 run that lost a player or skipped work is invalid. Canvas API calls and payload
 bytes are structural counts; elapsed time and frame pacing need calibrated
 repeated measurements. Follow `benchmarks/README.md` for the supported commands.
+
+For controlled reflective shots, arrange canonical identified bumpers on the
+server, await the exact live pilot epoch, and require a non-null shot receipt.
+Count bounces only on that accepted projectile ID. Retain selected authoritative
+rock rows and rejected receipts; a later passing sample does not establish the
+cause of an earlier failure. Capture artifacts before disposing browser handles,
+but attempt every restoration even when capture or the scenario fails.

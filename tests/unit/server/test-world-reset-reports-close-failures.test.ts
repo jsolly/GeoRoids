@@ -65,12 +65,16 @@ describe('test-world reset lifecycle failures', () => {
     req.method = 'POST';
     const res = new ServerResponse(req);
     const logError = vi.spyOn(serverLogging.logger, 'error').mockImplementation(() => undefined);
+    const responseEnd = vi.spyOn(res, 'end');
 
     try {
       handleTestResetWorld(req, res, 'development', engine);
 
       expect(res.statusCode).toBe(500);
       expect(res.writableEnded).toBe(true);
+      expect(responseEnd).toHaveBeenCalledWith(
+        JSON.stringify({ error: 'Test world reset failed', reason: 'socket-close-failed' })
+      );
       expect(engine.getPlayer('pilot')).toBeDefined();
       expect(logError).toHaveBeenCalledWith(
         'TEST_RESET_FAILED',

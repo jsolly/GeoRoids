@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { installAudioProbe } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
+import { arrangeCrewField } from '../../utils/test-server-control';
 import { readTouchControlState } from '../../utils/touch-input';
 
 function readLoops(page: Page): Promise<Array<{ duration: number; contextId: number }>> {
@@ -136,14 +137,20 @@ for (const browserType of [chromium, webkit]) {
         await page.screenshot({ path: titleScreenshot, fullPage: true });
 
         await game.startGame();
+        await game.waitForServerJoin();
+        const playerId = await game.getLocalPlayerId();
+        // Keep this native audio/input scenario free of unrelated asteroid deaths.
+        // Arrange only a live joined pilot; the fixture rejects death rather than reviving it.
+        const epochs = await arrangeCrewField([playerId], 'empty');
+        const fixtureEpoch = epochs.get(playerId);
+        await game.waitForControlledFixture(fixtureEpoch);
         await game.waitForGameReady();
-        await game.waitForCombatReady();
+        expect(await game.getAsteroidCount()).toBe(0);
         await expect
           .poll(async () => (await readLoops(page)).at(-1)?.duration, { timeout: 30000 })
           .not.toBe(titleLoop?.duration);
         await expectOnlyCurrentLoop(page, 1);
         const flightLoop = (await readLoops(page)).at(-1);
-        const playerId = await game.getLocalPlayerId();
         const socketsBefore = gameplaySockets.length;
         expect(socketsBefore).toBe(1);
         expect(
@@ -261,6 +268,7 @@ for (const browserType of [chromium, webkit]) {
               debugScreenshots,
               wikiScreenshot,
               playerId,
+              fixture: { scenario: 'empty', motionEpoch: fixtureEpoch },
               socketsBefore,
               errors,
               warnings,

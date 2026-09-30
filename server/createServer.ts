@@ -26,6 +26,7 @@ import {
   areTestHttpEndpointsEnabled,
   buildHealthPayload,
   handleTestArrangeCrewField,
+  handleTestFixtureState,
   handleTestPlacePlayer,
   handleTestResetWorld,
 } from './testHttpHandlers';
@@ -88,6 +89,11 @@ export function createServerInstance(options: CreateServerOptions = {}) {
           )
         )
       );
+      return;
+    }
+
+    if (req.url === '/test/fixture-state') {
+      handleTestFixtureState(req, res, NODE_ENV, gameEngine, wss.clients);
       return;
     }
 

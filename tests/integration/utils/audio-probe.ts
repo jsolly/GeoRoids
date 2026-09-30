@@ -53,6 +53,60 @@ export async function installAudioProbe(
       let contexts = 0;
       const contextIds = new WeakMap<BaseAudioContext, number>();
       const contextStates: AudioContextState[] = [];
+      const nativeSnapshots: Array<
+        () => {
+          id: number;
+          state: AudioContextState;
+          time: number;
+          rawTime: number;
+          observedTime: number;
+        }
+      > = [];
+      const lifecycle: Array<Record<string, unknown>> = [];
+      let lifecycleSequence = 0;
+      const record = (kind: string, details: Record<string, unknown> = {}) => {
+        lifecycle.push({
+          sequence: ++lifecycleSequence,
+          at: performance.now(),
+          kind,
+          visibility: document.visibilityState,
+          userActivation: navigator.userActivation
+            ? {
+                active: navigator.userActivation.isActive,
+                everActive: navigator.userActivation.hasBeenActive,
+              }
+            : null,
+          ...details,
+        });
+        if (lifecycle.length > 512) {
+          lifecycle.shift();
+        }
+      };
+      for (const type of ['pointerdown', 'touchend', 'keydown']) {
+        document.addEventListener(
+          type,
+          (event) => {
+            record('gesture', {
+              type,
+              trusted: event.isTrusted,
+              target:
+                event.target instanceof Element ? event.target.id || event.target.tagName : null,
+              key: event instanceof KeyboardEvent ? event.key : null,
+            });
+          },
+          true
+        );
+      }
+      document.addEventListener('visibilitychange', () => record('visibility'));
+      document.addEventListener('georoids-audio-probe-snapshot', () => {
+        const snapshots = nativeSnapshots.map((read) => read());
+        record('snapshot', { contexts: snapshots });
+        document.documentElement.dataset['nativeAudioContexts'] = JSON.stringify(snapshots);
+        document.documentElement.dataset['audioLifecycle'] = JSON.stringify(lifecycle);
+        document.documentElement.dataset['audioLifecycleDropped'] = String(
+          lifecycleSequence - lifecycle.length
+        );
+      });
       let media = 0;
       let decoded = 0;
       const decodedDurations: number[] = [];
@@ -85,6 +139,14 @@ export async function installAudioProbe(
         document.documentElement.dataset['orbitMotion'] = JSON.stringify(orbitMotion);
       };
       const NativeContext = window.AudioContext;
+      const nativeTimeGetter = Object.getOwnPropertyDescriptor(
+        BaseAudioContext.prototype,
+        'currentTime'
+      )?.get;
+      if (!nativeTimeGetter) {
+        throw new Error('Native currentTime getter unavailable');
+      }
+      const readRawTime = nativeTimeGetter.call.bind(nativeTimeGetter);
       window.AudioContext = class extends NativeContext {
         private frozenTime: number | null = null;
 
@@ -104,6 +166,14 @@ export async function installAudioProbe(
           document.documentElement.dataset['audioSampleRate'] = String(this.sampleRate);
           const id = contexts;
           contextIds.set(this, id);
+          nativeSnapshots.push(() => ({
+            id,
+            state: this.state,
+            time: super.currentTime,
+            rawTime: Number(readRawTime(this)),
+            observedTime: this.currentTime,
+          }));
+          record('create', { contextId: id, state: this.state, sampleRate: this.sampleRate });
           const publishState = () => {
             contextStates[id - 1] = this.state;
             if (id === contexts) {
@@ -111,9 +181,43 @@ export async function installAudioProbe(
             }
             publish();
           };
-          this.addEventListener('statechange', publishState);
+          this.addEventListener('statechange', () => {
+            record('statechange', { contextId: id, state: this.state, time: super.currentTime });
+            publishState();
+          });
           publishState();
           publish();
+        }
+        private observeControl(operation: string, execute: () => Promise<void>): Promise<void> {
+          const details = () => ({
+            contextId: contextIds.get(this),
+            state: this.state,
+            time: super.currentTime,
+          });
+          record(`${operation}-call`, details());
+          let result: Promise<void>;
+          try {
+            result = execute();
+          } catch (error) {
+            record(`${operation}-throw`, { ...details(), error: String(error) });
+            throw error;
+          }
+          // Return the native promise unchanged. Observation must not delay activation.
+          void result.then(
+            () => record(`${operation}-fulfilled`, details()),
+            (error: unknown) =>
+              record(`${operation}-rejected`, { ...details(), error: String(error) })
+          );
+          return result;
+        }
+        override resume(): Promise<void> {
+          return this.observeControl('resume', () => super.resume());
+        }
+        override suspend(): Promise<void> {
+          return this.observeControl('suspend', () => super.suspend());
+        }
+        override close(): Promise<void> {
+          return this.observeControl('close', () => super.close());
         }
         override createPanner(): PannerNode {
           const pan = super.createPanner();
@@ -215,6 +319,7 @@ export async function installAudioProbe(
           start.call(this, when, offset, duration);
         }
         active.add(this);
+        record('source-start', { contextId: contextIds.get(this.context), loop: this.loop, when });
         if (this.buffer && !buffers.has(this.buffer)) {
           buffers.set(this.buffer, ++nextBufferId);
         }
@@ -251,6 +356,7 @@ export async function installAudioProbe(
           'ended',
           () => {
             active.delete(this);
+            record('source-ended', { contextId: contextIds.get(this.context), loop: this.loop });
             publish();
           },
           { once: true }
@@ -259,6 +365,7 @@ export async function installAudioProbe(
       };
       AudioBufferSourceNode.prototype.stop = function (this: AudioBufferSourceNode, when = 0) {
         stop.call(this, when);
+        record('source-stop', { contextId: contextIds.get(this.context), loop: this.loop, when });
         // Immediate stops release voices now; scheduled synth stops finish through ended.
         if (when <= this.context.currentTime) {
           active.delete(this);
@@ -301,4 +408,49 @@ export async function readSamplePlaybackRates(page: Page, name: string): Promise
       .filter((event) => Math.abs(event.duration - sampleDuration) < 0.001)
       .map((event) => event.rate);
   }, duration);
+}
+
+/** Read native context state now, alongside the event-published observation. */
+export function readNativeAudioSnapshot(page: Page) {
+  return page.evaluate(() => {
+    document.dispatchEvent(new Event('georoids-audio-probe-snapshot'));
+    const data = document.documentElement.dataset;
+    if (!data['nativeAudioContexts'] || !data['audioLifecycle']) {
+      throw new Error('Native audio probe is unavailable');
+    }
+    const parsed: unknown = JSON.parse(data['nativeAudioContexts']);
+    if (!Array.isArray(parsed)) {
+      throw new Error('Native audio context snapshot is malformed');
+    }
+    const contexts = parsed.map((row: unknown) => {
+      if (
+        typeof row !== 'object' ||
+        row === null ||
+        !('id' in row) ||
+        typeof row.id !== 'number' ||
+        !('state' in row) ||
+        typeof row.state !== 'string' ||
+        !('time' in row) ||
+        typeof row.time !== 'number'
+      ) {
+        throw new Error('Native audio context observation is malformed');
+      }
+      return {
+        id: row.id,
+        state: row.state,
+        time: row.time,
+        rawTime: 'rawTime' in row ? row.rawTime : null,
+        observedTime: 'observedTime' in row ? row.observedTime : null,
+      };
+    });
+    const lifecycle: unknown = JSON.parse(data['audioLifecycle']);
+    return {
+      contexts,
+      lifecycleDropped: Number(data['audioLifecycleDropped']),
+      cachedStates: data['audioContextStates'],
+      activeLoopContexts: data['activeLoopContexts'],
+      activeLoops: data['activeLoops'],
+      lifecycle,
+    };
+  });
 }

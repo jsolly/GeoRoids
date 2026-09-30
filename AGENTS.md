@@ -74,7 +74,9 @@ Triggers do not wake idle agents, and no recurring monitor is configured.
 
 ## Project
 
-GeoAsteroids — a 2D multiplayer spaceship/asteroids game. Vite + TypeScript client (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
+GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Vite + TypeScript client (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
+
+`AGENTS.md` (plus `tests/AGENTS.md`) is the only agent instruction file. Claude Code 2.1.277+ reads it natively; do not add a `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md`, because any of them makes Claude Code ignore `AGENTS.md`.
 
 ## Deploy
 
@@ -154,7 +156,7 @@ Run `npm run check:actions` when changing it.
 # Dev (Vite on :5173 + ws server on :3001 via concurrently)
 npm run dev                # ./scripts/dev-server.sh
 npm run dev:check          # status of dev servers
- npm run dev:kill           # stop only this checkout's owned dev session
+npm run dev:kill           # stop only this checkout's owned dev session
 
 # Build / typecheck / lint
 npm run build              # wiki checks + tsc -p tsconfig.build.json + vite build
@@ -168,6 +170,8 @@ npm run check:yaml         # yamllint --strict
 npm run check:actions      # actionlint + ShellCheck
 npm run check:fix          # biome check --write --error-on-warnings .
 npm run fix                # biome write + tsc + unit tests
+npm run check:wiki         # flag gameplay changes that need a Wiki review (runs in build)
+npm run gate               # full local review gate: pre-commit checks + test:review
 
 # Tests
 npm run test               # unit only (tests/unit/)
@@ -176,6 +180,11 @@ npm run test:review        # all integration + frame-work + constrained-client c
 npm run test:integration:browser   # browser tests via test-runner.sh
 npm run test:integration:server    # server-side integration
 npm run test:integration:entities  # entity integration
+npm run test:coverage      # unit tests with coverage
+
+# Diagnostics / performance
+npm run --silent logs -- --player <id>   # merged client/server timeline
+npm run benchmark          # see benchmarks/README.md
 
 # Single test file (integration must use the runner script — not raw vitest)
 ./scripts/test-runner.sh tests/integration/browser/sanity/<file>.test.ts --reporter=verbose
@@ -202,6 +211,8 @@ protocol opt-out flags or rollback procedure. Reconnects use a private resume to
 ### Server-authoritative model
 
 Asteroids live on the server; clients render snapshots. Clients still simulate their local ship for responsiveness. `playerNetwork.ts` and `network/networkManager.ts` handle outbound (input/shoot) and inbound (state) messages. Shared message/payload types live in `shared-types.ts` (top level, imported by both client and server).
+
+`shared/` holds the gameplay rules both sides must agree on (ship flight, combat, asteroid materials/reflection, furnaces, economy, exploration, world interest radii in `shared/world.ts`). Client prediction and the server simulation import the same module, so change a rule there once rather than mirroring it in `src/` and `server/`.
 
 ### Key client modules
 
@@ -274,31 +285,9 @@ Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive develo
 
 **Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
 
-### Lint / tests (reference)
-
-See **Commands** above. Browser E2E must use `./scripts/test-runner.sh` (never raw `npx vitest` on `tests/integration/`).
-
 ### Hello-world smoke
 
 For a manual smoke, open `http://localhost:5173`, click Play, steer (left/right arrow keys) and fire (Space); thrust is automatic. Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose`; the runner starts the required services on unused configured ports and asserts canvas, starting player state, and asteroids.
-
-### Logs
-
-`logs/client.log` and `logs/server.log` contain structured records; see [docs/diagnostics.md](docs/diagnostics.md). Enable verbose client logs in `src/constants/index.ts` (`LOGGING.GLOBAL_LOG_LEVEL`, `DEBUG.ENABLED`), not via env vars.
-
-### Quick verification checklist
-
-```bash
-npm run check:lint         # biome check --error-on-warnings — should pass cleanly
-npm run check:lint-policy  # fail closed if Biome defaults/overrides become warn/info
-npm run check:knip         # unused files/exports/dependencies and config hints
-npm run check:md           # markdownlint-cli2
-npm run check:yaml         # yamllint --strict
-npm run check:actions      # actionlint + ShellCheck
-npm run check:ts           # tsc --noEmit — should pass cleanly
-npm run test         # unit tests (~3s)
-npm run build        # tsc -p tsconfig.build.json && vite build — produces dist/
-```
 
 ## Verified-tree CI
 

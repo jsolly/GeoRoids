@@ -17,7 +17,7 @@ only after fresh evidence covers the PR's acceptance criteria.
 | --- | --- | --- | --- |
 | 1 | Reconcile verified completions and engineering decisions. Keep relative imports, no barrels and Canvas2D; verify existing regeneration and survey sharing. Distinguish historical performance from physical-phone proof. | Shipped [#737](https://github.com/jsolly/GeoRoids/pull/737) | Alias `6hcHJJpqRp2MmcMv`; GPU `6hcHJJxRJgM4GwWM`; regeneration `6hfGfxp2c6wf2gmM`; survey `6hfFGqgFPxC28f9v`; archived work `6hRVg8qpghM6Qv22` |
 | 2 | Fix fixture determinism and retain actionable failure evidence for #715 and #716. Prove failures expose the cause without retries or weaker assertions. | Shipped [#738](https://github.com/jsolly/GeoRoids/pull/738), `e0ef52be` | Triage `6hfFQfq4PP367Vxv`; harness parent `6hfFQcvww7gHj4Mv`; human schedule `6hf8pMC4JVjgvgQv` |
-| 3 | Fix WebKit audio and obtain cross-architecture proof for #714 and #717. Run 20 focused repetitions and three full suites on native ARM and x64. | In progress in an isolated checkout | Same triage, harness parent and human schedule as PR 2 |
+| 3 | Fix WebKit audio and obtain cross-architecture proof for #714 and #717. Run 20 focused repetitions and three full suites on native ARM and x64. | Instrumentation [#740](https://github.com/jsolly/GeoRoids/pull/740), furnace fixture [#741](https://github.com/jsolly/GeoRoids/pull/741) and native audio ownership [#742](https://github.com/jsolly/GeoRoids/pull/742) shipped; native acceptance remains open | Same triage, harness parent and human schedule as PR 2 |
 | 4 | Prove authoritative firing in production. A correlated non-null `shotAcknowledged` is sufficient even if a collision consumes the bolt before a snapshot. Reject missing, null, wrong or stale acknowledgements; malformed snapshots still fail. | Shipped [#739](https://github.com/jsolly/GeoRoids/pull/739) | Projectile `6hfP8334Q638373M` |
 | 5 | Run six isolated integration shards three times, each run under 300 seconds. Preserve isolation and failure evidence. | Planned | Shards `6hcHJM3WrR7Hh9CM` |
 | 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | Planned | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
@@ -371,3 +371,81 @@ artifact lookup still expects `production-smoke-ID` while the actual name is
 `6hfmw9hqc4jw9Qvc`. PR 3's six affected round-two semantic review lenses completed
 without findings or fingerprint change. Its full gate and clean native ARM/x64
 20+3 acceptance remain pending; no historical #714 cause is declared fixed.
+
+### Native audio repair and remaining fixture evidence
+
+The later native run [36768091849](https://github.com/jsolly/GeoRoids/actions/runs/36768091849)
+completed all 23 attempts per architecture at `c9038068`, with every failure
+retained. ARM passed 14 of 20 focused attempts and all three full suites;
+x64 passed 10 of 20 focused attempts and one of three full suites. Focused
+failures all observed one native source after mute. The two failing x64 full
+suites observed a 350-versus-300 delivery reward; one also observed an unchanged
+150-HP mining target. Their original causes remain unproved. The receipts omit
+the selected belt rock, accepted shot and terminal hit, carried cargo and
+identified delivery rewards. The next fixture repair must retain that evidence
+and establish an authoritative zero-cargo delivery baseline without weakening
+the exact assertions or adding retries.
+
+Audio repair [#742](https://github.com/jsolly/GeoRoids/pull/742) landed as
+`bb160a81ad33613147ca6f86d63d3b61fe88b207`. A real native sample with an explicitly
+injected early Howler wall-clock end reproduced a source remaining active after
+mute. A second native overlap regression reproduced reuse of that source's gain
+and panner. The repair owns sources until native completion and reserves their
+Howler pool rows; mute stops and disconnects both identified voices while their
+independent controls and pilot identity remain intact. Three regression browser
+cases, 63 audio unit cases and actual desktop/touch Sound Effects controls passed.
+These controlled reproductions do not establish the unobserved historical
+Howler handle state in the original remote failures.
+
+Two semantic review rounds retained and fixed the confirmed pool-reuse finding.
+The first full gate failed scoped Wiki digest validation; the second was stopped
+after static checks, units and build to repair that finding. Both attempts remain
+retained. The final complete gate passed static checks, units, build and all 210
+integration cases across 91 files in 706.50 seconds, followed by 120 frame-work
+vectors, both constrained-client scenarios and cleanup. The report-only frame
+observations exceeded contour endpoint-read and pickup position-read baselines;
+retain them for the runtime audit rather than claiming those observations passed.
+
+[CI 36780446214](https://github.com/jsolly/GeoRoids/actions/runs/36780446214)
+passed on exact head `84ab3485e1934aa685d2d62af8205e9da051dc3b`. Vercel and
+Railway independently served the exact merge; Railway reported worker
+persistence, no failure and zero stalls. [Production smoke 36780825363](https://github.com/jsolly/GeoRoids/actions/runs/36780825363)
+validated request `6770738197`, exact client/server releases, 52 decoded snapshots
+and an accepted real-UI shot, with no errors. The canonical helper now downloads
+the actual artifact but rejects its existing receipt field names; direct
+validation of the retained receipt verified the successful run without another
+dispatch. That external helper issue remains on `6hfmw9hqc4jw9Qvc`.
+
+The required clean native ARM/x64 20-focused-plus-three-full acceptance remains
+open. Address the retained crew fixture failures before sampling the final
+revision. The audio checkout was archived after its evidence and production
+receipts were preserved; continuing fixture work uses a fresh `origin/main`.
+
+### Crew fixture observations
+
+The pending fixture repair uses the actual arranged belt-rock identity and
+retains socket admission, projectile collision competition, terminal targets
+and before/after health. Recording is opt-in for local test servers, bounded,
+and cleared by reset. Delivery arrangement establishes zero carried cargo while
+preserving banked score, then retains each pilot's exact Town Square reward.
+The assertions still require mining damage and 300 points for each contributor.
+
+Development verification passed 31 unit cases across four files and five browser
+cases across the mining and delivery files. Both mining receipts recorded an
+accepted shot hitting the identified belt rock from 150 to 125 HP, with no
+capture errors or dropped records. Delivery receipts recorded zero initial
+cargo and separate 300-point rewards for both pilots. These controlled browser
+shoot commands exercise client, socket and server behavior; they do not prove
+native keyboard or touch firing gestures. One field-manual browser case also
+passed desktop and mobile navigation. Only the three actually reviewed watched
+source hashes were accepted; unrelated Wiki hashes remain unchanged.
+
+The first full semantic review found one reset-observation coverage gap, which
+independent adjudication classified as Minor. The remaining six lenses found no
+material issues. The bounded follow-up tests a valid shot after reset without re-enabling
+observation and adds both crew files to every native focused attempt. Its 19
+fixture unit cases and eight repeatability contracts passed. One local focused
+attempt passed all 23 cases across six files in 84.43 seconds, with exact
+coverage verified by the strict report reader. This dirty-tree run does not
+establish native repeatability. A complete gate, final review and clean native
+architecture sample remain required before the phase's acceptance can close.

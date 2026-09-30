@@ -228,7 +228,25 @@ export function handleTestFixtureState(
       respond(400, { error: 'Invalid fixture asteroid IDs' });
       return;
     }
+    const observePlayerShots = isRecord(body) ? body['observePlayerShots'] : undefined;
+    if (observePlayerShots !== undefined) {
+      if (
+        !Array.isArray(observePlayerShots) ||
+        observePlayerShots.length > 4 ||
+        !observePlayerShots.every(
+          (id) => typeof id === 'string' && id.length > 0 && id.length < 128
+        )
+      ) {
+        respond(400, { error: 'Invalid fixture shot owners' });
+        return;
+      }
+      gameEngine.observeFixtureShots(nodeEnv, observePlayerShots);
+    }
     respond(200, {
+      combat: gameEngine.getFixtureCombatEvidence(),
+      crawlers: gameEngine
+        .getSpiderField()
+        .spiders.filter((spider) => spider.crawler && asteroidIds.includes(spider.crawler.hostId)),
       observedRocks: asteroidIds.flatMap((id: string) => {
         const rock = gameEngine.getAsteroid(id);
         return rock ? [rock] : [];
@@ -249,6 +267,9 @@ export function handleTestFixtureState(
       },
       players: gameEngine.getAllPlayers().map((player) => ({
         id: player.id,
+        cargo: player.cargo,
+        score: player.score,
+        kitId: player.kitId,
         health: player.health,
         exploding: player.exploding,
         position: { ...player.position },
@@ -425,6 +446,12 @@ export function handleTestArrangeCrewField(
       respond(409, { error: 'Crew fixture motion unavailable' });
       return;
     }
+    const playersBefore = players.map((player) => {
+      if (!player) {
+        throw new Error('Validated crew disappeared');
+      }
+      return { id: player.id, cargo: player.cargo, score: player.score, kitId: player.kitId };
+    });
     gameEngine.prepareDiagnosticWorld('traversal');
     const poses: { playerId: string; position: { x: number; y: number }; motionEpoch?: number }[] =
       [];
@@ -514,6 +541,9 @@ export function handleTestArrangeCrewField(
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
       player.abilityCooldownFrames = 0;
+      if (body['scenario'] === 'delivery') {
+        player.cargo = 0;
+      }
       if (body['scenario'] === 'full-cargo') {
         player.cargo = cargoCapacity(player.kitId);
       }
@@ -826,20 +856,29 @@ export function handleTestArrangeCrewField(
     wsCore.getBroadcaster().broadcastGameState();
     respond(200, {
       status: 'arranged',
+      playersBefore,
+      playersAfter: players.map((player) => {
+        if (!player) {
+          throw new Error('Validated crew disappeared');
+        }
+        return { id: player.id, cargo: player.cargo, score: player.score, kitId: player.kitId };
+      }),
       poses,
       ...(body['scenario'] === 'shared-field'
         ? { asteroidIds: ['crew-fixture-shared-stationary', 'crew-fixture-shared-moving'] }
         : {}),
       asteroidId:
-        body['scenario'] === 'shared-field'
-          ? 'crew-fixture-shared-stationary'
-          : ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
-            ? null
-            : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
-              ? 'crew-fixture-spider-deposit'
-              : body['scenario'] === 'reflection'
-                ? 'crew-fixture-reflector'
-                : 'crew-fixture-ore',
+        body['scenario'] === 'belt-mining'
+          ? beltAsteroid(gameEngine.getWorldSeedForTesting(), 60, 0).id
+          : body['scenario'] === 'shared-field'
+            ? 'crew-fixture-shared-stationary'
+            : ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
+              ? null
+              : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
+                ? 'crew-fixture-spider-deposit'
+                : body['scenario'] === 'reflection'
+                  ? 'crew-fixture-reflector'
+                  : 'crew-fixture-ore',
     });
   });
 }

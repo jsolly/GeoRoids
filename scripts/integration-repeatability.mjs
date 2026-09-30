@@ -32,6 +32,14 @@ export const focusedScenarios = [
     path: 'tests/integration/browser/sanity/muted-pilot-stops-sample-after-howler-wall-clock-end.test.ts',
     count: 3,
   },
+  {
+    path: 'tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts',
+    count: 4,
+  },
+  {
+    path: 'tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts',
+    count: 1,
+  },
 ];
 const focusedPaths = focusedScenarios.map(({ path }) => path);
 const focusedTestCount = focusedScenarios.reduce((total, { count }) => total + count, 0);

@@ -1,9 +1,11 @@
 import type { GameEngine } from '../../../server/core/GameEngine';
-import type { AsteroidData } from '../../../shared-types';
+import type { AsteroidData, TerrainSpider } from '../../../shared-types';
 import { TestConfig } from './test-config';
 
 type FixtureState = {
   observedRocks: AsteroidData[];
+  crawlers: TerrainSpider[];
+  combat: ReturnType<GameEngine['getFixtureCombatEvidence']>;
   world: ServerWorldDiagnostics;
   seed: number;
   controlledRocks: {
@@ -14,6 +16,9 @@ type FixtureState = {
   sockets: { total: number; open: number };
   players: {
     id: string;
+    cargo: number;
+    score: number;
+    kitId: string;
     health: number;
     exploding: boolean;
     position: { x: number; y: number };
@@ -52,10 +57,13 @@ async function fixtureFailure(response: Response, operation: string): Promise<ne
   throw new Error(`${operation}: HTTP ${response.status} ${body}`);
 }
 
-export async function getFixtureState(asteroidIds: readonly string[] = []): Promise<FixtureState> {
+export async function getFixtureState(
+  asteroidIds: readonly string[] = [],
+  observePlayerShots?: readonly string[]
+): Promise<FixtureState> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/fixture-state`, {
     method: 'POST',
-    body: JSON.stringify({ asteroidIds }),
+    body: JSON.stringify({ asteroidIds, observePlayerShots }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
@@ -90,6 +98,12 @@ export async function getFixtureState(asteroidIds: readonly string[] = []): Prom
         typeof player !== 'object' ||
         !('id' in player) ||
         typeof player.id !== 'string' ||
+        !('cargo' in player) ||
+        typeof player.cargo !== 'number' ||
+        !('score' in player) ||
+        typeof player.score !== 'number' ||
+        !('kitId' in player) ||
+        typeof player.kitId !== 'string' ||
         !('health' in player) ||
         typeof player.health !== 'number' ||
         !('exploding' in player) ||
@@ -226,7 +240,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function arrangeCrewField(
+export async function arrangeCrewFieldWithEvidence(
   playerIds: string[],
   scenario:
     | 'delivery'
@@ -258,7 +272,12 @@ export async function arrangeCrewField(
     | 'furnace-build'
     | 'street-escape'
     | 'street-travel'
-): Promise<ReadonlyMap<string, number>> {
+): Promise<{
+  epochs: ReadonlyMap<string, number>;
+  asteroidId: string | null;
+  playersBefore: { id: string; cargo: number; score: number; kitId: string }[];
+  playersAfter: { id: string; cargo: number; score: number; kitId: string }[];
+}> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-crew-field`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -293,5 +312,45 @@ export async function arrangeCrewField(
   if (epochs.size !== playerIds.length || playerIds.some((id) => !epochs.has(id))) {
     throw new Error('Crew fixture omitted or duplicated a requested pilot');
   }
-  return epochs;
+  if (
+    !('asteroidId' in body) ||
+    (body.asteroidId !== null && typeof body.asteroidId !== 'string') ||
+    !('playersBefore' in body) ||
+    !Array.isArray(body.playersBefore) ||
+    !('playersAfter' in body) ||
+    !Array.isArray(body.playersAfter)
+  ) {
+    throw new Error('Missing crew fixture baseline');
+  }
+  const readPlayers = (rows: unknown[]) =>
+    rows.map((row) => {
+      if (
+        !row ||
+        typeof row !== 'object' ||
+        !('id' in row) ||
+        typeof row.id !== 'string' ||
+        !('cargo' in row) ||
+        typeof row.cargo !== 'number' ||
+        !('score' in row) ||
+        typeof row.score !== 'number' ||
+        !('kitId' in row) ||
+        typeof row.kitId !== 'string'
+      ) {
+        throw new Error('Invalid crew fixture baseline');
+      }
+      return { id: row.id, cargo: row.cargo, score: row.score, kitId: row.kitId };
+    });
+  return {
+    epochs,
+    asteroidId: body.asteroidId,
+    playersBefore: readPlayers(body.playersBefore),
+    playersAfter: readPlayers(body.playersAfter),
+  };
+}
+
+export async function arrangeCrewField(
+  playerIds: string[],
+  scenario: Parameters<typeof arrangeCrewFieldWithEvidence>[1]
+): Promise<ReadonlyMap<string, number>> {
+  return (await arrangeCrewFieldWithEvidence(playerIds, scenario)).epochs;
 }

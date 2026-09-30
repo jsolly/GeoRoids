@@ -165,3 +165,50 @@ test('cyclic and deeply nested error causes produce bounded receipts without rep
   expect(receipt).not.toContain('leaf');
   expect(receipt.length).toBeLessThan(25000);
 });
+
+test('selected rock IDs and wire receipts follow the scenario while evidence failures keep both observations', async () => {
+  let selected: string[] = [];
+  await withFixtureEvidence(
+    evidencePage(),
+    'selected-host',
+    async (stage) => {
+      selected = ['belt-42-60-0'];
+      await stage('host-selected');
+    },
+    {
+      asteroidIds: () => selected,
+      evidence: () => ({ acknowledgement: { requestId: 'shot', projectileId: 'accepted' } }),
+    }
+  );
+  expect(boundary.observe.mock.calls).toEqual([[[]], [['belt-42-60-0']], [['belt-42-60-0']]]);
+  expect(finalReceipt()).toMatchObject({
+    stages: expect.arrayContaining([
+      expect.objectContaining({
+        evidence: { acknowledgement: { requestId: 'shot', projectileId: 'accepted' } },
+      }),
+    ]),
+  });
+  boundary.write.mockClear();
+  await expect(
+    withFixtureEvidence(evidencePage(), 'failed-wire-capture', () => Promise.resolve(), {
+      evidence: () => {
+        throw new Error('wire capture failed');
+      },
+    })
+  ).rejects.toThrow('evidence capture failures');
+  expect(finalReceipt()).toMatchObject({
+    stages: expect.arrayContaining([
+      expect.objectContaining({
+        server: { seed: 42, sockets: { total: 0, open: 0 }, players: [] },
+        client: { health: 17, motionEpoch: 4 },
+        evidence: null,
+        captureFailures: [
+          {
+            source: 'scenario',
+            error: expect.objectContaining({ message: 'wire capture failed' }),
+          },
+        ],
+      }),
+    ]),
+  });
+});

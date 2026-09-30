@@ -421,7 +421,13 @@ export class MessageHandler {
       return;
     }
 
-    const laser = this.gameEngine.spawnPlayerLaser(shooter.id, laserStart, laserDirection);
+    const laser = this.gameEngine.spawnPlayerLaser(
+      shooter.id,
+      laserStart,
+      laserDirection,
+      undefined,
+      requestId
+    );
     if (requestId !== undefined) {
       const acknowledgement: PlayerShotAcknowledgement = {
         requestId,

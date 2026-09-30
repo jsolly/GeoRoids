@@ -115,6 +115,7 @@ import { getVelocityMagnitude } from '../../src/utils/mathUtils';
 import { sanitizePlayerName } from '../../src/utils/playerName';
 import { serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
+import { crawlerEvidence, FixtureCombatRecorder } from '../testing/FixtureCombatRecorder';
 import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
@@ -331,6 +332,70 @@ export class GameEngine {
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly laserExpiry = new WeakMap<ServerLaser, number>();
   private readonly damageStateLogs = new WeakMap<GameEntity, number>();
+
+  private fixtureCombat: FixtureCombatRecorder | undefined;
+
+  public observeFixtureShots(nodeEnv: string, owners: readonly string[]): void {
+    if (!['test', 'development'].includes(nodeEnv)) {
+      throw new Error('Combat fixture evidence is unavailable in production');
+    }
+    this.fixtureCombat = new FixtureCombatRecorder();
+    this.fixtureCombat.start(owners);
+  }
+
+  public getFixtureCombatEvidence() {
+    return this.fixtureCombat?.read() ?? { events: [], dropped: 0 };
+  }
+
+  private observeFixtureAdmission(
+    ownerId: string,
+    requestId: string | undefined,
+    start: Position,
+    velocity: Velocity,
+    projectileId: string | null,
+    rejectionReason: string | null
+  ): void {
+    if (!this.fixtureCombat?.watches(ownerId)) {
+      return;
+    }
+    const shooter = this.getPlayer(ownerId);
+    this.fixtureCombat.record(ownerId, this.gameTime, {
+      kind: 'admission',
+      requestId: requestId ?? null,
+      projectileId,
+      rejectionReason,
+      start,
+      velocity,
+      shooter: shooter
+        ? {
+            position: shooter.position,
+            velocity: shooter.velocity,
+            health: shooter.health,
+            exploding: shooter.exploding,
+            motionEpoch: shooter.playerMotion?.epoch,
+            furnaceTransit: shooter.furnaceTransit,
+          }
+        : null,
+    });
+  }
+
+  private observeFixtureTerminal(
+    laser: ServerLaser,
+    reason: string,
+    targetId: string | null = null,
+    targetBefore: unknown = null,
+    targetAfter: unknown = null
+  ): void {
+    this.fixtureCombat?.record(laser.ownerId, this.gameTime, {
+      kind: 'terminal',
+      projectileId: laser.id,
+      reason,
+      targetId,
+      position: laser.position,
+      targetBefore,
+      targetAfter,
+    });
+  }
 
   constructor(
     rngSeed?: number,
@@ -710,6 +775,7 @@ export class GameEngine {
   }
 
   private resetGameState(): void {
+    this.fixtureCombat = undefined;
     this.regionalField.reset();
     this.pilots.clear();
     this.dirtyPilots.clear();
@@ -2114,7 +2180,8 @@ export class GameEngine {
     ownerId: string,
     start: Position,
     velocity: Velocity,
-    now = this.getServerTime()
+    now = this.getServerTime(),
+    requestId?: string
   ): ServerLaser | null {
     const shooter = this.entityManager.getEntity(ownerId);
     if (
@@ -2133,6 +2200,14 @@ export class GameEngine {
       !Number.isFinite(shooter.velocity.x) ||
       !Number.isFinite(shooter.velocity.y)
     ) {
+      this.observeFixtureAdmission(
+        ownerId,
+        requestId,
+        start,
+        velocity,
+        null,
+        'invalid-pilot-or-request'
+      );
       return null;
     }
     const kit = getShipKit(shooter.kitId);
@@ -2157,6 +2232,14 @@ export class GameEngine {
       Math.hypot(velocity.x, velocity.y) > maxLaserSpeed + 1e-6 ||
       Math.hypot(shooter.velocity.x, shooter.velocity.y) > maxShipSpeed + 1e-6
     ) {
+      this.observeFixtureAdmission(
+        ownerId,
+        requestId,
+        start,
+        velocity,
+        null,
+        'origin-or-speed-outside-budget'
+      );
       return null;
     }
     // Sustained fire follows the kit cooldown.
@@ -2166,14 +2249,31 @@ export class GameEngine {
       ? Math.min(SHIP.MAX_LASERS, previous.tokens + Math.max(0, now - previous.at) * rate)
       : SHIP.MAX_LASERS;
     if (available < 1) {
+      this.observeFixtureAdmission(
+        ownerId,
+        requestId,
+        start,
+        velocity,
+        null,
+        'shoot-budget-exhausted'
+      );
       return null;
     }
     const laser = this.spawnLaser(ownerId, start, velocity);
     if (!laser) {
+      this.observeFixtureAdmission(
+        ownerId,
+        requestId,
+        start,
+        velocity,
+        null,
+        'invalid-world-launch'
+      );
       return null;
     }
     this.shootBudgets.set(shooter, { tokens: available - 1, at: now });
     this.laserExpiry.set(laser, now + PLAYER_LASER_MAX_LIFETIME_MS);
+    this.observeFixtureAdmission(ownerId, requestId, start, velocity, laser.id, null);
     return laser;
   }
 
@@ -2230,12 +2330,14 @@ export class GameEngine {
         continue;
       }
       if (laser.hasExploded || now >= (this.laserExpiry.get(laser) ?? Infinity)) {
+        this.observeFixtureTerminal(laser, laser.hasExploded ? 'already-exploded' : 'lifetime');
         this.lasers.splice(i, 1);
         continue;
       }
 
       laser.age++;
       if (laser.age > ASTEROID_INTERACTIONS.maxLaserFrames) {
+        this.observeFixtureTerminal(laser, 'age-limit');
         this.lasers.splice(i, 1);
         continue;
       }
@@ -2247,6 +2349,7 @@ export class GameEngine {
       laser.distTraveled += getVelocityMagnitude(laser.velocity);
 
       if (laser.distTraveled >= SERVER_LASER_MAX_DISTANCE) {
+        this.observeFixtureTerminal(laser, 'distance-limit');
         this.lasers.splice(i, 1);
         continue;
       }
@@ -2377,6 +2480,22 @@ export class GameEngine {
         crawlerHit && (!terrainHit || crawlerHit.distance < terrainHit.distance)
           ? crawlerHit
           : terrainHit;
+      this.fixtureCombat?.record(laser.ownerId, this.gameTime, {
+        kind: 'segment',
+        projectileId: laser.id,
+        start,
+        end,
+        candidates: {
+          asteroid: impact,
+          surface,
+          auxiliary,
+          terrainSpider: terrainHit,
+          crawler: crawlerHit,
+          crawlerBody: crawlerEvidence(
+            crawlerHit ? this.beltCrawlers.getBody(crawlerHit.spiderId) : undefined
+          ),
+        },
+      });
       if (
         auxiliary &&
         (!spiderHit || auxiliary.distance <= spiderHit.distance) &&
@@ -2386,6 +2505,10 @@ export class GameEngine {
         (!surface || auxiliary.distance < surface.distance)
       ) {
         laser.hasExploded = true;
+        const targetBefore =
+          this.fixtureCombat?.watches(laser.ownerId) && auxiliary.kind === 'ship'
+            ? { health: this.getPlayer(auxiliary.id)?.health ?? null }
+            : null;
         if (auxiliary.kind === 'satellitePickup') {
           this.handleSatellitePickupDamage(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         } else if (auxiliary.kind === 'loot') {
@@ -2403,6 +2526,15 @@ export class GameEngine {
         } else {
           this.applyRicochetHullHit(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         }
+        this.observeFixtureTerminal(
+          laser,
+          auxiliary.kind,
+          auxiliary.id,
+          targetBefore,
+          this.fixtureCombat?.watches(laser.ownerId) && auxiliary.kind === 'ship'
+            ? { health: this.getPlayer(auxiliary.id)?.health ?? null }
+            : null
+        );
         return null;
       }
       if (
@@ -2412,13 +2544,26 @@ export class GameEngine {
         (!surface || spiderHit.distance < surface.distance)
       ) {
         const predators = spiderHit === crawlerHit ? this.beltCrawlers : this.spiderManager;
+        const before = this.fixtureCombat?.watches(laser.ownerId)
+          ? crawlerEvidence(predators.getBody(spiderHit.spiderId))
+          : null;
         predators.resolveLaserHit(start, end, DAMAGE.LASER_HIT * laser.energy);
         laser.hasExploded = true;
+        this.observeFixtureTerminal(
+          laser,
+          spiderHit === crawlerHit ? 'belt-crawler' : 'terrain-spider',
+          spiderHit.spiderId,
+          before,
+          this.fixtureCombat?.watches(laser.ownerId)
+            ? crawlerEvidence(predators.getBody(spiderHit.spiderId))
+            : null
+        );
         return null;
       }
       if (surface && (!impact || surface.distance <= impact.distance)) {
         if (laser.bounces >= ASTEROID_INTERACTIONS.maxBounces) {
           laser.hasExploded = true;
+          this.observeFixtureTerminal(laser, 'bounce-limit');
           return null;
         }
         laser.velocity = reflectVector(laser.velocity, surface.normal);
@@ -2458,6 +2603,7 @@ export class GameEngine {
         if (!charge.reflects) {
           const result = this.handleAsteroidHit(rock.id, laser.ownerId, 'collision');
           laser.hasExploded = true;
+          this.observeFixtureTerminal(laser, 'reflective-asteroid', rock.id);
           return {
             applied: result.outcome === 'destroyed',
             outcome: result.outcome,
@@ -2476,6 +2622,7 @@ export class GameEngine {
         const speed = Math.hypot(laser.velocity.x, laser.velocity.y);
         if (speed <= 1e-9) {
           laser.hasExploded = true;
+          this.observeFixtureTerminal(laser, 'zero-reflected-speed', rock.id);
           return null;
         }
         const remaining = Math.max(0, distance - impact.distance);
@@ -2485,8 +2632,18 @@ export class GameEngine {
         continue;
       }
       laser.hasExploded = true;
+      const healthBefore = rock.health;
       if (rock.isCollabTarget) {
         const result = this.handleAsteroidDamage(rock.id, laser.ownerId, laser.miningDamage);
+        if (this.fixtureCombat?.watches(laser.ownerId)) {
+          this.observeFixtureTerminal(
+            laser,
+            'asteroid',
+            rock.id,
+            { health: healthBefore },
+            { health: this.getAsteroid(rock.id)?.health ?? null }
+          );
+        }
         if (!result.destroyed) {
           return null;
         }
@@ -2513,9 +2670,19 @@ export class GameEngine {
       if (laser.energy >= 2 && rock.material === 'metal' && this.getAsteroid(rock.id)) {
         hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now, laser.miningDamage);
       }
+      if (this.fixtureCombat?.watches(laser.ownerId)) {
+        this.observeFixtureTerminal(
+          laser,
+          'asteroid',
+          rock.id,
+          { health: healthBefore },
+          { health: this.getAsteroid(rock.id)?.health ?? null, outcome: hit.outcome }
+        );
+      }
       return hit.applied ? hit : null;
     }
     laser.hasExploded = true;
+    this.observeFixtureTerminal(laser, 'segment-budget');
     return null;
   }
 

@@ -123,19 +123,19 @@ test('skips, incomplete discovery and failed suites cannot masquerade as a compl
   }
 });
 
-test('each focused attempt proves all four reviewed files and all six audio combinations', () => {
+test('each focused attempt proves all six reviewed files and all audio and crew cases', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-focused-coverage-'));
   try {
     const path = join(directory, 'vitest.json');
     assert.deepEqual(
       focusedScenarios.map(({ count }) => count),
-      [6, 7, 2, 3]
+      [6, 7, 2, 3, 4, 1]
     );
     const files = focusedScenarios.map(({ path: file }) => file);
     const passed = {
       success: true,
-      numTotalTests: 18,
-      numPassedTests: 18,
+      numTotalTests: 23,
+      numPassedTests: 23,
       numFailedTests: 0,
       numPendingTests: 0,
       numTodoTests: 0,
@@ -151,12 +151,28 @@ test('each focused attempt proves all four reviewed files and all six audio comb
       writeFileSync(path, JSON.stringify(evidence));
       return readTestEvidence(path, files, focusedScenarios);
     };
-    assert.deepEqual(read(passed), { total: 18, passed: 18, files: 4 });
+    assert.deepEqual(read(passed), { total: 23, passed: 23, files: 6 });
     assert.throws(() => read({ ...passed, testResults: passed.testResults.slice(0, 3) }));
     assert.throws(() =>
       read({ ...passed, testResults: [...passed.testResults, passed.testResults[0]] })
     );
-    assert.throws(() => read({ ...passed, numTotalTests: 17, numPassedTests: 17 }));
+    assert.throws(() => read({ ...passed, numTotalTests: 22, numPassedTests: 22 }));
+    for (const missingCrewIndex of [4, 5]) {
+      assert.throws(() =>
+        read({
+          ...passed,
+          testResults: passed.testResults.filter((_, index) => index !== missingCrewIndex),
+        })
+      );
+    }
+    assert.throws(() =>
+      read({
+        ...passed,
+        numTotalTests: 18,
+        numPassedTests: 18,
+        testResults: passed.testResults.slice(0, 4),
+      })
+    );
     const skipped = structuredClone(passed);
     skipped.testResults[2].assertionResults[0].status = 'pending';
     assert.throws(() => read(skipped));
@@ -165,6 +181,10 @@ test('each focused attempt proves all four reviewed files and all six audio comb
     redistributed.testResults[0].assertionResults.pop();
     redistributed.testResults[2].assertionResults.push({ status: 'passed' });
     assert.throws(() => read(redistributed));
+    const redistributedCrew = structuredClone(passed);
+    redistributedCrew.testResults[4].assertionResults.pop();
+    redistributedCrew.testResults[5].assertionResults.push({ status: 'passed' });
+    assert.throws(() => read(redistributedCrew));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

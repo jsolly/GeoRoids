@@ -2,11 +2,12 @@
 
 The manually dispatched **Integration repeatability** workflow runs the same full
 `main` commit SHA on native Ubuntu 24.04 x64 and ARM64. Each architecture runs 20
-serialized focused attempts covering four reviewed files together: title music
+serialized focused attempts covering six reviewed files together: title music
 lifecycle (six cases), furnace travel and resized prompt (seven), resource sound
 (two), and native sample ownership after an injected early Howler wall-clock end
-plus visible desktop/mobile Sound Effects mute (three). Each focused attempt must
-report all four files and exactly 18 passing
+plus visible desktop/mobile Sound Effects mute (three), desktop/mobile belt crew
+mining and crawler windup (four), and Scout/Hauler crew delivery (one).
+Each focused attempt must report all six files and exactly 23 passing
 cases, including all six title music cases. It then runs three complete integration
 suites. Title music includes Chromium and WebKit at desktop, mobile, and landscape
 sizes, so each audio combination has 20 attempts. The report records the selected
@@ -164,3 +165,30 @@ travel scenarios keep their normal flight behavior. Named evidence stages retain
 prompt activity, focus, menu, viewport and footprint eligibility with both poses
 and epochs. This fixture change requires a fresh complete native sample after it
 lands; a focused local pass does not replace that sample.
+
+## Crew mining and delivery evidence
+
+The belt crew receipts retain the actual `belt-*` host ID, authoritative rock
+geometry and health, attached crawler positions and health, and the sent shot's
+request ID with its `shotAcknowledged` projectile ID or null rejection. The local
+fixture control enables combat recording only for explicitly requested pilots.
+Segment records retain the nearest asteroid, terrain surface, auxiliary target,
+terrain spider and belt crawler candidates; terminal records identify the actual
+consumed target or expiry reason. The recorder keeps at most 1,024 segments and
+64 admission/terminal records, reports any dropped records, and clears on world
+reset. A received shoot message alone never proves admission or a rock hit.
+
+Delivery arrangement records cargo and banked score before and after setup. It
+clears only the delivery crew's inherited cargo, preserves banked score, and
+requires each client to receive that authoritative baseline before towing. Crew
+receipts retain furnace entry and the identified `furnaceDelivery` rewards before
+asserting the same full per-pilot reward, total score, banners and audio behavior.
+Captured socket evidence contains only shots, acknowledgements and delivery
+metadata, never join credentials. Capture failure or truncated evidence fails the
+scenario; later passing attempts do not replace earlier failures.
+
+These fixture omissions are demonstrated independently. The original September
+30 x64 failures at clean `c903806890aeab748915615031cad37d6e02a9c2` still lack
+cargo and accepted-projectile terminal evidence. Crawler interception and cargo
+banking remain possible explanations, not established causes of those attempts.
+No Wiki gameplay page is affected by these test-control and observation changes.

@@ -41,10 +41,13 @@ export async function smoke({
     await checkHealth();
     let snapshots = 0;
     let playerId;
-    let projectileSeen = false;
+    let firing = false;
+    let acceptedShot = false;
+    let activeSocket;
+    let activeAdmission;
     let socketError;
     let state;
-    let joinedId;
+
     const expectedSocket = new URL(healthUrl);
     expectedSocket.protocol = 'wss:';
     expectedSocket.pathname = '/ws';
@@ -53,13 +56,49 @@ export async function smoke({
       if (url.pathname !== '/ws') {
         return;
       }
-      const observed = { url: socket.url(), serverReleaseId: null, admitted: false };
+      const observed = {
+        url: socket.url(),
+        serverReleaseId: null,
+        admitted: false,
+        playerId: null,
+        shots: [],
+      };
+      const requests = new Map();
       evidence.sockets.push(observed);
       if (url.protocol !== 'wss:' || url.host !== expectedSocket.host) {
         socketError = new Error(`Unexpected gameplay WebSocket: ${socket.url()}`);
         return;
       }
       const decoder = new SnapshotDecoder();
+      socket.on('framesent', ({ payload }) => {
+        if (!firing || socket !== activeSocket || !observed.admitted) {
+          return;
+        }
+        try {
+          const message = JSON.parse(typeof payload === 'string' ? payload : payload.toString());
+          if (message.type !== 'shoot') {
+            return;
+          }
+          const data = message.data;
+          assert.equal(message.id, playerId, 'Shoot request belongs to another player');
+          assert.equal(
+            message.id,
+            observed.playerId,
+            'Shoot request differs from socket admission'
+          );
+          assert.ok(
+            typeof data.requestId === 'string' && data.requestId.length,
+            'Missing shoot request ID'
+          );
+          assert.ok(!requests.has(data.requestId), 'Duplicate shoot request ID');
+          const shot = { playerId: message.id, requestId: data.requestId, projectileId: null };
+          requests.set(data.requestId, shot);
+          observed.shots.push(shot);
+        } catch (error) {
+          socketError = error;
+          observed.error = String(error);
+        }
+      });
       socket.on('framereceived', ({ payload }) => {
         try {
           const decoded = decoder.readMessage(
@@ -70,6 +109,30 @@ export async function smoke({
             throw decoded.error;
           }
           if (decoded.kind === 'message') {
+            if (decoded.message?.type === 'shotAcknowledged') {
+              const data = decoded.message.data;
+              assert.ok(
+                typeof data?.requestId === 'string' && data.requestId.length,
+                'Malformed shot acknowledgement request ID'
+              );
+              assert.ok(
+                data.projectileId === null ||
+                  (typeof data.projectileId === 'string' && data.projectileId.length),
+                'Malformed shot acknowledgement projectile ID'
+              );
+              const shot = requests.get(data.requestId);
+              if (
+                firing &&
+                socket === activeSocket &&
+                observed.playerId === playerId &&
+                shot &&
+                data.projectileId !== null
+              ) {
+                shot.projectileId = data.projectileId;
+                acceptedShot = true;
+              }
+              return;
+            }
             if (decoded.message?.type !== 'joined') {
               return;
             }
@@ -79,19 +142,20 @@ export async function smoke({
             assert.equal(data.snapshotVersion, 1, 'Unsupported joined snapshot protocol');
             assert.equal(data.asteroidInteractions, 1, 'Missing asteroid protocol admission');
             assert.ok(typeof data.id === 'string' && data.id.length, 'Missing joined player ID');
-            joinedId = data.id;
+            observed.playerId = data.id;
+            activeSocket = socket;
+            activeAdmission = observed;
+            state = undefined;
+            snapshots = 0;
             observed.admitted = true;
+            return;
+          }
+          if (socket !== activeSocket) {
             return;
           }
           state = decoded.state;
           snapshots++;
           evidence.acceptedSnapshots = snapshots;
-          if (
-            playerId &&
-            state.playerProjectiles.some((projectile) => projectile.ownerId === playerId)
-          ) {
-            projectileSeen = true;
-          }
         } catch (error) {
           socketError = error;
           observed.error = String(error);
@@ -112,7 +176,8 @@ export async function smoke({
       assert.ifError(socketError);
       return (
         snapshots >= 2 &&
-        joinedId === playerId &&
+        activeAdmission?.admitted &&
+        activeAdmission.playerId === playerId &&
         state?.entities.some((entity) => entity.id === playerId)
       );
     }, 'join and snapshots');
@@ -134,16 +199,19 @@ export async function smoke({
     } finally {
       await page.keyboard.up('ArrowRight');
     }
-    await page.keyboard.down('Space');
+    firing = true;
     try {
+      await page.keyboard.down('Space');
       await waitForEvidence(() => {
         assert.ifError(socketError);
-        return projectileSeen;
-      }, 'owned projectile after firing');
+        return acceptedShot;
+      }, 'accepted shot acknowledgement after firing');
     } finally {
+      firing = false;
       await page.keyboard.up('Space');
     }
     await checkHealth();
+    assert.ifError(socketError);
   } catch (error) {
     evidence.error = String(error);
     throw error;

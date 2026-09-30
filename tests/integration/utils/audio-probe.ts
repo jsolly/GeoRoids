@@ -47,6 +47,43 @@ export async function installAudioProbe(
       }
       AudioNode.prototype.connect = connect;
       const active = new Set<AudioBufferSourceNode>();
+      const sourceIds = new WeakMap<AudioBufferSourceNode, number>();
+      const sourceStarts = new WeakMap<
+        AudioBufferSourceNode,
+        { duration: number | null; when: number; offset: number; requestedDuration: number | null }
+      >();
+      let nextSourceId = 0;
+      const describeSource = (source: AudioBufferSourceNode) => ({
+        sourceId: sourceIds.get(source),
+        contextId: contextIds.get(source.context),
+        state: source.context.state,
+        rawTime: Number(readRawTime(source.context)),
+        observedTime: source.context.currentTime,
+        ...sourceStarts.get(source),
+        currentBufferDuration: source.buffer?.duration ?? null,
+        rate: source.playbackRate.value,
+        loop: source.loop,
+        connected: connections.has(source),
+      });
+      const nativeDisconnect = AudioNode.prototype.disconnect;
+      AudioNode.prototype.disconnect = function (
+        this: AudioNode,
+        ...args:
+          | []
+          | [number]
+          | [AudioNode]
+          | [AudioNode, number]
+          | [AudioNode, number, number]
+          | [AudioParam]
+          | [AudioParam, number]
+      ) {
+        const result = Reflect.apply(nativeDisconnect, this, args);
+        connections.delete(this);
+        if (this instanceof AudioBufferSourceNode) {
+          record('source-disconnect', describeSource(this));
+        }
+        return result;
+      };
       const rates = new WeakMap<AudioParam, (typeof events)[number]>();
       const buffers = new WeakMap<AudioBuffer, number>();
       let nextBufferId = 0;
@@ -100,7 +137,9 @@ export async function installAudioProbe(
       document.addEventListener('visibilitychange', () => record('visibility'));
       document.addEventListener('georoids-audio-probe-snapshot', () => {
         const snapshots = nativeSnapshots.map((read) => read());
-        record('snapshot', { contexts: snapshots });
+        const sources = [...active].map(describeSource);
+        record('snapshot', { contexts: snapshots, sources });
+        document.documentElement.dataset['nativeAudioSources'] = JSON.stringify(sources);
         document.documentElement.dataset['nativeAudioContexts'] = JSON.stringify(snapshots);
         document.documentElement.dataset['audioLifecycle'] = JSON.stringify(lifecycle);
         document.documentElement.dataset['audioLifecycleDropped'] = String(
@@ -319,7 +358,19 @@ export async function installAudioProbe(
           start.call(this, when, offset, duration);
         }
         active.add(this);
-        record('source-start', { contextId: contextIds.get(this.context), loop: this.loop, when });
+        sourceIds.set(this, ++nextSourceId);
+        sourceStarts.set(this, {
+          duration: this.buffer?.duration ?? null,
+          when,
+          offset,
+          requestedDuration: duration ?? null,
+        });
+        record('source-start', {
+          ...describeSource(this),
+          when,
+          offset,
+          requestedDuration: duration ?? null,
+        });
         if (this.buffer && !buffers.has(this.buffer)) {
           buffers.set(this.buffer, ++nextBufferId);
         }
@@ -331,6 +382,9 @@ export async function installAudioProbe(
           loop: this.loop,
         };
         events.push(event);
+        if (events.length > 512) {
+          events.shift();
+        }
         queueMicrotask(() => {
           let node: AudioNode | undefined = this;
           for (let hop = 0; node && hop < 8; hop++) {
@@ -356,7 +410,7 @@ export async function installAudioProbe(
           'ended',
           () => {
             active.delete(this);
-            record('source-ended', { contextId: contextIds.get(this.context), loop: this.loop });
+            record('source-ended', describeSource(this));
             publish();
           },
           { once: true }
@@ -365,7 +419,7 @@ export async function installAudioProbe(
       };
       AudioBufferSourceNode.prototype.stop = function (this: AudioBufferSourceNode, when = 0) {
         stop.call(this, when);
-        record('source-stop', { contextId: contextIds.get(this.context), loop: this.loop, when });
+        record('source-stop', { ...describeSource(this), when });
         // Immediate stops release voices now; scheduled synth stops finish through ended.
         if (when <= this.context.currentTime) {
           active.delete(this);
@@ -446,6 +500,8 @@ export function readNativeAudioSnapshot(page: Page) {
     const lifecycle: unknown = JSON.parse(data['audioLifecycle']);
     return {
       contexts,
+      sources: JSON.parse(data['nativeAudioSources'] ?? '[]'),
+      activeAudio: data['activeAudio'],
       lifecycleDropped: Number(data['audioLifecycleDropped']),
       cachedStates: data['audioContextStates'],
       activeLoopContexts: data['activeLoopContexts'],

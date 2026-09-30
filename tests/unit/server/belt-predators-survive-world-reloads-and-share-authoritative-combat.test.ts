@@ -67,6 +67,7 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   try {
     const player = addPilot(engine);
+    engine.observeFixtureShots('test', [player.id]);
     for (const rock of engine.getAllAsteroids()) {
       engine.removeAsteroid(rock.id);
     }
@@ -99,6 +100,16 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
     assert(shot);
     engine.advanceLasersAndResolveHits();
     expect(shot.hasExploded).toBe(true);
+    expect(engine.getFixtureCombatEvidence().events).toContainEqual(
+      expect.objectContaining({
+        kind: 'terminal',
+        projectileId: shot.id,
+        reason: 'belt-crawler',
+        targetId: crawler.id,
+        targetBefore: expect.objectContaining({ health: DAMAGE.LASER_HIT }),
+        targetAfter: null,
+      })
+    );
     expect(engine.getAsteroid(rock.id)?.health).toBe(150);
     expect(engine.getSpiderField().spiders.some((spider) => spider.id === crawler.id)).toBe(false);
     expect(engine.getAsteroid(rock.id)?.beltCrawlerHealth?.[0]).toBe(0);

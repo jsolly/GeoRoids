@@ -349,9 +349,27 @@ test('the controlled belt scene contains its stationary identified deposit and s
   expect(Math.hypot(player.position.x - rock.position.x, player.position.y - rock.position.y)).toBe(
     450
   );
-  expect((await response.json()).poses).toEqual([
+  const arranged = await response.json();
+  expect(arranged.asteroidId).toBe(rock.id);
+  expect(arranged.poses).toEqual([
     { playerId: player.id, position: player.position, motionEpoch: player.playerMotion?.epoch },
   ]);
+});
+
+test('a delivery fixture removes inherited cargo while preserving banked points before the tow', async () => {
+  const { origin, server, player } = await pilot();
+  player.cargo = 50;
+  player.score = 170;
+  const response = await fetch(`${origin}/test/arrange-crew-field`, {
+    method: 'POST',
+    body: JSON.stringify({ playerIds: [player.id], scenario: 'delivery' }),
+  });
+  expect(response.status).toBe(200);
+  expect(player.cargo).toBe(0);
+  expect(player.score).toBe(170);
+  player.position = { x: 0, y: 0 };
+  server.gameEngine.depositCargo();
+  expect(player.score).toBe(170);
 });
 
 test('a retained pilot with missing transport is rejected before crew mutation', async () => {
@@ -462,4 +480,87 @@ test('a live pinball fixture uses canonical three-bumper geometry and rejects a 
   expect(JSON.stringify(server.gameEngine.getAllAsteroids())).toBe(before);
   expect(player.health).toBe(0);
   expect(player.exploding).toBe(true);
+});
+
+test('unrequested combat history stays empty and production cannot enable a recorder', async () => {
+  const { server, player } = await pilot();
+  const shot = server.gameEngine.spawnLaser(player.id, player.position, { x: 1, y: 0 });
+  assert.ok(shot);
+  server.gameEngine.advanceLasersAndResolveHits();
+  expect(server.gameEngine.getFixtureCombatEvidence()).toEqual({ events: [], dropped: 0 });
+  expect(() => server.gameEngine.observeFixtureShots('production', [player.id])).toThrow(
+    'unavailable in production'
+  );
+  expect(server.gameEngine.getFixtureCombatEvidence()).toEqual({ events: [], dropped: 0 });
+});
+
+test('a rejected live shot retains its null admission and resetting the world clears the watch', async () => {
+  const { origin, server, socket, player } = await pilot();
+  const enable = await fetch(`${origin}/test/fixture-state`, {
+    method: 'POST',
+    body: JSON.stringify({ observePlayerShots: [player.id] }),
+  });
+  expect(enable.status).toBe(200);
+  socket.send(
+    JSON.stringify({
+      type: 'shoot',
+      data: {
+        id: player.id,
+        requestId: 'outside-hull',
+        laserStart: { x: 9000, y: 9000 },
+        laserDirection: { x: 1, y: 0 },
+      },
+    })
+  );
+  const pong = once(socket, 'pong');
+  socket.ping();
+  await pong;
+  expect(server.gameEngine.getFixtureCombatEvidence().events).toContainEqual(
+    expect.objectContaining({
+      kind: 'admission',
+      requestId: 'outside-hull',
+      projectileId: null,
+      rejectionReason: 'origin-or-speed-outside-budget',
+      ownerId: player.id,
+    })
+  );
+  const departure = once(socket, 'close');
+  socket.close();
+  await departure;
+  await expect.poll(() => server.wss.clients.size).toBe(0);
+  const reset = await fetch(`${origin}/test/reset-world`, { method: 'POST' });
+  expect(reset.status).toBe(200);
+  expect(server.gameEngine.getFixtureCombatEvidence()).toEqual({ events: [], dropped: 0 });
+  const rejoinedSocket = new RecordingSocket();
+  server.wsCore.handleClientMessage(
+    {
+      type: 'join',
+      data: {
+        id: player.id,
+        name: 'Rejoined fixture pilot',
+        asteroidInteractions: 1,
+        snapshotVersion: 1,
+      },
+    },
+    rejoinedSocket
+  );
+  server.gameEngine.stopGameLoop();
+  const rejoined = server.gameEngine.getPlayer(player.id);
+  assert.ok(rejoined);
+  server.wsCore.handleClientMessage(
+    {
+      type: 'shoot',
+      data: {
+        id: rejoined.id,
+        requestId: 'after-reset',
+        laserStart: { ...rejoined.position },
+        laserDirection: { x: 1, y: 0 },
+      },
+    },
+    rejoinedSocket
+  );
+  const acknowledgement = rejoinedSocket.lastReceived('shotAcknowledged')?.data;
+  expect(acknowledgement).toEqual({ requestId: 'after-reset', projectileId: expect.any(String) });
+  server.gameEngine.advanceLasersAndResolveHits();
+  expect(server.gameEngine.getFixtureCombatEvidence()).toEqual({ events: [], dropped: 0 });
 });

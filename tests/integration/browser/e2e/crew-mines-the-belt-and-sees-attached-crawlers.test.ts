@@ -7,9 +7,14 @@ import {
   watchBrowserDiagnostics,
 } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { watchCrewMessages } from '../../utils/crew-message-evidence';
 import { withFixtureEvidence } from '../../utils/fixture-evidence';
 import { GameInteractions } from '../../utils/game-interactions';
-import { arrangeCrewField } from '../../utils/test-server-control';
+import {
+  arrangeCrewField,
+  arrangeCrewFieldWithEvidence,
+  getFixtureState,
+} from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 function field(page: Page): Promise<SpiderFieldState> {
@@ -26,84 +31,135 @@ for (const viewport of [
     const page = await browserManager.recreatePage({ hasTouch: viewport.hasTouch });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
-    await withFixtureEvidence(page, `belt-crew-${viewport.name}`, async (stage) => {
-      const game = new GameInteractions(page);
-      await game.bootGame({ waitForCombatReady: false });
-      const home = beltSlotPosition(60);
-      const second = await browserManager.createAdditionalPage({ hasTouch: viewport.hasTouch });
-      await second.setViewportSize(viewport);
-      const secondDiagnostics = watchBrowserDiagnostics(second);
-      const crewmate = new GameInteractions(second);
-      await crewmate.bootGame({ waitForCombatReady: false });
-      await stage('crew-joined');
-      const id = await game.getLocalPlayerId();
-      const secondId = await crewmate.getLocalPlayerId();
-      const epochs = await arrangeCrewField([id, secondId], 'belt-mining');
-      await game.waitForControlledFixture(epochs.get(id));
-      await crewmate.waitForControlledFixture(epochs.get(secondId));
-      await stage('arranged');
-      await expect
-        .poll(
-          async () =>
-            (await field(page)).spiders.filter((s) => s.crawler?.hostId.includes('-60-')).length,
-          {
-            timeout: 10000,
+    const wire = watchCrewMessages(page);
+    let hostId: string | undefined;
+    let arrangement: unknown;
+    try {
+      await withFixtureEvidence(
+        page,
+        `belt-crew-${viewport.name}`,
+        async (stage) => {
+          const game = new GameInteractions(page);
+          await game.bootGame({ waitForCombatReady: false });
+          const home = beltSlotPosition(60);
+          const second = await browserManager.createAdditionalPage({ hasTouch: viewport.hasTouch });
+          await second.setViewportSize(viewport);
+          const secondDiagnostics = watchBrowserDiagnostics(second);
+          const crewmate = new GameInteractions(second);
+          await crewmate.bootGame({ waitForCombatReady: false });
+          await stage('crew-joined');
+          const id = await game.getLocalPlayerId();
+          const secondId = await crewmate.getLocalPlayerId();
+          const arranged = await arrangeCrewFieldWithEvidence([id, secondId], 'belt-mining');
+          arrangement = { ...arranged, epochs: [...arranged.epochs] };
+          if (!arranged.asteroidId) {
+            throw new Error('Belt fixture omitted its host ID');
           }
-        )
-        .toBeGreaterThan(0);
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`asteroid-belt-${viewport.name}.png`),
-      });
-      const crawler = (await field(page)).spiders.find((s) => s.crawler?.hostId.includes('-60-'));
-      expect(crawler?.crawler).toBeDefined();
-      if (!crawler?.crawler) {
-        throw new Error('Belt host has no crawlers');
-      }
-      await page.locator('#universe-map-toggle').click();
-      await expect
-        .poll(async () => (await field(second)).spiders.some((s) => s.id === crawler.id))
-        .toBe(true);
-      await stage('shared-crawlers');
-      // Discover the actual belt through the server, then inspect the shared map.
-      await expect
-        .poll(() => page.locator('#universe-map-locations').textContent())
-        .toContain('Asteroid belt');
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`asteroid-belt-map-${viewport.name}.png`),
-      });
-      await page.locator('#universe-map-close').click();
-      const hostId = crawler.crawler.hostId;
-      const health = await page.evaluate(
-        (asteroidId) =>
-          window.gameController
-            ?.getCurrRoidBelt()
-            .getRoids()
-            .find((r) => r.id === asteroidId)?.health,
-        hostId
+          hostId = arranged.asteroidId;
+          await game.waitForControlledFixture(arranged.epochs.get(id));
+          await crewmate.waitForControlledFixture(arranged.epochs.get(secondId));
+          await stage('arranged');
+          await expect
+            .poll(
+              async () =>
+                (await field(page)).spiders.filter((s) => s.crawler?.hostId.includes('-60-'))
+                  .length,
+              {
+                timeout: 10000,
+              }
+            )
+            .toBeGreaterThan(0);
+          await page.screenshot({
+            path: screenshotManager.getScreenshotPath(`asteroid-belt-${viewport.name}.png`),
+          });
+          const crawler = (await field(page)).spiders.find((s) =>
+            s.crawler?.hostId.includes('-60-')
+          );
+          expect(crawler?.crawler).toBeDefined();
+          if (!crawler?.crawler) {
+            throw new Error('Belt host has no crawlers');
+          }
+          await page.locator('#universe-map-toggle').click();
+          await expect
+            .poll(async () => (await field(second)).spiders.some((s) => s.id === crawler.id))
+            .toBe(true);
+          await stage('shared-crawlers');
+          // Discover the actual belt through the server, then inspect the shared map.
+          await expect
+            .poll(() => page.locator('#universe-map-locations').textContent())
+            .toContain('Asteroid belt');
+          await page.screenshot({
+            path: screenshotManager.getScreenshotPath(`asteroid-belt-map-${viewport.name}.png`),
+          });
+          await page.locator('#universe-map-close').click();
+          expect(crawler.crawler.hostId).toBe(hostId);
+          const selectedHostId = crawler.crawler.hostId;
+          const health = await page.evaluate(
+            (asteroidId) =>
+              window.gameController
+                ?.getCurrRoidBelt()
+                .getRoids()
+                .find((r) => r.id === asteroidId)?.health,
+            selectedHostId
+          );
+          expect(health).toBeGreaterThan(0);
+          await game.placeControlledShipAt(home.x - 300, home.y + 90);
+          await getFixtureState([selectedHostId], [id]);
+          await stage('mining-request');
+          await game.fireLaserToward(home.x, home.y);
+          await expect
+            .poll(
+              () =>
+                wire.acknowledgements.find((ack) =>
+                  wire.shots.some((shot) => shot.requestId === ack.requestId)
+                ),
+              { timeout: 5000 }
+            )
+            .toBeDefined();
+          const admitted = wire.acknowledgements.find((ack) =>
+            wire.shots.some((shot) => shot.requestId === ack.requestId)
+          );
+          expect(admitted?.projectileId).toBeTypeOf('string');
+          await stage('shot-admitted');
+          await expect
+            .poll(
+              async () =>
+                page.evaluate(
+                  (asteroidId) =>
+                    window.gameController
+                      ?.getCurrRoidBelt()
+                      .getRoids()
+                      .find((r) => r.id === asteroidId)?.health ?? 0,
+                  selectedHostId
+                ),
+              { timeout: 5000 }
+            )
+            .toBeLessThan(health ?? 0);
+          await game.placeControlledShipAt(home.x - 450, home.y);
+          const terminal = (await getFixtureState([selectedHostId])).combat;
+          expect(terminal.dropped).toBe(0);
+          expect(terminal.events).toContainEqual(
+            expect.objectContaining({
+              kind: 'terminal',
+              projectileId: admitted?.projectileId,
+              reason: 'asteroid',
+              targetId: selectedHostId,
+            })
+          );
+          await stage('mined-and-safe');
+          assertNoBrowserDiagnostics(diagnostics);
+          assertNoBrowserDiagnostics(secondDiagnostics);
+          expect(wire.failures).toEqual([]);
+          expect(wire.snapshot().dropped).toBe(0);
+        },
+        {
+          asteroidIds: () => (hostId ? [hostId] : []),
+          evidence: () => ({ arrangement, wire: wire.snapshot() }),
+        }
       );
-      expect(health).toBeGreaterThan(0);
-      await game.placeControlledShipAt(home.x - 300, home.y + 90);
-      await stage('mining-request');
-      await game.fireLaserToward(home.x, home.y);
-      await expect
-        .poll(
-          async () =>
-            page.evaluate(
-              (asteroidId) =>
-                window.gameController
-                  ?.getCurrRoidBelt()
-                  .getRoids()
-                  .find((r) => r.id === asteroidId)?.health ?? 0,
-              hostId
-            ),
-          { timeout: 5000 }
-        )
-        .toBeLessThan(health ?? 0);
-      await game.placeControlledShipAt(home.x - 450, home.y);
-      await stage('mined-and-safe');
-      assertNoBrowserDiagnostics(diagnostics);
-      assertNoBrowserDiagnostics(secondDiagnostics);
-    });
+    } finally {
+      wire.stop();
+    }
   }, 45000);
 }
 

@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed HUD Sound and haptics and docs/sounds.md playback against native source ownership: mute stops/disconnects active samples even after an early Howler wall-clock end; native completion releases resources and retires backend bookkeeping; still-active native voices reserve their backend pool rows so overlapping cues keep independent gain and panner nodes. Existing controls, trusted-gesture authorization, pitch, spatial playback and demonstrations remain accurate. Audio units, native-source fault regression, visible desktop/touch mute controls with clean console receipts, and desktop/mobile field-manual browser checks passed. Accepted only the changed Sound.ts and explicitly cited title-audio test digests. The test adapts its native-source mock without changing title music assertions; all unrelated accepted source hashes are unchanged.",
+  "note": "Reviewed only the changed GameEngine, MessageHandler and explicitly cited crew-delivery scenario sources: opt-in local test combat observations and zero-cargo delivery fixtures leave gameplay, controls, shared rewards and demonstrations unchanged. Read the eleven GameEngine-linked Wiki topics plus controls and teamwork; existing rules remain accurate. Desktop/mobile field-manual browser check passed (one scenario,4.13s), and five desktop/touch crew browser scenarios passed17.12s with identified hits and exact delivery rewards. Only these three hashes are accepted; unrelated hashes unchanged.",
   "hashes": {
     "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
     "docs/protocol/snapshot-v1.md": "sha256:5dce0d4d4fa17b41d2498664a40f6719d53b4d169b91cfe670d71d0a6aa56394",
@@ -67,7 +67,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-vite.ts": "sha256:a20cca6c58262a96b23334348619ac8bbcfd0a05c77be5dc475a9994877dafa1",
     "server.ts": "sha256:1847341c2cd9286dc2a2ef87693cdb199d290d58f16a3a195c4e34d158c24125",
-    "server/communication/MessageHandler.ts": "sha256:3f0d352162d4fa561128e58d767f89036290c0f7b20252c3e778b50ddcac95c6",
+    "server/communication/MessageHandler.ts": "sha256:3584bcda9272e54cf29e1dc9dbd077016403490cd13fc0e91ea76e8161fc8599",
     "server/communication/WebSocketCore.ts": "sha256:b474d6d358de1fbf9bcffd55dfde35b61cea9abe75a6a3230bc53d66700498ee",
     "server/communication/clientCommandDecoder.ts": "sha256:d0622c8ea2c5e2c6da19df305d07c5cb53d30e191d9eac99230b2b424adf9536",
     "server/communication/connectionAdmission.ts": "sha256:9a5adee606b90c0d8ec0f0cd6c0cf2bd4bb60a90787966e70764d9d9b385cbea",
@@ -78,7 +78,7 @@
     "server/core/BeltCrawlerManager.ts": "sha256:4951e8e6cf373a9905048b5dc210ca92eac4f9778c8abc7fa2f9bb2bbd00c30f",
     "server/core/CollisionAuthority.ts": "sha256:6fcd4df104d81ce156ea40fbc49dc55a83dd96e059ec7474640940af239e2ca9",
     "server/core/EntityManager.ts": "sha256:135d0d7464106101cf14f2290c19ed486b82c3116bb022fc2df2c6969ca3d85b",
-    "server/core/GameEngine.ts": "sha256:f4931a602d252d6b5f6cac54e4d9f76cc88b4a6e8fec9e0915a4df32fdb01675",
+    "server/core/GameEngine.ts": "sha256:e4e2dfb5d38632374725c09cabac00044351fb782b3d231d45f3bc1d5d105557",
     "server/core/GameLoopHealth.ts": "sha256:4c934a63da53b93facc60b6dadf197e95c3df69e749f90fe4c794eee22fe19ba",
     "server/core/LootManager.ts": "sha256:4dfe20746d95bac5c0f60831f92b3cf65fa2ed092e9d91d2bbf6cadbf9e6692c",
     "server/core/PlayerMotionService.ts": "sha256:d341837a33c3425a0f17d6459f9825d0583e0831c46f8ad8f876b6bc5349cfbb",
@@ -324,7 +324,7 @@
     "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts": "sha256:8c313209bb56ae2925811a5c6e7b57e3dbc4d701f3ad58fd831a0566b9dab12e",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts": "sha256:f59c33b77ae06e973130ea52cdd9c67178b7a9ca7fd6dc3769a3590a42ff944f",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:fc4ae564e41042142dfd8078e198433752dc56110e0735fe6730fad41b49a4d5",
-    "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts": "sha256:34656068a72756ad516a7caa35762ed70ae32e2c60e35776b3c54812f06b1fc2",
+    "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts": "sha256:d2c598b36ab223f163b037068e7aa13ad35c3154cd85139d81b066cebc32a3cd",
     "tests/integration/browser/e2e/hauler-extracts-silk-and-tows-spiders-into-furnaces.test.ts": "sha256:1bcb9c236a071757228f07ed30327b85f7a07978c09f5d24155b01ab9c8c0f5e",
     "tests/integration/browser/e2e/menus-hold-the-ship-still-and-protect-it.test.ts": "sha256:9389833bd033dacf3c6b2624aaa45f160ad58778060b0121028ccdd01a2a3934",
     "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts": "sha256:4845a1803891e674f373f8f2b04e1ecf84b0dcd22e6fa9763a047bf06af65e63",

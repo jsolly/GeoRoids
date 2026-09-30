@@ -101,7 +101,8 @@ function failureEvidence(value: unknown): FailureEvidence {
 export async function withFixtureEvidence(
   page: Page,
   scenario: string,
-  run: (stage: (name: string) => Promise<void>) => Promise<void>
+  run: (stage: (name: string) => Promise<void>) => Promise<void>,
+  observations: { asteroidIds?: () => readonly string[]; evidence?: () => unknown } = {}
 ): Promise<void> {
   const directory = join(process.cwd(), 'tests/integration/browser/screenshots');
   mkdirSync(directory, { recursive: true });
@@ -116,15 +117,16 @@ export async function withFixtureEvidence(
       durationMs: number;
       server: unknown;
       client: unknown;
-      captureFailures: { source: 'server' | 'client'; error: FailureEvidence }[];
+      evidence: unknown;
+      captureFailures: { source: 'server' | 'client' | 'scenario'; error: FailureEvidence }[];
     }[],
   };
   const started = performance.now();
   let previous = started;
   const stage = async (name: string) => {
     const now = performance.now();
-    const [server, client] = await Promise.allSettled([
-      Promise.resolve().then(() => getFixtureState()),
+    const [server, client, scenarioEvidence] = await Promise.allSettled([
+      Promise.resolve().then(() => getFixtureState(observations.asteroidIds?.() ?? [])),
       Promise.resolve().then(() =>
         page.isClosed()
           ? null
@@ -155,6 +157,8 @@ export async function withFixtureEvidence(
                 },
                 connected: controller?.getNetworkManager().isConnected,
                 playerId: controller?.getNetworkManager().getLocalPlayerId(),
+                cargo: player?.cargo,
+                score: controller?.getCurrScore(),
                 health: ship?.health,
                 exploding: ship?.exploding,
                 position: ship?.position,
@@ -165,12 +169,15 @@ export async function withFixtureEvidence(
               };
             }, civicLot('street-1-0'))
       ),
+      Promise.resolve().then(() => structuredClone(observations.evidence?.() ?? null)),
     ]);
     const failures: unknown[] = [];
-    const captureFailures: { source: 'server' | 'client'; error: FailureEvidence }[] = [];
+    const captureFailures: { source: 'server' | 'client' | 'scenario'; error: FailureEvidence }[] =
+      [];
     for (const [source, result] of [
       ['server', server],
       ['client', client],
+      ['scenario', scenarioEvidence],
     ] as const) {
       if (result.status === 'rejected') {
         failures.push(result.reason);
@@ -179,6 +186,7 @@ export async function withFixtureEvidence(
     }
     const observation = {
       name,
+      evidence: scenarioEvidence.status === 'fulfilled' ? scenarioEvidence.value : null,
       elapsedMs: now - started,
       durationMs: now - previous,
       server: server.status === 'fulfilled' ? server.value : null,

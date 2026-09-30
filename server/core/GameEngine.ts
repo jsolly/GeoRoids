@@ -610,6 +610,10 @@ export class GameEngine {
   }
 
   /** Read-only snapshot for health checks and integration test barriers. */
+  public getWorldSeedForTesting(): number {
+    return this.worldSeed;
+  }
+
   public getDiagnostics(): {
     isPaused: boolean;
     gameTime: number;

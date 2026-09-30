@@ -1,6 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import process from 'node:process';
+import type { WebSocket } from 'ws';
 import { logger } from '../setup/serverLogger';
+import { beltAsteroid, beltSlotPosition } from '../shared/asteroidBelt';
+import { ASTEROID_INTERACTIONS, layoutReflectiveCluster } from '../shared/asteroidPhenomena';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
 import { cargoCapacity } from '../shared/economy';
 import { EQUIPMENT_IDS } from '../shared/equipment';
@@ -185,7 +188,12 @@ export function handleTestResetWorld(
       error: failure,
     });
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Test world reset failed' }));
+    res.end(
+      JSON.stringify({
+        error: 'Test world reset failed',
+        reason: error instanceof AggregateError ? 'socket-close-failed' : 'world-reset-failed',
+      })
+    );
     return;
   }
   res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -196,6 +204,62 @@ export function handleTestResetWorld(
       timestamp: new Date().toISOString(),
     })
   );
+}
+
+/** Detached, credential-free observations for local fixture completion and failure evidence. */
+export function handleTestFixtureState(
+  req: IncomingMessage,
+  res: ServerResponse,
+  nodeEnv: string,
+  gameEngine: GameEngine,
+  sockets: ReadonlySet<WebSocket>
+): void {
+  if (!acceptTestPost(req, res, nodeEnv)) {
+    return;
+  }
+  readBoundedTestJson(req, res, (body, respond) => {
+    const asteroidIds =
+      isRecord(body) && body['asteroidIds'] !== undefined ? body['asteroidIds'] : [];
+    if (
+      !Array.isArray(asteroidIds) ||
+      asteroidIds.length > 30 ||
+      !asteroidIds.every((id) => typeof id === 'string' && id.length < 128)
+    ) {
+      respond(400, { error: 'Invalid fixture asteroid IDs' });
+      return;
+    }
+    respond(200, {
+      observedRocks: asteroidIds.flatMap((id: string) => {
+        const rock = gameEngine.getAsteroid(id);
+        return rock ? [rock] : [];
+      }),
+      world: gameEngine.getDiagnostics(),
+      seed: gameEngine.getWorldSeedForTesting(),
+      controlledRocks: ['crew-fixture-shared-stationary', 'crew-fixture-shared-moving'].flatMap(
+        (id) => {
+          const rock = gameEngine.getAsteroid(id);
+          return rock
+            ? [{ id, position: { ...rock.position }, velocity: { ...rock.velocity } }]
+            : [];
+        }
+      ),
+      sockets: {
+        total: sockets.size,
+        open: [...sockets].filter((socket) => socket.readyState === socket.OPEN).length,
+      },
+      players: gameEngine.getAllPlayers().map((player) => ({
+        id: player.id,
+        health: player.health,
+        exploding: player.exploding,
+        position: { ...player.position },
+        velocity: { ...player.velocity },
+        socketState: player.ws?.readyState ?? null,
+        motionEpoch: player.playerMotion?.epoch ?? null,
+        furnaceTransit: player.furnaceTransit ?? null,
+        spawnProtectionTimer: player.spawnProtectionTimer ?? 0,
+      })),
+    });
+  });
 }
 
 /** Place one live test pilot; gameplay still owns every resulting collision and action. */
@@ -236,8 +300,25 @@ export function handleTestPlacePlayer(
       return;
     }
     const player = gameEngine.getPlayer(parsed['playerId']);
-    if (!player || player.health <= 0 || player.exploding) {
-      respond(404, { error: 'Live fixture player not found' });
+    if (
+      !player ||
+      player.health <= 0 ||
+      player.exploding ||
+      !player.ws ||
+      player.ws.readyState !== player.ws.OPEN
+    ) {
+      respond(404, {
+        error: 'Live fixture player not found',
+        reason: !player
+          ? 'missing'
+          : player.health <= 0 || player.exploding
+            ? 'dead'
+            : 'transport-closed',
+        health: player?.health ?? null,
+        exploding: player?.exploding ?? null,
+        socketState: player?.ws?.readyState ?? null,
+        motionEpoch: player?.playerMotion?.epoch ?? null,
+      });
       return;
     }
 
@@ -299,6 +380,9 @@ export function handleTestArrangeCrewField(
         'spider-tools',
         'spider-rescue',
         'spider-tow-bite',
+        'pinball',
+        'shared-field',
+        'belt-mining',
         'belt-escape',
         'belt-pursuit',
         'map-icons',
@@ -325,9 +409,20 @@ export function handleTestArrangeCrewField(
     const players = ids.map((id) => gameEngine.getPlayer(id));
     if (
       new Set(ids).size !== ids.length ||
-      players.some((player) => !player || player.exploding || player.health <= 0)
+      players.some(
+        (player) =>
+          !player ||
+          player.exploding ||
+          player.health <= 0 ||
+          !player.ws ||
+          player.ws.readyState !== player.ws.OPEN
+      )
     ) {
       respond(404, { error: 'Live fixture crew unavailable' });
+      return;
+    }
+    if (players.some((player) => !player || !gameEngine.playerMotion.getState(player.id))) {
+      respond(409, { error: 'Crew fixture motion unavailable' });
       return;
     }
     gameEngine.prepareDiagnosticWorld('traversal');
@@ -338,34 +433,45 @@ export function handleTestArrangeCrewField(
         throw new Error('Validated crew disappeared');
       }
       const position =
-        body['scenario'] === 'town-store'
-          ? { x: 0, y: 0 }
-          : ['furnace-build', 'street-escape', 'street-travel'].includes(String(body['scenario']))
-            ? { ...furnaceLot.position }
-            : body['scenario'] === 'spider-tow-bite'
-              ? { x: 4400, y: 2200 + index * 600 }
-              : body['scenario'] === 'spider-rescue'
-                ? { x: 4400 + index * 120, y: 2200 }
-                : body['scenario'] === 'spider-tools'
-                  ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
-                  : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
-                    ? { x: 3000 + index * 120, y: 5000 }
-                    : body['scenario'] === 'boundary'
-                      ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-                      : body['scenario'] === 'delivery'
-                        ? player.kitId === 'hauler'
-                          ? { x: 0, y: 550 }
-                          : { x: 220, y: 460 }
-                        : body['scenario'] === 'tow'
-                          ? player.kitId === 'hauler'
-                            ? { x: 0, y: -500 }
-                            : { x: 220, y: -460 }
-                          : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-                            ? {
-                                x: -220,
-                                y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0),
-                              }
-                            : { x: index * 120, y: -500 };
+        body['scenario'] === 'pinball'
+          ? { x: Math.cos((Math.PI * 3) / 10) * 300, y: -1500 + Math.sin((Math.PI * 3) / 10) * 300 }
+          : body['scenario'] === 'shared-field'
+            ? { x: 20_120, y: (index - (players.length - 1) / 2) * 120 }
+            : body['scenario'] === 'belt-mining'
+              ? { x: beltSlotPosition(60).x - 450, y: beltSlotPosition(60).y + index * 150 }
+              : body['scenario'] === 'town-store'
+                ? { x: 0, y: 0 }
+                : ['furnace-build', 'street-escape', 'street-travel'].includes(
+                      String(body['scenario'])
+                    )
+                  ? { ...furnaceLot.position }
+                  : body['scenario'] === 'spider-tow-bite'
+                    ? { x: 4400, y: 2200 + index * 600 }
+                    : body['scenario'] === 'spider-rescue'
+                      ? { x: 4400 + index * 120, y: 2200 }
+                      : body['scenario'] === 'spider-tools'
+                        ? {
+                            x: spiderWorks.position.x + 800 + index * 120,
+                            y: spiderWorks.position.y,
+                          }
+                        : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
+                          ? { x: 3000 + index * 120, y: 5000 }
+                          : body['scenario'] === 'boundary'
+                            ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+                            : body['scenario'] === 'delivery'
+                              ? player.kitId === 'hauler'
+                                ? { x: 0, y: 550 }
+                                : { x: 220, y: 460 }
+                              : body['scenario'] === 'tow'
+                                ? player.kitId === 'hauler'
+                                  ? { x: 0, y: -500 }
+                                  : { x: 220, y: -460 }
+                                : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                                  ? {
+                                      x: -220,
+                                      y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0),
+                                    }
+                                  : { x: index * 120, y: -500 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -394,6 +500,7 @@ export function handleTestArrangeCrewField(
         'map-icons',
         'spider-tools',
         'spider-rescue',
+        'belt-mining',
         'belt-escape',
         'belt-pursuit',
         'furnace',
@@ -434,6 +541,53 @@ export function handleTestArrangeCrewField(
       gameEngine.parkSatellitePickups();
     }
     const first = poses[0];
+    if (body['scenario'] === 'pinball') {
+      for (const [index, placement] of layoutReflectiveCluster({ x: 0, y: -1500 }).entries()) {
+        gameEngine.addAsteroid({
+          id: `crew-fixture-pinball-${index}`,
+          position: placement.position,
+          velocity: { x: 0, y: 0 },
+          size: ASTEROID_INTERACTIONS.reflectiveSize,
+          health: 75,
+          maxHealth: 75,
+          material: 'metal',
+          rotation: placement.rotation,
+          angularVelocity: 0,
+          jaggedness: 0.25,
+          vertices: 6,
+          offsets: [1, 0.8, 1, 1, 0.8, 1],
+          phenomenon: {
+            kind: 'reflective',
+            clusterId: 'crew-fixture-pinball-0',
+            energy: 0,
+            maxEnergy: ASTEROID_INTERACTIONS.reflectiveEnergy,
+          },
+        });
+      }
+    }
+    if (body['scenario'] === 'shared-field') {
+      gameEngine.clearSpiderField();
+      for (const moving of [false, true]) {
+        gameEngine.addAsteroid({
+          id: moving ? 'crew-fixture-shared-moving' : 'crew-fixture-shared-stationary',
+          position: { x: 20_000, y: moving ? 350 : 0 },
+          velocity: { x: moving ? 0.25 : 0, y: 0 },
+          angularVelocity: moving ? 0.005 : 0,
+          size: 25,
+          health: 75,
+          maxHealth: 75,
+          material: 'metal',
+          rotation: 0,
+          jaggedness: 0.25,
+          vertices: 6,
+          offsets: [1, 0.8, 1, 0.9, 1, 0.8],
+        });
+      }
+    }
+    if (body['scenario'] === 'belt-mining') {
+      gameEngine.clearSpiderField();
+      gameEngine.addAsteroid(beltAsteroid(gameEngine.getWorldSeedForTesting(), 60, 0));
+    }
     if (body['scenario'] === 'equipment' && first) {
       for (const [index, equipment] of EQUIPMENT_IDS.entries()) {
         gameEngine.dropEquipmentAt(
@@ -610,7 +764,17 @@ export function handleTestArrangeCrewField(
         });
       }
     } else if (
-      !['empty', 'boundary', 'satellite', 'cargo'].includes(String(body['scenario'])) &&
+      ![
+        'empty',
+        'boundary',
+        'satellite',
+        'cargo',
+        'pinball',
+        'shared-field',
+        'belt-mining',
+        'street-travel',
+        'furnace-build',
+      ].includes(String(body['scenario'])) &&
       first
     ) {
       gameEngine.addAsteroid({
@@ -663,13 +827,19 @@ export function handleTestArrangeCrewField(
     respond(200, {
       status: 'arranged',
       poses,
-      asteroidId: ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
-        ? null
-        : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
-          ? 'crew-fixture-spider-deposit'
-          : body['scenario'] === 'reflection'
-            ? 'crew-fixture-reflector'
-            : 'crew-fixture-ore',
+      ...(body['scenario'] === 'shared-field'
+        ? { asteroidIds: ['crew-fixture-shared-stationary', 'crew-fixture-shared-moving'] }
+        : {}),
+      asteroidId:
+        body['scenario'] === 'shared-field'
+          ? 'crew-fixture-shared-stationary'
+          : ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
+            ? null
+            : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
+              ? 'crew-fixture-spider-deposit'
+              : body['scenario'] === 'reflection'
+                ? 'crew-fixture-reflector'
+                : 'crew-fixture-ore',
     });
   });
 }

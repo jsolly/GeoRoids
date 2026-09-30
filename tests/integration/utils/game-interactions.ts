@@ -4,7 +4,12 @@ import type { EquipmentId, HaulerUtilityId, Position } from '../../../shared-typ
 import { HAULER_UTILITY_STORAGE_KEY } from '../../../src/entities/ship/haulerUtility';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
-import { arrangeCrewField, getWorldDiagnostics, placePlayer } from './test-server-control';
+import {
+  arrangeCrewField,
+  getFixtureState,
+  getWorldDiagnostics,
+  placePlayer,
+} from './test-server-control';
 
 let nextPilotNumber = 1;
 
@@ -505,6 +510,51 @@ export class GameInteractions {
     });
   }
 
+  async placeControlledShipAt(x: number, y: number): Promise<void> {
+    const placement = await placePlayer(await this.getLocalPlayerId(), { x, y });
+    await this.waitForControlledFixture(placement.motionEpoch);
+    if (placement.motionEpoch === undefined) {
+      throw new Error('Controlled placement omitted its epoch');
+    }
+    await this.setPredictedShipPosition(x, y, {
+      expectedMotionEpoch: placement.motionEpoch,
+      requireLivePlacement: true,
+    });
+  }
+
+  /** Controlled scenes fail if death/reconnect supersedes their placement. */
+  async waitForControlledFixture(motionEpoch: number | undefined): Promise<void> {
+    if (motionEpoch === undefined) {
+      throw new Error('Controlled fixture omitted its motion epoch');
+    }
+    await this.page.waitForFunction(
+      (epoch) => {
+        const player = window.gameController?.getCurrPlayer();
+        return (
+          player?.ship.playerMotion?.epoch === epoch &&
+          player.ship.health > 0 &&
+          !player.ship.exploding
+        );
+      },
+      motionEpoch,
+      { timeout: 5000, polling: 25 }
+    );
+    const id = await this.getLocalPlayerId();
+    const state = await getFixtureState();
+    const actor = state.players.find((player) => player.id === id);
+    if (
+      !actor ||
+      actor.health <= 0 ||
+      actor.exploding ||
+      actor.socketState !== 1 ||
+      actor.motionEpoch !== motionEpoch
+    ) {
+      throw new Error(
+        `Controlled fixture superseded or unavailable: ${JSON.stringify({ id, expectedEpoch: motionEpoch, actor, sockets: state.sockets })}`
+      );
+    }
+  }
+
   private async waitForFixtureMotionEpoch(motionEpoch: number | undefined): Promise<void> {
     if (motionEpoch === undefined) {
       return;
@@ -524,13 +574,31 @@ export class GameInteractions {
   private async setPredictedShipPosition(
     x: number,
     y: number,
-    options: { clearSpawnProtection?: boolean; expectedMotionEpoch?: number } = {}
+    options: {
+      clearSpawnProtection?: boolean;
+      expectedMotionEpoch?: number;
+      requireLivePlacement?: boolean;
+    } = {}
   ): Promise<void> {
     await this.page.evaluate(
-      ({ x: worldX, y: worldY, clearSpawnProtection: clearProtection, expectedMotionEpoch }) => {
+      ({
+        x: worldX,
+        y: worldY,
+        clearSpawnProtection: clearProtection,
+        expectedMotionEpoch,
+        requireLivePlacement,
+      }) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!ship) {
           throw new Error('No local ship to align after fixture placement');
+        }
+        if (
+          requireLivePlacement &&
+          (ship.playerMotion?.epoch !== expectedMotionEpoch || ship.health <= 0 || ship.exploding)
+        ) {
+          throw new Error(
+            `Controlled placement superseded before alignment: expected epoch ${expectedMotionEpoch}, observed ${ship.playerMotion?.epoch}, health ${ship.health}, exploding ${ship.exploding}`
+          );
         }
         // Check in the same browser task as the writes so a death or respawn
         // that superseded this placement keeps its authoritative pose.
@@ -551,6 +619,7 @@ export class GameInteractions {
         y,
         clearSpawnProtection: options.clearSpawnProtection ?? false,
         expectedMotionEpoch: options.expectedMotionEpoch,
+        requireLivePlacement: options.requireLivePlacement ?? false,
       }
     );
   }
@@ -739,6 +808,19 @@ export class GameInteractions {
       undefined,
       { timeout: timeoutMs, polling: 200 }
     );
+    const id = await this.getLocalPlayerId();
+    const state = await getFixtureState();
+    const actor = state.players.find((player) => player.id === id);
+    if (
+      actor?.socketState !== 1 ||
+      actor.health <= 0 ||
+      actor.exploding ||
+      actor.motionEpoch === null
+    ) {
+      throw new Error(
+        `Joined pilot is not authoritative/live: ${JSON.stringify({ id, actor, sockets: state.sockets })}`
+      );
+    }
   }
 
   async waitForCombatReady(timeoutMs = 45000): Promise<void> {

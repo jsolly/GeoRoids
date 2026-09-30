@@ -1,5 +1,29 @@
 import type { GameEngine } from '../../../server/core/GameEngine';
+import type { AsteroidData } from '../../../shared-types';
 import { TestConfig } from './test-config';
+
+type FixtureState = {
+  observedRocks: AsteroidData[];
+  world: ServerWorldDiagnostics;
+  seed: number;
+  controlledRocks: {
+    id: string;
+    position: { x: number; y: number };
+    velocity: { x: number; y: number };
+  }[];
+  sockets: { total: number; open: number };
+  players: {
+    id: string;
+    health: number;
+    exploding: boolean;
+    position: { x: number; y: number };
+    velocity: { x: number; y: number };
+    socketState: number | null;
+    motionEpoch: number | null;
+    furnaceTransit: unknown;
+    spawnProtectionTimer: number;
+  }[];
+};
 
 type ServerWorldDiagnostics = ReturnType<GameEngine['getDiagnostics']>;
 const REQUEST_TIMEOUT_MS = 5000;
@@ -21,6 +45,85 @@ function isWorldDiagnostics(value: unknown): value is ServerWorldDiagnostics {
         typeof world[field] === 'number' && Number.isSafeInteger(world[field]) && world[field] >= 0
     )
   );
+}
+
+async function fixtureFailure(response: Response, operation: string): Promise<never> {
+  const body = await response.text();
+  throw new Error(`${operation}: HTTP ${response.status} ${body}`);
+}
+
+export async function getFixtureState(asteroidIds: readonly string[] = []): Promise<FixtureState> {
+  const response = await fetch(`${TestConfig.SERVER_URL}/test/fixture-state`, {
+    method: 'POST',
+    body: JSON.stringify({ asteroidIds }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    return fixtureFailure(response, 'Fixture observation failed');
+  }
+  const value: unknown = await response.json();
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('world' in value) ||
+    !isWorldDiagnostics(value.world) ||
+    !('seed' in value) ||
+    typeof value.seed !== 'number' ||
+    !Number.isSafeInteger(value.seed) ||
+    !('sockets' in value) ||
+    !value.sockets ||
+    typeof value.sockets !== 'object' ||
+    !('total' in value.sockets) ||
+    typeof value.sockets.total !== 'number' ||
+    !Number.isSafeInteger(value.sockets.total) ||
+    value.sockets.total < 0 ||
+    !('open' in value.sockets) ||
+    typeof value.sockets.open !== 'number' ||
+    !Number.isSafeInteger(value.sockets.open) ||
+    value.sockets.open < 0 ||
+    value.sockets.open > value.sockets.total ||
+    !('players' in value) ||
+    !Array.isArray(value.players) ||
+    value.players.some(
+      (player: unknown) =>
+        !player ||
+        typeof player !== 'object' ||
+        !('id' in player) ||
+        typeof player.id !== 'string' ||
+        !('health' in player) ||
+        typeof player.health !== 'number' ||
+        !('exploding' in player) ||
+        typeof player.exploding !== 'boolean' ||
+        !('position' in player) ||
+        !player.position ||
+        typeof player.position !== 'object' ||
+        !('x' in player.position) ||
+        typeof player.position.x !== 'number' ||
+        !('y' in player.position) ||
+        typeof player.position.y !== 'number' ||
+        !('motionEpoch' in player) ||
+        (player.motionEpoch !== null &&
+          (typeof player.motionEpoch !== 'number' ||
+            !Number.isSafeInteger(player.motionEpoch) ||
+            player.motionEpoch < 0)) ||
+        !('socketState' in player) ||
+        (player.socketState !== null &&
+          (typeof player.socketState !== 'number' || ![0, 1, 2, 3].includes(player.socketState))) ||
+        !('velocity' in player) ||
+        !player.velocity ||
+        typeof player.velocity !== 'object' ||
+        !('x' in player.velocity) ||
+        typeof player.velocity.x !== 'number' ||
+        !('y' in player.velocity) ||
+        typeof player.velocity.y !== 'number' ||
+        !('furnaceTransit' in player) ||
+        !('spawnProtectionTimer' in player) ||
+        typeof player.spawnProtectionTimer !== 'number'
+    )
+  ) {
+    throw new Error('Fixture observation returned invalid state');
+  }
+  return value as FixtureState;
 }
 
 export async function getWorldDiagnostics(): Promise<ServerWorldDiagnostics> {
@@ -58,7 +161,7 @@ export async function resetWorld(): Promise<void> {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`World reset failed: HTTP ${response.status}`);
+    return fixtureFailure(response, 'World reset failed');
   }
   await waitForWorldReset();
 }
@@ -74,7 +177,7 @@ export async function placePlayer(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`Player fixture placement failed: HTTP ${response.status}`);
+    return fixtureFailure(response, 'Player fixture placement failed');
   }
   const result: unknown = await response.json();
   if (
@@ -108,15 +211,15 @@ export async function placePlayer(
 async function waitForWorldReset(timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const world = await getWorldDiagnostics();
-    if (isWorldClean(world)) {
+    const state = await getFixtureState();
+    if (isWorldClean(state.world) && state.sockets.total === 0) {
       return;
     }
     await sleep(DEFAULT_POLL_MS);
   }
 
-  const world = await getWorldDiagnostics();
-  throw new Error(`Timed out waiting for server world reset: ${JSON.stringify(world)}`);
+  const state = await getFixtureState();
+  throw new Error(`Timed out waiting for server world reset/departure: ${JSON.stringify(state)}`);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -141,6 +244,9 @@ export async function arrangeCrewField(
     | 'spider-tools'
     | 'spider-rescue'
     | 'spider-tow-bite'
+    | 'pinball'
+    | 'shared-field'
+    | 'belt-mining'
     | 'belt-escape'
     | 'belt-pursuit'
     | 'map-icons'
@@ -160,7 +266,7 @@ export async function arrangeCrewField(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`Crew fixture failed: HTTP ${response.status}`);
+    return fixtureFailure(response, 'Crew fixture failed');
   }
   const body: unknown = await response.json();
   if (!body || typeof body !== 'object' || !('status' in body) || body.status !== 'arranged') {
@@ -183,6 +289,9 @@ export async function arrangeCrewField(
       throw new Error('Invalid crew fixture motion epoch');
     }
     epochs.set(pose.playerId, pose.motionEpoch);
+  }
+  if (epochs.size !== playerIds.length || playerIds.some((id) => !epochs.has(id))) {
+    throw new Error('Crew fixture omitted or duplicated a requested pilot');
   }
   return epochs;
 }

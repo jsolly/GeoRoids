@@ -7,8 +7,11 @@ import {
   projectWorldToScreenInto,
 } from '../../../../src/rendering/playfieldCamera';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { withFixtureEvidence } from '../../utils/fixture-evidence';
 import { GameInteractions } from '../../utils/game-interactions';
+import { withScenarioCleanup } from '../../utils/scenario-cleanup';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField, getFixtureState } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 type Field = Awaited<ReturnType<GameInteractions['getAsteroidPositions']>>;
@@ -40,6 +43,8 @@ type CanvasImage = {
 
 type AsteroidDrawCapture = {
   cameraRotation: number;
+  devicePixelRatio: number;
+  backingCanvas: { width: number; height: number };
   canvas: { width: number; height: number };
   rock: {
     id: string;
@@ -54,6 +59,8 @@ type AsteroidDrawCapture = {
 };
 
 type AsteroidDrawEvidence = {
+  devicePixelRatio: number;
+  backingCanvas: { width: number; height: number };
   canvas: { width: number; height: number };
   rockId: string;
   screen: { x: number; y: number };
@@ -97,8 +104,10 @@ async function setViewportAndWait(page: BrowserPage, width: number, height: numb
       const canvas = document.querySelector('#gameCanvas');
       return (
         canvas instanceof HTMLCanvasElement &&
-        canvas.width === expectedWidth &&
-        canvas.height === expectedHeight
+        canvas.clientWidth === expectedWidth &&
+        canvas.clientHeight === expectedHeight &&
+        canvas.width === Math.round(expectedWidth * window.devicePixelRatio) &&
+        canvas.height === Math.round(expectedHeight * window.devicePixelRatio)
       );
     },
     { expectedWidth: width, expectedHeight: height },
@@ -263,7 +272,9 @@ async function captureAsteroidDraw(
             gameController.renderGame();
             return {
               cameraRotation: canvasManager.getCameraRotation(),
-              canvas: { width: canvas.width, height: canvas.height },
+              devicePixelRatio: window.devicePixelRatio,
+              backingCanvas: { width: canvas.width, height: canvas.height },
+              canvas: { width: canvas.clientWidth, height: canvas.clientHeight },
               rock: {
                 id: roid.id,
                 position: { x: roid.position.x, y: roid.position.y },
@@ -303,16 +314,17 @@ function identifyAsteroidDraw(capture: AsteroidDrawCapture): AsteroidDrawEvidenc
     capture.cameraRotation
   );
   const screenAngle = capture.rock.angle + capture.cameraRotation;
+  const dpr = capture.devicePixelRatio;
   const close = (actual: number, expected: number) => Math.abs(actual - expected) <= 0.001;
   const rasterSilhouetteCount = capture.images.filter((image) => {
     const { transform, destination } = image;
     return (
-      close(transform.a, Math.cos(screenAngle)) &&
-      close(transform.b, Math.sin(screenAngle)) &&
-      close(transform.c, -Math.sin(screenAngle)) &&
-      close(transform.d, Math.cos(screenAngle)) &&
-      close(transform.e, screen.x) &&
-      close(transform.f, screen.y) &&
+      close(transform.a, dpr * Math.cos(screenAngle)) &&
+      close(transform.b, dpr * Math.sin(screenAngle)) &&
+      close(transform.c, -dpr * Math.sin(screenAngle)) &&
+      close(transform.d, dpr * Math.cos(screenAngle)) &&
+      close(transform.e, dpr * screen.x) &&
+      close(transform.f, dpr * screen.y) &&
       close(destination.x, -destination.width / 2) &&
       close(destination.y, -destination.height / 2) &&
       image.width === image.height &&
@@ -325,6 +337,8 @@ function identifyAsteroidDraw(capture: AsteroidDrawCapture): AsteroidDrawEvidenc
   }).length;
 
   return {
+    devicePixelRatio: dpr,
+    backingCanvas: capture.backingCanvas,
     canvas: capture.canvas,
     rockId: capture.rock.id,
     screen,
@@ -335,13 +349,6 @@ function identifyAsteroidDraw(capture: AsteroidDrawCapture): AsteroidDrawEvidenc
 function assertNoBrowserErrors(label: string, errors: BrowserErrors): void {
   expect(errors.consoleErrors, `${label} console errors`).toEqual([]);
   expect(errors.pageErrors, `${label} page errors`).toEqual([]);
-}
-
-function survivingRockMoved(before: Field, after: Field): boolean {
-  return before.some((start) => {
-    const later = after.find((rock) => rock.id === start.id);
-    return later !== undefined && Math.hypot(later.x - start.x, later.y - start.y) > 1;
-  });
 }
 
 function observeField(page: BrowserPage): Promise<FieldObservation> {
@@ -393,11 +400,6 @@ function compareSharedField(first: FieldObservation, second: FieldObservation) {
   };
 }
 
-async function visitSharedSector(game: GameInteractions): Promise<void> {
-  // A distant region separates the camera check from the launch area.
-  await game.placeShipAt(20_000, 0);
-}
-
 test(
   'second player sees a shared asteroid field and nearby rocks render at fixed camera sizes',
   async () => {
@@ -405,173 +407,220 @@ test(
     if (!page1) {
       throw new Error('Page 1 not available');
     }
-    const page1Errors = observeBrowserErrors(page1);
-    let page2Errors: BrowserErrors | undefined;
-    const pausedGames: PausedGame[] = [];
-    let cleanupFailures: unknown[] = [];
+    await withFixtureEvidence(page1, 'shared-asteroid-field', async (stage) => {
+      const page1Errors = observeBrowserErrors(page1);
+      let page2Errors: BrowserErrors | undefined;
+      const pausedGames: PausedGame[] = [];
+      await withScenarioCleanup(
+        async () => {
+          const page2 = await browserManager.createAdditionalPage({ hasTouch: true });
+          page2Errors = observeBrowserErrors(page2);
+          const game1 = new GameInteractions(page1);
+          const game2 = new GameInteractions(page2);
 
-    try {
-      const page2 = await browserManager.createPage();
-      page2Errors = observeBrowserErrors(page2);
-      const game1 = new GameInteractions(page1);
-      const game2 = new GameInteractions(page2);
-
-      // Install both observers before either browser joins the shared world.
-      await game1.bootGame({ waitForCombatReady: false });
-      await visitSharedSector(game1);
-      await game2.bootGame({ waitForCombatReady: false });
-      await visitSharedSector(game2);
-
-      // Pilots cruise while the second browser boots, so their recipient fields
-      // can differ at the edges. Compare every rock in their shared interior in
-      // both directions, allowing network ticks and destruction to settle.
-      await expect
-        .poll(
-          async () => {
-            const [first, second] = await Promise.all([observeField(page1), observeField(page2)]);
-            return compareSharedField(first, second);
-          },
-          { timeout: 5000, message: 'both clients should share current asteroid IDs and poses' }
-        )
-        .toEqual({
-          hasSharedField: true,
-          firstMissingOrDisplaced: [],
-          secondMissingOrDisplaced: [],
-        });
-
-      const firstField = await game1.getAsteroidPositions();
-      await expect
-        .poll(async () => survivingRockMoved(firstField, await game1.getAsteroidPositions()), {
-          timeout: 2500,
-          message: 'existing shared asteroids should keep moving',
-        })
-        .toBe(true);
-
-      // Place both cameras near the same surviving stationary rock, choosing the
-      // greatest clearance from live NPCs and leaving space outside its hull.
-      // A drifting target can leave a small viewport before the frame is captured.
-      const [field, pickups, radius1, radius2] = await Promise.all([
-        game1.getAsteroidPositions(),
-        game1.getSatellitePickups(),
-        game1.getShipRadius(),
-        game2.getShipRadius(),
-      ]);
-      const nearbyPilots = pickups.filter(
-        (pickup) => pickup.health > 0 && pickup.state !== 'broken'
-      );
-      const clearance = (rock: Field[number]) =>
-        Math.min(...nearbyPilots.map((pilot) => Math.hypot(pilot.x - rock.x, pilot.y - rock.y)));
-      const focus = field
-        .filter((rock) => rock.speed === 0)
-        .sort((a, b) => clearance(b) - clearance(a))[0];
-      expect(focus, 'a surviving shared rock should be available for camera focus').toBeDefined();
-      if (!focus) {
-        throw new Error('No surviving shared rock was available for camera focus');
-      }
-      const outward = Math.atan2(focus.y, focus.x);
-      const gap = focus.radius + Math.max(radius1, radius2) + 100;
-      const pose = {
-        x: focus.x + Math.cos(outward) * gap,
-        y: focus.y + Math.sin(outward) * gap,
-      };
-      const separation = Math.max(radius1, radius2) + 30;
-      const tangent = { x: -Math.sin(outward) * separation, y: Math.cos(outward) * separation };
-      expect(Math.hypot(pose.x, pose.y) + separation + Math.max(radius1, radius2)).toBeLessThan(
-        getGameBoundary().radius
-      );
-      await Promise.all([
-        game1.placeShipAt(pose.x + tangent.x, pose.y + tangent.y),
-        game2.placeShipAt(pose.x - tangent.x, pose.y - tangent.y),
-      ]);
-
-      await expect
-        .poll(
-          async () => {
-            const [first, second] = await Promise.all([
-              game1.getAsteroidPositions(),
-              game2.getAsteroidPositions(),
-            ]);
-            return (
-              first.some((rock) => rock.id === focus.id) &&
-              second.some((rock) => rock.id === focus.id)
-            );
-          },
-          { timeout: 2500, message: 'focused rock should remain available to both clients' }
-        )
-        .toBe(true);
-
-      pausedGames.push({ page: page1, wasRunning: await pauseGame(page1) });
-      pausedGames.push({ page: page2, wasRunning: await pauseGame(page2) });
-
-      for (const viewport of VIEWPORTS) {
-        await Promise.all([
-          setViewportAndWait(page1, viewport.width, viewport.height),
-          setViewportAndWait(page2, viewport.width, viewport.height),
-        ]);
-        const [capture1, capture2] = await Promise.all([
-          captureAsteroidDraw(page1, focus.id),
-          captureAsteroidDraw(page2, focus.id),
-        ]);
-        const draw1 = identifyAsteroidDraw(capture1);
-        const draw2 = identifyAsteroidDraw(capture2);
-
-        for (const [label, evidence] of [
-          ['tab 1', draw1],
-          ['tab 2', draw2],
-        ] as const) {
-          expect(evidence.rockId, `${label} should draw the identified shared rock`).toBe(focus.id);
-          expect(evidence.canvas).toEqual({ width: viewport.width, height: viewport.height });
-          expect(evidence.screen.x, `${label} target should be inside the canvas`).toBeGreaterThan(
-            0
-          );
-          expect(evidence.screen.x, `${label} target should be inside the canvas`).toBeLessThan(
-            viewport.width
-          );
-          expect(evidence.screen.y, `${label} target should be inside the canvas`).toBeGreaterThan(
-            0
-          );
-          expect(evidence.screen.y, `${label} target should be inside the canvas`).toBeLessThan(
-            viewport.height
-          );
+          // Install both observers before either browser joins the shared world.
+          await game1.bootGame({ waitForCombatReady: false });
+          await game2.bootGame({ waitForCombatReady: false });
+          await stage('crew-joined');
+          const firstId = await game1.getLocalPlayerId();
+          const secondId = await game2.getLocalPlayerId();
+          const epochs = await arrangeCrewField([firstId, secondId], 'shared-field');
+          await game1.waitForControlledFixture(epochs.get(firstId));
+          await game2.waitForControlledFixture(epochs.get(secondId));
+          const authoritativeBefore = (await getFixtureState()).controlledRocks;
           expect(
-            evidence.rasterSilhouetteCount,
-            `${label} should draw the identified rock's visible outline at its projected pose`
-          ).toBeGreaterThan(0);
-        }
+            authoritativeBefore.map((rock) => rock.id).sort((a, b) => a.localeCompare(b))
+          ).toEqual(['crew-fixture-shared-moving', 'crew-fixture-shared-stationary']);
+          await stage('identified-field-arranged');
 
-        await renderFullFrame(page1);
-        const screenshotPath = screenshotManager.getScreenshotPath(
-          `shared-asteroid-field-${viewport.name}.png`
-        );
-        await page1.screenshot({ path: screenshotPath });
-      }
+          // Compare all identified rocks in both recipient fields through real snapshots.
+          await expect
+            .poll(
+              async () => {
+                const [first, second] = await Promise.all([
+                  observeField(page1),
+                  observeField(page2),
+                ]);
+                return compareSharedField(first, second);
+              },
+              { timeout: 5000, message: 'both clients should share current asteroid IDs and poses' }
+            )
+            .toEqual({
+              hasSharedField: true,
+              firstMissingOrDisplaced: [],
+              secondMissingOrDisplaced: [],
+            });
 
-      assertNoBrowserErrors('page 1', page1Errors);
-      if (!page2Errors) {
-        throw new Error('Page 2 browser error observer was not installed');
-      }
-      assertNoBrowserErrors('page 2', page2Errors);
-    } finally {
-      const cleanupResults = await Promise.allSettled(
-        pausedGames.map(({ page, wasRunning }) =>
-          page.evaluate((running) => {
-            const gameController = window.gameController;
-            if (!gameController) {
-              throw new Error('Asteroid field fixture lost its game controller during cleanup');
+          const stationaryId = 'crew-fixture-shared-stationary';
+          const movingId = 'crew-fixture-shared-moving';
+          const firstField = await game1.getAsteroidPositions();
+          expect(firstField.map((rock) => rock.id).sort((a, b) => a.localeCompare(b))).toEqual(
+            [movingId, stationaryId].sort((a, b) => a.localeCompare(b))
+          );
+          const focus = firstField.find((rock) => rock.id === stationaryId);
+          const moving = firstField.find((rock) => rock.id === movingId);
+          if (!focus || !moving) {
+            throw new Error('Controlled shared scene omitted an identified rock');
+          }
+          expect(focus.speed).toBe(0);
+          expect(moving.speed).toBeGreaterThan(0);
+          const before = { x: moving.x, y: moving.y };
+          await expect
+            .poll(
+              async () => {
+                const fields = await Promise.all([
+                  game1.getAsteroidPositions(),
+                  game2.getAsteroidPositions(),
+                ]);
+                return fields.map((field) => {
+                  let later: Field[number] | undefined;
+                  for (const rock of field) {
+                    if (rock.id === movingId) {
+                      later = rock;
+                      break;
+                    }
+                  }
+                  return (
+                    later !== undefined && Math.hypot(later.x - before.x, later.y - before.y) > 1
+                  );
+                });
+              },
+              { timeout: 2500, message: 'both pilots should observe the identified rock drifting' }
+            )
+            .toEqual([true, true]);
+          for (const field of await Promise.all([
+            game1.getAsteroidPositions(),
+            game2.getAsteroidPositions(),
+          ])) {
+            const stationary = field.find((rock) => rock.id === stationaryId);
+            expect(stationary).toMatchObject({ x: 20_000, y: 0, speed: 0 });
+          }
+          const [radius1, radius2, pose1, pose2] = await Promise.all([
+            game1.getShipRadius(),
+            game2.getShipRadius(),
+            game1.getShipPosition(),
+            game2.getShipPosition(),
+          ]);
+          for (const pose of [pose1, pose2]) {
+            expect(Math.hypot(pose.x - focus.x, pose.y - focus.y)).toBeGreaterThan(
+              focus.radius + Math.max(radius1, radius2) + 50
+            );
+            expect(Math.hypot(pose.x, pose.y) + Math.max(radius1, radius2)).toBeLessThan(
+              getGameBoundary().radius
+            );
+          }
+          const authoritativeAfter = (await getFixtureState()).controlledRocks;
+          const movingBefore = authoritativeBefore.find((rock) => rock.id === movingId);
+          const movingAfter = authoritativeAfter.find((rock) => rock.id === movingId);
+          if (!movingBefore || !movingAfter) {
+            throw new Error('Authoritative shared scene omitted its identified drifter');
+          }
+          expect(movingAfter.position.x).toBeGreaterThan(movingBefore.position.x);
+          await stage('shared-drift-observed');
+
+          await expect
+            .poll(
+              async () => {
+                const [first, second] = await Promise.all([
+                  game1.getAsteroidPositions(),
+                  game2.getAsteroidPositions(),
+                ]);
+                return (
+                  first.some((rock) => rock.id === focus.id) &&
+                  second.some((rock) => rock.id === focus.id)
+                );
+              },
+              { timeout: 2500, message: 'focused rock should remain available to both clients' }
+            )
+            .toBe(true);
+
+          pausedGames.push({ page: page1, wasRunning: await pauseGame(page1) });
+          pausedGames.push({ page: page2, wasRunning: await pauseGame(page2) });
+
+          for (const viewport of VIEWPORTS) {
+            await Promise.all([
+              setViewportAndWait(page1, viewport.width, viewport.height),
+              setViewportAndWait(page2, viewport.width, viewport.height),
+            ]);
+            const [capture1, capture2] = await Promise.all([
+              captureAsteroidDraw(page1, focus.id),
+              captureAsteroidDraw(page2, focus.id),
+            ]);
+            const draw1 = identifyAsteroidDraw(capture1);
+            const draw2 = identifyAsteroidDraw(capture2);
+
+            for (const [label, evidence, expectedDpr] of [
+              ['tab 1', draw1, 1],
+              ['tab 2', draw2, 2],
+            ] as const) {
+              expect(evidence.rockId, `${label} should draw the identified shared rock`).toBe(
+                focus.id
+              );
+              expect(evidence.canvas).toEqual({ width: viewport.width, height: viewport.height });
+              expect(evidence.devicePixelRatio).toBe(expectedDpr);
+              expect(evidence.backingCanvas).toEqual({
+                width: viewport.width * expectedDpr,
+                height: viewport.height * expectedDpr,
+              });
+              expect(
+                evidence.screen.x,
+                `${label} target should be inside the canvas`
+              ).toBeGreaterThan(0);
+              expect(evidence.screen.x, `${label} target should be inside the canvas`).toBeLessThan(
+                viewport.width
+              );
+              expect(
+                evidence.screen.y,
+                `${label} target should be inside the canvas`
+              ).toBeGreaterThan(0);
+              expect(evidence.screen.y, `${label} target should be inside the canvas`).toBeLessThan(
+                viewport.height
+              );
+              expect(
+                evidence.rasterSilhouetteCount,
+                `${label} should draw the identified rock's visible outline at its projected pose`
+              ).toBeGreaterThan(0);
             }
-            gameController.getGameStateManager().setIsGameRunning(running);
-          }, wasRunning)
-        )
+
+            await renderFullFrame(page1);
+            const screenshotPath = screenshotManager.getScreenshotPath(
+              `shared-asteroid-field-${viewport.name}.png`
+            );
+            await page1.screenshot({ path: screenshotPath });
+            await renderFullFrame(page2);
+            await page2.screenshot({
+              path: screenshotManager.getScreenshotPath(
+                `shared-asteroid-field-touch-${viewport.name}.png`
+              ),
+            });
+          }
+
+          await stage('desktop-and-touch-bitmaps-captured');
+          assertNoBrowserErrors('page 1', page1Errors);
+          if (!page2Errors) {
+            throw new Error('Page 2 browser error observer was not installed');
+          }
+          assertNoBrowserErrors('page 2', page2Errors);
+        },
+        () => [
+          ...pausedGames.map(
+            ({ page, wasRunning }) =>
+              () =>
+                page.evaluate((running) => {
+                  const gameController = window.gameController;
+                  if (!gameController) {
+                    throw new Error(
+                      'Asteroid field fixture lost its game controller during cleanup'
+                    );
+                  }
+                  gameController.getGameStateManager().setIsGameRunning(running);
+                }, wasRunning)
+          ),
+          () => page2Errors?.dispose(),
+          () => page1Errors.dispose(),
+        ]
       );
-      page2Errors?.dispose();
-      page1Errors.dispose();
-      cleanupFailures = cleanupResults.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason] : []
-      );
-    }
-    if (cleanupFailures.length > 0) {
-      throw new AggregateError(cleanupFailures, 'Asteroid field fixture cleanup failed');
-    }
+    });
   },
   TestConfig.DEFAULT_TIMEOUT * 2
 );

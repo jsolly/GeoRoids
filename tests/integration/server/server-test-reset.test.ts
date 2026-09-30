@@ -85,7 +85,10 @@ test('a reset attempts every pilot close and reports a socket cleanup failure', 
     });
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'Test world reset failed' });
+    expect(await response.json()).toEqual({
+      error: 'Test world reset failed',
+      reason: 'socket-close-failed',
+    });
     expect(server.gameEngine.getDiagnostics()).toEqual(before);
     expect(server.gameEngine.getPlayer('pilot-a')).toBeDefined();
     expect(server.gameEngine.getPlayer('pilot-b')).toBeDefined();

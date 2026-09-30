@@ -22,14 +22,18 @@ for (const viewport of [
     const peerDiagnostics = watchBrowserDiagnostics(peerPage);
     const game = new GameInteractions(page);
     const peer = new GameInteractions(peerPage);
-    await game.bootGame();
-    await peer.bootGame();
-    const ids = [await game.getLocalPlayerId(), await peer.getLocalPlayerId()];
-    await arrangeCrewField(ids, 'cargo');
+    await game.bootGame({ waitForCombatReady: false });
+    await peer.bootGame({ waitForCombatReady: false });
+    const firstId = await game.getLocalPlayerId();
+    const peerId = await peer.getLocalPlayerId();
+    const ids = [firstId, peerId];
+    const cargoEpochs = await arrangeCrewField(ids, 'cargo');
+    await game.waitForControlledFixture(cargoEpochs.get(firstId));
+    await peer.waitForControlledFixture(cargoEpochs.get(peerId));
     await expect
       .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.cargo))
       .toBe(400);
-    await game.placeShipAt(0, 0);
+    await game.placeControlledShipAt(0, 0);
     await expect.poll(() => game.getScore()).toBe(700);
     await expect
       .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.cargo))
@@ -42,10 +46,12 @@ for (const viewport of [
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`economy-station-level1-${viewport.width}.png`),
     });
-    await arrangeCrewField(ids, 'settlement-delivery');
+    const settlementEpochs = await arrangeCrewField(ids, 'settlement-delivery');
+    await game.waitForControlledFixture(settlementEpochs.get(firstId));
+    await peer.waitForControlledFixture(settlementEpochs.get(peerId));
     await expect.poll(async () => (await readShared(page)).level).toBe(2);
     await expect.poll(async () => (await readShared(peerPage)).level).toBe(2);
-    await game.placeShipAt(0, 0);
+    await game.placeControlledShipAt(0, 0);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`economy-station-level2-${viewport.width}.png`),
     });
@@ -58,7 +64,7 @@ for (const viewport of [
         color: player?.color,
       };
     });
-    await game.placeShipAt(0, 0);
+    await game.placeControlledShipAt(0, 0);
     if (viewport.touch) {
       await page.getByRole('button', { name: 'Enter', exact: true }).tap();
     } else {

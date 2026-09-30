@@ -56,7 +56,8 @@ for (const viewport of [
           const player = window.gameController?.getCurrPlayer();
           return {
             health: player?.ship?.health,
-            cargo: player?.ship?.mass,
+            cargo: player?.cargo,
+            mass: player?.ship?.mass,
             preferences: {
               sound: localStorage.getItem('soundOn'),
               music: localStorage.getItem('musicOn'),

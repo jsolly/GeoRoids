@@ -2,9 +2,11 @@
 
 The manually dispatched **Integration repeatability** workflow runs the same full
 `main` commit SHA on native Ubuntu 24.04 x64 and ARM64. Each architecture runs 20
-serialized focused attempts covering three reviewed files together: title music
-lifecycle (six cases), furnace travel and resized prompt (seven), and resource sound
-(two). Each focused attempt must report all three files and exactly 15 passing
+serialized focused attempts covering four reviewed files together: title music
+lifecycle (six cases), furnace travel and resized prompt (seven), resource sound
+(two), and native sample ownership after an injected early Howler wall-clock end
+plus visible desktop/mobile Sound Effects mute (three). Each focused attempt must
+report all four files and exactly 18 passing
 cases, including all six title music cases. It then runs three complete integration
 suites. Title music includes Chromium and WebKit at desktop, mobile, and landscape
 sizes, so each audio combination has 20 attempts. The report records the selected

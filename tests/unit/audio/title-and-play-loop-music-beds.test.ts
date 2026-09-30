@@ -15,9 +15,23 @@ vi.mock('../../../src/utils/logForwarder', () => ({
   forwardLogToServer: vi.fn(),
 }));
 
+class FakeSource extends EventTarget {
+  stop = vi.fn();
+  disconnect = vi.fn();
+}
+
 class FakeHowl {
   static instances: FakeHowl[] = [];
   readonly voices = new Map<number, { volume: number }>();
+  readonly sources = new Map<number, FakeSource>();
+  readonly nodes = new Map<number, { bufferSource: FakeSource | null }>();
+  readonly rows = new Map<
+    number,
+    { _node: { bufferSource: FakeSource | null }; _ended: boolean; _paused: boolean }
+  >();
+  _soundById(id: number) {
+    return this.rows.get(id);
+  }
   private nextId = 0;
   loaded = true;
   playbackRate = 1;
@@ -31,6 +45,18 @@ class FakeHowl {
   }
   play = vi.fn(() => {
     const id = ++this.nextId;
+    const source = new FakeSource();
+    this.sources.set(id, source);
+    const inactive = [...this.rows].find(([, candidate]) => candidate._ended);
+    const row = inactive?.[1] ?? { _node: { bufferSource: null }, _ended: false, _paused: false };
+    if (inactive) {
+      this.rows.delete(inactive[0]);
+    }
+    row._ended = false;
+    row._paused = false;
+    row._node.bufferSource = source;
+    this.rows.set(id, row);
+    this.nodes.set(id, row._node);
     this.voices.set(id, { volume: 1 });
     return id;
   });
@@ -185,6 +211,7 @@ beforeEach(async () => {
   FakeHowl.instances = [];
   FakeContext.instances = [];
   vi.stubGlobal('AudioContext', FakeContext);
+  vi.stubGlobal('AudioBufferSourceNode', FakeSource);
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const addEventListener = document.addEventListener.bind(document);
   vi.spyOn(document, 'addEventListener').mockImplementation((...args) => {

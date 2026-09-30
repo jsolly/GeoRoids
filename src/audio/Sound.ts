@@ -15,9 +15,49 @@ function boundedScale(scale: number): number {
   return Number.isFinite(scale) ? Math.min(1, Math.max(0, scale)) : 1;
 }
 
+/** Howler's wall-clock end can discard this handle before native playback ends. */
+function nativeVoiceSource(
+  howl: Howl,
+  id: number
+): Pick<OwnedVoice, 'source' | 'reserve'> | undefined {
+  if (!('_soundById' in howl) || typeof howl._soundById !== 'function') {
+    return undefined;
+  }
+  const voice: unknown = howl._soundById(id);
+  if (
+    !voice ||
+    typeof voice !== 'object' ||
+    !('_node' in voice) ||
+    !('_ended' in voice) ||
+    typeof voice._ended !== 'boolean' ||
+    !('_paused' in voice) ||
+    typeof voice._paused !== 'boolean'
+  ) {
+    return undefined;
+  }
+  const node = voice._node;
+  if (!node || typeof node !== 'object' || !('bufferSource' in node)) {
+    return undefined;
+  }
+  if (!(node.bufferSource instanceof AudioBufferSourceNode)) {
+    return undefined;
+  }
+  return {
+    source: node.bufferSource,
+    reserve: () => {
+      // Native playback still owns this gain/panner even if Howler's timer fired.
+      // Both inactive-row reuse and pool drain use _ended; play also uses _paused.
+      voice._ended = false;
+      voice._paused = false;
+    },
+  };
+}
+
+type OwnedVoice = { source: AudioBufferSourceNode; ended: () => void; reserve: () => void };
+
 export class Sound {
   private howl: Howl | undefined;
-  private readonly voices = new Set<number>();
+  private readonly voices = new Map<number, OwnedVoice>();
   private readonly maxVoices: number;
 
   constructor(
@@ -42,10 +82,8 @@ export class Sound {
           pos: [0, 0, -1],
           panningModel: 'HRTF',
           rolloffFactor: 0,
-          onend: (id) => {
-            this.voices.delete(id);
-          },
-          onstop: (id) => this.voices.delete(id),
+          // Howler's end is a wall timer, not native source completion.
+          onstop: (id) => this.releaseVoice(id, true),
           onload: () => {
             const howl = this.howl;
             if (howl && '_webAudio' in howl && howl._webAudio !== true) {
@@ -60,7 +98,7 @@ export class Sound {
           onloaderror: (_id, error) =>
             logger.error('SOUND', 'Failed to load sound', new Error(String(error)), { src }),
           onplayerror: (id, error) => {
-            this.voices.delete(id);
+            this.releaseVoice(id, true);
             logger.error('SOUND', 'Failed to play sound', new Error(String(error)), { src });
           },
         };
@@ -68,6 +106,7 @@ export class Sound {
       },
       () => this.stop(),
       () => {
+        this.stop();
         if (this.howl) {
           disposeAudioSound(this.howl);
         }
@@ -96,8 +135,34 @@ export class Sound {
     if (this.voices.size >= this.maxVoices) {
       return false;
     }
+    for (const voice of this.voices.values()) {
+      voice.reserve();
+    }
     const id = howl.play();
-    this.voices.add(id);
+    const nativeVoice = nativeVoiceSource(howl, id);
+    if (!nativeVoice) {
+      try {
+        howl.stop(id);
+      } catch (error: unknown) {
+        this.reportCleanupError(error);
+      }
+      logger.error('SOUND', 'Native sound source ownership unavailable', undefined, {
+        src: this.src,
+      });
+      return false;
+    }
+    const { source, reserve } = nativeVoice;
+    const ended = () => {
+      this.releaseVoice(id, false);
+      // Native completion can precede the wall timer; retire Howler's pool row too.
+      try {
+        howl.stop(id);
+      } catch (error: unknown) {
+        this.reportCleanupError(error);
+      }
+    };
+    this.voices.set(id, { source, ended, reserve });
+    source.addEventListener('ended', ended, { once: true });
     howl.volume(Math.min(1, this.baseVolume * scale), id);
     howl.rate(rate, id);
     // Screen right = right; screen up = front. Reset local cues on reused voices.
@@ -106,10 +171,44 @@ export class Sound {
   }
 
   stop(): void {
-    for (const id of this.voices) {
-      this.howl?.stop(id);
+    for (const id of [...this.voices.keys()]) {
+      this.releaseVoice(id, true);
+      try {
+        this.howl?.stop(id);
+      } catch (error: unknown) {
+        this.reportCleanupError(error);
+      }
     }
-    this.voices.clear();
+  }
+
+  private releaseVoice(id: number, stop: boolean): void {
+    const voice = this.voices.get(id);
+    if (!voice) {
+      return;
+    }
+    this.voices.delete(id);
+    voice.source.removeEventListener('ended', voice.ended);
+    if (stop) {
+      try {
+        voice.source.stop();
+      } catch (error: unknown) {
+        this.reportCleanupError(error);
+      }
+    }
+    try {
+      voice.source.disconnect();
+    } catch (error: unknown) {
+      this.reportCleanupError(error);
+    }
+  }
+
+  private reportCleanupError(error: unknown): void {
+    logger.error(
+      'SOUND',
+      'Native sound source cleanup failed',
+      error instanceof Error ? error : new Error(String(error)),
+      { src: this.src }
+    );
   }
 
   isPlaying(): boolean {

@@ -8,7 +8,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { withFixtureEvidence } from '../../utils/fixture-evidence';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { arrangeCrewField } from '../../utils/test-server-control';
+import { arrangeCrewField, getFixtureState } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
@@ -216,55 +216,123 @@ for (const width of [1280, 390]) {
 }
 
 test('the touch furnace prompt fits resized viewports and keeps Space from firing', async () => {
-  const width = 390;
   const page = await browserManager.recreatePage({ hasTouch: true });
   const diagnostics = watchBrowserDiagnostics(page);
-  const game = new GameInteractions(page);
-  await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
-  const id = await game.getLocalPlayerId();
-  const epochs = await arrangeCrewField([id], 'street-travel');
-  await game.waitForControlledFixture(epochs.get(id));
-  await page.keyboard.press('KeyE');
-  const prompt = page.locator('#furnace-travel-prompt');
-  await prompt.waitFor({ state: 'visible' });
-  const menu = page.getByRole('dialog', { name: 'Furnace travel' });
-  if (width === 390) {
-    for (const viewport of [
-      { width: 320, height: 568 },
-      { width: 844, height: 390 },
-      { width: 568, height: 320 },
-    ]) {
-      await page.setViewportSize(viewport);
-      await game.waitForAnimationFrames(3);
-      const button = prompt.getByRole('button', { name: 'Tap to travel' });
-      expect(await button.isVisible()).toBe(true);
-      const travelBounds = await button.boundingBox();
-      const contourLockBounds = await page.locator('#touch-contour-lock').boundingBox();
-      if (!travelBounds || !contourLockBounds) {
-        throw new Error('Missing travel or Contour Lock control bounds');
-      }
-      expect(travelBounds.y + travelBounds.height).toBeLessThan(contourLockBounds.y);
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`furnace-prompt-resized-${viewport.width}.png`),
-      });
-      if (viewport.width === 568) {
-        const shotBefore = await page.evaluate(
-          () => window.gameController?.getCurrPlayer()?.ship.lastShotTime
-        );
-        await button.focus();
-        await page.keyboard.press('Space');
-        expect(
-          await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.lastShotTime)
-        ).toBe(shotBefore);
-      } else {
-        await button.tap();
-      }
-      await menu.waitFor({ state: 'visible' });
-      await page.keyboard.press('Escape');
-      await menu.waitFor({ state: 'hidden' });
+  await withFixtureEvidence(page, 'furnace-prompt-resized', async (stage) => {
+    const game = new GameInteractions(page);
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    const id = await game.getLocalPlayerId();
+    const lot = civicLot('street-1-0');
+    if (!lot) {
+      throw new Error('Missing street travel fixture');
     }
-  }
-  assertNoBrowserDiagnostics(diagnostics);
+    await stage('join-complete');
+    // This scenario tests layout and native button activation, not flight. Keep
+    // cruise acceleration at zero while real input and network updates continue.
+    const originalThrust = await page.evaluate(() => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      if (!ship || ship.health <= 0 || ship.exploding) {
+        throw new Error('Live fixture ship unavailable');
+      }
+      const thrust = ship.thrust;
+      ship.thrust = 0;
+      return thrust;
+    });
+    const failures: unknown[] = [];
+    try {
+      const epochs = await arrangeCrewField([id], 'street-travel');
+      await game.waitForControlledFixture(epochs.get(id));
+      const assertStationary = async () => {
+        await game.waitForControlledFixture(epochs.get(id));
+        const server = (await getFixtureState()).players.find((pilot) => pilot.id === id);
+        expect(server?.position).toEqual(lot.position);
+        expect(server?.velocity).toEqual({ x: 0, y: 0 });
+        const client = await page.evaluate(() => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          return { position: ship?.position, velocity: ship?.velocity, thrust: ship?.thrust };
+        });
+        expect(client.position).toEqual(lot.position);
+        expect(client.thrust).toBe(0);
+        if (!client.velocity) {
+          throw new Error('Stationary fixture velocity unavailable');
+        }
+        expect(Math.hypot(client.velocity.x, client.velocity.y)).toBe(0);
+      };
+      await assertStationary();
+      await stage('stationary-arranged');
+      await page.keyboard.press('KeyE');
+      const prompt = page.locator('#furnace-travel-prompt');
+      await prompt.waitFor({ state: 'visible' });
+      const menu = page.getByRole('dialog', { name: 'Furnace travel' });
+      await stage('furnace-lit-prompt-active');
+      for (const viewport of [
+        { width: 320, height: 568 },
+        { width: 844, height: 390 },
+        { width: 568, height: 320 },
+      ]) {
+        await stage(`viewport-${viewport.width}-resize-request`);
+        await page.setViewportSize(viewport);
+        await game.waitForAnimationFrames(3);
+        const button = prompt.getByRole('button', { name: 'Tap to travel' });
+        expect(await button.isVisible()).toBe(true);
+        expect(await prompt.evaluate((element) => element.classList.contains('is-visible'))).toBe(
+          true
+        );
+        await assertStationary();
+        const travelBounds = await button.boundingBox();
+        const contourLockBounds = await page.locator('#touch-contour-lock').boundingBox();
+        if (!travelBounds || !contourLockBounds) {
+          throw new Error('Missing travel or Contour Lock control bounds');
+        }
+        expect(travelBounds.y + travelBounds.height).toBeLessThan(contourLockBounds.y);
+        await page.screenshot({
+          path: screenshotManager.getScreenshotPath(`furnace-prompt-resized-${viewport.width}.png`),
+        });
+        await stage(`viewport-${viewport.width}-layout-captured`);
+        if (viewport.width === 568) {
+          const shotBefore = await page.evaluate(
+            () => window.gameController?.getCurrPlayer()?.ship.lastShotTime
+          );
+          await button.focus();
+          expect(await button.evaluate((element) => document.activeElement === element)).toBe(true);
+          await stage('viewport-568-space-focused');
+          await page.keyboard.press('Space');
+          expect(
+            await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.lastShotTime)
+          ).toBe(shotBefore);
+        } else {
+          await button.tap();
+        }
+        await stage(`viewport-${viewport.width}-activation-sent`);
+        await menu.waitFor({ state: 'visible' });
+        await stage(`viewport-${viewport.width}-menu-visible`);
+        await page.keyboard.press('Escape');
+        await menu.waitFor({ state: 'hidden' });
+        await assertStationary();
+        await stage(`viewport-${viewport.width}-menu-closed-stationary`);
+      }
+      assertNoBrowserDiagnostics(diagnostics);
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      await page.evaluate((thrust) => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        if (!ship) {
+          throw new Error('Fixture ship unavailable during thrust restoration');
+        }
+        ship.thrust = thrust;
+      }, originalThrust);
+    } catch (error) {
+      failures.push(error);
+    }
+    if (failures.length === 1) {
+      throw failures[0];
+    }
+    if (failures.length > 1) {
+      throw new AggregateError(failures, 'Furnace prompt fixture and restoration failed');
+    }
+  });
 }, 30000);
 
 for (const width of [1280, 390]) {

@@ -2,9 +2,13 @@
 
 The manually dispatched **Integration repeatability** workflow runs the same full
 `main` commit SHA on native Ubuntu 24.04 x64 and ARM64. Each architecture runs 20
-serialized repetitions of the complete audio lifecycle file, then three complete
-integration suites. Every focused repetition includes Chromium and WebKit at desktop,
-mobile, and landscape sizes, so each combination has 20 attempts. A failed attempt
+serialized focused attempts covering three reviewed files together: title music
+lifecycle (six cases), furnace travel and resized prompt (seven), and resource sound
+(two). Each focused attempt must report all three files and exactly 15 passing
+cases, including all six title music cases. It then runs three complete integration
+suites. Title music includes Chromium and WebKit at desktop, mobile, and landscape
+sizes, so each audio combination has 20 attempts. The report records the selected
+paths and per-file counts. A failed attempt
 remains a failure even when later attempts pass. The two matrix jobs do not cancel
 each other.
 
@@ -125,3 +129,36 @@ and crawler investigations. Keep it open until all linked investigations have th
 own demonstrated causes and regression evidence. Existing sample-rate and contour
 fixture regressions remain required. Instrumentation and test orchestration change
 no gameplay instructions, controls, or settings, so no in-game Wiki topic changes.
+
+## Furnace prompt fixture failure on September 30
+
+Native run `36750270743` retained a timeout in the touch furnace prompt resize
+scenario on ARM64 full-02 and x64 full-01/full-02/full-03. ARM64 full-01/full-03 passed;
+all 20 focused audio repetitions passed on each architecture. All three x64 full
+attempts failed the furnace prompt scenario; x64 full-03 also failed the resource
+sound scenario with `activeAudio` observed as 1 where 0 was expected. The resource
+sound failure's cause remains unknown. These results do not establish full native
+acceptance or identify the cause of the earlier #714 audio failure.
+
+The failing ARM64 568px screenshot placed the pilot at approximately `(1119, 277)`,
+outside street-1-0's 85-unit footprint centered at `(1119.057645, 369.522578)`.
+The passing full-01 screenshot showed `(1119, 288)`, still inside. The original
+fixture cleared velocity once, but automatic cruise resumed between viewport
+checks. Leaving the footprint removes the prompt's active class, clears its
+callback and blurs its button during the fade, so the final native Space press
+could no longer open the menu. This proves footprint loss in ARM64 full-02.
+The x64 attempts retained only the 320px and 844px screenshots, so their exact
+failing await is unproven. The x64 full-03 844px screenshot still showed an active
+prompt at approximately `(1119, 301)`, with only about 16.5 units of travel left
+inside the footprint; it establishes the same fixture timing risk.
+
+The layout/input scenario now disables acceleration on its local fixture ship,
+then places the living pilot through the authoritative control and waits for its
+exact motion epoch. Normal speed limits remain intact. Every viewport verifies
+both server and client stay at the fixture center with zero velocity; native tap
+and focused Space still open the real menu, and Space must not fire. Cleanup
+restores acceleration and retains any original and restoration errors. Moving
+travel scenarios keep their normal flight behavior. Named evidence stages retain
+prompt activity, focus, menu, viewport and footprint eligibility with both poses
+and epochs. This fixture change requires a fresh complete native sample after it
+lands; a focused local pass does not replace that sample.

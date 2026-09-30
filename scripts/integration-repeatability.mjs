@@ -15,8 +15,22 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const focusedPath =
-  'tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts';
+export const focusedScenarios = [
+  {
+    path: 'tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts',
+    count: 6,
+  },
+  {
+    path: 'tests/integration/browser/sanity/pilots-ride-furnace-pipes-between-travel-stops.test.ts',
+    count: 7,
+  },
+  {
+    path: 'tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts',
+    count: 2,
+  },
+];
+const focusedPaths = focusedScenarios.map(({ path }) => path);
+const focusedTestCount = focusedScenarios.reduce((total, { count }) => total + count, 0);
 
 export function parseOptions(args) {
   const options = { sha: '', output: '', focused: 20, full: 3 };
@@ -282,7 +296,7 @@ export function retainArtifacts({ source, destination, previousScreenshots }) {
   writeJson(join(destination, 'artifact-index.json'), index);
 }
 
-export function readTestEvidence(path, expectedFiles) {
+export function readTestEvidence(path, expectedFiles, expectedScenarios = []) {
   const evidence = JSON.parse(readFileSync(path, 'utf8'));
   if (
     !Array.isArray(evidence.testResults) ||
@@ -309,6 +323,25 @@ export function readTestEvidence(path, expectedFiles) {
   ) {
     throw new Error('Vitest discovery differs from the pinned integration file set');
   }
+  for (const { path: file, count } of expectedScenarios) {
+    const result = evidence.testResults.find(
+      (entry) => resolve(entry.name) === resolve(root, file)
+    );
+    if (
+      result?.status !== 'passed' ||
+      !Array.isArray(result.assertionResults) ||
+      result.assertionResults.length !== count ||
+      result.assertionResults.some((assertion) => assertion.status !== 'passed')
+    ) {
+      throw new Error(`Focused scenario evidence must contain ${count} passing tests in ${file}`);
+    }
+  }
+  if (
+    expectedScenarios.length > 0 &&
+    evidence.numTotalTests !== expectedScenarios.reduce((total, { count }) => total + count, 0)
+  ) {
+    throw new Error('Focused scenario evidence does not match the reviewed test count');
+  }
   return {
     total: evidence.numTotalTests,
     passed: evidence.numPassedTests,
@@ -330,6 +363,9 @@ async function main() {
   mkdirSync(options.output, { recursive: true });
   const report = {
     ...options,
+    focusedPaths,
+    focusedScenarios,
+    focusedTestCount,
     status: 'incomplete',
     startedAt: new Date().toISOString(),
     environment: {
@@ -385,9 +421,9 @@ async function main() {
         .filter((line) => line.includes('DEFAULT_SEED')),
     };
     retainReport();
-    for (const [stage, count, path] of [
-      ['focused', options.focused, focusedPath],
-      ['full', options.full, 'tests/integration/'],
+    for (const [stage, count, paths] of [
+      ['focused', options.focused, focusedPaths],
+      ['full', options.full, ['tests/integration/']],
     ]) {
       for (let attempt = 1; attempt <= count; attempt++) {
         const directory = join(options.output, `${stage}-${String(attempt).padStart(2, '0')}`);
@@ -408,7 +444,7 @@ async function main() {
           directory,
           command: './scripts/test-runner.sh',
           args: [
-            path,
+            ...paths,
             '--reporter=verbose',
             '--reporter=json',
             `--outputFile.json=${join(directory, 'vitest.json')}`,
@@ -421,14 +457,15 @@ async function main() {
         try {
           const expectedFiles =
             stage === 'focused'
-              ? [focusedPath]
+              ? focusedPaths
               : git(['ls-files', 'tests/integration/'])
                   .split('\n')
                   .filter((file) => file.endsWith('.test.ts'));
-          testEvidence = readTestEvidence(join(directory, 'vitest.json'), expectedFiles);
-          if (stage === 'focused' && testEvidence.total !== 6) {
-            throw new Error('Focused sample must run all six browser/viewport scenarios');
-          }
+          testEvidence = readTestEvidence(
+            join(directory, 'vitest.json'),
+            expectedFiles,
+            stage === 'focused' ? focusedScenarios : []
+          );
         } catch (error) {
           evidenceError = String(error);
         }

@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import process from 'node:process';
 import type { Page } from 'playwright';
+import { civicLot } from '../../../shared/furnaces';
 import { getFixtureState } from './test-server-control';
 
 function fixtureEvidenceMetadata() {
@@ -127,20 +128,42 @@ export async function withFixtureEvidence(
       Promise.resolve().then(() =>
         page.isClosed()
           ? null
-          : page.evaluate(() => {
+          : page.evaluate((lot) => {
               const controller = window.gameController;
               const player = controller?.getCurrPlayer();
               const ship = player?.ship;
+              const prompt = document.querySelector('#furnace-travel-prompt');
+              const button = prompt?.querySelector('button');
+              const menu = document.querySelector('#town-store-dialog');
               return {
+                furnacePrompt: {
+                  visible: prompt?.classList.contains('is-visible') ?? false,
+                  focused:
+                    button !== null && button !== undefined && document.activeElement === button,
+                  menuVisible: menu instanceof HTMLDialogElement && menu.open,
+                  viewport: { width: window.innerWidth, height: window.innerHeight },
+                  streetFootprintEligible:
+                    lot !== undefined &&
+                    ship !== undefined &&
+                    ship.health > 0 &&
+                    !ship.exploding &&
+                    !ship.furnaceTransit &&
+                    Math.hypot(
+                      ship.position.x - lot.position.x,
+                      ship.position.y - lot.position.y
+                    ) <= lot.radius,
+                },
                 connected: controller?.getNetworkManager().isConnected,
                 playerId: controller?.getNetworkManager().getLocalPlayerId(),
                 health: ship?.health,
                 exploding: ship?.exploding,
                 position: ship?.position,
+                velocity: ship?.velocity,
+                thrust: ship?.thrust,
                 motionEpoch: ship?.playerMotion?.epoch,
                 furnaceTransit: ship?.furnaceTransit,
               };
-            })
+            }, civicLot('street-1-0'))
       ),
     ]);
     const failures: unknown[] = [];

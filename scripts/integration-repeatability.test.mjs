@@ -6,6 +6,7 @@ import process from 'node:process';
 import { Writable } from 'node:stream';
 import { test } from 'node:test';
 import {
+  focusedScenarios,
   parseOptions,
   readTestEvidence,
   retainArtifacts,
@@ -117,6 +118,53 @@ test('skips, incomplete discovery and failed suites cannot masquerade as a compl
       writeFileSync(path, JSON.stringify({ ...passed, ...failure }));
       assert.throws(() => readTestEvidence(path, [file]));
     }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('each focused attempt proves all three reviewed files and all six audio combinations', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-focused-coverage-'));
+  try {
+    const path = join(directory, 'vitest.json');
+    assert.deepEqual(
+      focusedScenarios.map(({ count }) => count),
+      [6, 7, 2]
+    );
+    const files = focusedScenarios.map(({ path: file }) => file);
+    const passed = {
+      success: true,
+      numTotalTests: 15,
+      numPassedTests: 15,
+      numFailedTests: 0,
+      numPendingTests: 0,
+      numTodoTests: 0,
+      numFailedTestSuites: 0,
+      numPendingTestSuites: 0,
+      testResults: focusedScenarios.map(({ path: file, count }) => ({
+        name: file,
+        status: 'passed',
+        assertionResults: Array.from({ length: count }, () => ({ status: 'passed' })),
+      })),
+    };
+    const read = (evidence) => {
+      writeFileSync(path, JSON.stringify(evidence));
+      return readTestEvidence(path, files, focusedScenarios);
+    };
+    assert.deepEqual(read(passed), { total: 15, passed: 15, files: 3 });
+    assert.throws(() => read({ ...passed, testResults: passed.testResults.slice(0, 2) }));
+    assert.throws(() =>
+      read({ ...passed, testResults: [...passed.testResults, passed.testResults[0]] })
+    );
+    assert.throws(() => read({ ...passed, numTotalTests: 14, numPassedTests: 14 }));
+    const skipped = structuredClone(passed);
+    skipped.testResults[2].assertionResults[0].status = 'pending';
+    assert.throws(() => read(skipped));
+    // A same-total count redistribution must not erase an audio combination.
+    const redistributed = structuredClone(passed);
+    redistributed.testResults[0].assertionResults.pop();
+    redistributed.testResults[2].assertionResults.push({ status: 'passed' });
+    assert.throws(() => read(redistributed));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

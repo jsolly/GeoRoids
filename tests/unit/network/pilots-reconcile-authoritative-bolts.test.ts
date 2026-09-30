@@ -21,7 +21,7 @@ class Transport {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
-  sent: Array<{ type: string; data?: Record<string, unknown> }> = [];
+  sent: Array<{ type: string; id?: string; data?: Record<string, unknown> }> = [];
   constructor() {
     Transport.latest = this;
   }
@@ -112,6 +112,22 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     }
     return player.ship;
   }
+
+  test('the real firing client sends its player identity outside the correlated shot data', async () => {
+    const local = PlayerManager.getInstance().createLocalPlayer('scout');
+    const ws = await connect();
+    local.ship.fireLaser();
+    const packet = ws.sent.findLast((message) => message.type === 'shoot');
+    const laser = local.ship.lasers.at(-1);
+    expect(packet?.id).toBe(manager.getClientId());
+    expect(packet?.data).not.toHaveProperty('id');
+    expect(packet?.data).toMatchObject({
+      laserStart: laser?.position,
+      laserDirection: laser?.velocity,
+      requestId: expect.any(String),
+    });
+    expect(packet?.data?.['requestId']).not.toBe('');
+  });
 
   test('new snapshots update one existing bolt while provisional client shots cannot duplicate it', async () => {
     const ws = await connect();

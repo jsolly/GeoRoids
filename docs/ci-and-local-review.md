@@ -71,3 +71,18 @@ For hosted verification, measure from the Actions run creation time through the
 last job completion and link the successful run in the PR validation receipt.
 
 No game behavior, controls, or Wiki content changes are part of this workflow split.
+
+## Production firing evidence
+
+The production smoke fires through the real page's Space key and observes the
+outgoing `shoot` request on the admitted gameplay socket. It requires a matching
+`shotAcknowledged` with a nonempty projectile ID on that same socket for the
+joined local player. A null acknowledgement is a rejected shot and cannot pass.
+Requests and acknowledgements observed before the firing step cannot pass either.
+
+An accepted bolt can hit an asteroid immediately, before the next snapshot.
+Firing verification therefore uses the server's acknowledgement, which precedes
+immediate hit resolution, rather than requiring the bolt to survive in a snapshot.
+Release identity, world health, decoded snapshots, movement and browser diagnostic
+checks still apply. This changes verification only; gameplay and Wiki instructions
+are unchanged.

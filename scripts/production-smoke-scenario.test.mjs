@@ -135,3 +135,166 @@ for (const failure of [
     }
   });
 }
+
+const { tsImport } = await import('tsx/esm/api');
+const { SnapshotEncoder } = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
+const { snapshotFixture } = await tsImport(
+  '../tests/unit/network/snapshotFixture.ts',
+  import.meta.url
+);
+
+// Only this test transport emits packets. Production observes the real page's sockets and keys.
+function firingPage(outcome) {
+  const page = new EventEmitter();
+  const socket = new EventEmitter();
+  socket.url = () => 'wss://georoids-production-2403.up.railway.app/ws';
+  const receive = (target, type, data) =>
+    target.emit('framereceived', { payload: JSON.stringify({ type, data }) });
+  const acknowledge = (target = socket, data = { requestId: 'ui-shot', projectileId: 'bolt' }) =>
+    receive(target, 'shotAcknowledged', data);
+  let sequence = 0;
+  let baseline;
+  const snapshot = (tick) => {
+    const encoder = new SnapshotEncoder(snapshotFixture(tick));
+    const frame = encoder.encode(++sequence, baseline);
+    baseline = { sequence, state: encoder.state };
+    receive(socket, 'snapshot', frame);
+  };
+  page.getByLabel = () => ({ fill: async () => {} });
+  page.getByRole = () => ({
+    click: () => {
+      page.emit('websocket', socket);
+      receive(socket, 'joined', {
+        id: 'pilot-0',
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+        serverReleaseId: release,
+      });
+      if (outcome === 'stale-before-window') {
+        socket.emit('framesent', {
+          payload: JSON.stringify({
+            type: 'shoot',
+            id: 'pilot-0',
+            data: {
+              laserStart: { x: 0, y: 0 },
+              laserDirection: { x: 5, y: 0 },
+              requestId: 'ui-shot',
+            },
+          }),
+        });
+        acknowledge();
+      }
+      snapshot(0);
+      snapshot(1);
+    },
+  });
+  page.waitForFunction = async () => {};
+  page.evaluate = async () => 'pilot-0';
+  page.keyboard = {
+    up: (key) => {
+      if (key === 'Space' && outcome === 'malformed-on-keyup') {
+        socket.emit('framereceived', { payload: '{broken' });
+      }
+    },
+    down: (key) => {
+      if (key === 'ArrowRight') {
+        snapshot(20);
+        return;
+      }
+      assert.equal(key, 'Space');
+      socket.emit('framesent', {
+        payload: JSON.stringify({
+          type: 'shoot',
+          id: outcome === 'wrong-player' ? 'pilot-other' : 'pilot-0',
+          data: {
+            laserStart: { x: 0, y: 0 },
+            laserDirection: { x: 5, y: 0 },
+            requestId: 'ui-shot',
+          },
+        }),
+      });
+      if (outcome === 'accepted-immediate-collision' || outcome === 'malformed-on-keyup') {
+        acknowledge();
+        snapshot(21); // No projectile survives into this decoded delta.
+      } else if (outcome === 'null') {
+        acknowledge(socket, { requestId: 'ui-shot', projectileId: null });
+      } else if (outcome === 'wrong-request') {
+        acknowledge(socket, { requestId: 'old-shot', projectileId: 'bolt' });
+      } else if (outcome === 'wrong-socket') {
+        const other = new EventEmitter();
+        other.url = socket.url;
+        page.emit('websocket', other);
+        acknowledge(other);
+      } else if (outcome === 'malformed-projectile') {
+        acknowledge(socket, { requestId: 'ui-shot', projectileId: 42 });
+      } else if (outcome === 'missing-projectile') {
+        acknowledge(socket, { requestId: 'ui-shot' });
+      } else if (outcome === 'missing-request') {
+        acknowledge(socket, { projectileId: 'bolt' });
+      }
+    },
+  };
+  return page;
+}
+
+test('real firing evidence requires its socket, player, request and accepted acknowledgement', {
+  concurrency: true,
+}, async (t) => {
+  await Promise.all(
+    [
+      'accepted-immediate-collision',
+      'null',
+      'missing',
+      'wrong-request',
+      'wrong-socket',
+      'wrong-player',
+      'stale-before-window',
+      'malformed-projectile',
+      'missing-projectile',
+      'missing-request',
+      'malformed-on-keyup',
+    ].map((outcome) =>
+      t.test(outcome, async () => {
+        const artifacts = await mkdtemp(join(tmpdir(), 'georoids-firing-'));
+        try {
+          const run = smoke({
+            page: firingPage(outcome),
+            artifacts,
+            verifyAncestry,
+            expectedServerSha: release,
+            verifyRelease: async () => ({ json: async () => ({ world: healthyWorld }) }),
+          });
+          if (outcome === 'accepted-immediate-collision') {
+            await run;
+          } else {
+            await assert.rejects(
+              run,
+              /accepted shot acknowledgement|another player|Malformed shot acknowledgement|JSON/u
+            );
+          }
+          const evidence = JSON.parse(
+            await readFile(join(artifacts, 'gameplay-server.json'), 'utf8')
+          );
+          assert.ok(evidence.acceptedSnapshots >= 3);
+          if (outcome === 'accepted-immediate-collision') {
+            assert.deepEqual(evidence.sockets[0].shots, [
+              { playerId: 'pilot-0', requestId: 'ui-shot', projectileId: 'bolt' },
+            ]);
+            assert.equal(evidence.error, undefined);
+          } else {
+            assert.ok(evidence.error);
+            if (outcome !== 'malformed-on-keyup') {
+              assert.ok(
+                evidence.sockets.every((connection) =>
+                  connection.shots.every((shot) => shot.projectileId === null)
+                )
+              );
+            }
+          }
+        } finally {
+          await rm(artifacts, { recursive: true, force: true });
+        }
+      })
+    )
+  );
+});

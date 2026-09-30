@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed only changed pinball and title-music browser demonstration sources: guarded canonical three-bumper setup, accepted normal shot and authoritative bounce proof; audio empty-scene epoch setup. Gameplay rules, music assets, controls and demonstration generators are unchanged; no Wiki article or media changes needed. Frozen desktop/touch Chromium/WebKit audio, pinball and shared-field scenarios passed nine cases.",
+  "note": "Reviewed only the changed authoritative-bolt client unit source against combat-survival firing instructions and ConnectionManager.sendShootEvent. The added test verifies the existing top-level player identity and correlated shot payload; no gameplay behavior, controls, Wiki article, illustration, or media generator changes. Focused client reconciliation tests passed seven cases; production smoke scenario contract passed 22 cases with zero skips.",
   "hashes": {
     "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
     "docs/protocol/snapshot-v1.md": "sha256:5dce0d4d4fa17b41d2498664a40f6719d53b4d169b91cfe670d71d0a6aa56394",
@@ -390,7 +390,7 @@
     "tests/unit/input/touchAbility.test.ts": "sha256:ad6dd0f3e0aead43c1d92e1823a114239ffd0db01840405827d89509ca1411fa",
     "tests/unit/network/asteroidFieldSync.test.ts": "sha256:d9cde9cbbed30caf04a383de12bfacaf4bbbf6ab8bfc2f64070aeca09e957431",
     "tests/unit/network/failed-connections-settle-and-recover.test.ts": "sha256:b5cb840249f721fe5cb92b6fbdd75a9110324bd7e8293a4df90b934200e7469e",
-    "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts": "sha256:4c2a79b7825656f62d574d25cf41b3896fe5ca866347ab58150808e431ad757a",
+    "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts": "sha256:1c07802b099bd0b9feede8b9f2d8b7316f034685475996ab01cc8dc2f2c858fd",
     "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts": "sha256:52996f3c79b14553eb4934f741485ecc5f493066928331b145029a214a4d60a9",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts": "sha256:3098891f13a880178b7360fc068c6756708b2ff8e10fde0932a48313d2850de4",
     "tests/unit/network/resume-credential-stores-release-provenance.test.ts": "sha256:6ad859a57905a6db1119e110a3d35409da4639f49a74bafbaa133676654df9c7",

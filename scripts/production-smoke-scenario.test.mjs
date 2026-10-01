@@ -1,10 +1,27 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import process from 'node:process';
 import test from 'node:test';
 import { chromium } from 'playwright';
-import { verifyAncestry } from './production-smoke.mjs';
-import { productionUrl, smoke } from './production-smoke-scenario.mjs';
+import { verifyAncestry } from './production-smoke-release.mjs';
+import { productionUrl, smoke, waitForClientRelease } from './production-smoke-scenario.mjs';
 
-const sha = 'a'.repeat(40);
+const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+function clientPage() {
+  return {
+    goto: async () => ({ url: () => productionUrl, status: () => 200 }),
+    waitForFunction: async () => {},
+    locator: () => ({ getAttribute: async () => sha }),
+  };
+}
+
+function smokeHttp(world = healthyWorld) {
+  return async (url) => ({
+    json: async () =>
+      url.endsWith('/release.json') ? { releaseSha: sha } : { world, releaseId: sha },
+  });
+}
+
 const healthyWorld = { persistence: { mode: 'worker', failed: false }, loop: { stalls: 0 } };
 
 for (const world of [
@@ -16,11 +33,10 @@ for (const world of [
     await assert.rejects(
       smoke({
         verifyAncestry,
+        page: clientPage(),
+        expectedSha: sha,
         expectedServerSha: sha,
-        verifyRelease: (_url, minimum) => {
-          assert.equal(minimum, sha);
-          return { json: async () => ({ world }) };
-        },
+        verifyHttp: smokeHttp(world),
       }),
       /Persistent world|Game loop/u
     );
@@ -35,7 +51,7 @@ test('Enter Game without a successful multiplayer join fails production smoke', 
     await page.route('**/*', (route) =>
       route.fulfill({
         contentType: 'text/html',
-        body: '<label>Your Nickname<input></label><button>Enter Game</button>',
+        body: `<html data-client-release="${sha}"><label>Your Nickname<input></label><button>Enter Game</button></html>`,
       })
     );
     await page.goto(productionUrl);
@@ -43,8 +59,9 @@ test('Enter Game without a successful multiplayer join fails production smoke', 
       smoke({
         verifyAncestry,
         page,
+        expectedSha: sha,
         expectedServerSha: sha,
-        verifyRelease: async () => ({ json: async () => ({ world: healthyWorld }) }),
+        verifyHttp: smokeHttp(),
       }),
       /Timeout/u
     );
@@ -53,7 +70,6 @@ test('Enter Game without a successful multiplayer join fails production smoke', 
   }
 });
 
-const { execFileSync } = await import('node:child_process');
 const { EventEmitter } = await import('node:events');
 const { mkdtemp, readFile, rm } = await import('node:fs/promises');
 const { tmpdir } = await import('node:os');
@@ -109,6 +125,8 @@ for (const failure of [
         return Promise.resolve();
       },
     });
+    page.goto = clientPage().goto;
+    page.locator = clientPage().locator;
     page.waitForFunction = () => Promise.resolve();
     page.evaluate = () => Promise.resolve('pilot');
     try {
@@ -117,8 +135,9 @@ for (const failure of [
           verifyAncestry,
           page,
           artifacts,
+          expectedSha: release,
           expectedServerSha: release,
-          verifyRelease: () => ({ json: () => Promise.resolve({ world: healthyWorld }) }),
+          verifyHttp: smokeHttp(),
         }),
         /Unexpected gameplay|merge-base|malformed snapshot|before the current protocol join/u
       );
@@ -188,6 +207,8 @@ function firingPage(outcome) {
       snapshot(1);
     },
   });
+  page.goto = clientPage().goto;
+  page.locator = clientPage().locator;
   page.waitForFunction = async () => {};
   page.evaluate = async () => 'pilot-0';
   page.keyboard = {
@@ -261,8 +282,9 @@ test('real firing evidence requires its socket, player, request and accepted ack
             page: firingPage(outcome),
             artifacts,
             verifyAncestry,
+            expectedSha: release,
             expectedServerSha: release,
-            verifyRelease: async () => ({ json: async () => ({ world: healthyWorld }) }),
+            verifyHttp: smokeHttp(),
           });
           if (outcome === 'accepted-immediate-collision') {
             await run;
@@ -297,4 +319,112 @@ test('real firing evidence requires its socket, player, request and accepted ack
       })
     )
   );
+});
+
+test('canonical callback derives server minimum from release environment and validates client', async (t) => {
+  const beforeClient = process.env.PRODUCTION_SMOKE_RELEASE_SHA;
+  const beforeServer = process.env.PRODUCTION_SMOKE_SERVER_SHA;
+  process.env.PRODUCTION_SMOKE_RELEASE_SHA = sha;
+  delete process.env.PRODUCTION_SMOKE_SERVER_SHA;
+  t.after(() => {
+    if (beforeClient === undefined) {
+      delete process.env.PRODUCTION_SMOKE_RELEASE_SHA;
+    } else {
+      process.env.PRODUCTION_SMOKE_RELEASE_SHA = beforeClient;
+    }
+    if (beforeServer === undefined) {
+      delete process.env.PRODUCTION_SMOKE_SERVER_SHA;
+    } else {
+      process.env.PRODUCTION_SMOKE_SERVER_SHA = beforeServer;
+    }
+  });
+  const artifacts = await mkdtemp(join(tmpdir(), 'georoids-canonical-callback-'));
+  try {
+    await smoke({
+      page: firingPage('accepted-immediate-collision'),
+      context: {},
+      artifacts,
+      verifyHttp: smokeHttp(),
+    });
+    const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+    assert.match(evidence.minimumServerRelease, /^[0-9a-f]{40}$/u);
+    assert.ok(evidence.acceptedSnapshots >= 3);
+  } finally {
+    await rm(artifacts, { recursive: true, force: true });
+  }
+});
+
+for (const manifest of [null, [], {}, { releaseSha: sha.slice(0, 7) }, { releaseSha: previous }]) {
+  test(`rejects stale or malformed client manifest ${JSON.stringify(manifest)}`, async () => {
+    await assert.rejects(
+      smoke({
+        page: clientPage(),
+        expectedSha: sha,
+        clientReadinessMs: 0,
+        expectedServerSha: sha,
+        verifyHttp: async () => ({ json: async () => manifest }),
+      }),
+      /client release manifest|client manifest is stale/u
+    );
+  });
+}
+
+test('rejects old executed bundle even when manifest is current', async () => {
+  const page = clientPage();
+  page.locator = () => ({ getAttribute: async () => previous });
+  await assert.rejects(
+    smoke({
+      page,
+      expectedSha: sha,
+      clientReadinessMs: 0,
+      expectedServerSha: sha,
+      verifyHttp: smokeHttp(),
+    }),
+    /Loaded client bundle is stale/u
+  );
+});
+
+test('waits for client propagation and reloads an old executed bundle before gameplay', async () => {
+  let manifests = 0;
+  let navigations = 0;
+  const page = clientPage();
+  page.goto = () => {
+    navigations++;
+    return Promise.resolve({ url: () => productionUrl, status: () => 200 });
+  };
+  page.locator = () => ({ getAttribute: async () => (navigations < 2 ? previous : sha) });
+  await waitForClientRelease({
+    page,
+    expectedSha: sha,
+    readinessMs: 2000,
+    pollMs: 1,
+    verifyHttp: async () => ({
+      json: async () => ({ releaseSha: ++manifests === 1 ? previous : sha }),
+    }),
+  });
+  assert.equal(manifests, 3);
+  assert.equal(navigations, 2);
+});
+
+test('client readiness remains bounded when publication never arrives', async () => {
+  await assert.rejects(
+    waitForClientRelease({
+      page: clientPage(),
+      expectedSha: sha,
+      readinessMs: 10,
+      pollMs: 1,
+      verifyHttp: async () => ({ json: async () => ({ releaseSha: previous }) }),
+    }),
+    /Client release readiness deadline/u
+  );
+});
+
+test('production workflow delegates to the GeoRoids smoke entry', async () => {
+  const workflow = await readFile(
+    new URL('../.github/workflows/production-smoke.yml', import.meta.url),
+    'utf8'
+  );
+  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(workflow, /run:\s+npm run smoke:production\b/u);
+  assert.equal(manifest.scripts['smoke:production'], 'node scripts/production-smoke-entry.mjs');
 });

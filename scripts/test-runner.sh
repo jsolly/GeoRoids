@@ -3,6 +3,7 @@
 # Run integration tests with one repository-wide owner at a time. The lock lives
 # in Git's common directory so linked worktrees sharing ports 3001/5173 also
 # share the same serialization boundary.
+((BASH_VERSINFO[0] >= 5)) || { echo "✗ $0 requires Bash >= 5, not $BASH_VERSION. Fix: brew install bash; rerun bash ~/code/dotagents/setup/install-local-agent-runtime.sh; open a new shell." >&2; exit 1; }
 set -uo pipefail
 
 if ! REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then

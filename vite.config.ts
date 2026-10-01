@@ -45,6 +45,30 @@ function requireHaulerTetherHexes(): Plugin {
   };
 }
 
+/** Publish the same full identity embedded in the built client. */
+function publishClientRelease(releaseSha: string): Plugin {
+  const source = JSON.stringify({ releaseSha });
+  return {
+    name: 'client-release-manifest',
+    generateBundle(
+      this: ThisParameterType<Exclude<Plugin['generateBundle'], undefined | { handler: unknown }>>
+    ) {
+      this.emitFile({ type: 'asset', fileName: 'release.json', source });
+    },
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (new URL(request.url ?? '/', 'http://vite.local').pathname !== '/release.json') {
+          next();
+          return;
+        }
+        response.setHeader('Content-Type', 'application/json');
+        response.setHeader('Cache-Control', 'no-store');
+        response.end(request.method === 'HEAD' ? '' : source);
+      });
+    },
+  };
+}
+
 /** Match the production wiki rewrite in development and build previews. */
 function wikiEntry(request: IncomingMessage, _response: ServerResponse, next: () => void): void {
   const url = new URL(request.url ?? '/', 'http://vite.local');
@@ -81,6 +105,7 @@ export default defineConfig(() => {
   return {
     plugins: [
       wikiContentPlugin(),
+      publishClientRelease(commitHash.toLowerCase()),
       requireHaulerTetherHexes(),
       {
         name: 'wiki-entry',

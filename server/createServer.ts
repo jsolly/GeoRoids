@@ -55,7 +55,6 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   // Create HTTP server for health checks
   const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-    res.setHeader('x-release-id', SERVER_RELEASE_ID);
     // Add CORS headers for production
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');

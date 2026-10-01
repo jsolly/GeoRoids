@@ -309,8 +309,9 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   const base = `http://127.0.0.1:${port}`;
   const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
   expect(health.status).toBe(200);
-  expect(health.headers.get('x-release-id')).toBeTruthy();
-  expect(await health.json()).toHaveProperty('status', 'healthy');
+  const healthPayload: unknown = await health.json();
+  expect(healthPayload).toHaveProperty('releaseId', process.env['RAILWAY_GIT_COMMIT_SHA'] || 'dev');
+  expect(healthPayload).toHaveProperty('status', 'healthy');
   const status = await fetch(`${base}/status`, {
     headers: { Accept: 'application/json' },
     signal: AbortSignal.timeout(5000),

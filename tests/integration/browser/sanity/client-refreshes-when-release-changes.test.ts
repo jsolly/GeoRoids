@@ -39,7 +39,7 @@ async function waitForProbe(page: Page, minimum: number): Promise<void> {
 
 // The dev-only fixture imports the actual production watcher, since its normal
 // entry intentionally does not run under Vite development. Only the document
-// and HEAD metadata are controlled; fetch, tab storage and reload are real.
+// and static JSON metadata are controlled; fetch, tab storage and reload are real.
 // No game connection or game-server state is mocked, started or reset here.
 const fixture = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -53,10 +53,10 @@ const loads = Number(sessionStorage.getItem('release-fixture-loads') || 0) + 1;
 sessionStorage.setItem('release-fixture-loads', String(loads));
 document.querySelector('#loads').textContent = String(loads);
 document.documentElement.dataset.probes = '0';
-watchClientRelease('${current.slice(0, 7)}', {
+watchClientRelease('${current}', {
   fetch: async (input, init) => {
     const response = await window.fetch(input, init);
-    document.querySelector('#release').textContent = response.headers.get('x-release-id') || 'unverified';
+    document.querySelector('#release').textContent = (await response.clone().json()).releaseSha || 'unverified';
     document.documentElement.dataset.probes = String(Number(document.documentElement.dataset.probes) + 1);
     return response;
   },
@@ -91,18 +91,19 @@ for (const viewport of [
       });
       let published = current;
       let documentRequests = 0;
-      const headRequests: Array<{ url: string; method: string }> = [];
+      const releaseRequests: Array<{ url: string; method: string }> = [];
       const origin = new URL(TestConfig.GAME_URL).origin;
       await page.route(
-        (url) => url.origin === origin && url.pathname === '/',
+        (url) =>
+          url.origin === origin && (url.pathname === '/' || url.pathname === '/release.json'),
         async (route) => {
           const request = route.request();
-          if (request.method() === 'HEAD') {
-            headRequests.push({ url: request.url(), method: request.method() });
+          if (new URL(request.url()).pathname === '/release.json') {
+            releaseRequests.push({ url: request.url(), method: request.method() });
             await route.fulfill({
               status: 200,
-              headers: { 'x-release-id': published, 'cache-control': 'no-store' },
-              body: '',
+              headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+              body: JSON.stringify({ releaseSha: published }),
             });
             return;
           }
@@ -140,7 +141,7 @@ for (const viewport of [
       expect(await page.evaluate(() => sessionStorage.getItem('release-fixture-reloads'))).toBe(
         '1'
       );
-      // Fixture deliberately keeps serving the old bundle after the new header:
+      // Fixture deliberately keeps serving the old bundle after the new manifest:
       // its persisted per-bundle guard must stop another confirmed reload.
       await page.clock.runFor(30_000);
       await waitForProbe(page, 2);
@@ -150,9 +151,11 @@ for (const viewport of [
       expect(await page.evaluate(() => sessionStorage.getItem('release-fixture-reloads'))).toBe(
         '1'
       );
-      expect(headRequests.length).toBeGreaterThanOrEqual(5);
+      expect(releaseRequests.length).toBeGreaterThanOrEqual(5);
       expect(
-        headRequests.every((request) => request.url === `${origin}/` && request.method === 'HEAD')
+        releaseRequests.every(
+          (request) => request.url === `${origin}/release.json` && request.method === 'GET'
+        )
       ).toBe(true);
       const screenshotPath = screenshots.getScreenshotPath(
         screenshots.getTimestampedFilename(`release-refresh-${viewport.name}`)
@@ -160,10 +163,10 @@ for (const viewport of [
       await page.screenshot({ path: screenshotPath, fullPage: true });
       const receipt = {
         route: `${origin}/`,
-        fixture: 'local HTML and client HEAD metadata; actual watcher/fetch/reload',
+        fixture: 'local HTML and client static JSON metadata; actual watcher/fetch/reload',
         viewport,
         documentRequests,
-        headRequests: headRequests.length,
+        releaseRequests: releaseRequests.length,
         reloadCallbackCount: 1,
         mainFrameNavigationsAfterInitialLoad: 1,
         errors,

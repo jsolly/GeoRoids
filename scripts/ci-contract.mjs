@@ -29,6 +29,19 @@ for (const name of required.needs) {
   );
   assert.ok(ci.jobs[name]['timeout-minutes'] <= 4);
 }
+// Secrets scan precedes reusable-tree decisions in each independently validated lane.
+for (const name of required.needs) {
+  const steps = ci.jobs[name].steps;
+  assert.equal(steps[0].uses, 'actions/checkout@v7');
+  assert.equal(steps[0].with['fetch-depth'], 0);
+  assert.equal(steps[0].with['persist-credentials'], false);
+  assert.equal(steps[1].name, 'Secrets scan (range)');
+  assert.equal(steps[1].if, undefined);
+  assert.match(steps[1].run, /sha256sum --check/u);
+  assert.match(steps[1].run, /--text/u);
+  assert.match(steps[1].run, /--diff-merges=remerge/u);
+  assert.equal(steps[2].id, 'verified-tree');
+}
 assert.deepEqual(Object.keys(coverage.on), ['workflow_dispatch']);
 assert.equal(
   JSON.parse(read('package.json')).scripts.gate,
@@ -41,7 +54,9 @@ assert.equal(
 );
 
 // Execute the actual aggregate step for every GitHub dependency outcome.
-const aggregate = required.steps.find((step) => step.run);
+const aggregate = required.steps.find(
+  (step) => step.name === 'Require both validation lanes to pass'
+);
 assert.ok(aggregate);
 assert.match(aggregate.env.STATIC_RESULT, /^\$\{\{ needs\.static-checks\.result \}\}$/u);
 assert.match(aggregate.env.BEHAVIORAL_RESULT, /^\$\{\{ needs\.behavioral-smoke\.result \}\}$/u);

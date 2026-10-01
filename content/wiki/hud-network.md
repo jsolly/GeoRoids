@@ -38,7 +38,7 @@ The title screen has separate Sound Effects, Music, and Haptics settings, saved 
 
 ## Connection interruptions
 
-The game reconnects automatically; if it returns to the title screen, choose Enter Game. A brief interruption restores your ship. Banked points remain safe, and carrying cargo preserves your field position even after a longer absence. Reload when the game requests an update.
+The game reconnects automatically; if it returns to the title screen, choose Enter Game. A brief interruption restores your ship. Banked points remain safe, and carrying cargo preserves your field position even after a longer absence. Published client updates refresh open tabs automatically after confirmation; a per-version guard prevents a cached old client from repeatedly reloading. Reload when the game requests an update.
 
 ## Diagnostics
 

@@ -14,7 +14,7 @@ const LATER = 'c'.repeat(40);
 const stops: Array<() => void> = [];
 
 function response(release?: string, status = 200): Response {
-  return new Response(null, { status, headers: release ? { 'x-release-id': release } : {} });
+  return new Response(JSON.stringify(release ? { releaseSha: release } : {}), { status });
 }
 
 function fixture() {
@@ -23,7 +23,14 @@ function fixture() {
   const fetch = vi.fn<ClientReleaseEnvironment['fetch']>().mockResolvedValue(response(CURRENT));
   const reload = vi.fn();
   const environment: ClientReleaseEnvironment = {
-    fetch,
+    // Each HTTP request owns a fresh body, even when the controlled payload repeats.
+    fetch: async (input, init) => {
+      const reply = await fetch(input, init);
+      const copy = reply.clone();
+      // A redirected response is simulated at this HTTP boundary, not in its body.
+      Object.defineProperty(copy, 'redirected', { value: reply.redirected });
+      return copy;
+    },
     reload,
     storage: {
       getItem: (key) => values.get(key) ?? null,
@@ -40,7 +47,7 @@ function fixture() {
   return { fetch, reload, environment, target, values };
 }
 
-async function start(f: ReturnType<typeof fixture>, build = CURRENT.slice(0, 7)) {
+async function start(f: ReturnType<typeof fixture>, build = CURRENT) {
   const stop = watchClientRelease(build, f.environment);
   stops.push(stop);
   await vi.advanceTimersByTimeAsync(0);
@@ -60,14 +67,14 @@ afterEach(() => {
 });
 
 describe('open clients refresh only for a verified published client release', () => {
-  test('a current baseline then two matching changed headers refreshes exactly once across later polls', async () => {
+  test('a current baseline then two matching changed manifests refreshes exactly once across later polls', async () => {
     const f = fixture();
     await start(f);
     expect(f.reload).not.toHaveBeenCalled();
     expect(f.fetch).toHaveBeenCalledWith(
-      '/',
+      '/release.json',
       expect.objectContaining({
-        method: 'HEAD',
+        method: 'GET',
         cache: 'no-store',
         redirect: 'error',
         credentials: 'same-origin',
@@ -85,9 +92,9 @@ describe('open clients refresh only for a verified published client release', ()
     expect(f.reload).toHaveBeenCalledTimes(1);
   });
 
-  test('full published SHAs matching the abbreviated build remain current', async () => {
+  test('full published SHAs matching the full build remain current', async () => {
     const f = fixture();
-    await start(f, CURRENT.slice(0, 9).toUpperCase());
+    await start(f, CURRENT.toUpperCase());
     await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 3);
     expect(f.reload).not.toHaveBeenCalled();
     expect(f.values.size).toBe(0);
@@ -105,6 +112,11 @@ describe('open clients refresh only for a verified published client release', ()
       response('dev'),
       response(NEXT.slice(0, 7)),
       response(NEXT, 503),
+      new Response('<html>fallback</html>'),
+      new Response('{broken'),
+      new Response('null'),
+      new Response('[]'),
+      new Response(JSON.stringify({ releaseSha: 42 })),
     ]) {
       f.fetch.mockResolvedValue(response(NEXT));
       await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
@@ -130,7 +142,7 @@ describe('open clients refresh only for a verified published client release', ()
     await start(f); // The edge served the old bundle again after its reload.
     await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 3);
     expect(f.reload).toHaveBeenCalledTimes(1);
-    await start(f, NEXT.slice(0, 7));
+    await start(f, NEXT);
     f.fetch.mockResolvedValue(response(LATER));
     await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 2);
     expect(f.reload).toHaveBeenCalledTimes(2);
@@ -215,4 +227,84 @@ test('an invalid release response logs once until a valid response restores the 
   f.fetch.mockResolvedValue(response(NEXT, 503));
   await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
   expect(logger.error).toHaveBeenCalledTimes(2);
+});
+
+test('alternating cached builds cannot overwrite another build refresh guard', async () => {
+  const f = fixture();
+  f.fetch.mockResolvedValue(response(NEXT));
+  await start(f, CURRENT);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(f.reload).toHaveBeenCalledTimes(1);
+  f.fetch.mockResolvedValue(response(CURRENT));
+  await start(f, NEXT);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(f.reload).toHaveBeenCalledTimes(2);
+  f.fetch.mockResolvedValue(response(NEXT));
+  await start(f, CURRENT);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 3);
+  expect(f.reload).toHaveBeenCalledTimes(2);
+});
+
+test('distinct full releases sharing a seven-character prefix still refresh', async () => {
+  const f = fixture();
+  f.fetch.mockResolvedValue(response(`${CURRENT.slice(0, 7)}${'b'.repeat(33)}`));
+  await start(f);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(f.reload).toHaveBeenCalledTimes(1);
+});
+
+test('abbreviated builds and unreadable or already-marked storage cannot reload', async () => {
+  const f = fixture();
+  await start(f, CURRENT.slice(0, 7));
+  expect(f.fetch).not.toHaveBeenCalled();
+  f.fetch.mockResolvedValue(response(NEXT));
+  f.environment.storage.getItem = () => {
+    throw new Error('storage read blocked');
+  };
+  await start(f);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 3);
+  expect(f.reload).not.toHaveBeenCalled();
+  f.environment.storage.getItem = () => 'malformed marker';
+  await start(f);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 3);
+  expect(f.reload).not.toHaveBeenCalled();
+});
+
+test('changing published candidates need two consecutive matching observations', async () => {
+  const f = fixture();
+  await start(f);
+  for (const published of [NEXT, LATER, NEXT]) {
+    f.fetch.mockResolvedValue(response(published));
+    await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+    expect(f.reload).not.toHaveBeenCalled();
+  }
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(f.reload).toHaveBeenCalledTimes(1);
+});
+
+test('a late response after timeout resets change confirmation', async () => {
+  const f = fixture();
+  await start(f);
+  f.fetch.mockResolvedValue(response(NEXT));
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  let deliver: ((reply: Response) => void) | undefined;
+  f.fetch.mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        deliver = resolve;
+      })
+  );
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  await vi.advanceTimersByTimeAsync(8000);
+  expect(f.fetch.mock.calls.at(-1)?.[1].signal?.aborted).toBe(true);
+  if (!deliver) {
+    throw new Error('No in-flight release request');
+  }
+  deliver(response(NEXT));
+  await vi.advanceTimersByTimeAsync(0);
+  f.fetch.mockResolvedValue(response(NEXT));
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS - 8000);
+  expect(f.reload).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(f.reload).toHaveBeenCalledTimes(1);
 });

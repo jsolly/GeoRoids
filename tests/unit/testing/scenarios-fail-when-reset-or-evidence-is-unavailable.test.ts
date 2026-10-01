@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
+  arrangeCrewFieldWithEvidence,
   getFixtureState,
   getWorldDiagnostics,
   isWorldClean,
@@ -20,6 +21,53 @@ const cleanWorld = {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+});
+
+test('an acknowledged impact pose survives the pilot moving to its respawn position', async () => {
+  const position = { x: 0, y: -500 };
+  const response = Response.json({});
+  vi.spyOn(response, 'json').mockResolvedValue({
+    status: 'arranged',
+    poses: [{ playerId: 'impacted-pilot', motionEpoch: 2, position }],
+    asteroidId: 'crew-fixture-ore',
+    playersBefore: [],
+    playersAfter: [],
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+
+  const receipt = await arrangeCrewFieldWithEvidence(['impacted-pilot'], 'impact');
+  position.x = -175;
+  position.y = 44;
+
+  expect(receipt.positions.get('impacted-pilot')).toEqual({ x: 0, y: -500 });
+  expect(Object.isFrozen(receipt.positions.get('impacted-pilot'))).toBe(true);
+});
+
+test.each([
+  { x: Number.NaN, y: -500 },
+  { x: 0, y: Number.POSITIVE_INFINITY },
+  { x: '0', y: -500 },
+  { x: 0 },
+])('a corrupt acknowledged impact position rejects the fixture: %j', async (position) => {
+  const response = Response.json({});
+  vi.spyOn(response, 'json').mockResolvedValue({
+    status: 'arranged',
+    poses: [{ playerId: 'impacted-pilot', motionEpoch: 2, position }],
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+  await expect(arrangeCrewFieldWithEvidence(['impacted-pilot'], 'impact')).rejects.toThrow(
+    'Invalid crew fixture pose'
+  );
+});
+
+test('duplicate acknowledged pilot poses reject the impact fixture', async () => {
+  const pose = { playerId: 'impacted-pilot', motionEpoch: 2, position: { x: 0, y: -500 } };
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    Response.json({ status: 'arranged', poses: [pose, pose] })
+  );
+  await expect(arrangeCrewFieldWithEvidence(['impacted-pilot'], 'impact')).rejects.toThrow(
+    'Crew fixture duplicated a requested pilot'
+  );
 });
 
 test('failed reset blocks the next scenario even when all players disconnected', async () => {

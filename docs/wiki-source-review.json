@@ -7,7 +7,7 @@
     "index.css": "sha256:266f8e48116cf1dd6940e73d06fe52fee0f095df144feab67c90c99c4cb6eb4e",
     "index.html": "sha256:45c944e4f6bbe66762fa78af529253fb536a1cc72d0bce64e9823c50902bb56f",
     "middleware.ts": "sha256:b1804785a737be08e3410c647ce88f86b06da2de7161e0af4277ab07830ce4ee",
-    "package.json": "sha256:fc90f2b8aa93614851e701e81964a47adb304db511208ae4b89bbfcb5b5b45d5",
+    "package.json": "sha256:d36c7248a2f487515517163c04662f8dc305832eae604bcf75a0ff723dee0d83",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -58,7 +58,7 @@
     "public/wiki/media/terrain.gif": "sha256:dcaebe9bf2bf9e9c1ef6d5fd5555dc1f06b3f15d3344a8520c8da7ad2796a663",
     "public/wiki/media/terrain.png": "sha256:96426cda4ad69680b231e1b9b653c51d695fa709cdcd79bf7b2048728745a107",
     "scripts/generate-sounds.ts": "sha256:7aa65b0caa7873259dd249990054a74c503faf98839bf2196096ffd5425ec7d0",
-    "scripts/wiki-check.ts": "sha256:358bb5f35fcbaf4a033a64b11d70e61a28d2916f83b07efacc02bfc8fc08e01d",
+    "scripts/wiki-check.ts": "sha256:7dbc0a3dfc50b68f493517cd0d72def7350fe6eb79bef99c6d51a67c52765d57",
     "scripts/wiki-content.ts": "sha256:d7006a811d3fee2b623e6b3fdbc921ef3142d968e58bd5aaed89c21b8f40ee1d",
     "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
@@ -339,7 +339,7 @@
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts": "sha256:f223b1792c6bf3d04c0dc134f611c3bea922ae31e5ebde3de8f47ad6d91509d5",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:e7991b7ee2d912845f2f47bf24f3179eec2cad4cb72dd7674f2620c2ac8694ba",
     "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:9086f92863879f8fc8bb761e7cc5c4049b4621e103a05ea5d320c8a30d55f9b4",
-    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:ee5a2cb07e7791f7ddb58f940d0dffd8575ece32cd5b794004a9af55d3bd5476",
+    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:7a4754427c3575e7055363f52f67c7777fb3eb7010c96faf85ee1261a73fa780",
     "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts": "sha256:8850fe0f4da3e4a34a8ceabf5fcb9635ca80ad53c218e5a730ee7b4c91d0534f",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:80f0990a793ed71da543f5d93b6898b623e358aad37910604120cc4f8efe8950",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:fef2684b46c2f5c6727f3bca8ba446c312bd6d1376f8904cac9963713c02d0e8",
@@ -468,5 +468,35 @@
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "vite.config.ts": "sha256:efa0b06e756456a39bb5740710a0f6a53c208630f212fec4428e194918898022",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"
-  }
+  },
+  "reviews": [
+    {
+      "note": "Reviewed the complete validation command and scoped Wiki maintenance CLI against Read the field and its linked controls, ships, terrain, teamwork and network guidance. Player rules, controls and demonstrations are unchanged; this batch accepts only these two maintenance sources.",
+      "sources": ["package.json", "scripts/wiki-check.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "scripts/wiki-check.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed native directional-audio evidence instrumentation. The shipped laser, HRTF positions, stereo energy assertions, controls, behavior and demonstrations remain unchanged; only immediate retained stage diagnostics were added. Focused desktop scenario file passed all three cases. The original timeout cause remains unproven.",
+      "sources": [
+        "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed merged package manifest: preserve PR6 complete gate commands and main’s landed Knip 6.38.0 update. No gameplay controls, Wiki prose, demonstrations or runtime dependency behavior changed.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    }
+  ]
 }

@@ -44,8 +44,7 @@ include `--with-deps` to install their system libraries.
    delay and combat at native CPU speed. Both use a portrait touch viewport at DPR 3.
    Failures stop the gate. Fix and repeat; a green CI smoke does not replace this gate.
 
-The pre-commit hook retains its static/unit/build checks. `npm run gate` forces
-those checks even with an empty index, then runs the heavy review checks. For focused iteration, `npm run test:review` runs only the heavy
+The pre-commit hook owns the complete static/unit/build and integration/performance battery. `npm run gate` uses the same entry even with an empty index, with the fleet documentation fast path disabled. For focused iteration, `npm run test:review` runs only the heavy
 integration/performance portion. Standalone integration runs retain their existing
 20-minute deadline, process ownership, and cleanup. Full coordinated runs require
 less than 600 seconds including discovery and cleanup; 300 seconds remains a future performance target; see [isolated shards](integration-shards.md). Choose unused ports with
@@ -94,3 +93,9 @@ The optional manually dispatched [native repeatability sample](integration-repea
 runs 20 focused audio lifecycle repetitions and three full integration suites on
 both native Ubuntu architectures at one pinned SHA. It retains every failed attempt
 and never substitutes retries for a passing sample.
+
+## Exact validation receipts
+
+A complete receipt is reusable only when source content, modes and symlinks, relevant runtime inputs, installed dependencies and tool identities, stage definitions, retained artifact hashes and final cleanup evidence still match. Receipt reuse requires the current staged candidate to match the checked working tree, including manual invocations; divergent partial staging cannot inherit its proof. Missing, malformed, failed, cancelled or stale receipts require fresh validation. A fleet documentation fast-path result is never a complete-battery receipt. Build commit identity, npm configuration and consumed symlink targets also enter the receipt. Caller environment differences can conservatively require another run, including native commits versus npm invocations. Internal installed-directory aliases are covered through their canonical payload; external directory links are unsupported. Local receipts do not replace CI or production verification.
+
+A previous successful graph witness can avoid Knip and ts-prune for proven numeric or boolean constant-data literal changes with unchanged module references, imports, exports, declarations, object shape and dependencies. String literals, unknown edits and mixed changes run graph checks. Changed source still runs unit, build, integration and performance checks; gameplay evidence never transfers across changed literal values.

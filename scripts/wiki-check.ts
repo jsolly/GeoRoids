@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +36,7 @@ for (const article of articles) {
     }
   }
   for (const id of article.media) {
-    if (!media[id]) {
+    if (!Object.hasOwn(media, id)) {
       failures.push(`${article.id}: missing media definition ${id}`);
     }
   }
@@ -141,46 +141,193 @@ for (const path of [...sourcePaths].sort()) {
       .digest('hex')}`;
   }
 }
-if (process.argv.includes('--accept')) {
-  const note = process.argv[process.argv.indexOf('--note') + 1];
-  if (!process.argv.includes('--note') || !note || note.startsWith('--')) {
-    failures.push('Acceptance requires --note with the completed source/media review summary');
+// Parse every selector before touching the accepted review. Old note/hash baselines
+// remain readable; acceptance always records an explicit, independently reviewable batch.
+const args = process.argv.slice(2);
+const selected = new Set<string>();
+const topics = new Set<string>();
+const demonstrations = new Set<string>();
+const owners = new Map<string, string>();
+let accepting = false;
+let note = '';
+for (let index = 0; index < args.length; index++) {
+  const flag = args[index];
+  if (flag === '--accept') {
+    if (accepting) {
+      failures.push('Duplicate --accept');
+    }
+    accepting = true;
+    continue;
   }
-  if (failures.length === 0) {
-    writeFileSync(baselinePath, `${JSON.stringify({ note, hashes }, null, 2)}\n`);
+  const value = args[index + 1];
+  if (
+    !['--source', '--topic', '--media', '--owner', '--note'].includes(flag ?? '') ||
+    !value ||
+    value.startsWith('--') ||
+    !value.trim()
+  ) {
+    failures.push(`Invalid Wiki review argument: ${flag}`);
+    continue;
+  }
+  index++;
+  if (flag === '--note') {
+    if (note) {
+      failures.push('Duplicate --note');
+    }
+    note = value.trim();
+  } else if (flag === '--owner') {
+    const parts = value.split('=');
+    const [path, topic] = parts;
+    if (parts.length !== 2 || !path || !topic || owners.has(path)) {
+      failures.push(`Invalid or duplicate --owner: ${value}; use source/path=topic-id`);
+    } else {
+      owners.set(path, topic);
+    }
+  } else {
+    const collection =
+      flag === '--source' ? selected : flag === '--topic' ? topics : demonstrations;
+    if (collection.has(value)) {
+      failures.push(`Duplicate ${flag}: ${value}`);
+    }
+    collection.add(value);
+  }
+}
+if (!accepting && args.length) {
+  failures.push('Review selectors require --accept');
+}
+let baseline: Record<string, unknown> = {};
+let previous: Record<string, string> = {};
+try {
+  const parsed: unknown = existsSync(baselinePath)
+    ? JSON.parse(readFileSync(baselinePath, 'utf8'))
+    : { hashes: {} };
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    Array.isArray(parsed) ||
+    !('hashes' in parsed) ||
+    !parsed.hashes ||
+    typeof parsed.hashes !== 'object' ||
+    Array.isArray(parsed.hashes) ||
+    Object.entries(parsed.hashes).some(
+      ([path, hash]) => !path || typeof hash !== 'string' || !/^sha256:[a-f0-9]{64}$/u.test(hash)
+    )
+  ) {
+    failures.push('Invalid wiki review baseline');
+  } else {
+    baseline = Object.fromEntries(Object.entries(parsed));
+    previous = Object.fromEntries(Object.entries(parsed.hashes));
+    if ('reviews' in parsed && !Array.isArray(parsed.reviews)) {
+      failures.push('Invalid wiki review batches');
+    }
+  }
+} catch {
+  failures.push('Invalid wiki review baseline JSON');
+}
+const changed = new Set(
+  [...new Set([...Object.keys(previous), ...Object.keys(hashes)])].filter(
+    (path) => previous[path] !== hashes[path]
+  )
+);
+if (accepting) {
+  if (!note || !selected.size || !topics.size) {
+    failures.push(
+      'Acceptance requires --note, repeated changed --source paths and affected --topic IDs'
+    );
+  }
+  for (const topic of topics) {
+    if (!ids.has(topic)) {
+      failures.push(`Unknown topic: ${topic}`);
+    }
+  }
+  for (const id of demonstrations) {
+    if (!Object.hasOwn(media, id)) {
+      failures.push(`Unknown media: ${id}`);
+    }
+  }
+  for (const [path, topic] of owners) {
+    if (!selected.has(path) || !ids.has(topic) || !topics.has(topic)) {
+      failures.push(`Owner must name a selected source and selected real topic: ${path}=${topic}`);
+    }
+  }
+  for (const path of selected) {
+    if (!changed.has(path)) {
+      failures.push(`Source is not changed: ${path}`);
+    }
+    const affectedMedia = Object.entries(media).filter(
+      ([id, item]) =>
+        item.sources.includes(path) ||
+        ['gif', 'png'].some((extension) => path === `public/wiki/media/${id}.${extension}`)
+    );
+    const affectedTopics = articles.filter(
+      (article) =>
+        article.sources.includes(path) || affectedMedia.some(([id]) => article.media.includes(id))
+    );
+    if ((!affectedTopics.length || !(path in hashes)) && !owners.has(path)) {
+      failures.push(`Unmapped or deleted source requires --owner ${path}=topic-id`);
+    }
+    for (const article of affectedTopics) {
+      if (!topics.has(article.id)) {
+        failures.push(`${path}: missing affected --topic ${article.id}`);
+      }
+    }
+    for (const [id] of affectedMedia) {
+      if (!demonstrations.has(id)) {
+        failures.push(`${path}: missing affected --media ${id}`);
+      }
+    }
+  }
+  if (!failures.length) {
+    const accepted = { ...previous };
+    for (const path of selected) {
+      const hash = hashes[path];
+      if (hash !== undefined) {
+        accepted[path] = hash;
+      } else {
+        delete accepted[path];
+      }
+    }
+    const reviews = Array.isArray(baseline['reviews']) ? baseline['reviews'] : [];
+    const updated = {
+      ...baseline,
+      hashes: accepted,
+      reviews: [
+        ...reviews,
+        {
+          note,
+          sources: [...selected].sort(),
+          topics: [...topics].sort(),
+          media: [...demonstrations].sort(),
+          owners: Object.fromEntries(owners),
+        },
+      ],
+    };
+    const temporary = `${baselinePath}.${process.pid}.tmp`;
+    try {
+      writeFileSync(temporary, `${JSON.stringify(updated, null, 2)}\n`, { flag: 'wx' });
+      renameSync(temporary, baselinePath);
+    } finally {
+      rmSync(temporary, { force: true });
+    }
+    const pending = [...changed].filter((path) => !selected.has(path));
     process.stdout.write(
-      `Wiki review recorded: ${articles.length} articles, ${Object.keys(media).length} demonstrations.\n`
+      `Wiki review recorded for ${selected.size} sources; ${pending.length} pending sources.\n`
     );
   }
 } else if (!existsSync(baselinePath)) {
   failures.push(
-    'Wiki has no accepted source review. Review articles and regenerate affected media, then run wiki:review with --note.'
+    'Wiki has no accepted source review. Use explicit wiki:review source/topic selectors and --note.'
   );
-} else {
-  const baseline: unknown = JSON.parse(readFileSync(baselinePath, 'utf8'));
-  if (
-    !baseline ||
-    typeof baseline !== 'object' ||
-    !('hashes' in baseline) ||
-    !baseline.hashes ||
-    typeof baseline.hashes !== 'object'
-  ) {
-    failures.push('Invalid wiki review baseline');
-  } else {
-    const previous = baseline.hashes;
-    const changed = [...new Set([...Object.keys(previous), ...Object.keys(hashes)])].filter(
-      (path) => !(path in previous) || Reflect.get(previous, path) !== hashes[path]
-    );
-    if (changed.length) {
-      failures.push(
-        `Wiki review needed for ${changed.length} changed sources/assets:\n${changed.map((path) => `  ${relative(root, resolve(root, path))}`).join('\n')}\nReview rules and affected GIFs before accepting a new baseline. See docs/wiki-maintenance.md.`
-      );
-    }
-  }
+} else if (changed.size) {
+  failures.push(
+    `Wiki review needed for ${changed.size} changed sources/assets:\n${[...changed].map((path) => `  ${relative(root, resolve(root, path))}`).join('\n')}\nReview rules and affected GIFs before accepting selected sources. See docs/wiki-maintenance.md.`
+  );
 }
 if (failures.length) {
   process.stderr.write(`${failures.join('\n')}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write('Wiki coverage, links, media, and source review passed.\n');
+  if (!accepting) {
+    process.stdout.write('Wiki coverage, links, media, and source review passed.\n');
+  }
 }

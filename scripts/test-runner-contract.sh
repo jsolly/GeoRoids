@@ -50,12 +50,16 @@ trap 'exit 143' TERM
 # Exercise the real runner in an owned repository. Contract checks must never
 # acquire, remove, or assert on another checkout's integration-runner lock.
 CONTRACT_ROOT="$TEMP_DIR/repository"
-GIT_LOCAL_ENV_VARS="$(git -C "$ROOT" rev-parse --local-env-vars)"
-while IFS= read -r git_variable; do
+for git_variable in "${!GIT_@}"; do
     unset "$git_variable"
-done <<< "$GIT_LOCAL_ENV_VARS"
+done
+export HOME="$TEMP_DIR/home"
+export XDG_CONFIG_HOME="$TEMP_DIR/xdg"
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
+mkdir -p "$HOME" "$XDG_CONFIG_HOME"
 mkdir -p "$CONTRACT_ROOT/scripts"
 cp "$ROOT/scripts/process-tree.sh" "$CONTRACT_ROOT/scripts/process-tree.sh"
+cp "$ROOT/scripts/review-receipt.mjs" "$CONTRACT_ROOT/scripts/review-receipt.mjs"
 cp "$ROOT/.env.example" "$CONTRACT_ROOT/.env.example"
 git -C "$CONTRACT_ROOT" init -q
 cd "$CONTRACT_ROOT"
@@ -65,6 +69,38 @@ case "$CONTRACT_GIT_DIR" in
     /*) ;;
     *) CONTRACT_GIT_DIR="$CONTRACT_ROOT/$CONTRACT_GIT_DIR" ;;
 esac
+CONTRACT_GIT_DIR="$(cd "$CONTRACT_GIT_DIR" && pwd -P)"
+EXPECTED_GIT_DIR="$(cd "$TEMP_DIR/repository/.git" && pwd -P)"
+[ "$CONTRACT_GIT_DIR" = "$EXPECTED_GIT_DIR" ] || { echo "Fixture escaped private Git common directory" >&2; exit 1; }
+if [[ "${1:-}" == --isolation-probe ]]; then
+    printf 'private fixture\n' > isolation.txt
+    git add isolation.txt
+    exit 0
+fi
+
+# A hostile parent repository must survive the actual private-fixture entry.
+HOSTILE_PARENT="$TEMP_DIR/hostile-parent"
+mkdir -p "$HOSTILE_PARENT"
+git -C "$HOSTILE_PARENT" init -q
+printf 'parent\n' > "$HOSTILE_PARENT/parent.txt"
+git -C "$HOSTILE_PARENT" add parent.txt
+git -C "$HOSTILE_PARENT" -c core.hooksPath=/dev/null -c user.name=Contract -c user.email=contract@example.invalid commit -qm 'fixture parent'
+printf 'staged parent\n' > "$HOSTILE_PARENT/parent.txt"
+git -C "$HOSTILE_PARENT" add parent.txt
+for parent_file in HEAD config index; do
+    cp "$HOSTILE_PARENT/.git/$parent_file" "$TEMP_DIR/parent-$parent_file.before"
+done
+mkdir -p "$TEMP_DIR/hostile-home"
+printf '[core]\n hooksPath = /untrusted\n' > "$TEMP_DIR/hostile-home/.gitconfig"
+env GIT_DIR="$HOSTILE_PARENT/.git" GIT_WORK_TREE="$HOSTILE_PARENT" \
+    GIT_INDEX_FILE="$HOSTILE_PARENT/.git/index" \
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.repositoryformatversion GIT_CONFIG_VALUE_0=999 \
+    GIT_CONFIG_GLOBAL="$TEMP_DIR/hostile-home/.gitconfig" GIT_CONFIG_SYSTEM="$TEMP_DIR/hostile-home/.gitconfig" \
+    HOME="$TEMP_DIR/hostile-home" XDG_CONFIG_HOME="$TEMP_DIR/hostile-home" \
+    bash "$ROOT/scripts/test-runner-contract.sh" --isolation-probe
+for parent_file in HEAD config index; do
+    cmp "$HOSTILE_PARENT/.git/$parent_file" "$TEMP_DIR/parent-$parent_file.before" || { echo "Fixture mutated parent $parent_file" >&2; exit 1; }
+done
 LOCK_DIR="$CONTRACT_GIT_DIR/georoids-test-runner.lock"
 
 fail() {
@@ -377,6 +413,7 @@ run_mock_runner() {
         GEOROIDS_CONTRACT_REAL_RM="$REAL_RM" \
         GEOROIDS_CONTRACT_REAL_TOUCH="$REAL_TOUCH" \
         GEOROIDS_CONTRACT_FAILURE_MARKER="$MOCK_FAILURE_MARKER_FILE" \
+        GEOROIDS_TEST_RUNNER_RECEIPT="$TEMP_DIR/final-runner.json" \
         GEOROIDS_TEST_MAX_DURATION_SECONDS="$max_duration" \
         GEOROIDS_TEST_VITE_PORT=59993 \
         GEOROIDS_TEST_SERVER_PORT=59994 \
@@ -489,6 +526,19 @@ assert_cleanup_failure_preserves_test_failure() {
     assert_lock_released
 }
 
+assert_final_failure_receipt() {
+    node - "$TEMP_DIR/final-runner.json" "$1" "$2" <<'NODE'
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const [path, status, lockReleased] = process.argv.slice(2);
+const receipt = JSON.parse(fs.readFileSync(path));
+assert.equal(receipt.exitCode, Number(status));
+assert.equal(receipt.cleanupSucceeded, false);
+assert.equal(receipt.lockReleased, lockReleased === 'true');
+assert.equal(receipt.success, false);
+NODE
+}
+
 assert_impaired_benchmark_cleanup() {
     local mode="$1"
     local expected="$2"
@@ -502,6 +552,19 @@ assert_impaired_benchmark_cleanup() {
     IFS= read -r session < "$MOCK_DEV_PID_FILE.session"
     [ ! -e "$session" ] || fail "proxy $mode leaked private session directory"
     assert_lock_released
+    node - "$CONTRACT_ROOT" "$session" "$expected" <<'NODE'
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const [root, session, expected] = process.argv.slice(2);
+const receipt = JSON.parse(fs.readFileSync(path.join(root, '.performance', `runner-${path.basename(session)}`, 'runner.json')));
+assert.equal(receipt.kind, 'georoids-runner-final');
+assert.equal(receipt.exitCode, Number(expected));
+assert.equal(receipt.cleanupSucceeded, true);
+assert.equal(receipt.sessionRemoved, true);
+assert.equal(receipt.lockReleased, true);
+assert.equal(receipt.success, Number(expected) === 0);
+NODE
 }
 
 assert_live_benchmark_mode() {
@@ -697,8 +760,11 @@ assert_live_benchmark_mode benchmark-client realtime-client
 assert_live_benchmark_mode benchmark-load load
 assert_test_timeout_cleans_owned_processes
 assert_cleanup_failure_is_not_success
+assert_final_failure_receipt 1 true
 assert_cleanup_failure_preserves_test_failure
+assert_final_failure_receipt 7 true
 assert_lock_release_failure_is_not_success
+assert_final_failure_receipt 1 false
 assert_process_inspection_failure_is_not_success \
     process-tree-pgrep-failure "Could not enumerate children of owned process PID"
 assert_process_inspection_failure_is_not_success \

@@ -24,7 +24,7 @@ Vite static client and authoritative WebSocket server deploy independently from 
 
 ## CI
 
-The dotagents dispatcher runs the tracked pre-commit gate. Lint, unused-code checks, contracts, types, unit tests and build must pass; `npm run gate` additionally runs full integration and constrained-client checks. Canonical actionlint/ShellCheck bytes come from dotagents.
+The dotagents dispatcher runs the tracked pre-commit gate. The tracked pre-commit hook owns lint, unused-code checks, contracts, types, unit tests, build, full integration, frame-work and constrained-client checks. `npm run gate` invokes that same complete battery with the fleet docs exception disabled. Exact receipts may reuse unchanged validation; candidate reuse requires index parity. Canonical actionlint/ShellCheck bytes come from dotagents.
 
 ## Commands
 

@@ -65,7 +65,23 @@ test('muting stops a real sample whose Howler wall clock ended before its native
       const diagnostic = window.sampleOwnershipDiagnostic;
       const sound = diagnostic.sound;
       const howl = sound.howl;
-      if (!sound.playNote(1, -48)) throw new Error('Real sample playback rejected');
+      diagnostic.sourceIds = [];
+      diagnostic.playSample = (volume, offset) => {
+        const readStarts = () => {
+          document.dispatchEvent(new Event('georoids-audio-probe-snapshot'));
+          return JSON.parse(document.documentElement.dataset.audioLifecycle)
+            .filter(event => event.kind === 'source-start');
+        };
+        const before = new Set(readStarts().map(event => event.sourceId));
+        if (!sound.playNote(volume, -48, offset)) throw new Error('Real sample playback rejected');
+        // This synchronous boundary excludes live-game cues using the same asset.
+        const starts = readStarts().filter(event => !before.has(event.sourceId));
+        if (starts.length !== 1) throw new Error('Expected one native source per diagnostic sample');
+        const sourceId = starts[0].sourceId;
+        if (!Number.isInteger(sourceId) || sourceId <= 0) throw new Error('Invalid diagnostic native source ID');
+        diagnostic.sourceIds.push(sourceId);
+      };
+      diagnostic.playSample(1);
       const ids = [...sound.voices.keys()];
       if (ids.length !== 1) throw new Error('Expected one owned real sample');
       const voice = howl._soundById(ids[0]);
@@ -89,7 +105,7 @@ test('muting stops a real sample whose Howler wall clock ended before its native
       const panner = voice._panner;
       diagnostic.startOverlap = () => {
         diagnostic.firstSettings = { gain: gain.gain.value, x: panner.positionX.value, z: panner.positionZ.value };
-        if (!sound.playNote(0.5, -48, { x: 200, y: 50 })) throw new Error('Second overlapping sample rejected');
+        diagnostic.playSample(0.5, { x: 200, y: 50 });
         const secondId = [...sound.voices.keys()].find(id => id !== ids[0]);
         const second = howl._soundById(secondId);
         diagnostic.overlap = () => ({ distinctGain: gain !== second._node, distinctPanner: panner !== second._panner,
@@ -157,12 +173,18 @@ test('muting stops a real sample whose Howler wall clock ended before its native
     expect(mutedSample.pilotId).toBe(precondition.after.pilotId);
     const mutedAudio = await readNativeAudioSnapshot(page);
     const lifecycle = lifecycleRows(mutedAudio.lifecycle);
+    const sampleSourceIds = await page.evaluate<number[]>(
+      'window.sampleOwnershipDiagnostic.sourceIds'
+    );
+    expect(sampleSourceIds).toHaveLength(2);
+    expect(new Set(sampleSourceIds).size).toBe(2);
     const sampleStarts = lifecycle.filter(
       (event) =>
-        event['kind'] === 'source-start' && event['duration'] === precondition.after.duration
+        event['kind'] === 'source-start' && sampleSourceIds.includes(Number(event['sourceId']))
     );
     expect(sampleStarts).toHaveLength(2);
     for (const sampleStart of sampleStarts) {
+      expect(sampleStart['duration']).toBe(precondition.after.duration);
       expect(
         lifecycle.some(
           (event) =>

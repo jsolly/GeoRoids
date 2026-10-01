@@ -91,7 +91,7 @@ npm run check:actions      # actionlint + ShellCheck
 npm run check:fix          # biome check --write --error-on-warnings .
 npm run fix                # biome write + tsc + unit tests
 npm run check:wiki         # flag gameplay changes that need a Wiki review (runs in build)
-npm run gate               # full local review gate: pre-commit checks + test:review
+npm run gate               # same complete pre-commit battery; exact unchanged receipts may reuse
 
 # Tests
 npm run test               # unit only (tests/unit/)

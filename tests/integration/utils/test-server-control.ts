@@ -329,6 +329,7 @@ export async function arrangeCrewFieldWithEvidence(
     | 'street-travel'
 ): Promise<{
   epochs: ReadonlyMap<string, number>;
+  positions: ReadonlyMap<string, Readonly<{ x: number; y: number }>>;
   asteroidId: string | null;
   playersBefore: { id: string; cargo: number; score: number; kitId: string }[];
   playersAfter: { id: string; cargo: number; score: number; kitId: string }[];
@@ -350,6 +351,7 @@ export async function arrangeCrewFieldWithEvidence(
     throw new Error('Missing crew fixture poses');
   }
   const epochs = new Map<string, number>();
+  const positions = new Map<string, Readonly<{ x: number; y: number }>>();
   for (const pose of body.poses) {
     if (
       !pose ||
@@ -358,11 +360,24 @@ export async function arrangeCrewFieldWithEvidence(
       typeof pose.playerId !== 'string' ||
       !('motionEpoch' in pose) ||
       typeof pose.motionEpoch !== 'number' ||
-      !Number.isSafeInteger(pose.motionEpoch)
+      !Number.isSafeInteger(pose.motionEpoch) ||
+      !('position' in pose) ||
+      !pose.position ||
+      typeof pose.position !== 'object' ||
+      !('x' in pose.position) ||
+      typeof pose.position.x !== 'number' ||
+      !Number.isFinite(pose.position.x) ||
+      !('y' in pose.position) ||
+      typeof pose.position.y !== 'number' ||
+      !Number.isFinite(pose.position.y)
     ) {
-      throw new Error('Invalid crew fixture motion epoch');
+      throw new Error('Invalid crew fixture pose');
+    }
+    if (epochs.has(pose.playerId)) {
+      throw new Error('Crew fixture duplicated a requested pilot');
     }
     epochs.set(pose.playerId, pose.motionEpoch);
+    positions.set(pose.playerId, Object.freeze({ x: pose.position.x, y: pose.position.y }));
   }
   if (epochs.size !== playerIds.length || playerIds.some((id) => !epochs.has(id))) {
     throw new Error('Crew fixture omitted or duplicated a requested pilot');
@@ -397,6 +412,7 @@ export async function arrangeCrewFieldWithEvidence(
     });
   return {
     epochs,
+    positions,
     asteroidId: body.asteroidId,
     playersBefore: readPlayers(body.playersBefore),
     playersAfter: readPlayers(body.playersAfter),

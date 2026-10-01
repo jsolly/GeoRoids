@@ -9,6 +9,7 @@ mkdir -p .performance/review
 ARTIFACTS="$(mktemp -d "$ROOT/.performance/review/run.XXXXXX")"
 echo "Review artifacts: $ARTIFACTS"
 stage=integration
+node scripts/review-receipt.mjs start "$ARTIFACTS" "$ROOT"
 
 retain_stage() {
   mkdir -p "$ARTIFACTS/$stage"
@@ -31,10 +32,13 @@ retain_stage() {
 finish() {
   local status=$?
   trap - EXIT
+  local retention=true
   if ! retain_stage; then
+    retention=false
     if [[ "$status" == 0 ]]; then status=1; fi
   fi
   printf 'exit_status=%s\n' "$status" > "$ARTIFACTS/result.txt" || status=1
+  if ! node scripts/review-receipt.mjs finish "$ARTIFACTS" "$status" "$retention" "${GEOROIDS_REVIEW_RECEIPT:-$ARTIFACTS/review.json}"; then status=1; fi
   echo "Review exit $status; artifacts: $ARTIFACTS"
   exit "$status"
 }
@@ -44,9 +48,12 @@ run_stage() {
   stage=$1
   shift
   mkdir -p "$ARTIFACTS/$stage"
-  "$@" 2>&1 | tee "$ARTIFACTS/$stage/output.log"
+  local status=0
+  GEOROIDS_TEST_RUNNER_RECEIPT="$ARTIFACTS/$stage/runner.json" "$@" 2>&1 | tee "$ARTIFACTS/$stage/output.log" || status=$?
   # Each runner clears live logs, so copy before starting the next stage.
-  retain_stage
+  retain_stage || return 1
+  if [[ "$status" != 0 ]]; then return "$status"; fi
+  node scripts/review-receipt.mjs stage "$ARTIFACTS" "$stage" "$status" "$@"
 }
 
 # The runner owns integration serialization, services, deadlines, and cleanup.

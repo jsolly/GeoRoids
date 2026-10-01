@@ -55,7 +55,7 @@ the shared world stay until `WORLD.generation` changes.
 
 Published client releases automatically refresh open tabs after two matching
 release checks, about 30–60 seconds for active tabs. The check uses the client
-origin's `x-release-id`; the independently deployed Railway server does not
+origin's static `release.json` full build SHA; the independently deployed Railway server does not
 trigger reloads. A per-tab guard prevents repeated reloads if the edge still
 serves a cached bundle. Tabs opened before this watcher was shipped need one
 manual refresh.

@@ -2,75 +2,15 @@
 
 ## Ship
 
-Ship profile: `vercel-static`
+Ship profile: `vercel-static`.
 
-**Integration: branch → PR → merge on green `CI / ci`.** `/ship` opens the PR, arms native auto-merge as the backstop where the base branch's ruleset requires `ci`, and runs the head-pinned squash itself as soon as `ci` passes on the head (`~/code/dotagents/skills/ship/references/git-discipline.md` → Merge a same-repo self PR). Agents never push to `main`, change rulesets, or admin-merge.
+**Integration: branch → PR → merge on green `CI / ci`.** `/ship` merges per `skills/ship/references/git-discipline.md` → Merge a same-repo self PR, read the installed reference. Agents never push to `main`, change rulesets, or admin-merge.
 
-Verify the active branch immediately before committing and pushing. The
-`.git-hooks/pre-push` hook checks the actual destination ref and blocks direct
-`main` updates. `GEOROIDS_BREAK_GLASS_PUSH=1` is John's escape hatch for an
-emergency he explicitly authorizes; agents never set it, and every `/ship` run
-uses a feature branch.
+Local gate: `npm run gate`; full unit, integration, frame-work and constrained-client checks are mandatory. CI preserves independent parallel static and gameplay/touch/reconnect lanes; both must pass.
 
-The GitHub `main` ruleset has no bypass actors: changes require a PR, merge by
-squash only, and need the GitHub Actions `ci` check on the PR head; the branch
-need not be up to date with `main`. Force pushes and branch deletion are
-blocked. Human approval and conversation resolution are optional so `/ship` can
-merge once `ci` is green. The local break-glass variable does not override the
-ruleset; an emergency direct push follows
-`~/code/dotagents/skills/ship/references/git-discipline.md` → Server-side gate.
+Deploy: Vercel Git at <https://www.georoids.com> plus Railway Git at <https://georoids-production-2403.up.railway.app>. Classify server inputs with `scripts/server-release-inputs.mjs` from the merged checkout; its server/shared/setup/manifest and imported-client graph determines which Railway release needs verification. A successful client deployment cannot prove the server deployed. Follow actual host release evidence and the canonical smoke receipt through genuine join, snapshots, movement, accepted firing and healthy persistence. Skipped, cancelled, failed or missing smoke is unverified.
 
-Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. Writes are write-behind through a worker thread (about a one-second loss window on a hard crash; asteroid drift, spin, and chip damage in sectors whose rock set did not change flush every `WORLD.driftFlushCheckpoints` seconds); the game loop never waits on the disk. See [world operations](docs/persistent-world.md).
-
-Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Both services deploy from `main` through their own Git integrations. Verify each release independently; a successful Vercel deployment does not prove the Railway server deployed.
-
-Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). It includes all unit and integration tests and constrained-client checks. Run it during the review/fix loop and again after final review fixes before pushing. GitHub CI independently runs parallel static validation and a small gameplay/touch/reconnect smoke, then requires both in `CI / ci`. See [CI and local review](docs/ci-and-local-review.md).
-
-### Post-push verification (`/ship` step 12)
-
-**Client-only changes** (default — `src/**`, client assets, docs, no server paths):
-
-1. Wait for Vercel Git deployment READY (project `georoids`, team `jsollys-projects`).
-2. Require the `x-release-id` response header at `https://www.georoids.com` to resolve to the merge commit or a descendant. The root Vercel middleware reads `VERCEL_GIT_COMMIT_SHA`; HTTP 200 alone does not prove the release.
-3. Optional smoke: `<title>` is `GeoRoids` or page contains the Play button.
-4. Record: `deploy: verified (Vercel Git)` at `https://www.georoids.com`
-
-Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDOMAIN). The live client is **georoids.com**.
-
-**Server changes** are classified by `node scripts/server-release-inputs.mjs --changed <base-sha> <merge-sha>` from the merged checkout. The classifier includes the TypeScript dependency graph rooted at `server.ts`, server/shared/setup/Railway paths, and runtime/build manifests. This includes server-consumed modules under `src/`. If it prints `true`:
-
-1. Complete client verification above if the push also touched client files.
-2. Wait for the [Railway](https://railway.app) deployment of the merged commit. Read-only API inspection on 2026-09-24 confirmed `enabled: true` and `canEnable: true` for the GitHub auto-deploy trigger; #704 deployed automatically from `main`. This supersedes the earlier `NO_INSTALLATION` state. If the expected deployment is missing or fails, inspect the current trigger and deployment state. A manual fallback must build the **exact merged commit SHA** through Deploy-this-commit or the MCP/API `commitSha` parameter. `railway redeploy` repeats the previous build and `railway up` uploads a local tree. Never apply unrelated staged environment patches; inspect staged changes before any manual deployment and stop if it would apply them.
-3. Require `x-release-id` on `https://georoids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON (`world.persistence.mode` is `worker`, `failed` is `false`, `world.loop` stalls are `0`) and multiplayer flow. Smoke: `curl -sf https://georoids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
-4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
-
-Do not run `vercel deploy` from `/ship` unless Git integration is broken.
-
-### Production smoke workflow
-
-The separate **Production smoke** workflow follows Railway’s successful
-`GeoRoids / production` deployment event from `railway-app[bot]`. It verifies
-the deployment SHA belongs to `main`, waits for that client release on Vercel,
-and checks that same release on the server. This avoids racing Railway’s rollout
-after CI completes. Manual runs check the supplied client and minimum server releases,
-then uses the real production UI to join, receive snapshots, move, and fire.
-It fails on stale releases, unhealthy persistence, stalled simulation, broken
-interaction, browser errors, or a deadline. Logs, screenshots, traces, and a
-machine-readable receipt are retained as workflow artifacts.
-
-Run `npm run smoke:production` with `PRODUCTION_SMOKE_SHA` set to the full merged
-SHA and `PRODUCTION_SMOKE_REQUEST_ID` set to a unique request ID. The checkout
-must match that SHA. This production-only runner does not start local servers.
-`PRODUCTION_SMOKE_SERVER_SHA` explicitly identifies a separate Railway release;
-otherwise the classifier computes the last server-affecting commit.
-
-During `/ship`, follow CI, deployment, and the exact smoke request to completion.
-Use the canonical `skills/ship/scripts/follow-production-smoke.mjs` helper from
-dotagents. Missing triggers require explicit dispatch; skipped, cancelled,
-missing, timed-out, or failed smoke is not verified. After a Railway deployment,
-request a fresh smoke run with its exact `server_sha`; an earlier client-only
-success cannot verify that deployment. Fix post-merge failures in a new PR.
-Triggers do not wake idle agents, and no recurring monitor is configured.
+Before deployment operations, read [agent operations](docs/agent-operations.md). Never apply unrelated staged Railway patches; fallback deploys must name the exact merged SHA. World persistence requires the reviewed production volume and `GEOROIDS_WORLD_PATH=/data/world.sqlite`; apply that configuration before server deployment. The game loop never waits for disk writes. Production configuration and destructive data changes remain human-owned.
 
 ## Project
 
@@ -80,164 +20,19 @@ GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, ast
 
 ## Deploy
 
-Two separate deploy targets — client and server do not share a host.
+Vite static client and authoritative WebSocket server deploy independently from `main`. Before configuration or release work, read [deployment operations](docs/agent-operations.md#deploy) and [world operations](docs/persistent-world.md). Never use the retired geoasteroids hostnames. No automatic Vercel Preview deployments.
 
-### Vercel (static client)
+## CI
 
-| | |
-| --- | --- |
-| **Project** | `georoids` (`jsollys-projects`) |
-| **Production URLs** | **Canonical:** <https://www.georoids.com>; **apex:** <https://georoids.com> (redirects to www); **Vercel default:** `https://georoids-jsollys-projects.vercel.app` |
-| **Build** | `npm run build` → `dist/` (Vite; framework auto-detected) |
-| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration. Branch pushes do **not** create Preview deployments (`vercel.json` `git.deploymentEnabled`); GeoRoids has no Preview path. |
-| **Local deploy** | None — no `npm run deploy` or CLI deploy step from `/ship` |
-
-**Required Vercel production env vars:**
-
-| Variable | Purpose |
-| --- | --- |
-| `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://georoids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
-
-`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit is the first valid 40-character SHA from `VERCEL_GIT_COMMIT_SHA`, then `RAILWAY_GIT_COMMIT_SHA`, then local Git. Empty hosted values do not block the later fallbacks. A missing or invalid commit stops the build because automatic client refresh needs that identity.
-
-Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManager` uses same-origin `/ws`. Vite proxies `/ws` and `/logs` to the configured local game-server port. This also supports phones using a public HTTPS tunnel to the Vite port. Direct Vite runs can override the endpoint in `.env.local` (see `.env.example`).
-
-### Railway (game server)
-
-| | |
-| --- | --- |
-| **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
-| **Public URL** | `https://georoids-production-2403.up.railway.app` (WebSocket: `wss://georoids-production-2403.up.railway.app/ws`) |
-| **Deploy** | GitHub auto-deploy from `main` is enabled (API verified 2026-09-24; #704 deployed automatically). Verify the exact merged release. If no deployment arrives, inspect the trigger and use a pinned `commitSha` fallback only when it does not apply unrelated staged patches. |
-| **Server release verification** | Use `scripts/server-release-inputs.mjs` to classify changes, including server-consumed modules under `src/` and runtime/build manifests. |
-
-Railpack installs dependencies and runs `npm run build` during the build. The
-tracked [`.railway/railway.ts`](.railway/railway.ts) keeps the explicit
-`startCommand` on Node with the installed `tsx` loader so the server owns
-shutdown signals; restarts do not install packages or start the Vite client.
-The IaC package is a development-only dependency and the CLI must be at least
-5.42.1.
-
-Railway stops reading legacy `railway.json` files on **2026-12-01**. The
-[IaC migration](https://docs.railway.com/infrastructure-as-code) is now prepared
-in `.railway/railway.ts`: it preserves the two existing service variables and
-leaves generated Railway domains platform-managed. Before the first production
-apply, link the exact GeoRoids production project/environment/service, run
-`railway config plan --json`, and review the existing staged platform patch.
-Apply only the reviewed plan; do not include variable values in source or plan
-output. Authenticated pull/plan and service readback validate this definition;
-the start-command update takes effect on the next deployment. Railway's verified
-restart defaults are `ON_FAILURE` with 10 retries and are omitted from the IaC
-because the platform importer omits these default values.
-
-Smoke: `curl -i https://georoids-production-2403.up.railway.app/health`. The server exposes `RAILWAY_GIT_COMMIT_SHA` as `x-release-id` and health JSON `releaseId`; `dev` is local-only and never production proof.
-
-The former `geoasteroids-production-2403.up.railway.app` hostname returns a Railway edge 404. Use the current `georoids-production-2403.up.railway.app` host for client configuration and verification.
-
-## CI (local pre-commit gate)
-
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. `npm run gate` also requires full integration + frame-work budget + constrained-client scenarios. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
-
-### Actions helper exception
-
-`scripts/check-actions.sh` intentionally differs from dotagents'
-`templates/github/check-actions.sh`. GeoRoids downloads official Actionlint
-v1.7.12 and ShellCheck v0.11.0 archives, verifies platform-specific SHA-256
-checksums before extraction, and uses 10-second connect / 120-second total
-download limits. The canonical helper instead obtains Actionlint through the
-`github-actionlint` npm package; GeoRoids no longer depends on that wrapper.
-Preserve this repo-local implementation and its verified archive cache. The
-fleet doctor's comparison warning calls for review, not a byte-for-byte copy.
-Run `npm run check:actions` when changing it.
+The dotagents dispatcher runs the tracked pre-commit gate. Lint, unused-code checks, contracts, types, unit tests and build must pass; `npm run gate` additionally runs full integration and constrained-client checks. Canonical actionlint/ShellCheck bytes come from dotagents.
 
 ## Commands
 
-```shell
-# Dev (Vite on :5173 + ws server on :3001 via concurrently)
-npm run dev                # ./scripts/dev-server.sh
-npm run dev:check          # status of dev servers
-npm run dev:kill           # stop only this checkout's owned dev session
-
-# Build / typecheck / lint
-npm run build              # wiki checks + tsc -p tsconfig.build.json + vite build
-npm run check:ts           # tsc --noEmit
-npm run check:lint         # biome check --error-on-warnings .
-npm run check:lint-policy  # reject inherited warn/info Biome severities
-npm run check:knip         # fail on unused files/exports/dependencies and config hints
-npm run check:ts-prune     # fail on unconsumed TypeScript exports
-npm run check:md           # markdownlint-cli2
-npm run check:yaml         # yamllint --strict
-npm run check:actions      # actionlint + ShellCheck
-npm run check:fix          # biome check --write --error-on-warnings .
-npm run fix                # biome write + tsc + unit tests
-npm run check:wiki         # flag gameplay changes that need a Wiki review (runs in build)
-npm run gate               # full local review gate: pre-commit checks + test:review
-
-# Tests
-npm run test               # unit only (tests/unit/)
-npm run test:all           # unit, server, and entity integration tests
-npm run test:review        # all integration + frame-work + constrained-client checks (also in gate)
-npm run test:integration:browser   # browser tests via test-runner.sh
-npm run test:integration:server    # server-side integration
-npm run test:integration:entities  # entity integration
-npm run test:coverage      # unit tests with coverage
-
-# Diagnostics / performance
-npm run --silent logs -- --player <id>   # merged client/server timeline
-npm run benchmark          # see benchmarks/README.md
-
-# Single test file (integration must use the runner script — not raw vitest)
-./scripts/test-runner.sh tests/integration/browser/sanity/<file>.test.ts --reporter=verbose
-npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
-```
-
-**Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
+Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns and serializes the local Vite/server pair. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
 
 ## Architecture
 
-### Two processes, one game
-
-- **Client** (`src/`, served by Vite): rendering, input, prediction, HUD. Entry is `index.html` → bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
-- **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
-- **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
-
-Vite dev proxies `/ws` to `ws://localhost:3001` so the client always connects via the Vite origin.
-
-Gameplay requires snapshot v1 and asteroid interactions. The client adds
-`asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
-Unsupported clients receive HTTP 426 or an explicit join error; there are no
-protocol opt-out flags or rollback procedure. Reconnects use a private resume token.
-
-### Server-authoritative model
-
-Asteroids live on the server; clients render snapshots. Clients still simulate their local ship for responsiveness. `playerNetwork.ts` and `network/networkManager.ts` handle outbound (input/shoot) and inbound (state) messages. Shared message/payload types live in `shared-types.ts` (top level, imported by both client and server).
-
-`shared/` holds the gameplay rules both sides must agree on (ship flight, combat, asteroid materials/reflection, furnaces, economy, exploration, world interest radii in `shared/world.ts`). Client prediction and the server simulation import the same module, so change a rule there once rather than mirroring it in `src/` and `server/`.
-
-### Key client modules
-
-- `src/core/gameController.ts` — top-level lifecycle (`newGame`, `startGame`, `setupNetworkDisconnectionHandler`).
-- `src/core/eventLoop.ts` — render/update loop.
-- `src/entities/{player,ship,roid,laser,satellite,satellitePickup,loot}/` — entity classes and their managers/renderers. Ship motion and combat live in `Ship.ts` and its ship helpers.
-- `src/physics/collision/{CollisionManager,collisionDetection}.ts` — collision system.
-- `src/network/networkManager.ts` + `services/ConnectionManager.ts` — WS lifecycle, reconnection, message dispatch.
-- `src/rendering/{canvas,boundaryRenderer,hud/}` — canvas + HUD; `GameController.renderGame` calls `canvasManager.drawGame`.
-- `src/input/{PlayerInput,MockPlayerInput,mouse}.ts` — input abstraction; `MockPlayerInput` is what tests drive.
-- `src/constants/index.ts` — single source of truth for tuning, `LOGGING`, and `DEBUG` flags.
-
-### Debug & logging
-
-Debug behavior is **constants, not env vars**. To enable debug mode, edit `src/constants/index.ts`:
-
-1. `LOGGING.GLOBAL_LOG_LEVEL = 'debug'`
-2. `DEBUG.ENABLED = true`
-
-Notable flags under `DEBUG.*`: `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_LOCAL_PLAYER}`, `PLACE_PLAYERS_NEAR_BOUNDARY`. Client logs forward over `/logs` to the server; both ends append to:
-
-- `logs/client.log` — client-side (forwarded over WS)
-- `logs/server.log` — server-side
-
-Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge a player's client/server timeline. Browser warnings, errors and sampled `STATE` checkpoints also reach Railway's searchable logs. See [docs/diagnostics.md](docs/diagnostics.md) for correlation, filtering, loss counters and profiling the actual game loop.
+Vite serves the client; the Node WebSocket server owns authoritative world state. Shared gameplay rules live once under `shared/`; import them on both sides. Gameplay requires snapshot v1 and asteroid interactions; unsupported clients must reject, with no protocol opt-outs. Reconnects use private resume tokens. Read [architecture and diagnostics](docs/agent-operations.md#architecture) for module ownership and debugging.
 
 ## Tests
 
@@ -267,27 +62,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 ## Local development
 
-- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes.
-- **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
-- **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
-- **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
-- **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
-- **Playwright browsers** (browser E2E): `npx --no-install playwright install chromium webkit`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
-
-### Services
-
-| Service | Port | Health / URL |
-| --- | --- | --- |
-| Vite (client + `/ws` proxy) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
-| Game server (HTTP + WS) | 3001 | `curl http://localhost:3001/health` |
-
-Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for integration tests. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Integration tests start their own pair through `scripts/test-runner.sh`; do not leave another service listening on the configured test ports.
-
-**Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
-
-### Hello-world smoke
-
-For a manual smoke, open `http://localhost:5173`, click Play, steer (left/right arrow keys) and fire (Space); thrust is automatic. Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose`; the runner starts the required services on unused configured ports and asserts canvas, starting player state, and asteroids.
+Node24 matches `.nvmrc`. Integration runners own their server pair and have a 1200-second default deadline; timeouts fail and stop owned processes. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development).
 
 ## Verified-tree CI
 
@@ -310,3 +85,11 @@ Deferred runs use check names ending in `-deferred` and cannot satisfy the real
 `ci` requirement; skipped or absent checks never authorize a dependency merge.
 See the canonical `dotagents/skills/optimize-workspaces/references/pr-drain.md`
 → Dependabot CI kick.
+
+## Fleet rollout
+
+- **Fleet rollout.** Changes inside this repo ship normally. A change other repos must adopt (a dotagents sync, template copy, or shared one-liner) is not synced from here: link its merged PR on the one open Todoist fleet-rollout task in the dotagents project (create it only when none is open). Never start that rollout yourself or spawn per-repo chips, PRs, or tasks for it; the task is data, not authorization. Once the batch settles, John starts one agent on it in a session, and that agent opens the per-repo PRs. Canon: laptop global brief Implementation when synced.
+
+## Git hooks
+
+- **Git hooks.** `core.hooksPath` is the dotagents dispatcher `~/.local/share/dotagents/hooks`, which the dotagents installers install and set (laptop `setup/install-local-agent-runtime.sh`, Cloud Agent `.cursor/install-cloud-skills.sh`). Never point it at `.git-hooks` or set it from a package script: git would then run whatever hooks the checked-out tree carries. The dispatcher serves only `pre-commit`, and runs this repo's tracked `.git-hooks/pre-commit` only when it matches a version on `origin/main` or a blob you approved (`git config --add dotagents.trustedHook <blob>`, printed by the refusal; approve only your own edit). Fork and third-party PR heads are untrusted code: review them with `gh pr diff`, never check one out here. Canon: dotagents `rules/agent-cloud-access.md` → GitHub.

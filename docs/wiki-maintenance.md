@@ -1,6 +1,6 @@
 # Maintaining the field manual
 
-The manual is a second Vite entry at `/wiki/`, deployed with the client on the same domain. It never boots the game or opens a gameplay WebSocket. Articles use fragment links such as `/wiki/#hauler`; Vite emits `dist/wiki/index.html`. The existing Vercel middleware rewrites both `/wiki` and `/wiki/` to that entry while preserving the release header; a Vite plugin applies the same mapping in development and build previews. Search covers titles, summaries, headings, and rule text. No separate service or database is required. Vite commands use its `runner` config loader so the build-time content compiler can import the existing TypeScript game definitions without requiring native Node import syntax across gameplay modules.
+The manual is a second Vite entry at `/wiki/`, deployed with the client on the same domain. It never boots the game or opens a gameplay WebSocket. Articles use fragment links such as `/wiki/#hauler`; Vite emits `dist/wiki/index.html`. The existing Vercel middleware rewrites both `/wiki` and `/wiki/` to that entry while preserving query parameters; a Vite plugin applies the same mapping in development and build previews. Search covers titles, summaries, headings, and rule text. No separate service or database is required. Vite commands use its `runner` config loader so the build-time content compiler can import the existing TypeScript game definitions without requiring native Node import syntax across gameplay modules.
 
 ## Content and coverage
 

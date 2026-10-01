@@ -252,7 +252,7 @@ Server or protocol work follows the measurements, with client and server changes
 
 Run the focused canvas/input/protocol tests appropriate to each implementation, then the repository gate. Integration and browser scenarios must use the repository runner. Include simultaneous steering/fire, scan/tow feedback, rotation, death/respawn, background recovery, and two-player reconnect. Visual checks must cover low-quality rendering as well as the normal tier.
 
-Ship through the branch, PR, and CI-gated merge flow. Client changes use Vercel Git deployment. Server changes require the separate Railway deployment and must preserve unrelated staged configuration. Verify release ancestry through both relevant `x-release-id` headers, then run two-player and reconnect smoke before repeating mobile acceptance. An HTTP 200 response alone does not prove a performance change reached production.
+Ship through the branch, PR, and CI-gated merge flow. Client changes use Vercel Git deployment. Server changes require the separate Railway deployment and must preserve unrelated staged configuration. Verify the actual Vercel and Railway deployment releases plus the server health/admission identity, then run two-player and reconnect smoke before repeating mobile acceptance. An HTTP 200 response alone does not prove a performance change reached production.
 
 The companion [measurement runbook](performance/mobile-measurement-runbook.md) specifies executable repository checks, device evidence, and the experiment record. Existing [performance strategy](performance-and-testing-strategy.md) and [benchmark guide](../benchmarks/README.md) remain the references for broader capacity and harness semantics.
 

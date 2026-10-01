@@ -1,13 +1,13 @@
 {
-  "note": "Reviewed only the changed GameEngine, MessageHandler and explicitly cited crew-delivery scenario sources: opt-in local test combat observations and zero-cargo delivery fixtures leave gameplay, controls, shared rewards and demonstrations unchanged. Read the eleven GameEngine-linked Wiki topics plus controls and teamwork; existing rules remain accurate. Desktop/mobile field-manual browser check passed (one scenario,4.13s), and five desktop/touch crew browser scenarios passed17.12s with identified hits and exact delivery rewards. Only these three hashes are accepted; unrelated hashes unchanged.",
+  "note": "Reviewed smoke CLI ownership and bounded independent-host readiness. Client manifest and fresh executed bundle must match the full expected SHA before authoritative gameplay checks. The 31 smoke/server contracts, types, Knip and affected lint passed; actual production bundle identity was verified at desktop/mobile widths. The full earlier gate passed 210 integration scenarios and frame/constrained-client checks. Only deployment scripts changed since that review; wiki routes, mechanics, source references and GIF generators/assets are unchanged.",
   "hashes": {
-    "docs/diagnostics.md": "sha256:cab77b687add48e4fc525165f3df487c6315d4b9d53b09763f41e5a32d7cbf83",
+    "docs/diagnostics.md": "sha256:b4f5c0dec434b9655e340bfc47d3686ace1fb51bd909f745a0c92418ee2e833f",
     "docs/protocol/snapshot-v1.md": "sha256:5dce0d4d4fa17b41d2498664a40f6719d53b4d169b91cfe670d71d0a6aa56394",
     "docs/sounds.md": "sha256:a35715e58266ec6919f54784c484038fb042bc086d7902b7f0e2f6d9297a1b69",
     "index.css": "sha256:266f8e48116cf1dd6940e73d06fe52fee0f095df144feab67c90c99c4cb6eb4e",
     "index.html": "sha256:45c944e4f6bbe66762fa78af529253fb536a1cc72d0bce64e9823c50902bb56f",
-    "middleware.ts": "sha256:0acf90e66e33c6369a952e09cc281f79b1a0b8239b9c7a0a07f266487dbf08da",
-    "package.json": "sha256:e830cd4197c50dc0a5543e30d36f4873219953ea1ea895a7b18acbad48765df2",
+    "middleware.ts": "sha256:b1804785a737be08e3410c647ce88f86b06da2de7161e0af4277ab07830ce4ee",
+    "package.json": "sha256:56e2e6baaa9120c83a07eb4109aed6a5d8260d5ea05e2e977021a0de3fb50a74",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -466,7 +466,7 @@
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:c3774ad7d079936e6ea267c640ca05f1e98b9e14b88465bf35d13a72f272ee37",
     "tests/unit/ui/universeMap.test.ts": "sha256:d80a9d3ce675b8c722e8d37f6c228fa9a8962d4cb4102a59b1faaf60ab968f96",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
-    "vite.config.ts": "sha256:9607cbba4a39e40f1de822510277eb6d6b1d2e9b23937c37b206af5e9e95ee18",
+    "vite.config.ts": "sha256:d1a40d182d7b180a42b2bc2e21fcdbed06f4548f0102067644ab520e161c5add",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"
   }
 }

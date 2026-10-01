@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { tsImport } from 'tsx/esm/api';
+import { verifyResponse } from './production-smoke.mjs';
+import { verifyAncestry as verifyServerAncestry } from './production-smoke-release.mjs';
 import { minimumServerRelease } from './server-release-inputs.mjs';
 
 export const productionUrl = 'https://www.georoids.com/';
@@ -20,18 +23,67 @@ async function waitForEvidence(predicate, description) {
   }
 }
 
-export async function smoke({
+export async function waitForClientRelease({
   page,
   expectedSha,
-  expectedServerSha,
-  verifyRelease,
-  artifacts,
-  verifyAncestry,
+  verifyHttp,
+  readinessMs = 120000,
+  pollMs = 5000,
 }) {
+  assert.match(expectedSha ?? '', /^[0-9a-f]{40}$/u, 'Full client release SHA is required');
+  const deadline = Date.now() + readinessMs;
+  for (;;) {
+    try {
+      const manifestResponse = await verifyHttp(new URL('/release.json', productionUrl).href);
+      const manifest = await manifestResponse.json();
+      assert.ok(
+        manifest && typeof manifest === 'object' && !Array.isArray(manifest),
+        'Invalid client release manifest'
+      );
+      assert.equal(manifest.releaseSha, expectedSha, 'Published client manifest is stale');
+      const timeout = Math.max(1, Math.min(15000, deadline - Date.now()));
+      const response = await page.goto(productionUrl, { waitUntil: 'domcontentloaded', timeout });
+      assert.ok(response, 'Client navigation returned no document');
+      verifyResponse({ url: response.url(), status: response.status() }, productionUrl);
+      await page.waitForFunction(
+        () => Boolean(document.documentElement.dataset['clientRelease']),
+        undefined,
+        { timeout }
+      );
+      const loadedClient = await page.locator('html').getAttribute('data-client-release');
+      assert.equal(loadedClient, expectedSha, 'Loaded client bundle is stale');
+      return;
+    } catch (error) {
+      if (Date.now() >= deadline) {
+        throw new Error(`Client release readiness deadline: ${error}`, { cause: error });
+      }
+      await delay(Math.min(pollMs, deadline - Date.now()));
+    }
+  }
+}
+
+export async function smoke({
+  page,
+  expectedSha = process.env.PRODUCTION_SMOKE_RELEASE_SHA,
+  expectedServerSha = process.env.PRODUCTION_SMOKE_SERVER_SHA,
+  verifyHttp,
+  artifacts,
+  verifyAncestry = verifyServerAncestry,
+  clientReadinessMs = 120000,
+  clientPollMs = 5000,
+}) {
+  await waitForClientRelease({
+    page,
+    expectedSha,
+    verifyHttp,
+    readinessMs: clientReadinessMs,
+    pollMs: clientPollMs,
+  });
   const minimum = expectedServerSha || minimumServerRelease(expectedSha);
   const checkHealth = async () => {
-    const response = await verifyRelease(healthUrl, minimum);
+    const response = await verifyHttp(healthUrl);
     const health = await response.json();
+    verifyAncestry(minimum, health.releaseId);
     assert.equal(health.world?.persistence?.mode, 'worker', 'Persistent world worker is required');
     assert.equal(health.world?.persistence?.failed, false, 'Persistent world worker failed');
     assert.equal(health.world?.loop?.stalls, 0, 'Game loop has stalled');

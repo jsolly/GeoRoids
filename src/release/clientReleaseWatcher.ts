@@ -3,9 +3,8 @@ import { logger } from '../utils/Logger';
 /** Only the same-origin Vercel client identity controls page refreshes. */
 export const CLIENT_RELEASE_POLL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 8000;
-const RELOAD_GUARD_KEY = 'georoids:client-release-refresh';
-const BUILD_RELEASE_PATTERN = /^[a-f0-9]{7,40}$/iu;
-const PUBLISHED_RELEASE_PATTERN = /^[a-f0-9]{40}$/u;
+const RELOAD_GUARD_PREFIX = 'georoids:client-release-refresh';
+const BUILD_RELEASE_PATTERN = /^[a-f0-9]{40}$/iu;
 
 export interface ClientReleaseEnvironment {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
@@ -14,7 +13,7 @@ export interface ClientReleaseEnvironment {
   reload: () => void;
 }
 
-/** Vite embeds an abbreviated Git SHA; deployment headers contain the full SHA.
+/** The bundle and same-origin static manifest carry the same full Git SHA.
  * Confirm a change twice, then permit one reload per loaded bundle in this tab.
  * If propagation serves that old bundle again, its persisted guard prevents a
  * loop. A successfully loaded newer bundle gets its own future refresh attempt.
@@ -52,8 +51,8 @@ export function watchClientRelease(
     pending = controller;
     requestTimeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await environment.fetch('/', {
-        method: 'HEAD',
+      const response = await environment.fetch('/release.json', {
+        method: 'GET',
         cache: 'no-store',
         redirect: 'error',
         credentials: 'same-origin',
@@ -66,27 +65,31 @@ export function watchClientRelease(
         candidate = undefined;
         return;
       }
-      const published = response.headers.get('x-release-id')?.toLowerCase();
-      if (
-        !response.ok ||
-        response.redirected ||
-        !published ||
-        !PUBLISHED_RELEASE_PATTERN.test(published)
-      ) {
-        candidate = undefined;
-        const reason = !response.ok
-          ? `status=${response.status}`
-          : response.redirected
-            ? 'redirected=true'
-            : !published
-              ? 'release-header=missing'
-              : 'release-header=invalid';
-        throw new Error(`Invalid release response (${reason})`);
+      if (!response.ok || response.redirected) {
+        throw new Error(
+          `Invalid release response (${!response.ok ? `status=${response.status}` : 'redirected=true'})`
+        );
       }
+      const payload: unknown = await response.json();
+      if (stopped || controller.signal.aborted) {
+        candidate = undefined;
+        return;
+      }
+      if (
+        typeof payload !== 'object' ||
+        payload === null ||
+        Array.isArray(payload) ||
+        !('releaseSha' in payload) ||
+        typeof payload.releaseSha !== 'string' ||
+        !BUILD_RELEASE_PATTERN.test(payload.releaseSha)
+      ) {
+        throw new Error('Invalid release manifest');
+      }
+      const published = payload.releaseSha.toLowerCase();
       failureReported = false;
       // The first same-build response is the normal baseline. A page already
       // stale on load may also refresh, after two matching full-SHA responses.
-      if (published.startsWith(build)) {
+      if (published === build) {
         candidate = undefined;
         return;
       }
@@ -95,19 +98,13 @@ export function watchClientRelease(
         return;
       }
       // Fail closed if tab storage is unavailable: a reload without a durable
-      // guard could loop indefinitely on an old cached bundle/new edge header.
-      const previous = environment.storage.getItem(RELOAD_GUARD_KEY);
-      if (previous) {
-        try {
-          if ((JSON.parse(previous) as { build?: unknown }).build === build) {
-            stop();
-            return;
-          }
-        } catch {
-          // An invalid old marker is replaced below before any reload.
-        }
+      // guard could loop indefinitely on an old cached bundle/new manifest.
+      const guardKey = `${RELOAD_GUARD_PREFIX}:${build}`;
+      if (environment.storage.getItem(guardKey) !== null) {
+        stop();
+        return;
       }
-      environment.storage.setItem(RELOAD_GUARD_KEY, JSON.stringify({ build, target: published }));
+      environment.storage.setItem(guardKey, published);
       stop();
       environment.reload();
     } catch (cause) {

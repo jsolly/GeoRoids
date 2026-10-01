@@ -79,7 +79,7 @@ and a tested admission reserve are still unmeasured.
 
 Use the repository's branch/PR/CI-gated merge path for client delivery. These
 server changes also require a separate Railway deploy. Before acceptance, verify
-both `x-release-id` headers, current health, two real players, and reconnect.
+actual host deployment releases, the client's static release manifest, current server health JSON, two real players, and reconnect.
 Deploy the merged commit using Railway's active configuration, preserving the
 unrelated staged operation. Keep one
 authoritative process per world; replicas need room and reconnect routing before

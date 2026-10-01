@@ -126,7 +126,7 @@ for the query syntax, platform limits and plan-specific retention.
 
 Vercel hosts the static client. Its build and runtime logs help diagnose builds,
 delivery and middleware; browser JavaScript state reaches the game server
-through the forwarding pipeline above. Check the client's `x-release-id` header
+through the forwarding pipeline above. Check the client's static `release.json` identity
 and the server's `/health` release ID before comparing deployments. See
 [Vercel logs](https://vercel.com/docs/logs) for the distinction between build and
 runtime evidence.

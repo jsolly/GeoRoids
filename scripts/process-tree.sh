@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 
 # Shared process inspection, ownership, and cleanup primitives for repository
 # scripts. Callers retain their own session metadata and port policies; this

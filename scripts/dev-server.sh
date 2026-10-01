@@ -4,6 +4,7 @@
 # The session record is keyed by the absolute repository path. We never search
 # for or signal arbitrary `vite`, `tsx`, or port-owning processes: a developer
 # may have another checkout or application running at the same time.
+((BASH_VERSINFO[0] >= 5)) || { echo "✗ $0 requires Bash >= 5, not $BASH_VERSION. Fix: brew install bash; rerun bash ~/code/dotagents/setup/install-local-agent-runtime.sh; open a new shell." >&2; exit 1; }
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

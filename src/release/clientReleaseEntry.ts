@@ -2,10 +2,12 @@ import { watchClientRelease } from './clientReleaseWatcher';
 
 // Independent of the match loop: open menus and background game tabs refresh too.
 if (import.meta.env.PROD) {
+  // Smoke observes the identity embedded in the executed bundle, separately from its manifest.
+  document.documentElement.dataset['clientRelease'] = import.meta.env['VITE_COMMIT_SHA'];
   let stop: () => void = () => undefined;
   const start = () => {
     stop();
-    stop = watchClientRelease(import.meta.env['VITE_COMMIT_HASH'], {
+    stop = watchClientRelease(import.meta.env['VITE_COMMIT_SHA'], {
       fetch: (input, init) => window.fetch(input, init),
       storage: {
         getItem: (key) => window.sessionStorage.getItem(key),

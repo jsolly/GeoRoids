@@ -1,6 +1,8 @@
 // @vitest-environment node
 import assert from 'node:assert/strict';
-import type { Page } from 'playwright';
+import { appendFileSync } from 'node:fs';
+import { join as joinPath } from 'node:path';
+import type { ConsoleMessage, Page, Request, Response } from 'playwright';
 import { expect, test } from 'vitest';
 import { SHIP } from '../../../../src/constants';
 import { installAudioProbe, readSampleDuration } from '../../utils/audio-probe';
@@ -218,30 +220,131 @@ test(
   async () => {
     const page = browserManager.getCurrentPage();
     assert.ok(page);
-    await page.goto(TestConfig.GAME_URL);
-    const energies = await page.evaluate(async () => {
-      const bytes = await (await fetch('/sounds/laser.m4a')).arrayBuffer();
-      const results: number[][] = [];
-      for (const x of [-2, 2]) {
-        const context = new OfflineAudioContext(2, 48000, 48000);
-        const source = context.createBufferSource();
-        source.buffer = await context.decodeAudioData(bytes.slice(0));
-        const pan = context.createPanner();
-        pan.panningModel = 'HRTF';
-        pan.rolloffFactor = 0;
-        pan.positionX.value = x;
-        pan.positionZ.value = -1;
-        source.connect(pan).connect(context.destination);
-        source.start(0.1);
-        const rendered = await context.startRendering();
-        results.push(
-          [0, 1].map((channel) =>
-            rendered.getChannelData(channel).reduce((sum, value) => sum + value * value, 0)
-          )
-        );
+    const receiptPath = joinPath(
+      screenshotManager.getScreenshotsDir(),
+      `native-hrtf-stages-${Date.now()}.jsonl`
+    );
+    const started = performance.now();
+    const record = (stage: string, details: Record<string, unknown> = {}) => {
+      appendFileSync(
+        receiptPath,
+        `${JSON.stringify({ stage, elapsedMs: performance.now() - started, ...details })}\n`
+      );
+    };
+    const prefix = 'georoids-native-hrtf:';
+    const onConsole = (message: ConsoleMessage) => {
+      const text = message.text();
+      if (text.startsWith(prefix)) {
+        record('browser-stage', { message: text.slice(prefix.length) });
       }
-      return results;
-    });
+    };
+    const isLaser = (request: Request) => new URL(request.url()).pathname === '/sounds/laser.m4a';
+    const onRequest = (request: Request) => {
+      if (isLaser(request)) {
+        record('laser-request');
+      }
+    };
+    const onResponse = (response: Response) => {
+      if (isLaser(response.request())) {
+        record('laser-response', { status: response.status() });
+      }
+    };
+    const onFinished = (request: Request) => {
+      if (isLaser(request)) {
+        record('laser-request-finished');
+      }
+    };
+    const onFailed = (request: Request) => {
+      if (isLaser(request)) {
+        record('laser-request-failed', { failure: request.failure() });
+      }
+    };
+    page.on('console', onConsole);
+    page.on('request', onRequest);
+    page.on('response', onResponse);
+    page.on('requestfinished', onFinished);
+    page.on('requestfailed', onFailed);
+    let energies: number[][];
+    try {
+      record('goto-start', { browser: page.context().browser()?.version() });
+      await page.goto(TestConfig.GAME_URL);
+      record('goto-complete');
+      energies = await page.evaluate(async (stagePrefix) => {
+        const recordStage = (stage: string, details: Record<string, unknown> = {}) => {
+          console.info(
+            `${stagePrefix}${JSON.stringify({ stage, at: performance.now(), ...details })}`
+          );
+        };
+        let currentStage = 'fetch';
+        const timer = setTimeout(
+          () => recordStage('pending-at-45-seconds', { currentStage }),
+          45000
+        );
+        try {
+          recordStage('fetch-start');
+          const response = await fetch('/sounds/laser.m4a');
+          recordStage('fetch-complete', { status: response.status });
+          currentStage = 'array-buffer';
+          recordStage('array-buffer-start');
+          const bytes = await response.arrayBuffer();
+          recordStage('array-buffer-complete', { byteLength: bytes.byteLength });
+          const results: number[][] = [];
+          for (const x of [-2, 2]) {
+            const context = new OfflineAudioContext(2, 48000, 48000);
+            const contextDetails = () => ({
+              x,
+              state: context.state,
+              currentTime: context.currentTime,
+              sampleRate: context.sampleRate,
+            });
+            context.onstatechange = () => recordStage('context-state-change', contextDetails());
+            context.oncomplete = () => recordStage('context-complete', contextDetails());
+            const source = context.createBufferSource();
+            currentStage = `decode-${x}`;
+            recordStage('decode-start', contextDetails());
+            source.buffer = await context.decodeAudioData(bytes.slice(0));
+            recordStage('decode-complete', {
+              ...contextDetails(),
+              duration: source.buffer.duration,
+              channels: source.buffer.numberOfChannels,
+            });
+            const pan = context.createPanner();
+            pan.panningModel = 'HRTF';
+            pan.rolloffFactor = 0;
+            pan.positionX.value = x;
+            pan.positionZ.value = -1;
+            source.connect(pan).connect(context.destination);
+            source.start(0.1);
+            currentStage = `render-${x}`;
+            recordStage('render-start', contextDetails());
+            const rendered = await context.startRendering();
+            recordStage('render-complete', contextDetails());
+            results.push(
+              [0, 1].map((channel) =>
+                rendered.getChannelData(channel).reduce((sum, value) => sum + value * value, 0)
+              )
+            );
+          }
+          recordStage('energies-complete', { results });
+          return results;
+        } finally {
+          clearTimeout(timer);
+        }
+      }, prefix);
+      record('evaluate-complete');
+    } catch (error) {
+      record('scenario-failed', {
+        error:
+          error instanceof Error ? { name: error.name, message: error.message } : String(error),
+      });
+      throw error;
+    } finally {
+      page.off('console', onConsole);
+      page.off('request', onRequest);
+      page.off('response', onResponse);
+      page.off('requestfinished', onFinished);
+      page.off('requestfailed', onFailed);
+    }
     const left = energies[0];
     const right = energies[1];
     assert.ok(left?.[0] && left[1] && right?.[0] && right[1]);

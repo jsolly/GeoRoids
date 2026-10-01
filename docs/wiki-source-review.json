@@ -339,7 +339,7 @@
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts": "sha256:f223b1792c6bf3d04c0dc134f611c3bea922ae31e5ebde3de8f47ad6d91509d5",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:e7991b7ee2d912845f2f47bf24f3179eec2cad4cb72dd7674f2620c2ac8694ba",
     "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:9086f92863879f8fc8bb761e7cc5c4049b4621e103a05ea5d320c8a30d55f9b4",
-    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:ee5a2cb07e7791f7ddb58f940d0dffd8575ece32cd5b794004a9af55d3bd5476",
+    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:7a4754427c3575e7055363f52f67c7777fb3eb7010c96faf85ee1261a73fa780",
     "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts": "sha256:8850fe0f4da3e4a34a8ceabf5fcb9635ca80ad53c218e5a730ee7b4c91d0534f",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:80f0990a793ed71da543f5d93b6898b623e358aad37910604120cc4f8efe8950",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:fef2684b46c2f5c6727f3bca8ba446c312bd6d1376f8904cac9963713c02d0e8",
@@ -479,6 +479,15 @@
         "package.json": "field-manual",
         "scripts/wiki-check.ts": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed native directional-audio evidence instrumentation. The shipped laser, HRTF positions, stereo energy assertions, controls, behavior and demonstrations remain unchanged; only immediate retained stage diagnostics were added. Focused desktop scenario file passed all three cases. The original timeout cause remains unproven.",
+      "sources": [
+        "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

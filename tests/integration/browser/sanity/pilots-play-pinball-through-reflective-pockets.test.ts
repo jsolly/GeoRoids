@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { writeFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import type { AuthoritativeProjectileField } from '../../../../src/entities/laser/AuthoritativeProjectileField';

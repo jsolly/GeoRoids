@@ -11,6 +11,8 @@ export async function installAudioProbe(
       localStorage.setItem('soundOn', String(soundEnabled));
       localStorage.setItem('musicOn', String(musicEnabled));
       const events: Array<{
+        sourceId: number;
+        at: number;
         duration: number;
         rate: number;
         loop: boolean;
@@ -375,6 +377,8 @@ export async function installAudioProbe(
           buffers.set(this.buffer, ++nextBufferId);
         }
         const event: (typeof events)[number] = {
+          sourceId: sourceIds.get(this) ?? 0,
+          at: performance.now(),
           bufferId: this.buffer ? (buffers.get(this.buffer) ?? 0) : 0,
           contextId: contextIds.get(this.context) ?? 0,
           duration: this.buffer?.duration ?? 0,

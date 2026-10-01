@@ -641,6 +641,20 @@ assert_process_inspection_failure_is_not_success() {
     assert_lock_released
 }
 
+assert_native_cache_rejected() {
+    local output_file="$TEMP_DIR/native-cache-rejected.txt"
+    local exit_code
+    if "$RUNNER" "$@" > "$output_file" 2>&1; then exit_code=0; else exit_code=$?; fi
+    [ "$exit_code" -eq 64 ] || fail "native cache option was not rejected early"
+    grep -Fq "Native compile-cache options require --discovery-node" "$output_file" || fail "native cache rejection did not identify its boundary"
+    if grep -Fq "Checking that test ports" "$output_file"; then fail "native cache rejection reached startup"; fi
+    assert_lock_released
+}
+assert_native_cache_rejected --native-compile-cache=cold
+assert_native_cache_rejected --shards=6 --native-compile-cache=disabled
+assert_native_cache_rejected --discover-integration --native-compile-cache=cold
+assert_native_cache_rejected --discovery-node --native-compile-cache=unknown
+
 assert_rejected "config-equals" --config=alternate.config.ts
 assert_rejected "config-short" -c alternate.config.ts
 assert_rejected "config-short-attached" -c=alternate.config.ts
@@ -653,6 +667,7 @@ assert_rejected "file-parallelism" --fileParallelism=true
 assert_rejected "no-file-parallelism" --no-file-parallelism
 assert_rejected "sequence" --sequence.concurrent=true
 assert_rejected "sequence-shuffle" --sequence.shuffle=true
+assert_rejected "partial-shard" --shard=1/6
 assert_invalid_duration_rejected
 assert_invalid_build_rejected
 assert_occupied_port_rejected

@@ -103,6 +103,9 @@ export default defineConfig(() => {
   // Do not define it here — vite `define` overrides env and breaks production builds.
 
   return {
+    ...(process.env['GEOROIDS_TEST_SESSION_DIR']
+      ? { cacheDir: `${process.env['GEOROIDS_TEST_SESSION_DIR']}/cache/vite` }
+      : {}),
     plugins: [
       wikiContentPlugin(),
       publishClientRelease(commitHash.toLowerCase()),

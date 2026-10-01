@@ -1,3 +1,4 @@
+// @vitest-environment node
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 import { TOWN_HEARTH } from '../../../../shared/furnaces';

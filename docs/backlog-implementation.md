@@ -16,10 +16,10 @@ only after fresh evidence covers the PR's acceptance criteria.
 | PR | Work and required proof | Status | Todoist IDs |
 | --- | --- | --- | --- |
 | 1 | Reconcile verified completions and engineering decisions. Keep relative imports, no barrels and Canvas2D; verify existing regeneration and survey sharing. Distinguish historical performance from physical-phone proof. | Shipped [#737](https://github.com/jsolly/GeoRoids/pull/737) | Alias `6hcHJJpqRp2MmcMv`; GPU `6hcHJJxRJgM4GwWM`; regeneration `6hfGfxp2c6wf2gmM`; survey `6hfFGqgFPxC28f9v`; archived work `6hRVg8qpghM6Qv22` |
-| 2 | Fix fixture determinism and retain actionable failure evidence for #715 and #716. Prove failures expose the cause without retries or weaker assertions. | Shipped [#738](https://github.com/jsolly/GeoRoids/pull/738), `e0ef52be` | Triage `6hfFQfq4PP367Vxv`; harness parent `6hfFQcvww7gHj4Mv`; human schedule `6hf8pMC4JVjgvgQv` |
-| 3 | Fix WebKit audio and obtain cross-architecture proof for #714 and #717. Run 20 focused repetitions and three full suites on native ARM and x64. | Instrumentation [#740](https://github.com/jsolly/GeoRoids/pull/740), furnace fixture [#741](https://github.com/jsolly/GeoRoids/pull/741) and native audio ownership [#742](https://github.com/jsolly/GeoRoids/pull/742) shipped; native acceptance remains open | Same triage, harness parent and human schedule as PR 2 |
+| 2 | Fix fixture determinism and retain actionable failure evidence for #715 and #716. Prove failures expose the cause without retries or weaker assertions. | Shipped [#738](https://github.com/jsolly/GeoRoids/pull/738), `e0ef52be`; historical investigation criteria remain open | Triage `6hfFQfq4PP367Vxv`; furnace `6hg2qp9VMh6vjr9M`; crawler `6hg2qpCc5VMq6hMv`; harness parent `6hfFQcvww7gHj4Mv`; human schedule `6hf8pMC4JVjgvgQv` |
+| 3 | Fix WebKit audio and obtain cross-architecture proof for #714 and #717. Run 20 focused repetitions and three full suites on native ARM and x64. | Shipped [#740](https://github.com/jsolly/GeoRoids/pull/740)–[#743](https://github.com/jsolly/GeoRoids/pull/743); native 20+3 sample passed on both architectures at `38b79c1a`; historical criteria remain open | Audio `6hg2qp9cFGqMMCFM`; umbrella `6hg2qp7XVWfCCQGv`; same triage, harness parent and human schedule as PR 2 |
 | 4 | Prove authoritative firing in production. A correlated non-null `shotAcknowledged` is sufficient even if a collision consumes the bolt before a snapshot. Reject missing, null, wrong or stale acknowledgements; malformed snapshots still fail. | Shipped [#739](https://github.com/jsolly/GeoRoids/pull/739) | Projectile `6hfP8334Q638373M` |
-| 5 | Run six isolated integration shards three times, each run under 300 seconds. Preserve isolation and failure evidence. | Planned | Shards `6hcHJM3WrR7Hh9CM` |
+| 5 | Run six isolated integration shards three times, each run under 600 seconds; retain 300 seconds as a future performance target. Preserve isolation and failure evidence. | Three full runs passed under 600s; review and shipping pending | Shards `6hcHJM3WrR7Hh9CM` |
 | 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | Planned | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
 | 7 | Audit targeted dependency injection and indexes. Use measured ownership and query needs to choose changes. | Planned | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
 | 8 | Improve furnace travel and delivery feedback, including pinching, drop-off and shortage feedback. | Planned | Pinch `6hfFVMfQvxvm7JHv`; drop-off `6hfG7J5m99CC75mM`; shortage `6hfGfjj459h5v7Wv` |
@@ -449,3 +449,177 @@ attempt passed all 23 cases across six files in 84.43 seconds, with exact
 coverage verified by the strict report reader. This dirty-tree run does not
 establish native repeatability. A complete gate, final review and clean native
 architecture sample remain required before the phase's acceptance can close.
+
+## Native repeatability accepted on September 30
+
+Crew fixture repair [#743](https://github.com/jsolly/GeoRoids/pull/743) shipped
+as `38b79c1ae40fbb39f2c99c126e7a84f442c159c4`. Its complete local gate
+passed 210 integration cases across 91 files in 695.75 seconds, alongside
+static, unit, build, frame-work and constrained-client checks. Exact-head CI,
+Vercel, Railway and the deployment-specific production smoke were verified.
+Report-only contour and pickup work observations remain inputs to PR 7.
+
+[Native run 36788889181](https://github.com/jsolly/GeoRoids/actions/runs/36788889181)
+completed the same merged revision on native Ubuntu ARM64 and x64. Each
+architecture passed twenty focused attempts containing all six files and
+23 cases, then three complete suites containing all 91 files and 210 cases.
+All 46 runner receipts exited zero with no skipped/todo tests, hidden retries,
+output, evidence or cleanup failures. Root and an independent reviewer checked
+every nested Vitest report and retained receipt; the reviewer also checked all
+7,248 retained changed-artifact hashes and 1,946 complete teardown receipts.
+Full runner durations were ARM64 986.355/994.795/1007.181 seconds and
+x64 936.937/936.708/945.235 seconds. These remote serial durations do not
+establish the local sharding performance target.
+
+Artifacts, previous failed samples and the independent acceptance receipt remain
+under `/Users/johnsolly/.local/state/georoids-backlog/20260930/pr3/`. The approved
+repeatability sample is accepted and permits PR 5. It does not prove zero
+flakiness or explain the unobserved historical #714 and original crew causes;
+those limitations remain explicit in the linked investigations. The human
+scheduling checkbox and harness parent remain open.
+
+## Original triage inventory
+
+On October 1, GitHub #714–#717 were closed with “Moved to Todoist.” Their
+technical work was already in the approved plan; the four new records do not
+represent completion or additional gameplay scope. Current investigation homes
+are [native determinism](https://app.todoist.com/app/task/6hg2qp7XVWfCCQGv),
+[WebKit lifecycle](https://app.todoist.com/app/task/6hg2qp9cFGqMMCFM),
+[furnace travel](https://app.todoist.com/app/task/6hg2qp9VMh6vjr9M), and
+[crawler fixture lifecycle](https://app.todoist.com/app/task/6hg2qpCc5VMq6hMv).
+GitHub readback confirmed closed, rather than deleted, issues. Preserve the
+original evidence and every remaining acceptance condition in these task homes.
+
+A source/artifact audit of the original local review runs found 24 failed cases:
+`LAy1ic` had 15 cases across 11 files, `w2Uwyg` had eight across five, and
+`LiA98J` had one. The task notes counted failing files. The prepared-fixture
+snapshot sequence race is directly addressed by #710 stopping periodic
+broadcasts before counting fixture snapshots. Intentional join rejection and
+injected reset failures occurred in passing tests and are not additional defects.
+
+The remaining 23 browser failures have relevant shipped repairs and current
+regression evidence, but their original causes remain unproved. Their exact
+observations and missing provenance are explicitly retained in
+[the existing #717 investigation](https://github.com/jsolly/GeoRoids/issues/717#issuecomment-5922765886).
+Copied screenshots and contradictory printed source frames do not establish
+original execution state. The triage checkbox remains open while its full
+classification criterion is reconciled; the accepted native sample is not
+used to assert historical causes.
+
+## Sharding development evidence
+
+The first real six-shard run, `run-2AULLi`, failed during service startup:
+the `tsx` CLI's Unix socket exceeded the usable path length inside the isolated
+temporary directory. A same-path comparison and real server contract verify
+that `node --import tsx` reaches health and cleans up successfully. Independent
+review also required shard-owned Wiki output and sticky console-write failure
+handling. All three repairs passed their bounded checks and independent review.
+
+The second real run, `run-CLLp7s`, exceeded the end-to-end deadline at 302.74
+seconds. It completed 104 cases, including 17 failures, before stopping; no
+complete Vitest report exists. All six runner cleanup receipts succeeded, and
+source fingerprints were unchanged. Independent servers reported synchronized
+multi-second stalls. Their cause needs measured diagnosis; this run establishes
+neither complete coverage nor the performance target. Both failures remain
+retained under the backlog evidence home. Three complete successful runs below
+300 seconds, full gate, shipping and deployment verification remain required.
+
+The first balanced run, `run-viJk2s`, used six partitions with at most three
+active runners. It exceeded the deadline at 305.35 seconds. Three partitions
+passed all 93 assigned cases; the other three had no complete reports. The
+console recorded 180 completed cases without a printed case failure before
+termination, which does not establish full coverage. Source fingerprints were
+unchanged. Expanded discovery took about 45 seconds, and the first three
+partitions took 132–150 seconds each.
+
+The coordinator's three-second cancellation escalation killed the remaining
+runners before they wrote cleanup receipts. Later inspection found all twelve
+ports closed, all six runner PIDs absent, and the common lock absent; that
+inspection does not replace the missing receipts. Independent review also
+identified an owner path that cleared the coordinator PID after a crash without
+verifying detached-child cleanup. Both cancellation defects require repairs
+and regression evidence. The successful-run limit remains 300 seconds.
+
+The subsequent cancellation repair passed 23 unassisted runner contracts on
+frozen source. These cover slow cleanup, repeated signals, inherited output
+pipes, coordinator and owner crashes, discovery ownership, and a crash between
+child spawn and authorization. Ownership records precede authorization; unknown
+ownership retains a lock marker that also blocks stale-lock reclamation.
+The imported discovery entry's nonzero exit status is preserved. Types, lint,
+Actions, and runner checks also passed. Earlier development failures and the
+manually assisted development run remain retained and do not count as accepted
+verification. These bounded results do not establish the integration timing
+target or a shipped release.
+
+The reviewed Node collector preserves per-file isolation and dynamically expanded
+registration. Matching frozen-source diagnostics collected the same 91 files and
+210 source-located case identities in jsdom and Node. They took 43.72 and 20.81
+seconds respectively, with successful ownership cleanup and no collected or
+unhandled errors. Collection executes setup modules and registration callbacks;
+it does not execute test lifecycle hooks or bodies. These results establish
+collector equivalence for this tree, not gameplay success.
+
+The first full run using that collector, `run-ZY4qL0`, exceeded the deadline at
+305.07 seconds. All six cleanup receipts succeeded without forced killing;
+185 cases printed success, two printed failure, and 23 remained incomplete.
+Three completed partitions passed all 93 assigned cases. A laser assertion failed
+before cancellation because a pilot took asteroid damage during joining, then
+regenerated health during the exchange. A controlled joining repair passed independent review and both affected
+laser scenarios in a focused runner execution. The mobile spider scenario's
+failed teardown began after cancellation, but retained evidence does not prove
+its body succeeded. Historical case-only weights omit worker and fixture costs;
+further measured savings are required before timing acceptance.
+
+Independent import and design reviews found no worker-DOM requirement in the
+79 Playwright scenario files. Each now explicitly selects a Node worker;
+actual Chromium/WebKit pages, fresh contexts, shared setup and per-file isolated
+serial execution are preserved. Entity and unit DOM environments retain their
+existing configuration. A representative runner sample passed all 12 files and
+24 cases, including both engines' audio recovery and touch interactions, HUD
+layout, shared delivery, lasers, Wiki and client refresh. Its Vitest duration
+was 92.86 seconds. This compatibility sample does not establish full-suite
+coverage or the 300-second sharding target.
+
+The subsequent full run, `run-9alfLN`, exceeded the deadline at 303.50 seconds.
+The first three partitions passed all 93 cases with lower Vitest durations of
+123.99, 130.90 and 140.26 seconds. A fourth partition passed its 48 cases.
+The final two were interrupted. Their crashed-page evidence appeared after
+cancellation, so it neither proves completed bodies nor establishes independent
+assertion regressions. All six cleanup receipts succeeded, and checkout
+fingerprints matched. Full-suite timing acceptance remains unmet; exact per-file
+phase costs are needed before the next balancing change.
+
+The exact timing reporter passed independent review and 30 runner contracts,
+including real Vitest callback failure, runtime identity and late source-change
+checks. Its first full measurement, `run-XrenSn`, exceeded the deadline at
+303.73 seconds. It retained 88 ended file rows totalling 790.72 seconds of tracked
+work; four complete child receipts account for 60 rows, and the other rows remain
+observations from partial receipts. All six runner cleanup receipts succeeded.
+These measurements do not establish a complete baseline or performance pass.
+
+The measured three-slot projection leaves insufficient margin. Independent
+review approved a bounded four-slot experiment with six serial shards: two
+larger and four smaller partitions use relative capacities `2, 2, 1, 1, 1, 1`.
+Proposed weights preserve partial and missing-observation provenance. An actual
+run must verify stability, CPU/memory pressure, loop behavior and all acceptance
+criteria. This schedule is being implemented; no four-slot run has passed yet.
+
+### Current-main integration before four-slot measurement
+
+PR #744 landed while PR 5 was in progress. The branch now starts at `26dec1c9b8258f312bbf445cd610561c5ede4b64`; its release, CI, Bash 5, and fleet-control changes are preserved. The seven overlapping code paths matched clean three-way merge output. The agent instruction conflict retained the new concise structure, with shard operating details also added to `docs/agent-operations.md`. Runner contracts and independent review are refreshed on the combined source before measurement; earlier performance failures and accepted narrow proofs remain historical evidence. No four-slot full run has passed yet.
+
+The first four-slot attempt, `run-3suNk7`, failed after 151.87 coordinator seconds (152.24 seconds including the runner). The 1280-pixel nearby-crew audio scenario observed two explosion cues where it expected one; this was a genuine pre-deadline assertion failure. The coordinator cancelled the other active work and all four launched shards confirmed cleanup. Source fingerprints before and after matched. Retained logs prove that the listener lost health to an asteroid while the second browser joined, before the controlled empty scene was admitted. The saved artifacts do not identify the second native cue, so its precise cause remains unproved. Controlled admission and richer native audio phase evidence are being repaired without relaxing cue counts or gameplay assertions. No four-slot run is accepted yet.
+
+The bounded spatial-audio repair is independently accepted: each pilot is admitted into a clear scene before the next joins, with exact motion epochs, live socket and full-health barriers. Native lifetime cue counts and HRTF assertions remain unchanged. Additive source identity and timing observations are retained with fresh failure-phase evidence. The complete focused direction file passed all three cases on the final source; the shared-probe Chromium/WebKit batch passed twelve cases. Desktop/touch Wiki verification passed, and only the 35 reviewed source hashes were updated, preserving 432 unrelated accepted hashes. Renewed full-run performance proof remains outstanding.
+
+The second four-slot attempt, `run-4NEMxw`, failed after 271.58 coordinator seconds (272.06 seconds including the runner). The 390-pixel Hauler tow-bite scenario failed to latch after a spider killed its owner during fixture admission. All six launched shards confirmed cleanup, and source fingerprints matched. A crashed-page observation in another shard occurred after cancellation; its independent onset remains unproved. The saved gesture evidence does not identify why the attempted latch was absent. Neither attempt establishes performance acceptance.
+
+Finite protected tow admission and atomic removal of protection passed four focused browser cases and 32 unit cases, but independent review found that ordinary test placement also clears the Hauler cable. Those retained passing results do not establish a towed owner bite. A narrowly validated test-only placement path must preserve the already confirmed captive during owner placement, reject mismatched targets before mutation, and prove the attachment in its atomic release receipt. Normal placement and production combat remain unchanged. Full sharding acceptance still requires three complete runs below 300 seconds, followed by the full review gate and shipping.
+
+The corrected tow fixture now validates both live motion sessions, exactly one Tow Cable owner and the expected living terrain spider before mutation. Explicit placement preserves the existing owner attachment; ordinary placement still clears it. The unit proof calls the real spider advancement and verifies that the exact lethal attack occurred with the captive in the tow mapping. All 35 focused unit cases and four keyboard/touch browser cases pass, with fresh matching release receipts and no capture failures. The earlier insufficient passing proof and failed correction attempts are retained. Independent exact-source review precedes renewed full timing measurement. Scoped Wiki review updates only the motion and tow-browser source hashes, retaining 465 others; gameplay rules and illustrations are unchanged.
+
+### Approved timing adjustment — October 1
+
+John approved a 600-second end-to-end acceptance limit for three complete runs. The 300-second goal remains a future performance target and no longer blocks shipping. Historical failed-run receipts above retain their original deadlines. All cases, failure checks, source identity, isolation and cleanup requirements remain mandatory. Further cache A/B performance experiments are stopped; correctness review and complete validation take priority. The current schedule is six equal-capacity serial shards with at most three active children. No complete successful sharded run has yet been accepted.
+
+Three consecutive complete runs on identical source passed all 91 files and 210 cases with no aggregate errors: `run-VpnQH7`, `run-9H52no`, and `run-7XKjzs`. Coordinator durations were 301.677, 335.425 and 365.243 seconds; runner-inclusive durations were 302.28, 336.14 and 365.86 seconds. These satisfy the approved 600-second timing bar, not the 300-second target. Independent receipt review, the full gate and shipping remain required.

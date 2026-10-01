@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test, vi } from 'vitest';
 import { createServerInstance } from '../../../server/createServer';
 import { logger } from '../../../setup/serverLogger';

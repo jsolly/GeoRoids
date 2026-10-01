@@ -52,7 +52,13 @@ test('successful reset waits for verified empty world diagnostics', async () => 
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(Response.json({ success: true }))
     .mockResolvedValueOnce(
-      Response.json({ world: cleanWorld, seed: 42, sockets: { total: 0, open: 0 }, players: [] })
+      Response.json({
+        world: cleanWorld,
+        seed: 42,
+        sockets: { total: 0, open: 0 },
+        players: [],
+        spiderField: { spiders: [], nests: [] },
+      })
     );
   await expect(resetWorld()).resolves.toBeUndefined();
   expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -67,15 +73,20 @@ test.each(['asteroids', 'loot', 'satellitePickups'] as const)(
 
 test('an empty world waits for closing owned sockets to leave before reset completes', async () => {
   vi.useFakeTimers();
-  const state = { world: cleanWorld, seed: 42, players: [] };
+  const state = {
+    world: cleanWorld,
+    seed: 42,
+    players: [],
+    spiderField: { spiders: [], nests: [] },
+  };
   const fetchSpy = vi
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(Response.json({ status: 'reset' }))
     .mockResolvedValueOnce(Response.json({ ...state, sockets: { total: 1, open: 0 } }))
     .mockResolvedValueOnce(Response.json({ ...state, sockets: { total: 0, open: 0 } }));
-  const reset = resetWorld();
+  const reset = expect(resetWorld()).resolves.toBeUndefined();
   await vi.advanceTimersByTimeAsync(200);
-  await expect(reset).resolves.toBeUndefined();
+  await reset;
   expect(fetchSpy).toHaveBeenCalledTimes(3);
 });
 
@@ -103,7 +114,12 @@ test('fixture observation failure cannot pass a reset completion barrier', async
 
 test('fixture observations reject missing transport evidence', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-    Response.json({ world: cleanWorld, seed: 42, players: [] })
+    Response.json({
+      world: cleanWorld,
+      seed: 42,
+      players: [],
+      spiderField: { spiders: [], nests: [] },
+    })
   );
   await expect(getFixtureState()).rejects.toThrow('invalid state');
 });
@@ -114,7 +130,13 @@ test.each([
   { total: 1.5, open: 0 },
 ])('fixture observations reject impossible socket membership: %j', async (sockets) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-    Response.json({ world: cleanWorld, seed: 42, players: [], sockets })
+    Response.json({
+      world: cleanWorld,
+      seed: 42,
+      players: [],
+      sockets,
+      spiderField: { spiders: [], nests: [] },
+    })
   );
   await expect(getFixtureState()).rejects.toThrow('invalid state');
 });

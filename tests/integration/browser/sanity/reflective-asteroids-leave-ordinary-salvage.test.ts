@@ -1,3 +1,4 @@
+// @vitest-environment node
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import type { Page } from 'playwright';

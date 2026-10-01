@@ -142,7 +142,9 @@ run with `npx vitest run tests/unit/<scenario>.test.ts`.
 
 Always run integration tests through `./scripts/test-runner.sh`; never invoke
 raw Vitest on `tests/integration/`. The runner owns the Vite/server pair and
-serializes execution. Do not overlap integration runners or attach to an
+serializes each child. Full runs may use its authenticated six-shard coordinator;
+standalone callers cannot select a partial shard. Do not overlap coordinators or
+standalone integration runners or attach to an
 existing developer server. Run unit and integration batches separately when
 they share logging or other process resources.
 

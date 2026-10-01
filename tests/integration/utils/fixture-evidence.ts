@@ -104,7 +104,9 @@ export async function withFixtureEvidence(
   run: (stage: (name: string) => Promise<void>) => Promise<void>,
   observations: { asteroidIds?: () => readonly string[]; evidence?: () => unknown } = {}
 ): Promise<void> {
-  const directory = join(process.cwd(), 'tests/integration/browser/screenshots');
+  const directory =
+    process.env['GEOROIDS_TEST_SCREENSHOTS_DIR'] ??
+    join(process.cwd(), 'tests/integration/browser/screenshots');
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `${scenario}-${Date.now()}`);
   const receipt = {

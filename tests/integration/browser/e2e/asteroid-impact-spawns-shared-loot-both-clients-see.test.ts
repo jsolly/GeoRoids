@@ -1,3 +1,4 @@
+// @vitest-environment node
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { GROWTH } from '../../../../shared/shipGrowth';

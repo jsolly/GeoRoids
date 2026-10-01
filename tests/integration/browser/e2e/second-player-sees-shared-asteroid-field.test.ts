@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { WORLD } from '../../../../shared/world';
 import { PALETTE } from '../../../../src/constants';

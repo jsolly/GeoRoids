@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { CONTOUR_LOCK } from '../../../../shared/contourLock';
 import { SHIP } from '../../../../src/constants';

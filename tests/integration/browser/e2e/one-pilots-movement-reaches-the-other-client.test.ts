@@ -1,3 +1,4 @@
+// @vitest-environment node
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';

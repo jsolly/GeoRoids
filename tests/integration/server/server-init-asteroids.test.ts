@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it as test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';

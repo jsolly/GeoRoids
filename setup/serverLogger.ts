@@ -155,7 +155,7 @@ function internalFailure(
 }
 
 function logsDirectory(): string {
-  return path.join(process.cwd(), 'logs');
+  return process.env['GEOROIDS_TEST_LOG_DIR'] ?? path.join(process.cwd(), 'logs');
 }
 
 function serverLogPath(): string {

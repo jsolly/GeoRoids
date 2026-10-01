@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { strict as assert } from 'node:assert';
 import { once } from 'node:events';
 import { afterEach, expect, test, vi } from 'vitest';

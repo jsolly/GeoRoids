@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';

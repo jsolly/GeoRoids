@@ -7,7 +7,9 @@ export class ScreenshotManager {
 
   constructor(_testDir?: string) {
     // Use centralized screenshots directory under browser tests
-    this.screenshotsDir = join(process.cwd(), 'tests', 'integration', 'browser', 'screenshots');
+    this.screenshotsDir =
+      process.env['GEOROIDS_TEST_SCREENSHOTS_DIR'] ??
+      join(process.cwd(), 'tests', 'integration', 'browser', 'screenshots');
   }
 
   /**

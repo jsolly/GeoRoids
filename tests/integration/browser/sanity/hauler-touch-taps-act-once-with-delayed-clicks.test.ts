@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { chromium, webkit } from 'playwright';
 import { describe, expect, test } from 'vitest';
 import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';

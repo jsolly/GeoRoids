@@ -12,6 +12,7 @@ import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shar
 import { cruiseSpeed } from '../../shared/shipFlight';
 import type { ContourLockState, PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
+import { isTowCableUtility } from '../../src/entities/ship/haulerUtility';
 import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
@@ -634,6 +635,53 @@ export class PlayerMotionService {
       return false;
     }
     this.clearHarpoon(session.actor);
+    return this.placeFixtureSession(session, position, now);
+  }
+
+  /** Match the live published test actor to its actual current motion/socket session. */
+  public hasLiveActorForTesting(actor: GameEntity): boolean {
+    const session = this.sessions.get(actor.id);
+    return Boolean(
+      session &&
+        session.actor === actor &&
+        session.socket === actor.ws &&
+        actor.ws &&
+        actor.ws.readyState === actor.ws.OPEN &&
+        actor.playerMotion?.epoch === session.epoch &&
+        this.alive(actor)
+    );
+  }
+
+  /** A test fixture may preserve only the current live actor/session's existing tow. */
+  public hasLiveTowForTesting(actor: GameEntity, expectedTowTargetId: string): boolean {
+    return (
+      this.hasLiveActorForTesting(actor) &&
+      isTowCableUtility(actor) &&
+      Boolean(expectedTowTargetId) &&
+      actor.harpoonTargetId === expectedTowTargetId
+    );
+  }
+
+  /** Preserve only an already validated, live tow during explicit test placement. */
+  public placeTowedActorForTesting(
+    actor: GameEntity,
+    position: Position,
+    now: number,
+    expectedTowTargetId: string
+  ): boolean {
+    this.assertTime(now);
+    const session = this.sessions.get(actor.id);
+    if (
+      !finiteMotionVector(position) ||
+      !session ||
+      !this.hasLiveTowForTesting(actor, expectedTowTargetId)
+    ) {
+      return false;
+    }
+    return this.placeFixtureSession(session, position, now);
+  }
+
+  private placeFixtureSession(session: Session, position: Position, now: number): boolean {
     session.epoch += 1;
     session.mode = 'free';
     session.ack = 0;

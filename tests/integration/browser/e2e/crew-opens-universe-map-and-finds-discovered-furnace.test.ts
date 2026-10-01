@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { oreResource } from '../../../../shared/economy';
 import { civicLot } from '../../../../shared/furnaces';

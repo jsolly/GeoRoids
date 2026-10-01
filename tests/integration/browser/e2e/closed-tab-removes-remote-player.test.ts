@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { bootTwoClientGames } from '../../utils/multi-client-setup';

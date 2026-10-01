@@ -125,7 +125,8 @@ native playback, gesture, identity/session/input and preference assertions passe
 An explicit final Wiki URL/load/document barrier also passed. This later success
 neither explains the earlier failure nor establishes cross-architecture
 repeatability. No product lifecycle fix or browser-policy bypass was introduced.
-The historical cause and full clean pinned repeatability evidence remain unresolved.
+The historical cause remains unresolved. The clean pinned sample is now accepted;
+see the latest acceptance below.
 
 [#717](https://github.com/jsolly/GeoRoids/issues/717) also requires the separate furnace
 and crawler investigations. Keep it open until all linked investigations have their
@@ -192,3 +193,26 @@ These fixture omissions are demonstrated independently. The original September
 cargo and accepted-projectile terminal evidence. Crawler interception and cargo
 banking remain possible explanations, not established causes of those attempts.
 No Wiki gameplay page is affected by these test-control and observation changes.
+
+## Accepted native sample
+
+[Run 36788889181](https://github.com/jsolly/GeoRoids/actions/runs/36788889181)
+passed at `38b79c1ae40fbb39f2c99c126e7a84f442c159c4` on native Ubuntu ARM64
+and x64. Each architecture completed twenty six-file focused attempts with
+23 passing cases each, followed by three complete 91-file suites with
+210 passing cases each. Root and independent review verified all 46 nested
+reports and runner receipts, with no skips, retries, output/evidence failures
+or incomplete teardown. Both use Node 24.21.0, Chromium 153.0.8010.12 and
+WebKit 26.6 from the same pinned lockfile.
+
+This satisfies the approved repeatability sample and permits isolated sharding.
+Earlier failures remain retained. The passing sample does not determine the
+unobserved historical lifecycle mismatch or original crew failure causes and
+does not prove zero flakiness. Exact reports and evidence are retained locally
+in `~/.local/state/georoids-backlog/20260930/pr3/native-{arm64,x64}-36788889181/`.
+
+GitHub #714–#717 were closed after migration to Todoist on October 1. Their
+current task IDs are `6hg2qp9cFGqMMCFM` (audio), `6hg2qp9VMh6vjr9M` (furnace),
+`6hg2qpCc5VMq6hMv` (crawler) and `6hg2qp7XVWfCCQGv` (umbrella). This migration
+does not satisfy their historical reproduction or causal-analysis criteria.
+Keep those criteria and earlier failure evidence explicit when reconciling them.

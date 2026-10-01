@@ -1,7 +1,8 @@
 import type { Page } from 'playwright';
+import { SHIP } from '../../../../src/constants';
 import type { BrowserManager } from '../../utils/browser-manager';
 import { GameInteractions } from '../../utils/game-interactions';
-import { arrangeCrewField } from '../../utils/test-server-control';
+import { arrangeCrewField, getFixtureState } from '../../utils/test-server-control';
 
 interface ObservedLaser {
   ownerId: string;
@@ -12,7 +13,7 @@ interface ObservedLaser {
   onCanvas: boolean;
 }
 
-/** Join every pilot before arranging their shared, empty firing lane. */
+/** Clear each joined crew before another browser can leave them drifting in the belt. */
 export async function bootLaserClients(browserManager: BrowserManager, count: 2 | 3 = 2) {
   const pages: Page[] = [];
   const games: GameInteractions[] = [];
@@ -22,9 +23,14 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
       throw new Error('Browser page is not available');
     }
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false });
+    await game.navigateToGame();
+    await page.locator('#playerNameInput').fill(`Laser pilot ${index + 1}`);
+    await game.startGame();
+    await game.waitForGameReady();
+    await game.waitForServerJoin();
     pages.push(page);
     games.push(game);
+    await arrangeLaserClients(games);
   }
   await Promise.all(games.map((game) => game.waitForRemotePlayers(count - 1)));
   await parkLaserClients(games);
@@ -51,9 +57,34 @@ export async function parkLaserClient(game: GameInteractions, index = 0): Promis
 
 /** Re-establish every participant's clear firing lane after all clients join. */
 export async function parkLaserClients(games: readonly GameInteractions[]): Promise<void> {
-  await arrangeCrewField(await Promise.all(games.map((game) => game.getLocalPlayerId())), 'empty');
-  await Promise.all(games.map((game, index) => game.placeShipAt(index * 120, -360)));
+  await arrangeLaserClients(games);
   await Promise.all(games.map((game) => game.waitForCombatReady()));
+  await requireFullLaserCrewHealth(games);
+}
+
+async function arrangeLaserClients(games: readonly GameInteractions[]): Promise<void> {
+  const ids = await Promise.all(games.map((game) => game.getLocalPlayerId()));
+  // The server activates the field for these live pilots before removing rocks.
+  const epochs = await arrangeCrewField(ids, 'empty');
+  await Promise.all(
+    games.map(async (game, index) => {
+      await game.waitForControlledFixture(epochs.get(ids[index] ?? ''));
+      await game.placeControlledShipAt(index * 120, -360);
+    })
+  );
+  await requireFullLaserCrewHealth(games);
+}
+
+async function requireFullLaserCrewHealth(games: readonly GameInteractions[]): Promise<void> {
+  const ids = await Promise.all(games.map((game) => game.getLocalPlayerId()));
+  const state = await getFixtureState();
+  for (const id of ids) {
+    const pilot = state.players.find((player) => player.id === id);
+    if (!pilot || pilot.health !== SHIP.MAX_HEALTH || pilot.exploding || pilot.socketState !== 1) {
+      throw new Error(`Laser crew must join live at full health: ${JSON.stringify({ id, pilot })}`);
+    }
+  }
+  await Promise.all(games.map((game) => game.waitForShipHealth(SHIP.MAX_HEALTH)));
 }
 
 export function localPlayerId(page: Page): Promise<string> {

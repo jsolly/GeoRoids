@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { LOCAL_STORAGE_KEYS } from '../../../../src/constants/user-preferences';
 import {

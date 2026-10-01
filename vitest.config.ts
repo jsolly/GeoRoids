@@ -1,10 +1,16 @@
+import process from 'node:process';
 import { configDefaults, defineConfig } from 'vitest/config';
+import { IntegrationSequencer } from './scripts/integration-sequencer';
 
 export default defineConfig({
+  ...(process.env['GEOROIDS_TEST_SESSION_DIR']
+    ? { cacheDir: `${process.env['GEOROIDS_TEST_SESSION_DIR']}/cache/vitest` }
+    : {}),
   test: {
     environment: 'jsdom',
     setupFiles: ['tests/viteSetup.ts'],
     globals: true,
+    includeTaskLocation: true,
     // Vitest does not read .gitignore; keep default discovery out of nested
     // Claude desktop worktrees (other branches' test files).
     exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
@@ -28,6 +34,7 @@ export default defineConfig({
     isolate: true,
     fileParallelism: false,
     sequence: {
+      ...(process.env['GEOROIDS_SHARD_MANIFEST'] ? { sequencer: IntegrationSequencer } : {}),
       concurrent: false,
     },
     maxConcurrency: 1,

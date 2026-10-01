@@ -12,6 +12,11 @@ stage=integration
 
 retain_stage() {
   mkdir -p "$ARTIFACTS/$stage"
+  if [[ "$stage" == integration ]]; then
+    # The coordinator retains each isolated shard directly; its receipt names the home.
+    [[ -s "$ARTIFACTS/integration/shards.json" ]] || { echo "Missing integration shard receipt" >&2; return 1; }
+    return 0
+  fi
   local source
   for source in logs tests/integration/browser/screenshots; do
     if [[ -d "$source" ]]; then
@@ -46,7 +51,7 @@ run_stage() {
 
 # The runner owns integration serialization, services, deadlines, and cleanup.
 # Full discovery includes every scenario formerly run by PR behavioral CI.
-run_stage integration ./scripts/test-runner.sh tests/integration/ --reporter=verbose
+run_stage integration env GEOROIDS_TEST_SHARD_RECEIPT="$ARTIFACTS/integration/shards.json" ./scripts/test-runner.sh --shards=6 tests/integration/ --reporter=verbose
 
 run_stage frame node --import tsx scripts/measure-frame-work.ts \
   --budget docs/performance/frame-work-budget.json \

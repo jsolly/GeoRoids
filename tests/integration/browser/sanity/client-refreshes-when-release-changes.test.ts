@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { writeFileSync } from 'node:fs';
 import type { Page } from 'playwright';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';

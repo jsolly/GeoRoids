@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { existsSync } from 'node:fs';
 import { expect, test } from 'vitest';
 

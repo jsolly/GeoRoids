@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { writeFileSync } from 'node:fs';
 import { chromium, type Page, webkit } from 'playwright';
 import { describe, expect, test } from 'vitest';

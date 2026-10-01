@@ -97,6 +97,7 @@ npm run gate               # full local review gate: pre-commit checks + test:re
 npm run test               # unit only (tests/unit/)
 npm run test:all           # unit, server, and entity integration tests
 npm run test:review        # all integration + frame-work + constrained-client checks (also in gate)
+npm run test:integration:sharded   # complete integration suite, six owned serial shards
 npm run test:integration:browser   # browser tests via test-runner.sh
 npm run test:integration:server    # server-side integration
 npm run test:integration:entities  # entity integration
@@ -111,7 +112,7 @@ npm run benchmark          # see benchmarks/README.md
 npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 ```
 
-**Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
+**Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. Full suites use six authenticated shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. Each child retains serial execution. See [isolated shards](integration-shards.md). The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
 
 ## Architecture
 

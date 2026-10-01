@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { pointsForRoidSize } from '../../../../src/entities/roid/roidScore';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { SHIP } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';

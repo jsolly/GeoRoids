@@ -1,9 +1,12 @@
 import type { GameEngine } from '../../../server/core/GameEngine';
-import type { AsteroidData, TerrainSpider } from '../../../shared-types';
+import type { AsteroidData, SpiderFieldState, TerrainSpider } from '../../../shared-types';
 import { TestConfig } from './test-config';
 
 type FixtureState = {
   observedRocks: AsteroidData[];
+  spiderField: Omit<SpiderFieldState, 'spiders'> & {
+    spiders: (TerrainSpider & { towedBy: string | null })[];
+  };
   crawlers: TerrainSpider[];
   combat: ReturnType<GameEngine['getFixtureCombatEvidence']>;
   world: ServerWorldDiagnostics;
@@ -19,6 +22,9 @@ type FixtureState = {
     cargo: number;
     score: number;
     kitId: string;
+    harpoonTargetId: string | null;
+    haulerUtility: string | null;
+    abilityCooldownFrames: number;
     health: number;
     exploding: boolean;
     position: { x: number; y: number };
@@ -73,6 +79,13 @@ export async function getFixtureState(
   if (
     !value ||
     typeof value !== 'object' ||
+    !('spiderField' in value) ||
+    !value.spiderField ||
+    typeof value.spiderField !== 'object' ||
+    !('spiders' in value.spiderField) ||
+    !Array.isArray(value.spiderField.spiders) ||
+    !('nests' in value.spiderField) ||
+    !Array.isArray(value.spiderField.nests) ||
     !('world' in value) ||
     !isWorldDiagnostics(value.world) ||
     !('seed' in value) ||
@@ -104,6 +117,12 @@ export async function getFixtureState(
         typeof player.score !== 'number' ||
         !('kitId' in player) ||
         typeof player.kitId !== 'string' ||
+        !('harpoonTargetId' in player) ||
+        (player.harpoonTargetId !== null && typeof player.harpoonTargetId !== 'string') ||
+        !('haulerUtility' in player) ||
+        (player.haulerUtility !== null && typeof player.haulerUtility !== 'string') ||
+        !('abilityCooldownFrames' in player) ||
+        typeof player.abilityCooldownFrames !== 'number' ||
         !('health' in player) ||
         typeof player.health !== 'number' ||
         !('exploding' in player) ||
@@ -182,12 +201,21 @@ export async function resetWorld(): Promise<void> {
 
 export async function placePlayer(
   playerId: string,
-  position: { x: number; y: number }
-): Promise<{ motionEpoch?: number }> {
+  position: { x: number; y: number },
+  options: { clearSpawnProtection?: boolean; expectedTowTargetId?: string } = {}
+): Promise<{
+  motionEpoch?: number;
+  expectedTowTargetId: string | null;
+  towOwnerId: string | null;
+  towTargetId: string | null;
+  placedActorTowTargetId: string | null;
+  spawnProtectionCleared: boolean;
+  spawnProtectionTimer: number;
+}> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/place-player`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, position }),
+    body: JSON.stringify({ playerId, position, ...options }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
@@ -197,6 +225,25 @@ export async function placePlayer(
   if (
     typeof result !== 'object' ||
     result === null ||
+    !('expectedTowTargetId' in result) ||
+    result.expectedTowTargetId !== (options.expectedTowTargetId ?? null) ||
+    !('towOwnerId' in result) ||
+    (options.expectedTowTargetId !== undefined
+      ? typeof result.towOwnerId !== 'string'
+      : result.towOwnerId !== null) ||
+    !('towTargetId' in result) ||
+    result.towTargetId !== (options.expectedTowTargetId ?? null) ||
+    !('placedActorTowTargetId' in result) ||
+    (result.placedActorTowTargetId !== null && typeof result.placedActorTowTargetId !== 'string') ||
+    (result.towOwnerId === playerId &&
+      result.placedActorTowTargetId !== options.expectedTowTargetId) ||
+    !('spawnProtectionCleared' in result) ||
+    result.spawnProtectionCleared !== (options.clearSpawnProtection === true) ||
+    !('spawnProtectionTimer' in result) ||
+    typeof result.spawnProtectionTimer !== 'number' ||
+    !Number.isFinite(result.spawnProtectionTimer) ||
+    result.spawnProtectionTimer < 0 ||
+    (options.clearSpawnProtection === true && result.spawnProtectionTimer !== 0) ||
     !('status' in result) ||
     result.status !== 'placed' ||
     !('playerId' in result) ||
@@ -219,7 +266,15 @@ export async function placePlayer(
   ) {
     throw new Error('Player fixture placement returned an invalid motion epoch');
   }
-  return 'motionEpoch' in result ? { motionEpoch: result.motionEpoch as number } : {};
+  return {
+    expectedTowTargetId: result.expectedTowTargetId as string | null,
+    towOwnerId: result.towOwnerId as string | null,
+    towTargetId: result.towTargetId as string | null,
+    placedActorTowTargetId: result.placedActorTowTargetId as string | null,
+    spawnProtectionCleared: result.spawnProtectionCleared,
+    spawnProtectionTimer: result.spawnProtectionTimer,
+    ...('motionEpoch' in result ? { motionEpoch: result.motionEpoch as number } : {}),
+  };
 }
 
 async function waitForWorldReset(timeoutMs = DEFAULT_WAIT_MS): Promise<void> {

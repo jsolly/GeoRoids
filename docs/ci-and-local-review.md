@@ -34,25 +34,28 @@ include `--with-deps` to install their system libraries.
 
 1. Add or update regression tests for the change and run the affected scenarios
    through `scripts/test-runner.sh`. Review the code and test evidence independently.
-2. Fix findings and repeat affected checks. Keep integration tests serialized;
-   never use raw Vitest or extra workers to shorten them.
+2. Fix findings and repeat affected checks. Keep each integration child serialized;
+   use the owned six-shard coordinator for full runs, never raw Vitest or extra workers.
 3. Run `npm run gate` after the final changes and before pushing through `/ship`.
    This runs all static checks, the full unit suite, build, and `npm run test:review`.
-4. `test:review` runs **all** integration tests, the deterministic frame-work budget,
+4. `test:review` runs **all** integration tests in six isolated serial shards with
+   at most three active children, the deterministic frame-work budget,
    then the production-client traversal scenario at 4× CPU slowdown with network
    delay and combat at native CPU speed. Both use a portrait touch viewport at DPR 3.
    Failures stop the gate. Fix and repeat; a green CI smoke does not replace this gate.
 
 The pre-commit hook retains its static/unit/build checks. `npm run gate` forces
 those checks even with an empty index, then runs the heavy review checks. For focused iteration, `npm run test:review` runs only the heavy
-integration/performance portion. The full integration runner retains its existing
-20-minute deadline, process ownership, and cleanup. Choose unused ports with
+integration/performance portion. Standalone integration runs retain their existing
+20-minute deadline, process ownership, and cleanup. Full coordinated runs require
+less than 600 seconds including discovery and cleanup; 300 seconds remains a future performance target; see [isolated shards](integration-shards.md). Choose unused ports with
 `GEOROIDS_TEST_VITE_PORT` and `GEOROIDS_TEST_SERVER_PORT` when another dev session
-owns the defaults; the repository-wide lock still allows only one integration run.
+owns the defaults; the repository-wide lock still allows only one coordinator or standalone integration run.
 
 Each heavy run keeps console output, client/server logs, screenshots, benchmark
 JSON, and its exit status in a unique ignored `.performance/review/run.*` directory.
-The command prints that directory on start and completion. Retain it for review;
+The command prints that directory on start and completion. Integration receipts
+point to the separate retained directory for all six isolated children. Retain both for review;
 do not commit generated test artifacts. Report skipped tests explicitly, including
 any pre-existing skips; never describe them as passes.
 

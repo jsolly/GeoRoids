@@ -1,4 +1,6 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
+import { SHIP } from '../../../../src/constants';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -67,6 +69,7 @@ test(
       await game1.getShipHealth(),
       await game2.getShipHealth(),
     ];
+    expect(healthBeforeFirstExchange).toEqual([SHIP.MAX_HEALTH, SHIP.MAX_HEALTH]);
     await expectPilotsAliveWithUnchangedHealth(game1, game2, id1, id2, healthBeforeFirstExchange);
 
     const [local1, remote1] = await Promise.all([

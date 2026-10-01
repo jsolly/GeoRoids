@@ -47,11 +47,39 @@ TEST_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-5173}"
 TEST_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-3001}"
 MAX_TEST_DURATION_SECONDS="${GEOROIDS_TEST_MAX_DURATION_SECONDS:-1200}"
 RUN_MODE=tests
+COMPILE_CACHE_TREATMENT=""
 BUILD_MODE="${GEOROIDS_TEST_BUILD:-development}"
+SHARD_CHILD=false
+SHARD_DIRECTORY=""
+SHARD_ASSIGNMENT=""
 case "${1:-}" in
+    --shards=6) RUN_MODE=shards; shift ;;
+    --discover-integration) RUN_MODE=discovery; shift ;;
+    --discovery-node) RUN_MODE=discovery-node; shift ;;
+    --coordinator-child) SHARD_CHILD=true; shift ;;
     --benchmark-client) RUN_MODE=benchmark-client; BUILD_MODE=production; shift ;;
     --benchmark-load) RUN_MODE=benchmark-load; BUILD_MODE=production; shift ;;
 esac
+if [ "$RUN_MODE" = discovery-node ]; then
+    case "${1:-}" in
+        --native-compile-cache=disabled) COMPILE_CACHE_TREATMENT=disabled; shift ;;
+        --native-compile-cache=cold) COMPILE_CACHE_TREATMENT=cold; shift ;;
+    esac
+fi
+for runner_argument in "$@"; do
+    case "$runner_argument" in
+        --native-compile-cache*)
+            echo "❌ Native compile-cache options require --discovery-node and one supported treatment" >&2
+            exit 64
+            ;;
+    esac
+done
+if [ -n "$COMPILE_CACHE_TREATMENT" ]; then
+    if [ -n "${NODE_V8_COVERAGE:-}" ] || [[ "${NODE_OPTIONS:-}" =~ (compil(e|ation)[_-]cache|coverage) ]]; then
+        echo "❌ Native compile-cache diagnostic refuses coverage or conflicting Node options" >&2
+        exit 64
+    fi
+fi
 RUNNER_ARGS=("$@")
 case "$BUILD_MODE" in
     development|production) ;;
@@ -85,6 +113,12 @@ BENCHMARK_SESSION=""
 BENCHMARK_ARTIFACT_DIR=""
 TEST_TIMED_OUT=false
 CLEANUP_RUNNING=false
+CLEANUP_FAILED=false
+COORDINATOR_CONTROL=""
+COORDINATOR_BIRTH=""
+INTERRUPT_SIGNAL=""
+REGISTERING_CHILD=false
+PENDING_INTERRUPT_CODE=""
 
 read_lock_pid() {
     local lock_pid=""
@@ -104,6 +138,7 @@ read_lock_worktree() {
 
 is_protected_vitest_option() {
     case "${1:-}" in
+        --shard|--shard=*|--shards|--shards=*|--coordinator-child|--discover-integration|--discovery-node|\
         -c*|--config|--config=*|\
         --pool|--pool=*|--pool-options|--pool-options=*|--pool-options.*|--poolOptions|--poolOptions=*|--poolOptions.*|\
         --maxWorkers|--maxWorkers=*|--max-workers|--max-workers=*|\
@@ -137,11 +172,21 @@ write_lock_metadata() {
         ! printf '%s\n' "$REPO_ROOT" > "$LOCK_WORKTREE_FILE" || \
         ! printf '%s\n' "$*" > "$LOCK_COMMAND_FILE"; then
         echo "❌ Could not write test-runner lock metadata" >&2
+        if lock_cleanup_pending; then return 1; fi
         rm -f "$LOCK_PID_FILE" "$LOCK_WORKTREE_FILE" "$LOCK_COMMAND_FILE"
         rmdir "$LOCK_DIR" 2>/dev/null || true
         return 1
     fi
     return 0
+}
+
+lock_cleanup_pending() {
+    [ -e "$LOCK_DIR/ownership-pending.json" ] || [ -e "$LOCK_DIR/cleanup-failed.json" ]
+}
+
+retain_cleanup_state() {
+    local state="$1"
+    node "$REPO_ROOT/scripts/integration-shards.mjs" mark-lock "$COORDINATOR_CONTROL" "$$" "$LOCK_DIR" "$state"
 }
 
 acquire_lock() {
@@ -154,6 +199,10 @@ acquire_lock() {
         return 0
     fi
 
+    if lock_cleanup_pending; then
+        echo "❌ Unresolved coordinated cleanup blocks this test-runner lock: $LOCK_DIR" >&2
+        return 1
+    fi
     local owner_pid
     owner_pid="$(read_lock_pid)"
     if valid_pid "$owner_pid" && kill -0 "$owner_pid" 2>/dev/null; then
@@ -165,6 +214,7 @@ acquire_lock() {
 
     if valid_pid "$owner_pid"; then
         echo "⚠️  Removing stale test-runner lock for dead PID $owner_pid." >&2
+        if lock_cleanup_pending; then return 1; fi
         rm -f "$LOCK_PID_FILE" "$LOCK_WORKTREE_FILE" "$LOCK_COMMAND_FILE"
         if ! rmdir "$LOCK_DIR" 2>/dev/null; then
             echo "❌ Could not remove stale test-runner lock: $LOCK_DIR" >&2
@@ -192,6 +242,10 @@ release_lock() {
         return 0
     fi
 
+    if lock_cleanup_pending; then
+        echo "❌ Retaining test-runner lock until owned cleanup is resolved: $LOCK_DIR" >&2
+        return 1
+    fi
     if [ "$(read_lock_pid)" != "$$" ]; then
         echo "⚠️  Test-runner lock ownership changed; leaving the current lock untouched: $LOCK_DIR" >&2
         LOCK_HELD=false
@@ -238,26 +292,71 @@ on_test_timeout() {
     signal_tree_nowait "${TEST_PID:-}" KILL
 }
 
+await_coordinator_cleanup() {
+    local coordinator_pid="$1"
+    local deadline=$((SECONDS + 30))
+    local fallback=false
+    local validation=false
+    local actual_birth=""
+    actual_birth="$(ps -p "$coordinator_pid" -o lstart= 2>/dev/null)" || actual_birth=""
+    if [ "$actual_birth" = "$COORDINATOR_BIRTH" ] && [ -n "$actual_birth" ]; then
+        kill -TERM "$coordinator_pid" 2>/dev/null || true
+    else
+        fallback=true
+    fi
+    while kill -0 "$coordinator_pid" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1 || true; done
+    if kill -0 "$coordinator_pid" 2>/dev/null; then fallback=true; fi
+    if ! kill -0 "$coordinator_pid" 2>/dev/null; then wait "$coordinator_pid" 2>/dev/null || true; fi
+    if [ "$fallback" = false ] && node "$REPO_ROOT/scripts/integration-shards.mjs" verify-stop "$COORDINATOR_CONTROL" "$$"         > "$COORDINATOR_CONTROL/receipt-validation.log" 2>&1; then
+        validation=true
+        rm -f "$LOCK_DIR/ownership-pending.json" "$LOCK_DIR/cleanup-failed.json" || return 1
+    else
+        fallback=true
+    fi
+    if [ "$fallback" = true ]; then
+        echo "❌ Coordinator graceful cleanup or receipt validation failed; owned fallback required" >&2
+        actual_birth="$(ps -p "$coordinator_pid" -o lstart= 2>/dev/null)" || actual_birth=""
+        if [ -n "$actual_birth" ] && [ "$actual_birth" = "$COORDINATOR_BIRTH" ]; then terminate_process_tree "$coordinator_pid" || true; fi
+        if node "$REPO_ROOT/scripts/integration-shards.mjs" fallback-stop "$COORDINATOR_CONTROL" "$$" \
+            > "$COORDINATOR_CONTROL/fallback-cleanup.log" 2>&1; then
+            rm -f "$LOCK_DIR/ownership-pending.json" "$LOCK_DIR/cleanup-failed.json" || return 1
+        else
+            retain_cleanup_state cleanup-failed || true
+        fi
+        wait "$coordinator_pid" 2>/dev/null || true
+    fi
+    printf '{"ownerPid":%s,"coordinatorPid":%s,"signal":"%s","graceSeconds":30,"receiptValidated":%s,"fallbackUsed":%s,"success":false}\n'         "$$" "$coordinator_pid" "$INTERRUPT_SIGNAL" "$validation" "$fallback" > "$COORDINATOR_CONTROL/owner-cancellation.json" || return 1
+    [ "$validation" = true ] && [ "$fallback" = false ]
+}
+
 cleanup() {
     local exit_code=$?
     if [ "$CLEANUP_RUNNING" = true ]; then
         exit "$exit_code"
     fi
     CLEANUP_RUNNING=true
-    trap - EXIT INT TERM ALRM
+    local cleanup_succeeded=true
+    if [ "$CLEANUP_FAILED" = true ]; then cleanup_succeeded=false; fi
+    trap - EXIT
+    trap '' INT TERM ALRM
 
     if [ -n "$TEST_PID" ]; then
-        if ! terminate_process_tree "$TEST_PID" && [ "$exit_code" -eq 0 ]; then
-            exit_code=1
+        if [ -n "$COORDINATOR_CONTROL" ]; then
+            if ! await_coordinator_cleanup "$TEST_PID"; then cleanup_succeeded=false; fi
+        elif ! terminate_process_tree "$TEST_PID"; then
+            cleanup_succeeded=false
+            if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
         fi
         TEST_PID=""
     fi
-    if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
-        exit_code=1
+    if ! stop_watchdog; then
+        cleanup_succeeded=false
+        if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
     fi
     if [ -n "$DEV_PID" ]; then
-        if ! terminate_process_tree "$DEV_PID" && [ "$exit_code" -eq 0 ]; then
-            exit_code=1
+        if ! terminate_process_tree "$DEV_PID"; then
+            cleanup_succeeded=false
+            if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
         fi
         DEV_PID=""
     fi
@@ -273,15 +372,35 @@ cleanup() {
         fi
         rm -rf -- "$BENCHMARK_SESSION" || exit_code=1
     fi
-    if ! release_lock && [ "$exit_code" -eq 0 ]; then
-        exit_code=1
+    if ! release_lock; then
+        cleanup_succeeded=false
+        if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
+    fi
+    if [ "$SHARD_CHILD" = true ] && [ -n "$SHARD_DIRECTORY" ]; then
+        if ! printf '{"runId":"%s","shard":%s,"exitCode":%s,"cleanupSucceeded":%s,"timedOut":%s}\n' \
+            "$GEOROIDS_SHARD_RUN_ID" "${SHARD_ASSIGNMENT%/*}" "$exit_code" "$cleanup_succeeded" "$TEST_TIMED_OUT" \
+            > "$SHARD_DIRECTORY/runner.json"; then
+            echo "❌ Could not retain shard cleanup receipt" >&2
+            exit_code=1
+        fi
     fi
     exit "$exit_code"
 }
 
 trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+on_interrupt() {
+    INTERRUPT_SIGNAL="$1"
+    PENDING_INTERRUPT_CODE="$2"
+    if [ "$REGISTERING_CHILD" = false ]; then exit "$PENDING_INTERRUPT_CODE"; fi
+}
+
+honor_pending_interrupt() {
+    REGISTERING_CHILD=false
+    if [ -n "$PENDING_INTERRUPT_CODE" ]; then exit "$PENDING_INTERRUPT_CODE"; fi
+}
+
+trap 'on_interrupt SIGINT 130' INT
+trap 'on_interrupt SIGTERM 143' TERM
 trap on_test_timeout ALRM
 
 servers_ready() {
@@ -330,12 +449,13 @@ ensure_env_local() {
 }
 
 prepare_logs() {
-    mkdir -p logs || return 1
-    if ! rm -f logs/client.log logs/server.log; then
+    local log_directory="${GEOROIDS_TEST_LOG_DIR:-logs}"
+    mkdir -p "$log_directory" || return 1
+    if ! rm -f "$log_directory/client.log" "$log_directory/server.log"; then
         echo "❌ Could not clear test logs before starting the runner" >&2
         return 1
     fi
-    if ! touch logs/client.log logs/server.log; then
+    if ! touch "$log_directory/client.log" "$log_directory/server.log"; then
         echo "❌ Could not create fresh test logs before starting the runner" >&2
         return 1
     fi
@@ -371,7 +491,7 @@ start_dev_servers() {
         return 1
     fi
 
-    ensure_env_local || return 1
+    if [ "$SHARD_CHILD" != true ]; then ensure_env_local || return 1; fi
     prepare_logs || {
         echo "❌ Could not prepare test logs" >&2
         return 1
@@ -403,10 +523,12 @@ start_dev_servers() {
         export GEOROIDS_BENCHMARK_SEED="$benchmark_seed"
     fi
     if [ "$RUN_MODE" = benchmark-client ] && [ "$benchmark_network" != clean ]; then
+        REGISTERING_CHILD=true
         npx --no-install tsx scripts/benchmark-proxy.ts --target "$TEST_SERVER_PORT" \
             --network "$benchmark_network" --seed "$benchmark_seed" \
             --ready "$BENCHMARK_SESSION/proxy-port" --stats "$BENCHMARK_SESSION/proxy-stats.json" > "$BENCHMARK_ARTIFACT_DIR/proxy.log" 2>&1 &
         PROXY_PID=$!
+        honor_pending_interrupt
         local attempts=0
         until [ -s "$BENCHMARK_SESSION/proxy-port" ]; do
             kill -0 "$PROXY_PID" 2>/dev/null || return 1
@@ -420,6 +542,8 @@ start_dev_servers() {
     export GEOROIDS_BENCHMARK_WS_URL="ws://localhost:$gameplay_port/ws"
     local client_command="vite --configLoader runner --port $TEST_VITE_PORT --strictPort"
     local server_entry=server.ts
+    local server_env=.env.local
+    if [ "$SHARD_CHILD" = true ]; then server_env=.env.example; fi
     if [ "$RUN_MODE" != tests ]; then
         server_entry=benchmarks/realtime-server.ts
     fi
@@ -429,24 +553,25 @@ start_dev_servers() {
         client_command="vite preview --configLoader runner --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
     fi
     echo "🚀 Starting servers owned by this runner..."
+    REGISTERING_CHILD=true
     (
         export NODE_ENV="$BUILD_MODE"
         export VITEST=false
         export PORT="$TEST_SERVER_PORT"
-        export GEOROIDS_WORLD_PATH=:memory:
         if [ "$RUN_MODE" != tests ]; then
             export GEOROIDS_PERFORMANCE=1
         fi
         export VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws"
-        exec npx --no-install concurrently \
+        GEOROIDS_WORLD_PATH=:memory: exec npx --no-install concurrently \
             --kill-others \
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
             --names "vite,network" \
             "$client_command" \
-            "tsx --env-file=.env.local $server_entry"
+            "node --env-file=$server_env --import tsx $server_entry"
     ) &
     DEV_PID=$!
+    honor_pending_interrupt
 
     if ! wait_for_servers; then
         echo "❌ Failed to start dev servers" >&2
@@ -501,6 +626,7 @@ run_tests() {
     local -a vitest_command=(
         npx --no-install vitest run
         --config "$vitest_config"
+        --configLoader=runner
         --pool=forks
         --maxWorkers=1
         --sequence.concurrent=false
@@ -522,18 +648,29 @@ run_tests() {
     fi
     printf '\n📝 Vitest config: %s\n' "$vitest_config"
 
+    REGISTERING_CHILD=true
     VITEST_MAX_WORKERS=1 "${vitest_command[@]}" "${test_args[@]}" &
     TEST_PID=$!
+    honor_pending_interrupt
     local test_wait_pid="$TEST_PID"
     TEST_TIMED_OUT=false
+    REGISTERING_CHILD=true
     (
-        trap 'exit 0' INT TERM
+        watchdog_interrupted=false
+        trap 'watchdog_interrupted=true' INT TERM
         sleep "$MAX_TEST_DURATION_SECONDS" &
         watchdog_sleep_pid=$!
+        trap 'kill -TERM "$watchdog_sleep_pid" 2>/dev/null || true; wait "$watchdog_sleep_pid" 2>/dev/null || true; exit 0' INT TERM
+        if [ "$watchdog_interrupted" = true ]; then
+            kill -TERM "$watchdog_sleep_pid" 2>/dev/null || true
+            wait "$watchdog_sleep_pid" 2>/dev/null || true
+            exit 0
+        fi
         wait "$watchdog_sleep_pid" || exit 0
         kill -ALRM "$$" 2>/dev/null || true
     ) &
     WATCHDOG_PID=$!
+    honor_pending_interrupt
 
     local exit_code=0
     while kill -0 "$test_wait_pid" 2>/dev/null; do
@@ -551,8 +688,9 @@ run_tests() {
     fi
     wait "$test_wait_pid" 2>/dev/null || true
 
-    if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
-        exit_code=1
+    if ! stop_watchdog; then
+        CLEANUP_FAILED=true
+        if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
     fi
 
     if [ "$TEST_TIMED_OUT" = true ]; then
@@ -583,8 +721,69 @@ main() {
     fi
 
     echo "🧪 Starting GeoRoids test runner..."
-    if ! acquire_lock "${test_args[@]}"; then
-        exit 1
+    if [ "$SHARD_CHILD" = true ]; then
+        local authorization
+        authorization="$(mktemp "${TMPDIR:-/tmp}/georoids-shard-auth.XXXXXX")" || exit 1
+        if ! node "$REPO_ROOT/scripts/integration-shards.mjs" authorize "$$" "$PPID" "$REPO_ROOT" "$LOCK_DIR" > "$authorization"; then
+            rm -f "$authorization"
+            exit 1
+        fi
+        {
+            IFS= read -r TEST_VITE_PORT
+            IFS= read -r TEST_SERVER_PORT
+            IFS= read -r SHARD_DIRECTORY
+            IFS= read -r SHARD_ASSIGNMENT
+        } < "$authorization"
+        rm -f "$authorization" || exit 1
+        export GEOROIDS_TEST_VITE_PORT="$TEST_VITE_PORT"
+        export GEOROIDS_TEST_SERVER_PORT="$TEST_SERVER_PORT"
+        export GEOROIDS_TEST_SESSION_DIR="$SHARD_DIRECTORY"
+        export GEOROIDS_TEST_LOG_DIR="$SHARD_DIRECTORY/logs"
+        export GEOROIDS_TEST_SCREENSHOTS_DIR="$SHARD_DIRECTORY/screenshots"
+        export TMPDIR="$SHARD_DIRECTORY/tmp"
+        export GEOROIDS_WORLD_PATH=:memory:
+        test_args=(tests/integration/ "--shard=$SHARD_ASSIGNMENT" --reporter=verbose --reporter=json "--reporter=$REPO_ROOT/scripts/integration-timing-reporter.mjs" "--outputFile.json=$SHARD_DIRECTORY/vitest.json")
+    else
+        if ! acquire_lock "${test_args[@]}"; then exit 1; fi
+    fi
+    if [ "$RUN_MODE" = shards ] || [ "$RUN_MODE" = discovery ] || [ "$RUN_MODE" = discovery-node ]; then
+        local argument
+        for argument in "${test_args[@]}"; do
+            case "$argument" in
+                tests/integration|tests/integration/|--reporter=verbose) ;;
+                *) echo "❌ Coordinated shards require complete integration discovery; unsupported argument: $argument" >&2; exit 64 ;;
+            esac
+        done
+        local -a coordinator=(node "$REPO_ROOT/scripts/integration-shards.mjs" coordinate "$LOCK_DIR" "$$")
+        if [ "$RUN_MODE" = discovery ]; then coordinator+=(--discover-only); fi
+        if [ "$RUN_MODE" = discovery-node ]; then coordinator+=(--discovery-node); fi
+        if [ -n "$COMPILE_CACHE_TREATMENT" ]; then coordinator+=("--native-compile-cache=$COMPILE_CACHE_TREATMENT"); fi
+        mkdir -p "$REPO_ROOT/.performance/integration-shards" || exit 1
+        COORDINATOR_CONTROL="$(mktemp -d "$REPO_ROOT/.performance/integration-shards/owner-XXXXXX")" || exit 1
+        retain_cleanup_state ownership-pending || exit 1
+        REGISTERING_CHILD=true
+        GEOROIDS_COORDINATOR_CONTROL="$COORDINATOR_CONTROL" "${coordinator[@]}" &
+        TEST_PID=$!
+        COORDINATOR_BIRTH="$(ps -p "$TEST_PID" -o lstart=)" || exit 1
+        honor_pending_interrupt
+        local coordinator_status=0
+        wait "$TEST_PID" || coordinator_status=$?
+        if ! node "$REPO_ROOT/scripts/integration-shards.mjs" verify-exit "$COORDINATOR_CONTROL" "$$" \
+            > "$COORDINATOR_CONTROL/receipt-validation.log" 2>&1; then
+            echo "❌ Coordinator exit omitted valid cleanup evidence; owned fallback required" >&2
+            if node "$REPO_ROOT/scripts/integration-shards.mjs" fallback-stop "$COORDINATOR_CONTROL" "$$" \
+                > "$COORDINATOR_CONTROL/fallback-cleanup.log" 2>&1; then
+                rm -f "$LOCK_DIR/ownership-pending.json" "$LOCK_DIR/cleanup-failed.json" || CLEANUP_FAILED=true
+            else
+                CLEANUP_FAILED=true
+                retain_cleanup_state cleanup-failed || true
+            fi
+            coordinator_status=1
+        else
+            rm -f "$LOCK_DIR/ownership-pending.json" "$LOCK_DIR/cleanup-failed.json" || coordinator_status=1
+        fi
+        TEST_PID=""
+        return "$coordinator_status"
     fi
 
     local startup_status=0

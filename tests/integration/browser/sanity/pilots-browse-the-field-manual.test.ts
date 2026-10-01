@@ -1,9 +1,11 @@
+// @vitest-environment node
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { expect, test } from 'vitest';
 import { readWikiArticles } from '../../../../scripts/wiki-content';
 import { media } from '../../../../src/wiki/media';
+import { ScreenshotManager } from '../../utils/screenshot-manager';
 import { TestConfig } from '../../utils/test-config';
 
 const articles = readWikiArticles();
@@ -14,7 +16,7 @@ const HAULER_LEGACY_TERMS_PATTERN = /Q latches|couple a second/u;
 
 test('pilots find rules and see autoplay demonstrations on desktop and mobile', async () => {
   const browser = await chromium.launch({ headless: true });
-  const output = resolve('tests/integration/browser/screenshots');
+  const output = new ScreenshotManager().getScreenshotsDir();
   await mkdir(output, { recursive: true });
   const consoleMessages: string[] = [];
   const errors: string[] = [];

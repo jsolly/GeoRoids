@@ -244,6 +244,15 @@ export function handleTestFixtureState(
     }
     respond(200, {
       combat: gameEngine.getFixtureCombatEvidence(),
+      spiderField: {
+        ...gameEngine.getSpiderField(),
+        spiders: gameEngine.getSpiderField().spiders.map((spider) => ({
+          ...spider,
+          towedBy:
+            gameEngine.getAllPlayers().find((player) => player.harpoonTargetId === spider.id)?.id ??
+            null,
+        })),
+      },
       crawlers: gameEngine
         .getSpiderField()
         .spiders.filter((spider) => spider.crawler && asteroidIds.includes(spider.crawler.hostId)),
@@ -270,6 +279,9 @@ export function handleTestFixtureState(
         cargo: player.cargo,
         score: player.score,
         kitId: player.kitId,
+        harpoonTargetId: player.harpoonTargetId ?? null,
+        haulerUtility: player.haulerUtility ?? null,
+        abilityCooldownFrames: player.abilityCooldownFrames ?? 0,
         health: player.health,
         exploding: player.exploding,
         position: { ...player.position },
@@ -297,7 +309,15 @@ export function handleTestPlacePlayer(
   readBoundedTestJson(req, res, (parsed, respond) => {
     if (
       !isRecord(parsed) ||
-      Object.keys(parsed).some((key) => key !== 'playerId' && key !== 'position') ||
+      Object.keys(parsed).some(
+        (key) =>
+          !['playerId', 'position', 'clearSpawnProtection', 'expectedTowTargetId'].includes(key)
+      ) ||
+      ('clearSpawnProtection' in parsed && typeof parsed['clearSpawnProtection'] !== 'boolean') ||
+      ('expectedTowTargetId' in parsed &&
+        (typeof parsed['expectedTowTargetId'] !== 'string' ||
+          parsed['expectedTowTargetId'].length === 0 ||
+          Buffer.byteLength(parsed['expectedTowTargetId']) > 128)) ||
       typeof parsed['playerId'] !== 'string' ||
       parsed['playerId'].length === 0 ||
       Buffer.byteLength(parsed['playerId']) > 128 ||
@@ -343,19 +363,69 @@ export function handleTestPlacePlayer(
       return;
     }
 
+    const expectedTowTargetId = parsed['expectedTowTargetId'];
+    const towOwners =
+      typeof expectedTowTargetId === 'string'
+        ? gameEngine
+            .getAllPlayers()
+            .filter(
+              (actor) =>
+                actor.harpoonTargetId === expectedTowTargetId &&
+                gameEngine.playerMotion.hasLiveTowForTesting(actor, expectedTowTargetId)
+            )
+        : [];
+    const towOwner = towOwners.length === 1 ? towOwners[0] : undefined;
+    const towTarget =
+      typeof expectedTowTargetId === 'string'
+        ? gameEngine
+            .getSpiderField()
+            .spiders.find(
+              (spider) => spider.id === expectedTowTargetId && spider.health > 0 && !spider.crawler
+            )
+        : undefined;
+    if (
+      (expectedTowTargetId !== undefined &&
+        (!gameEngine.playerMotion.hasLiveActorForTesting(player) ||
+          !towOwner ||
+          !towTarget ||
+          (player.id !== towOwner.id && Boolean(player.harpoonTargetId)))) ||
+      (parsed['clearSpawnProtection'] === true &&
+        player.harpoonTargetId &&
+        expectedTowTargetId === undefined)
+    ) {
+      respond(409, { error: 'Validated live terrain tow required' });
+      return;
+    }
     const position = { x, y };
-    const placed = gameEngine.playerMotion.placeActorForTesting(
-      player.id,
-      position,
-      gameEngine.getServerTime()
-    );
+    const placed =
+      towOwner?.id === player.id && typeof expectedTowTargetId === 'string'
+        ? gameEngine.playerMotion.placeTowedActorForTesting(
+            player,
+            position,
+            gameEngine.getServerTime(),
+            expectedTowTargetId
+          )
+        : gameEngine.playerMotion.placeActorForTesting(
+            player.id,
+            position,
+            gameEngine.getServerTime()
+          );
     if (!placed) {
       respond(409, { error: 'Fixture player motion state unavailable' });
       return;
     }
+    if (parsed['clearSpawnProtection'] === true) {
+      player.spawnProtectionTimer = 0;
+    }
     gameEngine.ensureAsteroidField();
     wsCore.getBroadcaster().broadcastGameState();
     respond(200, {
+      expectedTowTargetId: expectedTowTargetId ?? null,
+      towOwnerId: towOwner?.id ?? null,
+      towTargetId: towOwner?.harpoonTargetId ?? null,
+      placedActorTowTargetId: player.harpoonTargetId ?? null,
+      spawnProtectionCleared: parsed['clearSpawnProtection'] === true,
+      spawnProtectionTimer: player.spawnProtectionTimer ?? 0,
       status: 'placed',
       playerId: player.id,
       position,
@@ -527,6 +597,7 @@ export function handleTestArrangeCrewField(
         'map-icons',
         'spider-tools',
         'spider-rescue',
+        'spider-tow-bite',
         'belt-mining',
         'belt-escape',
         'belt-pursuit',
@@ -540,7 +611,9 @@ export function handleTestArrangeCrewField(
         player.health = DAMAGE.ASTEROID_COLLISION;
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
-      player.abilityCooldownFrames = 0;
+      if (body['scenario'] !== 'spider-tow-bite') {
+        player.abilityCooldownFrames = 0;
+      }
       if (body['scenario'] === 'delivery') {
         player.cargo = 0;
       }

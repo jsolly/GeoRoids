@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { RICOCHET_COURT } from '../../../../shared/ricochetCourt';
 import { DAMAGE } from '../../../../src/constants';

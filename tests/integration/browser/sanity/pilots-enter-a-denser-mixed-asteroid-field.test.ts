@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { DEPOSIT_FIELD } from '../../../../src/constants';
 import {

@@ -88,6 +88,10 @@ case "$*" in
 esac
 echo "$stage" >> "$CALLS"
 echo "$stage output"
+if [[ "$stage" == integration && "$FAIL_STAGE" != receipt ]]; then
+  mkdir -p "$(dirname "$GEOROIDS_TEST_SHARD_RECEIPT")"
+  echo '{"success":true,"artifactDirectory":"fixture"}' > "$GEOROIDS_TEST_SHARD_RECEIPT"
+fi
 mkdir -p logs
 echo "$stage server log" > logs/server.log
 if [[ "$stage" == "$FAIL_STAGE" ]]; then exit 42; fi
@@ -96,7 +100,7 @@ if [[ "$stage" == "$FAIL_STAGE" ]]; then exit 42; fi
     writeFileSync(join(fixture, path), substitute, { mode: 0o755 });
   }
   const stages = ['integration', 'frame', 'traversal', 'combat'];
-  for (const failure of ['', ...stages, 'tee']) {
+  for (const failure of ['', ...stages, 'receipt', 'tee']) {
     const calls = join(fixture, 'calls');
     writeFileSync(calls, '');
     if (failure === 'tee') {
@@ -116,7 +120,7 @@ if [[ "$stage" == "$FAIL_STAGE" ]]; then exit 42; fi
     });
     assert.equal(result.status === 0, failure === '', result.stdout + result.stderr);
     const expected =
-      failure === 'tee'
+      failure === 'tee' || failure === 'receipt'
         ? ['integration']
         : stages.slice(0, failure ? stages.indexOf(failure) + 1 : stages.length);
     assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n'), expected);
@@ -129,6 +133,16 @@ if [[ "$stage" == "$FAIL_STAGE" ]]; then exit 42; fi
       failure ? /exit_status=[1-9]/u : /exit_status=0/u
     );
     for (const stage of expected) {
+      if (stage === 'integration') {
+        if (failure === 'receipt') {
+          assert.match(result.stderr, /Missing integration shard receipt/u);
+        } else {
+          const receipt = JSON.parse(readFileSync(join(outputPath, stage, 'shards.json'), 'utf8'));
+          assert.equal(receipt.success, true);
+          assert.equal(receipt.artifactDirectory, 'fixture');
+        }
+        continue;
+      }
       assert.equal(
         readFileSync(join(outputPath, stage, 'logs/server.log'), 'utf8').trim(),
         `${stage} server log`

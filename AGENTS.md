@@ -30,6 +30,8 @@ The dotagents dispatcher runs the tracked pre-commit gate. Lint, unused-code che
 
 Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns and serializes the local Vite/server pair. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
 
+Full suites use six authenticated serial shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. See [isolated shards](docs/integration-shards.md).
+
 ## Architecture
 
 Vite serves the client; the Node WebSocket server owns authoritative world state. Shared gameplay rules live once under `shared/`; import them on both sides. Gameplay requires snapshot v1 and asteroid interactions; unsupported clients must reject, with no protocol opt-outs. Reconnects use private resume tokens. Read [architecture and diagnostics](docs/agent-operations.md#architecture) for module ownership and debugging.

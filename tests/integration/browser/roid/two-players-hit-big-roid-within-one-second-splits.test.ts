@@ -1,3 +1,4 @@
+// @vitest-environment node
 import assert from 'node:assert/strict';
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';

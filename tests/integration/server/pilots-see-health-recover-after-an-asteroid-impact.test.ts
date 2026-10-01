@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { strict as assert } from 'node:assert';
 import { expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';

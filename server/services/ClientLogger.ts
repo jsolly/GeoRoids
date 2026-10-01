@@ -147,7 +147,10 @@ function withinQuota(source: object, bytes: number): boolean {
 }
 
 function logPath(): string {
-  return path.join(process.cwd(), 'logs', 'client.log');
+  return path.join(
+    process.env['GEOROIDS_TEST_LOG_DIR'] ?? path.join(process.cwd(), 'logs'),
+    'client.log'
+  );
 }
 
 async function size(filePath: string): Promise<number> {

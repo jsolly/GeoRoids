@@ -49,6 +49,14 @@ When a check fails:
 2. Update relevant articles and source references; regenerate affected demonstrations.
 3. Inspect the resulting images and verify their behavior against the implementation. Run the media reproducibility check when the generator changes.
 4. Run lint, types, relevant gameplay tests, and desktop/mobile wiki checks.
-5. Record the completed review with `npm run wiki:review -- --note "Describe the rules and demonstrations reviewed"`. Then run `npm run test` and `npm run build`, including the review-invalidation contract test. Commit the resulting `docs/wiki-source-review.json` with the change.
+5. Record only the completed scope with `npm run wiki:review`: repeat `--source` for each reviewed changed path, `--topic` for every affected article, and `--media` for every affected demonstration, with a nonempty `--note`. Unmapped or deleted sources also need an explicit `--owner source/path=topic-id` using a selected real topic. Then run `npm run test` and `npm run build`, including the review-invalidation contract test. Commit the resulting `docs/wiki-source-review.json` with the change.
 
 Do not regenerate the baseline automatically in CI or as part of a build. The digest detects review work; it cannot write or validate the explanation for you. Review notes should describe actual completed checks.
+
+Acceptance updates only the selected source hashes, adding or removing those keys as needed. It preserves unrelated pending hashes, the legacy review note and earlier review batches. A scoped acceptance can succeed while reporting other pending sources; the ordinary check still fails until those sources are reviewed. Unknown, duplicate or incomplete selectors fail before writing. Build and CI never accept a review automatically.
+
+For a change confined to the Wiki checker, a review command from `/Users/johnsolly/code/GeoRoids` or its absolute worktree root is:
+
+```sh
+npm run wiki:review -- --source scripts/wiki-check.ts --topic field-manual --owner scripts/wiki-check.ts=field-manual --note "Reviewed scoped maintenance checks; player rules and demonstrations are unchanged."
+```

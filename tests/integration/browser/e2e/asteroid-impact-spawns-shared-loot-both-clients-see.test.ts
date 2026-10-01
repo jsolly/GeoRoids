@@ -10,7 +10,7 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { arrangeCrewField } from '../../utils/test-server-control';
+import { arrangeCrewFieldWithEvidence } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
@@ -73,20 +73,18 @@ test(
     await Promise.all([impactedPilot.waitForRemotePlayers(1), collector.waitForRemotePlayers(1)]);
 
     const healthBefore = await impactedPilot.getShipHealth();
+    expect(healthBefore).toBeGreaterThan(0);
     const scoreBefore = await collector.getScore();
     const knownLoot = new Set((await collector.getLoot()).map((drop) => drop.id));
     damageMessages.length = 0;
 
     // Start the first pilot at one impact's worth of health, then let the
     // real asteroid collision loop kill it and publish wreckage to both clients.
-    await arrangeCrewField([impactedPilotId, collectorId], 'impact');
-
-    await expect
-      .poll(() => impactedPilot.getShipHealth(), {
-        timeout: 8000,
-        message: 'the fixture asteroid should cost the impacted pilot one life',
-      })
-      .toBeLessThan(healthBefore);
+    const fixture = await arrangeCrewFieldWithEvidence([impactedPilotId, collectorId], 'impact');
+    // Respawn can finish before either browser observes the death. Retain the
+    // acknowledged impact pose instead of reading the pilot's latest pose.
+    const deathPosition = fixture.positions.get(impactedPilotId);
+    assert.ok(deathPosition, 'the fixture should acknowledge the impacted pilot position');
 
     await expect
       .poll(
@@ -97,9 +95,6 @@ test(
         }
       )
       .toBe(true);
-
-    const deathPosition = await collector.getNetworkPlayerPosition(impactedPilotId);
-    assert.ok(deathPosition, 'the collector should receive the impacted pilot position');
 
     const isImpactWreckage = (
       drop: Awaited<ReturnType<GameInteractions['getLoot']>>[number]

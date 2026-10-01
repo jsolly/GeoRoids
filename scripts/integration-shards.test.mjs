@@ -4,10 +4,12 @@ import { createHash } from 'node:crypto';
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
@@ -68,6 +70,26 @@ function fixtureCommonDir(directory, inherited = process.env) {
 
 const root = resolve(import.meta.dirname, '..');
 const helper = join(root, 'scripts/integration-shards.mjs');
+function cacheInventory(directory, prefix = '') {
+  if (!existsSync(directory)) {
+    return [];
+  }
+  return readdirSync(directory)
+    .sort()
+    .flatMap((name) => {
+      const path = join(directory, name),
+        relative = prefix ? `${prefix}/${name}` : name;
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) {
+        return cacheInventory(path, relative);
+      }
+      const bytes = stat.isSymbolicLink() ? readlinkSync(path) : readFileSync(path);
+      return [[relative, createHash('sha256').update(bytes).digest('hex')]];
+    });
+}
+function sharedVitestCache() {
+  return cacheInventory(join(root, 'node_modules/.vite'));
+}
 function retainFixture(directory, label, output) {
   const home = process.env.GEOROIDS_CONTRACT_EVIDENCE_DIR;
   if (!home) {
@@ -200,6 +222,7 @@ test('discovery requires all integration files and excludes nested unit copies',
 // Bash children. Authorization runs in its ordinary helper subprocess so PID,
 // parent chain, process birth times and common-lock ownership are not mocked.
 async function handshake(mode) {
+  const sharedCacheBefore = sharedVitestCache();
   const directory = mkdtempSync(join(tmpdir(), 'geo-shard-auth-'));
   let processOutput;
   try {
@@ -267,7 +290,7 @@ process.stdout.write(JSON.stringify(result.map(file=>file.moduleId))+'\\n');
       }
       writeFileSync(
         join(worktree, 'vitest.config.ts'),
-        `import {defineConfig} from 'vitest/config';import {IntegrationSequencer} from './scripts/integration-sequencer.ts';export default defineConfig({test:{environment:'node',pool:'forks',maxWorkers:1,isolate:true,fileParallelism:false,sequence:{sequencer:IntegrationSequencer,concurrent:false},maxConcurrency:1}});`
+        `import {defineConfig} from 'vitest/config';import {IntegrationSequencer} from './scripts/integration-sequencer.ts';export default defineConfig({cacheDir:${JSON.stringify(join(worktree, '.performance/vitest-cache'))},test:{environment:'node',pool:'forks',maxWorkers:1,isolate:true,fileParallelism:false,sequence:{sequencer:IntegrationSequencer,concurrent:false},maxConcurrency:1}});`
       );
     }
     if (sequencerMode) {
@@ -361,6 +384,12 @@ child.once('exit',(code)=>{if(!process.exitCode)process.exitCode=code??1;});
         return result;
       }
       assert.equal(result.code, 0, result.stderr);
+      assert.ok(
+        cacheInventory(join(worktree, '.performance/vitest-cache')).some(([name]) =>
+          name.endsWith('/results.json')
+        ),
+        'Installed Vitest results must remain in the fixture cache'
+      );
       assert.equal(receipt.complete, true);
       assert.equal(receipt.files.length, 1);
       assert.equal(receipt.files[0].file, join(worktree, 'tests/integration/file-0.test.ts'));
@@ -369,8 +398,14 @@ child.once('exit',(code)=>{if(!process.exitCode)process.exitCode=code??1;});
     }
     return result;
   } finally {
+    const sharedCacheAfter = sharedVitestCache();
     retainFixture(directory, mode, processOutput);
     rmSync(directory, { recursive: true, force: true });
+    assert.deepEqual(
+      sharedCacheAfter,
+      sharedCacheBefore,
+      'Installed timing fixture must not write shared dependency caches'
+    );
   }
 }
 test('actual child handshake waits for its issued PID manifest and rejects forged identities', async () => {
@@ -1430,6 +1465,7 @@ async function installedDiscoveryFixture(
   treatment = '',
   inherited = process.env
 ) {
+  const sharedCacheBefore = sharedVitestCache();
   const directory = mkdtempSync(join(tmpdir(), 'geo-installed-discovery-'));
   let output;
   try {
@@ -1457,7 +1493,7 @@ async function installedDiscoveryFixture(
     );
     writeFileSync(
       join(directory, 'vitest.browser.config.ts'),
-      `import {defineConfig} from 'vitest/config';export default defineConfig({test:{environment:'jsdom',includeTaskLocation:true,setupFiles:['./setup.mjs']${fault === 'global' ? ",globalSetup:['./global-setup.mjs']" : ''}}});`
+      `import {defineConfig} from 'vitest/config';export default defineConfig({cacheDir:${JSON.stringify(join(directory, '.performance/vitest-cache'))},test:{environment:'jsdom',includeTaskLocation:true,setupFiles:['./setup.mjs']${fault === 'global' ? ",globalSetup:['./global-setup.mjs']" : ''}}});`
     );
     writeFileSync(
       join(directory, 'setup.mjs'),
@@ -1587,8 +1623,14 @@ import {it} from 'vitest';it('pragma retains its actual DOM environment',()=>{th
         : null,
     };
   } finally {
+    const sharedCacheAfter = sharedVitestCache();
     retainFixture(directory, `installed-discovery-${option}-${fault}`, output);
     rmSync(directory, { recursive: true, force: true });
+    assert.deepEqual(
+      sharedCacheAfter,
+      sharedCacheBefore,
+      'Installed discovery fixture must not write shared dependency caches'
+    );
   }
 }
 

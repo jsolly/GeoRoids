@@ -111,6 +111,9 @@ WATCHDOG_PID=""
 PROXY_PID=""
 BENCHMARK_SESSION=""
 BENCHMARK_ARTIFACT_DIR=""
+RUNNER_RECEIPT="${GEOROIDS_TEST_RUNNER_RECEIPT:-}"
+if [ "$SHARD_CHILD" = true ]; then RUNNER_RECEIPT=""; fi
+RUNNER_STARTED_AT="$(date +%s)"
 TEST_TIMED_OUT=false
 CLEANUP_RUNNING=false
 CLEANUP_FAILED=false
@@ -361,20 +364,41 @@ cleanup() {
         DEV_PID=""
     fi
     if [ -n "$PROXY_PID" ]; then
-        if ! terminate_process_tree "$PROXY_PID" && [ "$exit_code" -eq 0 ]; then exit_code=1; fi
+        if ! terminate_process_tree "$PROXY_PID"; then
+            cleanup_succeeded=false
+            if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
+        fi
+        PROXY_PID=""
     fi
     if [ -n "$BENCHMARK_SESSION" ]; then
         if [ -n "$BENCHMARK_ARTIFACT_DIR" ]; then
             if [ -f "$BENCHMARK_SESSION/proxy-stats.json" ]; then
-                cp "$BENCHMARK_SESSION/proxy-stats.json" "$BENCHMARK_ARTIFACT_DIR/proxy-stats.json" || exit_code=1
+                if ! cp "$BENCHMARK_SESSION/proxy-stats.json" "$BENCHMARK_ARTIFACT_DIR/proxy-stats.json"; then
+                    cleanup_succeeded=false
+                    exit_code=1
+                fi
             fi
-            printf '{"exitCode":%s,"timedOut":%s}\n' "$exit_code" "$TEST_TIMED_OUT" > "$BENCHMARK_ARTIFACT_DIR/runner.json" || exit_code=1
         fi
-        rm -rf -- "$BENCHMARK_SESSION" || exit_code=1
+        if ! rm -rf -- "$BENCHMARK_SESSION" || [ -e "$BENCHMARK_SESSION" ]; then
+            cleanup_succeeded=false
+            exit_code=1
+        fi
     fi
     if ! release_lock; then
         cleanup_succeeded=false
         if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
+    fi
+    if [ "$cleanup_succeeded" != true ] && [ "$exit_code" -eq 0 ]; then exit_code=1; fi
+    # Final receipts follow owned process shutdown, diagnostic retention, session
+    # removal and lock release. A failed write can never certify this runner.
+    if [ -n "$BENCHMARK_ARTIFACT_DIR" ] || [ -n "$RUNNER_RECEIPT" ]; then
+        if ! node "$REPO_ROOT/scripts/review-receipt.mjs" runner \
+            "$BENCHMARK_ARTIFACT_DIR" "$RUNNER_RECEIPT" "$RUN_MODE" "$REPO_ROOT" \
+            "$$" "$RUNNER_STARTED_AT" "$exit_code" "$cleanup_succeeded" \
+            "$TEST_TIMED_OUT" "$LOCK_HELD" "$BENCHMARK_SESSION" "$INTERRUPT_SIGNAL"; then
+            echo "❌ Could not retain final runner cleanup receipt" >&2
+            exit_code=1
+        fi
     fi
     if [ "$SHARD_CHILD" = true ] && [ -n "$SHARD_DIRECTORY" ]; then
         if ! printf '{"runId":"%s","shard":%s,"exitCode":%s,"cleanupSucceeded":%s,"timedOut":%s}\n' \

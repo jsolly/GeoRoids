@@ -473,6 +473,41 @@ async function coordinatedFixture(mode) {
         )
       );
     }
+    if (mode === 'reused-port-allocation') {
+      const path = join(directory, 'scripts/integration-shards.mjs');
+      writeFileSync(
+        path,
+        readFileSync(path, 'utf8').replace(
+          "import { createServer } from 'node:net';",
+          "import { createServer } from './fixture-port-allocator.mjs';"
+        )
+      );
+      writeFileSync(
+        join(directory, 'scripts/fixture-port-allocator.mjs'),
+        `const held = new Set();
+export function createServer() {
+  let port;
+  return {
+    listening: false,
+    once() {},
+    listen(_port, _host, accept) {
+      port = 40000;
+      while (held.has(port)) port++;
+      held.add(port);
+      this.listening = true;
+      queueMicrotask(accept);
+    },
+    address() { return { port }; },
+    close(accept) {
+      held.delete(port);
+      this.listening = false;
+      queueMicrotask(accept);
+    }
+  };
+}
+`
+      );
+    }
     writeFileSync(join(directory, '.env.example'), '');
     for (let i = 0; i < 6; i++) {
       writeFileSync(join(directory, 'tests/integration', `file-${i}.test.ts`), '');
@@ -986,6 +1021,10 @@ test('six actual authenticated runner commands retain isolation and fail closed 
   assert.equal(valid.receipt.success, true);
   assert.equal(valid.receipt.equivalencePassed, true);
   assert.equal(valid.receipt.summary.cases, 6);
+  const reusedPorts = await coordinatedFixture('reused-port-allocation');
+  assert.equal(reusedPorts.code, 0, `${reusedPorts.stdout}\n${reusedPorts.stderr}`);
+  assert.equal(reusedPorts.receipt.success, true);
+  assert.equal(reusedPorts.receipt.summary.cases, 6);
   for (const fault of [
     'missing',
     'duplicate',

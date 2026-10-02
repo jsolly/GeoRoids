@@ -1203,6 +1203,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
           b.estimatedFileMs - a.estimatedFileMs ||
           a.index - b.index
       );
+      reservations.push(...(await reservePorts(totalShards * 2)));
       const active = new Set();
       async function launch(assignment) {
         required(!interrupted, 'Stopped before queued launch');
@@ -1212,7 +1213,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
         for (const name of ['tmp', 'cache', 'logs', 'screenshots']) {
           mkdirSync(join(directory, name), { recursive: true });
         }
-        const pair = await reservePorts(2);
+        const pair = reservations.slice((index - 1) * 2, index * 2);
         await Promise.all(pair.map(({ server }) => new Promise((accept) => server.close(accept))));
         required(!interrupted, 'Stopped before child spawn');
         const child = spawn(join(worktree, 'scripts/test-runner.sh'), ['--coordinator-child'], {
@@ -1357,7 +1358,9 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
     stop();
   } finally {
     for (const { server } of reservations) {
-      await new Promise((accept) => server.close(accept));
+      if (server.listening) {
+        await new Promise((accept) => server.close(accept));
+      }
     }
     if (discoveryChild?.pid) {
       try {

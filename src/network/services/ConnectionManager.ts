@@ -804,31 +804,31 @@ export class ConnectionManager {
   }
 
   // Send player state to server
-  sendPlayerState(playerState: PlayerUpdate): void {
+  sendPlayerState(playerState: PlayerUpdate): boolean {
     if (
       !this.state.isConnected ||
       !this.state.socket ||
       this.state.socket.readyState !== WebSocket.OPEN
     ) {
-      return;
+      return false;
     }
 
     if (!this.joinAcknowledged) {
-      return;
+      return false;
     }
     const ship = PlayerManager.getInstance().getLocalShip();
     if (!ship || ship.furnaceTransit) {
-      return;
+      return false;
     }
     const pose = this.motionReconciliation.buildHandoffPose(ship);
     if (pose) {
       Object.assign(playerState, pose);
     }
     if (!pose && this.motionReconciliation.shouldSuppressPose()) {
-      return;
+      return false;
     }
     this.updateEnvelope.data = playerState;
-    this.sendPayload(this.updateEnvelope);
+    return this.sendPayload(this.updateEnvelope);
   }
 
   // Send shoot event to server
@@ -843,8 +843,21 @@ export class ConnectionManager {
       return;
     }
 
-    const ship = PlayerManager.getInstance().getLocalShip();
-    if (!ship?.lasers.includes(laser)) {
+    const player = PlayerManager.getInstance().getLocalPlayer();
+    const ship = player?.ship;
+    if (
+      !player ||
+      !this.localPlayerId ||
+      player.id !== this.localPlayerId ||
+      !ship?.lasers.includes(laser) ||
+      ship.exploding ||
+      ship.health <= 0
+    ) {
+      return;
+    }
+    // The shot budget uses the authoritative pose. Keep its current handoff
+    // immediately ahead of the shot on this socket, using the normal allocator.
+    if (!this.sendPlayerState({ id: this.localPlayerId, ...player.getStateForNetwork() })) {
       return;
     }
     const field = AuthoritativeProjectileField.getInstance();

@@ -22,7 +22,7 @@ only after fresh evidence covers the PR's acceptance criteria.
 | 4 | Prove authoritative firing in production. A correlated non-null `shotAcknowledged` is sufficient even if a collision consumes the bolt before a snapshot. Reject missing, null, wrong or stale acknowledgements; malformed snapshots still fail. | Shipped [#739](https://github.com/jsolly/GeoRoids/pull/739) | Projectile `6hfP8334Q638373M` |
 | 5 | Run six isolated integration shards three times, each run under 600 seconds; retain 300 seconds as a future performance target. Preserve isolation and failure evidence. | Shipped [#746](https://github.com/jsolly/GeoRoids/pull/746); approved 600s bar met | Shards `6hcHJM3WrR7Hh9CM` |
 | 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | Shipped [#747](https://github.com/jsolly/GeoRoids/pull/747), `abb78c0b` | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
-| 7 | Inject targeted runtime capabilities, then repair measured global loot scans in a separate PR. Preserve atlas knowledge, loot motion/expiry and guard discovery ordering; leave already-bounded indexes unchanged. | Runtime shipped [#748](https://github.com/jsolly/GeoRoids/pull/748), `b63406ff`; index implementation under validation | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
+| 7 | Inject targeted runtime capabilities, then repair measured global loot scans in a separate PR. Preserve atlas knowledge, loot motion/expiry and guard discovery ordering; leave already-bounded indexes unchanged. | Runtime shipped [#748](https://github.com/jsolly/GeoRoids/pull/748), `b63406ff`; index shipped [#749](https://github.com/jsolly/GeoRoids/pull/749), `1fb6ed53` | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
 | 8 | Improve furnace travel and delivery feedback, including pinching, drop-off and shortage feedback. | Planned | Pinch `6hfFVMfQvxvm7JHv`; drop-off `6hfG7J5m99CC75mM`; shortage `6hfGfjj459h5v7Wv` |
 | 9 | Add cargo shielding and hauling pressure. Apply immunity first, then eject recoverable loot at 10 cargo points per HP. Hull health falls only for residual damage after cargo reaches zero. Cargo speed scales from 1 empty to 0.7 full. Reduce loot magnetic pull and give spills outward motion beyond immediate pickup reach; tune against current values during implementation. Prove physical conservation of recoverable hit spills, concurrent pickup, identity and expiry, no loot consumption for full-cargo ships, retention of partial remainders and remaining cargo dropping once on death. Use a bounded temporary own-spill recollection lockout only if the spatial kick and reduced pull still allow automatic overlap to negate the hit. | Planned | Cargo `6hfGfwppj5j2hPmv`; roles `6hfFGqVW7vrcCWhv` |
 | 10 | Add travelling tow/probe behavior at speed 1200. Preserve solo Hauler Tow Cable access to hives. Misses retract; each attempt incurs cooldown, enforced by the authoritative server. | Planned | Tow `6hfG7XPr4P73WcwM` |
@@ -695,3 +695,36 @@ desktop/mobile field-manual browser scenario passed; scoped acceptance updates
 only `package.json`, with `field-manual` ownership. Gameplay instructions and
 demonstrations are unchanged. The rerun and shipping remain pending. PR 8–16, historical
 investigations, parents and John's production migration handoff remain required.
+
+The adjacent tooling repair landed as [#750](https://github.com/jsolly/GeoRoids/pull/750),
+`5aaccc3d`. Its commit and explicit pre-push full gates passed 1794 unit tests,
+91 integration files / 210 cases in 302.2 and 329.8 seconds respectively,
+performance checks, cleanup and installed-input certification. Independent
+semantic and dependency review passed; npm audit reported zero vulnerabilities.
+Vercel and Railway both served the exact merge, with healthy worker persistence
+and zero loop stalls.
+
+Production smoke [36967333274](https://github.com/jsolly/GeoRoids/actions/runs/36967333274)
+failed on firing. The retained browser wire trace contains one real shoot request
+and its matching null projectile acknowledgement: an explicit rejection rather
+than a missing response. The trace places the shoot between movement updates;
+its inherited velocity is legal at the client firing position but exceeds the
+ceiling at the older authoritative pose. A narrow fix-forward will send the
+ordinary validated current pose before firing on the same connection, retaining
+server speed and muzzle bounds. The original failed receipt and trace remain
+under the external backlog evidence home; this release is not fully smoke-verified.
+Focused regression, full validation and fix-forward shipping remain pending.
+
+The narrow firing fix flushes the owned live pilot's ordinary validated pose
+before its shoot request and reports a matching null acknowledgement as rejection.
+Independent full review converged after strengthening fresh-pose regression
+coverage. Its second commit gate passed all 314 unit files / 1,796 cases and build,
+then failed on the mobile Resource Tap browser's 18-frame first-snapshot gap.
+That sampled gap cannot establish canister birth timing: the unchanged controlled
+server scenario requires exactly frames 23, 45, 68 and 90. The bounded browser
+repair instead requires four distinct ejection events preceding their identified
+live canisters, exact event/canister identity agreement, an admitted placement
+epoch and uninterrupted session. All three browser widths passed in 12.46 seconds;
+all four canonical tap unit cases passed. These focused results do not certify
+the complete gate. Both failed gate attempts remain retained; full validation,
+fix-forward integration and fresh production smoke remain required.

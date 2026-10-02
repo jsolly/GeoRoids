@@ -14,26 +14,40 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirna
 const WS_PATH = /\/ws(?:\?|$)/u;
 
 test.each([1280, 954, 390])(
-  'Hauler swaps hardware and extracts spaced loot at %i pixels',
+  'Hauler swaps hardware and receives four ejected canisters at %i pixels',
   async (width) => {
     const mobile = width === 390;
     const page = await browserManager.recreatePage({ hasTouch: mobile });
     await page.setViewportSize({ width, height: 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const decoder = new SnapshotDecoder();
-    const drops = new Map<string, number>();
+    const drops = new Set<string>();
+    const ejections: string[] = [];
     const seenLoot = new Set<string>();
     let observingTap = false;
+    const unannouncedDrops: string[] = [];
+    const interruptedSessions: string[] = [];
     page.on('websocket', (socket) => {
       if (!WS_PATH.test(socket.url())) {
         return;
       }
+      if (observingTap) {
+        interruptedSessions.push('replacement socket');
+      }
+      socket.on('close', () => {
+        if (observingTap) {
+          interruptedSessions.push('closed socket');
+        }
+      });
       socket.on('framereceived', ({ payload }) => {
         const result = decoder.readMessage(String(payload), { acceptSnapshots: true });
         if (result.kind === 'snapshot') {
           for (const loot of result.state.loot ?? []) {
             if (observingTap && loot.kind === 'tap' && !seenLoot.has(loot.id)) {
-              drops.set(loot.id, result.state.gameTime);
+              if (!ejections.includes(loot.id)) {
+                unannouncedDrops.push(loot.id);
+              }
+              drops.add(loot.id);
             }
             seenLoot.add(loot.id);
           }
@@ -44,7 +58,24 @@ test.each([1280, 954, 390])(
           'type' in result.message &&
           result.message.type === 'joined'
         ) {
+          if (observingTap) {
+            interruptedSessions.push('replacement join');
+          }
           decoder.reset();
+        } else if (
+          observingTap &&
+          result.kind === 'message' &&
+          typeof result.message === 'object' &&
+          result.message !== null &&
+          'type' in result.message &&
+          result.message.type === 'tapEjected' &&
+          'data' in result.message &&
+          typeof result.message.data === 'object' &&
+          result.message.data !== null &&
+          'lootId' in result.message.data &&
+          typeof result.message.data.lootId === 'string'
+        ) {
+          ejections.push(result.message.data.lootId);
         }
       });
     });
@@ -66,8 +97,8 @@ test.each([1280, 954, 390])(
     const useAbility = () =>
       mobile ? page.locator('#touch-ability').tap() : page.keyboard.press('e');
     for (const utility of ['tow_cable', 'resource_tap'] as const) {
-      await arrangeCrewField([id], 'tow');
-      await game.waitForAnimationFrames(10);
+      const epochs = await arrangeCrewField([id], 'tow');
+      await game.waitForControlledFixture(epochs.get(id));
       await openSchematic();
       const layout = () =>
         page.evaluate(() =>
@@ -130,13 +161,14 @@ test.each([1280, 954, 390])(
             page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId)
           )
           .toBeNull();
-        const frames = [...drops.values()];
-        for (let i = 1; i < frames.length; i++) {
-          // Each 22/23-frame burst is sampled by the 30 Hz authoritative snapshots.
-          const gap = (frames[i] ?? 0) - (frames[i - 1] ?? 0);
-          expect(gap).toBeGreaterThanOrEqual(20);
-          expect(gap).toBeLessThanOrEqual(25);
-        }
+        // Exact 23/45/68/90-frame cadence is proved by the controlled server
+        // scenario in tap-extract-spawns-tap-loot.test.ts. Snapshot arrival
+        // frames cannot identify birth frames when simulation and transport lag.
+        await expect.poll(() => ejections.length).toBe(4);
+        expect(new Set(ejections).size).toBe(4);
+        expect(unannouncedDrops).toEqual([]);
+        expect(interruptedSessions).toEqual([]);
+        expect([...drops].sort()).toEqual([...ejections].sort());
       }
     }
     expect(page.url().startsWith(TestConfig.GAME_URL)).toBe(true);

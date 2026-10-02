@@ -53,6 +53,9 @@ function bolt(id: string, x = 600): PlayerProjectileState {
 function frame(projectiles: PlayerProjectileState[]): ServerGameSnapshot {
   const state = captureSnapshot(snapshotFixture());
   state.entities = state.entities.slice(0, 2);
+  for (const row of state.entities) {
+    row.playerMotion = { epoch: 1, ack: 0, mode: 'free' };
+  }
   state.asteroids = [];
   state.loot = [];
   state.satellitePickups = [];
@@ -110,6 +113,19 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     return ws;
   }
 
+  function receiveLocalPose(ws: Transport): void {
+    const state = frame([]);
+    const row = state.entities[0];
+    const local = PlayerManager.getInstance().getLocalPlayer();
+    if (!row || !local) {
+      throw new Error('Local pose fixture unavailable');
+    }
+    row.id = local.id;
+    row.position = { ...local.ship.position };
+    row.velocity = { ...local.ship.velocity };
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+  }
+
   function ship() {
     const player = manager.getPlayer('pilot-1');
     if (!player) {
@@ -121,8 +137,33 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   test('the real firing client sends its player identity outside the correlated shot data', async () => {
     const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
+    receiveLocalPose(ws);
+    manager.sendPlayerState({ id: manager.getLocalPlayerId(), ...local.getStateForNetwork() });
+    const earlierPacket = structuredClone(ws.sent.at(-1));
+    const earlierSequence = earlierPacket?.data?.['motionSequence'];
+    if (earlierPacket?.type !== 'update' || typeof earlierSequence !== 'number') {
+      throw new Error('Earlier ordinary pose was not sent');
+    }
+    local.ship.position = { x: 15, y: -9 };
+    local.ship.velocity = { x: 0.4, y: -0.7 };
+    const firingPosition = { ...local.ship.position };
+    const firingVelocity = { ...local.ship.velocity };
+    expect(earlierPacket.data?.['position']).not.toEqual(firingPosition);
+    expect(earlierPacket.data?.['velocity']).not.toEqual(firingVelocity);
     local.ship.fireLaser();
     const packet = ws.sent.findLast((message) => message.type === 'shoot');
+    const shotIndex = ws.sent.findLastIndex((message) => message.type === 'shoot');
+    const firingPacket = structuredClone(ws.sent[shotIndex - 1]);
+    expect(firingPacket).toMatchObject({
+      type: 'update',
+      data: {
+        id: manager.getLocalPlayerId(),
+        position: firingPosition,
+        velocity: firingVelocity,
+        motionEpoch: 1,
+      },
+    });
+    expect(firingPacket?.data?.['motionSequence']).toBeGreaterThan(earlierSequence);
     const laser = local.ship.lasers.at(-1);
     expect(packet?.id).toBe(manager.getClientId());
     expect(packet?.data).not.toHaveProperty('id');
@@ -132,6 +173,22 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
       requestId: expect.any(String),
     });
     expect(packet?.data?.['requestId']).not.toBe('');
+  });
+
+  test('a pilot awaiting its authoritative pose or losing its update transport cannot send a shot', async () => {
+    const local = PlayerManager.getInstance().createLocalPlayer('scout');
+    const ws = await connect();
+    local.ship.fireLaser();
+    expect(ws.sent.some((packet) => packet.type === 'shoot')).toBe(false);
+    receiveLocalPose(ws);
+    vi.spyOn(ws, 'send').mockImplementation(() => {
+      throw new Error('Update transport failed');
+    });
+    const laser = new Laser({ x: 20, y: 0 }, { x: 1, y: 0 }, 0, 0);
+    local.ship.lasers.push(laser);
+    manager.sendShootEvent(laser);
+    expect(ws.sent.some((packet) => packet.type === 'shoot')).toBe(false);
+    expect(ws.close).toHaveBeenCalled();
   });
 
   test('new snapshots update one existing bolt while provisional client shots cannot duplicate it', async () => {
@@ -217,6 +274,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   test('rejected, timed-out and disconnected predictions leave no ghost and receipts cannot claim another shot', async () => {
     const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
+    receiveLocalPose(ws);
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
     local.ship.fireLaser();
     local.ship.fireLaser();
@@ -253,6 +311,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   test('a stalled connection expires a stationary prediction without another snapshot or trigger', async () => {
     const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
+    receiveLocalPose(ws);
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(document.createElement('canvas'));
     vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 1280, height: 900 });
@@ -287,6 +346,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();
     acknowledge(ws, false);
+    receiveLocalPose(ws);
     local.ship.fireLaser();
     expect(ws.sent.findLast((packet) => packet.type === 'shoot')?.data).not.toHaveProperty(
       'requestId'

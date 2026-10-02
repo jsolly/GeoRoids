@@ -334,7 +334,7 @@ const common={version:1,runId,worktree,lock,ownerPid:process.ppid,ownerStart:bir
 writeFileSync(join(runDirectory,'manifest.json'),JSON.stringify(common),{mode:0o600});
 const assignmentPath=join(runDirectory,'assignments.json');writeFileSync(assignmentPath,sequence?readFileSync(join(worktree,'planned.json')):JSON.stringify({version:2,runId,worktree,total:6,maxActive:3,inventory:Array.from({length:6},(_,i)=>({file:join(worktree,'tests/integration/file-'+i+'.test.ts')})),shards:Array.from({length:6},(_,i)=>({index:i+1,allocationWeight:1,files:[join(worktree,'tests/integration/file-'+i+'.test.ts')]}))}),{mode:0o600});
 const assignmentSha256=createHash('sha256').update(readFileSync(assignmentPath)).digest('hex');
-const script=mode.startsWith('installed-timing')?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; node "$2/node_modules/vitest/vitest.mjs" run "$2/tests/integration" --root="$2" --config="$2/vitest.config.ts" --shard=1/6 --reporter="$4"':mode==='sequencer-ancestry'?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; sleep 5':sequence?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; node --import "$4" "$2/sequence.mjs"':'node "$1" authorize "$$" "$PPID" "$2" "$3"; status=$?; exit "$status"';
+const script=mode.startsWith('installed-timing')?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; node "$2/node_modules/vitest/vitest.mjs" run "$2/tests/integration" --root="$2" --config="$2/vitest.config.ts" --shard=1/6 --reporter="$4"':mode==='sequencer-ancestry'?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; exec sleep 5':sequence?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; node --import "$4" "$2/sequence.mjs"':'node "$1" authorize "$$" "$PPID" "$2" "$3"; status=$?; exit "$status"';
 const child=spawn('bash',['-c',script,'fixture',helper,worktree,lock,mode==='installed-timing-sink'?join(worktree,'scripts/timing-failure-reporter.mjs'):mode==='installed-timing'?join(worktree,'scripts/integration-timing-reporter.mjs'):loader],{env:{...process.env,GEOROIDS_SHARD_MANIFEST:join(directory,'child.json'),GEOROIDS_SHARD_NONCE:mode==='nonce'?'b'.repeat(64):nonce,GEOROIDS_SHARD_RUN_ID:mode==='run'?'other-run':runId,SEQUENCE_FAULT:mode==='sequencer-digest'?'digest':mode==='sequencer-late'?'late':''},stdio:['ignore','pipe','pipe']});
 child.stdout.pipe(process.stdout);child.stderr.pipe(process.stderr);
 const record={...common,index,directory,runDirectory,nonce,assignmentPath,assignmentSha256,childPid:child.pid,childStart:birth(child.pid),vitePort:41001,serverPort:41002};
@@ -345,7 +345,7 @@ if(mode==='worktree')record.worktree='/wrong';
 if(mode==='lock')writeFileSync(join(lock,'pid'),'1\\n');
 if(mode!=='missing-manifest')setTimeout(()=>writeFileSync(join(directory,'child.json'),JSON.stringify(record),{mode:mode==='permissions'?0o644:0o600}),100);
 if(mode==='sequencer-ancestry')setTimeout(()=>{const outside=spawn(process.execPath,['--import',loader,join(worktree,'sequence.mjs')],{env:{...process.env,GEOROIDS_SHARD_MANIFEST:join(directory,'child.json'),GEOROIDS_SHARD_NONCE:nonce,GEOROIDS_SHARD_RUN_ID:runId},stdio:['ignore','pipe','pipe']});outside.stdout.pipe(process.stdout);outside.stderr.pipe(process.stderr);outside.once('close',code=>{process.exitCode=code;child.kill('SIGTERM');});},250);
-child.once('exit',(code)=>{if(!process.exitCode)process.exitCode=code??1;});
+child.once('exit',(code)=>{if(process.exitCode===undefined)process.exitCode=code??1;});
 `
     );
     const result = await new Promise((accept, reject) => {
@@ -1279,6 +1279,10 @@ test('the installed Vitest sequencer selects each issued bucket and rejects chan
   for (const mode of ['sequencer-digest', 'sequencer-late', 'sequencer-ancestry']) {
     const result = await handshake(mode);
     assert.notEqual(result.code, 0, `${mode}: ${result.stderr}`);
+    if (mode === 'sequencer-ancestry') {
+      assert.match(result.stderr, /Vitest ancestry does not reach issued child/u);
+      assert.equal(result.stdout, '', 'An outside process must not select an issued bucket');
+    }
   }
 });
 

@@ -4,16 +4,23 @@ import process from 'node:process';
 import { createServerInstance } from '../server/createServer';
 import { flushServerLogs } from '../setup/serverLogger';
 import { startFixtureControl } from './fixture-control';
+import { readBenchmarkCompression } from './websocket-compression';
 
 const seed = Number(process.env['GEOROIDS_BENCHMARK_SEED'] ?? 42);
 assert(Number.isSafeInteger(seed) && seed > 0, 'Benchmark seed must be a positive safe integer');
-const server = createServerInstance({ seed });
+const compression = readBenchmarkCompression(process.env['GEOROIDS_BENCHMARK_COMPRESSION']);
+const server = createServerInstance({ seed, perMessageDeflate: compression.perMessageDeflate });
 await server.listening;
 const session = process.env['GEOROIDS_BENCHMARK_SESSION'];
 assert(session, 'Benchmark server requires an owned session');
 let closeControl: () => Promise<void>;
 try {
-  closeControl = await startFixtureControl(server, join(session, 'fixture.sock'), seed);
+  closeControl = await startFixtureControl(
+    server,
+    join(session, 'fixture.sock'),
+    seed,
+    compression.mode
+  );
 } catch (error) {
   await server.close();
   throw error;

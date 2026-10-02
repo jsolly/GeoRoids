@@ -122,6 +122,10 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  .gpu-rear-canvas {
+    display: none;
+  }
+
   /* Playfield chrome above the local radar: Map and Inventory on every device. */
   .universe-map-toggle,
   .ship-schematic-toggle {

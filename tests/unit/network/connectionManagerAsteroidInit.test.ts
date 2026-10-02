@@ -1,4 +1,5 @@
 import { beforeAll, expect, test } from 'vitest';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { PlayerJoin } from '../../../shared-types';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { NetworkManager } from '../../../src/network/networkManager';
@@ -43,7 +44,7 @@ test('rejoining after a server restart requests asteroids despite a cached belt'
     name: 'Pilot',
     position: { x: 0, y: 0 },
     color: '#fff',
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
     resumeToken: 'a'.repeat(64),
   });

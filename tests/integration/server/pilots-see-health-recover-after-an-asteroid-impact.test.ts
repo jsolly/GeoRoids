@@ -7,7 +7,7 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { DAMAGE, GAME, SHIP } from '../../../src/constants';
 import { WireClient } from '../../support/wireClient';
@@ -23,13 +23,15 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
     server.wsCore.stopPeriodicGameStateBroadcast();
     for (const id of ['target', 'partner']) {
       const peer = new WireClient(
-        new WebSocket(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`)
+        new WebSocket(
+          `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+        )
       );
       peers.push(peer);
       await peer.open();
       peer.send({
         type: 'join',
-        data: { id, name: id, snapshotVersion: 1, asteroidInteractions: 1 },
+        data: { id, name: id, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
       });
       await peer.barrier();
       expect(peer.messages.some((message) => message.type === 'joined')).toBe(true);
@@ -63,6 +65,7 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
           }
           if (result.kind === 'snapshot') {
             snapshots.push(result.state);
+            peer.send({ type: 'snapshotAck', data: { sequence: result.metadata.sequence } });
           } else if (
             result.message &&
             typeof result.message === 'object' &&
@@ -80,6 +83,8 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
         assert.ok(observed);
         expect(observed.health).toBeCloseTo(health, 8);
         expect(observed).toMatchObject({ maxHealth, exploding: false });
+        // Settle applied ACKs before the next offer or mocked-clock advance.
+        await peer.barrier();
         peer.assertHealthy();
       }
     }

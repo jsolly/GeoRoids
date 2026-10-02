@@ -1,20 +1,22 @@
 import type { WebSocket } from 'ws';
 
 /**
- * A gameplay client sends one pose per client frame (~60 Hz) plus occasional
- * shoot, ability and chat messages. These token-bucket defaults sustain that
- * with roughly a 50% headroom, and the burst covers a full backlog flush: the
- * client keeps sampling poses on a fixed 60 Hz timer while its link is stalled
+ * A gameplay client sends one pose per client frame (~60 Hz), up to 30
+ * applied-snapshot acknowledgments per second, and occasional shoot,
+ * ability and chat messages. The 120/s budget leaves 30/s command headroom.
+ * The burst covers a full backlog flush: the client keeps sampling poses on
+ * a fixed 60 Hz timer while its link is stalled
  * and only gives up after 6 s (`CONNECTION_STALE_TIMEOUT_MS`), so TCP can
- * deliver up to ~360 buffered poses in one read on recovery. The burst is
- * sized past that (8 s of poses) so an honest reconnecting client is never
- * throttled, while a sustained flood is still cut off before it can load the
+ * deliver up to ~360 buffered poses and 180 acknowledgments in one read on
+ * recovery. The burst covers eight seconds of that 90/s honest traffic, so an
+ * honest reconnecting client is never throttled, while a sustained flood is
+ * still cut off before it can load the
  * single game loop. The 64 KiB per-message cap in `createServer` bounds one
  * message; this bounds their rate and aggregate size per connection.
  */
 export const GAMEPLAY_MESSAGE_BUDGET = {
-  messagesPerSecond: 90,
-  messageBurst: 480,
+  messagesPerSecond: 120,
+  messageBurst: 720,
   bytesPerSecond: 96 * 1024,
   byteBurst: 256 * 1024,
 } as const;

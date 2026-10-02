@@ -1,9 +1,11 @@
 import { CONTOUR_LOCK, contourLockDistance } from '../../../shared/contourLock';
 import type { ContourLockState, Position } from '../../../shared-types';
 import { canvasManager } from '../../rendering/canvasSurface';
-import { contourCandidates } from '../../rendering/contourSpatialIndex';
+import { createContourQuery } from '../../rendering/contourSpatialIndex';
 import { sampleGradient } from './heightfield';
 import { getTerrainContours, getTerrainField } from './terrainSession';
+
+const captureCandidates = createContourQuery();
 
 /** Capture only a visible nearby line, never an arbitrary implicit level in empty space. */
 export function findContourCapture(position: Position, angle: number): ContourLockState | null {
@@ -25,7 +27,7 @@ export function findContourCapture(position: Position, angle: number): ContourLo
     if (!level) {
       continue;
     }
-    for (const segment of contourCandidates(levels, ordinal, view)) {
+    for (const segment of captureCandidates(levels, ordinal, view)) {
       const dx = segment.bx - segment.ax;
       const dy = segment.by - segment.ay;
       const length = dx * dx + dy * dy;

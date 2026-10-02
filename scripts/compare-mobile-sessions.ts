@@ -49,8 +49,10 @@ assert(
 );
 const experiment = record(manifest['experiment']);
 assert(
-  experiment['kind'] === 'quality' || experiment['kind'] === 'product',
-  'Declare quality or product experiment'
+  experiment['kind'] === 'quality' ||
+    experiment['kind'] === 'product' ||
+    experiment['kind'] === 'renderer',
+  'Declare quality, product or renderer experiment'
 );
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -72,15 +74,41 @@ function parseQuality(value: unknown) {
 }
 function parseArm(value: unknown) {
   const arm = record(value);
+  const renderer = arm['renderer'];
+  assert(
+    renderer === undefined || renderer === 'canvas' || renderer === 'webgl2',
+    'Declare renderer canvas or webgl2'
+  );
+  if (experiment['kind'] === 'renderer') {
+    assert(renderer !== undefined, 'Renderer experiment requires a backend for each arm');
+  }
   return {
     sourceSha256: hash(arm['sourceSha256']),
     productSha256: hash(arm['productSha256']),
     quality: parseQuality(arm['quality']),
+    renderer,
   };
 }
 const baseline = parseArm(experiment['baseline']);
 const candidate = parseArm(experiment['candidate']);
-if (experiment['kind'] === 'quality') {
+if (experiment['kind'] === 'renderer') {
+  assert.equal(baseline.sourceSha256, candidate.sourceSha256, 'Renderer comparison changed source');
+  assert.equal(
+    baseline.productSha256,
+    candidate.productSha256,
+    'Renderer comparison changed product'
+  );
+  assert.deepEqual(
+    baseline.quality,
+    candidate.quality,
+    'Renderer comparison changed graphics quality'
+  );
+  assert.notEqual(
+    baseline.renderer,
+    candidate.renderer,
+    'A renderer experiment changes exactly one backend'
+  );
+} else if (experiment['kind'] === 'quality') {
   assert.equal(baseline.sourceSha256, candidate.sourceSha256, 'Quality comparison changed source');
   assert.equal(
     baseline.productSha256,
@@ -108,6 +136,13 @@ if (experiment['kind'] === 'quality') {
     baseline.quality,
     candidate.quality,
     'Product comparison changed graphics quality'
+  );
+}
+if (experiment['kind'] !== 'renderer') {
+  assert.equal(
+    baseline.renderer,
+    candidate.renderer,
+    'Comparison changed renderer outside a renderer experiment'
   );
 }
 const sources: Array<{
@@ -178,6 +213,23 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     'Missing browser environment'
   );
   assert(typeof record(environment['gpu'])['supported'] === 'boolean', 'Missing GPU observation');
+  if (experiment['kind'] === 'renderer') {
+    const gpu = record(environment['gpu']);
+    assert.equal(
+      gpu['supported'],
+      true,
+      'Renderer comparison requires an observed GPU environment'
+    );
+    const identity = record(gpu['renderer']);
+    assert(
+      typeof identity['glRenderer'] === 'string' &&
+        identity['glRenderer'].length > 0 &&
+        Array.isArray(gpu['devices']) &&
+        gpu['devices'].length > 0,
+      'Renderer comparison requires actual GPU identity'
+    );
+    record(gpu['featureStatus']);
+  }
   assert.equal(
     environment['physicalDevice'],
     false,
@@ -192,6 +244,13 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     assert.equal(report['kind'], 'realtime-client', 'Expected a real-time client report');
     assert.equal(report['status'], 'passed', 'Benchmark session failed');
     const parameters = record(record(report['measurement'])['parameters']);
+    if (experiment['kind'] === 'renderer') {
+      assert.equal(
+        parameters['renderer'],
+        arm.renderer,
+        'Requested renderer differs from experiment arm'
+      );
+    }
     assert.equal(parameters['workload'], scenario, 'Benchmark workload differs from manifest');
     assert.equal(
       parameters['profileRecorded'],
@@ -334,7 +393,14 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
       source: 'automated',
       environment,
       parameters: Object.fromEntries(
-        Object.entries(parameters).filter(([key]) => !['renderDpr', 'renderGlow'].includes(key))
+        Object.entries(parameters).filter(
+          ([key]) =>
+            ![
+              'renderDpr',
+              'renderGlow',
+              ...(experiment['kind'] === 'renderer' ? ['renderer'] : []),
+            ].includes(key)
+        )
       ),
       userAgent: metadata['userAgent'],
       css: metadata['css'],
@@ -370,6 +436,39 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     }
     assert(Math.abs(phaseTotal - duration) < 10, 'Incomplete phase duration ledger');
     const graphics = record(interval['graphicsSettings']);
+    if (experiment['kind'] === 'renderer') {
+      const renderer = record(interval['renderer']);
+      assert.equal(
+        renderer['requested'],
+        arm.renderer,
+        'Observed renderer request differs from experiment arm'
+      );
+      assert.equal(
+        renderer['backend'],
+        arm.renderer,
+        'Observed renderer backend differs from experiment arm'
+      );
+      const rendered = record(renderer['frames']);
+      const canvas = number(rendered['canvas']);
+      const webgl2 = number(rendered['webgl2']);
+      assert(
+        Number.isSafeInteger(canvas) && Number.isSafeInteger(webgl2),
+        'Invalid renderer frame counts'
+      );
+      const timedFrames = Object.entries(record(interval['metrics']))
+        .filter(([name]) => name.endsWith('.frameCpuMs'))
+        .reduce((total, [, metric]) => total + number(record(metric)['count']), 0);
+      assert.equal(
+        canvas + webgl2,
+        timedFrames,
+        'Renderer observations do not cover every timed frame'
+      );
+      assert.equal(
+        rendered[arm.renderer === 'canvas' ? 'webgl2' : 'canvas'],
+        0,
+        'Renderer fell back or changed during measurement'
+      );
+    }
     assert.deepEqual(
       { maxDpr: graphics['maxDpr'], glow: graphics['glow'] },
       quality,
@@ -440,6 +539,7 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     wallSeconds,
     phaseDurationsMs,
     quality,
+    ...(experiment['kind'] === 'renderer' ? { renderer: arm.renderer } : {}),
     frameOver25Ratio: frames.filter((value) => value > 25).length / frames.length,
     frameP99Ms: percentile(frames, 0.99),
     cpuP95Ms: percentile(cpu, 0.95),
@@ -494,6 +594,12 @@ assert(
   new Set(sources.map((source) => source.device)).size === 1,
   'Device, viewport, CPU, network or seed changed across pairs'
 );
+if (experiment['kind'] === 'renderer') {
+  assert(
+    new Set(sources.map((source) => record(source.provenance)['buildSha256'])).size === 1,
+    'Renderer comparison changed built assets'
+  );
+}
 assert(
   new Set(sources.map((source) => source.sessionId)).size === sources.length,
   'Duplicate session IDs'

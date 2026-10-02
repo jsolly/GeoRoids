@@ -2,6 +2,7 @@ interface PreparedFixtureRequirement {
   readonly sequence: number;
   readonly gameTime: number;
   readonly motionEpoch: number;
+  readonly requireExactMotionEpoch?: boolean;
 }
 
 interface PreparedFixtureObservation {
@@ -24,6 +25,8 @@ export function observesPreparedFixture(
     observation.lastSnapshotGameTime >= requirement.gameTime &&
     observation.motionEpoch !== null &&
     Number.isSafeInteger(observation.motionEpoch) &&
-    observation.motionEpoch >= requirement.motionEpoch
+    (requirement.requireExactMotionEpoch
+      ? observation.motionEpoch === requirement.motionEpoch
+      : observation.motionEpoch >= requirement.motionEpoch)
   );
 }

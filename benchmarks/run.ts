@@ -26,7 +26,7 @@ type Command =
 const HARNESS_PATHS = ['benchmarks', 'tests/unit/network/snapshotFixture.ts'];
 const GENERATED = new Set(['.git', 'node_modules', 'logs', 'dist', 'coverage', '.cache', '.vite']);
 
-function parseArguments(argv: readonly string[]) {
+export function parseArguments(argv: readonly string[]) {
   const { positionals, values } = parseArgs({
     args: [...argv],
     allowPositionals: true,
@@ -36,10 +36,22 @@ function parseArguments(argv: readonly string[]) {
       candidate: { type: 'string' },
       seed: { type: 'string' },
       viewport: { type: 'string' },
+      renderer: { type: 'string' },
+      scene: { type: 'string' },
+      dpr: { type: 'string' },
+      'chromium-gpu': { type: 'boolean', default: false },
     },
   });
   assert.equal(positionals.length, 2, 'Usage: benchmark <measure|compare> <kind> [options]');
-  const options = sampleOptions(positionals[1], values.seed, values.viewport);
+  const options = sampleOptions(
+    positionals[1],
+    values.seed,
+    values.viewport,
+    values.renderer,
+    values.dpr,
+    values['chromium-gpu'],
+    values.scene
+  );
   const mode = positionals[0];
   if (mode === 'measure') {
     assert(
@@ -51,6 +63,10 @@ function parseArguments(argv: readonly string[]) {
   }
   assert(mode === 'compare', 'Expected measure or compare');
   assert(options.kind !== 'transport', 'Transport is single-revision only');
+  assert(
+    options.kind !== 'wire-ledger',
+    'Wire ledger is a single-revision byte diagnostic, not a timing comparison'
+  );
   assert(
     values.baseline && values.candidate && !values.revision,
     'compare requires --baseline and --candidate'
@@ -329,9 +345,19 @@ async function measure(
     String(options.seed),
     '--viewport',
     options.viewport,
+    '--renderer',
+    options.renderer,
+    '--dpr',
+    String(options.dpr),
     '--output',
     output,
   ];
+  if (options.chromiumGpu) {
+    args.push('--chromium-gpu');
+  }
+  if (options.kind === 'client') {
+    args.push('--scene', options.scene);
+  }
   await writeJson(join(directory, `${id}.metadata.json`), {
     id,
     product: runtime.product,

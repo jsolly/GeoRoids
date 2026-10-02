@@ -1,5 +1,146 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { ClientPerformanceMetrics } from '../../../src/diagnostics/performanceMetrics';
+
+test('applied snapshot clocks survive interval drains and clear only with their session', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  const snapshot = {
+    ownerId: 'pilot',
+    sequence: 10,
+    kind: 'keyframe' as const,
+    gameTime: 60,
+    serverTime: 1000,
+  };
+  recorder.snapshotApplied(snapshot);
+  snapshot.gameTime = 0;
+  const first = recorder.read(true);
+  expect(first.lastSnapshot).toEqual({
+    sequence: 10,
+    kind: 'keyframe',
+    gameTime: 60,
+    serverTime: 1000,
+  });
+  expect(first.snapshotSession).toBe(0);
+  expect(recorder.read().lastSnapshot).toEqual(first.lastSnapshot);
+  if (first.lastSnapshot) {
+    first.lastSnapshot.serverTime = 0;
+  }
+  expect(recorder.read().lastSnapshot?.serverTime).toBe(1000);
+  recorder.resetSnapshotWitness();
+  expect(recorder.read()).toMatchObject({
+    lastSnapshot: undefined,
+    lastKeyframeSequence: 0,
+    snapshotSession: 1,
+  });
+});
+
+test('transient applied worlds retain every owner and session across drains and resets', () => {
+  vi.spyOn(performance, 'now').mockReturnValue(500);
+  const recorder = new ClientPerformanceMetrics(true);
+  const snapshot = {
+    ownerId: 'pilot-a',
+    sequence: 1,
+    kind: 'keyframe' as const,
+    gameTime: 60,
+    serverTime: 1000,
+  };
+  recorder.snapshotApplied(snapshot);
+  snapshot.ownerId = 'mutated';
+  snapshot.gameTime = 0;
+  recorder.snapshotApplied({
+    ownerId: 'pilot-a',
+    sequence: 2,
+    kind: 'delta',
+    gameTime: 61,
+    serverTime: 1017,
+  });
+  recorder.resetSnapshotWitness();
+  // Resetting transport cannot silently erase worlds applied earlier in this interval.
+  recorder.snapshotApplied({
+    ownerId: 'pilot-a',
+    sequence: 1,
+    kind: 'keyframe',
+    gameTime: 70,
+    serverTime: 1200,
+  });
+  const drained = recorder.read(true);
+  expect(drained.appliedSnapshots).toEqual({
+    count: 3,
+    omittedSamples: 0,
+    values: [
+      {
+        appliedAt: 500,
+        ownerId: 'pilot-a',
+        session: 0,
+        sequence: 1,
+        kind: 'keyframe',
+        gameTime: 60,
+        serverTime: 1000,
+      },
+      {
+        appliedAt: 500,
+        ownerId: 'pilot-a',
+        session: 0,
+        sequence: 2,
+        kind: 'delta',
+        gameTime: 61,
+        serverTime: 1017,
+      },
+      {
+        appliedAt: 500,
+        ownerId: 'pilot-a',
+        session: 1,
+        sequence: 1,
+        kind: 'keyframe',
+        gameTime: 70,
+        serverTime: 1200,
+      },
+    ],
+  });
+  const first = drained.appliedSnapshots.values[0];
+  expect(first).toBeDefined();
+  if (first) {
+    first.ownerId = 'changed-after-drain';
+  }
+  expect(recorder.read().appliedSnapshots).toEqual({ count: 0, omittedSamples: 0, values: [] });
+  expect(recorder.read().lastSnapshot?.gameTime).toBe(70);
+  recorder.snapshotApplied({
+    ownerId: undefined,
+    sequence: 2,
+    kind: 'delta',
+    gameTime: 71,
+    serverTime: undefined,
+  });
+  const read = recorder.read();
+  expect(read.appliedSnapshots.values[0]).toMatchObject({
+    ownerId: undefined,
+    serverTime: undefined,
+  });
+  if (read.appliedSnapshots.values[0]) {
+    read.appliedSnapshots.values[0].sequence = 0;
+  }
+  expect(recorder.read().appliedSnapshots.values[0]?.sequence).toBe(2);
+  vi.restoreAllMocks();
+});
+
+test('applied world receipts remain bounded and expose all omissions without collecting in ordinary play', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  const ordinary = new ClientPerformanceMetrics(false);
+  for (let sequence = 1; sequence <= 5000; sequence++) {
+    const snapshot = {
+      ownerId: 'pilot',
+      sequence,
+      kind: 'delta' as const,
+      gameTime: sequence,
+      serverTime: sequence * 17,
+    };
+    recorder.snapshotApplied(snapshot);
+    ordinary.snapshotApplied(snapshot);
+  }
+  expect(recorder.read().appliedSnapshots).toMatchObject({ count: 5000, omittedSamples: 904 });
+  expect(recorder.read().appliedSnapshots.values).toHaveLength(4096);
+  expect(ordinary.read().appliedSnapshots).toEqual({ count: 0, omittedSamples: 0, values: [] });
+  expect(ordinary.read().lastSnapshot?.sequence).toBe(5000);
+});
 
 test('long sessions retain bounded samples while accounting for every slow frame', () => {
   const recorder = new ClientPerformanceMetrics(true);
@@ -52,7 +193,32 @@ test('ordinary sessions collect no performance observations', () => {
   recorder.rendered(10);
   recorder.record('frameCpuMs', 3);
   recorder.count('messageFailures');
+  recorder.recordRendererFrame('webgl2');
   expect(recorder.read()).toMatchObject({ metrics: {}, counters: {}, pendingJoin: false });
+  expect(recorder.read().renderer.frames).toEqual({ canvas: 0, webgl2: 0 });
+});
+
+test('a GPU recording keeps fallback frames visible and reads resource observations only on export', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  const observe = vi.fn(() => ({ backend: 'webgl2' as const, gpuStats: null }));
+  recorder.setRendererObservation('webgl2', observe);
+  recorder.recordRendererFrame('webgl2');
+  recorder.recordRendererFrame('canvas');
+  recorder.recordRendererFrame('webgl2');
+  expect(observe).not.toHaveBeenCalled();
+  const interval = recorder.read(true);
+  expect(observe).toHaveBeenCalledTimes(1);
+  expect(interval.renderer).toEqual({
+    requested: 'webgl2',
+    backend: 'webgl2',
+    frames: { canvas: 1, webgl2: 2 },
+    gpuStats: null,
+  });
+  expect(recorder.read().renderer.frames).toEqual({ canvas: 0, webgl2: 0 });
+  expect(interval.renderer.frames).toEqual({ canvas: 1, webgl2: 2 });
+  recorder.setRendererObservation('canvas', null);
+  recorder.read();
+  expect(observe).toHaveBeenCalledTimes(2);
 });
 
 test('failed joins, reconnect exhaustion and invalid measurements remain in the report', () => {

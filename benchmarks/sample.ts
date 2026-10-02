@@ -4,14 +4,27 @@ import { dirname } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { clientSceneTraits, isClientScene } from './client-scenes';
 import { validateMeasurement } from './results';
 
 const UNSIGNED_INT_PATTERN = /^\d+$/u;
 
-export function sampleOptions(kind: string | undefined, seedText = '42', viewport = 'desktop') {
+export function sampleOptions(
+  kind: string | undefined,
+  seedText = '42',
+  viewport = 'desktop',
+  renderer = 'canvas',
+  dprText = '1',
+  chromiumGpu = false,
+  scene?: string
+) {
   assert(
-    kind === 'client' || kind === 'server' || kind === 'codec' || kind === 'transport',
-    'Expected client, server, codec, or transport'
+    kind === 'client' ||
+      kind === 'server' ||
+      kind === 'codec' ||
+      kind === 'transport' ||
+      kind === 'wire-ledger',
+    'Expected client, server, codec, transport, or wire-ledger'
   );
   assert(UNSIGNED_INT_PATTERN.test(seedText), 'seed must be an unsigned 32-bit integer');
   const seed = Number(seedText);
@@ -20,27 +33,52 @@ export function sampleOptions(kind: string | undefined, seedText = '42', viewpor
     'seed must be an unsigned 32-bit integer'
   );
   assert(
-    viewport === 'desktop' || viewport === 'touch-portrait' || viewport === 'touch-landscape',
+    viewport === 'desktop' ||
+      viewport === 'touch-portrait' ||
+      viewport === 'touch-landscape' ||
+      viewport === 'tablet',
     'Unknown viewport'
   );
   assert(kind === 'client' || viewport === 'desktop', 'Only client measurements accept a viewport');
-  return { kind, seed, viewport } as const;
+  assert(renderer === 'canvas' || renderer === 'webgl2', 'Unknown renderer');
+  const dpr = Number(dprText);
+  assert(Number.isFinite(dpr) && dpr >= 1 && dpr <= 4, 'dpr must be 1..4');
+  assert(
+    kind === 'client' || (renderer === 'canvas' && dpr === 1 && !chromiumGpu),
+    'Only client measurements accept graphics options'
+  );
+  assert(kind === 'client' || scene === undefined, 'Only client measurements accept a scene');
+  const clientScene = scene ?? 'stationary';
+  assert(isClientScene(clientScene), 'Unknown client scene');
+  return { kind, seed, viewport, renderer, dpr, chromiumGpu, scene: clientScene } as const;
 }
 
-function parseSampleArguments(argv: readonly string[]) {
+export function parseSampleArguments(argv: readonly string[]) {
   const { values } = parseArgs({
     args: [...argv],
     options: {
       kind: { type: 'string' },
       seed: { type: 'string' },
       viewport: { type: 'string' },
+      renderer: { type: 'string' },
+      scene: { type: 'string' },
+      dpr: { type: 'string' },
+      'chromium-gpu': { type: 'boolean', default: false },
       output: { type: 'string' },
       failure: { type: 'string' },
     },
   });
   assert(values.output, '--output is required');
   return {
-    ...sampleOptions(values.kind, values.seed, values.viewport),
+    ...sampleOptions(
+      values.kind,
+      values.seed,
+      values.viewport,
+      values.renderer,
+      values.dpr,
+      values['chromium-gpu'],
+      values.scene
+    ),
     outputPath: values.output,
     failurePath: values.failure ?? `${values.output}.failure.json`,
   };
@@ -83,11 +121,16 @@ async function executeSample(options: ReturnType<typeof sampleOptions>) {
   switch (options.kind) {
     case 'client': {
       const { runClientSample } = await import('./client');
+      const traits = clientSceneTraits(options.scene);
       return runClientSample({
         seed: options.seed,
         viewport: options.viewport,
-        warmupFrames: 30,
-        measuredFrames: 120,
+        warmupFrames: traits.warmupFrames,
+        measuredFrames: traits.measuredFrames,
+        scene: options.scene,
+        renderer: options.renderer,
+        dpr: options.dpr,
+        chromiumGpu: options.chromiumGpu,
       });
     }
     case 'server': {
@@ -101,6 +144,10 @@ async function executeSample(options: ReturnType<typeof sampleOptions>) {
     case 'transport': {
       const { runTransportSample, DEFAULT_TRANSPORT_SAMPLE_OPTIONS } = await import('./transport');
       return runTransportSample({ ...DEFAULT_TRANSPORT_SAMPLE_OPTIONS, seed: options.seed });
+    }
+    case 'wire-ledger': {
+      const { runWireLedgerSample, DEFAULT_WIRE_LEDGER_OPTIONS } = await import('./wire-ledger');
+      return runWireLedgerSample({ ...DEFAULT_WIRE_LEDGER_OPTIONS, seed: options.seed });
     }
     default: {
       const exhaustive: never = options.kind;
@@ -122,6 +169,9 @@ async function main(argv: readonly string[] = process.argv.slice(2)) {
         status: 'failed',
         options,
         error: errorRecord(error),
+        ...(error instanceof Error && 'wireEvidence' in error
+          ? { wireEvidence: error.wireEvidence }
+          : {}),
       });
     } catch (writeError) {
       artifactError = writeError;

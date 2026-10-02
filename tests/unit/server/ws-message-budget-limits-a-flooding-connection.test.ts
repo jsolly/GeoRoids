@@ -12,19 +12,25 @@ function socket(): WebSocket {
 }
 
 const POSE_BYTES = 220;
+const ACK_BYTES = Buffer.byteLength(
+  JSON.stringify({ type: 'snapshotAck', data: { sequence: 1234 } })
+);
 
-test('an honest 60 Hz client with occasional shots never trips the budget over a full minute', () => {
+test('an honest pilot applies 30 worlds per second while sending 60 poses and occasional shots', () => {
   let now = 0;
   const budget = new GameplayMessageBudget({ now: () => now });
   const ws = socket();
   let rejected = 0;
-  // 60 poses/s for 60 s, plus a shot every 5th frame — well above ordinary play.
+  // 60 poses/s, 30 applied ACKs/s and a shot every fifth frame for a minute.
   for (let frame = 0; frame < 60 * 60; frame++) {
     now += 1000 / 60;
     if (budget.admit(ws, POSE_BYTES) === 'rate-limited') {
       rejected++;
     }
     if (frame % 5 === 0 && budget.admit(ws, 90) === 'rate-limited') {
+      rejected++;
+    }
+    if (frame % 2 === 0 && budget.admit(ws, ACK_BYTES) === 'rate-limited') {
       rejected++;
     }
   }
@@ -56,7 +62,7 @@ test('a message flood is refused once the burst drains, closing the socket exact
   expect(budget.admit(ws, POSE_BYTES)).toBe('ok');
 });
 
-test('an honest client that flushes a 6-second pose backlog on reconnect is not throttled', () => {
+test('an honest pilot flushes six seconds of poses and applied-world receipts without throttling', () => {
   let now = 0;
   const budget = new GameplayMessageBudget({ now: () => now });
   const ws = socket();
@@ -68,10 +74,16 @@ test('an honest client that flushes a 6-second pose backlog on reconnect is not 
   // The link stalls for the full client stale window; the client keeps sampling
   // poses on its fixed timer, and TCP delivers the whole backlog in one instant.
   const stalledPoses = Math.ceil((6000 / 1000) * 60);
+  const stalledAcknowledgments = Math.ceil((6000 / 1000) * 30);
   now += 6000;
   let refused = 0;
   for (let i = 0; i < stalledPoses; i++) {
     if (budget.admit(ws, POSE_BYTES) !== 'ok') {
+      refused++;
+    }
+  }
+  for (let i = 0; i < stalledAcknowledgments; i++) {
+    if (budget.admit(ws, ACK_BYTES) !== 'ok') {
       refused++;
     }
   }

@@ -1,6 +1,7 @@
 /* @vitest-environment node */
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE } from '../../../src/constants';
@@ -144,10 +145,16 @@ describe('satellite pickups intercept physical damage', () => {
     const pickup = engine.getSatellitePickup(id);
     assert.ok(pickup);
     engine.addAsteroid(asteroidAt('pickup-rock', pickup.position));
-    engine.resolveAuthoritativeCombat();
-    expect(engine.getSatellitePickup(id)?.health).toBe(pickup.health - DAMAGE.LASER_HIT);
-    engine.resolveAuthoritativeCombat();
-    expect(engine.getSatellitePickup(id)?.state).toBe('broken');
+    const allRocks = vi.spyOn(AsteroidManager.prototype, 'getAllAsteroids');
+    try {
+      engine.resolveAuthoritativeCombat();
+      expect(engine.getSatellitePickup(id)?.health).toBe(pickup.health - DAMAGE.LASER_HIT);
+      engine.resolveAuthoritativeCombat();
+      expect(engine.getSatellitePickup(id)?.state).toBe('broken');
+      expect(allRocks).not.toHaveBeenCalled();
+    } finally {
+      allRocks.mockRestore();
+    }
   });
 
   test('a ricochet strikes an equipped satellite before reaching its owner', () => {

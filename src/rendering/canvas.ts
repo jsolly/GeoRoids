@@ -1,5 +1,4 @@
 import type { Position } from '../../shared-types';
-import { PALETTE } from '../constants';
 import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
@@ -25,13 +24,14 @@ import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
 import { drawBeltEncounters } from './beltRenderer';
 import { drawFieryBoundary } from './boundaryRenderer';
+import { paintOpaqueBackground } from './canvasBackground';
 import { canvasManager } from './canvasSurface';
 import {
   drawContourLaserTicks,
   type LiveLaserSource,
   liveLaserPositions,
 } from './contourLaserRenderer';
-import { drawIsoContours } from './contourRenderer';
+import { drawContourLayers, drawIsoContours, visibleContourLayers } from './contourRenderer';
 import { drawContourTrack } from './contourTrackRenderer';
 import { drawFurnaceFoundations, drawFurnacePipes, drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
@@ -42,7 +42,7 @@ import { drawMiniMap } from './hud/minimap';
 import { drawRicochetCourt } from './ricochetCourtRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawTerrainSpiders } from './spiderRenderer';
-import { drawStarfield } from './starfield';
+import { drawStarfield, visibleStarTiles } from './starfield';
 
 /** Mineral Scan widens the view to the whole scanned disc plus this margin. */
 const SCAN_VIEW_MARGIN = 1.15;
@@ -80,8 +80,24 @@ function drawWorldLayers(
   const localId = currPlayer.id;
   const viewport = canvasManager.getViewportSize();
 
-  drawStarfield(currShip.position);
-  drawIsoContours(currShip.position);
+  const gpuContours = canvasManager.canDrawGpuRear()
+    ? visibleContourLayers(currShip.position)
+    : undefined;
+  const gpuDrawn =
+    gpuContours !== undefined &&
+    canvasManager.drawGpuRear({
+      position: currShip.position,
+      contours: gpuContours,
+      starTiles: visibleStarTiles(currShip.position),
+    }) &&
+    canvasManager.composeGpuRear(ctx);
+  if (!gpuDrawn) {
+    paintOpaqueBackground(ctx);
+    drawStarfield(currShip.position);
+    drawIsoContours(currShip.position);
+  } else if (gpuContours !== undefined && canvasManager.requiresNativeGpuContours()) {
+    canvasManager.recordNativeGpuContours(drawContourLayers(currShip.position, gpuContours));
+  }
   if (!currShip.exploding && currShip.health > 0 && !currShip.furnaceTransit) {
     drawContourTrack(currShip.position, currShip.angle, currShip.contourLock);
   }
@@ -206,8 +222,6 @@ export function drawGame(
 
   canvasManager.followTravel(currShip);
   const viewport = canvasManager.getViewportSize();
-  ctx.fillStyle = PALETTE.BG;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
   canvasManager.easeZoomToward(
     scanCameraZoom(currShip, viewport.width, viewport.height),
     performance.now()
@@ -219,10 +233,12 @@ export function drawGame(
 
   // Always close the zoomed layer so a painter failure cannot leave the HUD viewport inflated.
   canvasManager.beginWorldLayers(ctx);
+  let worldLayersCompleted = false;
   try {
     drawWorldLayers(ctx, currPlayer, roids, loot, satellitePickups, allPlayers);
+    worldLayersCompleted = true;
   } finally {
-    canvasManager.endWorldLayers(ctx);
+    canvasManager.endWorldLayers(ctx, !worldLayersCompleted);
   }
 
   const hudLayout = hudLayoutForCanvas(viewport);

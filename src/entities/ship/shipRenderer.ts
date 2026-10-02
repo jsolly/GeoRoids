@@ -5,6 +5,7 @@ import { canvasManager } from '../../rendering/canvasSurface';
 import { drawContourSpeedLines } from '../../rendering/contourSpeedLines';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import type { PlayfieldSize } from '../../rendering/playfieldCamera';
+import { prepareRasterSurface, type RasterSurface } from '../../rendering/rasterSurface';
 import { resolveGlow } from '../../rendering/renderQuality';
 import { rotateVectorInto } from '../../rendering/travelCamera';
 import {
@@ -408,8 +409,7 @@ export function drawShipExplosionAtPosition(
   );
 }
 
-interface LaserBoltSprite {
-  canvas: HTMLCanvasElement;
+interface LaserBoltSprite extends RasterSurface {
   originX: number;
   originY: number;
 }
@@ -425,6 +425,7 @@ interface LaserBoltSprites {
 }
 
 let laserBoltSprites: LaserBoltSprites | null = null;
+const idleLaserBoltSurfaces: RasterSurface[] = [];
 
 /** Read once per drawLaserBolts batch, outside its projectile loop. */
 function prepareLaserBoltSprites(
@@ -442,6 +443,9 @@ function prepareLaserBoltSprites(
     laserBoltSprites.glow !== glow ||
     laserBoltSprites.baseColor !== baseColor
   ) {
+    for (const sprite of laserBoltSprites?.colors.values() ?? []) {
+      idleLaserBoltSurfaces.push({ canvas: sprite.canvas, context: sprite.context });
+    }
     laserBoltSprites = { dpr, scale, glow, baseColor, colors: new Map() };
   }
   return laserBoltSprites;
@@ -501,14 +505,19 @@ function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprit
   // Match the main context's DPR transform and the painter's existing blur values.
   // Keep room for the thick body and the complete soft halo in backing pixels.
   const padding = Math.ceil(VISUAL.LASER_STROKE_WIDTH / 2 + (3 * cache.glow + 2) / cache.dpr);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil((halfLength * 2 + trailLength + padding * 2) * cache.dpr);
-  canvas.height = Math.ceil(padding * 2 * cache.dpr);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('Laser bolt canvas context unavailable');
-  }
-  const sprite = { canvas, originX: padding + halfLength + trailLength, originY: padding };
+  const surface = prepareRasterSurface(
+    Math.ceil((halfLength * 2 + trailLength + padding * 2) * cache.dpr),
+    Math.ceil(padding * 2 * cache.dpr),
+    idleLaserBoltSurfaces.pop(),
+    'Laser bolt canvas context unavailable'
+  );
+  const { canvas, context: ctx } = surface;
+  const sprite = {
+    canvas,
+    context: ctx,
+    originX: padding + halfLength + trailLength,
+    originY: padding,
+  };
   ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
   paintLaserBolt(ctx, sprite.originX, sprite.originY, color, cache.scale);
   cache.colors.set(color, sprite);

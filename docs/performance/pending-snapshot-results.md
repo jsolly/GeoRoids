@@ -45,3 +45,14 @@ Both isolated arms passed focused units (17 control, 19 candidate), TypeScript, 
 The first product unit command passed its 43 discovered tests but also found three scratch copies through Vitest's substring path filter; those copies failed import resolution. Unit scripts now restrict discovery to `tests/unit`. The focused product rerun and final combined verification are recorded in the receipt. No Wiki controls or behavior text changes are needed for this internal transport optimization.
 
 See [the receipt](pending-snapshot-receipt.json) for source identities, per-run measurements, raw artifact hashes and retained limitations. Local full artifacts are under `.performance/pending-snapshot/` and the sibling `pending-snapshot-network/.performance/pending-network/network/` checkout.
+
+## Current keyframe policy
+
+The snapshot v2 draft now removes the forced 90-delta keyframe interval. Initial
+joins, rejoins and explicit recovery still require full worlds; otherwise the
+encoder retains its successful baseline and chooses a full frame only when its
+actual UTF-8 envelope is no larger than the delta. Applied ACK windows, the single
+recovery reserve and transport timeouts remain unchanged. This policy change has
+no new performance qualification in this historical receipt; its byte counts,
+periodic-boundary scenario and live measurements above retain their original
+revision and meaning.

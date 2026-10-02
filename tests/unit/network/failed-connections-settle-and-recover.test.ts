@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
-import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -120,7 +120,7 @@ test('a thrown gameplay send reports failure and reconnects without replaying th
     name: 'Runtime pilot',
     position: { x: 0, y: 0 },
     color: '#fff',
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
     resumeToken: 'a'.repeat(64),
   });
@@ -274,7 +274,7 @@ test('a pre-join server error fails the attempt while a post-join error leaves t
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
     });
@@ -297,7 +297,7 @@ test('join waits for the joined pose and first snapshot before play can start', 
     name: 'Bob',
     position: { x: 500, y: 600 },
     color: '#fff',
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
     resumeToken: 'a'.repeat(64),
   });
@@ -337,7 +337,7 @@ test('the first local authoritative state clears the join completion deadline', 
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
     });
@@ -369,7 +369,7 @@ test('resync diagnostics count successful sends only', async () => {
       name: 'Resync pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
     });

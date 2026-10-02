@@ -22,6 +22,7 @@ export interface EventLoopHost {
   cancelAnimationFrame(id: number): void;
   now(): number;
   paintDebugHud(now: number): void;
+  observeRenderer?(): void;
 }
 
 export class EventLoop {
@@ -146,6 +147,7 @@ export class EventLoop {
         clientPerformance.record('renderMs', rendered - updated);
         clientPerformance.record('frameCpuMs', rendered - started);
         clientPerformance.rendered(rendered);
+        this.host.observeRenderer?.();
         clientPerformance.exportIfDue(rendered);
       }
       this.scheduleFrame();

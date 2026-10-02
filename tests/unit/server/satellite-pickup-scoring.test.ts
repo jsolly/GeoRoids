@@ -1,7 +1,9 @@
 /* @vitest-environment node */
+
 import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { SATELLITE_PICKUP } from '../../../src/constants';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,7 +29,9 @@ describe('Server scoring via automatic satellite pickup collection', () => {
   test('awards points and broadcasts the collect event without a client claim', async () => {
     server = createServerInstance({ port: 0, nodeEnv: 'test' });
     const port = await server.listening;
-    const ws = new WebSocket(`ws://localhost:${port}/ws?asteroidInteractions=1`);
+    const ws = new WebSocket(
+      `ws://localhost:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    );
     client = ws;
     await new Promise<void>((resolve, reject) => {
       ws.once('open', () => resolve());
@@ -40,7 +44,7 @@ describe('Server scoring via automatic satellite pickup collection', () => {
         type: 'join',
         id: playerId,
         name: 'Collector',
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
       })
     );

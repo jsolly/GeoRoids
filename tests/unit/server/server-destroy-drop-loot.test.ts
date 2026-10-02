@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { GAME, LASER } from '../../../src/constants';
 import { WireClient, type WireMessage } from '../../support/wireClient';
@@ -75,7 +75,7 @@ async function join(
     id,
     name: id,
     position,
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
   });
   await client.barrier();
@@ -88,7 +88,9 @@ const activeClients: WireClient[] = [];
 
 async function connect(server: TestServer): Promise<WireClient> {
   const client = new WireClient(
-    new WebSocket(`ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`)
+    new WebSocket(
+      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    )
   );
   activeClients.push(client);
   await client.open();
@@ -129,6 +131,7 @@ async function startWorld(): Promise<{
 
 function decodeLatestSnapshot(client: WireClient, decoder: SnapshotDecoder): WireMessage {
   let latest: WireMessage | undefined;
+  let appliedSequence = 0;
   for (const { raw } of client.wireMessages) {
     const result = decoder.readMessage(raw, { acceptSnapshots: true });
     if (result.kind === 'snapshot-rejected') {
@@ -136,11 +139,13 @@ function decodeLatestSnapshot(client: WireClient, decoder: SnapshotDecoder): Wir
     }
     if (result.kind === 'snapshot') {
       latest = { type: 'snapshot', data: result.state };
+      appliedSequence = result.metadata.sequence;
     } else if (isRecord(result.message) && result.message['type'] === 'joined') {
       decoder.reset();
     }
   }
   assert.ok(latest, 'expected a snapshot frame');
+  client.send({ type: 'snapshotAck', data: { sequence: appliedSequence } });
   return latest;
 }
 

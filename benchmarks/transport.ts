@@ -11,7 +11,7 @@ function isClosed(socket: WebSocket): boolean {
 }
 
 import process from 'node:process';
-import { SnapshotDecoder } from '../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { Measurement } from './results';
 
 export const DEFAULT_TRANSPORT_SAMPLE_OPTIONS = { durationMs: 2_000, seed: 42 };
@@ -88,7 +88,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
   const ids = [0, 1].map((index) => `benchmark-transport-${seed.toString(36)}-${index}`);
   function connect(id: string, port: number) {
     const socket = new WebSocket(
-      `ws://127.0.0.1:${port}/ws?snapshotVersion=1&asteroidInteractions=1`
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
     );
     const decoder = new SnapshotDecoder();
     const state = {
@@ -139,6 +139,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
               }
               state.lastSnapshotAt = receivedAt;
             }
+            send(state, { type: 'snapshotAck', data: { sequence: result.metadata.sequence } });
             break;
           case 'snapshot-rejected':
             throw result.error;
@@ -158,7 +159,8 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
                   `Join identity mismatch for ${id}`
                 );
                 assert(
-                  data['snapshotVersion'] === 1 && data['asteroidInteractions'] === 1,
+                  data['snapshotVersion'] === SNAPSHOT_VERSION &&
+                    data['asteroidInteractions'] === 1,
                   'Server did not negotiate enhanced snapshots'
                 );
                 state.joined = true;
@@ -222,7 +224,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
           position: { x: Math.cos(angle) * 600, y: Math.sin(angle) * 600 },
           kitId: 'scout',
           asteroidInteractions: 1,
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
         },
       });
     }

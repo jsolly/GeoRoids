@@ -1,22 +1,36 @@
-# Snapshots v1
+# Snapshots v2
 
-Gameplay uses snapshot v1 with reflective asteroid support. Every join must offer
-`snapshotVersion:1` and `asteroidInteractions:1`; the server acknowledges both
+Gameplay uses snapshot v2 with reflective asteroid support. Every join must offer
+`snapshotVersion:2` and `asteroidInteractions:1`; the server acknowledges both
 and provides a private resume token before the client starts play. Missing or
 unsupported capabilities fail explicitly. There is no full-state `gameState`
 transport, disabled-offer build, or legacy-client mode.
 
 ## Deployment
 
-Merge through the CI-gated PR flow. Vercel deploys the client through Git; deploy
-the server separately on Railway. Verify both release headers, two-player state,
-shooting and reconnect. The current capability fields remain the wire contract
-across these independent deployments.
+Merge through the CI-gated PR flow. Vercel publishes the client through Git and
+Railway publishes the server independently. Version 2 is a clean break: no
+version-1 decoder, negotiation bridge, rollout flag or protocol rollback mode
+remains. World persistence, diagnostic log envelopes and player-motion epochs
+keep their existing schemas.
 
-Gameplay WebSocket URLs must include `asteroidInteractions=1`. Unsupported clients
-receive HTTP 426 before upgrade and must refresh. The join message is validated
-again, so the URL parameter alone does not grant access. The client also rejects
-an unsupported server acknowledgment. No protocol rollout or rollback flags exist.
+Publish the matching client and server revisions close together. Either deployment
+order has a temporary mismatch window: a version-1 tab cannot join a version-2
+server, and a version-2 client cannot join a version-1 server. Refreshing obtains
+the current client; it cannot finish a pending server deployment. Existing tabs
+must refresh when requested. A version mismatch fails explicitly rather than
+starting gameplay with incomplete or incompatible state.
+
+Gameplay WebSocket URLs must include `snapshotVersion=2` and
+`asteroidInteractions=1`. Missing or unsupported offers receive HTTP 426 before
+upgrade. The join message is validated again, so URL parameters alone do not
+grant access. The client rejects an unsupported server acknowledgment. The log
+WebSocket remains a separate version-1 diagnostic protocol.
+
+Verify the actual client and server release IDs after both hosts publish, then
+prove two-player snapshots, movement, accepted firing and private-token reconnect
+through the canonical production smoke. One host's successful deployment cannot
+prove that the other published. See [release operations](../agent-operations.md#deploy).
 
 Player rows carry `contourLock: {height, direction}` while following a contour.
 `height` is a fixed visible terrain level (a multiple of 0.08) and `direction` is
@@ -26,16 +40,84 @@ Omission means unlocked. Lock state is transient and is not persisted.
 ## Wire contract
 
 The envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
-`version:1`, positive integer `sequence`, and either:
+`version:2`, positive integer `sequence`, and either:
 
 - `kind:"keyframe", state:<complete ServerGameSnapshot>`.
-- `kind:"delta", baseline:<previous sequence>, patch:{set,clear,collections}`.
+- `kind:"delta", baseline:<previous sequence>, patch:{set?,clear?,collections?,objects?}`.
 
-Top-level `set` replaces a value, including nested arrays/objects. `clear` deletes
-named optional fields. An omitted field is unchanged. Collection patches contain
-`add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
-`order` (complete ID order when membership/order changes). Empty arrays are
-complete empty collections. Removed remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
+Top-level `set` replaces a value; `clear` deletes named optional fields. An
+omitted field is unchanged, and omitted operation lists are empty. Unknown
+valid JSON fields still use ordinary replacement patches. Complete empty
+arrays represent complete empty collections.
+
+A keyed collection patch may contain `add` (complete rows), `update`, `motion`,
+`remove` and `order`. Updates and removals address the zero-based row index in that
+recipient's immediate baseline, rather than repeating the row ID. Explicit
+`order` lists contain the complete resulting order: baseline indices refer
+to surviving baseline rows, and `baseline.length + addIndex` refers to a newly
+added row. Updates and removals cannot refer to additions. Without `order`, surviving baseline rows
+retain their order and additions append in their offered order. References
+expire on the next sequence; there is no retained ID dictionary or history.
+
+General updates are `[baselineIndex,set,clear?]`. An asteroid update containing
+only changed position, rotation or velocity may instead use
+`[baselineIndex,mask,...values]`: bit 1 carries position x/y, bit 2 rotation,
+and bit 4 velocity x/y, in that order. Without bit 8, values are absolute
+selected-precision numbers. Bit 8 makes every offered component a signed safe
+integer delta in four-decimal units (factor 10,000). It requires at least one
+field bit; it never adds a component. The previous and current values must each
+round-trip exactly through a safe scaled integer, and their difference must
+also be safe. The encoder uses relative motion only when the complete tuple's
+JSON UTF-8 byte size is strictly smaller, including the two-digit mask; ties
+keep absolute motion. Other asteroid changes, including
+optional field deletion, retain the general update shape.
+
+Only `objects.spiderField` supports a nested object patch, with the same optional
+`set`, `clear` and keyed `collections` operations for `spiders`, `nests` and
+`consumed`. Spider motion-only updates use position bit 1 and angle bit 2;
+bit 8 uses the same relative integer representation and exact size choice.
+other changed fields retain general updates. Spider and nest membership,
+order and unchanged fields survive exactly; the decoded application still
+receives the complete `spiderField` DTO. No distant spider, discovered nest,
+map knowledge or furnace pulse is dropped to reduce bytes.
+
+`motion` is a canonical base64 stream of relative asteroid or spider updates.
+Each record starts with an unsigned varint of `gap * 32 + mask`, where the gap
+counts untouched baseline ordinals after the previous packed record, starting
+at -1. Masks 9–15 retain the relative component order above; spiders permit
+only 9–11. Signed safe integers use a sign bit and six magnitude bits in the
+first byte, then seven magnitude bits per continuation byte. No integer is
+doubled or truncated to 32 bits. EOF ends the stream. Generic and absolute
+updates remain in `update`; one touched-row set rejects overlapping operations.
+
+For asteroids only, mask bit 16 marks exact residuals against a compression
+reference. The reference uses the accepted positive integer game-time difference,
+the baseline velocity for position and angular velocity for rotation. Each
+reference delta is `round((oldValue + rate * ticks) * 10000) - oldScaledValue`;
+velocity reference deltas are zero. Every intermediate and reconstructed integer
+must remain finite and safe. The decoder restores the actual relative deltas
+before applying them; it never infers an unoffered simulation result. Invalid
+contexts, extra baseline vector fields and unsafe arithmetic cannot use this
+mode. A packed record uses prediction only if its complete byte length shrinks,
+and a collection uses packing only if its entire JSON UTF-8 representation
+shrinks. Base64 spelling, padding bits and shortest varints are validated before
+bounded reconstruction; negative zero, truncation and overlong integers reject
+the frame atomically.
+
+Decoding requires the exact sequence/baseline, valid integer references,
+unique touched rows, nonconflicting field operations, immutable row IDs and a
+complete order permutation. Motion masks have fixed valid bits and exact tuple
+lengths; numeric values must be finite. Relative deltas must be safe integers,
+their corresponding baseline components must be exact P4 values with safe
+scaled integers, and each integer sum must be safe. Decoding adds integers
+first and divides by 10,000, never adding floating-point offsets. Non-P4 or
+unsafe baselines, extra vector fields and larger relative tuples retain
+absolute or general updates without losing fields. Existing safe-key, nesting and complete
+DTO validation still apply. A malformed patch cannot mutate or advance the
+retained baseline. The client requests a keyframe; a valid delta against the
+unchanged baseline may still apply. Removed remotes,
+asteroids, loot, EO satellites, projectiles and pickups disappear.
+
 Hauler snapshots include optional `haulerUtility` (`resource_tap`,
 `boost_coupling`, or `tow_cable`; missing means tow cable). Loot kind `tap` is a Resource Tap
 canister. Harpoon attachments persist until release, delivery, target removal, death or
@@ -86,7 +168,8 @@ silently dropping state. Unknown valid JSON fields remain intact.
 
 Before encoding, the server rounds selected kinematics in its detached wire
 world to four decimal places: asteroid position, velocity and rotation; loot
-position; satellite pickup position, velocity and angle; and projectile
+position; satellite pickup position, velocity and angle; spider position and
+angle; and projectile
 position, previous position where present, and velocity. Integers and values
 above the safe multiplication cutoff remain exact. Every player field,
 including motion-handoff anchors, remains exact, as do resources, timers,
@@ -96,19 +179,38 @@ wire world so unchanged rounded values need no delta field.
 
 ## Baselines and recovery
 
-Baselines are keyed by actual sockets in a WeakMap. Join/rejoin replaces the
-entry; reconnect starts at sequence 1. During a same-socket rejoin, the client
+Baselines and application credit are keyed by actual sockets in a WeakMap.
+A new physical connection starts at sequence 1; same-socket rejoin preserves
+the sent sequence frontier and outstanding credit, advances a local baseline
+generation and demands a keyframe. During a same-socket rejoin, the client
 continues decoding the old session until the ordered `joined` acknowledgment,
 so snapshots already in flight do not trigger a false protocol error. An old
-asynchronous callback cannot update a replacement entry. The first state is full, at most 90 deltas follow a keyframe,
-and a full frame replaces any delta that would be larger.
+successful callback still accounts for its sent sequence and bytes, but cannot
+install its baseline in the new generation. The first state is full. Subsequent
+states use deltas until recovery requires a full frame or a full frame is smaller.
 
 Baselines advance only in a successful WebSocket send callback. This acknowledges
-the local transport write, **not remote application receipt**. WebSocket ordering
-plus client sequence validation protects that distinction. An offer skipped while
-a write is pending leaves its baseline alone: a successful callback permits the
-next delta. Backpressure above 1 MiB, failed writes and explicitly requested
-resynchronization force the next send to be full.
+the local transport write, **not remote application receipt**. After successful
+world application the client sends `{type:"snapshotAck",data:{sequence}}`.
+The cumulative acknowledgment retires only that currently owning socket's sent
+frames. A receipt racing the send callback is retained without releasing credit
+until the transport succeeds. Future, regressing and superseded-owner receipts
+cannot change credit; a duplicate applied receipt is harmless.
+
+Ordinary outstanding snapshots are bounded by 64 KiB, eight frames and a
+750 ms offering-age limit. Offers blocked by pending writes, transport pressure
+or applied credit leave the sent baseline alone and prepare no recipient world;
+the next eligible offer samples current state and can remain a delta. A frame
+larger than the ordinary byte window travels alone, within the existing 1 MiB
+hard outbound bound. One reserved resync keyframe can follow rejected ordinary
+deltas without clearing their debt, preventing a full-window recovery deadlock.
+Its applied acknowledgment retires the older frames. Repeated resync requests
+coalesce; a rejected sole oversized frame requires a new socket instead of
+queuing a second oversized frame. Missing applied receipts close for recovery
+after six seconds, or ten seconds with oversized outstanding work. Failed
+transport writes also close and resume through a fresh socket; their receipt
+and baseline are never treated as successful delivery. These bounds cannot make
+an indivisible large keyframe arrive faster than the connection can transfer it.
 Excluded recipients keep their own baseline. Each recipient receives nearby
 asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
 The crew roster, shared exploration, and revealed `mapAssets` remain global.
@@ -123,8 +225,18 @@ application. Deltas require both the exact baseline and consecutive sequence.
 Stale frames, missing baselines, invalid shapes, conflicting edits, duplicate
 IDs and unsafe object keys are rejected atomically. The previous state remains
 visible; the client coalesces `snapshotResync` requests until a valid frame arrives.
-The server schedules a keyframe on its normal broadcast cadence. Periodic frames
-also repair a lost resync request. Unnegotiated snapshots close with protocol error.
+The server schedules a requested keyframe on its normal broadcast cadence, using
+the single reserved recovery frame without discarding older application debt.
+Initial joins and rejoins also require a keyframe. Otherwise the encoder retains
+the latest successful baseline and sends a full frame only when the delta
+envelope is not strictly smaller in UTF-8 bytes. There is no forced keyframe
+interval. Ordered WebSocket delivery and consecutive decoder baselines support
+sustained delta chains; pending-send skips consume no sequence. Missing valid
+application ACKs still close the socket after the existing six-second timeout,
+or ten seconds with oversized debt, so recovery can resume through a fresh
+socket. A gameplay ingress budget refusal closes the connection rather than
+silently dropping its resync request. Unnegotiated snapshots close with protocol
+error.
 
 ## Verification
 
@@ -231,7 +343,7 @@ recreate this archived table.
 
 ## Reflective asteroid capability
 
-The required `asteroidInteractions:1` join capability requires snapshot v1 and an
+The required `asteroidInteractions:1` join capability requires snapshot v2 and an
 explicit matching acknowledgment. The joined socket alone receives its private resume token.
 A physical gameplay socket close gives the live session a two-second neutral-input
 grace. A same-socket rejoin is idempotent, and a valid token can atomically

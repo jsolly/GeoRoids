@@ -1,3 +1,4 @@
+import { SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
 export function renderStatusPage(diagnosticsEnabled: boolean): string {
   return `
 <!DOCTYPE html>
@@ -282,7 +283,7 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
             }
 
             addLog('Connecting to game WebSocket...', 'info');
-            gameWs = createStatusSocket(\`\${wsBase}/ws?snapshotVersion=1&asteroidInteractions=1\`, 'Game', {
+            gameWs = createStatusSocket(\`\${wsBase}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1\`, 'Game', {
                 onopen: function(socket) {
                     if (gameWs !== socket) return;
                     addLog('Game WebSocket connected', 'info');

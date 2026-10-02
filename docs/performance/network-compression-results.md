@@ -8,7 +8,8 @@ retain their original workload and limitations.
 ## Open goal and current decision
 
 Performance alternatives are not exhausted. Compression remains an isolated
-experiment; production still uses uncompressed snapshot v1. Renderer libraries,
+experiment. These archived runs used uncompressed snapshot v1; the current
+[snapshot contract](../protocol/snapshot-v2.md) requires version 2. Renderer libraries,
 WebGL, workers, binary protocols, runtime/language changes and the client-server
 loop remain open where current measurements justify an experiment.
 

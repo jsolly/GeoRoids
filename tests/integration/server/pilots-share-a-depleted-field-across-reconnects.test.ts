@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import { nearbyAsteroidRows } from '../../../shared/world';
 import { WireClient, type WireMessage } from '../../support/wireClient';
 
@@ -17,7 +17,7 @@ const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 
 beforeEach(async () => {
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
-  url = `ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`;
+  url = `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`;
 });
 
 afterEach(async () => {
@@ -70,6 +70,9 @@ async function waitForMessage(
           if (result.kind === 'snapshot-rejected') {
             throw result.error;
           }
+          if (result.kind === 'snapshot') {
+            client.send({ type: 'snapshotAck', data: { sequence: result.metadata.sequence } });
+          }
           const message: WireMessage =
             result.kind === 'snapshot'
               ? { type: 'snapshot', data: result.state }
@@ -114,13 +117,13 @@ async function join(id: string, resumeToken?: string): Promise<WireClient> {
     type: 'join',
     id,
     data: { name: id, position: { x: 0, y: 0 } },
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
     ...(resumeToken ? { resumeToken } : {}),
   });
   const ack = dataOf(await joined);
   expect(ack['id']).toBe(id);
-  expect(ack['snapshotVersion']).toBe(1);
+  expect(ack['snapshotVersion']).toBe(SNAPSHOT_VERSION);
   expect(ack['asteroidInteractions']).toBe(1);
   const token = ack['resumeToken'];
   assert(typeof token === 'string' && RESUME_TOKEN_PATTERN.test(token));

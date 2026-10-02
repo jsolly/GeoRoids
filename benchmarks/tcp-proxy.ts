@@ -21,15 +21,22 @@ export class TransmissionSchedule {
   }
 }
 
-/** A bounded FIFO TCP impairment. Transport order is preserved; no application frames are dropped. */
-export async function startTcpProxy(options: {
-  targetPort: number;
+type Impairment = {
   latencyMs: number;
   jitterMs: number;
   downBytesPerSecond: number;
   upBytesPerSecond: number;
-  seed: number;
-}) {
+};
+
+/** Bounded raw-byte forwarding: clean is transparent; impaired delivery preserves FIFO. */
+export async function startTcpProxy(
+  options: {
+    targetPort: number;
+    /** Stable owned benchmark endpoint; omitted binds an ephemeral test port. */
+    port?: number;
+    seed: number;
+  } & ({ transparent: true } | (Impairment & { transparent?: false }))
+) {
   const sockets = new Set<Socket>();
   let bytesUp = 0;
   let bytesDown = 0;
@@ -39,6 +46,8 @@ export async function startTcpProxy(options: {
   let seed = options.seed >>> 0;
   const timers = new Set<ReturnType<typeof setTimeout>>();
   let closing = false;
+  const port = options.port ?? 0;
+  assert(Number.isSafeInteger(port) && port >= 0 && port <= 65535, 'Invalid proxy listen port');
   class ImpairedDirection extends Transform {
     private readonly arrivals = new WeakMap<Buffer, number>();
     private readonly schedule: TransmissionSchedule;
@@ -52,13 +61,15 @@ export async function startTcpProxy(options: {
     private flushCallback: TransformCallback | undefined;
     constructor(
       rate: number,
-      private readonly down: boolean
+      private readonly down: boolean,
+      private readonly impairment: Impairment
     ) {
       super({ highWaterMark: 64 * 1024 });
-      this.schedule = new TransmissionSchedule(rate, options.latencyMs);
+      this.schedule = new TransmissionSchedule(rate, impairment.latencyMs);
       // Room for propagation in flight plus one normal stream chunk. An ingress
       // chunk may exceed this threshold once; further input then backpressures.
-      this.pendingLimit = 65536 + Math.ceil((rate * (options.latencyMs + options.jitterMs)) / 1000);
+      this.pendingLimit =
+        65536 + Math.ceil((rate * (impairment.latencyMs + impairment.jitterMs)) / 1000);
     }
     arrived(chunk: Buffer) {
       this.arrivals.set(chunk, performance.now());
@@ -150,7 +161,7 @@ export async function startTcpProxy(options: {
     }
     override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      const jitter = (seed / 2 ** 32 - 0.5) * 2 * options.jitterMs;
+      const jitter = (seed / 2 ** 32 - 0.5) * 2 * this.impairment.jitterMs;
       const arrivedAt = this.arrivals.get(chunk);
       assert(arrivedAt !== undefined, 'Proxy chunk lacks an ingress timestamp');
       const schedule = this.schedule.schedule(arrivedAt, chunk.length, jitter);
@@ -174,16 +185,43 @@ export async function startTcpProxy(options: {
       callback(error);
     }
   }
-  for (const value of [options.latencyMs, options.jitterMs]) {
-    assert(Number.isFinite(value) && value >= 0, 'Invalid proxy delay');
+  class TransparentDirection extends Transform {
+    constructor(private readonly down: boolean) {
+      super({ highWaterMark: 64 * 1024 });
+    }
+    override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
+      // The same outbound-stream admission boundary as impaired delivery,
+      // without a transmission schedule, random jitter, timers, or rate cap.
+      if (this.down) {
+        bytesDown += chunk.length;
+      } else {
+        bytesUp += chunk.length;
+      }
+      peakWritableBytes = Math.max(peakWritableBytes, this.writableLength);
+      callback(null, chunk);
+    }
   }
-  for (const value of [options.downBytesPerSecond, options.upBytesPerSecond]) {
-    assert(Number.isFinite(value) && value > 0, 'Invalid proxy rate');
+  if (options.transparent !== true) {
+    for (const value of [options.latencyMs, options.jitterMs]) {
+      assert(Number.isFinite(value) && value >= 0, 'Invalid proxy delay');
+    }
+    for (const value of [options.downBytesPerSecond, options.upBytesPerSecond]) {
+      assert(Number.isFinite(value) && value > 0, 'Invalid proxy rate');
+    }
   }
   const server = createServer((client) => {
     const upstream = createConnection({ host: '127.0.0.1', port: options.targetPort });
-    const up = new ImpairedDirection(options.upBytesPerSecond, false);
-    const down = new ImpairedDirection(options.downBytesPerSecond, true);
+    // Match WebSocket endpoints; only the declared schedule adds sender delay.
+    client.setNoDelay(true);
+    upstream.setNoDelay(true);
+    const up =
+      options.transparent === true
+        ? new TransparentDirection(false)
+        : new ImpairedDirection(options.upBytesPerSecond, false, options);
+    const down =
+      options.transparent === true
+        ? new TransparentDirection(true)
+        : new ImpairedDirection(options.downBytesPerSecond, true, options);
     sockets.add(client);
     sockets.add(upstream);
     const close = () => {
@@ -206,15 +244,22 @@ export async function startTcpProxy(options: {
     }
     up.on('error', close);
     down.on('error', close);
-    client.on('data', (chunk: Buffer) => up.arrived(chunk));
-    upstream.on('data', (chunk: Buffer) => down.arrived(chunk));
+    if (up instanceof ImpairedDirection && down instanceof ImpairedDirection) {
+      client.on('data', (chunk: Buffer) => up.arrived(chunk));
+      upstream.on('data', (chunk: Buffer) => down.arrived(chunk));
+    }
     client.pipe(up).pipe(upstream);
     upstream.pipe(down).pipe(client);
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '127.0.0.1', resolve);
+    });
+  } catch (error) {
+    server.unref();
+    throw error;
+  }
   const address = server.address();
   assert(address && typeof address !== 'string');
   return {

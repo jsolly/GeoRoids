@@ -1,9 +1,11 @@
 // @vitest-environment node
+
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { prepareFixture, startFixtureControl } from '../../../benchmarks/fixture-control';
 import { createServerInstance } from '../../../server/createServer';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('a departed pilot leaves the diagnostic world untouched until it rejoins', async () => {
@@ -73,7 +75,7 @@ test('a prepared fixture returns the authoritative placed motion epoch', async (
           id: 'prepared-pilot',
           name: 'Prepared pilot',
           position: { x: 100, y: 100 },
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
         },
       },

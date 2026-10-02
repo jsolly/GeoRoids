@@ -97,13 +97,11 @@ function liveInputHashes(root = ROOT) {
       'server',
       'setup',
       'benchmarks',
-      'scripts/test-runner.sh',
-      'scripts/benchmark-proxy.ts',
-      'scripts/compare-mobile-sessions.ts',
-      'scripts/measure-frame-work.ts',
-      'scripts/compare-frame-work.ts',
-      'scripts/process-tree.sh',
-      'scripts/test-runner-contract.sh',
+      'scripts',
+      'tsconfig',
+      'wiki',
+      'content',
+      'docs/wiki-source-review.json',
       'public',
       'shared-types.ts',
       'server.ts',
@@ -217,12 +215,20 @@ export function createLiveReport<TDetails extends object>(options: {
 }
 
 export async function writeLiveReport(path: string, report: LiveReport): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
   const finalHashes = liveInputHashes();
   const drift =
     finalHashes.sourceSha256 !== report.metadata.git.sourceSha256 ||
     finalHashes.buildSha256 !== report.metadata.git.buildSha256;
+  // Scenario callbacks retain their diagnostics arrays through teardown. Read
+  // them at serialization, after the final asynchronous preparation, rather
+  // than trusting a status computed before those callbacks have finished.
+  const finalized = finalizeRecordedDiagnostics(report.details);
   let validationError: unknown;
   try {
+    if (finalized.failure) {
+      throw finalized.failure;
+    }
     if (report.measurement) {
       validateMeasurement(report.measurement);
     } else if (report.status === 'passed') {
@@ -234,13 +240,21 @@ export async function writeLiveReport(path: string, report: LiveReport): Promise
   } catch (error) {
     validationError = error;
   }
-  await mkdir(dirname(path), { recursive: true });
+  const measurement =
+    report.measurement && finalized.scenarioCounts
+      ? {
+          ...report.measurement,
+          counts: { ...report.measurement.counts, ...finalized.scenarioCounts },
+        }
+      : report.measurement;
   await writeFile(
     path,
     `${JSON.stringify(
       {
         ...report,
         status: validationError ? 'failed' : report.status,
+        details: finalized.details,
+        ...(measurement ? { measurement } : {}),
         finalHashes,
         ...(validationError ? { validationFailure: errorRecord(validationError) } : {}),
       },
@@ -251,6 +265,85 @@ export async function writeLiveReport(path: string, report: LiveReport): Promise
   if (validationError) {
     throw validationError;
   }
+}
+
+function diagnosticText(value: unknown): string {
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}`;
+  }
+  if (value && typeof value === 'object' && 'message' in value) {
+    return String(value.message);
+  }
+  return String(value);
+}
+
+function finalizeRecordedDiagnostics(details: Record<string, unknown>): {
+  details: Record<string, unknown>;
+  failure?: Error;
+  scenarioCounts?: { successfulScenarios: number; failedScenarios: number };
+} {
+  const failures: string[] = [];
+  function inspect(value: Record<string, unknown>, label: string): boolean {
+    const before = failures.length;
+    for (const field of ['errors', 'warnings', 'failures']) {
+      const diagnostics = value[field];
+      if (diagnostics === undefined) {
+        continue;
+      }
+      if (!Array.isArray(diagnostics)) {
+        failures.push(`${label}.${field} is not a diagnostics array`);
+      } else if (diagnostics.length > 0) {
+        failures.push(`${label}.${field}: ${diagnostics.map(diagnosticText).join('; ')}`);
+      }
+    }
+    if (value['cleanupComplete'] === false) {
+      failures.push(`${label} cleanup is incomplete`);
+    }
+    return failures.length !== before;
+  }
+  inspect(details, 'Benchmark');
+  const recordedScenarios = details['scenarios'];
+  let scenarioCounts: { successfulScenarios: number; failedScenarios: number } | undefined;
+  let finalizedDetails = details;
+  if (recordedScenarios !== undefined) {
+    if (!Array.isArray(recordedScenarios)) {
+      failures.push('Benchmark.scenarios is not an array');
+    } else {
+      let successfulScenarios = 0;
+      let failedScenarios = 0;
+      const scenarios = recordedScenarios.map((scenario: unknown, index: number) => {
+        const label = `Scenario ${index + 1}`;
+        if (!scenario || typeof scenario !== 'object' || Array.isArray(scenario)) {
+          failures.push(`${label} is not a scenario record`);
+          failedScenarios++;
+          return scenario;
+        }
+        const record = scenario as Record<string, unknown>;
+        const diagnosticsFailed = inspect(record, label);
+        const status = record['status'];
+        if (status === 'failed') {
+          failures.push(`${label} failed: ${diagnosticText(record['failure'] ?? 'See scenario')}`);
+        } else if (status !== 'passed') {
+          failures.push(`${label} has an invalid status`);
+        }
+        if (diagnosticsFailed || status !== 'passed') {
+          failedScenarios++;
+          return { ...record, status: 'failed' };
+        }
+        successfulScenarios++;
+        return record;
+      });
+      finalizedDetails = { ...details, scenarios };
+      scenarioCounts = { successfulScenarios, failedScenarios };
+    }
+  }
+  return {
+    details: finalizedDetails,
+    ...(scenarioCounts ? { scenarioCounts } : {}),
+    ...(failures.length
+      ? { failure: new Error(`Recorded benchmark failures:\n${failures.join('\n')}`) }
+      : {}),
+  };
 }
 
 export function validateHealth(value: unknown): void {

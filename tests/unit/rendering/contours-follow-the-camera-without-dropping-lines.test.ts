@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { CAMERA, VISUAL } from '../../../src/constants';
+import { findContourCapture } from '../../../src/physics/terrain/contourCapture';
 import type { ContourLevel } from '../../../src/physics/terrain/contours';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import {
@@ -9,12 +10,14 @@ import {
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
-import { contourCandidates } from '../../../src/rendering/contourSpatialIndex';
+import { createContourQuery } from '../../../src/rendering/contourSpatialIndex';
+import { spiderFootContacts } from '../../../src/rendering/spiderFootContacts';
 import { TestPath2D, type TestPathCommand } from '../../support/TestPath2D';
 
 type Segment = ContourLevel['segments'][number];
 const level = (segments: Segment[]): ContourLevel => ({ index: 0, height: 100, segments });
 const view = { x: 0, y: 0, width: 448, height: 448, scale: 1, pad: 32 };
+const contourCandidates = createContourQuery();
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -145,10 +148,12 @@ test('camera motion within the same cells reuses candidates without changing ret
   const distantCamera = { ...firstCamera, x: 4096 };
   expect(contourCandidates(levels, 0, distantCamera)).toEqual([segments[2]]);
   expect(first).toEqual(retained);
-  expect(contourCandidates(levels, 0, firstCamera)).toEqual(first);
+  const returned = contourCandidates(levels, 0, firstCamera);
+  expect(returned).toEqual(first);
+  expect(returned).not.toBe(first);
 });
 
-test('renderer reuses world paths until the candidate arrays or terrain change', () => {
+test('capture and spider queries leave the stationary camera world paths reusable', () => {
   vi.stubGlobal('Path2D', TestPath2D);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -207,8 +212,13 @@ test('renderer reuses world paths until the candidate arrays or terrain change',
 
     const firstPaths = strokes.splice(0).map(({ path }) => path);
     beginPath.mockClear();
+    findContourCapture(firstCamera, 0);
+    spiderFootContacts({ position: firstCamera, angle: 0 }, levels, 0);
     drawIsoContours({ x: 33, y: 32 });
-    expect(strokes.map(({ path }) => path)).toEqual(firstPaths);
+    expect(strokes).toHaveLength(firstPaths.length);
+    for (const [index, stroke] of strokes.entries()) {
+      expect(stroke.path).toBe(firstPaths[index]);
+    }
 
     strokes.length = 0;
     beginPath.mockClear();
@@ -223,6 +233,35 @@ test('renderer reuses world paths until the candidate arrays or terrain change',
   } finally {
     ensureTerrain(prior.seed, { cx: prior.cx, cy: prior.cy, radius: prior.radius });
   }
+});
+
+test('independent cameras retain their own candidates while sharing the terrain grid', () => {
+  let reads = 0;
+  const segments = Array.from({ length: 20 }, (_, index) => ({
+    get ax() {
+      reads++;
+      return index * 256;
+    },
+    ay: 0,
+    bx: index * 256 + 10,
+    by: 0,
+  }));
+  const levels = [level(segments)];
+  const playfield = createContourQuery();
+  const capture = createContourQuery();
+  const first = playfield(levels, 0, view);
+  reads = 0;
+  const narrow = { ...view, x: 512, width: 16, height: 16, pad: 0 };
+  const captured = capture(levels, 0, narrow);
+  expect(reads).toBe(0);
+  // Assert identity as scalars: object matchers can inspect the observed getters.
+  expect(captured.some((segment) => segment === segments[2])).toBe(true);
+  expect(captured.some((segment) => segment === segments[0])).toBe(false);
+  for (let frame = 0; frame < 10; frame++) {
+    capture(levels, 0, { ...narrow, x: 512 + frame * 256 });
+    expect(playfield(levels, 0, view) === first).toBe(true);
+  }
+  expect(reads).toBe(0);
 });
 
 test('an eastbound pilot sees terrain at the wide screen edge beyond the old north-up bounds', async () => {

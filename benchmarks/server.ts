@@ -1,20 +1,15 @@
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
 import { performance } from 'node:perf_hooks';
-import { WebSocket, WebSocketServer } from 'ws';
-
-function isClosed(socket: WebSocket): boolean {
-  return socket.readyState === WebSocket.CLOSED;
-}
+import { WebSocket } from 'ws';
 
 import { GameEngine } from '../server/core/GameEngine';
 import { ServerClock } from '../server/core/ServerClock';
 import { GAME_TICK_MS } from '../shared/gameClock';
 import type { Position, SatellitePickupData, ServerGameState } from '../shared-types';
+import { ownBenchmarkIdentity } from './benchmark-identity';
+import { createOwnedLoopback, type OwnedLoopback } from './owned-loopback';
 import type { Measurement } from './results';
 
-const LOOPBACK_TIMEOUT_MS = 5_000;
-const SOCKET_CLOSE_TIMEOUT_MS = 2_000;
 const SERVER_CLOCK_START_MS = 1_700_000_000_000;
 const MAX_PLAYERS = 25;
 
@@ -184,90 +179,6 @@ function validatePickupAccess(engine: GameEngine): SatellitePickupData {
   return before;
 }
 
-function isWebSocket(value: unknown): value is WebSocket {
-  return value instanceof WebSocket;
-}
-
-async function closeSocket(socket: WebSocket, label: string): Promise<void> {
-  if (socket.readyState === WebSocket.CLOSED) {
-    return;
-  }
-  const closed = once(socket, 'close', { signal: AbortSignal.timeout(SOCKET_CLOSE_TIMEOUT_MS) });
-  const results = await Promise.allSettled([
-    closed,
-    Promise.resolve().then(() => socket.close(1000, 'Benchmark cleanup')),
-  ]);
-  const failures = results
-    .filter((result) => result.status === 'rejected')
-    .map((result) => result.reason);
-  if (failures.length && !isClosed(socket)) {
-    const terminated = once(socket, 'close', {
-      signal: AbortSignal.timeout(SOCKET_CLOSE_TIMEOUT_MS),
-    });
-    const forced = await Promise.allSettled([
-      terminated,
-      Promise.resolve().then(() => socket.terminate()),
-    ]);
-    for (const result of forced) {
-      if (result.status === 'rejected') {
-        failures.push(result.reason);
-      }
-    }
-  }
-  if (failures.length) {
-    throw new AggregateError(failures, `${label} did not close normally`);
-  }
-}
-
-async function closeListener(listener: WebSocketServer): Promise<void> {
-  if (listener.address() === null) {
-    return;
-  }
-  const closed = once(listener, 'close', { signal: AbortSignal.timeout(SOCKET_CLOSE_TIMEOUT_MS) });
-  const failures: unknown[] = [];
-  try {
-    // Enter CLOSING synchronously so pending upgrades cannot add peers during teardown.
-    listener.close();
-  } catch (error) {
-    failures.push(error);
-  }
-  const results = await Promise.allSettled([closed]);
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      failures.push(result.reason);
-    }
-  }
-  if (failures.length) {
-    throw new AggregateError(failures, 'Loopback listener did not close normally');
-  }
-}
-
-async function closeOwnedSockets(
-  listener: WebSocketServer | undefined,
-  clients: readonly WebSocket[],
-  peers: readonly WebSocket[]
-): Promise<void> {
-  const failures: Error[] = [];
-  const listenerClosed = listener
-    ? closeListener(listener).catch((error: unknown) => {
-        failures.push(asError(error));
-      })
-    : Promise.resolve();
-  const sockets = [...new Set([...clients, ...peers, ...(listener ? [...listener.clients] : [])])];
-  const socketResults = await Promise.allSettled(
-    sockets.map((socket, index) => closeSocket(socket, `loopback socket ${index}`))
-  );
-  for (const result of socketResults) {
-    if (result.status === 'rejected') {
-      failures.push(asError(result.reason));
-    }
-  }
-  await listenerClosed;
-  if (failures.length > 0) {
-    throw new AggregateError(failures, 'Benchmark loopback cleanup failed');
-  }
-}
-
 function advanceTick(engine: GameEngine, clock: { nowMs: number }): void {
   clock.nowMs += GAME_TICK_MS;
   engine.advanceOneFrame();
@@ -280,42 +191,21 @@ export async function runServerSample(
   const originalDateNow = Date.now;
   const originalMathRandom = Math.random;
   const clock = { nowMs: SERVER_CLOCK_START_MS };
-  const clients: WebSocket[] = [];
-  const peers: WebSocket[] = [];
   const failures: Error[] = [];
-  let listener: WebSocketServer | undefined;
+  let loopback: OwnedLoopback | undefined;
   let engine: GameEngine | undefined;
+  let identity: ReturnType<typeof ownBenchmarkIdentity> | undefined;
   let result: Measurement | undefined;
-  Date.now = () => clock.nowMs;
-  Math.random = seededMathRandom(options.seed);
   try {
-    listener = new WebSocketServer({ host: '127.0.0.1', port: 0 });
-    listener.on('error', (error) => failures.push(asError(error)));
-    listener.on('connection', (peer) => {
-      peers.push(peer);
-      peer.on('error', (error) => failures.push(asError(error)));
-    });
-    await once(listener, 'listening', { signal: AbortSignal.timeout(LOOPBACK_TIMEOUT_MS) });
-    const address = listener.address();
-    if (!address || typeof address === 'string') {
-      throw new Error('Loopback listener did not expose an address');
-    }
+    identity = ownBenchmarkIdentity(options.seed);
+    Date.now = () => clock.nowMs;
+    Math.random = seededMathRandom(options.seed);
+    loopback = await createOwnedLoopback();
     for (let index = 0; index < options.players; index++) {
-      const connection = once(listener, 'connection', {
-        signal: AbortSignal.timeout(LOOPBACK_TIMEOUT_MS),
-      });
-      const client = new WebSocket(`ws://127.0.0.1:${address.port}`);
-      clients.push(client);
-      client.on('error', (error) => failures.push(asError(error)));
-      const [peerValue] = await connection;
-      if (!isWebSocket(peerValue)) {
-        throw new Error(`Loopback connection ${index} did not provide a WebSocket peer`);
-      }
-      await once(client, 'open', { signal: AbortSignal.timeout(LOOPBACK_TIMEOUT_MS) });
+      await loopback.connect();
     }
-    if (failures.length > 0) {
-      throw failures[0];
-    }
+    loopback.assertHealthy();
+    const peers = loopback.peers;
 
     engine = new GameEngine(
       options.seed,
@@ -409,6 +299,7 @@ export async function runServerSample(
       witness,
       parameters: {
         ...options,
+        identitySource: identity.source,
         initialLoot: 0,
         lootPolicy: 'Natural authoritative drops remain in the scene',
         clocks:
@@ -425,12 +316,17 @@ export async function runServerSample(
       failures.push(asError(error));
     }
     try {
-      await closeOwnedSockets(listener, clients, peers);
+      await loopback?.close();
     } catch (error) {
       failures.push(asError(error));
     }
     Date.now = originalDateNow;
     Math.random = originalMathRandom;
+    try {
+      identity?.release();
+    } catch (error) {
+      failures.push(asError(error));
+    }
   }
   // Include transport errors delivered during teardown as failed measurements.
   if (failures.length) {

@@ -1,6 +1,31 @@
 /* @vitest-environment node */
+
 import { expect, test } from 'vitest';
 import { decodeClientCommand } from '../../../server/communication/clientCommandDecoder';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
+
+test('applied-world acknowledgments require a positive safe sequence at the wire boundary', () => {
+  expect(decodeClientCommand({ type: 'snapshotAck', data: { sequence: 7 } })).toEqual({
+    ok: true,
+    command: { type: 'snapshotAck', sequence: 7 },
+  });
+  for (const sequence of [
+    undefined,
+    null,
+    0,
+    -1,
+    1.5,
+    '7',
+    Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    expect(decodeClientCommand({ type: 'snapshotAck', data: { sequence } })).toEqual({
+      ok: false,
+      messageType: 'snapshotAck',
+      error: 'Invalid applied snapshot acknowledgment',
+    });
+  }
+});
 
 test('legacy top-level fields override nested command fields once', () => {
   expect(
@@ -96,7 +121,7 @@ test('nested joins keep finite positions and capability offers', () => {
         position: { x: 12.5, y: -4 },
         kitId: 'hauler',
         asteroidInteractions: 1,
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
       },
     })
   ).toEqual({
@@ -107,7 +132,7 @@ test('nested joins keep finite positions and capability offers', () => {
       name: 'Pilot',
       position: { x: 12.5, y: -4 },
       kitId: 'hauler',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeRequested: false,
     },
@@ -122,7 +147,7 @@ test('join coordinates must be finite numbers', () => {
         id: 'pilot',
         name: 'Pilot',
         position: { x: '12.5px', y: '-4' },
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
       },
     })

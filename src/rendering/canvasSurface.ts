@@ -1,10 +1,16 @@
 import type { Position } from '../../shared-types';
-import { PALETTE } from '../constants';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { Point } from '../physics/Point';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
+import { paintOpaqueBackground } from './canvasBackground';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
-import { hudLayoutForCanvas } from './hud/hudLayout';
+import { type GpuContourLayer, GpuRearRenderer } from './gpuRearRenderer';
+import {
+  clearHudLayoutCache,
+  hudLayoutForCanvas,
+  refreshHudLayoutForCanvas,
+} from './hud/hudLayout';
+import { drawStarLayers, type StarPoint } from './nativeStarPainter';
 import {
   PLAYFIELD_CLOSE_SCALE,
   type PlayfieldSize,
@@ -56,12 +62,30 @@ class CanvasManager {
   private readonly screenViewport = { width: 1, height: 1 };
   private worldLayersZoomed = false;
   private readonly screenPos = { x: 0, y: 0 };
+  private gpuRenderer: GpuRearRenderer | null = null;
+  private gpuFrameActive = false;
+  private inputMediaQueries: MediaQueryList[] = [];
 
   initialize(): void {
+    if (this.canvas) {
+      this.destroy();
+    }
     this.canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
+    const gpuRequested = new URLSearchParams(window.location.search).get('renderer') === 'webgl2';
     this.context = this.canvas?.getContext('2d', { alpha: false }) || null;
 
     if (this.canvas && this.context) {
+      if (gpuRequested) {
+        try {
+          this.gpuRenderer = GpuRearRenderer.create(this.canvas, () => {
+            if (!this.gpuRenderer?.available()) {
+              this.gpuFrameActive = false;
+            }
+          });
+        } catch {
+          this.gpuRenderer = null;
+        }
+      }
       this.resizeHandler = () => {
         if (this.resizeFrame !== null) {
           return;
@@ -78,12 +102,22 @@ class CanvasManager {
       window.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('scroll', this.resizeHandler);
+      const onResize = this.resizeHandler;
+      this.inputMediaQueries = ['(pointer: coarse)', '(hover: none)'].map((query) => {
+        const media = window.matchMedia(query);
+        media.addEventListener('change', onResize);
+        return media;
+      });
 
       this.stopDevicePixelRatioWatcher = watchDevicePixelRatio(() => {
         this.handleCanvasResize();
       });
 
       this.handleCanvasResize();
+      clientPerformance.setRendererObservation(gpuRequested ? 'webgl2' : 'canvas', () => ({
+        backend: this.getRendererBackend(),
+        gpuStats: this.getGpuFrameStats(),
+      }));
     }
   }
 
@@ -118,7 +152,7 @@ class CanvasManager {
     this.viewport.width = width;
     this.viewport.height = height;
 
-    const { miniMap } = hudLayoutForCanvas(this.viewport);
+    const { miniMap } = refreshHudLayoutForCanvas(this.viewport);
     this.syncPlayfieldChrome(width, height, miniMap, touchControls);
 
     if (this.canvas.width !== backingWidth) {
@@ -136,6 +170,7 @@ class CanvasManager {
     if (this.canvas.style.height !== cssHeight) {
       this.canvas.style.height = cssHeight;
     }
+    this.gpuRenderer?.resizeSurface(width, height, dpr);
 
     if (backingSizeChanged || devicePixelRatioChanged) {
       this.context?.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -221,8 +256,16 @@ class CanvasManager {
       window.removeEventListener('resize', this.resizeHandler);
       window.visualViewport?.removeEventListener('resize', this.resizeHandler);
       window.visualViewport?.removeEventListener('scroll', this.resizeHandler);
+      for (const media of this.inputMediaQueries) {
+        media.removeEventListener('change', this.resizeHandler);
+      }
       this.resizeHandler = null;
     }
+    this.inputMediaQueries = [];
+    clientPerformance.setRendererObservation('canvas', null);
+    this.gpuRenderer?.destroy();
+    this.gpuRenderer = null;
+    this.gpuFrameActive = false;
     this.canvas = null;
     this.context = null;
     this.viewport.width = 1;
@@ -233,6 +276,95 @@ class CanvasManager {
     this.zoomUpdatedAt = null;
     this.worldLayersZoomed = false;
     configureRenderQuality('', false);
+    clearHudLayoutCache();
+  }
+
+  getRendererBackend(): 'canvas' | 'webgl2' {
+    return this.gpuFrameActive && this.gpuRenderer?.available() ? 'webgl2' : 'canvas';
+  }
+
+  getGpuFrameStats() {
+    return this.gpuRenderer?.getStats() ?? null;
+  }
+
+  canDrawGpuRear(): boolean {
+    return this.gpuRenderer?.available() ?? false;
+  }
+
+  drawGpuRear(scene: {
+    position: Position;
+    contours: readonly GpuContourLayer[];
+    starTiles: readonly (readonly StarPoint[])[];
+  }): boolean {
+    const viewport = this.worldLayersZoomed ? this.screenViewport : this.viewport;
+    this.gpuFrameActive = false;
+    const ctx = this.requireContext();
+    ctx.save();
+    let contourTransform: DOMMatrix;
+    try {
+      this.applyWorldTransform(ctx, scene.position);
+      contourTransform = ctx.getTransform();
+    } finally {
+      ctx.restore();
+    }
+    paintOpaqueBackground(ctx);
+    const nativeStars = drawStarLayers(
+      ctx,
+      scene.starTiles,
+      scene.position,
+      this.viewport,
+      PLAYFIELD_CLOSE_SCALE,
+      this.cameraRotation
+    );
+    const drawn =
+      this.gpuRenderer?.draw({
+        position: scene.position,
+        contours: scene.contours,
+        rearSource: ctx.canvas,
+        ...nativeStars,
+        width: viewport.width,
+        height: viewport.height,
+        dpr: this.devicePixelRatio,
+        scale: PLAYFIELD_CLOSE_SCALE,
+        zoom: this.zoom,
+        rotation: this.cameraRotation,
+        contourTransform: {
+          a: contourTransform.a,
+          b: contourTransform.b,
+          c: contourTransform.c,
+          d: contourTransform.d,
+        },
+      }) ?? false;
+    if (!drawn) {
+      this.replayScanTransform(ctx);
+    }
+    return drawn;
+  }
+
+  composeGpuRear(context: CanvasRenderingContext2D): boolean {
+    this.gpuFrameActive = this.gpuRenderer?.composeInto(context) ?? false;
+    this.replayScanTransform(context);
+    return this.gpuFrameActive;
+  }
+
+  private replayScanTransform(context: CanvasRenderingContext2D): void {
+    if (this.worldLayersZoomed) {
+      // A Canvas source snapshot can restart Chromium's native recorder from
+      // its double DOM matrix, changing float concatenation rounding. Replay
+      // the original scan operations so foreground painters see that same CTM.
+      context.setTransform(this.devicePixelRatio, 0, 0, this.devicePixelRatio, 0, 0);
+      this.applyScanTransform(context);
+    }
+  }
+
+  requiresNativeGpuContours(): boolean {
+    return this.gpuFrameActive && this.gpuRenderer?.getStats().contourMode === 'canvas-path';
+  }
+
+  recordNativeGpuContours(segments: number): void {
+    if (this.gpuFrameActive) {
+      this.gpuRenderer?.recordNativeContours(segments);
+    }
   }
 
   getCanvas(): HTMLCanvasElement | null {
@@ -253,8 +385,7 @@ class CanvasManager {
     if (!ctx || !canvas) {
       return;
     }
-    ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
+    paintOpaqueBackground(ctx);
   }
 
   requireCanvas(): HTMLCanvasElement {
@@ -315,19 +446,28 @@ class CanvasManager {
     this.viewport.width = this.screenViewport.width / this.zoom;
     this.viewport.height = this.screenViewport.height / this.zoom;
     ctx.save();
+    this.applyScanTransform(ctx);
+  }
+
+  private applyScanTransform(ctx: CanvasRenderingContext2D): void {
     ctx.translate(this.screenViewport.width / 2, this.screenViewport.height / 2);
     ctx.scale(this.zoom, this.zoom);
     ctx.translate(-this.viewport.width / 2, -this.viewport.height / 2);
   }
 
-  endWorldLayers(ctx: CanvasRenderingContext2D): void {
-    if (!this.worldLayersZoomed) {
-      return;
+  endWorldLayers(ctx: CanvasRenderingContext2D, painterFailed = false): void {
+    if (this.worldLayersZoomed) {
+      this.worldLayersZoomed = false;
+      ctx.restore();
+      this.viewport.width = this.screenViewport.width;
+      this.viewport.height = this.screenViewport.height;
     }
-    this.worldLayersZoomed = false;
-    ctx.restore();
-    this.viewport.width = this.screenViewport.width;
-    this.viewport.height = this.screenViewport.height;
+    if (painterFailed) {
+      // Frames start at the DPR transform established by applyViewportSize.
+      // Restore it without querying Canvas state. Painters own balanced save
+      // scopes on exceptions so their styles and clips also leave with them.
+      ctx.setTransform(this.devicePixelRatio, 0, 0, this.devicePixelRatio, 0, 0);
+    }
   }
 
   getPlayfieldScale(): number {

@@ -1,7 +1,9 @@
 /* @vitest-environment node */
+
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;
@@ -31,7 +33,7 @@ function join(socket: RecordingSocket, id: string, name = id) {
   core.handleClientMessage(
     {
       type: 'join',
-      data: { id, name, snapshotVersion: 1, asteroidInteractions: 1 },
+      data: { id, name, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
     },
     socket
   );
@@ -88,7 +90,12 @@ test('a case-variant name cannot bypass the full-server player cap', () => {
 
 test('a current pilot cannot be claimed without its private resume token', () => {
   const owner = transport();
-  const data = { id: 'owner', name: 'Owner', asteroidInteractions: 1, snapshotVersion: 1 };
+  const data = {
+    id: 'owner',
+    name: 'Owner',
+    asteroidInteractions: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
+  };
   core.handleClientMessage({ type: 'join', data }, owner.socket);
   const joined = owner.replies().find((reply) => reply.type === 'joined');
   if (!joined || !isRecord(joined.data) || typeof joined.data['resumeToken'] !== 'string') {

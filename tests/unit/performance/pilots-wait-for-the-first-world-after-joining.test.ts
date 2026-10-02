@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { expect, test, vi } from 'vitest';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { Pilot } from '../../../benchmarks/pilot';
-import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 test.each([false, true])(
@@ -37,7 +37,7 @@ test.each([false, true])(
           type: 'joined',
           data: {
             id: pilot.id,
-            snapshotVersion: 1,
+            snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
             resumeToken: 'a'.repeat(64),
           },
@@ -69,9 +69,16 @@ test.each([false, true])(
         playerMotion: { epoch: 1, ack: 0, mode: 'free' },
       });
       const received = once(pilot.socket, 'message');
+      const applied = once(peer, 'message');
       peer.send(JSON.stringify({ type: 'snapshot', data: new SnapshotEncoder(world).encode(1) }));
       await received;
       expect(pilot.state).toEqual(world);
+      const [applicationAck] = await applied;
+      expect(JSON.parse(String(applicationAck))).toEqual({
+        type: 'snapshotAck',
+        data: { sequence: 1 },
+      });
+      expect(requests).toHaveLength(2);
 
       const moved = once(peer, 'message');
       pilot.drive(1);
@@ -81,6 +88,7 @@ test.each([false, true])(
         id: pilot.id,
         data: { motionEpoch: 1, motionSequence: 1, thrusting: true },
       });
+      expect(requests).toHaveLength(3);
 
       const generation = pilot.gameJoins;
       const deadWorld = structuredClone(world);

@@ -8,6 +8,7 @@ import { logger } from '../../../setup/serverLogger';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -191,7 +192,7 @@ function join(id: string) {
   core.handleClientMessage(
     {
       type: 'join',
-      data: { id, name: id, snapshotVersion: 1, asteroidInteractions: 1 },
+      data: { id, name: id, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
     },
     socket
   );

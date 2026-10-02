@@ -3,9 +3,9 @@ import { logger } from '../../setup/serverLogger';
 import { canCollectEquipment, isEquipmentId } from '../../shared/equipment';
 import {
   SNAPSHOT_BACKPRESSURE_BYTES,
-  SNAPSHOT_KEYFRAME_INTERVAL,
   SNAPSHOT_VERSION,
   type SnapshotBaseline,
+  SnapshotBroadcastCapture,
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
@@ -16,12 +16,29 @@ import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
 
+interface SnapshotFlight {
+  sequence: number;
+  bytes: number;
+  submittedAt: number;
+  kind: 'ordinary' | 'recovery';
+}
+
+interface SnapshotSubmission extends SnapshotFlight {
+  generation: number;
+  applied: boolean;
+}
+
 interface SnapshotRecipient {
   baseline?: SnapshotBaseline;
   sequence: number;
-  sinceKeyframe: number;
-  pending: boolean;
+  pending?: SnapshotSubmission;
   needsKeyframe: boolean;
+  generation: number;
+  appliedSequence: number;
+  flights: SnapshotFlight[];
+  outstandingBytes: number;
+  resyncRequested: boolean;
+  recoverySequence?: number;
 }
 
 type AsteroidUpdateData = Partial<AsteroidData>;
@@ -40,6 +57,14 @@ function messageType(message: unknown): string | undefined {
 type OutboundClass = 'snapshot' | 'event' | 'control';
 type OutboundSendResult = 'sent' | 'skipped-pressure' | 'closed-pressure' | 'not-open';
 const OUTBOUND_FRAME_HEADER_RESERVE_BYTES = 10;
+// Eight snapshots pipeline a 30 Hz stream through ordinary round-trip latency.
+// Applied acknowledgments bound bytes already accepted by TCP, which are absent
+// from ws.bufferedAmount. At 125,000 bytes/s, 64 KiB drains in about 524 ms.
+const SNAPSHOT_APPLIED_WINDOW_BYTES = 64 * 1024;
+const SNAPSHOT_APPLIED_WINDOW_FRAMES = 8;
+const SNAPSHOT_APPLIED_OFFER_MAX_AGE_MS = 750;
+const SNAPSHOT_APPLIED_TIMEOUT_MS = 6000;
+const SNAPSHOT_LARGE_APPLIED_TIMEOUT_MS = 10_000;
 
 function outboundClass(message: unknown): OutboundClass {
   switch (messageType(message)) {
@@ -150,7 +175,8 @@ export class GameStateBroadcaster {
         this.broadcastToAll(message);
       }
     }
-    const gameState = this.gameEngine.getSnapshotState();
+    let gameState: ReturnType<GameEngine['getSnapshotState']> | undefined;
+    let capture: SnapshotBroadcastCapture | undefined;
     // Snapshot rows are the engine's live rows, so the engine's frame index covers them.
     const asteroidIndex = this.gameEngine.getAsteroidSpatialIndex();
     const timestamp = Date.now();
@@ -159,6 +185,10 @@ export class GameStateBroadcaster {
       this.broadcastLootExploded(blast);
     }
     const players = this.gameEngine.getAllPlayers();
+    let playerProjectiles: ReturnType<GameEngine['getPlayerProjectiles']> | undefined;
+    let collabTags:
+      | Array<ReturnType<GameEngine['getActiveCollabTags']>[number] & { id: string }>
+      | undefined;
     for (const player of players) {
       const ws = player.ws;
       if (!ws || (excludeId && player.id === excludeId)) {
@@ -176,15 +206,17 @@ export class GameStateBroadcaster {
         recipient.needsKeyframe = true;
         continue;
       }
-      if (recipient.pending) {
-        continue;
-      }
-      if (ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) {
-        recipient.needsKeyframe = true;
-        recordOutbound('snapshot', 'pressure-skipped', 0, bufferedBytes(ws));
+      if (!this.canOfferSnapshot(ws, recipient)) {
         continue;
       }
       try {
+        // Prepare common rows only once, after a recipient can accept this broadcast.
+        capture ??= new SnapshotBroadcastCapture();
+        gameState ??= this.gameEngine.getSnapshotState();
+        playerProjectiles ??= this.gameEngine.getPlayerProjectiles();
+        collabTags ??= this.gameEngine
+          .getActiveCollabTags()
+          .map((tag) => ({ id: tag.asteroidId, ...tag }));
         const scanning = isActiveScanner(player);
         const reach = asteroidReach(scanning);
         const asteroids = nearbyAsteroidRows(
@@ -198,57 +230,99 @@ export class GameStateBroadcaster {
           scanning
         );
         const asteroidIds = new Set(asteroids.map((rock) => rock.id));
-        const canonical = new SnapshotEncoder({
-          ...gameState,
-          asteroids,
-          loot: this.gameEngine
-            .getNearbyLoot(player.position)
-            .filter((drop) => !isEquipmentId(drop.kind) || canCollectEquipment(player, drop.kind)),
-          satellitePickups: [
-            ...gameState.satellitePickups.filter((pickup) => pickup.ownerId === player.id),
-            ...nearbyWorldRows(
-              gameState.satellitePickups.filter(
-                (pickup) => pickup.ownerId !== player.id && pickup.state !== 'stored'
+        const canonical = new SnapshotEncoder(
+          {
+            ...gameState,
+            asteroids,
+            loot: this.gameEngine
+              .getNearbyLoot(player.position)
+              .filter(
+                (drop) => !isEquipmentId(drop.kind) || canCollectEquipment(player, drop.kind)
               ),
-              player.position
-            ),
-          ],
-          playerProjectiles: nearbyWorldRows(
-            this.gameEngine.getPlayerProjectiles(),
-            player.position
-          ),
-          collabTags: this.gameEngine
-            .getActiveCollabTags()
-            .filter((tag) => asteroidIds.has(tag.asteroidId))
-            .map((tag) => ({ id: tag.asteroidId, ...tag })),
-        });
+            satellitePickups: [
+              ...gameState.satellitePickups.filter((pickup) => pickup.ownerId === player.id),
+              ...nearbyWorldRows(
+                gameState.satellitePickups.filter(
+                  (pickup) => pickup.ownerId !== player.id && pickup.state !== 'stored'
+                ),
+                player.position
+              ),
+            ],
+            playerProjectiles: nearbyWorldRows(playerProjectiles, player.position),
+            collabTags: collabTags.filter((tag) => asteroidIds.has(tag.asteroidId)),
+          },
+          capture
+        );
         const sequence = recipient.sequence + 1;
-        const full =
-          recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
+        // Ordered delivery retains the successful baseline indefinitely. Joins
+        // and explicit recovery require full worlds; the encoder also chooses
+        // full when its actual envelope is no larger than the delta.
         const encoded = canonical.encodeSerialized(
           sequence,
-          full ? undefined : recipient.baseline,
+          recipient.needsKeyframe ? undefined : recipient.baseline,
           timestamp
         );
         const { frame } = encoded;
-        recipient.pending = true;
+        const bytes = Buffer.byteLength(encoded.text, 'utf8') + OUTBOUND_FRAME_HEADER_RESERVE_BYTES;
+        const recovery = recipient.resyncRequested;
+        if (!this.canAdmitSnapshot(recipient, bytes, recovery)) {
+          recordOutbound('snapshot', 'pressure-skipped', 0, bufferedBytes(ws));
+          continue;
+        }
+        const submission: SnapshotSubmission = {
+          sequence,
+          bytes,
+          submittedAt: globalThis.performance.now(),
+          kind: recovery ? 'recovery' : 'ordinary',
+          generation: recipient.generation,
+          applied: false,
+        };
+        const requiredKeyframe = recipient.needsKeyframe;
+        recipient.pending = submission;
+        recipient.outstandingBytes += bytes;
+        if (recovery) {
+          recipient.recoverySequence = sequence;
+        }
         recipient.needsKeyframe = false;
         const deliveredState = canonical.state;
         const recipientPlayerId = player.id;
         const result = this.sendSerialized(ws, encoded.text, 'snapshot', (error) => {
-          recipient.pending = false;
-          if (error) {
-            recipient.needsKeyframe = true;
-            logger.error('Snapshot send failed; next send requires keyframe', error);
+          // One physical socket owns its sequence frontier even across rejoin.
+          if (this.snapshotRecipients.get(ws) !== recipient || recipient.pending !== submission) {
             return;
           }
-          // Rejoin replaces the WeakMap entry; an old callback cannot advance it.
-          if (this.snapshotRecipients.get(ws) !== recipient) {
+          delete recipient.pending;
+          if (error) {
+            recipient.outstandingBytes -= bytes;
+            if (recipient.recoverySequence === sequence) {
+              delete recipient.recoverySequence;
+            }
+            recipient.needsKeyframe = true;
+            logger.error('Snapshot transport failed; reconnect for state recovery', error);
+            this.closeSocketForRecovery(
+              ws,
+              1011,
+              'Snapshot transport failed; reconnect for state recovery'
+            );
             return;
           }
           recipient.sequence = sequence;
-          recipient.baseline = { sequence, state: deliveredState };
-          recipient.sinceKeyframe = frame.kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
+          recipient.flights.push({
+            sequence,
+            bytes,
+            submittedAt: submission.submittedAt,
+            kind: submission.kind,
+          });
+          // An old accepted frame still consumes sequence/credit, but its
+          // baseline cannot cross the new joined acknowledgment.
+          if (submission.generation === recipient.generation) {
+            recipient.baseline = { sequence, state: deliveredState };
+          } else {
+            recipient.needsKeyframe = true;
+          }
+          if (submission.applied) {
+            this.applySnapshotCredit(recipient, sequence);
+          }
           if (shouldSampleSnapshot(sequence)) {
             const authoritative = deliveredState.entities.find(
               (entity) => entity.id === recipientPlayerId
@@ -275,17 +349,131 @@ export class GameStateBroadcaster {
           }
         });
         if (result !== 'sent') {
-          recipient.pending = false;
-          recipient.needsKeyframe = true;
+          if (recipient.pending === submission) {
+            delete recipient.pending;
+            recipient.outstandingBytes -= bytes;
+            if (recipient.recoverySequence === sequence) {
+              delete recipient.recoverySequence;
+            }
+            recipient.needsKeyframe ||= requiredKeyframe;
+          }
         }
       } catch (error) {
-        recipient.pending = false;
+        if (recipient.pending) {
+          recipient.outstandingBytes -= recipient.pending.bytes;
+          if (recipient.recoverySequence === recipient.pending.sequence) {
+            delete recipient.recoverySequence;
+          }
+          delete recipient.pending;
+        }
         recipient.needsKeyframe = true;
         logger.error('Failed to encode or send snapshot', error);
         // No partial state or silent format fallback after negotiation.
         this.closeFailedSnapshotSocket(ws);
       }
     }
+  }
+
+  private canOfferSnapshot(ws: WebSocket, recipient: SnapshotRecipient): boolean {
+    const oldest = recipient.flights[0] ?? recipient.pending;
+    const now = globalThis.performance.now();
+    const large = recipient.outstandingBytes > SNAPSHOT_APPLIED_WINDOW_BYTES;
+    if (
+      oldest &&
+      now - oldest.submittedAt >=
+        (large ? SNAPSHOT_LARGE_APPLIED_TIMEOUT_MS : SNAPSHOT_APPLIED_TIMEOUT_MS)
+    ) {
+      recordOutbound('snapshot', 'pressure-closed', 0, bufferedBytes(ws));
+      this.closeSocketForRecovery(ws, 1013, 'Applied snapshot acknowledgments timed out');
+      return false;
+    }
+    if (recipient.pending) {
+      recordOutbound('snapshot', 'pressure-skipped', 0, bufferedBytes(ws));
+      return false;
+    }
+    if (
+      ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES ||
+      recipient.recoverySequence !== undefined ||
+      large ||
+      (!recipient.resyncRequested &&
+        (recipient.flights.length >= SNAPSHOT_APPLIED_WINDOW_FRAMES ||
+          recipient.outstandingBytes >= SNAPSHOT_APPLIED_WINDOW_BYTES ||
+          (oldest && now - oldest.submittedAt >= SNAPSHOT_APPLIED_OFFER_MAX_AGE_MS)))
+    ) {
+      recordOutbound('snapshot', 'pressure-skipped', 0, bufferedBytes(ws));
+      return false;
+    }
+    return true;
+  }
+
+  private canAdmitSnapshot(
+    recipient: SnapshotRecipient,
+    bytes: number,
+    recovery: boolean
+  ): boolean {
+    if (recovery) {
+      // One reserved keyframe breaks the no-ACK/rejected-delta deadlock. Older
+      // debt stays charged until this complete replacement is actually applied.
+      return recipient.recoverySequence === undefined;
+    }
+    if (bytes > SNAPSHOT_APPLIED_WINDOW_BYTES) {
+      // Initial, recovery or interest-changing frames can exceed the window.
+      // One indivisible large frame may travel alone, never as a growing queue.
+      return recipient.flights.length === 0;
+    }
+    return (
+      recipient.flights.length < SNAPSHOT_APPLIED_WINDOW_FRAMES &&
+      recipient.outstandingBytes + bytes <= SNAPSHOT_APPLIED_WINDOW_BYTES
+    );
+  }
+
+  /** Cumulative application credit belongs to the currently owning socket. */
+  public acknowledgeSnapshot(ws: WebSocket, sequence: number): boolean {
+    const recipient = this.snapshotRecipients.get(ws);
+    const owner = this.gameEngine.getPlayerBySocket(ws);
+    if (
+      !recipient ||
+      !owner ||
+      owner.ws !== ws ||
+      !Number.isSafeInteger(sequence) ||
+      sequence <= 0
+    ) {
+      return false;
+    }
+    if (sequence < recipient.appliedSequence) {
+      return false;
+    }
+    if (sequence === recipient.appliedSequence) {
+      return true;
+    }
+    if (sequence > recipient.sequence) {
+      // A peer can finish applying before Node runs its write callback. Retain
+      // that receipt but release no credit or baseline until transport succeeds.
+      if (sequence === recipient.pending?.sequence) {
+        recipient.pending.applied = true;
+        return true;
+      }
+      return false;
+    }
+    this.applySnapshotCredit(recipient, sequence);
+    return true;
+  }
+
+  private applySnapshotCredit(recipient: SnapshotRecipient, sequence: number): void {
+    recipient.appliedSequence = sequence;
+    let retired = 0;
+    for (const flight of recipient.flights) {
+      if (flight.sequence > sequence) {
+        break;
+      }
+      recipient.outstandingBytes -= flight.bytes;
+      if (flight.kind === 'recovery') {
+        delete recipient.recoverySequence;
+        recipient.resyncRequested = false;
+      }
+      retired++;
+    }
+    recipient.flights.splice(0, retired);
   }
 
   private closeFailedSnapshotSocket(ws: WebSocket): void {
@@ -296,24 +484,49 @@ export class GameStateBroadcaster {
     }
   }
 
-  /** Register the current snapshot-v1 recipient before the join acknowledgment. */
-  public negotiateSnapshot(ws: WebSocket): 1 {
-    this.snapshotRecipients.delete(ws);
+  /** Register the current snapshot-v2 recipient before the join acknowledgment. */
+  public negotiateSnapshot(ws: WebSocket): typeof SNAPSHOT_VERSION {
+    const existing = this.snapshotRecipients.get(ws);
+    if (existing) {
+      // Same-socket rejoin never reuses a sent sequence or forgets TCP debt.
+      existing.generation++;
+      delete existing.baseline;
+      existing.needsKeyframe = true;
+      // A queued decode-recovery request still owns this socket's single
+      // reserve. Rejoin must not strand its preserved, unacknowledgeable debt.
+      return SNAPSHOT_VERSION;
+    }
     this.snapshotRecipients.set(ws, {
       sequence: 0,
-      sinceKeyframe: 0,
-      pending: false,
       needsKeyframe: true,
+      generation: 0,
+      appliedSequence: 0,
+      flights: [],
+      outstandingBytes: 0,
+      resyncRequested: false,
     });
     return SNAPSHOT_VERSION;
   }
 
   /** Request a keyframe and return its earliest possible sequence as a lower bound. */
-  public requestSnapshotKeyframe(ws: WebSocket): number | undefined {
+  public requestSnapshotKeyframe(
+    ws: WebSocket,
+    options: { recovery?: boolean } = {}
+  ): number | undefined {
     const recipient = this.snapshotRecipients.get(ws);
     if (recipient) {
+      if (options.recovery && recipient.resyncRequested) {
+        return recipient.recoverySequence ?? recipient.sequence + 1;
+      }
+      if (options.recovery && recipient.outstandingBytes > SNAPSHOT_APPLIED_WINDOW_BYTES) {
+        // A rejected sole oversized frame cannot be followed by a second one
+        // without violating the hard one-large-frame memory bound.
+        this.closeSocketForRecovery(ws, 1013, 'Oversized snapshot recovery requires reconnect');
+        return undefined;
+      }
       // Coalesce requests; the periodic broadcast supplies the keyframe.
       recipient.needsKeyframe = true;
+      recipient.resyncRequested ||= options.recovery === true;
       return recipient.sequence + 1;
     }
     return undefined;

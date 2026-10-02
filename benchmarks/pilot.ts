@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { WebSocket } from 'ws';
-import { SnapshotDecoder } from '../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../shared-types';
 import { GAME, LASER } from '../src/constants';
 import { PerformanceBudget } from './performance-budget';
@@ -38,6 +38,14 @@ export class Pilot {
     | undefined;
   private snapshotSequence = 0;
   lastKeyframeSequence = 0;
+  lastSnapshot:
+    | {
+        sequence: number;
+        kind: 'keyframe' | 'delta';
+        gameTime: number;
+        serverTime: number | undefined;
+      }
+    | undefined;
   private streamStartedAt = 0;
   private activeMeasuredMs = 0;
   private measuredStartedAt = 0;
@@ -64,6 +72,7 @@ export class Pilot {
       minimumStateHz?: number;
       maximumStateGapMs?: number;
       repeatMeasuredPings?: boolean;
+      naturalSpawn?: boolean;
       deliveryBudget?: () => { minimumStateHz: number; maximumStateGapMs: number };
     }
   ) {
@@ -84,6 +93,9 @@ export class Pilot {
       this.pingStartedAt = undefined;
     });
     this.socket.on('message', (raw) => {
+      // Buffered worlds can arrive after close() starts the WebSocket handshake.
+      // Decline world decoding/application then, but still parse control replies:
+      // an explicit rejection of an earlier command remains a real failure.
       const bytes = Array.isArray(raw)
         ? Buffer.concat(raw)
         : Buffer.isBuffer(raw)
@@ -94,10 +106,10 @@ export class Pilot {
       const started = performance.now();
       try {
         const result = this.decoder.readMessage(bytes.toString(), {
-          acceptSnapshots: this.joined,
+          acceptSnapshots: this.joined && !this.closing,
         });
         if (result.kind === 'snapshot-rejected') {
-          if (!this.joined) {
+          if (this.closing || !this.joined) {
             return;
           }
           throw result.error;
@@ -125,6 +137,9 @@ export class Pilot {
           if (message.type === 'error') {
             throw new Error(`Server rejected pilot command: ${JSON.stringify(data)}`);
           }
+          if (this.closing) {
+            return;
+          }
           if (message.type === 'joined') {
             assert(
               data &&
@@ -132,7 +147,7 @@ export class Pilot {
                 'id' in data &&
                 data.id === this.id &&
                 'snapshotVersion' in data &&
-                data.snapshotVersion === 1 &&
+                data.snapshotVersion === SNAPSHOT_VERSION &&
                 'asteroidInteractions' in data &&
                 data.asteroidInteractions === 1 &&
                 'resumeToken' in data &&
@@ -143,7 +158,6 @@ export class Pilot {
             this.joined = true;
             this.joinedAt ??= performance.now();
             this.decoder.reset();
-            this.snapshotSequence = 0;
             if ('serverReleaseId' in data && typeof data.serverReleaseId === 'string') {
               this.releaseId = data.serverReleaseId;
             }
@@ -154,6 +168,13 @@ export class Pilot {
           this.state.entities.some((entity) => entity.id === this.id),
           'Authoritative state lost pilot'
         );
+        this.lastSnapshot = {
+          sequence: result.metadata.sequence,
+          kind: result.metadata.kind,
+          gameTime: this.state.gameTime,
+          serverTime: this.state.serverTime,
+        };
+        this.send({ type: 'snapshotAck', data: { sequence: result.metadata.sequence } });
         const ownState = this.state.entities.find((entity) => entity.id === this.id);
         const motion = ownState?.playerMotion;
         if (
@@ -219,6 +240,7 @@ export class Pilot {
     this.measuredServerTick = undefined;
     this.joined = false;
     this.state = undefined;
+    this.lastSnapshot = undefined;
     this.decoder.reset();
     this.lastKeyframeSequence = 0;
     this.sessionStartedAt = performance.now();
@@ -228,9 +250,9 @@ export class Pilot {
       id: this.id,
       data: {
         name: `測試-${this.index}`,
-        position: { x: 100 + this.index * 70, y: 100 },
+        ...(this.options.naturalSpawn ? {} : { position: { x: 100 + this.index * 70, y: 100 } }),
         kitId: 'scout',
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
       },
     });

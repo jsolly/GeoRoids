@@ -1,5 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import {
+  captureSnapshot,
+  SNAPSHOT_VERSION,
+  SnapshotEncoder,
+} from '../../../shared/snapshotProtocol';
 import type { PlayerProjectileState, ServerGameSnapshot } from '../../../shared-types';
 import { LASER } from '../../../src/constants';
 import { AuthoritativeProjectileField } from '../../../src/entities/laser/AuthoritativeProjectileField';
@@ -91,7 +95,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
       id: manager.getClientId(),
       name: 'Projectile observer',
       position: { x: 0, y: 0 },
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       ...(supportsShots ? { shotAcknowledgements: true } : {}),
       resumeToken: 'a'.repeat(64),
@@ -105,7 +109,9 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     await pending;
     manager.setLocalPlayerName('Projectile observer');
     manager.initializeAsteroidSync();
-    expect(ws.sent.find((packet) => packet.type === 'join')?.data?.['snapshotVersion']).toBe(1);
+    expect(ws.sent.find((packet) => packet.type === 'join')?.data?.['snapshotVersion']).toBe(
+      SNAPSHOT_VERSION
+    );
     expect(ws.sent.find((packet) => packet.type === 'join')?.data?.['asteroidInteractions']).toBe(
       1
     );

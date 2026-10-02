@@ -47,11 +47,13 @@ const HUD_FONT_SIZE_PATTERN = /(\d+(?:\.\d+)?)px/u;
 const ZERO_SAFE: SafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DESKTOP_EDGE = VISUAL.HUD_INSET;
 
-function readSafeAreaInsets(): SafeAreaInsets {
-  if (typeof document === 'undefined') {
-    return { ...ZERO_SAFE };
-  }
-  const probe = document.querySelector('#safe-area-probe');
+function safeAreaProbe(): HTMLElement | null {
+  return typeof document === 'undefined'
+    ? null
+    : document.querySelector<HTMLElement>('#safe-area-probe');
+}
+
+function readSafeAreaInsets(probe: HTMLElement | null): SafeAreaInsets {
   if (!probe) {
     return { ...ZERO_SAFE };
   }
@@ -162,6 +164,48 @@ export function computeHudLayout(
   };
 }
 
+let cachedLayout:
+  | {
+      width: number;
+      height: number;
+      probe: HTMLElement | null;
+      probeStyle: string | null;
+      probeClass: string | null;
+      layout: HudLayout;
+    }
+  | undefined;
+
+/** Read browser layout at resize boundaries, rather than forcing style/media reads each frame. */
+export function refreshHudLayoutForCanvas(viewport: PlayfieldSize): HudLayout {
+  const probe = safeAreaProbe();
+  const layout = computeHudLayout(viewport, { safeArea: readSafeAreaInsets(probe) });
+  cachedLayout = {
+    width: viewport.width,
+    height: viewport.height,
+    probe,
+    probeStyle: probe?.getAttribute('style') ?? null,
+    probeClass: probe?.getAttribute('class') ?? null,
+    layout,
+  };
+  return layout;
+}
+
+export function clearHudLayoutCache(): void {
+  cachedLayout = undefined;
+}
+
 export function hudLayoutForCanvas(viewport: PlayfieldSize): HudLayout {
-  return computeHudLayout(viewport, { safeArea: readSafeAreaInsets() });
+  const probe = safeAreaProbe();
+  // Inline/class changes can precede a synchronous render without a resize.
+  // Attribute reads do not force style resolution on unchanged flight frames.
+  if (
+    cachedLayout?.width === viewport.width &&
+    cachedLayout.height === viewport.height &&
+    cachedLayout.probe === probe &&
+    cachedLayout.probeStyle === (probe?.getAttribute('style') ?? null) &&
+    cachedLayout.probeClass === (probe?.getAttribute('class') ?? null)
+  ) {
+    return cachedLayout.layout;
+  }
+  return refreshHudLayoutForCanvas(viewport);
 }

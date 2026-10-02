@@ -1,9 +1,11 @@
 /* @vitest-environment node */
+
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { expect, test } from 'vitest';
 import { Pilot } from '../../../benchmarks/pilot';
 import { createServerInstance } from '../../../server/createServer';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { GAME, LASER } from '../../../src/constants';
 
 test('a benchmark pilot moves and fires a shot that the authoritative world publishes', async () => {
@@ -13,7 +15,9 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
   const port = await server.listening;
   const failures: unknown[] = [];
   const pilot = new Pilot(0, {
-    url: new URL(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`),
+    url: new URL(
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    ),
     measuring: () => false,
     fail: (error) => failures.push(error),
   });
@@ -36,7 +40,19 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
       pilot.socket.ping();
       await pong;
     };
+    // The initial world can exceed the applied-credit window. Retire its actual
+    // client ACK before offering the arranged state, rather than skipping it.
+    await barrier();
+    const initialSequence = pilot.lastSnapshot?.sequence;
+    assert(initialSequence, 'applied initial snapshot sequence');
+    const arranged = once(pilot.socket, 'message', { signal: AbortSignal.timeout(2000) });
     server.wsCore.getBroadcaster().broadcastGameState();
+    await arranged;
+    expect(pilot.lastSnapshot?.sequence).toBe(initialSequence + 1);
+    expect(pilot.state?.entities.find((entity) => entity.id === pilot.id)?.position).toEqual({
+      x: 0,
+      y: 0,
+    });
     await barrier();
     // Broadcasting can replenish the field; isolate the actual shot corridor again.
     for (const rock of server.gameEngine.getAllAsteroids()) {
@@ -46,6 +62,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     await barrier();
     expect(actor.position.x).toBeCloseTo(Math.cos(0.4));
     expect(actor.position.y).toBeCloseTo(Math.sin(0.4));
+    expect(actor.playerMotion).toMatchObject({ epoch: 1, ack: 1, mode: 'free' });
     const shots = server.gameEngine.getServerLasers();
     expect(shots).toHaveLength(1);
     const shot = shots[0];
@@ -53,8 +70,13 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     expect(shot.ownerId).toBe(pilot.id);
     expect(shot.velocity.x).toBe(LASER.SPEED / GAME.FPS);
     expect(shot.velocity.y).toBe(0);
+    const published = once(pilot.socket, 'message', { signal: AbortSignal.timeout(2000) });
     server.wsCore.getBroadcaster().broadcastGameState();
+    await published;
     await barrier();
+    expect(
+      pilot.state?.entities.find((entity) => entity.id === pilot.id)?.playerMotion
+    ).toMatchObject({ epoch: 1, ack: 1, mode: 'free' });
     expect(pilot.state?.playerProjectiles.map((projectile) => projectile.id)).toContain(shot.id);
     expect(failures).toEqual([]);
   } finally {

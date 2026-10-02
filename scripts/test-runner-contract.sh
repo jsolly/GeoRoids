@@ -19,6 +19,7 @@ REAL_RMDIR="$(command -v rmdir)"
 REAL_PGREP="$(command -v pgrep)"
 REAL_RM="$(command -v rm)"
 REAL_TOUCH="$(command -v touch)"
+REAL_MKDIR="$(command -v mkdir)"
 
 cleanup() {
     local pid_file
@@ -58,9 +59,14 @@ export XDG_CONFIG_HOME="$TEMP_DIR/xdg"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
 mkdir -p "$HOME" "$XDG_CONFIG_HOME"
 mkdir -p "$CONTRACT_ROOT/scripts"
+mkdir -p "$CONTRACT_ROOT/tests/integration/browser/sanity" "$CONTRACT_ROOT/tests/integration/server"
+printf '// explicit browser selector fixture\n' > "$CONTRACT_ROOT/tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts"
+printf '// explicit server selector fixture\n' > "$CONTRACT_ROOT/tests/integration/server/selected-pilot.test.ts"
 cp "$ROOT/scripts/process-tree.sh" "$CONTRACT_ROOT/scripts/process-tree.sh"
 cp "$ROOT/scripts/review-receipt.mjs" "$CONTRACT_ROOT/scripts/review-receipt.mjs"
+cp "$ROOT/scripts/benchmark-build-receipt.mjs" "$CONTRACT_ROOT/scripts/benchmark-build-receipt.mjs"
 cp "$ROOT/.env.example" "$CONTRACT_ROOT/.env.example"
+printf '{"lockfileVersion":3}\n' > "$CONTRACT_ROOT/package-lock.json"
 git -C "$CONTRACT_ROOT" init -q
 cd "$CONTRACT_ROOT"
 CONTRACT_ROOT="$(git rev-parse --show-toplevel)"
@@ -77,6 +83,7 @@ if [[ "${1:-}" == --isolation-probe ]]; then
     git add isolation.txt
     exit 0
 fi
+git -c core.hooksPath=/dev/null -c user.name=Contract -c user.email=contract@example.invalid commit --allow-empty -qm 'fixture build identity'
 
 # A hostile parent repository must survive the actual private-fixture entry.
 HOSTILE_PARENT="$TEMP_DIR/hostile-parent"
@@ -222,6 +229,16 @@ assert_occupied_port_rejected() {
 setup_mock_tools() {
     mkdir -p "$MOCK_BIN"
 
+    cat > "$MOCK_BIN/mkdir" <<'EOF'
+#!/usr/bin/env bash
+for argument in "$@"; do
+    if [ "$argument" = "$GEOROIDS_CONTRACT_LOCK_DIR" ]; then
+        printf 'lock acquisition attempted\n' > "$GEOROIDS_CONTRACT_DEV_PID_FILE.lock-attempt"
+    fi
+done
+exec "$GEOROIDS_CONTRACT_REAL_MKDIR" "$@"
+EOF
+
     cat > "$MOCK_BIN/lsof" <<'EOF'
 #!/usr/bin/env bash
 # Contract processes never bind ports; report them free.
@@ -252,8 +269,10 @@ case " $* " in
     *" tsx scripts/benchmark-proxy.ts "*)
         printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.proxy"
         printf '%s\n' "$GEOROIDS_BENCHMARK_SESSION" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.session"
+        printf '%s\n' "$*" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.proxy-command"
         while [ "$#" -gt 0 ]; do
-            if [ "$1" = --ready ]; then shift; printf '59995' > "$1"; fi
+            if [ "$1" = --port ]; then shift; proxy_port="$1"; fi
+            if [ "$1" = --ready ]; then shift; printf '%s' "$proxy_port" > "$1"; fi
             shift
         done
         trap 'exit 0' TERM INT
@@ -296,6 +315,10 @@ EOF
 [ "$*" = "run build" ] || exit 70
 printf '%s\n' "$VITE_WEBSOCKET_URL" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.build"
 if [ "$GEOROIDS_CONTRACT_MODE" = build-failure ]; then exit 19; fi
+mkdir -p dist/assets
+printf '<script src="/assets/game.js"></script>\n' > dist/index.html
+printf '{"releaseSha":"fixture"}\n' > dist/release.json
+printf 'fixture client\n' > dist/assets/game.js
 EOF
 
     cat > "$MOCK_BIN/ps" <<'EOF'
@@ -385,7 +408,7 @@ fi
 exec "$GEOROIDS_CONTRACT_REAL_TOUCH" "$@"
 EOF
 
-    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir" "$MOCK_BIN/rm" "$MOCK_BIN/touch" "$MOCK_BIN/npm"
+    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir" "$MOCK_BIN/rm" "$MOCK_BIN/touch" "$MOCK_BIN/npm" "$MOCK_BIN/mkdir"
 }
 
 run_mock_runner() {
@@ -398,8 +421,9 @@ run_mock_runner() {
         "$MOCK_TEST_PID_FILE" \
         "$MOCK_DEV_CHILD_PID_FILE" \
         "$MOCK_TEST_CHILD_PID_FILE" \
-        "$MOCK_FAILURE_MARKER_FILE" "$MOCK_DEV_PID_FILE.proxy" "$MOCK_DEV_PID_FILE.session" \
-        "$MOCK_TEST_PID_FILE.command" "$MOCK_DEV_PID_FILE.build"
+        "$MOCK_FAILURE_MARKER_FILE" "$MOCK_DEV_PID_FILE.proxy" "$MOCK_DEV_PID_FILE.session" "$MOCK_DEV_PID_FILE.proxy-command" \
+        "$MOCK_TEST_PID_FILE.command" "$MOCK_DEV_PID_FILE.build" \
+        "$MOCK_DEV_PID_FILE.lock-attempt" "$TEMP_DIR/final-runner.json"
     env \
         PATH="$MOCK_BIN:$PATH" \
         GEOROIDS_CONTRACT_MODE="$mode" \
@@ -412,12 +436,60 @@ run_mock_runner() {
         GEOROIDS_CONTRACT_REAL_PGREP="$REAL_PGREP" \
         GEOROIDS_CONTRACT_REAL_RM="$REAL_RM" \
         GEOROIDS_CONTRACT_REAL_TOUCH="$REAL_TOUCH" \
+        GEOROIDS_CONTRACT_REAL_MKDIR="$REAL_MKDIR" \
         GEOROIDS_CONTRACT_FAILURE_MARKER="$MOCK_FAILURE_MARKER_FILE" \
         GEOROIDS_TEST_RUNNER_RECEIPT="$TEMP_DIR/final-runner.json" \
         GEOROIDS_TEST_MAX_DURATION_SECONDS="$max_duration" \
         GEOROIDS_TEST_VITE_PORT=59993 \
         GEOROIDS_TEST_SERVER_PORT=59994 \
         "$RUNNER" "$@" > "$output_file" 2>&1
+}
+
+assert_selector_rejected() {
+    local name="$1"
+    local diagnostic="$2"
+    shift 2
+    local output_file="$TEMP_DIR/rejected-selector-$name.txt"
+    local exit_code=0
+    run_mock_runner success 10 "$output_file" "$@" || exit_code=$?
+    [ "$exit_code" -eq 64 ] || { cat "$output_file" >&2; fail "$name did not refuse the invalid selection (exit $exit_code)"; }
+    grep -Fq "$diagnostic" "$output_file" || { cat "$output_file" >&2; fail "$name did not identify the invalid selection"; }
+    [ ! -e "$MOCK_DEV_PID_FILE.lock-attempt" ] || fail "$name attempted lock acquisition"
+    [ ! -e "$MOCK_DEV_PID_FILE" ] || fail "$name started services"
+    [ ! -e "$MOCK_TEST_PID_FILE.command" ] || fail "$name invoked tests"
+    [ ! -e "$TEMP_DIR/final-runner.json" ] || fail "$name reached child cleanup receipts"
+    if grep -Fq 'Checking that test ports' "$output_file"; then fail "$name reached service inspection"; fi
+    assert_lock_released
+}
+
+assert_missing_selector_rejected() {
+    local name="$1"
+    local missing="$2"
+    shift 2
+    assert_selector_rejected "$name" "Explicit test file does not exist: $missing" "$@"
+}
+
+assert_vitest_boolean_options_keep_selectors() {
+    local option
+    local options_file="$TEMP_DIR/vitest-boolean-options.txt"
+    # Match the installed public CLI metadata rather than duplicating the
+    # runner's arity list in its test. Dependency upgrades must keep this proof.
+    node --input-type=module - "$ROOT" "$options_file" <<'NODE'
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [root, output] = process.argv.slice(2);
+const { createCLI } = await import(pathToFileURL(join(root, 'node_modules/vitest/dist/node.js')).href);
+const options = createCLI().globalCommand.options
+    .filter(option => option.isBoolean && option.name !== 'isolate' && option.name !== 'fileParallelism' && !option.name.startsWith('sequence.'))
+    .map(option => `--${option.name}`);
+if (options.length === 0) throw new Error('Vitest CLI returned no boolean option metadata');
+writeFileSync(output, [...new Set(options)].sort().join('\n') + '\n');
+NODE
+    while IFS= read -r option; do
+        assert_missing_selector_rejected "boolean-${option#--}" "$MISSING_TEST" \
+            "$SELECTED_TEST" "$option" "$MISSING_TEST"
+    done < "$options_file"
 }
 
 assert_vitest_config() {
@@ -576,9 +648,88 @@ assert_live_benchmark_mode() {
         fail "$mode failed"
     fi
     grep -Fxq -- "--no-install tsx benchmarks/$entry.ts --seconds 1" "$MOCK_TEST_PID_FILE.command" || fail "$mode selected wrong entry point"
-    grep -Fxq 'ws://localhost:59994/ws' "$MOCK_DEV_PID_FILE.build" || fail "$mode did not build for its owned server"
+    if [ "$mode" = benchmark-client ]; then
+        grep -Fxq 'ws://localhost:59995/ws' "$MOCK_DEV_PID_FILE.build" || fail 'clean client bypassed its transparent counting proxy'
+        grep -Fq -- '--network clean' "$MOCK_DEV_PID_FILE.proxy-command" || fail 'clean client lost proxy profile'
+        grep -Fq -- '--control ' "$MOCK_DEV_PID_FILE.proxy-command" || fail 'clean client lost private live counter path'
+        assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "clean benchmark proxy"
+        local session
+        IFS= read -r session < "$MOCK_DEV_PID_FILE.session"
+        [ ! -e "$session" ] || fail 'clean client leaked private proxy session'
+    else
+        grep -Fxq 'ws://localhost:59994/ws' "$MOCK_DEV_PID_FILE.build" || fail "$mode did not build for its owned server"
+    fi
     assert_pid_stopped "$MOCK_TEST_PID_FILE" "$mode driver"
     assert_pid_stopped "$MOCK_DEV_PID_FILE" "$mode server"
+    assert_lock_released
+}
+
+assert_frozen_benchmark_reuse() {
+    local output_file="$TEMP_DIR/frozen-build.txt"
+    local receipt="$CONTRACT_ROOT/.performance/benchmark-client-build.json"
+    if ! run_mock_runner success 10 "$output_file" --benchmark-client --seconds 1; then
+        cat "$output_file" >&2
+        fail "initial frozen client build failed"
+    fi
+    cp "$receipt" "$TEMP_DIR/frozen-build.before.json"
+    if ! run_mock_runner success 10 "$output_file" --benchmark-client --reuse-build --seconds 1; then
+        cat "$output_file" >&2
+        fail "unchanged frozen client could not be reused"
+    fi
+    [ ! -e "$MOCK_DEV_PID_FILE.build" ] || fail "reuse rebuilt the frozen client"
+    cmp "$receipt" "$TEMP_DIR/frozen-build.before.json" || fail "reuse replaced its build proof"
+    grep -Fxq -- '--no-install tsx benchmarks/realtime-client.ts --seconds 1' "$MOCK_TEST_PID_FILE.command" || fail "reuse flag leaked into client arguments"
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "reused benchmark driver"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "reused benchmark server"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "reused clean benchmark proxy"
+    assert_lock_released
+
+    if ! run_mock_runner success 10 "$output_file" --benchmark-client --reuse-build --network degraded --seconds 1; then
+        cat "$output_file" >&2
+        fail 'changing impairment on the same owned endpoint invalidated the frozen build'
+    fi
+    [ ! -e "$MOCK_DEV_PID_FILE.build" ] || fail 'impairment change rebuilt frozen assets'
+    cmp "$receipt" "$TEMP_DIR/frozen-build.before.json" || fail 'impairment change replaced build proof'
+    assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "reused degraded benchmark proxy"
+    assert_lock_released
+
+    local status=0
+    GEOROIDS_TEST_PROXY_PORT=59996 run_mock_runner success 10 "$output_file" --benchmark-client --reuse-build --network degraded --seconds 1 || status=$?
+    [ "$status" -eq 1 ] || fail "different proxy endpoint retained frozen build"
+    grep -Fq 'Reusable build inputs differ' "$output_file" || fail "endpoint mismatch lost its reason"
+    [ ! -e "$MOCK_DEV_PID_FILE" ] || fail "invalid reuse started the owned server pair"
+    [ ! -e "$MOCK_TEST_PID_FILE" ] || fail "invalid reuse started the measurement driver"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "rejected reuse proxy"
+    assert_lock_released
+}
+
+assert_invalid_proxy_ports_rejected() {
+    local port
+    local status
+    local output_file="$TEMP_DIR/proxy-invalid-port.txt"
+    for port in 0 65536 59993 59994; do
+        status=0
+        GEOROIDS_TEST_PROXY_PORT="$port" run_mock_runner success 10 "$output_file" --benchmark-client --seconds 1 || status=$?
+        [ "$status" -eq 64 ] || { cat "$output_file" >&2; fail "invalid proxy port $port exit $status"; }
+        grep -Fq 'GEOROIDS_TEST_PROXY_PORT must be a valid TCP port distinct' "$output_file" || fail 'invalid proxy port lost its reason'
+        [ ! -e "$MOCK_DEV_PID_FILE.proxy" ] || fail 'invalid proxy port started a proxy'
+        [ ! -e "$MOCK_DEV_PID_FILE" ] || fail 'invalid proxy port started an owned server'
+        [ ! -e "$MOCK_TEST_PID_FILE" ] || fail 'invalid proxy port started a measurement'
+        assert_lock_released
+    done
+}
+
+assert_invalid_build_reuse_rejected() {
+    local name="$1"
+    shift
+    local output_file="$TEMP_DIR/reuse-$name.txt"
+    local status=0
+    "$RUNNER" "$@" > "$output_file" 2>&1 || status=$?
+    [ "$status" -eq 64 ] || fail "$name did not reject unsupported build reuse"
+    grep -Fq 'supported only immediately after --benchmark-client' "$output_file" || fail "$name lost its parsing reason"
+    if grep -Fq 'Checking that test ports' "$output_file"; then
+        fail "$name reached service startup"
+    fi
     assert_lock_released
 }
 
@@ -735,6 +886,34 @@ assert_invalid_duration_rejected
 assert_invalid_build_rejected
 assert_occupied_port_rejected
 setup_mock_tools
+SELECTED_TEST=tests/integration/server/selected-pilot.test.ts
+MISSING_TEST=tests/integration/server/misspelled-pilot.test.ts
+assert_missing_selector_rejected mixed "$MISSING_TEST" "$SELECTED_TEST" "$MISSING_TEST"
+assert_missing_selector_rejected absolute "$CONTRACT_ROOT/$MISSING_TEST" "$SELECTED_TEST" "$CONTRACT_ROOT/$MISSING_TEST"
+assert_missing_selector_rejected dot-relative "./$MISSING_TEST" "$SELECTED_TEST" "./$MISSING_TEST"
+assert_missing_selector_rejected spec missing-pilot.spec.js "$SELECTED_TEST" missing-pilot.spec.js
+assert_missing_selector_rejected after-boolean "$MISSING_TEST" "$SELECTED_TEST" --hideSkippedTests "$MISSING_TEST"
+assert_missing_selector_rejected after-negation "$MISSING_TEST" "$SELECTED_TEST" --no-color "$MISSING_TEST"
+assert_missing_selector_rejected boolean-equals "$MISSING_TEST" "$SELECTED_TEST" "--globals=$MISSING_TEST"
+assert_missing_selector_rejected after-value "$MISSING_TEST" "$SELECTED_TEST" --testNamePattern "$MISSING_TEST" "$MISSING_TEST"
+assert_selector_rejected missing-after-separator 'Arguments after -- are unsupported' "$SELECTED_TEST" -- "$MISSING_TEST"
+assert_selector_rejected valid-after-separator 'Arguments after -- are unsupported' "$SELECTED_TEST" -- \
+    tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts
+assert_missing_selector_rejected line "$MISSING_TEST" "$SELECTED_TEST" "$MISSING_TEST:12"
+assert_missing_selector_rejected repeated-location "$SELECTED_TEST:12" "$SELECTED_TEST" "$SELECTED_TEST:12:34"
+assert_missing_selector_rejected nonnumeric-location "$SELECTED_TEST:typo" "$SELECTED_TEST" "$SELECTED_TEST:typo"
+assert_vitest_boolean_options_keep_selectors
+assert_vitest_config valid-file vitest.config.ts "$SELECTED_TEST"
+assert_vitest_config valid-absolute-file vitest.config.ts "$CONTRACT_ROOT/$SELECTED_TEST"
+assert_vitest_config valid-file-line vitest.config.ts "$SELECTED_TEST:12"
+assert_vitest_config empty-separator vitest.config.ts "$SELECTED_TEST" --
+assert_vitest_config file-like-option-values vitest.config.ts "$SELECTED_TEST" \
+    --testNamePattern "$MISSING_TEST" --exclude "$MISSING_TEST" --outputFile.json "$MISSING_TEST"
+assert_vitest_config short-and-equal-option-values vitest.config.ts "$SELECTED_TEST" \
+    -t "$MISSING_TEST" "--exclude=$MISSING_TEST" "--outputFile=$MISSING_TEST" "-t=$MISSING_TEST"
+assert_vitest_config clustered-short-option-value vitest.config.ts "$SELECTED_TEST" -wt "$MISSING_TEST"
+assert_vitest_config text-filter vitest.browser.config.ts selected-pilot
+assert_vitest_config glob-filter vitest.config.ts 'tests/integration/server/*.test.ts'
 assert_log_preparation_failure_is_not_success \
     log-remove-failure "Could not clear test logs"
 assert_log_preparation_failure_is_not_success \
@@ -757,7 +936,13 @@ assert_impaired_benchmark_cleanup success 0
 assert_impaired_benchmark_cleanup build-failure 1
 assert_impaired_benchmark_cleanup timeout 124
 assert_live_benchmark_mode benchmark-client realtime-client
+assert_invalid_proxy_ports_rejected
 assert_live_benchmark_mode benchmark-load load
+assert_frozen_benchmark_reuse
+assert_invalid_build_reuse_rejected tests --reuse-build
+assert_invalid_build_reuse_rejected load --benchmark-load --reuse-build
+assert_invalid_build_reuse_rejected misplaced --benchmark-client --seconds 1 --reuse-build
+assert_invalid_build_reuse_rejected value --benchmark-client --reuse-build=true
 assert_test_timeout_cleans_owned_processes
 assert_cleanup_failure_is_not_success
 assert_final_failure_receipt 1 true
@@ -773,4 +958,5 @@ assert_process_inspection_failure_is_not_success \
     process-tree-ps-status-one "Could not inspect process start time for PID" \
     "simulated ps inspection failure (status 1)"
 
+node --test "$ROOT/scripts/benchmark-build-receipt.test.mjs"
 echo "✅ Test-runner contract checks passed"

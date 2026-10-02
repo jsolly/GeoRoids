@@ -461,6 +461,26 @@ export class GameEngine {
     return this.serverClock.now();
   }
 
+  /** Scalar read on the same clock that stamps authoritative snapshots. */
+  public getSimulationClock(): { gameTime: number; serverTime: number } {
+    return { gameTime: this.gameTime, serverTime: this.getServerTime() };
+  }
+
+  /** Scalar observations of the live field; does not wake sectors or read persistence. */
+  public getAsteroidFieldStatus(): {
+    mode: 'regional' | 'fixture';
+    activeSectors: number;
+    asteroids: number;
+    players: number;
+  } {
+    return {
+      mode: this.managedField ? 'regional' : 'fixture',
+      activeSectors: this.regionalField.activeSectorCount(),
+      asteroids: this.asteroidManager.getAsteroidCount(),
+      players: this.getPlayerCount(),
+    };
+  }
+
   private simulationNow(nowMs?: number): number {
     const serverNow = nowMs ?? this.getServerTime();
     if (!Number.isFinite(serverNow) || serverNow < 0) {
@@ -1905,11 +1925,8 @@ export class GameEngine {
       }
     }
 
-    const asteroids = this.asteroidManager
-      .getAllAsteroids()
-      .filter((rock) => rock.boost?.phase !== 'burning');
     const pickupBodyHits = this.collisionAuthority.collectAsteroidPickupHits(
-      asteroids,
+      this.asteroidManager.spatialIndex(),
       this.satellitePickupManager.getAllPickups()
     );
     for (const hit of pickupBodyHits) {

@@ -473,6 +473,10 @@ export class RegionalAsteroidField {
     return this.visited.has(id) || this.active.has(id) || this.dormant.has(id);
   }
 
+  activeSectorCount(): number {
+    return this.active.size;
+  }
+
   visitedSectorIds(): string[] {
     const ids = new Set(this.visited);
     for (const id of this.active) {

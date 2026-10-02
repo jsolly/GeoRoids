@@ -129,7 +129,9 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
     broadcaster.broadcastGameState();
     const first = socket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
     assert(first, 'a complete atlas must fit the snapshot transport');
-    const decoded = decodeSnapshotMessage(new SnapshotDecoder(), first);
+    const applied = new SnapshotDecoder().readMessage(first, { acceptSnapshots: true });
+    assert(applied.kind === 'snapshot');
+    const decoded = applied.state;
     expect(decoded.exploration).toEqual(exploration.snapshot());
     expect(decoded.mapAssets.filter((asset) => asset.kind === 'furnace')).toContainEqual(
       expect.objectContaining({ id: `furnace:${TOWN_HEARTH.id}` })
@@ -139,6 +141,7 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
     );
     expect(decoded.asteroids.length).toBeGreaterThan(0);
     expect(socket.readyState).toBe(1);
+    expect(broadcaster.acknowledgeSnapshot(socket, applied.metadata.sequence)).toBe(true);
 
     socket.sent.length = 0;
     broadcaster.negotiateSnapshot(socket);

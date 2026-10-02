@@ -65,6 +65,14 @@ function asteroid(id: string, radius = 30): Roid {
   return roid;
 }
 
+function bitmap(canvas: HTMLCanvasElement): number[] {
+  const paint = canvas.getContext('2d');
+  if (!paint) {
+    throw new Error('Missing silhouette painter');
+  }
+  return [...paint.getImageData(0, 0, canvas.width, canvas.height).data];
+}
+
 test('moving and spinning snapshots reuse numeric geometry while damage marks update and surveyed rocks stay unlabeled', () => {
   const view = scene();
   const detail = vi.spyOn(materialArt, 'drawAsteroidMaterialDetails');
@@ -114,14 +122,20 @@ test('moving and spinning snapshots reuse numeric geometry while damage marks up
   const replacement = asteroid(roid.id);
   replacement.material = 'metal';
   expect(view.draw(replacement)).toBe(image);
+  const beforeReshape = bitmap(image);
   replacement.offsets[1] = 0.6;
   const reshaped = view.draw(replacement);
-  expect(reshaped).not.toBe(image);
+  expect(reshaped).toBe(image);
+  expect(bitmap(reshaped)).not.toEqual(beforeReshape);
+  const beforeResize = reshaped.width;
   replacement.r = 50;
   const resized = view.draw(replacement);
-  expect(resized).not.toBe(reshaped);
+  expect(resized).toBe(reshaped);
+  expect(resized.width).toBeGreaterThan(beforeResize);
+  const beforeInnerFacet = bitmap(resized);
   delete replacement.material;
-  expect(view.draw(replacement)).not.toBe(resized);
+  expect(view.draw(replacement)).toBe(resized);
+  expect(bitmap(resized)).not.toEqual(beforeInnerFacet);
 
   const barren = asteroid('surveyed-barren', 40);
   delete barren.material;
@@ -135,10 +149,11 @@ test('DPR, playfield scale and glow changes regenerate full-resolution asteroid 
   const view = scene();
   const roid = asteroid('resized-display');
   const initial = view.draw(roid);
+  const initialWidth = initial.width;
   view.ctx.setTransform(2, 0, 0, 2, 0, 0);
   const retina = view.draw(roid);
-  expect(retina).not.toBe(initial);
-  expect(retina.width).toBeGreaterThan(initial.width);
+  expect(retina).toBe(initial);
+  expect(retina.width).toBeGreaterThan(initialWidth);
   expect(view.images.mock.lastCall?.slice(1)).toEqual([
     -retina.width / 4,
     -retina.height / 4,
@@ -146,13 +161,72 @@ test('DPR, playfield scale and glow changes regenerate full-resolution asteroid 
     retina.height / 2,
   ]);
   view.scale.mockReturnValue(1.5);
+  const retinaWidth = retina.width;
   const zoomed = view.draw(roid);
-  expect(zoomed).not.toBe(retina);
-  expect(zoomed.width).toBeGreaterThan(retina.width);
+  expect(zoomed).toBe(retina);
+  expect(zoomed.width).toBeGreaterThan(retinaWidth);
   configureRenderQuality('?performance=collect&renderGlow=off', false);
+  const zoomedWidth = zoomed.width;
   const unblurred = view.draw(roid);
-  expect(unblurred).not.toBe(zoomed);
-  expect(unblurred.width).toBeLessThan(zoomed.width);
+  expect(unblurred).toBe(zoomed);
+  expect(unblurred.width).toBeLessThan(zoomedWidth);
+});
+
+test('fractional scan zoom repaints equal-sized backing surfaces and clears old clips, pixels and styles', () => {
+  const view = scene(1.123456);
+  const rock = asteroid('fractional-scan');
+  const canvas = view.draw(rock);
+  const width = canvas.width;
+  const originalPixels = bitmap(canvas);
+  const paint = canvas.getContext('2d');
+  if (!paint) {
+    throw new Error('Missing silhouette painter');
+  }
+  const create = vi.spyOn(document, 'createElement');
+  const strokes = vi.spyOn(paint, 'stroke');
+  paint.save();
+  paint.beginPath();
+  paint.rect(0, 0, 1, 1);
+  paint.clip();
+  paint.globalAlpha = 0;
+  paint.setLineDash([100, 100]);
+  view.ctx.setTransform(1.123457, 0, 0, 1.123457, 0, 0);
+  expect(view.draw(rock)).toBe(canvas);
+  expect(canvas.width).toBe(width);
+  expect(strokes).toHaveBeenCalled();
+  expect(paint.getTransform().a).toBe(view.ctx.getTransform().a);
+  expect(paint.globalAlpha).toBe(1);
+  expect(paint.getLineDash()).toEqual([]);
+  view.ctx.setTransform(1.123456, 0, 0, 1.123456, 0, 0);
+  view.draw(rock);
+  expect(bitmap(canvas)).toEqual(originalPixels);
+  expect(create).not.toHaveBeenCalled();
+});
+
+test('a scan through changing DPR retains at most the admitted surface and pixel budgets and clears idle art on restart', () => {
+  const view = scene();
+  const created: HTMLCanvasElement[] = [];
+  const createElement = document.createElement.bind(document);
+  vi.spyOn(document, 'createElement').mockImplementation((name, options) => {
+    const element = createElement(name, options);
+    if (element instanceof HTMLCanvasElement) {
+      created.push(element);
+    }
+    return element;
+  });
+  const rocks = Array.from({ length: 129 }, (_, index) => asteroid(`scan-${index}`));
+  for (const dpr of [1, 1.4, 2, 3, 1.123456, 1]) {
+    view.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const admitted = view.drawBatch(rocks);
+    expect(admitted).toHaveLength(128);
+    expect(created).toHaveLength(128);
+    expect(created.filter((canvas) => canvas.width > 0)).toHaveLength(128);
+    expect(
+      created.reduce((pixels, canvas) => pixels + canvas.width * canvas.height, 0)
+    ).toBeLessThanOrEqual(8_000_000);
+  }
+  clearAsteroidShatters();
+  expect(created.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
 });
 
 test('travel through more than 128 asteroid IDs evicts old silhouettes', () => {

@@ -3,25 +3,45 @@ import { writeFile } from 'node:fs/promises';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
 import { networkProfiles } from '../benchmarks/network-profiles';
+import { startProxyControl } from '../benchmarks/proxy-control';
 import { startTcpProxy } from '../benchmarks/tcp-proxy';
 
 const { values } = parseArgs({
   options: {
     target: { type: 'string' },
+    port: { type: 'string' },
     network: { type: 'string' },
     seed: { type: 'string' },
     ready: { type: 'string' },
     stats: { type: 'string' },
+    control: { type: 'string' },
   },
 });
-assert(values.ready && values.stats, 'Missing owned-session paths');
+assert(values.ready && values.stats && values.control, 'Missing owned-session paths');
 const network = values.network;
-assert(network === 'normal' || network === 'degraded', 'Proxy requires an impaired profile');
+assert(
+  network === 'clean' || network === 'normal' || network === 'degraded',
+  'Unknown proxy profile'
+);
 const targetPort = Number(values.target);
+const port = values.port === undefined ? 0 : Number(values.port);
 const seed = Number(values.seed);
 assert(Number.isSafeInteger(targetPort) && targetPort > 0 && targetPort <= 65535, 'Invalid target');
+assert(Number.isSafeInteger(port) && port >= 0 && port <= 65535, 'Invalid proxy listen port');
+assert(port === 0 || port !== targetPort, 'Proxy listen port must differ from target');
 assert(Number.isSafeInteger(seed) && seed > 0, 'Invalid seed');
-const proxy = await startTcpProxy({ targetPort, seed, ...networkProfiles[network] });
+const proxy = await startTcpProxy(
+  network === 'clean'
+    ? { targetPort, port, seed, transparent: true }
+    : { targetPort, port, seed, ...networkProfiles[network] }
+);
+let closeControl: () => Promise<void>;
+try {
+  closeControl = await startProxyControl(values.control, network, proxy.read);
+} catch (error) {
+  await proxy.close();
+  throw error;
+}
 let stopping = false;
 const statsPath = values.stats;
 let writing = Promise.resolve();
@@ -39,7 +59,13 @@ async function stop(error?: unknown) {
   stopping = true;
   clearInterval(timer);
   try {
-    await proxy.close();
+    const results = await Promise.allSettled([closeControl(), proxy.close()]);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        process.stderr.write(`${String(result.reason)}\n`);
+        process.exitCode = 1;
+      }
+    }
     await save();
   } catch (failure) {
     process.stderr.write(`${String(failure)}\n`);
@@ -56,5 +82,11 @@ process.once('SIGINT', () => {
 process.once('SIGTERM', () => {
   void stop();
 });
-await save();
-await writeFile(values.ready, String(proxy.port));
+try {
+  await save();
+  // Ready means both the gameplay path and its private live probe are available.
+  await writeFile(values.ready, String(proxy.port));
+} catch (error) {
+  await stop(error);
+  throw error;
+}

@@ -16,6 +16,7 @@ import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidFie
 import type { PersistentPilot } from '../../../server/world/WorldStore';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { logger } from '../../../setup/serverLogger';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -88,7 +89,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
           id: 'blocked',
           name: 'Blocked pilot',
           position: { x: 100, y: 100 },
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
         },
       },
@@ -167,7 +168,7 @@ function joinMessage(position: unknown): unknown {
       id: 'pilot',
       name: 'Pilot',
       position,
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
     },
   };

@@ -76,6 +76,11 @@ export interface AbilityUsedEvent {
   boostIgnitionPosition?: Position;
 }
 
+/** Highest complete snapshot applied on this physical gameplay socket. */
+export interface SnapshotAcknowledgement {
+  sequence: number;
+}
+
 export interface PlayerUpdate {
   id: string;
   position: Position;
@@ -92,7 +97,7 @@ export interface PlayerUpdate {
 
 export interface PlayerJoin {
   /** Required current-protocol acknowledgement. */
-  snapshotVersion: 1;
+  snapshotVersion: 2;
   asteroidInteractions: 1;
   /** The server accepts correlated shoot requests and emits per-shot acknowledgements. */
   shotAcknowledgements?: boolean;

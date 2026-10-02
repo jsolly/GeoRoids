@@ -1,4 +1,5 @@
 /* @vitest-environment node */
+
 import { once } from 'node:events';
 import type { IncomingMessage } from 'node:http';
 import { expect, test, vi } from 'vitest';
@@ -12,6 +13,7 @@ import {
 } from '../../../server/communication/connectionAdmission';
 import { createServerInstance } from '../../../server/createServer';
 import { logger } from '../../../setup/serverLogger';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 
 test('production enables connection budgets and test runs leave them off unless enforced', () => {
   expect(LOG_CONNECTIONS_PER_WINDOW).toBe(6);
@@ -124,7 +126,9 @@ test('the running server rejects the seventh log socket and still accepts a join
     } finally {
       warn.mockRestore();
     }
-    expect(await open(port, '/ws?snapshotVersion=1&asteroidInteractions=1')).toBe('open');
+    expect(await open(port, `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`)).toBe(
+      'open'
+    );
   } finally {
     for (const socket of sockets) {
       if (socket.readyState !== WebSocket.CLOSED) {

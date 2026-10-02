@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE, SHIP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -36,7 +37,7 @@ function clearAsteroidField(engine: GameEngine): void {
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
   core.handleClientMessage(
-    { type: 'join', data: { ...data, snapshotVersion: 1, asteroidInteractions: 1 } },
+    { type: 'join', data: { ...data, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 } },
     socket
   );
 }

@@ -22,14 +22,26 @@ for (const viewport of [
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize(viewport);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#hud-network`);
-    const instructions = page.getByText('Reload when the game requests an update.', {
-      exact: false,
-    });
+    const instructions = page
+      .locator('article .article-body')
+      .getByText(
+        'If the game requests an update, reload; joining can remain unavailable until both client and server updates have finished.',
+        { exact: false }
+      );
     await instructions.waitFor({ state: 'visible' });
     await instructions.scrollIntoViewIfNeeded();
+    const graphicsLink = page.getByRole('link', { name: 'experimental WebGL version' });
+    await graphicsLink.scrollIntoViewIfNeeded();
+    expect(await graphicsLink.isVisible()).toBe(true);
+    expect(await graphicsLink.getAttribute('href')).toBe(
+      'https://www.georoids.com/?renderer=webgl2'
+    );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
     );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`performance-graphics-manual-${viewport.name}.png`),
+    });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(

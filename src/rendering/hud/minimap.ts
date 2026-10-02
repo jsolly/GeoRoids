@@ -177,23 +177,33 @@ function solidRadarInk(tint: string, alpha: number): string {
 }
 
 /** Draw the shared exploration mask behind known world marks. */
-function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
+export function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   ctx.save();
   // Pale explored ground has to be its own ink: dark fog over a dark void disappears.
   const exploredInk = solidRadarInk(PALETTE.REMOTE, EXPLORED_RADAR_ALPHA);
   const cellScale = geometry.size / (geometry.radius * 2);
+  const centerX = geometry.x + geometry.size / 2;
+  const centerY = geometry.y + geometry.size / 2;
+  const radius = geometry.size / 2;
+  // Skip cells wholly outside the circular clip. Keep individual overlapping
+  // fills inside it: merging them changes antialiasing even with opaque ink.
+  const exteriorRadiusSquared = (radius + 2) ** 2;
   for (const cell of explorationCellsInView({
     cx: geometry.center.x,
     cy: geometry.center.y,
     radius: geometry.radius,
   })) {
-    ctx.fillStyle = isCellExplored(geometry.exploration, cell) ? exploredInk : PALETTE.BG;
     const bounds = cellWorldBounds(cell);
     const x = geometry.x + geometry.size / 2 + (bounds.x - geometry.center.x) * cellScale;
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;
     // One extra pixel closes tile gaps. The fill is opaque, so the overlap stays invisible.
     const size = bounds.size * cellScale + 1;
-    ctx.fillRect(x, y, size, size);
+    const nearX = Math.max(x - centerX, 0, centerX - x - size);
+    const nearY = Math.max(y - centerY, 0, centerY - y - size);
+    if (nearX * nearX + nearY * nearY < exteriorRadiusSquared) {
+      ctx.fillStyle = isCellExplored(geometry.exploration, cell) ? exploredInk : PALETTE.BG;
+      ctx.fillRect(x, y, size, size);
+    }
   }
   ctx.restore();
 }

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { createServerInstance } from '../../../server/createServer';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData, ServerGameSnapshot } from '../../../shared-types';
 import { GAME, LASER, ROID } from '../../../src/constants';
 
@@ -194,7 +194,9 @@ describe('Asteroid destruction over real sockets', () => {
       const received: { type: string; data: unknown }[] = [];
       const decoder = new SnapshotDecoder();
       const states: ServerGameSnapshot[] = [];
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`);
+      const ws = new WebSocket(
+        `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      );
       ws.on('message', (raw) => {
         const text = String(raw);
         const result = decoder.readMessage(text, { acceptSnapshots: true });
@@ -204,6 +206,9 @@ describe('Asteroid destruction over real sockets', () => {
         if (result.kind === 'snapshot') {
           states.push(result.state);
           received.push({ type: 'snapshot', data: result.metadata });
+          ws.send(
+            JSON.stringify({ type: 'snapshotAck', data: { sequence: result.metadata.sequence } })
+          );
           return;
         }
         const message = result.message;
@@ -228,7 +233,7 @@ describe('Asteroid destruction over real sockets', () => {
             id: 'shooter',
             name: 'Shooter',
             position: { x: 800, y: 800 },
-            snapshotVersion: 1,
+            snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
           },
         })

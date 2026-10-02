@@ -1,7 +1,9 @@
+import type { GpuFrameStats } from '../rendering/gpuRearRenderer';
 import { logger } from '../utils/Logger';
 import { installPhoneCollector } from './phoneCollector';
 
 const SAMPLE_LIMIT = 4096;
+export const APPLIED_SNAPSHOT_SAMPLE_LIMIT = SAMPLE_LIMIT;
 const encoder = new TextEncoder();
 type Metric =
   | 'rttMs'
@@ -24,28 +26,63 @@ type Metric =
   | 'recoveryMs';
 type Phase = 'menu' | 'play' | 'respawn' | 'hidden';
 type Samples = { values: number[]; count: number; sum: number; max: number; over33Ms: number };
+type AppliedSnapshot = {
+  appliedAt: number;
+  ownerId: string | undefined;
+  session: number;
+  sequence: number;
+  kind: 'keyframe' | 'delta';
+  gameTime: number;
+  serverTime: number | undefined;
+};
 
 /** Bounded opt-in observations; retained values are a prefix, never an implied full run. */
 export class ClientPerformanceMetrics {
   private readonly series = new Map<string, Samples>();
   private readonly counters: Record<string, number> = {};
   private lastSnapshot:
-    | { sequence: number; kind: 'keyframe' | 'delta'; gameTime: number }
+    | {
+        sequence: number;
+        kind: 'keyframe' | 'delta';
+        gameTime: number;
+        serverTime: number | undefined;
+      }
     | undefined;
   private lastKeyframeSequence = 0;
+  private snapshotSession = 0;
+  private appliedSnapshotCount = 0;
+  private readonly appliedSnapshots: AppliedSnapshot[] = [];
 
   /** Snapshot sequence numbers belong to one transport/join session. */
   resetSnapshotWitness(): void {
     this.lastSnapshot = undefined;
     this.lastKeyframeSequence = 0;
+    this.snapshotSession++;
   }
 
   snapshotApplied(snapshot: {
+    ownerId: string | undefined;
     sequence: number;
     kind: 'keyframe' | 'delta';
     gameTime: number;
+    serverTime: number | undefined;
   }): void {
-    this.lastSnapshot = snapshot;
+    this.lastSnapshot = {
+      sequence: snapshot.sequence,
+      kind: snapshot.kind,
+      gameTime: snapshot.gameTime,
+      serverTime: snapshot.serverTime,
+    };
+    if (this.enabled) {
+      this.appliedSnapshotCount++;
+      if (this.appliedSnapshots.length < APPLIED_SNAPSHOT_SAMPLE_LIMIT) {
+        this.appliedSnapshots.push({
+          ...snapshot,
+          session: this.snapshotSession,
+          appliedAt: performance.now(),
+        });
+      }
+    }
     if (snapshot.kind === 'keyframe') {
       this.lastKeyframeSequence = snapshot.sequence;
     }
@@ -80,6 +117,26 @@ export class ClientPerformanceMetrics {
   private readonly pendingProbes = new Map<number, number>();
   private readonly completedProbes = new Set<number>();
   private graphicsSettings: Record<string, string | number | boolean> = {};
+  private rendererRequested: 'canvas' | 'webgl2' = 'canvas';
+  private readonly rendererFrames = { canvas: 0, webgl2: 0 };
+  private rendererObserver:
+    | (() => { backend: 'canvas' | 'webgl2'; gpuStats: GpuFrameStats | null })
+    | null = null;
+
+  setRendererObservation(
+    requested: 'canvas' | 'webgl2',
+    observe: (() => { backend: 'canvas' | 'webgl2'; gpuStats: GpuFrameStats | null }) | null
+  ): void {
+    this.rendererRequested = requested;
+    this.rendererObserver = observe;
+  }
+
+  /** Called after the frame's CPU timing closes; no GPU queries or allocations. */
+  recordRendererFrame(backend: 'canvas' | 'webgl2'): void {
+    if (this.enabled) {
+      this.rendererFrames[backend]++;
+    }
+  }
 
   setGraphicsSettings(settings: Record<string, string | number | boolean>): void {
     this.graphicsSettings = { ...settings };
@@ -307,9 +364,16 @@ export class ClientPerformanceMetrics {
       throw new Error(`Performance drain owned by ${this.drainOwner}`);
     }
     const now = performance.now();
+    const renderer = this.rendererObserver?.();
     const result = {
       schemaVersion: 2,
-      lastSnapshot: this.lastSnapshot,
+      lastSnapshot: this.lastSnapshot ? { ...this.lastSnapshot } : undefined,
+      appliedSnapshots: {
+        count: this.appliedSnapshotCount,
+        omittedSamples: this.appliedSnapshotCount - this.appliedSnapshots.length,
+        values: this.appliedSnapshots.map((snapshot) => ({ ...snapshot })),
+      },
+      snapshotSession: this.snapshotSession,
       lastKeyframeSequence: this.lastKeyframeSequence,
       phaseDurationsMs: {
         ...this.phaseDurations,
@@ -319,6 +383,12 @@ export class ClientPerformanceMetrics {
       messageBytes: { ...this.messageBytes },
       messageCounts: { ...this.messageCounts },
       graphicsSettings: { ...this.graphicsSettings },
+      renderer: {
+        requested: this.rendererRequested,
+        backend: renderer?.backend ?? 'canvas',
+        frames: { ...this.rendererFrames },
+        gpuStats: renderer?.gpuStats ?? null,
+      },
       clientReleaseId: import.meta.env['VITE_COMMIT_HASH'] ?? 'unknown',
       serverReleaseId: this.serverReleaseId ?? 'unknown',
       durationMs: now - this.startedAt,
@@ -338,7 +408,11 @@ export class ClientPerformanceMetrics {
       ),
     };
     if (reset) {
+      this.appliedSnapshots.length = 0;
+      this.appliedSnapshotCount = 0;
       this.series.clear();
+      this.rendererFrames.canvas = 0;
+      this.rendererFrames.webgl2 = 0;
       for (const phase of Object.keys(this.phaseDurations) as Phase[]) {
         this.phaseDurations[phase] = 0;
       }

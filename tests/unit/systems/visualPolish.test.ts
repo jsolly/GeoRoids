@@ -329,6 +329,7 @@ test('local and remote shots retain their glowing artwork and direction, then hi
 test('moving pilots reuse both bolt colors and rebuild artwork when display quality changes', () => {
   const { ctx, strokes } = recordingContext();
   const images: HTMLCanvasElement[] = [];
+  const rasterSizes: Array<{ width: number; height: number }> = [];
   const transforms: DOMMatrix[] = [];
   const drawImage = ctx.drawImage.bind(ctx);
   vi.spyOn(ctx, 'drawImage').mockImplementation((...args) => {
@@ -337,6 +338,8 @@ test('moving pilots reuse both bolt colors and rebuild artwork when display qual
       throw new Error('Expected cached bolt artwork');
     }
     images.push(source);
+    // Retired surfaces may be repainted for the next quality; retain what was drawn.
+    rasterSizes.push({ width: source.width, height: source.height });
     transforms.push(ctx.getTransform());
     Reflect.apply(drawImage, ctx, args);
   });
@@ -370,11 +373,13 @@ test('moving pilots reuse both bolt colors and rebuild artwork when display qual
   if (!noGlow || !denser) {
     throw new Error('Quality change did not render bolt artwork');
   }
-  expect(noGlow.width).toBeLessThan(denser.width);
+  expect(rasterSizes[8]?.width).toBeLessThan(rasterSizes[6]?.width ?? 0);
+  expect(rasterSizes[8]?.height).toBeLessThan(rasterSizes[6]?.height ?? 0);
+  expect(images[8]).not.toBe(images[9]);
   configureRenderQuality('', false);
   drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
   expect(images[10]).not.toBe(noGlow);
-  expect(images[10]?.width).toBe(denser.width);
+  expect(rasterSizes[10]).toEqual(rasterSizes[6]);
 });
 
 test('local and remote kit thrusters draw two open V contours only while thrusting alive', () => {

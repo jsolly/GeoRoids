@@ -6,7 +6,11 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import {
+  SNAPSHOT_VERSION,
+  SnapshotDecoder,
+  SnapshotEncoder,
+} from '../../../shared/snapshotProtocol';
 import { nearbyAsteroidRows, nearbyWorldRows } from '../../../shared/world';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
@@ -69,7 +73,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   const port = address.port;
   async function pilot(id: string, resumeToken?: string) {
     const socket = new WebSocket(
-      `ws://127.0.0.1:${port}/ws?snapshotVersion=1&asteroidInteractions=1`
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
     );
     clients.push(socket);
     const decoder = new SnapshotDecoder();
@@ -88,6 +92,9 @@ test('current sockets render matching worlds across late join and reconnect', as
           snapshot = result.state;
           state = result.state;
           messages.push({ type: 'snapshot', data: result.metadata });
+          socket.send(
+            JSON.stringify({ type: 'snapshotAck', data: { sequence: result.metadata.sequence } })
+          );
           return;
         }
         const raw = result.message;
@@ -109,7 +116,7 @@ test('current sockets render matching worlds across late join and reconnect', as
           id,
           name: id,
           position: { x: 100, y: 100 },
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
           ...(resumeToken ? { resumeToken } : {}),
         },

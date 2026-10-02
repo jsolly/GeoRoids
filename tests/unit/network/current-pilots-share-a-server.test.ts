@@ -10,7 +10,7 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { logger } from '../../../setup/serverLogger';
 import {
   SNAPSHOT_BACKPRESSURE_BYTES,
-  SNAPSHOT_KEYFRAME_INTERVAL,
+  SNAPSHOT_VERSION,
   SnapshotDecoder,
   SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
@@ -33,6 +33,14 @@ type SendData = Parameters<RecordingSocket['send']>[0];
 class DelayedRecordingSocket extends RecordingSocket {
   defer = false;
   fail = false;
+  readonly decoder = new SnapshotDecoder();
+  readonly appliedStates: ServerGameSnapshot[] = [];
+  readIndex = 0;
+
+  override clear(): void {
+    super.clear();
+    this.readIndex = 0;
+  }
 
   constructor(private readonly pending: Array<(error?: Error) => void>) {
     super();
@@ -124,26 +132,31 @@ function snapshotSummary(data: unknown): SnapshotSummary {
   throw new Error('Malformed snapshot frame kind in recording');
 }
 
-function decodedSnapshots(pilot: ReturnType<typeof socket>) {
-  const decoder = new SnapshotDecoder();
-  const states: ServerGameSnapshot[] = [];
-  for (const raw of pilot.fake.sent) {
-    const result = decoder.readMessage(raw, { acceptSnapshots: true });
+function applySnapshots(pilot: ReturnType<typeof socket>, handler: MessageHandler) {
+  assert.equal(pilot.pending.length, 0, 'Only completed writes reach the applying client');
+  for (; pilot.fake.readIndex < pilot.fake.sent.length; pilot.fake.readIndex++) {
+    const raw = pilot.fake.sent[pilot.fake.readIndex];
+    assert.ok(raw, 'recorded client message');
+    const result = pilot.fake.decoder.readMessage(raw, { acceptSnapshots: true });
     if (result.kind === 'snapshot-rejected') {
       throw result.error;
     }
     if (result.kind === 'snapshot') {
-      states.push(result.state);
+      pilot.fake.appliedStates.push(result.state);
+      handler.handleMessage(
+        { type: 'snapshotAck', data: { sequence: result.metadata.sequence } },
+        pilot.ws
+      );
     } else if (
       result.message &&
       typeof result.message === 'object' &&
       'type' in result.message &&
       result.message.type === 'joined'
     ) {
-      decoder.reset();
+      pilot.fake.decoder.reset();
     }
   }
-  return states;
+  return pilot.fake.appliedStates;
 }
 
 describe('current pilots share the production handler and broadcaster', () => {
@@ -172,7 +185,7 @@ describe('current pilots share the production handler and broadcaster', () => {
           id,
           name: id,
           position: { x: 100, y: 100 },
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
           ...(resumeToken ? { resumeToken } : {}),
         },
@@ -180,16 +193,17 @@ describe('current pilots share the production handler and broadcaster', () => {
       ws
     );
 
-  test('current offers receive a joined acknowledgment before snapshot-v1 frames', () => {
+  test('current offers receive a joined acknowledgment before snapshot-v2 frames', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'pilot');
+    applySnapshots(pilot, handler);
     broadcaster.broadcastGameState();
     const joined = pilot.messages.find((m) => m.type === 'joined');
     assert.ok(joined, 'joined message');
     expect(joined).toMatchObject({
       type: 'joined',
       data: {
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
         resumeToken: expect.stringMatching(RESUME_TOKEN_PATTERN),
         serverReleaseId: expect.any(String),
@@ -198,8 +212,8 @@ describe('current pilots share the production handler and broadcaster', () => {
       },
     });
     expect(pilot.messages[0]?.type).toBe('joined');
-    const snapshot = decodedSnapshots(pilot)[0];
-    assert.ok(snapshot, 'snapshot-v1 state');
+    const snapshot = applySnapshots(pilot, handler)[0];
+    assert.ok(snapshot, 'snapshot-v2 state');
     expect(snapshot).toMatchObject({
       entities: expect.any(Array),
       playerProjectiles: expect.any(Array),
@@ -218,6 +232,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     ).toBe(false);
 
     pilot.pending.shift()?.();
+    applySnapshots(pilot, handler);
 
     expect(info).toHaveBeenCalledWith(
       'STATE',
@@ -261,43 +276,50 @@ describe('current pilots share the production handler and broadcaster', () => {
     };
     const a = socket();
     joinPilot(handler, a.ws, 'a');
+    applySnapshots(a, handler);
     const joinedA = a.messages.find((message) => message.type === 'joined');
     assert.ok(joinedA?.data && typeof joinedA.data === 'object' && !Array.isArray(joinedA.data));
     const resumeTokenA = (joinedA.data as Record<string, unknown>)['resumeToken'];
     assert.equal(typeof resumeTokenA, 'string');
     const b = socket();
     joinPilot(handler, b.ws, 'b');
+    applySnapshots(b, handler);
     const pilotBSnapshot = b.messages.find((m) => m.type === 'snapshot');
     assert.ok(pilotBSnapshot, 'pilot b snapshot');
     expect(pilotBSnapshot).toMatchObject({ data: { kind: 'keyframe' } });
     const reconstruct = (pilot: ReturnType<typeof socket>) => {
-      return decodedSnapshots(pilot).at(-1);
+      return applySnapshots(pilot, handler).at(-1);
     };
     expect(reconstruct(a)).toEqual(expectedWorld());
     expect(reconstruct(b)).toEqual(expectedWorld('b'));
     const count = a.messages.length;
     broadcaster.broadcastGameState('a');
+    applySnapshots(b, handler);
     expect(a.messages).toHaveLength(count);
     a.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
     broadcaster.broadcastGameState();
+    applySnapshots(b, handler);
     expect(a.messages).toHaveLength(count);
     a.fake.bufferedAmount = 0;
     const playerB = engine.getPlayer('b');
     assert.ok(playerB, 'player b');
     playerB.position.x = 720;
     broadcaster.broadcastGameState();
-    const pilotAKeyframe = a.messages.at(-1);
-    assert.ok(pilotAKeyframe, 'pilot a keyframe');
-    expect(pilotAKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
+    const pilotADelta = a.messages.at(-1);
+    assert.ok(pilotADelta, 'pilot a delta after transport pressure');
+    expect(pilotADelta).toMatchObject({ data: { kind: 'delta' } });
     expect(reconstruct(a)).toEqual(expectedWorld());
     expect(reconstruct(b)).toEqual(expectedWorld('b'));
+    const acceptedFrontier = snapshotSummary(snapshotEnvelopes(a).at(-1)?.data).sequence;
     joinPilot(handler, a.ws, 'a', resumeTokenA as string);
     const rejoinedKeyframe = a.messages.at(-1);
     assert.ok(rejoinedKeyframe, 'rejoined pilot a keyframe');
     expect(rejoinedKeyframe.data).toMatchObject({
-      sequence: 1,
+      sequence: acceptedFrontier + 1,
       kind: 'keyframe',
     });
+    applySnapshots(a, handler);
+    applySnapshots(b, handler);
     engine.removePlayer('a');
     const reconnected = socket();
     joinPilot(handler, reconnected.ws, 'a', resumeTokenA as string);
@@ -314,19 +336,27 @@ describe('current pilots share the production handler and broadcaster', () => {
     const a = socket();
     const b = socket();
     joinPilot(handler, a.ws, 'a');
+    applySnapshots(a, handler);
     joinPilot(handler, b.ws, 'b');
+    applySnapshots(a, handler);
+    applySnapshots(b, handler);
 
     a.fake.defer = true;
     broadcaster.broadcastGameState();
+    applySnapshots(b, handler);
     const playerB = engine.getPlayer('b');
     assert.ok(playerB, 'pilot b');
     playerB.position.x = 720;
     broadcaster.broadcastGameState();
+    applySnapshots(b, handler);
     const pending = a.pending.shift();
     assert.ok(pending, 'deferred snapshot callback');
     pending();
+    applySnapshots(a, handler);
     a.fake.defer = false;
     broadcaster.broadcastGameState();
+    applySnapshots(a, handler);
+    applySnapshots(b, handler);
 
     const aSnapshots = snapshotEnvelopes(a);
     const bSnapshots = snapshotEnvelopes(b);
@@ -365,7 +395,10 @@ describe('current pilots share the production handler and broadcaster', () => {
     const recovery = socket();
     const peer = socket();
     joinPilot(handler, recovery.ws, 'recovery');
+    applySnapshots(recovery, handler);
     joinPilot(handler, peer.ws, 'peer');
+    applySnapshots(recovery, handler);
+    applySnapshots(peer, handler);
     engine.addAsteroid({
       id: 'reflector-rock',
       position: { x: 500, y: 500 },
@@ -387,10 +420,12 @@ describe('current pilots share the production handler and broadcaster', () => {
     const shard = engine.getLoot().find((loot) => loot.kind === 'shard');
     assert.ok(shard, 'laser shard loot');
     broadcaster.broadcastGameState();
+    applySnapshots(recovery, handler);
+    applySnapshots(peer, handler);
     broadcaster.requestSnapshotKeyframe(recovery.ws);
     broadcaster.broadcastGameState();
     const decodeAll = (pilot: ReturnType<typeof socket>) => {
-      return decodedSnapshots(pilot);
+      return applySnapshots(pilot, handler);
     };
     expect(
       decodeAll(recovery)
@@ -424,49 +459,70 @@ describe('current pilots share the production handler and broadcaster', () => {
     ).toBe(false);
   });
 
-  test('pending and failed sends do not advance baseline; periodic/resync keyframes heal state', () => {
+  test('failed snapshot writes require a fresh socket while sustained deltas and explicit resync preserve current state', () => {
     const a = socket();
     joinPilot(handler, a.ws, 'a');
+    applySnapshots(a, handler);
+    const joined = a.messages.find((message) => message.type === 'joined');
+    const data = joined?.data;
+    assert(
+      data &&
+        typeof data === 'object' &&
+        'resumeToken' in data &&
+        typeof data.resumeToken === 'string'
+    );
     a.fake.defer = true;
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
     const failedSend = a.pending.shift();
     assert.ok(failedSend, 'deferred snapshot callback');
     failedSend(new Error('write failed'));
-    a.fake.defer = false;
+    expect(a.close).toHaveBeenCalledWith(
+      1011,
+      'Snapshot transport failed; reconnect for state recovery'
+    );
+    expect(engine.getPlayer('a')?.ws).toBeUndefined();
+    const recovery = socket();
+    joinPilot(handler, recovery.ws, 'ignored-id', data.resumeToken);
+    applySnapshots(recovery, handler);
     broadcaster.broadcastGameState();
-    const recoveryKeyframe = a.messages.at(-1);
-    assert.ok(recoveryKeyframe, 'recovery keyframe');
-    expect(recoveryKeyframe.data).toMatchObject({
+    applySnapshots(recovery, handler);
+    const recoveryDelta = recovery.messages.at(-1);
+    assert.ok(recoveryDelta, 'fresh socket delta');
+    expect(recoveryDelta.data).toMatchObject({
       sequence: 2,
-      kind: 'keyframe',
+      kind: 'delta',
     });
-    const beforePeriodic = snapshotEnvelopes(a).length;
-    for (let i = 0; i <= SNAPSHOT_KEYFRAME_INTERVAL; i++) {
+    const beforeSustained = snapshotEnvelopes(recovery).length;
+    const acceptedFrontier = snapshotSummary(snapshotEnvelopes(recovery).at(-1)?.data).sequence;
+    const sustainedOffers = 270;
+    for (let i = 0; i < sustainedOffers; i++) {
       broadcaster.broadcastGameState();
+      applySnapshots(recovery, handler);
     }
-    const periodic = snapshotEnvelopes(a)
-      .slice(beforePeriodic)
-      .map(({ data }) => snapshotSummary(data));
-    expect(periodic).toHaveLength(SNAPSHOT_KEYFRAME_INTERVAL + 1);
-    expect(periodic.slice(0, -1).every(({ kind }) => kind === 'delta')).toBe(true);
-    expect(periodic.at(-1)).toEqual({
-      sequence: SNAPSHOT_KEYFRAME_INTERVAL + 3,
-      kind: 'keyframe',
-    });
-    handler.handleMessage({ type: 'snapshotResync' }, a.ws);
+    const sustained = snapshotEnvelopes(recovery)
+      .slice(beforeSustained)
+      .map(({ data: frameData }) => snapshotSummary(frameData));
+    expect(sustained).toHaveLength(sustainedOffers);
+    expect(sustained.every(({ kind }) => kind === 'delta')).toBe(true);
+    expect(sustained.map(({ sequence }) => sequence)).toEqual(
+      Array.from({ length: sustainedOffers }, (_, index) => acceptedFrontier + index + 1)
+    );
+    handler.handleMessage({ type: 'snapshotResync' }, recovery.ws);
     broadcaster.broadcastGameState();
-    const resyncKeyframe = a.messages.at(-1);
+    applySnapshots(recovery, handler);
+    const resyncKeyframe = recovery.messages.at(-1);
     assert.ok(resyncKeyframe, 'resync keyframe');
     expect(resyncKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
-    a.fake.fail = true;
+    recovery.fake.fail = true;
     broadcaster.broadcastGameState();
-    expect(a.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
+    expect(recovery.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
   });
 
   test('a callback send records one terminal outbound outcome', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'callback-pilot');
+    applySnapshots(pilot, handler);
     pilot.fake.clear();
     pilot.fake.defer = true;
     const enabled = vi.spyOn(serverPerformanceMetrics, 'enabled', 'get').mockReturnValue(true);
@@ -489,9 +545,10 @@ describe('current pilots share the production handler and broadcaster', () => {
     enabled.mockRestore();
   });
 
-  test('current snapshots skip a pressured socket and recover on the next keyframe', () => {
+  test('current snapshots skip a pressured socket and continue the accepted delta baseline', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'pressured-snapshot');
+    applySnapshots(pilot, handler);
     pilot.fake.clear();
     pilot.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
 
@@ -502,15 +559,19 @@ describe('current pilots share the production handler and broadcaster', () => {
     broadcaster.broadcastGameState();
     expect(pilot.messages.at(-1)).toMatchObject({
       type: 'snapshot',
-      data: { kind: 'keyframe' },
+      data: { kind: 'delta', sequence: 2, baseline: 1 },
     });
+    applySnapshots(pilot, handler);
   });
 
   test('pressured event recipients reconnect for state recovery instead of growing queues', () => {
     const pressured = socket();
     const peer = socket();
     joinPilot(handler, pressured.ws, 'pressured');
+    applySnapshots(pressured, handler);
     joinPilot(handler, peer.ws, 'peer');
+    applySnapshots(pressured, handler);
+    applySnapshots(peer, handler);
     pressured.fake.clear();
     peer.fake.clear();
     pressured.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
@@ -543,12 +604,15 @@ describe('current pilots share the production handler and broadcaster', () => {
     const pressured = socket();
     const peer = socket();
     joinPilot(handler, pressured.ws, 'current-pressured');
+    applySnapshots(pressured, handler);
     const joined = pressured.messages.find((message) => message.type === 'joined');
     assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
     const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
     assert.equal(typeof resumeToken, 'string');
 
     joinPilot(handler, peer.ws, 'peer');
+    applySnapshots(pressured, handler);
+    applySnapshots(peer, handler);
     pressured.fake.clear();
     peer.fake.clear();
     if (code === 1013) {
@@ -572,7 +636,7 @@ describe('current pilots share the production handler and broadcaster', () => {
           id: 'untrusted-replacement-id',
           name: 'untrusted-replacement',
           position: { x: 800, y: 800 },
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
           resumeToken,
         },
@@ -583,6 +647,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       data: { id: 'current-pressured', resumeToken },
     });
     expect(engine.getPlayer('current-pressured')?.ws).toBe(replacement.ws);
+    applySnapshots(replacement, handler);
   });
 
   test('projected outbound pressure bounds snapshot, event, and control classes', () => {
@@ -590,8 +655,14 @@ describe('current pilots share the production handler and broadcaster', () => {
     const event = socket();
     const control = socket();
     joinPilot(handler, snapshot.ws, 'projected-snapshot');
+    applySnapshots(snapshot, handler);
     joinPilot(handler, event.ws, 'projected-event');
+    applySnapshots(snapshot, handler);
+    applySnapshots(event, handler);
     joinPilot(handler, control.ws, 'projected-control');
+    applySnapshots(snapshot, handler);
+    applySnapshots(event, handler);
+    applySnapshots(control, handler);
     snapshot.fake.clear();
     event.fake.clear();
     control.fake.clear();
@@ -619,6 +690,7 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('an oversized snapshot closes explicitly instead of retrying forever', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'oversized-snapshot');
+    applySnapshots(pilot, handler);
     pilot.fake.clear();
 
     broadcaster.sendToWebSocket(pilot.ws, {
@@ -636,7 +708,10 @@ describe('current pilots share the production handler and broadcaster', () => {
     const first = socket();
     const second = socket();
     joinPilot(handler, first.ws, 'first');
+    applySnapshots(first, handler);
     joinPilot(handler, second.ws, 'second');
+    applySnapshots(first, handler);
+    applySnapshots(second, handler);
     const broken = engine.getSnapshotState();
     Object.assign(broken, { badField: broken });
     vi.spyOn(engine, 'getSnapshotState').mockReturnValue(broken);
@@ -667,6 +742,7 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('fixture preparation preserves a pilot session while replacing the ambient world', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'pilot');
+    applySnapshots(pilot, handler);
     const actor = engine.getPlayer('pilot');
     assert.ok(actor);
     const oldEpoch = actor.playerMotion?.epoch;
@@ -700,9 +776,9 @@ describe('current pilots share the production handler and broadcaster', () => {
     ({ pendingKind, outcome }) => {
       const pilot = socket();
       joinPilot(handler, pilot.ws, 'pilot');
-      const decoder = new SnapshotDecoder();
-      let lastKeyframeSequence = 1;
-      let state = decodeSnapshotMessage(decoder, snapshotEnvelopes(pilot)[0]?.raw ?? '');
+      let state = applySnapshots(pilot, handler).at(-1);
+      assert.ok(state, 'applied initial world');
+      let lastKeyframeSequence = snapshotSummary(snapshotEnvelopes(pilot)[0]?.data).sequence;
       const actor = engine.getPlayer('pilot');
       assert.ok(actor?.playerMotion, 'authoritative pilot motion');
       const oldEpoch = actor.playerMotion.epoch;
@@ -730,16 +806,19 @@ describe('current pilots share the production handler and broadcaster', () => {
       assert.ok(sequence, 'keyframe sequence lower bound');
       expect(sequence).toBe(2);
       const requirement = { sequence, gameTime, motionEpoch };
+      const blockedCount = snapshotEnvelopes(pilot).length;
+      broadcaster.broadcastGameState();
+      expect(snapshotEnvelopes(pilot)).toHaveLength(blockedCount);
 
       const complete = pilot.pending.shift();
       assert.ok(complete, 'pending snapshot completion');
       if (outcome === 'success') {
         complete();
-        const result = decoder.readMessage(oldFrame.raw, { acceptSnapshots: true });
-        assert.equal(result.kind, 'snapshot');
-        state = result.state;
-        if (result.metadata.kind === 'keyframe') {
-          lastKeyframeSequence = result.metadata.sequence;
+        state = applySnapshots(pilot, handler).at(-1);
+        assert.ok(state, 'applied old completed frame');
+        const metadata = snapshotSummary(oldFrame.data);
+        if (metadata.kind === 'keyframe') {
+          lastKeyframeSequence = metadata.sequence;
         }
       } else {
         complete(new Error('write failed'));
@@ -753,22 +832,42 @@ describe('current pilots share the production handler and broadcaster', () => {
         })
       ).toBe(false);
 
-      pilot.fake.defer = false;
+      let current = pilot;
+      if (outcome === 'failure') {
+        expect(pilot.close).toHaveBeenCalledWith(
+          1011,
+          'Snapshot transport failed; reconnect for state recovery'
+        );
+        expect(engine.getPlayer('pilot')?.ws).toBeUndefined();
+        const joined = pilot.messages.find((message) => message.type === 'joined')?.data;
+        assert(
+          joined &&
+            typeof joined === 'object' &&
+            'resumeToken' in joined &&
+            typeof joined.resumeToken === 'string'
+        );
+        current = socket();
+        joinPilot(handler, current.ws, 'ignored-id', joined.resumeToken);
+        applySnapshots(current, handler);
+        broadcaster.requestSnapshotKeyframe(current.ws);
+      }
+      current.fake.defer = false;
       broadcaster.broadcastGameState();
-      const recoveryFrame = snapshotEnvelopes(pilot).at(-1);
+      const recoveryFrame = snapshotEnvelopes(current).at(-1);
       assert.ok(recoveryFrame, 'requested recovery keyframe');
-      const recovery = decoder.readMessage(recoveryFrame.raw, { acceptSnapshots: true });
-      assert.equal(recovery.kind, 'snapshot');
-      expect(recovery.metadata).toMatchObject({
+      const recoveredState = applySnapshots(current, handler).at(-1);
+      assert.ok(recoveredState, 'applied requested recovery state');
+      const recoveryMetadata = snapshotSummary(recoveryFrame.data);
+      expect(recoveryMetadata).toMatchObject({
         kind: 'keyframe',
         sequence: outcome === 'success' ? 3 : 2,
       });
-      const recoveredPlayer = recovery.state.entities.find((entity) => entity.id === 'pilot');
-      expect(recovery.state.gameTime).toBe(gameTime);
+      const recoveredPlayer = recoveredState.entities.find((entity) => entity.id === 'pilot');
+      expect(recoveredState.gameTime).toBe(gameTime);
       expect(
         observesPreparedFixture(requirement, {
-          lastKeyframeSequence: recovery.metadata.sequence,
-          lastSnapshotGameTime: recovery.state.gameTime,
+          lastKeyframeSequence: recoveryMetadata.sequence,
+          lastSnapshotGameTime: recoveredState.gameTime,
           motionEpoch: recoveredPlayer?.playerMotion?.epoch ?? null,
         })
       ).toBe(true);
@@ -780,6 +879,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     (outcome) => {
       const pilot = socket();
       joinPilot(handler, pilot.ws, 'pilot');
+      applySnapshots(pilot, handler);
       const oldActor = engine.getPlayer('pilot');
       assert.ok(oldActor, 'old actor');
       for (let epoch = 0; epoch < 4; epoch++) {
@@ -792,7 +892,9 @@ describe('current pilots share the production handler and broadcaster', () => {
         ).toBe(true);
       }
       broadcaster.broadcastGameState();
+      applySnapshots(pilot, handler);
       broadcaster.broadcastGameState();
+      applySnapshots(pilot, handler);
       broadcaster.requestSnapshotKeyframe(pilot.ws);
       pilot.fake.defer = true;
       broadcaster.broadcastGameState();
@@ -818,6 +920,15 @@ describe('current pilots share the production handler and broadcaster', () => {
       handler.handleMessage({ type: 'leave', data: {} }, pilot.ws);
       pilot.fake.defer = false;
       joinPilot(handler, pilot.ws, 'pilot', joinedData.resumeToken);
+      const freshJoinedData = pilot.messages
+        .filter((message) => message.type === 'joined')
+        .at(-1)?.data;
+      assert(
+        freshJoinedData &&
+          typeof freshJoinedData === 'object' &&
+          'resumeToken' in freshJoinedData &&
+          typeof freshJoinedData.resumeToken === 'string'
+      );
       const freshActor = engine.getPlayer('pilot');
       assert.ok(freshActor?.playerMotion, 'fresh actor registration');
       expect(freshActor.playerMotion.epoch).toBe(1);
@@ -833,20 +944,17 @@ describe('current pilots share the production handler and broadcaster', () => {
       const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
       assert.ok(sequence, 'fresh keyframe lower bound');
       broadcaster.broadcastGameState();
-      const freshFrames = snapshotEnvelopes(pilot).slice(oldFrames.length);
-      const freshDecoder = new SnapshotDecoder();
-      let freshState = decodeSnapshotMessage(freshDecoder, freshFrames[0]?.raw ?? '');
-      for (const frame of freshFrames.slice(1)) {
-        freshState = decodeSnapshotMessage(freshDecoder, frame.raw);
-      }
+      expect(snapshotEnvelopes(pilot)).toHaveLength(oldFrames.length);
       const requirement = {
-        sequence,
-        gameTime: freshState.gameTime,
+        // The pending old frame consumes its unique sequence on success. The
+        // fresh registration can only become ready at the following frontier.
+        sequence: snapshotSummary(oldFrame.data).sequence + 1,
+        gameTime: engine.getSnapshotState().gameTime,
         motionEpoch: freshEpoch,
       };
       const stalePlayer = staleState.entities.find((entity) => entity.id === 'pilot');
       expect(staleMetadata.kind).toBe('keyframe');
-      expect(staleMetadata.sequence).toBeGreaterThanOrEqual(sequence);
+      expect(staleMetadata.sequence).toBeLessThan(requirement.sequence);
       expect(stalePlayer?.playerMotion?.epoch).toBeGreaterThan(freshEpoch);
       expect(
         observesPreparedFixture(requirement, {
@@ -854,17 +962,40 @@ describe('current pilots share the production handler and broadcaster', () => {
           lastSnapshotGameTime: staleState.gameTime,
           motionEpoch: stalePlayer?.playerMotion?.epoch ?? null,
         })
-      ).toBe(true);
+      ).toBe(false);
 
       staleCompletion(outcome === 'failure' ? new Error('old write failed') : undefined);
+      let current = pilot;
+      let currentRequirement = requirement;
+      if (outcome === 'failure') {
+        expect(pilot.close).toHaveBeenCalledWith(
+          1011,
+          'Snapshot transport failed; reconnect for state recovery'
+        );
+        expect(engine.getPlayer('pilot')?.ws).toBeUndefined();
+        current = socket();
+        joinPilot(handler, current.ws, 'ignored-id', freshJoinedData.resumeToken);
+        applySnapshots(current, handler);
+        const freshSequence = broadcaster.requestSnapshotKeyframe(current.ws);
+        assert.ok(freshSequence, 'fresh physical socket keyframe lower bound');
+        currentRequirement = { ...requirement, sequence: freshSequence };
+      } else {
+        applySnapshots(pilot, handler);
+        expect(broadcaster.requestSnapshotKeyframe(pilot.ws)).toBe(requirement.sequence);
+      }
       broadcaster.broadcastGameState();
-      const current = snapshotEnvelopes(pilot).at(-1);
-      assert.ok(current, 'current session frame');
-      expect(snapshotSummary(current.data)).toMatchObject({ sequence: 3, kind: 'delta' });
+      const currentFrame = snapshotEnvelopes(current).at(-1);
+      assert.ok(currentFrame, 'current session frame');
+      expect(snapshotSummary(currentFrame.data)).toEqual({
+        sequence: currentRequirement.sequence,
+        kind: 'keyframe',
+      });
+      const freshState = applySnapshots(current, handler).at(-1);
+      assert.ok(freshState, 'fresh registration applied state');
       const freshPlayer = freshState.entities.find((entity) => entity.id === 'pilot');
       expect(
-        observesPreparedFixture(requirement, {
-          lastKeyframeSequence: 2,
+        observesPreparedFixture(currentRequirement, {
+          lastKeyframeSequence: snapshotSummary(currentFrame.data).sequence,
           lastSnapshotGameTime: freshState.gameTime,
           motionEpoch: freshPlayer?.playerMotion?.epoch ?? null,
         })
@@ -875,6 +1006,7 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('a resumed motion session keeps its epoch monotonic', () => {
     const original = socket();
     joinPilot(handler, original.ws, 'pilot');
+    applySnapshots(original, handler);
     const joined = original.messages.find((message) => message.type === 'joined');
     assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
     const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
@@ -889,6 +1021,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
     const replacement = socket();
     joinPilot(handler, replacement.ws, 'ignored-id', resumeToken);
+    applySnapshots(replacement, handler);
     expect(engine.getPlayer('pilot')).toBe(actor);
     expect(engine.getPlayer('pilot')?.playerMotion?.epoch).toBe(preparedEpoch);
   });
@@ -896,12 +1029,14 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('fixture readiness accepts an immediate requested keyframe lower bound', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'pilot');
+    applySnapshots(pilot, handler);
     const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
     expect(sequence).toBe(2);
     broadcaster.broadcastGameState();
     const frame = snapshotEnvelopes(pilot).at(-1);
     assert.ok(frame, 'requested keyframe');
     expect(snapshotSummary(frame.data)).toEqual({ kind: 'keyframe', sequence: 2 });
+    applySnapshots(pilot, handler);
   });
 
   test.each([{ outcome: 'success' }, { outcome: 'failure' }])(
@@ -909,35 +1044,61 @@ describe('current pilots share the production handler and broadcaster', () => {
     ({ outcome }) => {
       const pilot = socket();
       joinPilot(handler, pilot.ws, 'pilot');
+      applySnapshots(pilot, handler);
+      const joined = pilot.messages.find((message) => message.type === 'joined')?.data;
+      assert(
+        joined &&
+          typeof joined === 'object' &&
+          'resumeToken' in joined &&
+          typeof joined.resumeToken === 'string'
+      );
       pilot.fake.defer = true;
       broadcaster.broadcastGameState();
+      const oldFrame = snapshotEnvelopes(pilot).at(-1);
+      assert.ok(oldFrame, 'pending old delta');
+      const oldSequence = snapshotSummary(oldFrame.data).sequence;
       const staleCallback = pilot.pending.shift();
       assert.ok(staleCallback, 'old-session callback');
 
       pilot.fake.defer = false;
-      broadcaster.negotiateSnapshot(pilot.ws);
-      broadcaster.sendToWebSocket(pilot.ws, {
-        type: 'joined',
-        data: { snapshotVersion: 1 },
-        timestamp: Date.now(),
-      });
+      joinPilot(handler, pilot.ws, 'pilot', joined.resumeToken);
+      const blockedCount = snapshotEnvelopes(pilot).length;
       broadcaster.broadcastGameState();
+      expect(snapshotEnvelopes(pilot)).toHaveLength(blockedCount);
       staleCallback(outcome === 'failure' ? new Error('stale callback failure') : undefined);
+      let current = pilot;
+      if (outcome === 'failure') {
+        expect(pilot.close).toHaveBeenCalledWith(
+          1011,
+          'Snapshot transport failed; reconnect for state recovery'
+        );
+        expect(engine.getPlayer('pilot')?.ws).toBeUndefined();
+        current = socket();
+        joinPilot(handler, current.ws, 'ignored-id', joined.resumeToken);
+        applySnapshots(current, handler);
+      } else {
+        applySnapshots(pilot, handler);
+        broadcaster.broadcastGameState();
+        const replacement = snapshotEnvelopes(pilot).at(-1);
+        assert.ok(replacement, 'new generation keyframe');
+        expect(snapshotSummary(replacement.data)).toEqual({
+          sequence: oldSequence + 1,
+          kind: 'keyframe',
+        });
+        applySnapshots(pilot, handler);
+      }
       const actor = engine.getPlayer('pilot');
       assert.ok(actor, 'rejoined pilot');
+      const acceptedFrontier = snapshotSummary(snapshotEnvelopes(current).at(-1)?.data).sequence;
       actor.position.x += 1;
       broadcaster.broadcastGameState();
-
+      expect(snapshotSummary(snapshotEnvelopes(current).at(-1)?.data)).toEqual({
+        sequence: acceptedFrontier + 1,
+        kind: 'delta',
+        baseline: acceptedFrontier,
+      });
       expect(
-        snapshotEnvelopes(pilot)
-          .slice(-2)
-          .map(({ data }) => snapshotSummary(data))
-      ).toEqual([
-        { sequence: 1, kind: 'keyframe' },
-        { sequence: 2, kind: 'delta', baseline: 1 },
-      ]);
-      expect(
-        decodedSnapshots(pilot)
+        applySnapshots(current, handler)
           .at(-1)
           ?.entities.find(({ id }) => id === 'pilot')?.position.x
       ).toBe(actor.position.x);
@@ -946,6 +1107,7 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('a Scout sees scan-edge rocks in snapshots only while the Mineral Scan zooms the camera out', () => {
     const scout = socket();
     joinPilot(handler, scout.ws, 'scout');
+    applySnapshots(scout, handler);
     const actor = engine.getPlayer('scout');
     assert.ok(actor);
     actor.kitId = 'scout';
@@ -965,7 +1127,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     };
     engine.addAsteroid(edge);
     const latestRockIds = () =>
-      decodedSnapshots(scout)
+      applySnapshots(scout, handler)
         .at(-1)
         ?.asteroids.map(({ id }) => id) ?? [];
 

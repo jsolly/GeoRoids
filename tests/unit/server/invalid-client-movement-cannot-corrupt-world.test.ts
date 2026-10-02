@@ -1,8 +1,10 @@
 /* @vitest-environment node */
+
 import { strict as assert } from 'node:assert';
 import { afterEach, describe, expect, test } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { SHIP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -22,7 +24,7 @@ const invalidMovements: Array<{ label: string; movement: Record<string, unknown>
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
   core.handleClientMessage(
-    { type: 'join', data: { ...data, snapshotVersion: 1, asteroidInteractions: 1 } },
+    { type: 'join', data: { ...data, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 } },
     socket
   );
 }

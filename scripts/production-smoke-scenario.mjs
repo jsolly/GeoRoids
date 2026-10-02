@@ -10,7 +10,10 @@ import { verifyAncestry as verifyServerAncestry } from './production-smoke-relea
 import { minimumServerRelease } from './server-release-inputs.mjs';
 
 export const productionUrl = 'https://www.georoids.com/';
-const { SnapshotDecoder } = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
+const { SNAPSHOT_VERSION, SnapshotDecoder } = await tsImport(
+  '../shared/snapshotProtocol.ts',
+  import.meta.url
+);
 const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
 
 async function waitForEvidence(predicate, description) {
@@ -196,7 +199,11 @@ export async function smoke({
             const data = decoded.message.data;
             observed.serverReleaseId = data?.serverReleaseId;
             verifyAncestry(minimum, observed.serverReleaseId);
-            assert.equal(data.snapshotVersion, 1, 'Unsupported joined snapshot protocol');
+            assert.equal(
+              data.snapshotVersion,
+              SNAPSHOT_VERSION,
+              'Unsupported joined snapshot protocol'
+            );
             assert.equal(data.asteroidInteractions, 1, 'Missing asteroid protocol admission');
             assert.ok(typeof data.id === 'string' && data.id.length, 'Missing joined player ID');
             observed.playerId = data.id;

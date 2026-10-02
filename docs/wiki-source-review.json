@@ -215,7 +215,7 @@
     "src/input/touchAbility.ts": "sha256:5a0298c45330fd246955c4e659c01069eb7fb6a7c837824a77bc6d6c8641166d",
     "src/input/touchControls.ts": "sha256:20e434bf18f886db7a752bdd3ee41faf17dcdc5590255471ed189fb5ca4db2aa",
     "src/network/networkManager.ts": "sha256:a2efe6f586ba8dafdd337bc667f2d1bffc6c94e9bdd56feb41687793724685c5",
-    "src/network/services/ConnectionManager.ts": "sha256:8eae654dbd09a469114830f5aeaa12a4edb774dbf4bc96b10d9d74530e57b747",
+    "src/network/services/ConnectionManager.ts": "sha256:0809f81ea94e0e1316b906ff0deeaa9b67dc2fd4fe4ee3d00809e0ab4c0d7689",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:79eec567773280124bec64f9beeab27abbd9d6872b103386444e09ea6630b407",
     "src/network/services/asteroidFieldSync.ts": "sha256:b7817456404307f78366968533bb28a2ac7ceccb668fa2778d4d250f16cb7d00",
     "src/network/services/clientIdentity.ts": "sha256:9168521bb06cfd3407b188d9ce0594a38f3be367a74765f2b14d963bb561bfb2",
@@ -390,7 +390,7 @@
     "tests/unit/input/touchAbility.test.ts": "sha256:ad6dd0f3e0aead43c1d92e1823a114239ffd0db01840405827d89509ca1411fa",
     "tests/unit/network/asteroidFieldSync.test.ts": "sha256:d9cde9cbbed30caf04a383de12bfacaf4bbbf6ab8bfc2f64070aeca09e957431",
     "tests/unit/network/failed-connections-settle-and-recover.test.ts": "sha256:77da1dc599f5a8d5884d835f2f487406579b2d5d859a51f46805771a75f9edcd",
-    "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts": "sha256:6d22475bb2a392293b15e077d20edbb238ff4023eafee2ae8e0ab790419a6a3a",
+    "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts": "sha256:b01574209b3c6d1ac2a3c2b2f5a2971974f8f118b0eec3815864f7da067bcbb1",
     "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts": "sha256:52996f3c79b14553eb4934f741485ecc5f493066928331b145029a214a4d60a9",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts": "sha256:3098891f13a880178b7360fc068c6756708b2ff8e10fde0932a48313d2850de4",
     "tests/unit/network/resume-credential-stores-release-provenance.test.ts": "sha256:6ad859a57905a6db1119e110a3d35409da4639f49a74bafbaa133676654df9c7",
@@ -411,7 +411,7 @@
     "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:60dad04df87f91e4c250aa9f17bcad9d59b0f9d5c082063af82345b28ee954fa",
     "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-cargo-and-bank.test.ts": "sha256:9d956b43039c2ac725e334246d8a1f6fe6e581c7558bc4c0329c5be57caafd3a",
     "tests/unit/server/a-new-utc-month-keeps-the-world-and-scores.test.ts": "sha256:9be42129035ee98cdb927bd1117c961554a20496394781ddb7cfc6b68e01c958",
-    "tests/unit/server/authoritative-combat.test.ts": "sha256:71754150f2d7f42f72a7f5ba953f1f29f74cc064985e9b8cb8cc7ed103b57ce1",
+    "tests/unit/server/authoritative-combat.test.ts": "sha256:b33cb5f317f2e4d4258ba44e51362f59e6596bcf1b8d763ae867e51c30c9db43",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:d4b9b6851cd9728b0c893374fe8419e5172359788761aae5f7b7683ee4487c5f",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:1e0147b9774ff7bdb876361b90696eefb69f222345c991f12e9f3b8253f6d8d6",
     "tests/unit/server/collaborative-asteroid-split.test.ts": "sha256:60cc5d27a05ced9e0824ed9a194f7f109ad478b0097a542b6a43aa97d4c5c833",
@@ -638,6 +638,24 @@
       "owners": {
         "package.json": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed validated pose-before-shot ordering and exact terrain rejection regression. Firing controls, inherited velocity, server bounds, mining, crew safety and demonstrations remain accurate. Desktop crew, native touch and field-manual desktop/mobile/reduced-motion scenarios passed. Only these three changed source hashes are accepted.",
+      "sources": [
+        "src/network/services/ConnectionManager.ts",
+        "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts",
+        "tests/unit/server/authoritative-combat.test.ts"
+      ],
+      "topics": ["asteroids", "combat-survival", "hauler", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Strengthened the reviewed first-shot transport regression with distinct earlier and firing poses, by-value snapshots and a strictly newer motion sequence. Both focused files pass 26 tests; firing instructions and illustrations remain accurate. Only this changed test hash is refreshed.",
+      "sources": ["tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts"],
+      "topics": ["combat-survival"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

@@ -143,7 +143,12 @@ export async function smoke({
             'Missing shoot request ID'
           );
           assert.ok(!requests.has(data.requestId), 'Duplicate shoot request ID');
-          const shot = { playerId: message.id, requestId: data.requestId, projectileId: null };
+          const shot = {
+            playerId: message.id,
+            requestId: data.requestId,
+            projectileId: null,
+            acknowledged: false,
+          };
           requests.set(data.requestId, shot);
           observed.shots.push(shot);
         } catch (error) {
@@ -173,14 +178,14 @@ export async function smoke({
                 'Malformed shot acknowledgement projectile ID'
               );
               const shot = requests.get(data.requestId);
-              if (
-                firing &&
-                socket === activeSocket &&
-                observed.playerId === playerId &&
-                shot &&
-                data.projectileId !== null
-              ) {
+              if (firing && socket === activeSocket && observed.playerId === playerId && shot) {
+                shot.acknowledged = true;
                 shot.projectileId = data.projectileId;
+                assert.notEqual(
+                  data.projectileId,
+                  null,
+                  'Authoritative server rejected the matching smoke shot'
+                );
                 acceptedShot = true;
               }
               return;

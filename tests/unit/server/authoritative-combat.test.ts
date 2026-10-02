@@ -434,6 +434,41 @@ describe('server-authoritative combat', () => {
     expect(engine.getPlayer('alpha')?.kitId).toBe('scout');
   });
 
+  test('a Scout terrain shot is admitted only after its current legal pose reaches the server', () => {
+    engine.stopGameLoop();
+    engine = new GameEngine(8306717);
+    const socket = new RecordingSocket();
+    const oldPosition = { x: -141.02460894974666, y: -75.0664442435621 };
+    const actor = engine.addPlayer('terrain-pilot', 'Terrain pilot', socket, oldPosition, 'scout');
+    actor.velocity = { x: 1.0352958031951747, y: -2.0318824196562435 };
+    actor.angle = 1.0995574287564278;
+    actor.spawnProtectionTimer = 0;
+    actor.asteroidInteractions = 1;
+    const now = engine.getServerTime();
+    expect(engine.playerMotion.register(actor, socket, 1, now).ok).toBe(true);
+    const start = { x: -126.73821133054508, y: -103.1050782968309 };
+    const velocity = { x: 2.322998686897575, y: -4.559141627179853 };
+    expect(engine.spawnPlayerLaser(actor.id, start, velocity, now + 92)).toBeNull();
+    expect(
+      engine.playerMotion.acceptFreePose(
+        socket,
+        {
+          epoch: 1,
+          sequence: 1,
+          position: { x: -135.81802132533602, y: -85.28494781306354 },
+          velocity: { x: 1.0461504063801, y: -2.0531857779000684 },
+          angle: actor.angle,
+          thrusting: true,
+          contourLock: null,
+        },
+        now + 92
+      ).ok
+    ).toBe(true);
+    expect(engine.spawnPlayerLaser(actor.id, start, velocity, now + 92)).not.toBeNull();
+    expect(engine.spawnPlayerLaser(actor.id, start, { x: 100, y: 0 }, now + 92)).toBeNull();
+    expect(engine.spawnPlayerLaser(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)).toBeNull();
+  });
+
   test('shoot reports bind to the socket before creating a server laser', () => {
     const wsCore = new WebSocketCore(engine);
     const pilotWs = new RecordingSocket();

@@ -291,7 +291,9 @@ test('real firing evidence requires its socket, player, request and accepted ack
           } else {
             await assert.rejects(
               run,
-              /accepted shot acknowledgement|another player|Malformed shot acknowledgement|JSON/u
+              outcome === 'null'
+                ? /Authoritative server rejected the matching smoke shot/u
+                : /accepted shot acknowledgement|another player|Malformed shot acknowledgement|JSON/u
             );
           }
           const evidence = JSON.parse(
@@ -300,11 +302,19 @@ test('real firing evidence requires its socket, player, request and accepted ack
           assert.ok(evidence.acceptedSnapshots >= 3);
           if (outcome === 'accepted-immediate-collision') {
             assert.deepEqual(evidence.sockets[0].shots, [
-              { playerId: 'pilot-0', requestId: 'ui-shot', projectileId: 'bolt' },
+              {
+                playerId: 'pilot-0',
+                requestId: 'ui-shot',
+                projectileId: 'bolt',
+                acknowledged: true,
+              },
             ]);
             assert.equal(evidence.error, undefined);
           } else {
             assert.ok(evidence.error);
+            if (outcome === 'null') {
+              assert.equal(evidence.sockets[0].shots[0].acknowledged, true);
+            }
             if (outcome !== 'malformed-on-keyup') {
               assert.ok(
                 evidence.sockets.every((connection) =>

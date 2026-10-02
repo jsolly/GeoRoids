@@ -659,7 +659,7 @@ PR 7 runtime landed as [#748](https://github.com/jsolly/GeoRoids/pull/748),
 tests across 91 files; integration took 347.968 and 358.980 seconds. Frame-budget,
 constrained-client and cleanup checks passed. Required CI, exact Vercel and Railway
 releases, healthy worker persistence and fresh production smoke `36952859761`
-were verified. The singleton task is closed; the index task remains open.
+were verified. The singleton task closed; the index task was still open at that release.
 
 The indexed implementation's fixed-seed method measurements keep collection at
 six visited cells and zero candidate rows, stationary motion at ten visited cells
@@ -669,3 +669,29 @@ is measured separately. These owner counters demonstrate local candidate work;
 they do not establish complete-frame or production throughput. Atlas output still
 materializes all known landmarks by design, while undiscovered loot is tracked
 incrementally and unrelated dirty IDs do not trigger a known-landmark sort.
+
+PR 7 index repair shipped as [#749](https://github.com/jsolly/GeoRoids/pull/749),
+merge `1fb6ed53`. Its final corrected full gates passed 1,794 unit cases and all
+91 integration files / 210 cases in 319.881 and 332.333 seconds, plus frame budgets,
+constrained-client scenarios and cleanup. CI passed the corrected head; Vercel
+and Railway independently served the exact merge with healthy worker persistence
+and zero stalls. Fresh production smoke
+[36963086436](https://github.com/jsolly/GeoRoids/actions/runs/36963086436),
+request `6801023129`, passed without fallback. The index Todoist record is closed.
+CI exposed queued shards reusing earlier children's ports; one twelve-port
+reservation batch and a deterministic regression repaired that isolation rule.
+The regression fails against the old allocator and passes the correction.
+
+The separate tooling repair updates only the transitive `brace-expansion`
+resolution to 5.0.12 and disables Jiti filesystem memoization in canonical
+`check:knip`, preserving strict hints and complete installation fingerprints.
+A fresh clean install and audit report zero vulnerabilities. An isolated actual
+Knip loader probe preserves identity from cold cache and after a fixture source
+change; its cache-enabled control demonstrates detectable installed-byte writes.
+The first probe fixture failed a redundant-project-pattern hint and was corrected
+without weakening checks. Independent semantic review passed. The first full gate passed static checks and
+1,794 unit cases, then stopped at the manifest source-review requirement. The
+desktop/mobile field-manual browser scenario passed; scoped acceptance updates
+only `package.json`, with `field-manual` ownership. Gameplay instructions and
+demonstrations are unchanged. The rerun and shipping remain pending. PR 8–16, historical
+investigations, parents and John's production migration handoff remain required.

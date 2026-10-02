@@ -1,12 +1,19 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   initializeTouchControls,
   syncTouchChrome,
   tickTouchControls,
 } from '../../../src/input/touchControls';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { setPlayView } from '../../../src/ui/uiUtils';
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

@@ -37,7 +37,7 @@ export async function checkViteServer(): Promise<boolean> {
     if (
       !body.includes('GeoRoids') &&
       !body.includes('@vite/client') &&
-      !body.includes('eventLoop')
+      !body.includes('/src/core/main.ts')
     ) {
       console.error('Vite server responded but content seems incorrect');
       return false;

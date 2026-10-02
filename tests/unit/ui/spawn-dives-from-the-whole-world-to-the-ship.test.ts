@@ -1,10 +1,16 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { playSpawnFlyIn } from '../../../src/ui/spawnFlyIn';
 
 let gameArea: HTMLElement;
 let frames: FrameRequestCallback[];
 let localShip: { position: { x: number; y: number } } | null;
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 beforeEach(() => {
   frames = [];

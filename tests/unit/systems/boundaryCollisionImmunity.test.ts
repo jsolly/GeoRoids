@@ -61,6 +61,46 @@ describe('Boundary collision immunity', () => {
     expect(ship.impactFlashFrames).toBeGreaterThan(0);
   });
 
+  test('separate collision runtimes report damage through their own pilot connections', () => {
+    const sendA = vi.fn(() => true);
+    const sendB = vi.fn(() => true);
+    const runtimeA = new CollisionManager({
+      getLocalPlayerId: () => 'pilot-a',
+      sendMessage: sendA,
+    });
+    const runtimeB = new CollisionManager({
+      getLocalPlayerId: () => 'pilot-b',
+      sendMessage: sendB,
+    });
+    const shipA = new Ship({ isLocalPlayer: false });
+    const shipB = new Ship({ isLocalPlayer: false });
+    for (const hull of [shipA, shipB]) {
+      hull.health = 100;
+      hull.blinkCount = 0;
+      hull.exploding = false;
+    }
+
+    runtimeA.checkBoundaryCollisions([shipA], 'pilot-a');
+    expect(sendA).toHaveBeenCalledExactlyOnceWith({
+      type: 'collisionDamage',
+      data: { targetPlayerId: 'pilot-a', attackerId: 'boundary' },
+    });
+    expect(sendB).not.toHaveBeenCalled();
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(shipA.health).toBe(0);
+    expect(shipA.exploding).toBe(true);
+    expect(shipB.health).toBe(100);
+
+    runtimeB.checkBoundaryCollisions([shipB], 'pilot-b');
+    expect(sendB).toHaveBeenCalledExactlyOnceWith({
+      type: 'collisionDamage',
+      data: { targetPlayerId: 'pilot-b', attackerId: 'boundary' },
+    });
+    expect(sendA).toHaveBeenCalledTimes(1);
+    expect(shipB.health).toBe(0);
+    expect(shipB.exploding).toBe(true);
+  });
+
   test('does not send boundary damage while blinking', () => {
     ship.blinkCount = 12;
     collisionManager.checkBoundaryCollisions([ship], 'local-player-123');

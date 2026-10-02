@@ -282,27 +282,30 @@ for (const width of [1280, 390]) {
             expect(release.towTargetId).toBe(captive.id);
             expect(release.expectedTowTargetId).toBe(captive.id);
             expect(release.placedActorTowTargetId).toBe(victim === 'hauler' ? captive.id : null);
-            await record('victim-released');
-            await expect
-              .poll(
-                () =>
-                  targetPage.evaluate(() => window.gameController?.getCurrPlayer()?.ship.health),
-                { interval: 25 }
-              )
-              .toBe(0);
+            // Observe both clients before evidence capture can outlast the death animation.
             const witness = victim === 'hauler' ? otherPage : page;
-            await expect
-              .poll(() =>
-                witness.evaluate(
-                  (id) =>
-                    window.gameController
-                      ?.getPlayerManager()
-                      .getNonLocalPlayers()
-                      .find((p) => p.id === id)?.ship.health,
-                  targetId
+            await Promise.all([
+              expect
+                .poll(
+                  () =>
+                    targetPage.evaluate(() => window.gameController?.getCurrPlayer()?.ship.health),
+                  { interval: 25 }
                 )
-              )
-              .toBe(0);
+                .toBe(0),
+              expect
+                .poll(() =>
+                  witness.evaluate(
+                    (id) =>
+                      window.gameController
+                        ?.getPlayerManager()
+                        .getNonLocalPlayers()
+                        .find((p) => p.id === id)?.ship.health,
+                    targetId
+                  )
+                )
+                .toBe(0),
+            ]);
+            await record('victim-released');
             if (victim === 'passer') {
               expect(await latch()).toBe(captive.id);
             }

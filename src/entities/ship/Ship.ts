@@ -41,7 +41,7 @@ import {
   canActivateAbility,
   tickAbilityHost,
 } from './shipAbilities';
-import { getShipCombatNetwork } from './shipCombatNetwork';
+import type { ShipCombatNetwork } from './shipCombatNetwork';
 import {
   applyShipKitToShip,
   DEFAULT_SHIP_KIT_ID,
@@ -119,7 +119,10 @@ class Ship {
   /** Last specific environmental cause (boundary, asteroid, or ricochet). */
   lastExplodeCause?: string;
 
+  private readonly combatNetwork: ShipCombatNetwork | undefined;
+
   constructor(options?: {
+    combatNetwork?: ShipCombatNetwork;
     position?: Position;
     shotCooldown?: number;
     color?: string;
@@ -127,6 +130,7 @@ class Ship {
     frictionCoefficient?: number;
     kitId?: ShipKitId;
   }) {
+    this.combatNetwork = options?.combatNetwork;
     // Set initial spawn protection for local players to prevent immediate collisions
     if (options?.isLocalPlayer) {
       applyShipSpawnProtection(this);
@@ -323,7 +327,7 @@ class Ship {
     }
     const kit = getShipKit(this.kitId);
     if (this.isLocalPlayer) {
-      const network = getShipCombatNetwork();
+      const network = this.combatNetwork;
       if (network?.isConnected) {
         // The server owns the ability result and cooldown. An optimistic toggle
         // can be undone by an older snapshot or disagree about eligible cargo.
@@ -370,7 +374,7 @@ class Ship {
   }
 
   private sendShootEvent(laser: Laser): void {
-    const network = getShipCombatNetwork();
+    const network = this.combatNetwork;
     if (network?.isConnected) {
       logger.debug('SHIP', 'Sending shoot event', {
         position: laser.position,

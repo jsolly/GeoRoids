@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import { NetworkManager } from '../../../src/network/networkManager';
 import {
   FURNACE_MAP_CAMPFIRE_ZOOM,
   FURNACE_MAP_FAR_ZOOM,
@@ -34,7 +35,10 @@ describe('universe map play chrome', () => {
   const showModal = vi.fn(function (this: HTMLDialogElement) {
     this.setAttribute('open', '');
   });
+
   beforeAll(() => {
+    const network = NetworkManager.getInstance();
+    PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
     // jsdom does not implement dialog methods; browser coverage verifies native modality.
     Object.defineProperties(HTMLDialogElement.prototype, {
       showModal: { configurable: true, value: showModal },

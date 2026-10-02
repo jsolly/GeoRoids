@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
@@ -10,12 +10,18 @@ import {
   setTouchHeading,
   tickTouchControls,
 } from '../../../src/input/touchControls';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import * as townStore from '../../../src/ui/townStore';
 
 let player: Player;
 let canvas: HTMLCanvasElement;
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 beforeEach(() => {
   resetControlSources();

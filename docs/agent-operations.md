@@ -118,7 +118,7 @@ npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 
 ### Two processes, one game
 
-- **Client** (`src/`, served by Vite): rendering, input, prediction, HUD. Entry is `index.html` → bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
+- **Client** (`src/`, served by Vite): rendering, input, prediction, HUD. Entry is `index.html` → `src/core/main.ts`, which composes an injected `EventLoop` and bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
 - **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
 - **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
 
@@ -135,10 +135,18 @@ Asteroids live on the server; clients render snapshots. Clients still simulate t
 
 `shared/` holds the gameplay rules both sides must agree on (ship flight, combat, asteroid materials/reflection, furnaces, economy, exploration, world interest radii in `shared/world.ts`). Client prediction and the server simulation import the same module, so change a rule there once rather than mirroring it in `src/` and `server/`.
 
+The injected slice covers EventLoop lifecycle, collision messaging, PlayerManager's
+network port, and each Ship's combat capability. GameController creates the
+production PlayerManager with NetworkManager's connection-owned capabilities;
+authoritative snapshot creation passes that same connection's capability through
+the factory to Player and Ship. Later singleton access cannot rebind an instance.
+Other UI, world, rendering, telemetry, audio and network singleton entrypoints remain;
+the tested independent graphs do not represent two complete games or sockets.
+
 ### Key client modules
 
 - `src/core/gameController.ts` — top-level lifecycle (`newGame`, `startGame`, `setupNetworkDisconnectionHandler`).
-- `src/core/eventLoop.ts` — render/update loop.
+- `src/core/eventLoop.ts` — injected render/update loop with owned RAF and visibility/start listeners; `dispose()` cancels its work and removes those listeners. `src/core/main.ts` owns browser startup and the production HUD callback.
 - `src/entities/{player,ship,roid,laser,satellite,satellitePickup,loot}/` — entity classes and their managers/renderers. Ship motion and combat live in `Ship.ts` and its ship helpers.
 - `src/physics/collision/{CollisionManager,collisionDetection}.ts` — collision system.
 - `src/network/networkManager.ts` + `services/ConnectionManager.ts` — WS lifecycle, reconnection, message dispatch.

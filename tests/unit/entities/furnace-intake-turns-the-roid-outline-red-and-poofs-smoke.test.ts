@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { entityFactory } from '../../../src/entities/EntityFactory';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
 import {
   clearAsteroidShatters,
@@ -8,6 +9,7 @@ import {
   markFurnaceAsteroidShatter,
   recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { drawGame } from '../../../src/rendering/canvas';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { TestPath2D } from '../../support/TestPath2D';
@@ -188,6 +190,8 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
 });
 
 test('the playfield still paints a furnace poof after the last rock leaves the belt', () => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
   vi.stubGlobal('Path2D', TestPath2D);
   vi.spyOn(performance, 'now').mockReturnValue(2000);
   const { ctx, pilot } = asteroidScene();

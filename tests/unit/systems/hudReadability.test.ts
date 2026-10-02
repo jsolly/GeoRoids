@@ -207,7 +207,7 @@ describe('painted HUD composition', () => {
   let controllerDescriptor: PropertyDescriptor | undefined;
   let storedClientId: string | null = null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     controllerDescriptor = Object.getOwnPropertyDescriptor(window, 'gameController');
@@ -217,6 +217,10 @@ describe('painted HUD composition', () => {
       addListener(type, listener, options);
       removeListeners.push(() => window.removeEventListener(type, listener, options));
     });
+    const { NetworkManager } = await import('../../../src/network/networkManager');
+    const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
+    const network = NetworkManager.getInstance();
+    PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
   });
 
   afterEach(() => {

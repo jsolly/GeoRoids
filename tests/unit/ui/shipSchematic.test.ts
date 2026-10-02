@@ -1,10 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
-import {
-  bindPlayerNetworkPort,
-  resetPlayerNetworkPort,
-} from '../../../src/entities/player/playerNetworkPort';
+import { NetworkManager } from '../../../src/network/networkManager';
 import {
   BOOST_COUPLING_DEMO_DURATION_MS,
   closeShipSchematic,
@@ -24,11 +21,11 @@ import {
 
 describe('Hauler ship schematic overlay', () => {
   const releaseInput = vi.fn();
-  const canvasContext = vi
-    .spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockImplementation(() => null);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null);
 
   beforeAll(() => {
+    const network = NetworkManager.getInstance();
+    PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
     Object.defineProperties(HTMLDialogElement.prototype, {
       showModal: {
         configurable: true,
@@ -53,11 +50,7 @@ describe('Hauler ship schematic overlay', () => {
     flightCanvas.id = 'gameCanvas';
     document.body.append(flightCanvas);
     PlayerManager.getInstance().createLocalPlayer('hauler');
-    bindPlayerNetworkPort({
-      getAllPlayers: () => [],
-      setLocalPlayerName: () => undefined,
-      updatePlayerState: () => undefined,
-    });
+    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([]);
     initializeShipSchematic({ onOpen: releaseInput });
     initializeUniverseMap({ onOpen: releaseInput });
     InputManager.getInstance().initializeListeners();
@@ -66,8 +59,7 @@ describe('Hauler ship schematic overlay', () => {
   afterAll(() => {
     closeShipSchematic();
     closeUniverseMap();
-    resetPlayerNetworkPort();
-    canvasContext.mockRestore();
+    vi.restoreAllMocks();
     document.body.classList.remove('in-play');
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');

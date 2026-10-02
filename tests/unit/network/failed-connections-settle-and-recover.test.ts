@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 import {
   CONNECTION_HANDSHAKE_TIMEOUT_MS,
@@ -38,6 +39,12 @@ class Transport {
 }
 
 let manager: ConnectionManager;
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.spyOn(logger, 'info').mockImplementation(() => undefined);

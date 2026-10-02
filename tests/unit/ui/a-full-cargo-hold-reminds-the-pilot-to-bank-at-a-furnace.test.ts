@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
 import { cargoCapacity } from '../../../shared/economy';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { resetCargoFullHintForTests, syncCargoFullHint } from '../../../src/ui/cargoFullHint';
 import {
   CARGO_FULL_HINT,
@@ -12,6 +13,8 @@ const shown = () =>
   document.querySelector('#cargo-full-hint')?.classList.contains('is-visible') ?? false;
 
 beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
   document.body.classList.add('in-play');
   PlayerManager.getInstance().createLocalPlayer('hauler');
 });

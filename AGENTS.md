@@ -68,9 +68,10 @@ Node24 matches `.nvmrc`. Integration runners own their server pair and have a 12
 
 ## Verified-tree CI
 
-PRs run static checks and the bounded behavioral smoke concurrently. The final
-`ci` job requires both lanes to succeed. Full unit/integration/performance checks
-run locally in the review gate. Post-merge CI reuses each successful PR lane only
+PRs run static checks, runner contracts, and the bounded behavioral smoke concurrently.
+The final `ci` job requires all three lanes to succeed; failed, cancelled, or skipped
+lanes fail the aggregate. Each lane has its own exact-tree proof.
+Full unit/integration/performance checks run locally in the review gate. Post-merge CI reuses each successful PR lane only
 when its recorded checkout tree exactly matches the landed tree, using
 `scripts/ci-verified-tree.sh` from dotagents. Missing proof runs that CI lane;
 manual runs always validate. The required `ci` name and deployment triggers stay intact.

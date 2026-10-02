@@ -5,23 +5,27 @@ Heavy tests run in the local review/fix loop and the full gate before push.
 
 ## Required PR checks
 
-`static-checks` and `behavioral-smoke` start concurrently. Static checks cover
-lint policy, formatting, unused code, Markdown, YAML, Actions, runner/dev process
-contracts, TypeScript, benchmark types, Wiki source review, and the production
-build. The smoke runs these scenarios through the serialized integration runner:
+`static-checks`, `runner-contracts`, and `behavioral-smoke` start concurrently.
+Static checks cover lint policy, formatting, unused code, Markdown, YAML, Actions,
+TypeScript, benchmark types, Wiki source review, and the production build.
+Runner contracts run the unchanged test-runner and dev-server commands once.
+The smoke runs these scenarios through the serialized integration runner:
 
 - Desktop boot, movement, and authoritative firing.
 - Density changes and mobile viewport/touch controls.
 - Current-protocol reconnect recovery.
 
-The final required `ci` job succeeds only when both lanes succeed. Failed,
+The final required `ci` job succeeds only when all three lanes succeed. Failed,
 cancelled, and skipped dependencies fail the aggregate. Each substantive lane has
 a four-minute timeout; timing a successful real run establishes the five-minute
 target, not the timeout setting. Setup, browser installation, artifacts, and the
 aggregate are included in the measurement. GitHub runner queues can still delay a run.
 
+Each lane runs the canonical range secrets scan before considering reusable proof.
 Post-merge runs reuse successful PR lane evidence only for an identical Git tree.
-Missing evidence and manual dispatch run both checks normally. Dependabot retains
+Each proof is scoped to its job and exact tree; one lane cannot certify another.
+Missing evidence reruns that lane, and manual dispatch runs all three normally.
+Dependabot retains
 its explicit manual-drain invocation gate. No automatic dependency checks or
 merges are added by this change.
 

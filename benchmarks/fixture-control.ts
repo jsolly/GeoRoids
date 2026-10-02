@@ -9,6 +9,13 @@ import { TOWN_HEARTH } from '../shared/furnaces';
 import { resetShipMass } from '../shared/shipGrowth';
 import type { AsteroidData, Position } from '../shared-types';
 import { applyShipKitStats, hullRadiusForKit } from '../src/entities/ship/shipKits';
+import {
+  captureRegionalManifest,
+  parseRegionalStatus,
+  validateRegionalManifest,
+} from './regional-fixture';
+import { captureServerProcessUsage, parseServerProcessUsage } from './server-process-usage';
+import type { BenchmarkCompressionMode } from './websocket-compression';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -30,13 +37,17 @@ export function normalizeFixtureAsteroids(asteroids: AsteroidData[]) {
   }));
 }
 
-type FixtureRequest = { scenario: 'traversal' | 'combat' | 'dense-combat'; participants: string[] };
+type FixtureRequest = {
+  scenario: 'traversal' | 'combat' | 'dense-combat' | 'regional-combat';
+  participants: string[];
+};
 function parseRequest(value: unknown): FixtureRequest {
   assert(value && typeof value === 'object' && 'scenario' in value && 'participants' in value);
   assert(
     value.scenario === 'traversal' ||
       value.scenario === 'combat' ||
-      value.scenario === 'dense-combat',
+      value.scenario === 'dense-combat' ||
+      value.scenario === 'regional-combat',
     'Unknown scenario'
   );
   assert(
@@ -53,7 +64,8 @@ function parseRequest(value: unknown): FixtureRequest {
 export async function startFixtureControl(
   server: ReturnType<typeof createServerInstance>,
   path: string,
-  seed: number
+  seed: number,
+  compression: BenchmarkCompressionMode = 'none'
 ) {
   let epoch = 0;
   const sockets = new Set<Socket>();
@@ -79,6 +91,51 @@ export async function startFixtureControl(
       handled = true;
       try {
         const command: unknown = JSON.parse(data);
+        if (
+          command &&
+          typeof command === 'object' &&
+          'operation' in command &&
+          command.operation === 'readServerProcessUsage'
+        ) {
+          assert.deepEqual(Object.keys(command), ['operation']);
+          const response = `${JSON.stringify(captureServerProcessUsage(compression))}\n`;
+          assert(
+            Buffer.byteLength(response, 'utf8') <= 512,
+            'Server process usage exceeds IPC bound'
+          );
+          socket.end(response);
+          return;
+        }
+        if (
+          command &&
+          typeof command === 'object' &&
+          'operation' in command &&
+          (command.operation === 'readRegionalStatus' ||
+            command.operation === 'readRegionalManifest')
+        ) {
+          assert.deepEqual(Object.keys(command), ['operation']);
+          const result =
+            command.operation === 'readRegionalStatus'
+              ? server.gameEngine.getAsteroidFieldStatus()
+              : captureRegionalManifest(server.gameEngine, seed);
+          const response = `${JSON.stringify(result)}\n`;
+          assert(
+            Buffer.byteLength(response, 'utf8') <= 1024 * 1024,
+            'Regional evidence exceeds private IPC bound'
+          );
+          socket.end(response);
+          return;
+        }
+        if (
+          command &&
+          typeof command === 'object' &&
+          'operation' in command &&
+          command.operation === 'readSimulationClock'
+        ) {
+          assert.deepEqual(Object.keys(command), ['operation']);
+          socket.end(`${JSON.stringify(server.gameEngine.getSimulationClock())}\n`);
+          return;
+        }
         if (
           command &&
           typeof command === 'object' &&
@@ -114,6 +171,37 @@ export async function startFixtureControl(
           assert(player);
           return player;
         });
+        if (request.scenario === 'regional-combat') {
+          assert(
+            players.every(
+              (player) =>
+                player.health > 0 && !player.exploding && player.respawnTimer === undefined
+            ),
+            'Regional participant is not alive'
+          );
+          const manifest = captureRegionalManifest(engine, seed);
+          const baselines = players.map((player) => {
+            const motionEpoch = player.playerMotion?.epoch;
+            assert(
+              typeof motionEpoch === 'number' &&
+                Number.isSafeInteger(motionEpoch) &&
+                motionEpoch > 0,
+              'Regional participant has no live motion epoch'
+            );
+            assert(player.ws);
+            const sequence = server.wsCore.getBroadcaster().requestSnapshotKeyframe(player.ws);
+            assert(sequence !== undefined, 'Regional participant has no snapshot negotiation');
+            return { id: player.id, sequence, motionEpoch };
+          });
+          const clock = engine.getSimulationClock();
+          const response = `${JSON.stringify({ manifest, hash: createHash('sha256').update(JSON.stringify(manifest)).digest('hex'), epoch: ++epoch, gameTime: clock.gameTime, baselines, participants: request.participants })}\n`;
+          assert(
+            Buffer.byteLength(response, 'utf8') <= 1024 * 1024,
+            'Regional fixture exceeds private IPC bound'
+          );
+          socket.end(response);
+          return;
+        }
         // This synchronous callback runs between simulation ticks. No HTTP route or production hook.
         engine.prepareDiagnosticWorld(request.scenario === 'traversal' ? 'traversal' : 'combat');
         const actors = [...players];
@@ -330,21 +418,33 @@ export async function startFixtureControl(
   };
 }
 
-async function requestControl(path: string, request: object): Promise<unknown> {
+async function requestControl(
+  path: string,
+  request: object,
+  captureResponse?: (response: string) => void
+): Promise<unknown> {
   const socket = createConnection(path);
   try {
     return await new Promise<unknown>((resolve, reject) => {
       let data = '';
-      socket.setTimeout(10_000, () => reject(new Error('Fixture control timed out')));
-      socket.on('error', reject);
+      socket.setTimeout(10_000, () => {
+        captureResponse?.(data);
+        reject(new Error('Fixture control timed out'));
+      });
+      socket.on('error', (error) => {
+        captureResponse?.(data);
+        reject(error);
+      });
       socket.on('connect', () => socket.write(`${JSON.stringify(request)}\n`));
       socket.on('data', (chunk) => {
         data += chunk.toString();
         if (data.length > 1024 * 1024) {
+          captureResponse?.(data);
           reject(new Error('Fixture response too large'));
         }
       });
       socket.on('end', () => {
+        captureResponse?.(data);
         try {
           const value: unknown = JSON.parse(data);
           assert(value && typeof value === 'object');
@@ -379,6 +479,74 @@ export async function finalizeServerWindow(path: string) {
   return { summary: value, id: window.id, startedAt: window.startedAt, endedAt: window.endedAt };
 }
 
+export async function readServerProcessUsage(path: string) {
+  return parseServerProcessUsage(
+    await requestControl(path, { operation: 'readServerProcessUsage' })
+  );
+}
+
+export class SimulationClockProbeError extends Error {
+  constructor(
+    readonly response: {
+      text: string;
+      characters: number;
+      truncated: boolean;
+      parsedType: string;
+    } | null,
+    options: ErrorOptions
+  ) {
+    super(`Simulation clock probe failed: ${String(options.cause).slice(0, 2048)}`, options);
+    this.name = 'SimulationClockProbeError';
+  }
+}
+
+export async function readSimulationClock(path: string) {
+  let response: SimulationClockProbeError['response'] = null;
+  try {
+    const value = await requestControl(path, { operation: 'readSimulationClock' }, (text) => {
+      const retainedText = text.slice(0, 2048);
+      let parsedType = text.length > retainedText.length ? 'unparsed-truncated' : 'invalid-json';
+      try {
+        const parsed: unknown = JSON.parse(retainedText);
+        parsedType = parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed;
+      } catch {
+        // The retained prefix remains available when JSON is malformed or truncated.
+      }
+      response = {
+        text: retainedText,
+        characters: text.length,
+        truncated: text.length > retainedText.length,
+        parsedType,
+      };
+    });
+    assert(value && typeof value === 'object');
+    assert(
+      'gameTime' in value &&
+        typeof value.gameTime === 'number' &&
+        Number.isSafeInteger(value.gameTime) &&
+        value.gameTime >= 0 &&
+        'serverTime' in value &&
+        typeof value.serverTime === 'number' &&
+        Number.isFinite(value.serverTime) &&
+        value.serverTime >= 0,
+      'Invalid simulation clock'
+    );
+    return { gameTime: value.gameTime, serverTime: value.serverTime };
+  } catch (error) {
+    throw new SimulationClockProbeError(response, { cause: error });
+  }
+}
+
+export async function readRegionalStatus(path: string) {
+  return parseRegionalStatus(await requestControl(path, { operation: 'readRegionalStatus' }));
+}
+
+export async function readRegionalManifest(path: string) {
+  const manifest = await requestControl(path, { operation: 'readRegionalManifest' });
+  validateRegionalManifest(manifest);
+  return { manifest, hash: createHash('sha256').update(JSON.stringify(manifest)).digest('hex') };
+}
+
 export async function prepareFixture(path: string, request: FixtureRequest) {
   const value = await requestControl(path, request);
   assert(value && typeof value === 'object');
@@ -400,6 +568,9 @@ export async function prepareFixture(path: string, request: FixtureRequest) {
   assert('epoch' in value && typeof value.epoch === 'number');
   assert('gameTime' in value && typeof value.gameTime === 'number');
   assert('manifest' in value && 'baselines' in value && Array.isArray(value.baselines));
+  if (request.scenario === 'regional-combat') {
+    validateRegionalManifest(value.manifest);
+  }
   const baselines = value.baselines.map((entry: unknown) => {
     assert(
       entry &&

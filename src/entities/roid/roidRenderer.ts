@@ -5,6 +5,11 @@ import type { Ship } from '../../entities/ship/Ship';
 import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import { drawingOffsets } from '../../rendering/playfieldCamera';
+import {
+  discardRasterSurface,
+  prepareRasterSurface,
+  type RasterSurface,
+} from '../../rendering/rasterSurface';
 import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
@@ -21,12 +26,11 @@ import type { Roid } from './Roid';
 const roidScreen = { x: 0, y: 0 };
 const latchShudders = new Map<string, number>();
 
-interface RoidSilhouetteSprite {
+interface RoidSilhouetteSprite extends RasterSurface {
   radius: number;
   vertices: number;
   offsets: readonly number[];
   inner: boolean;
-  canvas: HTMLCanvasElement;
   origin: number;
   lastUsedFrame: number;
 }
@@ -43,6 +47,27 @@ interface RoidSilhouetteSprites {
 const MAX_ROID_SILHOUETTE_SPRITES = 128;
 const MAX_ROID_SILHOUETTE_PIXELS = 8_000_000;
 let roidSilhouetteSprites: RoidSilhouetteSprites | null = null;
+const idleSilhouetteSurfaces: RasterSurface[] = [];
+let idleSilhouettePixels = 0;
+
+function recycleSilhouetteSurface(sprite: RoidSilhouetteSprite): void {
+  idleSilhouetteSurfaces.push({ canvas: sprite.canvas, context: sprite.context });
+  idleSilhouettePixels += sprite.canvas.width * sprite.canvas.height;
+}
+
+function trimIdleSilhouettes(activeCount: number, activePixels: number): void {
+  while (
+    idleSilhouetteSurfaces.length &&
+    (activeCount + idleSilhouetteSurfaces.length > MAX_ROID_SILHOUETTE_SPRITES ||
+      activePixels + idleSilhouettePixels > MAX_ROID_SILHOUETTE_PIXELS)
+  ) {
+    const surface = idleSilhouetteSurfaces.pop();
+    if (surface) {
+      idleSilhouettePixels -= surface.canvas.width * surface.canvas.height;
+      discardRasterSurface(surface);
+    }
+  }
+}
 
 export function recordAsteroidLatch(id: string, now = performance.now()): void {
   latchShudders.set(id, now);
@@ -78,7 +103,15 @@ export function markFurnaceAsteroidShatter(asteroidId: string): void {
 export function clearAsteroidShatters(): void {
   shatterBursts.length = 0;
   latchShudders.clear();
+  for (const sprite of roidSilhouetteSprites?.entries.values() ?? []) {
+    discardRasterSurface(sprite);
+  }
   roidSilhouetteSprites = null;
+  for (const surface of idleSilhouetteSurfaces) {
+    discardRasterSurface(surface);
+  }
+  idleSilhouetteSurfaces.length = 0;
+  idleSilhouettePixels = 0;
 }
 
 export function getRoidStrokeWidth(
@@ -168,7 +201,11 @@ function prepareRoidSilhouetteSprites(
     roidSilhouetteSprites.scale !== scale ||
     roidSilhouetteSprites.glow !== glow
   ) {
+    for (const sprite of roidSilhouetteSprites?.entries.values() ?? []) {
+      recycleSilhouetteSurface(sprite);
+    }
     roidSilhouetteSprites = { dpr, scale, glow, entries: new Map(), pixels: 0, frame: 0 };
+    trimIdleSilhouettes(0, 0);
   }
   roidSilhouetteSprites.frame += 1;
   return roidSilhouetteSprites;
@@ -201,6 +238,7 @@ function drawCachedRoidSilhouette(
     if (sprite) {
       cache.pixels -= sprite.canvas.width * sprite.canvas.height;
       cache.entries.delete(roid.id);
+      recycleSilhouetteSurface(sprite);
     }
     if (side * side <= MAX_ROID_SILHOUETTE_PIXELS) {
       while (
@@ -214,6 +252,7 @@ function drawCachedRoidSilhouette(
           }
           cache.pixels -= candidate.canvas.width * candidate.canvas.height;
           cache.entries.delete(id);
+          recycleSilhouetteSurface(candidate);
           evicted = true;
           break;
         }
@@ -251,13 +290,18 @@ function drawCachedRoidSilhouette(
       );
       return;
     }
-    const canvas = document.createElement('canvas');
-    canvas.width = side;
-    canvas.height = side;
-    const paint = canvas.getContext('2d');
-    if (!paint) {
-      throw new Error('Asteroid silhouette canvas context unavailable');
+    const recycled = idleSilhouetteSurfaces.pop();
+    if (recycled) {
+      idleSilhouettePixels -= recycled.canvas.width * recycled.canvas.height;
     }
+    trimIdleSilhouettes(cache.entries.size + 1, cache.pixels + side * side);
+    const surface = prepareRasterSurface(
+      side,
+      side,
+      recycled,
+      'Asteroid silhouette canvas context unavailable'
+    );
+    const { canvas, context: paint } = surface;
     const origin = canvas.width / (2 * cache.dpr);
     paint.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
     const center = { x: origin, y: origin };
@@ -273,6 +317,7 @@ function drawCachedRoidSilhouette(
       offsets: [...offsets],
       inner,
       canvas,
+      context: paint,
       origin,
       lastUsedFrame: cache.frame,
     };

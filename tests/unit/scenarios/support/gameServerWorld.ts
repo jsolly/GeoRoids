@@ -2,7 +2,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
-import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../../shared/snapshotProtocol';
 import type {
   AsteroidData,
   Position,
@@ -53,7 +53,7 @@ interface JoinedAcknowledgment {
   id: string;
   name: string;
   resumeToken: string;
-  snapshotVersion: 1;
+  snapshotVersion: typeof SNAPSHOT_VERSION;
   asteroidInteractions: 1;
 }
 
@@ -72,7 +72,7 @@ function readJoinedAcknowledgment(socket: RecordingSocket): JoinedAcknowledgment
     typeof data['name'] !== 'string' ||
     typeof data['resumeToken'] !== 'string' ||
     data['resumeToken'].length !== 64 ||
-    data['snapshotVersion'] !== 1 ||
+    data['snapshotVersion'] !== SNAPSHOT_VERSION ||
     data['asteroidInteractions'] !== 1
   ) {
     throw new Error('Joined acknowledgment did not advertise the current protocol');
@@ -81,9 +81,90 @@ function readJoinedAcknowledgment(socket: RecordingSocket): JoinedAcknowledgment
     id: data['id'],
     name: data['name'],
     resumeToken: data['resumeToken'],
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
   };
+}
+
+type SendCallback = (error?: Error) => void;
+type SendData = Parameters<RecordingSocket['send']>[0];
+type SendOptions = { mask?: boolean; binary?: boolean; compress?: boolean; fin?: boolean };
+
+/** Application state survives clearing the fixture's transport recording. */
+class ScenarioSocket extends RecordingSocket {
+  private readonly decoder = new SnapshotDecoder();
+  private protocolReady = false;
+  private ownerId: string | undefined;
+  private appliedWorld: ServerGameSnapshot | undefined;
+  private applicationFailure: Error | undefined;
+
+  constructor(private readonly acknowledge: (sequence: number) => void) {
+    super();
+  }
+
+  override send(data: SendData, callback?: SendCallback): void;
+  override send(data: SendData, options: SendOptions, callback?: SendCallback): void;
+  override send(
+    data: SendData,
+    optionsOrCallback?: SendOptions | SendCallback,
+    callback?: SendCallback
+  ): void {
+    const previouslyRecorded = this.sent.length;
+    if (typeof optionsOrCallback === 'object') {
+      super.send(data, optionsOrCallback, callback);
+    } else {
+      super.send(data, optionsOrCallback ?? callback);
+    }
+    // Preserve RecordingSocket's transport callback/error behavior. Application
+    // consumption happens only after a successful recorded transport send.
+    if (this.sent.length > previouslyRecorded && typeof data === 'string') {
+      this.applyMessage(data);
+    }
+  }
+
+  private applyMessage(raw: string): void {
+    try {
+      const result = this.decoder.readMessage(raw, { acceptSnapshots: this.protocolReady });
+      if (result.kind === 'snapshot-rejected') {
+        throw result.error;
+      }
+      if (result.kind === 'message') {
+        if (isRecord(result.message) && result.message['type'] === 'joined') {
+          const joined = readJoinedAcknowledgment(this);
+          this.ownerId = joined.id;
+          this.protocolReady = true;
+          this.decoder.reset();
+        }
+        return;
+      }
+      if (!result.state.entities.some((entity) => entity.id === this.ownerId)) {
+        throw new Error('Fixture world omitted its current pilot');
+      }
+      this.appliedWorld = result.state;
+      this.acknowledge(result.metadata.sequence);
+    } catch (error) {
+      // Consumer failure cannot turn a successful server write into a failed
+      // transport callback. Surface it when observing or disposing the fixture.
+      this.applicationFailure ??=
+        error instanceof Error
+          ? error
+          : new Error('Fixture client failed to apply a world', { cause: error });
+    }
+  }
+
+  checkApplication(): void {
+    if (this.applicationFailure) {
+      throw this.applicationFailure;
+    }
+  }
+
+  snapshot(name: string): ServerGameSnapshot {
+    this.checkApplication();
+    if (!this.appliedWorld) {
+      throw new Error(`${name} has not applied a current snapshot`);
+    }
+    return this.appliedWorld;
+  }
 }
 
 /**
@@ -94,6 +175,7 @@ export class GameServerWorld {
   readonly engine: GameEngine;
   readonly core: WebSocketCore;
   private joinCount = 0;
+  private readonly clients = new Set<ScenarioSocket>();
 
   constructor(seed = 42) {
     this.engine = new GameEngine(seed);
@@ -106,7 +188,7 @@ export class GameServerWorld {
   join(name: string, position: Position = { x: 0, y: 0 }, options: JoinOptions = {}): Pilot {
     this.joinCount += 1;
     const id = `${name.toLowerCase()}-${this.joinCount}`;
-    const socket = new RecordingSocket();
+    const socket = this.createSocket();
     this.sendJoin(socket, id, name, position, options);
     const pilot = this.pilotFromJoin(socket, id, name);
     // The join protocol only keeps a town-ring arrival. Fixture poses are applied after that.
@@ -128,7 +210,7 @@ export class GameServerWorld {
     position: Position = { x: 0, y: 0 },
     options: JoinOptions = {}
   ): Pilot {
-    const socket = new RecordingSocket();
+    const socket = this.createSocket();
     this.sendJoin(socket, id, name, position, options);
     return this.pilotFromJoin(socket, id, name);
   }
@@ -140,14 +222,14 @@ export class GameServerWorld {
     position: Position = { x: 0, y: 0 },
     options: JoinOptions = {}
   ): RecordingSocket {
-    const socket = new RecordingSocket();
+    const socket = this.createSocket();
     this.sendJoin(socket, id, name, position, options);
     return socket;
   }
 
   /** Resume the current motion/session owner on a replacement gameplay socket. */
   resume(pilot: Pilot, position: Position = this.entity(pilot).position): Pilot {
-    const socket = new RecordingSocket();
+    const socket = this.createSocket();
     this.sendJoin(socket, pilot.id, pilot.name, position, {
       resumeToken: pilot.resumeToken,
     });
@@ -176,13 +258,21 @@ export class GameServerWorld {
           name,
           position,
           kitId: options.kitId,
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
           ...(options.resumeToken ? { resumeToken: options.resumeToken } : {}),
         },
       },
       socket
     );
+  }
+
+  private createSocket(): ScenarioSocket {
+    const socket: ScenarioSocket = new ScenarioSocket((sequence) => {
+      this.core.handleClientMessage({ type: 'snapshotAck', data: { sequence } }, socket);
+    });
+    this.clients.add(socket);
+    return socket;
   }
 
   private pilotFromJoin(socket: RecordingSocket, id: string, name: string): Pilot {
@@ -362,33 +452,18 @@ export class GameServerWorld {
   }
 
   snapshot(pilot: Pilot): ServerGameSnapshot {
-    const decoder = new SnapshotDecoder();
-    let state: ServerGameSnapshot | undefined;
-    for (const raw of pilot.socket.sent) {
-      const result = decoder.readMessage(raw, { acceptSnapshots: true });
-      if (result.kind === 'snapshot-rejected') {
-        throw result.error;
-      }
-      if (result.kind === 'snapshot') {
-        state = result.state;
-      } else if (
-        result.message &&
-        typeof result.message === 'object' &&
-        'type' in result.message &&
-        result.message.type === 'joined'
-      ) {
-        decoder.reset();
-      }
+    if (!(pilot.socket instanceof ScenarioSocket)) {
+      throw new Error(`${pilot.name} does not own a fixture client`);
     }
-    if (!state) {
-      throw new Error(`${pilot.name} has not received a current snapshot`);
-    }
-    return state;
+    return pilot.socket.snapshot(pilot.name);
   }
 
   dispose(): void {
     this.engine.stopGameLoop();
     this.core.stopPeriodicGameStateBroadcast();
+    for (const client of this.clients) {
+      client.checkApplication();
+    }
   }
 }
 

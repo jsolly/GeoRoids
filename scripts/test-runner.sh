@@ -47,6 +47,7 @@ TEST_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-5173}"
 TEST_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-3001}"
 MAX_TEST_DURATION_SECONDS="${GEOROIDS_TEST_MAX_DURATION_SECONDS:-1200}"
 RUN_MODE=tests
+REUSE_BENCHMARK_BUILD=false
 COMPILE_CACHE_TREATMENT=""
 BUILD_MODE="${GEOROIDS_TEST_BUILD:-development}"
 SHARD_CHILD=false
@@ -60,6 +61,10 @@ case "${1:-}" in
     --benchmark-client) RUN_MODE=benchmark-client; BUILD_MODE=production; shift ;;
     --benchmark-load) RUN_MODE=benchmark-load; BUILD_MODE=production; shift ;;
 esac
+if [ "${1:-}" = --reuse-build ] && [ "$RUN_MODE" = benchmark-client ]; then
+    REUSE_BENCHMARK_BUILD=true
+    shift
+fi
 if [ "$RUN_MODE" = discovery-node ]; then
     case "${1:-}" in
         --native-compile-cache=disabled) COMPILE_CACHE_TREATMENT=disabled; shift ;;
@@ -68,6 +73,10 @@ if [ "$RUN_MODE" = discovery-node ]; then
 fi
 for runner_argument in "$@"; do
     case "$runner_argument" in
+        --reuse-build|--reuse-build=*)
+            echo "❌ --reuse-build is supported only immediately after --benchmark-client" >&2
+            exit 64
+            ;;
         --native-compile-cache*)
             echo "❌ Native compile-cache options require --discovery-node and one supported treatment" >&2
             exit 64
@@ -98,6 +107,108 @@ fi
 # its own Vite/server pair while another checkout owns the default ports.
 export GEOROIDS_TEST_VITE_PORT="$TEST_VITE_PORT"
 export GEOROIDS_TEST_SERVER_PORT="$TEST_SERVER_PORT"
+
+is_boolean_vitest_option() {
+    # CAC returns non-boolean values following these flags to its positional
+    # filters. Other flags consume their next value, including file-like text.
+    case "$1" in
+        h|help|v|version|w|watch|ui|open|hideSkippedTests|\
+        coverage|coverage.enabled|coverage.clean|coverage.cleanOnRerun|\
+        coverage.reportOnFailure|coverage.allowExternal|coverage.skipFull|\
+        coverage.thresholds.100|coverage.excludeAfterRemap|coverage.autoAttachSubprocess|\
+        api.strictPort|api.allowExec|api.allowWrite|\
+        isolate|globals|injectCjsGlobals|dom|browser.enabled|browser.headless|browser.ui|\
+        browser.dependencySourcemaps|browser.trackUnhandledErrors|browser.traceView|\
+        browser.traceView.enabled|browser.traceView.recordCanvas|browser.traceView.inlineImages|\
+        browser.locators.exact|fileParallelism|passWithNoTests|logHeapUsage|detectAsyncLeaks|\
+        allowOnly|dangerouslyIgnoreUnhandledErrors|sequence.shuffle|sequence.shuffle.files|\
+        sequence.shuffle.tests|sequence.concurrent|diff.expand|diff.includeChangeCounts|\
+        diff.omitAnnotationLines|diff.printBasicPrototype|expandSnapshotDiff|disableConsoleIntercept|\
+        typecheck|typecheck.enabled|typecheck.only|typecheck.allowJs|typecheck.ignoreSourceErrors|\
+        typecheck.build|cache|fsModuleCache|expect|expect.requireAssertions|expect.poll|\
+        printConsoleTrace|includeTaskLocation|run|color|clearScreen|standalone|clearCache|\
+        strictTags|sharedViteServer|experimental.importDurations|\
+        experimental.importDurations.failOnDanger|experimental.importDurations.thresholds|\
+        experimental.viteModuleRunner|experimental.nodeLoader|experimental.preParse|\
+        experimental.diagnostics|experimental.diagnostics.isolate|\
+        experimental.diagnostics.environment|experimental.diagnostics.import|\
+        experimental.diagnostics.transform)
+            return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+validate_explicit_test_file() {
+    local selector="$1"
+    local path
+    # Leave directory, substring and glob filters to Vitest. A literal test file
+    # is an explicit selection. Vitest strips only one final numeric :line;
+    # preceding colons remain part of the selected filename.
+    case "$selector" in
+        *\**|*\?*|*\[*|*\]*) return 0 ;;
+    esac
+    if [[ "$selector" =~ \.(test|spec)\.[^/]+$ ]]; then
+        path="$selector"
+        if [[ "$path" =~ :[0-9]+$ ]]; then path="${path%:*}"; fi
+        if [ ! -f "$path" ]; then
+            echo "❌ Explicit test file does not exist: $path" >&2
+            echo "   Refusing partial validation; correct the selected file before running tests." >&2
+            return 1
+        fi
+    fi
+    return 0
+}
+
+reject_missing_test_files() {
+    local argument option value
+    while [ "$#" -gt 0 ]; do
+        argument="$1"
+        shift
+        case "$argument" in
+            --)
+                # CAC stores this tail in options['--']; Vitest ignores it
+                # when selecting tests. Never silently validate only the head.
+                if [ "$#" -gt 0 ]; then
+                    echo "❌ Arguments after -- are unsupported by test-runner.sh; Vitest ignores that tail when selecting tests." >&2
+                    echo "   Pass all selected test files and options before --, or omit the separator." >&2
+                    return 1
+                fi
+                continue ;;
+            --no-*|-no-*) continue ;;
+            -*)
+                option="${argument%%=*}"
+                if [[ "$option" = --* ]]; then
+                    option="${option#--}"
+                else
+                    # CAC expands short clusters; only the final flag gets a
+                    # value. For example, -wt pattern uses the value for -t.
+                    option="${option: -1}"
+                fi
+                value="${argument#*=}"
+                if [[ "$argument" != *=* ]] || [ -z "$value" ]; then
+                    if [ "$#" -eq 0 ] || [[ "$1" = -* ]]; then continue; fi
+                    value="$1"
+                    shift
+                fi
+                if is_boolean_vitest_option "$option"; then
+                    case "$value" in
+                        true|false) ;;
+                        *) validate_explicit_test_file "$value" || return 1 ;;
+                    esac
+                fi
+                ;;
+            *) validate_explicit_test_file "$argument" || return 1 ;;
+        esac
+    done
+    return 0
+}
+
+# Refuse misspelled explicit selectors before lock acquisition, cleanup traps,
+# receipts or any service/test children. Coordinator discovery and benchmarks
+# have their own argument contracts.
+if [ "$RUN_MODE" = tests ] && [ "$SHARD_CHILD" = false ]; then
+    reject_missing_test_files "$@" || exit 64
+fi
 
 LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
@@ -546,11 +657,17 @@ start_dev_servers() {
         export GEOROIDS_BENCHMARK_SESSION="$BENCHMARK_SESSION"
         export GEOROIDS_BENCHMARK_SEED="$benchmark_seed"
     fi
-    if [ "$RUN_MODE" = benchmark-client ] && [ "$benchmark_network" != clean ]; then
+    if [ "$RUN_MODE" = benchmark-client ]; then
+        local proxy_port="${GEOROIDS_TEST_PROXY_PORT:-$((10#$TEST_SERVER_PORT + 1))}"
+        if ! valid_port "$proxy_port" || [ "$proxy_port" -eq "$TEST_SERVER_PORT" ] || [ "$proxy_port" -eq "$TEST_VITE_PORT" ]; then
+            echo "❌ GEOROIDS_TEST_PROXY_PORT must be a valid TCP port distinct from the owned server and Vite ports" >&2
+            return 64
+        fi
         REGISTERING_CHILD=true
-        npx --no-install tsx scripts/benchmark-proxy.ts --target "$TEST_SERVER_PORT" \
+        npx --no-install tsx scripts/benchmark-proxy.ts --target "$TEST_SERVER_PORT" --port "$proxy_port" \
             --network "$benchmark_network" --seed "$benchmark_seed" \
-            --ready "$BENCHMARK_SESSION/proxy-port" --stats "$BENCHMARK_SESSION/proxy-stats.json" > "$BENCHMARK_ARTIFACT_DIR/proxy.log" 2>&1 &
+            --ready "$BENCHMARK_SESSION/proxy-port" --stats "$BENCHMARK_SESSION/proxy-stats.json" \
+            --control "$BENCHMARK_SESSION/proxy.sock" > "$BENCHMARK_ARTIFACT_DIR/proxy.log" 2>&1 &
         PROXY_PID=$!
         honor_pending_interrupt
         local attempts=0
@@ -562,6 +679,7 @@ start_dev_servers() {
         done
         gameplay_port=$(cat "$BENCHMARK_SESSION/proxy-port")
         valid_port "$gameplay_port" || return 1
+        [ "$gameplay_port" -eq "$proxy_port" ] || return 1
     fi
     export GEOROIDS_BENCHMARK_WS_URL="ws://localhost:$gameplay_port/ws"
     local client_command="vite --configLoader runner --port $TEST_VITE_PORT --strictPort"
@@ -572,8 +690,19 @@ start_dev_servers() {
         server_entry=benchmarks/realtime-server.ts
     fi
     if [ "$BUILD_MODE" = production ]; then
-        echo "Building production client for the owned session..."
-        VITE_WEBSOCKET_URL="ws://localhost:$gameplay_port/ws" npm run build || return 1
+        if [ "$REUSE_BENCHMARK_BUILD" = true ]; then
+            echo "Verifying frozen production client for the owned benchmark session..."
+            node scripts/benchmark-build-receipt.mjs verify "$REPO_ROOT" "$GEOROIDS_BENCHMARK_WS_URL" || return 1
+        else
+            if [ "$RUN_MODE" = benchmark-client ]; then
+                node scripts/benchmark-build-receipt.mjs prepare "$REPO_ROOT" "$GEOROIDS_BENCHMARK_WS_URL" "$BENCHMARK_SESSION/build-inputs.json" || return 1
+            fi
+            echo "Building production client for the owned session..."
+            VITE_WEBSOCKET_URL="ws://localhost:$gameplay_port/ws" npm run build || return 1
+            if [ "$RUN_MODE" = benchmark-client ]; then
+                node scripts/benchmark-build-receipt.mjs record "$REPO_ROOT" "$GEOROIDS_BENCHMARK_WS_URL" "$BENCHMARK_SESSION/build-inputs.json" || return 1
+            fi
+        fi
         client_command="vite preview --configLoader runner --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
     fi
     echo "🚀 Starting servers owned by this runner..."

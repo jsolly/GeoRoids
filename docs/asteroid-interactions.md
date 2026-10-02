@@ -36,7 +36,7 @@ friendly fire, bounce limits, and shot expiration still apply.
 
 ## Multiplayer protocol
 
-Every pilot uses snapshot v1 with `asteroidInteractions:1`, acknowledged by the
+Every pilot uses snapshot v2 with `asteroidInteractions:1`, acknowledged by the
 server with a private resume token. Unsupported clients cannot join. The server
 owns projectile collisions, and clients render keyed projectile snapshots.
 Reflective phenomena are generated with each world sector and persist with its
@@ -45,7 +45,7 @@ browser's bank, cargo and purchase receipts across disconnects and server restar
 Tokens appear only on the joined socket, not in the common public world. Join
 records the client and server Git identities that issued the token and last
 wrote the bank, plus the server times of those writes. Server-only bank writes
-omit a client identity. Those stamps do not replace the snapshot-v1 join gate.
+omit a client identity. Those stamps do not replace the snapshot-v2 join gate.
 A brief reconnect keeps the current pose; carrying cargo preserves that field
 position even after a longer absence. Death drops carried points with a two-minute
 expiry and always schedules a respawn. Banked points survive. Bank balances and

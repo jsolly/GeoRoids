@@ -1,3 +1,4 @@
+import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { canvasManager } from '../rendering/canvasSurface';
 import '../ui/mainMenu';
 import { paintDebugHud } from '../ui/debugHud';
@@ -25,6 +26,7 @@ const eventLoop = new EventLoop(GameController.getInstance(), {
   cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
   now: () => performance.now(),
   paintDebugHud,
+  observeRenderer: () => clientPerformance.recordRendererFrame(canvasManager.getRendererBackend()),
 });
 
 import.meta.hot?.dispose(() => {

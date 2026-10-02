@@ -1,4 +1,5 @@
 /* @vitest-environment node */
+
 import { strict as assert } from 'node:assert';
 import { once } from 'node:events';
 import { type ClientRequest, IncomingMessage, request, ServerResponse } from 'node:http';
@@ -16,6 +17,7 @@ import {
   layoutReflectiveCluster,
   previewChargedReflections,
 } from '../../../shared/asteroidPhenomena';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const servers: ReturnType<typeof createServerInstance>[] = [];
@@ -42,7 +44,7 @@ async function start(nodeEnv = 'test') {
   return {
     server,
     origin: `http://127.0.0.1:${port}`,
-    socketUrl: `ws://127.0.0.1:${port}/ws?asteroidInteractions=1`,
+    socketUrl: `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`,
   };
 }
 
@@ -60,7 +62,7 @@ async function pilot(kitId: 'scout' | 'hauler' = 'scout') {
         name: 'Fixture Pilot',
         position: { x: 1700, y: 0 },
         asteroidInteractions: 1,
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
       },
     })
   );
@@ -285,7 +287,7 @@ test('a crew with an unavailable motion session leaves every pose and the world 
         name: 'Second pilot',
         position: { x: 1800, y: 0 },
         asteroidInteractions: 1,
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
       },
     },
     transport
@@ -559,7 +561,7 @@ test('a rejected live shot retains its null admission and resetting the world cl
         id: player.id,
         name: 'Rejoined fixture pilot',
         asteroidInteractions: 1,
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
       },
     },
     rejoinedSocket
@@ -931,7 +933,7 @@ test('explicit tow release rejects stale victim or owner actor identity without 
         kitId: 'scout',
         position: { x: 4400, y: 2800 },
         asteroidInteractions: 1,
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
       },
     },
     witnessSocket

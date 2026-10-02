@@ -18,7 +18,7 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative as relativePath, resolve } from 'node:path';
 import process from 'node:process';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -70,6 +70,17 @@ function fixtureCommonDir(directory, inherited = process.env) {
 
 const root = resolve(import.meta.dirname, '..');
 const helper = join(root, 'scripts/integration-shards.mjs');
+// These planner/sequencer contracts use synthetic discovery, not runtime case
+// counts. Preserve historical fixture counts and give each unmeasured current
+// file one explicit fixture case. Real coordinator collection supplies its own
+// expanded case inventory; this must never add estimated historical weight rows.
+function planningFixtureDiscovery({ files, weights, worktree }) {
+  const historicalCases = new Map(weights.entries.map((entry) => [entry.path, entry.cases]));
+  return files.flatMap((file) => {
+    const path = relativePath(worktree, file).replaceAll('\\', '/');
+    return Array.from({ length: historicalCases.get(path) ?? 1 }, () => ({ file }));
+  });
+}
 function cacheInventory(directory, prefix = '') {
   if (!existsSync(directory)) {
     return [];
@@ -300,9 +311,7 @@ process.stdout.write(JSON.stringify(result.map(file=>file.moduleId))+'\\n');
       const files = integrationFiles(root).map((file) =>
         join(worktree, file.slice(root.length + 1))
       );
-      const discovery = weights.entries.flatMap((entry) =>
-        Array.from({ length: entry.cases }, () => ({ file: join(worktree, entry.path) }))
-      );
+      const discovery = planningFixtureDiscovery({ files, weights, worktree });
       writeFileSync(
         join(worktree, 'planned.json'),
         JSON.stringify(
@@ -1132,16 +1141,24 @@ test('proposed whole-file weights balance every current integration file without
     readFileSync(join(root, 'scripts/integration-shard-weights.json'), 'utf8')
   );
   const files = integrationFiles(root);
-  const discovery = weights.entries.flatMap((entry) =>
-    Array.from({ length: entry.cases }, () => ({ file: join(root, entry.path) }))
-  );
+  const discovery = planningFixtureDiscovery({ files, weights, worktree: root });
   const input = { worktree: root, files, discovery, weights, runId: 'plan-contract' };
   const plan = planShards(input);
-  assert.equal(plan.inventory.length, 91);
+  assert.equal(plan.inventory.length, files.length);
+  assert.equal(weights.entries.length, 91);
+  assert.equal(weights.caseCount, 210);
   assert.equal(
     plan.shards.reduce((sum, shard) => sum + shard.cases, 0),
-    210
+    discovery.length
   );
+  const historicalPaths = new Set(weights.entries.map((entry) => entry.path));
+  for (const entry of plan.inventory) {
+    if (!historicalPaths.has(entry.path)) {
+      assert.equal(entry.fallback, 'new-file');
+      assert.equal(entry.cases, 1, 'Unmeasured files have one synthetic contract case');
+      assert.equal(entry.estimatedFileMs, Math.ceil(plan.fallbackFileMsPerCase * 1.2 + 600));
+    }
+  }
   assert.deepEqual(
     plan.shards.map((shard) => shard.allocationWeight),
     [1, 1, 1, 1, 1, 1]
@@ -1200,17 +1217,27 @@ test('proposed whole-file weights balance every current integration file without
   assert.equal(new Set(selected).size, files.length);
   assert.deepEqual([...selected].sort(), files);
   const added = join(root, 'tests/integration/new-contract.test.ts');
+  const historicalFile = files.find((file) => historicalPaths.has(relativePath(root, file)));
+  assert.ok(historicalFile, 'Changed-count fixture requires a historically weighted file');
   const extended = planShards({
     ...input,
     files: [...files, added],
-    discovery: [...discovery, { file: added }, { file: files[0] }],
+    discovery: [...discovery, { file: added }, { file: historicalFile }],
   });
   assert.equal(extended.inventory.find((entry) => entry.file === added).fallback, 'new-file');
   assert.equal(
-    extended.inventory.find((entry) => entry.file === files[0]).fallback,
+    extended.inventory.find((entry) => entry.file === historicalFile).fallback,
     'case-count-changed'
   );
   assert.ok(extended.inventory.every((entry) => entry.estimatedFileMs > 0));
+  assert.throws(
+    () => planShards({ ...input, discovery: discovery.filter((entry) => entry.file !== files[0]) }),
+    /Every file needs discovered cases/u
+  );
+  assert.throws(
+    () => planShards({ ...input, discovery: [...discovery, { file: added }] }),
+    /Discovery contains extra files/u
+  );
   assert.throws(() => planShards({ ...input, files: [...files, files[0]] }), /Duplicate/u);
   assert.throws(
     () =>
@@ -1254,9 +1281,7 @@ test('the installed Vitest sequencer selects each issued bucket and rejects chan
     readFileSync(join(root, 'scripts/integration-shard-weights.json'), 'utf8')
   );
   const inventory = integrationFiles(root);
-  const discovery = weights.entries.flatMap((entry) =>
-    Array.from({ length: entry.cases }, () => ({ file: join(root, entry.path) }))
-  );
+  const discovery = planningFixtureDiscovery({ files: inventory, weights, worktree: root });
   const expected = planShards({
     worktree: root,
     files: inventory,
@@ -1266,7 +1291,7 @@ test('the installed Vitest sequencer selects each issued bucket and rejects chan
   });
   const relative = (file) => file.slice(file.indexOf('/tests/integration/') + 1);
   const selected = [];
-  assert.equal(inventory.length, 91);
+  assert.equal(expected.inventory.length, inventory.length);
   for (let index = 1; index <= 6; index++) {
     const result = await handshake(`sequencer-${index}`);
     assert.equal(result.code, 0, result.stderr);
@@ -1274,7 +1299,7 @@ test('the installed Vitest sequencer selects each issued bucket and rejects chan
     assert.deepEqual([...files].sort(), expected.shards[index - 1].files.map(relative).sort());
     selected.push(...files);
   }
-  assert.equal(new Set(selected).size, 91);
+  assert.equal(new Set(selected).size, inventory.length);
   assert.deepEqual([...selected].sort(), inventory.map(relative).sort());
   for (const mode of ['sequencer-digest', 'sequencer-late', 'sequencer-ancestry']) {
     const result = await handshake(mode);

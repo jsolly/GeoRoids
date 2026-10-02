@@ -37,15 +37,20 @@ export function syncFurnaceTravelPrompt(): void {
   }
   const overlaysClosed = !isTownStoreOpen() && !isShipSchematicOpen() && !isUniverseMapOpen();
   const travel = overlaysClosed && canEnterTownStore();
-  const town = travel && isAtTownSquare();
-  // Boarding is a contextual touch action; desktop keeps its E shortcut.
-  setFieldHint(
-    'furnace-travel-prompt',
-    travel,
-    shouldUseTouchControls()
-      ? { action: { label: town ? 'Enter' : 'Tap to travel', run: boardFromTap } }
-      : { text: town ? 'Press E to enter' : 'Press E to travel' }
-  );
+  if (travel) {
+    const town = isAtTownSquare();
+    // Boarding is a contextual touch action; desktop keeps its E shortcut.
+    setFieldHint(
+      'furnace-travel-prompt',
+      true,
+      shouldUseTouchControls()
+        ? { action: { label: town ? 'Enter' : 'Tap to travel', run: boardFromTap } }
+        : { text: town ? 'Press E to enter' : 'Press E to travel' }
+    );
+  } else {
+    // Hidden hints ignore content; skip viewport/media queries until boarding is available.
+    setFieldHint('furnace-travel-prompt', false);
+  }
   setFieldHint('furnace-build-hint', overlaysClosed && !travel && haulerOnDarkLot(), {
     text: SCOUT_ONLY_BUILD_HINT,
   });

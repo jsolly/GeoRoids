@@ -43,9 +43,15 @@ Pointer controls and cancellation handling already exist in `src/input/touchCont
 
 ### Authoritative server and protocol
 
-The authoritative simulation runs at 60 Hz; periodic snapshots target 30 Hz. The server uses monotonic scheduling and bounds accumulated simulation debt. Broadcast state uses required snapshot-v1 keyframes and deltas, with per-recipient sequence and baseline state. A new canonical encoder is shared within one broadcast, but recipient encoding and JSON serialization still occur inside the recipient loop.[^3]
+The authoritative simulation runs at 60 Hz; periodic snapshots target 30 Hz. The server uses monotonic scheduling and bounds accumulated simulation debt. At this research revision, broadcast state used required snapshot-v1 keyframes and deltas, with per-recipient sequence and baseline state. A new canonical encoder is shared within one broadcast, but recipient encoding and JSON serialization still occur inside the recipient loop.[^3]
 
 The broadcaster has a 1 MiB projected outbound limit and tracks pending sends. The [pending-send follow-up](performance/pending-snapshot-results.md) now preserves a successful baseline after an unsent pending offer; pressure skips and failed delivery still request a keyframe. Periodic keyframes use a 90-delta interval, approximately three seconds at an uninterrupted 30 Hz cadence. Recovery and skipped sends can alter that interval. These controls already exist and should be measured before changing them.[^3]
+
+Current snapshot v2 removes that forced interval while retaining full initial,
+rejoin and explicit recovery frames. Other frames use the encoder's actual
+UTF-8 byte comparison; ACK credit and recovery timeouts remain unchanged. The
+90-delta statement above describes the research revision, not the current draft,
+and its archived performance measurements do not qualify this policy change.
 
 WebSocket compression is not enabled in the inspected server configuration. The existing optimization is JSON delta encoding. The historical protocol experiment measured standalone gzip and deflate codec work; it did not validate deployed per-message compression.[^4]
 
@@ -248,7 +254,7 @@ Do not apply every row. Each conditional candidate has an evidence gate; rejecti
 
 The first implementation change should connect DPR, CPU throttling, and ordered network impairment to the existing production-client runner and prove that each constraint actually applies. Add missing attribution counters and the controlled rendering-scale comparison next. Follow with the smallest successful rendering change. Add a production quality policy only after fixed settings prove useful on real phones. Remove temporary switches and unused experiment paths once decisions are made.
 
-Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve snapshot-v1 recovery and authoritative asteroid and projectile behavior. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
+Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve [current snapshot recovery](protocol/snapshot-v2.md) and authoritative asteroid and projectile behavior. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
 
 Run the focused canvas/input/protocol tests appropriate to each implementation, then the repository gate. Integration and browser scenarios must use the repository runner. Include simultaneous steering/fire, scan/tow feedback, rotation, death/respawn, background recovery, and two-player reconnect. Visual checks must cover low-quality rendering as well as the normal tier.
 

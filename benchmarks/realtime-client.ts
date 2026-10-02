@@ -13,12 +13,27 @@ import {
   type Response as PlaywrightResponse,
   webkit,
 } from 'playwright';
-import { SnapshotDecoder } from '../shared/snapshotProtocol';
+import { onDarkFurnaceFootprint } from '../shared/furnaceField';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { Position, ServerGameSnapshot } from '../shared-types';
 import type { ClientPerformanceMetrics } from '../src/diagnostics/performanceMetrics';
 import { PLAYFIELD_CLOSE_SCALE } from '../src/rendering/playfieldCamera';
-import { finalizeServerWindow, prepareFixture } from './fixture-control';
+import {
+  type AppliedFreshness,
+  appliedFreshness,
+  type FreshnessObservation,
+} from './applied-freshness';
+import {
+  finalizeServerWindow,
+  prepareFixture,
+  readRegionalManifest,
+  readRegionalStatus,
+  readServerProcessUsage,
+  readSimulationClock,
+  SimulationClockProbeError,
+} from './fixture-control';
 import { observesPreparedFixture } from './fixture-readiness';
+import { LargeSnapshotEvidence } from './large-snapshot-evidence';
 import {
   collectLiveReportMetadata,
   createLiveReport,
@@ -29,7 +44,24 @@ import {
 import { deliveryBudget, networkProfiles } from './network-profiles';
 import { PerformanceBudget } from './performance-budget';
 import { Pilot } from './pilot';
+import { type ProxyCounters, readProxyCounters } from './proxy-control';
+import {
+  bindRegionalPilotOwner,
+  RegionalDecodedWorkCache,
+  RegionalScanSchedule,
+  regionalSnapshotWork,
+  requireAppliedRegionalWork,
+  type ScanDecision,
+} from './regional-scan-workload';
 import type { Measurement } from './results';
+import { errorRecord as serializeBenchmarkError } from './sample';
+import { validateSnapshotTimingRequirements } from './snapshot-timing-requirements';
+import {
+  measureProxyTransport,
+  measureServerProcessCpu,
+  requireNegotiatedCompression,
+} from './transport-qualification';
+import { readBenchmarkCompression } from './websocket-compression';
 
 const initialMetadata = collectLiveReportMetadata();
 
@@ -421,6 +453,7 @@ const { values } = parseArgs({
     scenario: { type: 'string', default: 'traversal' },
     'render-dpr': { type: 'string', default: 'native' },
     'render-glow': { type: 'string', default: 'full' },
+    renderer: { type: 'string', default: 'canvas' },
     'cpu-profile': { type: 'string' },
     trace: { type: 'string' },
     'chromium-gpu': { type: 'boolean', default: false },
@@ -444,6 +477,8 @@ const cpuSlowdown = Number(values['cpu-slowdown']);
 const seed = Number(values.seed);
 const network = values.network;
 const workload = values.scenario;
+const renderer = values.renderer;
+assert(renderer === 'canvas' || renderer === 'webgl2', 'renderer must be canvas or webgl2');
 assert(Number.isFinite(dpr) && dpr >= 1 && dpr <= 4, 'dpr must be 1..4');
 assert([1, 4, 6].includes(cpuSlowdown), 'cpu-slowdown must be 1, 4, or 6');
 assert(
@@ -452,10 +487,15 @@ assert(
 );
 assert(network === 'clean' || network === 'normal' || network === 'degraded', 'Unknown network');
 assert(
-  workload === 'traversal' || workload === 'combat' || workload === 'dense-combat',
+  workload === 'traversal' ||
+    workload === 'combat' ||
+    workload === 'dense-combat' ||
+    workload === 'regional-combat',
   'Unknown scenario'
 );
 const combatWorkload = workload !== 'traversal';
+const compression = readBenchmarkCompression(process.env['GEOROIDS_BENCHMARK_COMPRESSION']);
+const regionalWorkload = workload === 'regional-combat';
 assert(['native', '2', '1.5'].includes(values['render-dpr']), 'Invalid render-dpr');
 assert(['full', 'off'].includes(values['render-glow']), 'Invalid render-glow');
 assert(values.browser === 'chromium' || cpuSlowdown === 1, 'CPU slowdown requires Chromium');
@@ -485,13 +525,57 @@ const cases = [
   { name: 'touch-landscape', viewport: { width: 844, height: 390 }, hasTouch: true },
 ].filter((item) => values.viewport === 'all' || values.viewport === item.name);
 assert(cases.length > 0, 'Unknown viewport');
+assert(
+  !regionalWorkload || cases.length === 1,
+  'Regional combat requires one viewport in a fresh owned server session'
+);
 const origin = `http://127.0.0.1:${process.env['GEOROIDS_TEST_VITE_PORT'] ?? 5173}`;
 const healthUrl = `http://127.0.0.1:${process.env['GEOROIDS_TEST_SERVER_PORT'] ?? 3001}/health`;
 type Interval = ReturnType<ClientPerformanceMetrics['read']>;
+
+function requireMeasuredRenderer(interval: Interval): void {
+  // Frozen harnesses may also run older Canvas products without this observer.
+  // Renderer experiments reject those legacy reports in the comparison tool.
+  if (!('renderer' in interval)) {
+    assert.equal(renderer, 'canvas', 'WebGL2 measurement requires actual renderer observations');
+    return;
+  }
+  const observation = interval.renderer;
+  assert(observation && typeof observation === 'object', 'Missing actual renderer observation');
+  const observed = Object.fromEntries(Object.entries(observation));
+  assert.equal(observed['requested'], renderer, 'Observed renderer request differs from selector');
+  assert.equal(observed['backend'], renderer, 'Requested renderer is not the active backend');
+  const frames = observed['frames'];
+  assert(frames && typeof frames === 'object', 'Missing renderer frame ledger');
+  const counts = Object.fromEntries(Object.entries(frames));
+  let observedFrames = 0;
+  for (const mode of ['canvas', 'webgl2']) {
+    const count = counts[mode];
+    assert(
+      typeof count === 'number' && Number.isSafeInteger(count) && count >= 0,
+      'Invalid renderer frame count'
+    );
+    observedFrames += count;
+  }
+  const timedFrames = Object.entries(interval.metrics)
+    .filter(([name]) => name.endsWith('.frameCpuMs'))
+    .reduce((total, [, metric]) => total + metric.count, 0);
+  assert.equal(
+    observedFrames,
+    timedFrames,
+    'Actual renderer observations do not cover every timed frame'
+  );
+  assert.equal(
+    counts[renderer === 'canvas' ? 'webgl2' : 'canvas'],
+    0,
+    'Renderer fell back or changed during measurement'
+  );
+}
 const runs: Array<Record<string, unknown>> = [];
 const failures: unknown[] = [];
 const measuredIntervals: Interval[] = [];
 const joinIntervals: Interval[] = [];
+const measurementSetupIntervals: Interval[] = [];
 let browser: Browser | undefined;
 let browserVersion = 'unknown';
 let cleanupComplete = true;
@@ -539,14 +623,23 @@ function createMeasurement(): Measurement | undefined {
     : samples['renderMs']
       ? 'renderMs'
       : Object.keys(samples)[0];
-  if (!primaryMetric) {
-    return undefined;
+  try {
+    validateSnapshotTimingRequirements([
+      { phase: 'join', intervals: joinIntervals },
+      { phase: 'warmup', intervals: measurementSetupIntervals },
+      { phase: 'measured', intervals: measuredIntervals },
+    ]);
+  } catch (error) {
+    failures.push(error);
   }
-  const requiredMetrics = ['parseMs', 'keyframeDecodeMs', 'deltaDecodeMs', 'applyMs', 'joinMs'];
+  const requiredMetrics = ['parseMs', 'deltaDecodeMs', 'applyMs', 'joinMs'];
   for (const name of requiredMetrics) {
     if (!samples[name]) {
       failures.push(new Error(`Real-time client report is missing ${name} samples`));
     }
+  }
+  if (!primaryMetric) {
+    return undefined;
   }
   return {
     primaryMetric,
@@ -571,8 +664,10 @@ function createMeasurement(): Measurement | undefined {
       seed,
       workload,
       profileRecorded,
+      compression: compression.mode,
       renderDpr: values['render-dpr'],
       renderGlow: values['render-glow'],
+      renderer,
       build: 'production',
       warmupSeconds: warmup,
       measuredSeconds: seconds,
@@ -630,11 +725,11 @@ try {
             `Requested GPU path lacks accelerated ${feature}: ${status}`
           );
         }
-        const renderer = info.gpu.auxAttributes?.['glRenderer'];
+        const hardwareRenderer = info.gpu.auxAttributes?.['glRenderer'];
         assert(
-          typeof renderer === 'string' &&
-            renderer.length > 0 &&
-            !/swiftshader|llvmpipe|software/iu.test(renderer),
+          typeof hardwareRenderer === 'string' &&
+            hardwareRenderer.length > 0 &&
+            !/swiftshader|llvmpipe|software/iu.test(hardwareRenderer),
           'Requested GPU path lacks an observed hardware renderer'
         );
       }
@@ -678,6 +773,7 @@ try {
     let peerTimer: ReturnType<typeof setInterval> | undefined;
     const sockets: string[] = [];
     let measuredPilotId: string | undefined;
+    let preparedBrowserSession: number | undefined;
     let acknowledgedMotionStates = 0;
     let lastMotionAck = '';
     const observedProjectiles = new Set<string>();
@@ -688,11 +784,195 @@ try {
     let delivery = deliveryBudget(network, 1);
     let stateMeasuredStarted = 0;
     let measurementStoppedAt = 0;
+    let browserMeasurementStartedAt: number | undefined;
+    const largeSnapshots = new LargeSnapshotEvidence();
+    type BoundaryProbe = {
+      boundary: 'start' | 'end';
+      startedAt: number;
+      endedAt: number | null;
+      failure: ReturnType<typeof serializeBenchmarkError> | null;
+    };
+    const proxyTransport: {
+      start: ProxyCounters | null;
+      end: ProxyCounters | null;
+      measurement: ReturnType<typeof measureProxyTransport> | null;
+      probes: BoundaryProbe[];
+    } = { start: null, end: null, measurement: null, probes: [] };
+    async function sampleProxyTransport(boundary: 'start' | 'end') {
+      const probe: BoundaryProbe = {
+        boundary,
+        startedAt: performance.now(),
+        endedAt: null,
+        failure: null,
+      };
+      proxyTransport.probes.push(probe);
+      try {
+        return await readProxyCounters(join(ownedSessionPath, 'proxy.sock'));
+      } catch (error) {
+        probe.failure = serializeBenchmarkError(error);
+        throw error;
+      } finally {
+        probe.endedAt = performance.now();
+      }
+    }
+    const serverProcessCpu: {
+      start: Awaited<ReturnType<typeof readServerProcessUsage>> | null;
+      end: Awaited<ReturnType<typeof readServerProcessUsage>> | null;
+      measurement: ReturnType<typeof measureServerProcessCpu> | null;
+      probes: BoundaryProbe[];
+    } = { start: null, end: null, measurement: null, probes: [] };
+    async function sampleServerProcessCpu(boundary: 'start' | 'end') {
+      const probe: BoundaryProbe = {
+        boundary,
+        startedAt: performance.now(),
+        endedAt: null,
+        failure: null,
+      };
+      serverProcessCpu.probes.push(probe);
+      try {
+        return await readServerProcessUsage(join(ownedSessionPath, 'fixture.sock'));
+      } catch (error) {
+        probe.failure = serializeBenchmarkError(error);
+        throw error;
+      } finally {
+        probe.endedAt = performance.now();
+      }
+    }
+    async function captureMeasurementBoundary(boundary: 'start' | 'end') {
+      // Independent private probes start together; each keeps its own query
+      // bracket and raw reply even if the other endpoint rejects or times out.
+      const results = await Promise.allSettled([
+        sampleProxyTransport(boundary).then((counters) => {
+          proxyTransport[boundary] = counters;
+        }),
+        sampleServerProcessCpu(boundary).then((usage) => {
+          serverProcessCpu[boundary] = usage;
+        }),
+      ]);
+      const boundaryFailures: unknown[] = [];
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          boundaryFailures.push(result.reason);
+        }
+      }
+      return boundaryFailures;
+    }
     let measuredSnapshotBytes = 0;
     let lastMeasuredStateAt = 0;
     const stateGaps: Array<{ from: number; to: number; durationMs: number }> = [];
+    const freshnessSamples: Array<{
+      index: number;
+      measured: boolean;
+      phase: 'steady' | 'recovery';
+      collectionStartedAt: number;
+      appliedObservedAt: number;
+      queryStartedAt: number;
+      queryEndedAt: number;
+      queryDurationMs: number;
+      clock: Awaited<ReturnType<typeof readSimulationClock>> | null;
+      observations: FreshnessObservation[];
+      clients: AppliedFreshness[];
+      failure: string | null;
+      probeFailure: {
+        error: ReturnType<typeof serializeBenchmarkError>;
+        response: SimulationClockProbeError['response'];
+      } | null;
+    }> = [];
+    const previousFreshness = new Map<string, FreshnessObservation>();
+    let previousSimulationClock: Awaited<ReturnType<typeof readSimulationClock>> | undefined;
+    let freshnessAttempts = 0;
+    let omittedFreshnessSamples = 0;
+    let lastFreshnessRestartCount = 0;
+    function freshnessReport() {
+      const measured = freshnessSamples.filter((sample) => sample.measured);
+      return {
+        policy:
+          'server clock minus successfully applied snapshot clock; query follows applied observation',
+        maximumServerToAppliedMs: delivery.maximumStateGapMs,
+        retainedLimit: 4096,
+        attemptedSamples: freshnessAttempts,
+        retainedSamples: freshnessSamples.length,
+        omittedSamples: omittedFreshnessSamples,
+        clientObservations: freshnessSamples.reduce(
+          (count, sample) => count + sample.observations.length,
+          0
+        ),
+        validClients: freshnessSamples.reduce(
+          (count, sample) =>
+            count + sample.clients.filter((client) => client.kind === 'valid').length,
+          0
+        ),
+        measuredSamples: measured.length,
+        measuredClientObservations: measured.reduce(
+          (count, sample) => count + sample.observations.length,
+          0
+        ),
+        measuredValidClients: measured.reduce(
+          (count, sample) =>
+            count + sample.clients.filter((client) => client.kind === 'valid').length,
+          0
+        ),
+        samples: freshnessSamples,
+      };
+    }
     let latestAuthoritativeState: ServerGameSnapshot | undefined;
     const populationSamples: unknown[] = [];
+    const regionalStatusSamples: Array<{
+      measured: boolean;
+      startedAt: number;
+      endedAt: number;
+      status: Awaited<ReturnType<typeof readRegionalStatus>> | null;
+      failure: ReturnType<typeof errorRecord> | null;
+      freshnessSampleIndex: number;
+      peerAsteroidRows: Array<{ id: string; rows: number }>;
+    }> = [];
+    let regionalFinalManifest: Awaited<ReturnType<typeof readRegionalManifest>> | undefined;
+    let regionalFinalManifestAttempted = false;
+    let regionalFinalManifestFailure: ReturnType<typeof errorRecord> | undefined;
+    const regionalWork = {
+      snapshotStates: 0,
+      normalStates: 0,
+      scanStates: 0,
+      expandedScanStates: 0,
+      statesWithoutAsteroids: 0,
+      minAsteroids: 0,
+      maxAsteroids: 0,
+      warmupScanStates: 0,
+      warmupExpandedScanStates: 0,
+      appliedNormalStates: 0,
+      appliedScanStates: 0,
+      appliedExpandedScanStates: 0,
+    };
+    const regionalScanSchedule = new RegionalScanSchedule();
+    const regionalDecodedWork = new RegionalDecodedWorkCache();
+    let previousRegionalApplication: Interval['appliedSnapshots']['values'][number] | undefined;
+    const regionalScanEvidence = {
+      policy:
+        'Pending natural scan retries at the next input slot after authoritative cooldown and UI readiness; work requires successful client application.',
+      retainedLimit: 4096,
+      appliedRetainedLimit: 60_000,
+      attempts: [] as Array<{
+        step: number;
+        measured: boolean;
+        decision: ScanDecision;
+        uiReady: boolean;
+        authoritativeCooldownFrames: number | undefined;
+        authoritativeGameTime: number | undefined;
+        uiLabel: string | null;
+        dispatched: boolean;
+      }>,
+      accepted: [] as Array<{
+        measured: boolean;
+        observedAt: number;
+        abilityActiveFrames: number | null;
+      }>,
+      requests: [] as Array<{ measured: boolean; observedAt: number }>,
+      applied: [] as Array<{
+        measured: boolean;
+        session: number;
+        work: NonNullable<ReturnType<typeof regionalSnapshotWork>>;
+      }>,
+    };
     let sampledCamera:
       | { position: Position; width: number; height: number; observedAtMs: number }
       | undefined;
@@ -765,6 +1045,7 @@ try {
       seed,
       workload,
       sockets,
+      compressionRequested: compression,
     };
     const fixtures: Array<Awaited<ReturnType<typeof prepareFixture>>> = [];
     const context = await activeBrowser.newContext({
@@ -858,6 +1139,37 @@ try {
       const decoder = new SnapshotDecoder();
       let sequence = 0;
       let acceptSnapshots = false;
+      socket.on('framesent', ({ payload }) => {
+        if (!regionalWorkload) {
+          return;
+        }
+        try {
+          const text = typeof payload === 'string' ? payload : payload.toString();
+          if (!text.includes('"useAbility"')) {
+            return;
+          }
+          const envelope: unknown = JSON.parse(text);
+          if (
+            envelope &&
+            typeof envelope === 'object' &&
+            'type' in envelope &&
+            envelope.type === 'useAbility' &&
+            'id' in envelope &&
+            envelope.id === measuredPilotId
+          ) {
+            assert(
+              regionalScanEvidence.requests.length < 4096,
+              'Regional ability request bound exceeded'
+            );
+            regionalScanEvidence.requests.push({
+              measured: measuring,
+              observedAt: performance.now(),
+            });
+          }
+        } catch (error) {
+          errors.push(String(error));
+        }
+      });
       socket.on('framereceived', ({ payload }) => {
         try {
           const text = typeof payload === 'string' ? payload : payload.toString();
@@ -876,10 +1188,35 @@ try {
               return;
             }
             if (envelope.type === 'joined') {
+              if (regionalWorkload) {
+                measuredPilotId = bindRegionalPilotOwner(envelope.data, measuredPilotId);
+              }
               decoder.reset();
               sequence = 0;
               acceptSnapshots = true;
               previousHealth = undefined;
+            }
+            if (
+              regionalWorkload &&
+              envelope.type === 'abilityUsed' &&
+              envelope.data &&
+              typeof envelope.data === 'object' &&
+              'id' in envelope.data &&
+              envelope.data.id === measuredPilotId
+            ) {
+              assert(
+                regionalScanEvidence.accepted.length < 4096,
+                'Regional ability event bound exceeded'
+              );
+              regionalScanEvidence.accepted.push({
+                measured: measuring,
+                observedAt: performance.now(),
+                abilityActiveFrames:
+                  'abilityActiveFrames' in envelope.data &&
+                  typeof envelope.data.abilityActiveFrames === 'number'
+                    ? envelope.data.abilityActiveFrames
+                    : null,
+              });
             }
             if (
               measuring &&
@@ -997,6 +1334,39 @@ try {
           sequence++;
           const state = result.state;
           latestAuthoritativeState = state;
+          const regionalSnapshot = regionalWorkload
+            ? regionalSnapshotWork(state, result.metadata, measuredPilotId)
+            : undefined;
+          if (regionalSnapshot) {
+            assert(measuredPilotId, 'Regional snapshot has no negotiated browser owner');
+            if (measuring && !arranging) {
+              largeSnapshots.offer(text, {
+                ownerId: measuredPilotId,
+                measured: true,
+                ...regionalSnapshot,
+              });
+            }
+            regionalDecodedWork.remember(measuredPilotId, regionalSnapshot);
+            if (!measuring && !arranging) {
+              regionalWork.warmupScanStates += Number(regionalSnapshot.scanning);
+              regionalWork.warmupExpandedScanStates += Number(regionalSnapshot.expanded);
+            }
+          }
+          if (measuring && !arranging && regionalWorkload) {
+            assert(regionalSnapshot, 'Regional snapshot lost the browser pilot');
+            const scanning = regionalSnapshot.scanning;
+            regionalWork.snapshotStates++;
+            regionalWork[scanning ? 'scanStates' : 'normalStates']++;
+            regionalWork.statesWithoutAsteroids += Number(state.asteroids.length === 0);
+            regionalWork.minAsteroids =
+              regionalWork.snapshotStates === 1
+                ? state.asteroids.length
+                : Math.min(regionalWork.minAsteroids, state.asteroids.length);
+            regionalWork.maxAsteroids = Math.max(regionalWork.maxAsteroids, state.asteroids.length);
+            if (regionalSnapshot.expanded) {
+              regionalWork.expandedScanStates++;
+            }
+          }
           const motion = state.entities.find(
             (entity) => entity.id === measuredPilotId
           )?.playerMotion;
@@ -1284,8 +1654,11 @@ try {
           });
         }
       }
+      assert(
+        new URL(socketUrl).port !== new URL(healthUrl).port,
+        'Gameplay run bypasses its owned TCP proxy'
+      );
       if (network !== 'clean') {
-        assert(new URL(socketUrl).port !== new URL(healthUrl).port, 'Impaired run bypasses proxy');
         const control = networkProbes
           .slice(0, 3)
           .reduce((sum, probe) => sum + probe.milliseconds, 0);
@@ -1299,7 +1672,7 @@ try {
         profile: networkProfiles[network],
       });
       await page.goto(
-        `${origin}/?performance=collect&renderDpr=${values['render-dpr']}&renderGlow=${values['render-glow']}`,
+        `${origin}/?performance=collect&renderDpr=${values['render-dpr']}&renderGlow=${values['render-glow']}&renderer=${renderer}`,
         { waitUntil: 'load' }
       );
       await page.locator('#start-game').click();
@@ -1312,10 +1685,10 @@ try {
         undefined,
         { timeout: 10_000 }
       );
-      joined = await drain(page);
-      joinIntervals.push(joined);
+      joined = await collectInterval(joinIntervals);
       metadata = await page.evaluate(() => {
         const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+        const snapshot = window.georoidsPerformance?.read();
         return {
           userAgent: navigator.userAgent,
           dpr: devicePixelRatio,
@@ -1325,8 +1698,9 @@ try {
           backing: canvas ? { width: canvas.width, height: canvas.height } : null,
           visibility: document.visibilityState,
           canvasVisible: canvas?.checkVisibility() ?? false,
-          clientReleaseId: window.georoidsPerformance?.read().clientReleaseId,
-          serverReleaseId: window.georoidsPerformance?.read().serverReleaseId,
+          clientReleaseId: snapshot?.clientReleaseId,
+          serverReleaseId: snapshot?.serverReleaseId,
+          rendererObservation: snapshot && 'renderer' in snapshot ? snapshot.renderer : null,
         };
       });
       assert.equal(metadata['visibility'], 'visible', 'Admitted page is hidden');
@@ -1375,11 +1749,12 @@ try {
         errors.push(String(error));
       };
       const protocolPeerOptions = (_index: number) => ({
-        url: new URL(`${socketUrl}?asteroidInteractions=1`),
+        url: new URL(`${socketUrl}?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`),
         measuring: () => measuring,
         fail: protocolPeerFail,
         deliveryBudget: () => delivery,
         repeatMeasuredPings: false,
+        ...(regionalWorkload ? { naturalSpawn: true } : {}),
       });
       for (let index = 0; index < (combatWorkload ? 4 : 0); index++) {
         await delay(1500);
@@ -1420,7 +1795,11 @@ try {
               await recoverBrowser(target);
               continue;
             }
-            measuredPilotId = id;
+            if (regionalWorkload) {
+              assert.equal(id, measuredPilotId, 'Prepared browser differs from its joined owner');
+            } else {
+              measuredPilotId = id;
+            }
             const fixture = await prepareFixture(join(ownedSessionPath, 'fixture.sock'), {
               scenario: fixtureScenario,
               participants: [id, ...peers.map((peer) => peer.id)],
@@ -1442,11 +1821,13 @@ try {
             }
             // Keep every prepared attempt, including one invalidated by a queued leave.
             fixtures.push(fixture);
-            assert.equal(
-              fixture.hash,
-              fixtures[0]?.hash,
-              'Rejoined fixture differs from initial world'
-            );
+            if (!regionalWorkload) {
+              assert.equal(
+                fixture.hash,
+                fixtures[0]?.hash,
+                'Rejoined fixture differs from initial world'
+              );
+            }
             const own = fixture.baselines.find((baseline) => baseline.id === id);
             assert(own, 'Missing measured baseline');
             const joins = peers.map((peer) => peer.gameJoins);
@@ -1458,6 +1839,7 @@ try {
                 const interval = window.georoidsPerformance?.read();
                 const player = window.gameController?.getCurrPlayer();
                 return {
+                  snapshotSession: interval?.snapshotSession ?? null,
                   departed:
                     player?.id !== playerId ||
                     (player?.ship.health ?? 0) <= 0 ||
@@ -1487,6 +1869,7 @@ try {
                     sequence: baseline.sequence,
                     gameTime: fixture.gameTime,
                     motionEpoch: baseline.motionEpoch,
+                    requireExactMotionEpoch: regionalWorkload,
                   },
                   {
                     lastKeyframeSequence: peer.lastKeyframeSequence,
@@ -1501,12 +1884,21 @@ try {
                     sequence: own.sequence,
                     gameTime: fixture.gameTime,
                     motionEpoch: own.motionEpoch,
+                    requireExactMotionEpoch: regionalWorkload,
                   },
                   witness.observation
                 ) &&
                 peersReady
               ) {
                 preparedJoins = joins;
+                if (regionalWorkload) {
+                  assert(
+                    witness.snapshotSession !== null &&
+                      Number.isSafeInteger(witness.snapshotSession),
+                    'Missing regional browser session'
+                  );
+                  preparedBrowserSession = witness.snapshotSession;
+                }
                 return;
               }
               await delay(25);
@@ -1566,6 +1958,35 @@ try {
           }
         }
       }
+      function planRegionalScan(uiReady: boolean, uiLabel: string | null = null) {
+        const own = latestAuthoritativeState?.entities.find(
+          (entity) => entity.id === measuredPilotId
+        );
+        const cooldownFrames =
+          own?.kitId === 'scout' &&
+          (own.scoutUtility ?? 'mineral_scan') === 'mineral_scan' &&
+          own.health > 0 &&
+          !own.exploding &&
+          !own.furnaceTransit &&
+          !onDarkFurnaceFootprint(own.position, (id) =>
+            Boolean(latestAuthoritativeState?.civicModules?.some((module) => module.id === id))
+          )
+            ? own.abilityCooldownFrames
+            : undefined;
+        const attempt = {
+          step: inputSteps,
+          measured: measuring,
+          decision: regionalScanSchedule.plan(inputSteps, measuring, uiReady, cooldownFrames),
+          uiReady,
+          authoritativeCooldownFrames: cooldownFrames,
+          authoritativeGameTime: latestAuthoritativeState?.gameTime,
+          uiLabel,
+          dispatched: false,
+        };
+        assert(regionalScanEvidence.attempts.length < 4096, 'Regional scan input bound exceeded');
+        regionalScanEvidence.attempts.push(attempt);
+        return attempt;
+      }
       async function applyInput() {
         const action = {
           startedAt: performance.now(),
@@ -1578,11 +1999,20 @@ try {
         if (scenario.hasTouch && values.browser === 'chromium') {
           touchSession ??= await context.newCDPSession(page);
           const playfield = await page.locator('#gameCanvas').boundingBox();
-          const extra = inputSteps % 20 === 0 ? '#touch-ability' : undefined;
+          const extra = regionalWorkload || inputSteps % 20 === 0 ? '#touch-ability' : undefined;
+          const uiLabel = regionalWorkload
+            ? await page.locator('#touch-ability').textContent()
+            : null;
           const extraBox =
-            extra && (await page.locator(extra).getAttribute('aria-disabled')) !== 'true'
+            extra &&
+            (!regionalWorkload || uiLabel === 'SCAN') &&
+            (await page.locator(extra).getAttribute('aria-disabled')) !== 'true'
               ? await page.locator(extra).boundingBox()
               : null;
+          const scanAttempt = regionalWorkload
+            ? planRegionalScan(extraBox !== null, uiLabel)
+            : undefined;
+          const dispatchAbility = scanAttempt ? scanAttempt.decision === 'dispatch' : true;
           assert(playfield, 'Playfield absent');
           const steerX = playfield.x + playfield.width * (inputSteps % 2 ? 0.8 : 0.2);
           const fireX = playfield.x + playfield.width * (inputSteps % 2 ? 0.2 : 0.8);
@@ -1592,7 +2022,7 @@ try {
             touchPoints: [
               { x: steerX, y: touchY, id: 1 },
               { x: fireX, y: touchY, id: 2 },
-              ...(extraBox
+              ...(extraBox && dispatchAbility
                 ? [
                     {
                       x: extraBox.x + extraBox.width / 2,
@@ -1603,6 +2033,10 @@ try {
                 : []),
             ],
           });
+          if (scanAttempt && extraBox && dispatchAbility) {
+            scanAttempt.dispatched = true;
+            regionalScanSchedule.dispatched();
+          }
           touchActive = true;
         } else {
           await page.keyboard.down('ArrowUp');
@@ -1612,8 +2046,26 @@ try {
           } else {
             await page.keyboard.press('Space');
           }
-          if (inputSteps % 20 === 0) {
+          const scanAttempt = regionalWorkload
+            ? planRegionalScan(
+                await page.evaluate(() => {
+                  const ship = window.gameController?.getCurrPlayer()?.ship;
+                  return Boolean(
+                    ship &&
+                      ship.health > 0 &&
+                      !ship.exploding &&
+                      !ship.furnaceTransit &&
+                      ship.abilityCooldownFrames <= 0
+                  );
+                })
+              )
+            : undefined;
+          if (scanAttempt ? scanAttempt.decision === 'dispatch' : inputSteps % 20 === 0) {
             await page.keyboard.press('e');
+            if (scanAttempt) {
+              scanAttempt.dispatched = true;
+              regionalScanSchedule.dispatched();
+            }
           }
           if (inputSteps % 40 === 0) {
             await page.keyboard.press('f');
@@ -1640,12 +2092,210 @@ try {
           undefined,
           { timeout: 10000 }
         );
-        target.push(await drain(page));
         restarts.push({
           kind: 'browser-respawn',
           startedAt: restartAt,
           durationMs: performance.now() - restartAt,
         });
+        await collectInterval(target);
+      }
+      function correlateAppliedRegionalSnapshots(interval: Interval, measured: boolean): void {
+        if (regionalWorkload) {
+          assert.equal(
+            interval.appliedSnapshots.omittedSamples,
+            0,
+            'Applied regional receipts were omitted'
+          );
+          assert.equal(interval.appliedSnapshots.count, interval.appliedSnapshots.values.length);
+          for (const applied of interval.appliedSnapshots.values) {
+            assert(
+              Number.isFinite(applied.appliedAt) && applied.appliedAt >= 0,
+              'Missing browser application clock'
+            );
+            const appliedDuringMeasurement =
+              measured &&
+              browserMeasurementStartedAt !== undefined &&
+              applied.appliedAt >= browserMeasurementStartedAt;
+            const decoded = regionalDecodedWork.match(applied);
+            const work = requireAppliedRegionalWork(
+              decoded,
+              applied,
+              measuredPilotId,
+              appliedDuringMeasurement ? preparedBrowserSession : undefined
+            );
+            if (previousRegionalApplication) {
+              assert(
+                applied.session >= previousRegionalApplication.session,
+                'Applied regional session regressed'
+              );
+              assert(
+                applied.gameTime >= previousRegionalApplication.gameTime &&
+                  applied.serverTime !== undefined &&
+                  previousRegionalApplication.serverTime !== undefined &&
+                  applied.serverTime >= previousRegionalApplication.serverTime,
+                'Applied regional world clock regressed'
+              );
+              if (applied.session === previousRegionalApplication.session) {
+                assert(
+                  applied.sequence > previousRegionalApplication.sequence,
+                  'Applied regional sequence did not advance'
+                );
+              }
+            }
+            previousRegionalApplication = applied;
+            assert(
+              regionalScanEvidence.applied.length < regionalScanEvidence.appliedRetainedLimit,
+              'Regional applied work bound exceeded'
+            );
+            regionalScanEvidence.applied.push({
+              measured: appliedDuringMeasurement,
+              session: applied.session,
+              work,
+            });
+            if (appliedDuringMeasurement) {
+              regionalWork.appliedNormalStates += Number(!work.scanning);
+              regionalWork.appliedScanStates += Number(work.scanning);
+              regionalWork.appliedExpandedScanStates += Number(work.expanded);
+            }
+          }
+        }
+      }
+      async function collectInterval(target: Interval[]) {
+        const collectionStartedAt = performance.now();
+        const interval = await drain(page);
+        target.push(interval);
+        correlateAppliedRegionalSnapshots(interval, target === intervals);
+        const observations: FreshnessObservation[] = [
+          {
+            id: 'browser',
+            session: interval.snapshotSession,
+            pendingRecovery: interval.pendingJoin || interval.pendingRecovery,
+            applied: interval.lastSnapshot,
+          },
+          ...peers.map((peer) => ({
+            id: peer.id,
+            session: peer.gameJoins,
+            pendingRecovery: !peer.joined || !peer.state,
+            applied: peer.lastSnapshot,
+          })),
+        ];
+        const appliedObservedAt = performance.now();
+        const phase =
+          restarts.length !== lastFreshnessRestartCount ||
+          observations.some((client) => client.pendingRecovery)
+            ? 'recovery'
+            : 'steady';
+        lastFreshnessRestartCount = restarts.length;
+        const sample: (typeof freshnessSamples)[number] = {
+          index: freshnessAttempts++,
+          measured: target === intervals,
+          phase,
+          collectionStartedAt,
+          appliedObservedAt,
+          queryStartedAt: performance.now(),
+          queryEndedAt: 0,
+          queryDurationMs: 0,
+          clock: null,
+          observations,
+          clients: [],
+          failure: null,
+          probeFailure: null,
+        };
+        if (freshnessSamples.length >= 4096) {
+          omittedFreshnessSamples++;
+          throw new Error('Applied freshness sample bound exceeded');
+        }
+        freshnessSamples.push(sample);
+        try {
+          sample.clock = await readSimulationClock(join(ownedSessionPath, 'fixture.sock'));
+        } catch (error) {
+          sample.failure = String(error);
+          sample.probeFailure = {
+            error: serializeBenchmarkError(error),
+            response: error instanceof SimulationClockProbeError ? error.response : null,
+          };
+          throw error;
+        } finally {
+          sample.queryEndedAt = performance.now();
+          sample.queryDurationMs = sample.queryEndedAt - sample.queryStartedAt;
+        }
+        const clock = sample.clock;
+        assert(clock, 'Missing independent simulation clock');
+        if (
+          previousSimulationClock &&
+          (clock.gameTime < previousSimulationClock.gameTime ||
+            clock.serverTime < previousSimulationClock.serverTime)
+        ) {
+          sample.failure = 'Independent simulation clock regressed';
+          throw new Error(sample.failure);
+        }
+        previousSimulationClock = clock;
+        sample.clients = observations.map((observation) =>
+          appliedFreshness(clock, observation, previousFreshness.get(observation.id), phase)
+        );
+        for (const client of sample.clients) {
+          if (client.kind === 'invalid') {
+            sample.failure = `${client.observation.id}: ${client.reason}`;
+            throw new Error(sample.failure);
+          }
+          previousFreshness.set(client.observation.id, client.observation);
+          if (target === intervals) {
+            performanceBudget.observe(
+              `${client.observation.id}.serverToAppliedMs`,
+              client.serverToAppliedMs,
+              delivery.maximumStateGapMs
+            );
+          }
+        }
+        if (
+          regionalWorkload &&
+          target === intervals &&
+          interval.snapshotSession !== preparedBrowserSession
+        ) {
+          sample.failure = 'Regional browser rejoined during measurement';
+          throw new Error(sample.failure);
+        }
+        if (target === intervals) {
+          requireMeasuredRenderer(interval);
+        }
+        if (regionalWorkload) {
+          const regionalSample: (typeof regionalStatusSamples)[number] = {
+            measured: target === intervals,
+            startedAt: performance.now(),
+            endedAt: 0,
+            status: null,
+            failure: null,
+            freshnessSampleIndex: sample.index,
+            peerAsteroidRows: peers.map((peer) => ({
+              id: peer.id,
+              rows: peer.state?.asteroids.length ?? 0,
+            })),
+          };
+          assert(regionalStatusSamples.length < 4096, 'Regional status sample bound exceeded');
+          regionalStatusSamples.push(regionalSample);
+          try {
+            regionalSample.status = await readRegionalStatus(
+              join(ownedSessionPath, 'fixture.sock')
+            );
+            assert(
+              regionalSample.status.activeSectors > 0 && regionalSample.status.asteroids > 0,
+              'Natural regional field became empty'
+            );
+            if (target === intervals) {
+              assert.equal(regionalSample.status.players, 5, 'Regional combat lost a participant');
+              assert(
+                regionalSample.peerAsteroidRows.every((peer) => peer.rows > 0),
+                'Regional peer has no nearby asteroid rows'
+              );
+            }
+          } catch (error) {
+            regionalSample.failure = errorRecord(error);
+            throw error;
+          } finally {
+            regionalSample.endedAt = performance.now();
+          }
+        }
+        return interval;
       }
       async function observe(duration: number, target: Interval[]) {
         const until = performance.now() + duration;
@@ -1658,7 +2308,6 @@ try {
           }
           const slotStarted = performance.now();
           if (slotStarted >= until) {
-            target.push(await drain(page));
             break;
           }
           const missedSlots = Math.max(0, Math.floor((slotStarted - nextSlot) / 1000));
@@ -1676,8 +2325,8 @@ try {
           const awaitingPeerState = () => peers.some((peer) => !peer.state);
           if (peerJoinsChanged(preparedJoins)) {
             assert(
-              workload !== 'dense-combat',
-              'Dense combat lost a peer; refusing to reseed its asteroid field'
+              workload !== 'dense-combat' && !regionalWorkload,
+              'Live-field combat lost a peer; refusing to replace or recapture its field'
             );
             const restartAt = performance.now();
             await releaseInput();
@@ -1700,8 +2349,7 @@ try {
             });
           }
           await applyInput();
-          const interval = await drain(page);
-          target.push(interval);
+          const interval = await collectInterval(target);
           const camera = await page.evaluate(() => {
             const player = window.gameController?.getCurrPlayer();
             const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
@@ -1716,6 +2364,7 @@ try {
           sampledCamera = camera ? { ...camera, observedAtMs: performance.now() } : undefined;
           if (camera && latestAuthoritativeState) {
             const state = latestAuthoritativeState;
+            const observedPilotId = measuredPilotId;
             const visible = (position: { x: number; y: number }) =>
               Math.abs(position.x - camera.position.x) * PLAYFIELD_CLOSE_SCALE <=
                 camera.width / 2 &&
@@ -1726,10 +2375,24 @@ try {
               loot: state.loot,
               pickups: state.satellitePickups,
               projectiles: state.playerProjectiles,
+              ...(regionalWorkload
+                ? {
+                    mapAssets: state.mapAssets,
+                    spiders: state.spiderField?.spiders ?? [],
+                    nests: state.spiderField?.nests ?? [],
+                  }
+                : {}),
             };
             populationSamples.push({
               gameTime: state.gameTime,
               measured: target === intervals,
+              ...(regionalWorkload
+                ? {
+                    abilityActiveFrames:
+                      state.entities.find((entity) => entity.id === observedPilotId)
+                        ?.abilityActiveFrames ?? 0,
+                  }
+                : {}),
               counts: Object.fromEntries(
                 Object.entries(populations).map(([kind, entities]) => [
                   kind,
@@ -1798,6 +2461,7 @@ try {
             nextProgressAt = performance.now() + 30_000;
           }
         }
+        await collectInterval(target);
       }
       await observe(warmup * 1000, warmupIntervals);
       assert(warmupSnapshotCount > 0, 'No snapshots to size transport workload');
@@ -1811,6 +2475,57 @@ try {
         await profileSession.send('Profiler.start');
         profileRecorded = true;
       }
+      const startBoundaryFailures = await captureMeasurementBoundary('start');
+      if (startBoundaryFailures.length > 0) {
+        throw new AggregateError(startBoundaryFailures, 'Measurement start probes failed');
+      }
+      assert(proxyTransport.start, 'Missing live proxy measurement start');
+      assert.equal(
+        proxyTransport.start.profile,
+        network,
+        'Proxy profile differs from requested lane'
+      );
+      assert(serverProcessCpu.start, 'Missing server process CPU measurement start');
+      assert.equal(
+        serverProcessCpu.start.compression,
+        compression.mode,
+        'Server compression differs from requested experiment'
+      );
+      // Drain all setup work and capture the browser boundary atomically, so
+      // warmup/join decode samples cannot satisfy measured timing requirements.
+      const measurementBoundary = await page.evaluate(() => {
+        const recorder = window.georoidsPerformance;
+        if (!recorder) {
+          throw new Error('Production performance recorder missing');
+        }
+        recorder.claimDrain('benchmark');
+        const interval = recorder.read(true, 'benchmark');
+        return { interval, startedAt: performance.now() };
+      });
+      warmupIntervals.push(measurementBoundary.interval);
+      measurementSetupIntervals.push(measurementBoundary.interval);
+      correlateAppliedRegionalSnapshots(measurementBoundary.interval, false);
+      for (const name of [
+        'invalidSamples',
+        'messageFailures',
+        'joinFailures',
+        'frameFailures',
+        'recoveryFailures',
+      ]) {
+        assert.equal(
+          measurementBoundary.interval.counters[name] ?? 0,
+          0,
+          `Client setup recorded ${name}`
+        );
+      }
+      assert(
+        Object.values(measurementBoundary.interval.metrics).every(
+          (metric) => metric.omittedSamples === 0
+        ),
+        'Setup raw samples omitted'
+      );
+      browserMeasurementStartedAt = measurementBoundary.startedAt;
+      constraints['browserMeasurementStartedAt'] = browserMeasurementStartedAt;
       measuring = true;
       for (const peer of peers) {
         peer.beginMeasurement(performance.now());
@@ -1823,10 +2538,55 @@ try {
         await page.evaluate((mark) => performance.mark(mark), TRACE_MEASUREMENT_START_MARK);
         traceMeasurementStarted = true;
       }
-      await observe(seconds * 1000, intervals);
+      let observationFailure: { error: unknown } | undefined;
+      try {
+        await observe(seconds * 1000, intervals);
+      } catch (error) {
+        observationFailure = { error };
+      }
       const stateMeasuredEnded = performance.now();
       measurementStoppedAt = stateMeasuredEnded;
       measuring = false;
+      // Capture actual partial windows on observation failure before stopping
+      // inputs, profiling, tail windows or participants. Never substitute zeroes.
+      const endBoundaryFailures = await captureMeasurementBoundary('end');
+      if (proxyTransport.start && proxyTransport.end) {
+        try {
+          proxyTransport.measurement = measureProxyTransport({
+            start: proxyTransport.start,
+            end: proxyTransport.end,
+            profile: network,
+          });
+        } catch (error) {
+          endBoundaryFailures.push(error);
+        }
+      }
+      if (serverProcessCpu.start && serverProcessCpu.end) {
+        try {
+          serverProcessCpu.measurement = measureServerProcessCpu(
+            serverProcessCpu.start,
+            serverProcessCpu.end
+          );
+        } catch (error) {
+          endBoundaryFailures.push(error);
+        }
+      }
+      if (observationFailure) {
+        if (endBoundaryFailures.length > 0) {
+          throw new AggregateError(
+            [observationFailure.error, ...endBoundaryFailures],
+            'Gameplay observation and measurement boundary failed'
+          );
+        }
+        throw observationFailure.error;
+      }
+      if (endBoundaryFailures.length > 0) {
+        throw new AggregateError(endBoundaryFailures, 'Measurement end probes failed');
+      }
+      assert(
+        proxyTransport.measurement && serverProcessCpu.measurement,
+        'Incomplete measurement boundaries'
+      );
       await stopDesktopFire();
       clearInterval(peerTimer);
       for (const peer of peers) {
@@ -1950,6 +2710,10 @@ try {
         'Finalized server tail absent'
       );
       const generatorCpu = process.cpuUsage(cpuStart);
+      if (regionalWorkload) {
+        regionalFinalManifestAttempted = true;
+        regionalFinalManifest = await readRegionalManifest(join(ownedSessionPath, 'fixture.sock'));
+      }
       const measuredFrames = intervals.reduce(
         (sum, interval) =>
           sum +
@@ -1960,30 +2724,54 @@ try {
       assert(measuredFrames > 0, 'No real game frames recorded');
       assert(acknowledgedMotionStates > 0, 'No authoritative motion acknowledgments');
       assert(observedProjectiles.size > 0, 'No authoritative shots born during measurement');
+      if (regionalWorkload) {
+        assert(
+          regionalWork.snapshotStates > 0 &&
+            regionalWork.normalStates > 0 &&
+            regionalWork.appliedNormalStates > 0,
+          'No natural normal-view snapshots measured'
+        );
+        assert(regionalWork.minAsteroids > 0, 'Natural snapshot contained no nearby asteroids');
+        if (seconds >= 30) {
+          assert(
+            regionalScanEvidence.requests.some((request) => request.measured) &&
+              regionalScanEvidence.accepted.some(
+                (event) => event.measured && (event.abilityActiveFrames ?? 0) > 0
+              ),
+            'No measured natural scan request and authoritative acceptance observed'
+          );
+          assert(
+            regionalWork.scanStates > 0 &&
+              regionalWork.expandedScanStates > 0 &&
+              regionalWork.appliedScanStates > 0 &&
+              regionalWork.appliedExpandedScanStates > 0,
+            'No accepted natural scan with expanded asteroid rows measured'
+          );
+        }
+      }
       if (seconds >= 300) {
         assert(inputSteps >= 300, 'Insufficient distinct input steps');
       }
-      const proxyStats: unknown =
-        network === 'clean'
-          ? null
-          : JSON.parse(await readFile(join(sessionPath, 'proxy-stats.json'), 'utf8'));
-      if (network !== 'clean') {
-        assert(
-          proxyStats &&
-            typeof proxyStats === 'object' &&
-            'bytesUp' in proxyStats &&
-            typeof proxyStats.bytesUp === 'number' &&
-            proxyStats.bytesUp > 0 &&
-            'bytesDown' in proxyStats &&
-            typeof proxyStats.bytesDown === 'number' &&
-            proxyStats.bytesDown > 0,
-          'No proxy traffic witnessed'
-        );
-        assert(
-          'failures' in proxyStats && proxyStats.failures === 0,
-          'Proxy recorded transport failures'
-        );
-      }
+      // File totals/peaks are whole-session diagnostics. Qualification uses the
+      // live, monotonic proxyTransport window captured above in every lane.
+      const proxyStats: unknown = JSON.parse(
+        await readFile(join(sessionPath, 'proxy-stats.json'), 'utf8')
+      );
+      assert(
+        proxyStats &&
+          typeof proxyStats === 'object' &&
+          'bytesUp' in proxyStats &&
+          typeof proxyStats.bytesUp === 'number' &&
+          proxyStats.bytesUp > 0 &&
+          'bytesDown' in proxyStats &&
+          typeof proxyStats.bytesDown === 'number' &&
+          proxyStats.bytesDown > 0,
+        'No whole-session proxy traffic witnessed'
+      );
+      assert(
+        'failures' in proxyStats && proxyStats.failures === 0,
+        'Proxy recorded whole-session transport failures'
+      );
       assert(
         intervals.some((interval) =>
           Object.keys(interval.metrics).some((name) => name.endsWith('.applyMs'))
@@ -2001,6 +2789,24 @@ try {
         assert(
           webSocketNegotiations.some((handshake) => handshake.status === 101),
           'No successful gameplay WebSocket negotiation recorded'
+        );
+        for (const handshake of webSocketNegotiations.filter((entry) => entry.status === 101)) {
+          requireNegotiatedCompression(compression.mode, handshake.extensions);
+        }
+        constraints['compressionNegotiationVerified'] = true;
+      } else {
+        assert.equal(
+          compression.mode,
+          'none',
+          'Compression candidate needs actual browser handshake evidence'
+        );
+        constraints['compressionNegotiationVerified'] = false;
+      }
+      for (const peer of peers) {
+        assert.equal(
+          peer.socket.extensions,
+          compression.mode === 'none' ? '' : 'permessage-deflate',
+          'Peer negotiated a different compression mode'
         );
       }
       const screenshot = `${values.output}.${scenario.name}.png`;
@@ -2022,11 +2828,27 @@ try {
         restarts,
         health,
         generatorCpu,
+        serverProcessCpu,
+        proxyTransport,
         fixtures,
         finalizedHealth,
         measuredServerWindows,
         serverMeasurement: { startedAt: serverBoundary.endedAt, endedAt: serverTail.endedAt },
         populationSamples,
+        ...(regionalWorkload
+          ? {
+              regionalWorld: {
+                statusSampleCount: regionalStatusSamples.length,
+                statusSamples: regionalStatusSamples,
+                finalManifest: regionalFinalManifest,
+                finalManifestFailure: regionalFinalManifestFailure,
+                work: regionalWork,
+                scanEvidence: regionalScanEvidence,
+                decodedCorrelation: regionalDecodedWork.report(),
+                scanRequired: seconds >= 30,
+              },
+            }
+          : {}),
         combatWitness,
         desktopFire,
         inputSteps,
@@ -2036,6 +2858,7 @@ try {
         observedProjectiles: observedProjectiles.size,
         peers: peers.map((peer) => peer.report()),
         performanceBudget: performanceBudget.report(),
+        appliedFreshness: freshnessReport(),
         stateDelivery: {
           snapshotBytes: measuredSnapshotBytes,
           averageSnapshotBytes: measuredSnapshotBytes / Math.max(1, stateGaps.length),
@@ -2069,24 +2892,50 @@ try {
       for (const peer of peers) {
         peer.stopMeasurement();
       }
-      failures.push(error);
-      if (network !== 'clean') {
+      if (regionalWorkload && !regionalFinalManifestAttempted) {
+        regionalFinalManifestAttempted = true;
         try {
-          constraints['proxy'] = JSON.parse(
-            await readFile(join(sessionPath, 'proxy-stats.json'), 'utf8')
+          regionalFinalManifest = await readRegionalManifest(
+            join(ownedSessionPath, 'fixture.sock')
           );
-        } catch (proxyError) {
-          constraints['proxyError'] = String(proxyError);
+        } catch (manifestError) {
+          regionalFinalManifestFailure = errorRecord(manifestError);
         }
+      } else if (regionalWorkload && !regionalFinalManifest) {
+        regionalFinalManifestFailure = errorRecord(error);
+      }
+      failures.push(error);
+      try {
+        constraints['proxy'] = JSON.parse(
+          await readFile(join(sessionPath, 'proxy-stats.json'), 'utf8')
+        );
+      } catch (proxyError) {
+        constraints['proxyError'] = String(proxyError);
       }
       runs.push({
         scenario,
         metadata,
         joined,
+        serverProcessCpu,
+        proxyTransport,
         constraints,
         fixtures,
         finalizedHealth,
         populationSamples,
+        ...(regionalWorkload
+          ? {
+              regionalWorld: {
+                statusSampleCount: regionalStatusSamples.length,
+                statusSamples: regionalStatusSamples,
+                finalManifest: regionalFinalManifest,
+                finalManifestFailure: regionalFinalManifestFailure,
+                work: regionalWork,
+                scanEvidence: regionalScanEvidence,
+                decodedCorrelation: regionalDecodedWork.report(),
+                scanRequired: seconds >= 30,
+              },
+            }
+          : {}),
         combatWitness,
         desktopFire,
         inputSteps,
@@ -2096,6 +2945,7 @@ try {
         observedProjectiles: observedProjectiles.size,
         peers: peers.map((peer) => peer.report()),
         performanceBudget: performanceBudget.report(),
+        appliedFreshness: freshnessReport(),
         stateDelivery: {
           snapshotBytes: measuredSnapshotBytes,
           averageSnapshotBytes: measuredSnapshotBytes / Math.max(1, stateGaps.length),
@@ -2107,7 +2957,9 @@ try {
           finalStateAgeMs: lastMeasuredStateAt ? measurementStoppedAt - lastMeasuredStateAt : null,
         },
         status: 'failed',
-        failure: errorRecord(error),
+        // Boundary failures can accompany the original observation failure.
+        // Preserve every AggregateError member and cause in the scenario.
+        failure: serializeBenchmarkError(error),
         errors,
         warnings,
         intervals,
@@ -2204,6 +3056,11 @@ try {
       }
       try {
         await context.close();
+        if (regionalWorkload && completedRun) {
+          completedRun['largeSnapshotEvidence'] = await largeSnapshots.save(
+            `${values.output}.${scenario.name}.large-snapshots.json`
+          );
+        }
       } catch (error) {
         cleanupComplete = false;
         failures.push(error);

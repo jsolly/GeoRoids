@@ -63,6 +63,7 @@ function traceContext() {
 
 afterEach(() => {
   LootField.getInstance().clear();
+  drawLootRelative(new Ship(), []);
   vi.restoreAllMocks();
   configureRenderQuality('', false);
 });
@@ -170,19 +171,20 @@ test('ordinary loot reuses artwork, keeps edge halos and rebuilds for display qu
   ctx.setTransform(2, 0, 0, 2, 0, 0);
   drawLootRelative(ship, drops);
   const denser = images.mock.calls[4]?.[0];
-  expect(denser).not.toBe(images.mock.calls[0]?.[0]);
+  expect(denser).toBe(images.mock.calls[0]?.[0]);
   if (!(denser instanceof HTMLCanvasElement)) {
     throw new Error('DPR change did not rebuild loot artwork');
   }
   expect(denser.getContext('2d')?.getTransform().a).toBe(2);
   configureRenderQuality('?performance=1&renderGlow=off', false);
+  const denserWidth = denser.width;
   drawLootRelative(ship, drops);
   const noGlow = images.mock.calls[6]?.[0];
   if (!(noGlow instanceof HTMLCanvasElement)) {
     throw new Error('Glow change did not rebuild loot artwork');
   }
-  expect(noGlow).not.toBe(denser);
-  expect(noGlow.width).toBeLessThan(denser.width);
+  expect(noGlow).toBe(denser);
+  expect(noGlow.width).toBeLessThan(denserWidth);
 
   const fillText = vi.spyOn(ctx, 'fillText');
   drawLootRelative(ship, [

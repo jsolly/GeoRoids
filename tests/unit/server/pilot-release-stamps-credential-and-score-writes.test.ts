@@ -15,6 +15,7 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { FURNACES } from '../../../shared/furnaces';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { GAME, ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -236,7 +237,7 @@ test('joined echoes credential and score releases from the saved pilot', () => {
         id: 'scout',
         name: 'Bob',
         position: { x: 100, y: 100 },
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
         clientReleaseId: CLIENT_RELEASE,
       },
@@ -247,7 +248,7 @@ test('joined echoes credential and score releases from the saved pilot', () => {
   assert(joined);
   expect(joined.data).toMatchObject({
     id: 'scout',
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     serverReleaseId: SERVER_RELEASE_ID,
     credentialReleaseId: SERVER_RELEASE_ID,
     credentialClientReleaseId: CLIENT_RELEASE,
@@ -266,7 +267,7 @@ test('join decoding keeps a valid client release and ignores a malformed one', (
       id: 'pilot',
       name: 'Pilot',
       position: { x: 12.5, y: -4 },
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
     },
   };
@@ -279,7 +280,7 @@ test('join decoding keeps a valid client release and ignores a malformed one', (
       id: 'pilot',
       name: 'Pilot',
       position: { x: 12.5, y: -4 },
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeRequested: false,
       clientReleaseId: CLIENT_RELEASE,
@@ -294,7 +295,7 @@ test('join decoding keeps a valid client release and ignores a malformed one', (
       id: 'pilot',
       name: 'Pilot',
       position: { x: 12.5, y: -4 },
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeRequested: false,
     },

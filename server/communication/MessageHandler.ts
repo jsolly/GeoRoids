@@ -89,7 +89,13 @@ export class MessageHandler {
         case 'snapshotResync':
           if (this.gameEngine.getPlayerBySocket(ws)) {
             this.logSnapshotResync(ws, Date.now(), this.gameEngine.getServerTime());
-            this.broadcaster.requestSnapshotKeyframe(ws);
+            this.broadcaster.requestSnapshotKeyframe(ws, { recovery: true });
+          }
+          break;
+
+        case 'snapshotAck':
+          if (this.gameEngine.getPlayerBySocket(ws)) {
+            this.broadcaster.acknowledgeSnapshot(ws, command.sequence);
           }
           break;
 

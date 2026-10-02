@@ -1,4 +1,5 @@
 /* @vitest-environment node */
+
 import { once } from 'node:events';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
@@ -6,6 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import * as serverLogging from '../../../setup/serverLogger';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 
 const servers: ReturnType<typeof createServerInstance>[] = [];
 const sockets: WebSocket[] = [];
@@ -26,7 +28,7 @@ async function start(nodeEnv = 'test') {
   return {
     server,
     origin: `http://127.0.0.1:${port}`,
-    socketUrl: `ws://127.0.0.1:${port}/ws?asteroidInteractions=1`,
+    socketUrl: `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`,
   };
 }
 

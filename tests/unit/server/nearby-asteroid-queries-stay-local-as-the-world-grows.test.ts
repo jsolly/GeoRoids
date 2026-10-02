@@ -5,7 +5,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import { nearbyAsteroidRows } from '../../../shared/world';
-import type { AsteroidData } from '../../../shared-types';
+import type { AsteroidData, SatellitePickupData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function rock(id: string, x: number, y: number, size = 25): AsteroidData {
@@ -23,6 +23,60 @@ function rock(id: string, x: number, y: number, size = 25): AsteroidData {
     angularVelocity: 0,
   };
 }
+
+test('an orbiting pickup keeps the first ordinary impact across grid seams without reading distant rocks', () => {
+  let distantReads = 0;
+  const distant = Array.from({ length: 10000 }, (_, i) => {
+    const candidate = rock(`far-${i}`, 10000 + (i % 100) * 400, 10000 + Math.floor(i / 100) * 400);
+    Object.defineProperty(candidate, 'boost', {
+      get: () => {
+        distantReads++;
+        return undefined;
+      },
+    });
+    return candidate;
+  });
+  const burning = rock('burning', 510, 0);
+  burning.boost = { phase: 'burning', ownerId: 'pilot', angle: 0 };
+  const spanning = rock('spanning', 1100, 0, 700);
+  const later = rock('later', 510, 0);
+  const index = new AsteroidSpatialIndex([burning, spanning, later, ...distant]);
+  distantReads = 0;
+  const pickup: SatellitePickupData = {
+    id: 'orbiter',
+    name: 'Terra',
+    typeId: 'terra',
+    assetKey: 'eo/terra',
+    position: { x: 510, y: 0 },
+    velocity: { x: 0, y: 0 },
+    angle: 0,
+    radius: 12,
+    color: '#C4B5FD',
+    state: 'orbiting',
+    ownerId: 'pilot',
+    health: 50,
+    maxHealth: 50,
+  };
+  const collisions = new CollisionAuthority();
+  expect(collisions.collectAsteroidPickupHits(index, [pickup])).toEqual([
+    { asteroidId: 'spanning', pickupId: pickup.id },
+  ]);
+  index.remove(spanning.id);
+  expect(collisions.collectAsteroidPickupHits(index, [pickup])).toEqual([
+    { asteroidId: 'later', pickupId: pickup.id },
+  ]);
+  index.remove(later.id);
+  expect(collisions.collectAsteroidPickupHits(index, [pickup])).toEqual([]);
+  index.add(later);
+  expect(
+    collisions.collectAsteroidPickupHits(index, [
+      { ...pickup, state: 'stored' },
+      { ...pickup, state: 'loose' },
+      { ...pickup, health: 0 },
+    ])
+  ).toEqual([]);
+  expect(distantReads).toBe(0);
+});
 
 test('distant sectors do not become collision candidates and large rocks retain source priority across grid seams', () => {
   const distant = Array.from({ length: 10000 }, (_, i) =>

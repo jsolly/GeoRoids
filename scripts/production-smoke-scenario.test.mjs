@@ -6,6 +6,12 @@ import { chromium } from 'playwright';
 import { verifyAncestry } from './production-smoke-release.mjs';
 import { productionUrl, smoke, waitForClientRelease } from './production-smoke-scenario.mjs';
 
+const { tsImport } = await import('tsx/esm/api');
+const { SNAPSHOT_VERSION, SnapshotEncoder } = await tsImport(
+  '../shared/snapshotProtocol.ts',
+  import.meta.url
+);
+
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 function clientPage() {
   return {
@@ -102,7 +108,7 @@ for (const failure of [
               type: 'joined',
               data: {
                 id: 'pilot',
-                snapshotVersion: 1,
+                snapshotVersion: SNAPSHOT_VERSION,
                 asteroidInteractions: 1,
                 serverReleaseId: failure === 'stale-server' ? previous : release,
               },
@@ -155,8 +161,6 @@ for (const failure of [
   });
 }
 
-const { tsImport } = await import('tsx/esm/api');
-const { SnapshotEncoder } = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
 const { snapshotFixture } = await tsImport(
   '../tests/unit/network/snapshotFixture.ts',
   import.meta.url
@@ -185,7 +189,7 @@ function firingPage(outcome) {
       page.emit('websocket', socket);
       receive(socket, 'joined', {
         id: 'pilot-0',
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
         serverReleaseId: release,
       });

@@ -2,7 +2,11 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
-import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import {
+  captureSnapshot,
+  SNAPSHOT_VERSION,
+  SnapshotEncoder,
+} from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { Sound, setSound } from '../../../src/audio/Sound';
 import { bindGameAudio, resetGameAudio } from '../../../src/audio/spatialAudio';
@@ -113,7 +117,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken,
     });
@@ -561,7 +565,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
         id: manager.getClientId(),
         name: player.name,
         position: player.ship.position,
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
         resumeToken: 'a'.repeat(64),
       });
@@ -624,7 +628,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       id: manager.getClientId(),
       name: player.name,
       position: player.ship.position,
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'b'.repeat(64),
     });
@@ -676,7 +680,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       name: 'Runtime pilot',
       position: player.ship.position,
       color: '#fff',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
       serverReleaseId: 'server-release',
@@ -803,7 +807,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       id: oldId,
       name: 'Runtime pilot',
       position: player.ship.position,
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
     });
@@ -853,7 +857,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       id: freshId,
       name: 'Runtime pilot',
       position: player.ship.position,
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: 'b'.repeat(64),
     });
@@ -874,10 +878,10 @@ describe('actual ConnectionManager WebSocket message path', () => {
     assert.ok(initialJoin, 'initial join message');
     const initialJoinData = initialJoin.data;
     assert.ok(initialJoinData, 'initial join data');
-    expect(initialJoinData.snapshotVersion).toBe(1);
+    expect(initialJoinData.snapshotVersion).toBe(SNAPSHOT_VERSION);
     expect(initialJoinData.asteroidInteractions).toBe(1);
     expect(initialJoinData['clientReleaseId']).toMatch(CLIENT_RELEASE_ID_PATTERN);
-    expect(new URL(ws.url).searchParams.get('snapshotVersion')).toBe('1');
+    expect(new URL(ws.url).searchParams.get('snapshotVersion')).toBe(String(SNAPSHOT_VERSION));
     expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
     if (initialJoinData.resumeToken !== undefined) {
       expect(initialJoinData.resumeToken).toMatch(RESUME_TOKEN_PATTERN);
@@ -934,6 +938,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(ws.close).toHaveBeenCalled();
     expect(manager.isConnected()).toBe(false);
     expect(manager.getAllPlayers()).toEqual([]);
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([]);
   });
 
   test('real decoder applies keyframes/deltas, clears effects/empty worlds and survives malformed frames atomically', async () => {
@@ -956,6 +961,9 @@ describe('actual ConnectionManager WebSocket message path', () => {
     firstPilot.kitId = 'hauler';
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     expect(manager.getPlayer('pilot-1')?.ship.harpoonTargetId).toBe('asteroid-1');
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([
+      { type: 'snapshotAck', data: { sequence: 1 } },
+    ]);
     const next = captureSnapshot(snapshotFixture(1));
     next.asteroids = [];
     next.collabTags = [];
@@ -970,6 +978,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getAllPlayers()).toHaveLength(10);
     expect(LootField.getInstance().getAll()).toHaveLength(15);
     expect(ws.sent.filter((m) => m.type === 'snapshotResync')).toHaveLength(1);
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toHaveLength(1);
     expect(errorLog).toHaveBeenCalledWith(
       'STATE',
       'snapshot_rejected',
@@ -989,9 +998,47 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getPlayer('pilot-1')?.name).toBe('Renamed pilot');
     expect(removed).toHaveLength(80);
     expect(LootField.getInstance().getAll()).toEqual([]);
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([
+      { type: 'snapshotAck', data: { sequence: 1 } },
+      { type: 'snapshotAck', data: { sequence: 2 } },
+    ]);
     ws.receive('snapshot', new SnapshotEncoder(first).encode(20));
     expect(manager.getAllPlayers()).toHaveLength(10);
     expect(LootField.getInstance().getAll()).toEqual(first.loot);
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck').at(-1)).toEqual({
+      type: 'snapshotAck',
+      data: { sequence: 20 },
+    });
+  });
+
+  test('a decoded world earns no application credit when a snapshot consumer fails', async () => {
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const ws = await connect();
+    acknowledge(ws);
+    const first = captureSnapshot(snapshotFixture());
+    ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
+    bindAsteroidFieldApply({
+      onCreated: () => {},
+      onUpdated: () => {},
+      onDestroyed: () => {},
+      onReconciled: () => {
+        throw new Error('Unable to reconcile a visible asteroid');
+      },
+    });
+    const next = captureSnapshot(snapshotFixture(1));
+    next.asteroids = [];
+    next.collabTags = [];
+    ws.receive('snapshot', new SnapshotEncoder(next).encode(2, { sequence: 1, state: first }));
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([
+      { type: 'snapshotAck', data: { sequence: 1 } },
+    ]);
+    expect(ws.sent.filter((message) => message.type === 'snapshotResync')).toHaveLength(1);
+    unbindAsteroidFieldApply();
+    ws.receive('snapshot', new SnapshotEncoder(next).encode(3));
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck').at(-1)).toEqual({
+      type: 'snapshotAck',
+      data: { sequence: 3 },
+    });
   });
 
   test('pickup ownership, tag expiry and asteroid metadata reconcile in real managers', async () => {
@@ -1234,7 +1281,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(ws.sent.filter((message) => message.type === 'useAbility')).toHaveLength(0);
   });
 
-  test('rejoin accepts in-flight old-session snapshots until its delayed acknowledgment resets sequence', async () => {
+  test('rejoin acknowledges in-flight worlds while gameplay waits for its fresh baseline', async () => {
     const ws = await connect();
     acknowledge(ws);
     const state = captureSnapshot(snapshotFixture());
@@ -1249,28 +1296,74 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(queued).encode(16, { sequence: 15, state }));
     expect(ws.close).not.toHaveBeenCalled();
     expect(manager.getPlayer('pilot-1')?.ship.health).toBe(23);
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck').at(-1)).toEqual({
+      type: 'snapshotAck',
+      data: { sequence: 16 },
+    });
+    expect(manager.sendMessage({ type: 'chat', data: { message: 'Still joining' } })).toBe(false);
     acknowledge(ws);
-    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(17));
     const statePilot = state.entities[1];
     assert.ok(statePilot, 'state pilot entity');
     expect(manager.getPlayer('pilot-1')?.ship.health).toBe(statePilot.health);
+    expect(ws.close).not.toHaveBeenCalled();
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck').at(-1)).toEqual({
+      type: 'snapshotAck',
+      data: { sequence: 17 },
+    });
+  });
+
+  test('rejoin can recover a rejected queued world while gameplay is waiting for joined', async () => {
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const ws = await connect();
+    acknowledge(ws);
+    const state = captureSnapshot(snapshotFixture());
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(15));
+    manager.initializeAsteroidSync();
+    const queued = new SnapshotEncoder(state).encode(16, { sequence: 15, state });
+    assert.equal(queued.kind, 'delta');
+    ws.receive('snapshot', { ...queued, baseline: 14 });
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([
+      { type: 'snapshotAck', data: { sequence: 15 } },
+    ]);
+    expect(ws.sent.filter((message) => message.type === 'snapshotResync')).toEqual([
+      { type: 'snapshotResync', data: {} },
+    ]);
+    expect(manager.sendMessage({ type: 'chat', data: { message: 'Still joining' } })).toBe(false);
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(17));
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck').at(-1)).toEqual({
+      type: 'snapshotAck',
+      data: { sequence: 17 },
+    });
     expect(ws.close).not.toHaveBeenCalled();
   });
 
   test.each([
     {
-      label: 'snapshot version',
-      snapshotVersion: 2,
+      label: 'retired snapshot version',
+      snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken: 'a'.repeat(64),
+    },
+    {
+      label: 'future snapshot version',
+      snapshotVersion: SNAPSHOT_VERSION + 1,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
     },
     {
       label: 'asteroid interaction capability',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 2,
       resumeToken: 'a'.repeat(64),
     },
-    { label: 'resume token', snapshotVersion: 1, asteroidInteractions: 1, resumeToken: 'short' },
+    {
+      label: 'resume token',
+      snapshotVersion: SNAPSHOT_VERSION,
+      asteroidInteractions: 1,
+      resumeToken: 'short',
+    },
   ])('fails closed when the joined acknowledgment omits a valid $label', async (ack) => {
     const ws = await connect();
     ws.receive('joined', {

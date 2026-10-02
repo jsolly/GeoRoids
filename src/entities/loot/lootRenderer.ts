@@ -4,6 +4,11 @@ import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
 import { addResourceMapPath } from '../../rendering/hud/resourceMapMark';
 import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
+import {
+  discardRasterSurface,
+  prepareRasterSurface,
+  type RasterSurface,
+} from '../../rendering/rasterSurface';
 import { resolveGlow } from '../../rendering/renderQuality';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { Ship } from '../ship/Ship';
@@ -64,8 +69,7 @@ function traceDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, r: nu
 
 type OrdinaryLootKind = Extract<LootData['kind'], 'wreckage' | 'points' | 'shard' | 'silk'>;
 
-interface OrdinaryLootSprite {
-  canvas: HTMLCanvasElement;
+interface OrdinaryLootSprite extends RasterSurface {
   origin: number;
 }
 
@@ -73,6 +77,7 @@ interface OrdinaryLootSprites {
   dpr: number;
   glow: number;
   styles: Map<string, OrdinaryLootSprite>;
+  pending: RasterSurface[];
 }
 
 let ordinaryLootSprites: OrdinaryLootSprites | null = null;
@@ -90,7 +95,12 @@ function prepareOrdinaryLootSprites(ctx: CanvasRenderingContext2D): OrdinaryLoot
     ordinaryLootSprites.dpr !== dpr ||
     ordinaryLootSprites.glow !== glow
   ) {
-    ordinaryLootSprites = { dpr, glow, styles: new Map() };
+    ordinaryLootSprites = {
+      dpr,
+      glow,
+      styles: new Map(),
+      pending: [...(ordinaryLootSprites?.styles.values() ?? [])],
+    };
   }
   return ordinaryLootSprites;
 }
@@ -133,13 +143,13 @@ function ordinaryLootSprite(
   halfPixels: number,
   cache: OrdinaryLootSprites
 ): OrdinaryLootSprite {
-  const canvas = document.createElement('canvas');
-  canvas.width = halfPixels * 2;
-  canvas.height = halfPixels * 2;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('Loot artwork canvas context unavailable');
-  }
+  const surface = prepareRasterSurface(
+    halfPixels * 2,
+    halfPixels * 2,
+    cache.pending.pop(),
+    'Loot artwork canvas context unavailable'
+  );
+  const { canvas, context: ctx } = surface;
   const origin = halfPixels / cache.dpr;
   ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
   const trace = (): void => {
@@ -157,7 +167,7 @@ function ordinaryLootSprite(
     }
   };
   strokeLootShape(ctx, trace, VISUAL.LOOT_GLOW);
-  return { canvas, origin };
+  return { canvas, context: ctx, origin };
 }
 
 function drawOrdinaryLoot(
@@ -221,6 +231,12 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
   }
 
   if (loot.length === 0) {
+    for (const sprite of ordinaryLootSprites?.styles.values() ?? []) {
+      discardRasterSurface(sprite);
+    }
+    for (const surface of ordinaryLootSprites?.pending ?? []) {
+      discardRasterSurface(surface);
+    }
     ordinaryLootSprites = null;
     return;
   }
@@ -229,8 +245,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
   const usedStyles = new Map<string, OrdinaryLootSprite>();
   const viewport = canvasManager.getViewportSize();
 
-  const reducedMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let reducedMotion: boolean | undefined;
   const now = typeof performance !== 'undefined' ? performance.now() : 0;
   for (const drop of loot) {
     const projected = canvasManager.worldToScreen(drop.position, ship.position);
@@ -258,6 +273,10 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
       continue;
     }
 
+    // Ordinary sprites never animate. Query once only when this frame paints prominent loot.
+    reducedMotion ??=
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reducedMotion) {
       screen.y += Math.sin(now / 450 + drop.position.x * 0.01) * 6 * scale;
     }
@@ -299,5 +318,14 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     }
     ctx.restore();
   }
+  for (const [key, sprite] of sprites.styles) {
+    if (!usedStyles.has(key)) {
+      discardRasterSurface(sprite);
+    }
+  }
   sprites.styles = usedStyles;
+  for (const surface of sprites.pending) {
+    discardRasterSurface(surface);
+  }
+  sprites.pending.length = 0;
 }

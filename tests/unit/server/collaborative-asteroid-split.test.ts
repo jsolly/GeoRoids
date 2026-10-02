@@ -1,8 +1,10 @@
 /* @vitest-environment node */
+
 import { strict as assert } from 'node:assert';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { GAME, LASER, ROID } from '../../../src/constants';
 import { WireClient, type WireMessage } from '../../support/wireClient';
@@ -52,7 +54,7 @@ async function join(
     id,
     name: id,
     position,
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
   });
   await client.barrier();
@@ -65,7 +67,9 @@ const activeClients: WireClient[] = [];
 
 async function connect(server: TestServer): Promise<WireClient> {
   const client = new WireClient(
-    new WebSocket(`ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`)
+    new WebSocket(
+      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    )
   );
   activeClients.push(client);
   await client.open();

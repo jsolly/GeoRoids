@@ -385,7 +385,7 @@
     "shared/furnaces.ts",
     "shared/world.ts",
     "shared-types.ts",
-    "docs/protocol/snapshot-v1.md",
+    "docs/protocol/snapshot-v2.md",
     "tests/unit/rendering/hudLayout.test.ts",
     "tests/unit/systems/hudReadability.test.ts",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts",

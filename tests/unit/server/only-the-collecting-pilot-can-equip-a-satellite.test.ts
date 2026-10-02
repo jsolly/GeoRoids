@@ -1,22 +1,38 @@
 /* @vitest-environment node */
+
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { WireClient } from '../../support/wireClient';
 
 test("a socket cannot impersonate the collector or equip someone else's inventory", async () => {
   const server = createServerInstance({ port: 0, nodeEnv: 'test' });
   const port = await server.listening;
-  const owner = new WireClient(new WebSocket(`ws://localhost:${port}/ws?asteroidInteractions=1`));
-  const other = new WireClient(new WebSocket(`ws://localhost:${port}/ws?asteroidInteractions=1`));
+  const owner = new WireClient(
+    new WebSocket(
+      `ws://localhost:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    )
+  );
+  const other = new WireClient(
+    new WebSocket(
+      `ws://localhost:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    )
+  );
   try {
     await Promise.all([owner.open(), other.open()]);
     for (const [client, id] of [
       [owner, 'owner'],
       [other, 'other'],
     ] as const) {
-      client.send({ type: 'join', id, name: id, snapshotVersion: 1, asteroidInteractions: 1 });
+      client.send({
+        type: 'join',
+        id,
+        name: id,
+        snapshotVersion: SNAPSHOT_VERSION,
+        asteroidInteractions: 1,
+      });
       await client.barrier();
     }
     server.gameEngine.stopGameLoop();

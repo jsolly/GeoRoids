@@ -1197,10 +1197,12 @@ export class ConnectionManager {
   }
 
   private sendSnapshotResync(): boolean {
-    if (this.snapshotResyncPending) {
+    if (!this.currentProtocolReady || this.snapshotResyncPending) {
       return false;
     }
-    const sent = this.sendMessage({ type: 'snapshotResync', data: {} });
+    // A rejected world queued before same-socket rejoin must be able to
+    // request recovery while the new join keeps gameplay commands gated.
+    const sent = this.sendPayload({ type: 'snapshotResync', data: {} });
     if (sent) {
       this.snapshotResyncPending = true;
       clientPerformance.count('resyncs');
@@ -1213,6 +1215,7 @@ export class ConnectionManager {
     metadata: SnapshotMetadata,
     receivedAt: number
   ): void {
+    const appliedSocket = this.state.socket;
     const sampled = shouldSampleSnapshot(metadata.sequence);
     const localBefore = sampled ? PlayerManager.getInstance().getLocalPlayer() : undefined;
     const clientBeforeApply = localBefore ? captureClientPlayerState(localBefore) : undefined;
@@ -1224,11 +1227,21 @@ export class ConnectionManager {
         this.applyReceivedSnapshot(state);
       }
       this.lastAcceptedSnapshotSequence = metadata.sequence;
+      // TCP acceptance cannot prove the world was applied. Release the server's
+      // bounded pipeline only after all snapshot consumers completed above.
+      if (appliedSocket && this.state.socket === appliedSocket && this.currentProtocolReady) {
+        // Ordered old-session worlds can arrive while this socket's rejoin is
+        // awaiting joined. Their receipts must drain preserved transport debt
+        // even while gameplay commands remain gated by joinAcknowledged.
+        this.sendPayload({ type: 'snapshotAck', data: { sequence: metadata.sequence } });
+      }
       noteDebugSnapshot(metadata.sequence, performance.now());
       clientPerformance.snapshotApplied({
+        ownerId: this.getLocalPlayerId(),
         sequence: metadata.sequence,
         kind: metadata.kind,
         gameTime: state.gameTime,
+        serverTime: state.serverTime,
       });
       if (sampled) {
         const authoritative = state.entities.find(

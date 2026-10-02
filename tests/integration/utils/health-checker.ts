@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { TestConfig } from './test-config';
 
 const REQUEST_TIMEOUT_MS = 5000;
@@ -53,7 +54,7 @@ export async function checkViteServer(): Promise<boolean> {
 
 function checkWebSocketGameplayEndpoint(): Promise<boolean> {
   return new Promise((resolve) => {
-    const wsUrl = `${TestConfig.SERVER_URL.replace(HTTP_SCHEME_PATTERN, 'ws')}/ws?asteroidInteractions=1`;
+    const wsUrl = `${TestConfig.SERVER_URL.replace(HTTP_SCHEME_PATTERN, 'ws')}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`;
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
       ws.close();

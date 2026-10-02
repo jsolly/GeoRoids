@@ -1,4 +1,5 @@
 /* @vitest-environment node */
+
 import { strict as assert } from 'node:assert';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
@@ -9,6 +10,7 @@ import { ServerClock } from '../../../server/core/ServerClock';
 import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -349,7 +351,7 @@ describe('authoritative Scout probes', () => {
           name: id,
           data: {
             position: { x: 0, y: id === 'owner' ? 0 : 100 },
-            snapshotVersion: 1,
+            snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
           },
         },

@@ -1,4 +1,7 @@
 /* @vitest-environment node */
+
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import type { Page } from 'playwright';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
@@ -7,10 +10,28 @@ const boundary = vi.hoisted(() => ({
   observe: vi.fn(),
 }));
 vi.mock('node:child_process', () => ({
-  execFileSync: (_command: string, args: string[]) =>
-    args[0] === 'diff' ? Buffer.from('diff') : args[0] === 'rev-parse' ? 'fixture-revision\n' : '',
+  spawn: (_command: string, args: string[]) => {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(),
+    });
+    queueMicrotask(() => {
+      child.stdout.end(
+        args[0] === 'diff'
+          ? Buffer.from('diff')
+          : args[0] === 'rev-parse'
+            ? 'fixture-revision\n'
+            : ''
+      );
+      child.stderr.end();
+      child.emit('close', 0, null);
+    });
+    return child;
+  },
 }));
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
   mkdirSync: vi.fn(),
   readFileSync: () => '{"version":"1.63.0"}',
   writeFileSync: boundary.write,

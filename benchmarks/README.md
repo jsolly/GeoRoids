@@ -15,9 +15,10 @@ npm run benchmark -- measure client --revision HEAD --seed 42 --viewport desktop
 npm run benchmark -- measure server --revision HEAD --seed 42
 npm run benchmark -- measure codec --revision HEAD --seed 42
 npm run benchmark -- measure transport --revision HEAD --seed 42
+npm run benchmark -- measure wire-ledger --revision HEAD --seed 42
 ```
 
-The client viewport can be `desktop`, `touch-portrait`, or `touch-landscape`.
+The client viewport can be `desktop`, `touch-portrait`, `touch-landscape`, or `tablet`.
 The other runners use `desktop`. The seed defaults to `42`.
 
 Compare two revisions with the same workload:
@@ -29,7 +30,9 @@ npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
 ```
 
 Comparison is available for client, server, and codec. Transport is a realtime,
-nondeterministic sample and accepts one revision only.
+nondeterministic sample and accepts one revision only. The wire ledger also
+accepts one revision: review its bytes and decoded-state receipts separately
+instead of applying the framework's timing comparison to a byte diagnostic.
 
 ## Preconditions and isolation
 
@@ -60,6 +63,7 @@ browser contexts, sockets, and servers are closed before a result can be complet
 | `server` | Direct `GameEngine` ticks with two real loopback player peers. |
 | `codec` | Seeded snapshot fixtures across shared and staggered recipient baselines, with 1, 2, 5, 10, and 25 recipients. |
 | `transport` | Two real loopback clients against an owned child server for the default two-second window. |
+| `wire-ledger` | A seeded real engine and broadcaster with two owned real loopback clients, 60 warmup and 240 measured simulation ticks. |
 
 The client timing context uses native `requestAnimationFrame` timestamps and
 `performance.now()`. `updateMs` and `renderMs` are synchronous CPU submission
@@ -68,6 +72,102 @@ values proves that a GPU presented a frame. A second fresh observation context
 counts actual `CanvasRenderingContext2D` and `Path2D` API calls, including HUD and
 environment probes. Those counts describe submitted API work, not GPU draws, and
 are kept outside the timed result.
+
+### Snapshot wire ledger
+
+Server and wire-ledger fixtures own a separate deterministic UUID stream before
+constructing the engine. IDs remain unique valid UUIDs, independent of gameplay
+RNG consumption; full state and row order remain comparison evidence. The owner
+rejects overlapping or mismatched crypto bindings and restores the original
+Node bindings after its sockets close. Production randomness is unchanged.
+
+The `wire-ledger` scene advances the real engine at a controlled 60 Hz clock and
+offers a real broadcast every second tick. It awaits both actual client receipt
+and the server's send callback before offering the next snapshot. Each decoded
+snapshot must equal an independent recipient oracle from public engine state,
+including current rounding, asteroid interest, equipment privacy, own pickups,
+projectiles, tags and global spider/map knowledge. Every raw text message is
+retained with a hash and replayed through a fresh decoder for each pilot.
+
+The scene uses public engine motion admission and shot admission APIs, one real
+Mineral Scan activation, moving spiders and a forced keyframe followed by a
+delta. Positive controls require measured accepted movement, accepted/observed
+shots, both scan and normal snapshots, changed spider fields, and keyframe/delta
+delivery. This tests engine/broadcaster transport; it does not claim production
+join authentication, client command validation, persistence or browser play.
+
+Per-pilot receipts partition every snapshot UTF-8 byte into envelope/metadata,
+keyframe fields, delta fields and collection add/update/remove/order work.
+The containers/punctuation bucket includes their property names and syntax.
+Bucket sums must equal the exact emitted payload. Events and control messages
+remain in the complete stream and have separate totals by type.
+
+The uncompressed text-frame header calculation (2, 4 or 10 bytes) must reconcile
+with actual public TCP `bytesWritten` totals for each accepted socket, both for
+the entire post-upgrade window and the measured window. HTTP upgrade and close
+handshakes lie outside these windows; unexpected compression, control frames or
+fragmentation cannot silently pass the accounting equality. TCP/IP and TLS
+headers are not counted. Keep raw hashes unchanged; the additional normalized
+state hash aliases opaque runtime UUIDs solely for repeated outcome comparison.
+
+Broadcast and decode CPU timestamps end before oracle equality, hashes, byte
+partitioning and replay. Send interception bookkeeping is included in diagnostic
+broadcast submission time. Byte rates divide by simulated seconds, not elapsed
+wall time. Serialized draining removes congestion by design: this scene cannot
+establish constrained-network latency, client state freshness, sustained
+throughput or enjoyable slow-connection play. Follow byte candidates with the
+owned real-time constrained gameplay lane. Captures fail loudly at 128 MiB or
+20,000 messages, and failed samples retain their bounded partial wire evidence.
+No in-game Wiki page changes for this measurement tool.
+
+### Compiled client scene presets
+
+The default `--scene stationary` retains the original Hauler scene and its
+30 warmup / 120 measured frames. Three additional presets lock their kit,
+participants, activation timing and frame counts:
+
+| Scene | Warmup / measured frames | Actual fixture action |
+| --- | --- | --- |
+| `scan-transition` | 30 / 240 | A Scout activates Mineral Scan once before the first measured update; normal updates expire it and return the camera to flight scale. |
+| `scan-wide` | 60 / 45 | A Scout activates once before warmup; the measured window stays wide and ends with 15 active frames remaining. |
+| `spider-field` | 30 / 120 | A Hauler renders ten fixed non-crawler spiders supplied through the public server-snapshot field boundary. |
+
+Run from `/Users/johnsolly/code/GeoRoids` or a clean linked GeoRoids worktree:
+
+```sh
+npm run benchmark -- measure client --revision HEAD --seed 42 --viewport touch-portrait --dpr 3 --scene scan-transition
+npm run benchmark -- measure client --revision HEAD --seed 42 --viewport touch-portrait --dpr 3 --scene spider-field
+npm run benchmark -- measure client --revision HEAD --seed 42 --viewport touch-portrait --dpr 3 --scene scan-wide
+```
+
+These remain compiled client diagnostics without a live socket or product event
+loop. One harness RAF calls the actual game update and render once per frame;
+the public authoritative-pose mode keeps the pilot stationary. A successful
+offline scan activation proves the rendering fixture, not server admission or
+interest filtering. Snapshot spiders exercise drawing, infestation contours and
+foot placement; the client does not simulate their authoritative movement.
+
+New scenes use a fixed presentation `performance.now()` advancing at 60 Hz.
+CPU measurement uses the saved original native clock, and RAF intervals remain
+native. Scan activation is an arranged action outside the update/render timing
+boundaries; no active timer or cooldown is refreshed during measurement.
+Fresh timed and observed contexts must finish with identical participant and
+ability outcomes. All compiled scenes retain the maximum of 3600 total frames.
+
+The observation context records the actual world transform and virtual viewport,
+plus native spider painting and canvas creation. Scan transition captures
+composed pixel hashes at measured frames 6, 60, 119, 120, 126 and 240; other new
+scenes capture their declared checkpoints including the final frame. Capture and
+hashing occur outside timing and work counters. Hashing completes before the
+next observation RAF, bounding retained image memory. These checkpoints detect
+an omitted transition that a returned final frame would conceal.
+
+Dynamic scenes explicitly omit `contour.endpointReads`: widening can replace the
+terrain array, so initial-array probes would undercount actual work. Reports
+declare that coverage gap and retain native Canvas/Path2D calls, camera outcomes
+and pixels. Stationary endpoint probes remain unchanged. Native submission
+counts and canvas creation are separate kinds of work; neither establishes GPU
+completion, a phone speed improvement, or physical-device acceptance.
 
 The server runner fixes `Date.now()` and seeds `Math.random()` while retaining
 native `performance.now()` for tick timing. It creates two actual loopback player
@@ -82,6 +182,15 @@ WebSocket transport framing. `*-encode-serialize-ms` measures frame creation and
 envelope serialization. `*-parse-decode-ms` measures one decoder-owned envelope
 parse plus snapshot validation, reconstruction, and retained-baseline copying.
 The serialized envelopes are prepared before that timed region.
+
+Current snapshot streams require a full initial world and explicit recovery or
+rejoin keyframes. Otherwise the encoder uses a delta only when its actual UTF-8
+envelope is strictly smaller than a full frame; there is no forced keyframe
+interval. Codec and wire-ledger reports retain
+`keyframePolicy: initial/recovery/strictlysmaller`. The wire ledger independently
+replays each complete initial stream and requires measured delta work, rather
+than manufacturing periodic full frames. Historical codec and wire receipts
+retain the keyframe policy measured at their recorded revision.
 
 The transport runner measures realtime ping RTT and snapshot delivery intervals,
 packet and UTF-8 payload counts, client `bufferedAmount`, and child-server event
@@ -133,6 +242,29 @@ The runner refuses occupied ports. The default deadline is 1200 seconds; a
 30-minute soak needs a larger `GEOROIDS_TEST_MAX_DURATION_SECONDS` value that also
 allows admission, warmup, build and cleanup. Timed sessions must run separately
 from tests, coverage, builds and other measurements.
+
+Renderer comparisons must reuse the same built assets across every A/A and A/B
+session. Build the first clean-network client session normally, then put
+`--reuse-build` immediately after `--benchmark-client` for subsequent sessions:
+
+```sh
+./scripts/test-runner.sh --benchmark-client --renderer canvas --network clean --viewport touch-portrait --dpr 3 --cpu-slowdown 4 --scenario combat --warmup 30 --seconds 300 --output .performance/renderer-first.json
+./scripts/test-runner.sh --benchmark-client --reuse-build --renderer webgl2 --network clean --viewport touch-portrait --dpr 3 --cpu-slowdown 4 --scenario combat --warmup 30 --seconds 300 --output .performance/renderer-next.json
+```
+
+These two commands illustrate build ownership; the comparison still requires
+three distinct A/A pairs and three alternating A/B pairs with 300 foreground
+seconds and 300 completed measured input actions per session. The first build
+runs the usual Wiki/type/build checks and writes
+`.performance/benchmark-client-build.json` only after success. Reuse verifies
+the same checkout/revision, Git-visible files, ignored environment files, build
+environment, lockfile, Node version and every built asset. It starts a fresh
+owned preview/server pair and never attaches to existing services. Changed or
+missing inputs, assets or receipt fail before measurement. Other build commands
+can change `dist/` and invalidate reuse. An impaired-network proxy receives an
+ephemeral port, so reuse is rejected unless its actual WebSocket URL exactly
+matches the successful build; use clean network for frozen renderer cohorts.
+The receipt is local benchmark evidence and does not replace `npm run gate`.
 
 These runs measure the current worktree and real scheduling. They do not use the
 archived paired-comparison machinery above. Dirty results are diagnostics, never
@@ -245,6 +377,15 @@ slot counts remain in comparison evidence; at least 300 measured actions and
 slots are still required. Raw `inputToRenderMs` samples, rather than the offered step count,
 are the acceptance denominator. Finalized server windows are deduplicated by
 window ID; overlapping open health windows remain raw evidence only.
+
+Decode timing requirements follow successful applications during measurement.
+Every retained measured keyframe and delta must have its own finite decode
+sample; missing, malformed or omitted application witnesses reject the report.
+A measured stream with no applied keyframes leaves `keyframeDecodeMs` absent,
+without invented zero samples. Setup is drained atomically at the browser
+measurement boundary and retained as warmup evidence; warmup and join timings
+cannot satisfy measured decode requirements. Parse, delta, apply, join, renderer,
+input and gameplay requirements remain mandatory.
 
 ### Comparing mobile sessions
 
@@ -385,6 +526,54 @@ population and actual damage/tag/destruction witnesses over the complete measure
 window before calling it sustained collision load. A dense starting count alone
 is insufficient. Normal `combat` remains the existing sparse drifting fixture.
 
+Use `--scenario regional-combat` with one explicit viewport to measure the live
+production regional field. The five pilots keep their ordinary server-chosen
+spawns and current motion epochs. Preparation only verifies the participant set
+and requests fresh keyframes; it never clears the world, places ships or rocks,
+creates a fixed asteroid population, resets abilities, or supplies health.
+The normal game loop wakes and sleeps sectors while the existing trusted
+steering, firing and ability inputs run.
+
+The private socket preserves its 0600 permission and 1 MiB response bound.
+Initial and final regional manifests are captured outside measurement and retain
+the actual mode/counts, a digest of every active asteroid row, and at most 32
+asteroid samples sorted by actual ID. Pickup, map asset and spider samples are
+also bounded; these receipts contain no player credentials. Per-interval scalar
+field receipts prove that regional mode remains active, alongside real nearby
+population and applied-snapshot freshness observations. A natural manifest is
+an observation of an evolving world, so its digest can change as rocks drift or
+pilots harvest them. It is not the fixed-fixture identity used by renderer A/B
+comparisons; the comparison CLI continues to reject this separate scenario.
+
+Regional runs fail if a measured pilot rejoins, the field changes to fixture mode,
+the field becomes empty, or normal nearby asteroid snapshots are missing. Runs
+of at least 30 seconds additionally require server-accepted Mineral Scan states
+carrying asteroids beyond the ordinary radar circle, matched by sequence and
+server clocks to the real client's successful application. A due scan remains
+pending while authoritative cooldown or UI readiness blocks trusted input, and
+retries at the next input slot; beginning measurement also queues a scan. No
+world timer is reset. `regionalWorld.scanEvidence` retains bounded input
+decisions, actual ability requests, accepted events, and matching applied
+snapshots, while warmup scan counts remain separate from measured work. The
+opt-in client recorder retains a scalar receipt after every successful application,
+including its actual owner, session, sequence, both server clocks and browser
+application time. These receipts survive session resets until drained; a browser
+monotonic measurement boundary excludes undrained warmup work. A short scan can
+therefore qualify between observation polls. Missing, unmatched or omitted
+application receipts fail qualification. Each drain retains at most 4096 receipts;
+the regional report retains at most 60,000 matched application witnesses.
+
+After browser cleanup, a private 0600 artifact beside the report retains the first
+32 successfully decoded measured browser snapshot envelopes of at least 64 KiB, within an
+8 MiB artifact ceiling. It records exact UTF-8 payload sizes, hashes and explicit
+frame/byte omissions. Capture never retains join/resume controls, and performs no
+per-field byte partitioning during measurement. Use this actual nearby-world
+evidence for later geometry/collection analysis; old synthetic ledger shares do
+not establish natural-world byte costs.
+Ordinary damage, death, respawn, pickups, map discovery, spiders and loot remain live gameplay; their
+actual populations and existing combat witnesses remain in the report. Shorter
+runs report whether a scan was observed and cannot claim scan workload coverage.
+
 `combatWitness` records actual `playerDamaged`, `asteroidTagged`,
 `asteroidDestroy`, and `shockwave` messages. Player damage preserves the target,
 attacker, damage, remaining health, and destruction flag. An `asteroid` attacker
@@ -404,12 +593,51 @@ count as collisions.
 Chromium runs record successful gameplay WebSocket negotiation independently of
 `--trace`, including the negotiated extension header. Use the same harness when
 checking compression negotiation across runs; that witness does not claim that
-an unprofiled run is otherwise unchanged.
+an unprofiled run is otherwise unchanged. The client uses the same
+`GEOROIDS_BENCHMARK_COMPRESSION` selection as the owned server adapter: `none`,
+`deflate-level1-no-context`, or `deflate-level1-no-context-8k`. The original
+candidate retains threshold 1024 bytes; the 8 KiB candidate changes only that
+threshold to 8192 bytes. Both remain unqualified benchmark experiments, with
+production compression disabled. The report records the requested configuration
+and actual negotiation. Threshold is a local server option, so the extension
+header cannot distinguish these candidates; the strict server CPU receipt must
+retain the same named mode as the requested configuration. Candidate
+qualification requires the browser's successful 101
+extension header to prove both no-context directions; peers must also negotiate
+`permessage-deflate`. A `none` run must negotiate no extensions.
+
+Private O(1) process CPU probes bracket measurement and retain raw cumulative
+user/system microseconds, the server monotonic interval and driver-side query
+brackets. `serverProcessCpu.measurement` includes the entire server process,
+including zlib worker threads; utilization can exceed 100% when workers run in
+parallel. Driver `generatorCpu` and main-isolate CPU profiles remain separate
+observations. Regressed counters, a missing boundary or changed compression mode
+fail qualification. Transport and gameplay budgets are unchanged.
+
+Every benchmark-client lane routes gameplay through an owned TCP proxy. Both raw
+TCP sender legs disable Nagle, matching the WebSocket endpoints. The clean lane
+adds no bandwidth cap or scheduled delay; platform scheduling, receiver ACKs
+and backpressure still apply. `proxyTransport` retains live
+start/end counters from the private control socket and the driver's separate
+query brackets. Its measured bytes subtract the start totals, and rates use the
+proxy's monotonic elapsed time. Replies must belong to the same proxy instance
+and declared lane, have safe monotonic cumulative counters, and witness traffic
+in both directions without transport failures.
+
+These bytes count raw stream chunks admitted to outbound delivery, including
+WebSocket/HTTP framing and any in-flight warmup bytes that cross the window.
+They exclude TCP/IP headers and retransmission overhead. Start probes follow
+warmup and qualification; end probes immediately follow observation before
+trace/tail work or cleanup. CPU and transport probes start together but retain
+independent clocks and query brackets. Failed observations retain their actual
+partial end counters; failed or missing probes remain errors and null replies,
+never invented zeroes. `constraints.proxy` file totals and boundary peak counters
+remain whole-session diagnostics, not measured-window bytes or maxima.
 
 Real-time performance budgets allow two states for window endpoints and record rates
 below 27 authoritative states/s on a
 clean connection. Impaired lanes reserve 20% of configured downstream bandwidth
-for control/events, using measured average serialized snapshot size to derive
+for control/events, using the warmup average serialized snapshot size to derive
 the state-rate budget, capped at 27Hz with a useful floor of 10 Hz. The gap budget
 allows worst configured round-trip propagation, one bounded 64 KiB queued chunk,
 and 100 ms scheduling; clean gaps are compared with 250 ms. Whole-window state rate
@@ -419,6 +647,14 @@ failed recordings. Browser and pilot performance observations retain their limit
 worst value, difference and overrun count. Numeric overruns are report-only: no CI warning or failure. Missing streams, invalid snapshots, incomplete RTT measurements and workload
 generator failures remain errors. Review intentional feature costs before
 adjusting the reference budgets.
+The degraded profile is 125,000 bytes/s downstream and 32,000 bytes/s upstream
+per connection, with 90±60 ms propagation in each direction.
+Its nominal minimum rate is `max(10, min(27, floor(0.8 * 125000 / warmupAverageBytes)))`,
+with the same two-state endpoint allowance. Both delivery gaps and every retained
+independent server-to-applied age must stay within 924.288 ms; clean limits are
+27 Hz and 250 ms. Candidate qualification requires every browser and peer to
+meet the numeric and workload limits, even when the runner exits successfully
+and the report status is `passed`.
 The private control socket finalizes server metric windows at both measurement
 boundaries and requires every intervening window identity exactly once.
 

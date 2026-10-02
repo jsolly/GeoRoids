@@ -1,5 +1,6 @@
 import { isContourLockState } from '../../shared/contourLock';
 import { readReleaseId } from '../../shared/releaseId';
+import { SNAPSHOT_VERSION } from '../../shared/snapshotProtocol';
 import { storeOffer } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type {
@@ -9,6 +10,7 @@ import type {
   Position,
   ScoutUtilityId,
   ShipKitId,
+  SnapshotAcknowledgement,
   Velocity,
 } from '../../shared-types';
 import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
@@ -35,7 +37,7 @@ export type ClientCommand =
       name: string;
       position: Position;
       kitId?: ShipKitId;
-      snapshotVersion: 1;
+      snapshotVersion: typeof SNAPSHOT_VERSION;
       asteroidInteractions: 1;
       resumeRequested: boolean;
       resumeToken?: string;
@@ -45,6 +47,7 @@ export type ClientCommand =
   | { type: 'equipSatellite'; id: string; pickupId: string }
   | { type: 'leave' }
   | { type: 'snapshotResync' }
+  | ({ type: 'snapshotAck' } & SnapshotAcknowledgement)
   | {
       type: 'useAbility';
       id: string;
@@ -247,7 +250,7 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       const asteroidInteractionsOffer =
         message['asteroidInteractions'] ?? payload['asteroidInteractions'];
       const rawToken = message['resumeToken'] ?? payload['resumeToken'];
-      if (snapshotOffer !== 1 || asteroidInteractionsOffer !== 1) {
+      if (snapshotOffer !== SNAPSHOT_VERSION || asteroidInteractionsOffer !== 1) {
         return invalid(type, 'Client update required; refresh GeoRoids');
       }
       const position = readJoinPosition(fields['position']);
@@ -265,13 +268,19 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
           name,
           position,
           ...(isShipKitId(kitOffer) ? { kitId: kitOffer } : {}),
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
           resumeRequested: rawToken !== undefined,
           ...(typeof rawToken === 'string' ? { resumeToken: rawToken } : {}),
           ...(clientReleaseId ? { clientReleaseId } : {}),
         },
       };
+    }
+    case 'snapshotAck': {
+      const sequence = readSafeInteger(fields['sequence']);
+      return sequence !== undefined && sequence > 0
+        ? { ok: true, command: { type, sequence } }
+        : invalid(type, 'Invalid applied snapshot acknowledgment');
     }
     case 'leave':
     case 'snapshotResync':

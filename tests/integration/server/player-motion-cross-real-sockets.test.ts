@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it as test } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerEntityData, ServerGameSnapshot } from '../../../shared-types';
 import { WireClient } from '../../support/wireClient';
 
@@ -36,6 +36,7 @@ class PilotSocket {
         if (result.kind === 'snapshot') {
           this.snapshots.push(result.state);
           this.messages.push({ type: 'snapshot' });
+          this.send('snapshotAck', { sequence: result.metadata.sequence });
           return;
         }
         if (!isRecord(result.message) || typeof result.message['type'] !== 'string') {
@@ -98,7 +99,7 @@ class PilotSocket {
       name: id,
       position: { x, y: 0 },
       kitId: 'hauler',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       ...(resumeToken ? { resumeToken } : {}),
     });
@@ -125,7 +126,9 @@ async function connect(): Promise<PilotSocket> {
     throw new Error('Server missing');
   }
   const client = new PilotSocket(
-    new WebSocket(`ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`)
+    new WebSocket(
+      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+    )
   );
   clients.push(client);
   await client.open();
@@ -189,7 +192,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
 
   test('retains a free session through a physical flap and accepts only its private token', async () => {
     const { pilot, observer, joined, engine } = await world();
-    expect(joined['snapshotVersion']).toBe(1);
+    expect(joined['snapshotVersion']).toBe(SNAPSHOT_VERSION);
     expect(joined['asteroidInteractions']).toBe(1);
     expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
 
@@ -241,7 +244,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       id: 'forged-id',
       name: 'forged-id',
       position: { x: 800, y: 0 },
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: joined['resumeToken'],
     });
@@ -353,7 +356,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       name: 'retired',
       position: { x: 100, y: 0 },
       kitId: 'hauler',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: token,
     });
@@ -385,7 +388,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       name: 'retired',
       position: { x: 100, y: 0 },
       kitId: 'hauler',
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       resumeToken: token,
     });

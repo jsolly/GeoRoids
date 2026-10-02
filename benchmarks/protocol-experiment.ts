@@ -3,7 +3,12 @@ import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, gunzipSync, gzipSync, inflateSync } from 'node:zlib';
-import { SnapshotDecoder, SnapshotEncoder, type SnapshotFrame } from '../shared/snapshotProtocol';
+import {
+  SNAPSHOT_VERSION,
+  SnapshotDecoder,
+  SnapshotEncoder,
+  type SnapshotFrame,
+} from '../shared/snapshotProtocol';
 import type { PlayerProjectileState, ServerGameSnapshot } from '../shared-types';
 import { snapshotFixture } from '../tests/unit/network/snapshotFixture';
 import { type Measurement, validateMeasurement } from './results';
@@ -231,8 +236,8 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     witness: {
       fixture: 'tests/unit/network/snapshotFixture.ts',
       variants: {
-        keyframe: 'snapshot-v1 keyframe',
-        delta: 'snapshot-v1 delta',
+        keyframe: `snapshot-v${SNAPSHOT_VERSION} keyframe`,
+        delta: `snapshot-v${SNAPSHOT_VERSION} delta`,
       },
       utf8ByteSizing: "Buffer.byteLength(payload, 'utf8')",
       unicodeProbe: { value: unicodeProbe, utf8Bytes: Buffer.byteLength(unicodeProbe, 'utf8') },

@@ -114,6 +114,8 @@ npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 
 **Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. Full suites use six authenticated shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. Each child retains serial execution. See [isolated shards](integration-shards.md). The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
 
+Use repository-relative or absolute paths for explicit test files; missing files fail before services start. Plain substrings such as `selected-pilot` remain text filters. A file location may have one numeric `:line` suffix. Put selectors directly after the runner command: Vitest ignores a nonempty `--` tail, so the runner refuses that tail instead of silently running a partial selection.
+
 ## Architecture
 
 ### Two processes, one game
@@ -124,10 +126,12 @@ npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 
 Vite dev proxies `/ws` to `ws://localhost:3001` so the client always connects via the Vite origin.
 
-Gameplay requires snapshot v1 and asteroid interactions. The client adds
-`asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
+Gameplay requires snapshot v2 and asteroid interactions. The client adds
+`snapshotVersion=2` and `asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
 Unsupported clients receive HTTP 426 or an explicit join error; there are no
-protocol opt-out flags or rollback procedure. Reconnects use a private resume token.
+protocol opt-out flags or version-1 bridge. Client and server deploy independently;
+joining can be unavailable until both hosts publish matching versions. Reconnects
+use a private resume token. See [snapshot deployment](protocol/snapshot-v2.md#deployment).
 
 ### Server-authoritative model
 

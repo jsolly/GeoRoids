@@ -12,7 +12,7 @@ import { afterEach, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 import railwayConfig from '../../../.railway/railway';
 import { WorldStore } from '../../../server/world/WorldStore';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
@@ -133,6 +133,7 @@ class Pilot {
         if (result.kind === 'snapshot') {
           this.packets.push({ type: 'snapshot', data: result.metadata });
           this.states.push(result.state);
+          this.send('snapshotAck', { sequence: result.metadata.sequence });
           return;
         }
         const packet = result.message;
@@ -157,7 +158,7 @@ class Pilot {
       name: id,
       kitId: 'hauler',
       position: { x: id === 'observer' ? -2000 : 2000, y: 0 },
-      snapshotVersion: 1,
+      snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
       ...(resumeToken ? { resumeToken } : {}),
     });
@@ -183,7 +184,9 @@ class Pilot {
 }
 
 async function pilot(port: number): Promise<Pilot> {
-  const client = new Pilot(connect(port, '/ws?other=kept&asteroidInteractions=1'));
+  const client = new Pilot(
+    connect(port, `/ws?other=kept&snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`)
+  );
   await once(client.ws, 'open', { signal: AbortSignal.timeout(5000) });
   return client;
 }
@@ -344,7 +347,11 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   await observer.join('observer');
   const original = await pilot(port);
   const joined = await original.join('entry-pilot');
-  expect(joined).toMatchObject({ id: 'entry-pilot', snapshotVersion: 1, asteroidInteractions: 1 });
+  expect(joined).toMatchObject({
+    id: 'entry-pilot',
+    snapshotVersion: SNAPSHOT_VERSION,
+    asteroidInteractions: 1,
+  });
   expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
   const before = await observer.state();
   const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch;
@@ -385,7 +392,7 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   const expired = await pilot(port);
   expired.send('join', {
     id: 'expired',
-    snapshotVersion: 1,
+    snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
     resumeToken: joined['resumeToken'],
   });

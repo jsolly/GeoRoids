@@ -11,18 +11,20 @@ import { expect, test } from 'vitest';
 const script = fileURLToPath(
   new URL('../../../scripts/compare-mobile-sessions.ts', import.meta.url)
 );
+
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fixtureManifest = { seed: 42, scenario: 'combat' };
 const fixtureHash = hash(fixtureManifest);
 const quality = { maxDpr: 'native', glow: 'full' };
-async function fixture(directory: string, kind: 'quality' | 'product' = 'quality') {
+async function fixture(directory: string, kind: 'quality' | 'product' | 'renderer' = 'quality') {
   const aa: string[][] = [];
   const ab: string[][] = [];
   for (let index = 0; index < 12; index++) {
     const candidate = index >= 6 && index % 2 === 1;
     const arm = candidate && kind === 'product' ? 'candidate' : 'baseline';
     const graphics = candidate && kind === 'quality' ? { ...quality, maxDpr: 2 } : quality;
+    const renderer = candidate && kind === 'renderer' ? 'webgl2' : 'canvas';
     const frames = Array.from({ length: 18750 }, (_, frame) =>
       frame < (candidate ? 94 : 375) ? 31 : 16
     );
@@ -52,7 +54,16 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           browser: { name: 'chromium', version: '1', launchFlags: [], headed: false },
           physicalDevice: false,
           measurementSource: 'emulated-touch',
-          gpu: { supported: true },
+          gpu: {
+            supported: true,
+            ...(kind === 'renderer'
+              ? {
+                  renderer: { glRenderer: 'fixture GPU' },
+                  devices: [{ vendorId: 1, deviceId: 2 }],
+                  featureStatus: { webgl2: 'enabled' },
+                }
+              : {}),
+          },
         },
       },
       finalHashes: git,
@@ -64,6 +75,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           cpuSlowdown: 1,
           network: 'clean',
           headed: false,
+          ...(kind === 'renderer' ? { renderer } : {}),
         },
       },
       details: {
@@ -124,6 +136,19 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
                 clientReleaseId: arm,
                 serverReleaseId: arm,
                 graphicsSettings: { deviceDpr: 3, cssWidth: 390, cssHeight: 844, ...graphics },
+                ...(kind === 'renderer'
+                  ? {
+                      renderer: {
+                        requested: renderer,
+                        backend: renderer,
+                        frames: {
+                          canvas: renderer === 'canvas' ? 18750 : 0,
+                          webgl2: renderer === 'webgl2' ? 18750 : 0,
+                        },
+                        gpuStats: renderer === 'webgl2' ? { frames: 18750 } : null,
+                      },
+                    }
+                  : {}),
                 counters: {},
                 metrics: {
                   'play.frameIntervalMs': metric(frames),
@@ -157,11 +182,13 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           sourceSha256: hash('baseline'),
           productSha256: hash('product-baseline'),
           quality,
+          ...(kind === 'renderer' ? { renderer: 'canvas' } : {}),
         },
         candidate: {
           sourceSha256: hash(kind === 'product' ? 'candidate' : 'baseline'),
           productSha256: hash(kind === 'product' ? 'product-candidate' : 'product-baseline'),
           quality: kind === 'quality' ? { ...quality, maxDpr: 2 } : quality,
+          ...(kind === 'renderer' ? { renderer: 'webgl2' } : {}),
         },
       },
       aa,
@@ -178,7 +205,7 @@ function run(manifest: string, output: string) {
   );
 }
 
-test.each(['quality', 'product'] as const)(
+test.each(['quality', 'product', 'renderer'] as const)(
   'controlled %s comparison verifies source arms and preserves workload evidence',
   async (kind) => {
     const directory = await mkdtemp(join(tmpdir(), 'mobile-comparison-'));
@@ -241,7 +268,7 @@ test.each(['quality', 'product'] as const)(
           (r: typeof original) => {
             r.metadata.environment.gpu = { supported: false };
           },
-          'Device, viewport',
+          kind === 'renderer' ? 'requires an observed GPU environment' : 'Device, viewport',
         ],
         [
           (r: typeof original) => {
@@ -272,3 +299,105 @@ test.each(['quality', 'product'] as const)(
     }
   }
 );
+
+test('a GPU session cannot hide a Canvas fallback that recovered before collection', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'renderer-comparison-'));
+  try {
+    const manifest = await fixture(directory, 'renderer');
+    const output = join(directory, 'comparison.json');
+    const path = join(directory, 'session-7.json');
+    const original = JSON.parse(await readFile(path, 'utf8'));
+    for (const [mutation, error] of [
+      [
+        (report: typeof original) => {
+          const interval = report.details.scenarios[0].intervals[0];
+          interval.renderer.frames = { canvas: 1, webgl2: 18749 };
+        },
+        'Renderer fell back or changed during measurement',
+      ],
+      [
+        (report: typeof original) => {
+          report.details.scenarios[0].intervals[0].renderer.backend = 'canvas';
+        },
+        'Observed renderer backend differs from experiment arm',
+      ],
+      [
+        (report: typeof original) => {
+          report.details.scenarios[0].intervals[0].renderer.frames.webgl2--;
+        },
+        'Renderer observations do not cover every timed frame',
+      ],
+      [
+        (report: typeof original) => {
+          report.measurement.parameters.renderer = 'canvas';
+        },
+        'Requested renderer differs from experiment arm',
+      ],
+      [
+        (report: typeof original) => {
+          report.details.scenarios[0].intervals[0].renderer.requested = 'canvas';
+        },
+        'Observed renderer request differs from experiment arm',
+      ],
+      [
+        (report: typeof original) => {
+          delete report.details.scenarios[0].intervals[0].renderer;
+        },
+        'Expected an object',
+      ],
+      [
+        (report: typeof original) => {
+          report.metadata.environment.gpu.renderer.glRenderer = 'different GPU';
+        },
+        'Device, viewport',
+      ],
+      [
+        (report: typeof original) => {
+          report.metadata.git.buildSha256 = hash('different built assets');
+          report.finalHashes.buildSha256 = report.metadata.git.buildSha256;
+        },
+        'Renderer comparison changed built assets',
+      ],
+    ] as const) {
+      const damaged = structuredClone(original);
+      mutation(damaged);
+      await writeFile(path, JSON.stringify(damaged));
+      expect(() => run(manifest, output)).toThrow(error);
+    }
+    await writeFile(path, JSON.stringify(original));
+    const originalManifest = JSON.parse(await readFile(manifest, 'utf8'));
+    for (const [mutation, error] of [
+      [
+        (experiment: typeof originalManifest.experiment) => {
+          experiment.candidate.sourceSha256 = hash('other source');
+        },
+        'Renderer comparison changed source',
+      ],
+      [
+        (experiment: typeof originalManifest.experiment) => {
+          experiment.candidate.productSha256 = hash('other product');
+        },
+        'Renderer comparison changed product',
+      ],
+      [
+        (experiment: typeof originalManifest.experiment) => {
+          experiment.candidate.quality.maxDpr = 2;
+        },
+        'Renderer comparison changed graphics quality',
+      ],
+      [
+        (experiment: typeof originalManifest.experiment) => {
+          experiment.candidate.renderer = 'canvas';
+        },
+        'A renderer experiment changes exactly one backend',
+      ],
+    ] as const) {
+      const damaged = structuredClone(originalManifest);
+      mutation(damaged.experiment);
+      await writeFile(manifest, JSON.stringify(damaged));
+      expect(() => run(manifest, output)).toThrow(error);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -3,14 +3,10 @@ import { PALETTE, VISUAL } from '../constants';
 import { getGameBoundary } from '../physics/boundary';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
+import { drawStarLayers, type StarPoint } from './nativeStarPainter';
 import { rotatedViewSize } from './travelCamera';
 
-const starScreen = { x: 0, y: 0 };
-
-interface Star {
-  x: number;
-  y: number;
-  alpha: number;
+interface Star extends StarPoint {
   fillStyle: string;
 }
 
@@ -117,13 +113,8 @@ function getStarTile(tileX: number, tileY: number): readonly Star[] {
   return stars;
 }
 
-export function drawStarfield(shipPosition: Position): void {
-  const ctx = canvasManager.getContext();
-  const cvs = canvasManager.getCanvas();
-  if (!ctx || !cvs) {
-    return;
-  }
-
+/** Both backends retain only the deterministic tiles intersecting the current view. */
+export function visibleStarTiles(shipPosition: Position): readonly (readonly Star[])[] {
   const viewport = canvasManager.getViewportSize();
   const size = VISUAL.STAR_SIZE;
 
@@ -151,20 +142,11 @@ export function drawStarfield(shipPosition: Position): void {
   );
 
   const visibleTiles = new Set<string>();
-  const screen = starScreen;
+  const tiles: (readonly Star[])[] = [];
   for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
     for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
       visibleTiles.add(`${tileX},${tileY}`);
-      for (const star of getStarTile(tileX, tileY)) {
-        canvasManager.worldToScreenInto(screen, star, shipPosition);
-        const sx = screen.x;
-        const sy = screen.y;
-        if (sx < -size || sy < -size || sx > viewport.width + size || sy > viewport.height + size) {
-          continue;
-        }
-        ctx.fillStyle = star.fillStyle;
-        ctx.fillRect((sx + 0.5) | 0, (sy + 0.5) | 0, size, size);
-      }
+      tiles.push(getStarTile(tileX, tileY));
     }
   }
   for (const key of cachedTiles.keys()) {
@@ -172,4 +154,20 @@ export function drawStarfield(shipPosition: Position): void {
       cachedTiles.delete(key);
     }
   }
+  return tiles;
+}
+
+export function drawStarfield(shipPosition: Position): void {
+  const ctx = canvasManager.getContext();
+  if (!ctx || !canvasManager.getCanvas()) {
+    return;
+  }
+  drawStarLayers(
+    ctx,
+    visibleStarTiles(shipPosition),
+    shipPosition,
+    canvasManager.getViewportSize(),
+    canvasManager.getPlayfieldScale(),
+    canvasManager.getCameraRotation()
+  );
 }

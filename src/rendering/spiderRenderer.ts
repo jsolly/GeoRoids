@@ -11,10 +11,11 @@ import {
 } from '../physics/terrain/spiderSession';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { canvasManager } from './canvasSurface';
-import { contourCandidates } from './contourSpatialIndex';
+import { createContourQuery } from './contourSpatialIndex';
 import { spiderFootContacts } from './spiderFootContacts';
 
 const healthHistory = new Map<string, { health: number; flashUntil: number }>();
+const infestationCandidates = createContourQuery();
 
 function drawInfestedContours(
   ctx: CanvasRenderingContext2D,
@@ -33,7 +34,7 @@ function drawInfestedContours(
   ctx.strokeStyle = `rgba(236,58,83,${0.7 + 0.15 * Math.sin(time * 3)})`;
   ctx.beginPath();
   for (const [ordinal] of levels.entries()) {
-    const segments = contourCandidates(levels, ordinal, {
+    const segments = infestationCandidates(levels, ordinal, {
       x,
       y,
       width: radius * 2,

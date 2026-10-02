@@ -6,7 +6,6 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
-import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('inventory follows its owner across snapshot interest and reconnect grace, then drops on leave or grace expiry', () => {
@@ -38,6 +37,15 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
   broadcaster.negotiateSnapshot(observerSocket);
   const decoder = new SnapshotDecoder();
   const observerDecoder = new SnapshotDecoder();
+  const apply = (target: RecordingSocket, packetDecoder: SnapshotDecoder, raw: string) => {
+    const result = packetDecoder.readMessage(raw, { acceptSnapshots: true });
+    assert.ok(result.kind === 'snapshot');
+    core.handleClientMessage(
+      { type: 'snapshotAck', data: { sequence: result.metadata.sequence } },
+      target
+    );
+    return result.state;
+  };
   const read = () => {
     socket.sent.length = 0;
     observerSocket.sent.length = 0;
@@ -49,8 +57,8 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     );
     assert.ok(observerRaw);
     return {
-      owner: decodeSnapshotMessage(decoder, raw),
-      observer: decodeSnapshotMessage(observerDecoder, observerRaw),
+      owner: apply(socket, decoder, raw),
+      observer: apply(observerSocket, observerDecoder, observerRaw),
     };
   };
   try {

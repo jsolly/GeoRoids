@@ -37,23 +37,63 @@ function tileAddress(cell: number): { id: string; byte: number; bit: number } {
   };
 }
 
-const indexes = new WeakMap<readonly ExplorationTile[], Map<string, string>>();
+const SECTORS_PER_AXIS = EXPLORATION_GRID_SIZE / CELLS_PER_SECTOR;
+// Snapshot identity owns one index. Decode only queried sectors, retaining no history
+// after that immutable snapshot becomes unreachable.
+const indexes = new WeakMap<readonly ExplorationTile[], Map<number, string | Uint8Array>>();
 export function isCellExplored(tiles: readonly ExplorationTile[], cell: number): boolean {
   let index = indexes.get(tiles);
   if (!index) {
-    index = new Map(tiles.map((tile) => [tile.id, tile.bits]));
+    index = new Map();
+    for (const tile of tiles) {
+      const id = tile.id;
+      const comma = id.indexOf(',');
+      const col = Number(id.slice(0, comma));
+      const row = Number(id.slice(comma + 1));
+      // The old string lookup matched canonical addresses only. Leading zero IDs
+      // must not alias a canonical sector, even though validation accepts them.
+      if (
+        !Number.isSafeInteger(col) ||
+        !Number.isSafeInteger(row) ||
+        col < 0 ||
+        row < 0 ||
+        col >= SECTORS_PER_AXIS ||
+        row >= SECTORS_PER_AXIS ||
+        `${col},${row}` !== id
+      ) {
+        continue;
+      }
+      index.set(row * SECTORS_PER_AXIS + col, tile.bits);
+    }
     indexes.set(tiles, index);
   }
-  const address = tileAddress(cell);
-  const bits = index.get(address.id);
-  if (!bits) {
+  const col = cell % EXPLORATION_GRID_SIZE;
+  const row = Math.floor(cell / EXPLORATION_GRID_SIZE);
+  const sectorCol = Math.floor(col / CELLS_PER_SECTOR);
+  const sectorRow = Math.floor(row / CELLS_PER_SECTOR);
+  if (
+    sectorCol < 0 ||
+    sectorRow < 0 ||
+    sectorCol >= SECTORS_PER_AXIS ||
+    sectorRow >= SECTORS_PER_AXIS
+  ) {
     return false;
   }
-  return (
-    (Number.parseInt(bits.slice(address.byte * 2, address.byte * 2 + 2), 16) &
-      (1 << address.bit)) !==
-    0
-  );
+  const key = sectorRow * SECTORS_PER_AXIS + sectorCol;
+  let bytes = index.get(key);
+  if (bytes === undefined) {
+    return false;
+  }
+  if (typeof bytes === 'string') {
+    const encoded = bytes;
+    bytes = new Uint8Array(Math.ceil(encoded.length / 2));
+    for (let byte = 0; byte < bytes.length; byte++) {
+      bytes[byte] = Number.parseInt(encoded.slice(byte * 2, byte * 2 + 2), 16);
+    }
+    index.set(key, bytes);
+  }
+  const offset = (row % CELLS_PER_SECTOR) * CELLS_PER_SECTOR + (col % CELLS_PER_SECTOR);
+  return ((bytes[Math.floor(offset / 8)] ?? 0) & (1 << (offset % 8))) !== 0;
 }
 
 /** Iterate visible cells only, regardless of the explored world's size. */

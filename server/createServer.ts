@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
+import { SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   connectionLimitsDisabled,
@@ -39,6 +40,8 @@ type CreateServerOptions = {
   worldPath?: string;
   /** Apply production connection budgets even when test or development would skip them. */
   enforceConnectionLimits?: boolean;
+  /** Explicit transport injection; the production entry keeps compression disabled. */
+  perMessageDeflate?: false | WebSocket.PerMessageDeflateOptions;
 };
 
 export function createServerInstance(options: CreateServerOptions = {}) {
@@ -234,6 +237,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const wss = new WebSocketServer({
     server: httpServer,
     maxPayload: 64 * 1024,
+    perMessageDeflate: options.perMessageDeflate ?? false,
     verifyClient: (info, done) => {
       let url: URL;
       try {
@@ -242,7 +246,11 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         done(false, 400, 'Invalid WebSocket URL');
         return;
       }
-      if (url.pathname === '/ws' && url.searchParams.get('asteroidInteractions') !== '1') {
+      if (
+        url.pathname !== '/logs' &&
+        (url.searchParams.get('snapshotVersion') !== String(SNAPSHOT_VERSION) ||
+          url.searchParams.get('asteroidInteractions') !== '1')
+      ) {
         // Reject before open: clients without the supported capability otherwise
         // reset their retry counter on every successful upgrade and reconnect forever.
         done(false, 426, 'Client update required; refresh GeoRoids');

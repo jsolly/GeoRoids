@@ -1,7 +1,9 @@
 // @vitest-environment node
+
 import { afterEach, beforeEach, describe, expect, it as test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { nearbyAsteroidRows } from '../../../shared/world';
 import type { AsteroidData, Position } from '../../../shared-types';
 
@@ -129,7 +131,7 @@ async function join(socket: WireClient, id: string, position: Position): Promise
   socket.send({
     type: 'join',
     id,
-    data: { name: id, position, snapshotVersion: 1, asteroidInteractions: 1 },
+    data: { name: id, position, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
   });
   await socket.barrier();
   const joined = messageAt(socket.messages, start, 'joined');
@@ -155,7 +157,7 @@ beforeEach(async () => {
   const port = await server.listening;
   server.gameEngine.stopGameLoop();
   server.wsCore.stopPeriodicGameStateBroadcast();
-  wsUrl = `ws://127.0.0.1:${port}/ws?asteroidInteractions=1`;
+  wsUrl = `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`;
 });
 
 afterEach(async () => {

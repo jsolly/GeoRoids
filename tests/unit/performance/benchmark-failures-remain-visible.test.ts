@@ -128,3 +128,84 @@ test('changed benchmark inputs cannot retain a passing result', async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test.each(['errors', 'warnings'] as const)(
+  'a scenario with late %s cannot retain its earlier passing status',
+  async (field) => {
+    const directory = await mkdtemp(join(tmpdir(), 'georoids-late-diagnostics-'));
+    const path = join(directory, 'late.json');
+    const diagnostics: string[] = [];
+    const cause = 'Pilot socket unavailable during scenario teardown';
+    try {
+      const report = createLiveReport({
+        kind: 'realtime-client',
+        metadata: collectLiveReportMetadata(),
+        measurement: {
+          primaryMetric: 'frameMs',
+          samples: { frameMs: [16] },
+          counts: { successfulScenarios: 1, failedScenarios: 0 },
+          parameters: {},
+          witness: {},
+          cleanup: 'complete',
+        },
+        details: {
+          cleanupComplete: true,
+          scenarios: [{ status: 'passed', errors: [], warnings: [], [field]: diagnostics }],
+          failures: [],
+        },
+      });
+      expect(report.status).toBe('passed');
+      // The asynchronous teardown callback runs after scenario status is saved.
+      await Promise.resolve().then(() => diagnostics.push(cause));
+      await expect(writeLiveReport(path, report)).rejects.toThrow(cause);
+      const saved = JSON.parse(await readFile(path, 'utf8'));
+      expect(saved.status).toBe('failed');
+      expect(saved.details.scenarios[0]).toMatchObject({ status: 'failed', [field]: [cause] });
+      expect(saved.details.cleanupComplete).toBe(true);
+      expect(saved.measurement.counts).toMatchObject({
+        successfulScenarios: 0,
+        failedScenarios: 1,
+      });
+      expect(saved.validationFailure.message).toContain(cause);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
+test.each([
+  { scenarios: [{ status: 'failed', failure: { message: 'Peer lost its world' } }], failures: [] },
+  {
+    scenarios: [{ status: 'passed', errors: [], warnings: [] }],
+    failures: ['Browser cleanup failed'],
+  },
+  { scenarios: [{ status: 'passed', errors: [], warnings: [] }], cleanupComplete: false },
+])(
+  'recorded scenario or cleanup failure rejects an otherwise passing report: %j',
+  async (details) => {
+    const directory = await mkdtemp(join(tmpdir(), 'georoids-recorded-failure-'));
+    const path = join(directory, 'failure.json');
+    try {
+      const report = createLiveReport({
+        kind: 'realtime-client',
+        metadata: collectLiveReportMetadata(),
+        measurement: {
+          primaryMetric: 'frameMs',
+          samples: { frameMs: [16] },
+          counts: { frames: 1 },
+          parameters: {},
+          witness: {},
+          cleanup: 'complete',
+        },
+        details,
+      });
+      await expect(writeLiveReport(path, report)).rejects.toThrow('Recorded benchmark failures');
+      const saved = JSON.parse(await readFile(path, 'utf8'));
+      expect(saved.status).toBe('failed');
+      expect(saved.validationFailure.message).toBeTruthy();
+      expect(saved.details).toMatchObject(details);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);

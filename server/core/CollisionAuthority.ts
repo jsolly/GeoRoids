@@ -108,7 +108,7 @@ export class CollisionAuthority {
   }
 
   public collectAsteroidPickupHits(
-    asteroids: AsteroidData[],
+    index: AsteroidSpatialIndex,
     pickups: SatellitePickupData[]
   ): Array<{ asteroidId: string; pickupId: string }> {
     const livePickups = pickups.filter(
@@ -116,13 +116,21 @@ export class CollisionAuthority {
     );
     const hits: Array<{ asteroidId: string; pickupId: string }> = [];
     for (const pickup of livePickups) {
-      const asteroid = asteroids.find((candidate) =>
-        circlesOverlap(
-          pickup.position,
-          pickup.radius,
-          candidate.position,
-          asteroidCollisionRadius(candidate)
-        )
+      const nearby = index.query({
+        minX: pickup.position.x - pickup.radius,
+        minY: pickup.position.y - pickup.radius,
+        maxX: pickup.position.x + pickup.radius,
+        maxY: pickup.position.y + pickup.radius,
+      });
+      const asteroid = nearby.find(
+        (candidate) =>
+          candidate.boost?.phase !== 'burning' &&
+          circlesOverlap(
+            pickup.position,
+            pickup.radius,
+            candidate.position,
+            asteroidCollisionRadius(candidate)
+          )
       );
       if (asteroid) {
         hits.push({ asteroidId: asteroid.id, pickupId: pickup.id });

@@ -19,6 +19,7 @@ import {
   TOWN_STORE_IDS,
 } from '../../../src/ui/townStore';
 import { isTownStoreOpen } from '../../../src/ui/townStoreState';
+import { setWindowViewport } from '../../support/viewport';
 
 beforeAll(() => {
   const network = NetworkManager.getInstance();
@@ -239,6 +240,105 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   expect(isTownStoreOpen()).toBe(true);
   closeTownStore();
   width.mockRestore();
+});
+
+test('boarding hints query the current touch mode only while a live pilot can board', () => {
+  closeTownStore();
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  const street = civicLot('street-1-0');
+  if (!player || !street) {
+    throw new Error('Missing travel fixture');
+  }
+  const previous = {
+    position: { ...player.ship.position },
+    health: player.ship.health,
+    exploding: player.ship.exploding,
+    furnaceTransit: player.ship.furnaceTransit,
+    modules: worldFurnaces.litModules().map((module) => ({ ...module })),
+  };
+  const restoreViewport = setWindowViewport(1600, 1200);
+  let coarse = false;
+  const media = vi.spyOn(window, 'matchMedia').mockImplementation((query) =>
+    Object.assign(new window.EventTarget(), {
+      matches: coarse && query === '(pointer: coarse)',
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+    })
+  );
+  const hint = () => document.querySelector('#furnace-travel-prompt');
+  const button = () => hint()?.querySelector('button');
+  const line = () => hint()?.querySelector('span');
+  const shown = () => hint()?.classList.contains('is-visible') ?? false;
+  try {
+    worldFurnaces.replaceLit([{ id: street.id, builderName: 'Pilot' }]);
+    player.ship.position = { x: 800, y: 0 };
+    player.ship.health = 100;
+    player.ship.exploding = false;
+    player.ship.furnaceTransit = null;
+    for (let frame = 0; frame < 120; frame += 1) {
+      syncFurnaceTravelPrompt();
+    }
+    expect(shown()).toBe(false);
+    expect(media).not.toHaveBeenCalled();
+
+    // Positive work control: visible hints still read both actual media queries.
+    player.ship.position = { ...TOWN_HEARTH.position };
+    syncFurnaceTravelPrompt();
+    expect(shown()).toBe(true);
+    expect(line()?.textContent).toBe('Press E to enter');
+    expect(button()?.hidden).toBe(true);
+    expect(media.mock.calls).toEqual([['(pointer: coarse)'], ['(hover: none)']]);
+
+    media.mockClear();
+    player.ship.health = 0;
+    coarse = true;
+    syncFurnaceTravelPrompt();
+    expect(shown()).toBe(false);
+    expect(media).not.toHaveBeenCalled();
+    player.ship.health = 100;
+    syncFurnaceTravelPrompt();
+    expect(shown()).toBe(true);
+    expect(button()?.hidden).toBe(false);
+    expect(button()?.textContent).toBe('Enter');
+    expect(line()?.hidden).toBe(true);
+    expect(media).toHaveBeenCalledTimes(2);
+
+    media.mockClear();
+    player.ship.position = { ...street.position };
+    syncFurnaceTravelPrompt();
+    expect(button()?.textContent).toBe('Tap to travel');
+    coarse = false;
+    syncFurnaceTravelPrompt();
+    expect(line()?.textContent).toBe('Press E to travel');
+    expect(button()?.hidden).toBe(true);
+    expect(media).toHaveBeenCalledTimes(4);
+
+    media.mockClear();
+    player.ship.exploding = true;
+    syncFurnaceTravelPrompt();
+    expect(shown()).toBe(false);
+    expect(media).not.toHaveBeenCalled();
+    player.ship.exploding = false;
+    coarse = true;
+    syncFurnaceTravelPrompt();
+    expect(shown()).toBe(true);
+    expect(button()?.textContent).toBe('Tap to travel');
+    expect(button()?.hidden).toBe(false);
+    expect(media).toHaveBeenCalledTimes(2);
+  } finally {
+    media.mockRestore();
+    restoreViewport();
+    Object.assign(player.ship, {
+      position: previous.position,
+      health: previous.health,
+      exploding: previous.exploding,
+      furnaceTransit: previous.furnaceTransit,
+    });
+    worldFurnaces.replaceLit(previous.modules);
+    syncFurnaceTravelPrompt();
+  }
 });
 
 test('a Hauler on an unbuilt furnace footprint is told only Scouts can build it', () => {

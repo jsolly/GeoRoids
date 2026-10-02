@@ -1,8 +1,10 @@
 /* @vitest-environment node */
+
 import { strict as assert } from 'node:assert';
 import { afterEach, describe, expect, test } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -27,7 +29,7 @@ function addRubble(engine: GameEngine): AsteroidData {
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
   core.handleClientMessage(
-    { type: 'join', data: { ...data, snapshotVersion: 1, asteroidInteractions: 1 } },
+    { type: 'join', data: { ...data, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 } },
     socket
   );
 }
@@ -52,7 +54,7 @@ describe('server authority boundaries', () => {
           name: 'Pilot',
           kitId: 'scout',
           position: { x: 0, y: 0 },
-          snapshotVersion: 1,
+          snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
         },
       },

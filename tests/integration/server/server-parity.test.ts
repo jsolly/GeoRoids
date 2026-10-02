@@ -1,9 +1,11 @@
 // @vitest-environment node
+
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { TOWN_SPAWN_RADIUS } from '../../../shared/furnaces';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('supported gameplay message envelopes', () => {
@@ -28,7 +30,7 @@ describe('supported gameplay message envelopes', () => {
         id: 'pilot',
         name: 'Pilot',
         position: { x: 0, y: 0 },
-        snapshotVersion: 1,
+        snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
       };
       core.handleClientMessage(
@@ -75,7 +77,7 @@ describe('supported gameplay message envelopes', () => {
             id: 'peer',
             name: 'Peer',
             position: { x: 1000, y: 1000 },
-            snapshotVersion: 1,
+            snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
           },
         },

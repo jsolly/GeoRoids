@@ -2,6 +2,7 @@ export interface ClientMessage {
   type:
     | 'join'
     | 'snapshotResync'
+    | 'snapshotAck'
     | 'leave'
     | 'update'
     | 'shoot'

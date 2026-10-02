@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import {
-  SNAPSHOT_KEYFRAME_INTERVAL,
   type SnapshotBaseline,
   SnapshotDecoder,
   SnapshotEncoder,
@@ -12,17 +11,28 @@ import { snapshotFixture } from '../tests/unit/network/snapshotFixture';
 import type { Measurement } from './results';
 import { assertSelectedSnapshotState, SELECTED_SNAPSHOT_CONTRACT } from './snapshot-state';
 
-const FULL_FIXTURE_KEYS = [
-  'asteroids',
-  'collabTags',
-  'entities',
-  'gameTime',
-  'isPaused',
-  'loot',
-  'playerProjectiles',
-  'satellitePickups',
-  'terrainSeed',
-];
+const FULL_FIXTURE_FIELDS = {
+  asteroids: true,
+  beltRecovery: false,
+  civicModules: false,
+  collabTags: true,
+  entities: true,
+  exploration: true,
+  gameTime: true,
+  isPaused: true,
+  loot: true,
+  mapAssets: true,
+  playerProjectiles: true,
+  satellitePickups: true,
+  serverTime: false,
+  settlement: true,
+  spiderField: false,
+  terrainSeed: true,
+} satisfies Record<keyof ServerGameSnapshot, boolean>;
+const FULL_FIXTURE_KEYS = Object.entries(FULL_FIXTURE_FIELDS)
+  .filter(([, included]) => included)
+  .map(([name]) => name)
+  .toSorted();
 const BASELINE_PATTERNS: readonly BaselinePattern[] = ['shared', 'staggered'];
 const MAX_RECIPIENTS = 25;
 
@@ -44,7 +54,6 @@ export const DEFAULT_CODEC_SAMPLE_OPTIONS: CodecSampleOptions = {
 
 interface RecipientState {
   sequence: number;
-  sinceKeyframe: number;
   baseline?: SnapshotBaseline;
 }
 
@@ -137,14 +146,10 @@ function encodeTick(
       continue;
     }
     const sequence = current.sequence + 1;
-    const frame = encoder.encode(
-      sequence,
-      current.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL ? undefined : current.baseline
-    );
+    const frame = encoder.encode(sequence, current.baseline);
     const text = JSON.stringify({ type: 'snapshot', data: frame, timestamp: 0 });
     messages.push({ recipient, text });
     current.sequence = sequence;
-    current.sinceKeyframe = frame.kind === 'keyframe' ? 0 : current.sinceKeyframe + 1;
     current.baseline = { sequence, state: encoder.state };
   }
   return messages;
@@ -158,7 +163,6 @@ function timedEncode(
 ) {
   const state: RecipientState[] = Array.from({ length: recipientCount }, () => ({
     sequence: 0,
-    sinceKeyframe: 0,
   }));
   const history: WireMessage[][] = [];
   const samples: number[] = [];
@@ -194,7 +198,6 @@ function validateHistory(
   assert.equal(history.length, fixtureWorlds.length, 'Incomplete codec wire history');
   const state = Array.from({ length: recipientCount }, () => ({
     sequence: 0,
-    sinceKeyframe: 0,
     decoder: new SnapshotDecoder(),
   }));
   const stats = { messages: 0, keyframes: 0, deltas: 0, bytes: 0, validatedMessages: 0 };
@@ -220,7 +223,7 @@ function validateHistory(
       const kind = frame['kind'];
       assert(typeof sequence === 'number' && sequence === recipient.sequence + 1);
       assert(kind === 'keyframe' || kind === 'delta', 'Unsupported codec frame kind');
-      if (recipient.sequence === 0 || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL) {
+      if (recipient.sequence === 0) {
         assert.equal(kind, 'keyframe', 'Codec recipient did not receive its required keyframe');
       }
       const baseline = kind === 'delta' ? frame['baseline'] : null;
@@ -231,7 +234,6 @@ function validateHistory(
       trace.push([message.recipient, sequence, kind, baseline]);
       kinds.add(kind);
       recipient.sequence = sequence;
-      recipient.sinceKeyframe = kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
       stats.validatedMessages += 1;
       if (tick >= options.warmupTicks) {
         stats.messages += 1;
@@ -359,7 +361,7 @@ export function runCodecSample(
         originalInputsUnchanged: true,
       },
     },
-    parameters: options,
+    parameters: { ...options, keyframePolicy: 'initial/recovery/strictlysmaller' },
     cleanup: 'complete',
   };
 }

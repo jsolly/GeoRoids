@@ -33,12 +33,16 @@ describe('authoritative asteroid motion', () => {
       rotation: 0.5,
       angularVelocity: 0.01,
     });
+    const position = asteroid.position;
+    const velocity = asteroid.velocity;
 
     manager.updateMotion();
 
     const moved = manager.getAsteroid(id);
     expect(moved?.position).toEqual({ x: 13, y: 16 });
     expect(moved?.rotation).toBeCloseTo(0.51);
+    expect(moved?.position).toBe(position);
+    expect(moved?.velocity).toBe(velocity);
   });
 
   test('asteroids move over time on the running server loop', async () => {
@@ -77,6 +81,9 @@ describe('authoritative asteroid motion', () => {
       position: { x: getAsteroidFieldRadius() + 1000, y: 0 },
       velocity: { x: 2, y: 0 },
     });
+    const position = asteroid.position;
+    const velocity = asteroid.velocity;
+    const expected = stepAsteroidMotion({ ...position }, { ...velocity });
     manager.updateMotion();
     const after = manager.getAsteroid(asteroid.id);
     assert.ok(after);
@@ -84,6 +91,10 @@ describe('authoritative asteroid motion', () => {
     expect(Math.hypot(after.position.x, after.position.y)).toBeLessThanOrEqual(fieldRadius);
     expect(after.position.x).toBeGreaterThan(0);
     expect(after.velocity.x).toBeLessThan(0);
+    expect(after.position).toEqual(expected.position);
+    expect(after.velocity).toEqual(expected.velocity);
+    expect(after.position).toBe(position);
+    expect(after.velocity).toBe(velocity);
   });
 
   test('bouncing at the field edge stays at the wall instead of jumping into the interior', () => {

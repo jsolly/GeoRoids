@@ -12,7 +12,7 @@ import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/ro
 import {
   containAsteroidPosition,
   getAsteroidFieldRadius,
-  stepAsteroidMotion,
+  stepAsteroidMotionInto,
 } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import { isDebugMode } from '../../src/utils/debugUtils';
@@ -180,9 +180,13 @@ export class AsteroidManager {
 
     for (const asteroid of this.asteroids.values()) {
       tickAsteroidBoost(asteroid, asteroid.size, this.furnaces);
-      const next = stepAsteroidMotion(asteroid.position, asteroid.velocity);
-      asteroid.position = next.position;
-      asteroid.velocity = next.velocity;
+      stepAsteroidMotionInto(
+        asteroid.position,
+        asteroid.velocity,
+        1,
+        asteroid.position,
+        asteroid.velocity
+      );
       asteroid.rotation += asteroid.angularVelocity;
       this.index.move(asteroid);
     }

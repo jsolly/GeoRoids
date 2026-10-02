@@ -3,6 +3,7 @@ import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
+import { SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
 import {
   collectLiveReportMetadata,
   createLiveReport,
@@ -52,7 +53,7 @@ assert(
 const url = new URL(
   values.url ?? `ws://127.0.0.1:${process.env['GEOROIDS_TEST_SERVER_PORT'] ?? 3001}/ws`
 );
-url.searchParams.set('snapshotVersion', '1');
+url.searchParams.set('snapshotVersion', String(SNAPSHOT_VERSION));
 url.searchParams.set('asteroidInteractions', '1');
 assert(['ws:', 'wss:'].includes(url.protocol), 'Expected ws or wss URL');
 assert(!url.username && !url.password, 'Credentials must not appear in benchmark URLs');

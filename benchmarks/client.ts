@@ -6,7 +6,9 @@ import { extname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { type BrowserServer, chromium } from 'playwright';
+import { createClientConsoleDiagnostics } from './client-console-diagnostics';
 import type { ClientFixtureResult, ClientOptions } from './client-entry';
+import { clientSceneTraits, validateClientSceneFrames } from './client-scenes';
 
 const WS_OR_LOGS_PATH_PATTERN = /\/(ws|logs)(?:\/|\?|$)/u;
 
@@ -15,6 +17,7 @@ const VIEWPORTS = {
   desktop: { width: 1920, height: 1080 },
   'touch-portrait': { width: 390, height: 844 },
   'touch-landscape': { width: 844, height: 390 },
+  tablet: { width: 1024, height: 768 },
 };
 
 async function deadline<T>(promise: Promise<T>, milliseconds: number, label: string): Promise<T> {
@@ -76,8 +79,11 @@ async function compileFixture(output: string): Promise<void> {
   }
 }
 
-/** Compiled diagnostic fixture, not the deployed bundle; synchronous Canvas submission only. */
+/** Compiled diagnostic fixture; frame intervals and synchronous CPU submission. */
 export async function runClientSample(options: ClientOptions) {
+  const scene = options.scene ?? 'stationary';
+  const traits = clientSceneTraits(scene);
+  validateClientSceneFrames(scene, options.warmupFrames, options.measuredFrames);
   if (
     !Number.isInteger(options.seed) ||
     options.seed < 0 ||
@@ -87,7 +93,11 @@ export async function runClientSample(options: ClientOptions) {
     !Number.isInteger(options.measuredFrames) ||
     options.measuredFrames < 1 ||
     options.warmupFrames + options.measuredFrames > 3600 ||
-    !Object.hasOwn(VIEWPORTS, options.viewport)
+    !Object.hasOwn(VIEWPORTS, options.viewport) ||
+    !Number.isFinite(options.dpr ?? 1) ||
+    (options.dpr ?? 1) < 1 ||
+    (options.dpr ?? 1) > 4 ||
+    !['canvas', 'webgl2'].includes(options.renderer ?? 'canvas')
   ) {
     throw new Error('Invalid client seed, viewport, or frame counts (maximum 3600 total frames)');
   }
@@ -139,6 +149,11 @@ export async function runClientSample(options: ClientOptions) {
         frameImageSha256: ClientFixtureResult['frameImageSha256'];
         witness: ClientFixtureResult['witness'];
         parameters: object;
+        gpuObservation: object;
+        consoleDiagnostics: {
+          timing: ReturnType<ReturnType<typeof createClientConsoleDiagnostics>['finish']>;
+          observation: ReturnType<ReturnType<typeof createClientConsoleDiagnostics>['finish']>;
+        };
         cleanup: 'complete';
       }
     | undefined;
@@ -153,13 +168,46 @@ export async function runClientSample(options: ClientOptions) {
       throw new Error('No loopback fixture port');
     }
     const origin = `http://127.0.0.1:${address.port}`;
-    browserServer = await chromium.launchServer({ headless: true, timeout: 30_000 });
+    browserServer = await chromium.launchServer({
+      headless: true,
+      timeout: 30_000,
+      ...(options.chromiumGpu ? { channel: 'chromium', args: ['--enable-gpu'] } : {}),
+    });
     const browser = await chromium.connect(browserServer.wsEndpoint(), { timeout: 30_000 });
-    async function runContext(observe: boolean): Promise<ClientFixtureResult> {
+    const session = await browser.newBrowserCDPSession();
+    const { gpu } = await session.send('SystemInfo.getInfo');
+    await session.detach();
+    if (options.chromiumGpu) {
+      const renderer: unknown = gpu.auxAttributes?.['glRenderer'];
+      if (
+        typeof renderer !== 'string' ||
+        renderer.length === 0 ||
+        /swiftshader|llvmpipe|software/iu.test(renderer)
+      ) {
+        throw new Error('Requested hardware GPU path was not observed');
+      }
+      for (const feature of ['2d_canvas', 'gpu_compositing', 'rasterization']) {
+        const status: unknown = gpu.featureStatus?.[feature];
+        if (status !== 'enabled' && status !== 'enabled_on') {
+          throw new Error(`Requested GPU path lacks accelerated ${feature}`);
+        }
+      }
+    }
+    async function runContext(observe: boolean) {
+      // Each declared checkpoint captures once. The final frame reuses that
+      // capture when it is a checkpoint; otherwise it adds exactly one readback.
+      const plannedCaptures = observe
+        ? traits.checkpoints.length + (traits.checkpoints.includes(options.measuredFrames) ? 0 : 1)
+        : 0;
+      const consoleDiagnostics = createClientConsoleDiagnostics(
+        observe ? 'observation' : 'timing',
+        plannedCaptures
+      );
       const context = await deadline(
         browser.newContext({
           viewport: VIEWPORTS[options.viewport],
           hasTouch: options.viewport !== 'desktop',
+          deviceScaleFactor: options.dpr ?? 1,
           serviceWorkers: 'block',
         }),
         30_000,
@@ -187,7 +235,9 @@ export async function runClientSample(options: ClientOptions) {
         const page = await deadline(context.newPage(), 30_000, 'Browser page setup');
         page.on('pageerror', (error) => contextFailures.push(error));
         page.on('console', (message) => {
-          if (message.type() === 'error') {
+          if (message.type() === 'warning') {
+            consoleDiagnostics.warning(message.text());
+          } else if (message.type() === 'error') {
             contextFailures.push(new Error(message.text()));
           }
         });
@@ -199,10 +249,13 @@ export async function runClientSample(options: ClientOptions) {
             contextFailures.push(new Error(`HTTP ${response.status()}: ${response.url()}`));
           }
         });
-        await page.goto(`${origin}/benchmarks/client.html`, {
-          waitUntil: 'load',
-          timeout: 30_000,
-        });
+        await page.goto(
+          `${origin}/benchmarks/client.html?renderer=${options.renderer ?? 'canvas'}`,
+          {
+            waitUntil: 'load',
+            timeout: 30_000,
+          }
+        );
         await page.waitForFunction('typeof window.runClientFixture === "function"', undefined, {
           timeout: 30_000,
         });
@@ -222,16 +275,24 @@ export async function runClientSample(options: ClientOptions) {
       } catch (error) {
         contextFailures.push(error);
       }
+      let diagnostics: ReturnType<typeof consoleDiagnostics.finish> | undefined;
+      try {
+        diagnostics = consoleDiagnostics.finish(outcome?.observationCaptures ?? 0);
+      } catch (error) {
+        contextFailures.push(error);
+      }
       if (contextFailures.length) {
         throw new AggregateError(contextFailures, 'Client context failed');
       }
-      if (!outcome) {
-        throw new Error('Client context returned no outcome');
+      if (!outcome || !diagnostics) {
+        throw new Error('Client context returned no outcome or diagnostic receipt');
       }
-      return outcome;
+      return { outcome, diagnostics };
     }
-    const timed = await runContext(false);
-    const observed = await runContext(true);
+    const timingContext = await runContext(false);
+    const observationContext = await runContext(true);
+    const timed = timingContext.outcome;
+    const observed = observationContext.outcome;
     if (
       JSON.stringify(timed.witness.before) !== JSON.stringify(observed.witness.before) ||
       JSON.stringify(timed.witness.after) !== JSON.stringify(observed.witness.after)
@@ -252,22 +313,61 @@ export async function runClientSample(options: ClientOptions) {
       counts: observed.counts,
       frameWork: observed.frameWork,
       frameImageSha256: observed.frameImageSha256,
-      witness: { ...timed.witness, untimed: observed.witness.untimed },
+      witness: {
+        ...timed.witness,
+        untimed: {
+          ...observed.witness.untimed,
+          renderer: { backend: observed.rendererBackend, gpuStats: observed.gpuFrameStats },
+        },
+      },
       parameters: {
         ...options,
-        fixture: 'compiled-diagnostic-visible-scene-v1',
+        renderer: options.renderer ?? 'canvas',
+        dpr: options.dpr ?? 1,
+        chromiumGpu: options.chromiumGpu ?? false,
+        fixture:
+          scene === 'stationary'
+            ? 'compiled-diagnostic-visible-scene-v1'
+            : 'compiled-diagnostic-visible-scene-v2',
+        scene,
+        sceneTraits: traits,
+        presentationClock: traits.presentationClock,
+        contourEndpointProbeCoverage:
+          scene === 'stationary' ? 'initial-contour-set' : 'not-instrumented: dynamic terrain sets',
         viewportPixels: VIEWPORTS[options.viewport],
         browserVersion: browser.version(),
         simulationStepMs: 1000 / 60,
         initialDateNow: 1_700_000_000_000,
         localPose: 'stationary-public-authoritative-mode',
         canvasAttributes: timed.canvasAttributes,
+        rendererBackend: timed.rendererBackend,
+        gpu: {
+          devices: gpu.devices,
+          renderer: Object.fromEntries(
+            Object.entries(gpu.auxAttributes ?? {}).filter(([key]) =>
+              [
+                'glRenderer',
+                'glVendor',
+                'glVersion',
+                'displayType',
+                'passthroughCmdDecoder',
+              ].includes(key)
+            )
+          ),
+          featureStatus: gpu.featureStatus,
+        },
         timing:
-          'native rAF intervals and synchronous update/render CPU submission; excludes GPU completion',
-        observation: 'separate fresh context; real Canvas2D and Path2D method calls, not GPU draws',
+          'native rAF intervals and native-clock synchronous update/render CPU submission; excludes GPU completion',
+        observation:
+          'separate fresh context; real Canvas2D, Path2D and WebGL2 method calls; composed final image captured synchronously after drawing',
         audio: 'native silent elements without sources, installed before game imports',
       },
       cleanup: 'complete',
+      gpuObservation: gpu,
+      consoleDiagnostics: {
+        timing: timingContext.diagnostics,
+        observation: observationContext.diagnostics,
+      },
     };
   } catch (error) {
     failures.push(error);

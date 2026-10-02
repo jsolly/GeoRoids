@@ -1,10 +1,11 @@
 # Protocol and compression experiment
 
 The current script compares snapshot keyframes and deltas only. The local
-evidence table below predates legacy transport retirement.
+evidence table below predates legacy transport retirement and records version 1;
+it does not describe version-2 byte sizes or CPU costs.
 
 This is a diagnostic benchmark for the existing snapshot protocol. It compares
-a snapshot-v1 keyframe with the actual snapshot-v1 delta selected by
+a current snapshot keyframe with the actual snapshot delta selected by
 `SnapshotEncoder`. It does not change a
 wire default or enable compression in production.
 

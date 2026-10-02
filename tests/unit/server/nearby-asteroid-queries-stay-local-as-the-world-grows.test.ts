@@ -188,3 +188,23 @@ test('reflective pockets arranged in place are found where lasers and ships meet
     engine.stopGameLoop();
   }
 });
+
+test('two pilots discover one asteroid union in global source order despite overlap and pilot order', () => {
+  const earlier = rock('earlier-only-second-pilot', 4000, 0);
+  const later = rock('later-only-first-pilot', -4000, 0);
+  const shared = rock('shared', 0, 0);
+  const distant = rock('distant', 20000, 20000);
+  const index = new AsteroidSpatialIndex([earlier, later, shared, distant]);
+  const first = { minX: -4200, maxX: 200, minY: -100, maxY: 100 };
+  const second = { minX: -200, maxX: 4200, minY: -100, maxY: 100 };
+  expect(index.queryMany([first, second, first])).toEqual([earlier, later, shared]);
+  expect(index.queryMany([second, first])).toEqual([earlier, later, shared]);
+  const replacement = rock(earlier.id, 1000, 0);
+  index.add(replacement);
+  expect(index.queryMany([first, second])).toEqual([replacement, later, shared]);
+  index.remove(later.id);
+  index.add(later);
+  expect(index.queryMany([first, second])).toEqual([replacement, shared, later]);
+  index.clear();
+  expect(index.queryMany([first, second])).toEqual([]);
+});

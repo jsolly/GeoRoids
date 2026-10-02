@@ -26,8 +26,8 @@ interface SpiderAdvanceOptions {
   towedIds?: ReadonlySet<string>;
   spiderTows?: readonly { ownerId: string; spiderId: string }[];
   releaseTow?: (ownerId: string, spiderId: string) => void;
-  resources?: () => readonly SpiderResource[];
-  dormantResource?: (id: string, home: Position) => SpiderResource | undefined;
+  resources?: (players: readonly SpiderActor[]) => readonly SpiderResource[];
+  resource?: (id: string, home: Position) => SpiderResource | undefined;
   onNestCreated?: (nest: SpiderFieldState['nests'][number]) => void;
 }
 
@@ -294,9 +294,9 @@ export class TerrainSpiderManager {
     this.removeDistantBodies(players);
     if (players.length > 0 && nowFrame >= this.nextNestFrame) {
       this.updateNests(
-        options.resources?.() ?? [],
+        options.resources?.(players) ?? [],
         players,
-        options.dormantResource,
+        options.resource,
         options.onNestCreated
       );
       this.nextNestFrame = nowFrame + 60;
@@ -479,7 +479,7 @@ export class TerrainSpiderManager {
   private updateNests(
     resources: readonly SpiderResource[],
     players: readonly SpiderActor[],
-    dormantResource: SpiderAdvanceOptions['dormantResource'],
+    resolveResource: SpiderAdvanceOptions['resource'],
     onNestCreated: SpiderAdvanceOptions['onNestCreated']
   ): void {
     const candidates = new Map<string, SpiderResource>();
@@ -507,6 +507,25 @@ export class TerrainSpiderManager {
       ) {
         candidates.set(cell, resource);
       }
+    }
+    const available = resolveResource
+      ? undefined
+      : new Map(resources.map((resource) => [resource.id, resource]));
+    const observedResources = new Map<string, SpiderResource>();
+    const observeAnchor = (cell: string, resourceId: string, position: Position): void => {
+      const resource = resolveResource
+        ? resolveResource(resourceId, position)
+        : available?.get(resourceId);
+      if (resource) {
+        observedResources.set(cell, { ...resource, position: copyPosition(resource.position) });
+      }
+    };
+    // Reward callbacks may evict an anchor; this refresh observes the earlier resource state.
+    for (const [cell, nest] of this.nests) {
+      observeAnchor(cell, nest.resourceId, nest.home);
+    }
+    for (const [cell, resource] of candidates) {
+      observeAnchor(cell, resource.id, resource.position);
     }
     for (const [id, resource] of candidates) {
       const count = SPIDER.NEST_GUARDS;
@@ -542,13 +561,11 @@ export class TerrainSpiderManager {
       }
       onNestCreated?.({ id, resourceId: resource.id, position: copyPosition(home) });
     }
-    const available = new Map(resources.map((resource) => [resource.id, resource]));
     const markers: SpiderFieldState['nests'] = [];
     // At most one nest per 5,000-unit cell (576 cells across this world).
     // Check only those known homes once a second, never scan dormant sectors.
     for (const [id, nest] of this.nests) {
-      const resource =
-        available.get(nest.resourceId) ?? dormantResource?.(nest.resourceId, nest.home);
+      const resource = observedResources.get(id);
       if (
         resource &&
         distanceBetween(nest.home, resource.position) <= POSITION_EPSILON &&

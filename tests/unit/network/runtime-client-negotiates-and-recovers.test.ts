@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
 import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
@@ -19,6 +19,7 @@ import { resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp } from '../../../src/input/keybindings';
 import { handleMouseDown, handleMouseUp } from '../../../src/input/mouse';
 import { setTouchHeading } from '../../../src/input/touchControls';
+import { NetworkManager } from '../../../src/network/networkManager';
 import {
   applyAsteroidRowToBelt,
   bindAsteroidFieldApply,
@@ -77,6 +78,11 @@ class Transport {
   }
 }
 
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
+
 describe('actual ConnectionManager WebSocket message path', () => {
   let manager: ConnectionManager;
   beforeEach(() => {
@@ -114,16 +120,24 @@ describe('actual ConnectionManager WebSocket message path', () => {
   }
 
   test.each([1, 7])('a returning pilot moves after its saved epoch %i restarts', async (epoch) => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'scout');
+    const player = entityFactory.createLocalPlayer(
+      'Runtime pilot',
+      { x: 0, y: 0 },
+      'scout',
+      manager.combatNetwork
+    );
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
     let ws = await connect();
     acknowledge(ws);
     const frame = captureSnapshot(snapshotFixture());
+    const displayedShip = player.ship;
     const pilot = frame.entities[0];
     assert.ok(pilot);
     pilot.id = manager.getClientId();
     pilot.playerMotion = { epoch, mode: 'free', ack: 80 };
+    const remoteId = 'reconciled-crew';
+    frame.entities.push({ ...pilot, id: remoteId, name: 'Reconciled crew' });
     ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
 
     // A hidden tab can outlive the live actor. Its private credential restores
@@ -134,6 +148,14 @@ describe('actual ConnectionManager WebSocket message path', () => {
     pilot.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
     pilot.position = { x: 2382, y: 2849 };
     ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
+    expect(manager.getPlayer(player.id)).toBe(player);
+    expect(player.ship).toBe(displayedShip);
+    const remote = manager.getPlayer(remoteId);
+    assert.ok(remote);
+    const sendShoot = vi.spyOn(manager, 'sendShootEvent').mockImplementation(() => undefined);
+    remote.ship.fireLaser();
+    expect(sendShoot).toHaveBeenCalledExactlyOnceWith(remote.ship.lasers[0]);
+    sendShoot.mockRestore();
     expect(player.ship.serverOwnsMotion).toBe(false);
     expect(player.ship.position).toEqual(pilot.position);
     manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
@@ -335,7 +357,12 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a warm reconnect silently hydrates destruction before later deaths sound normally', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'scout');
+    const player = entityFactory.createLocalPlayer(
+      'Returning pilot',
+      { x: 0, y: 0 },
+      'scout',
+      manager.combatNetwork
+    );
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -376,7 +403,12 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('mineral scan waits for one accepted ability cue and unknown orbital pickups use event positions', async () => {
-    const player = entityFactory.createLocalPlayer('Survey pilot', { x: 0, y: 0 }, 'scout');
+    const player = entityFactory.createLocalPlayer(
+      'Survey pilot',
+      { x: 0, y: 0 },
+      'scout',
+      manager.combatNetwork
+    );
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -392,7 +424,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
       return Promise.resolve();
     });
     try {
-      player.ship.activateAbility();
+      expect(player.ship.activateAbility()).toBe(true);
+      expect(ws.sent.filter((message) => message.type === 'useAbility')).toEqual([
+        expect.objectContaining({
+          id: player.id,
+          data: { kitId: 'scout', abilityId: 'surveyScan' },
+        }),
+      ]);
       expect(paths).toEqual([]);
       ws.receive('abilityUsed', { id: player.id, kitId: 'scout', abilityId: 'surveyScan' });
       expect(paths).toHaveLength(1);
@@ -573,7 +611,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
   );
 
   test('cruise and held turn resume after authoritative respawn', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'scout');
+    const player = entityFactory.createLocalPlayer(
+      'Returning pilot',
+      { x: 0, y: 0 },
+      'scout',
+      manager.combatNetwork
+    );
+    const displayedShip = player.ship;
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     ws.receive('joined', {
@@ -610,6 +654,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
       position: { x: 400, y: 400 },
     });
     receive(3);
+    expect(manager.getPlayer(player.id)).toBe(player);
+    expect(player.ship).toBe(displayedShip);
     expect(player.ship.exploding).toBe(false);
     expect(player.ship.thrusting).toBe(true);
     expect(player.ship.angularVelocity).toBeGreaterThan(0);

@@ -1,14 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { civicLot } from '../../../shared/furnaces';
 import { Ship } from '../../../src/entities/ship/Ship';
-import {
-  bindShipCombatNetwork,
-  resetShipCombatNetwork,
-} from '../../../src/entities/ship/shipCombatNetwork';
 import { resetWorldExploration } from '../../../src/network/worldExploration';
 
 afterEach(() => {
-  resetShipCombatNetwork();
   resetWorldExploration();
 });
 
@@ -19,13 +14,12 @@ test('a Scout sends an escape-furnace build during tool cooldown without resetti
   }
   resetWorldExploration();
   const sendAbility = vi.fn(() => true);
-  bindShipCombatNetwork({
+  const combatNetwork = {
     isConnected: true,
-    localPlayerId: 'pilot',
     sendShoot: () => undefined,
     sendAbility,
-  });
-  const ship = new Ship();
+  };
+  const ship = new Ship({ combatNetwork });
   ship.kitId = 'scout';
   ship.isLocalPlayer = true;
   ship.position = { ...street.position };

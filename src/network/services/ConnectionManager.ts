@@ -58,6 +58,7 @@ import { SatellitePickupManager } from '../../entities/satellitePickup/Satellite
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { scoutUtilityOf } from '../../entities/ship/scoutUtility';
 import { setScoutUtilityOnHost } from '../../entities/ship/shipAbilities';
+import type { ShipCombatNetwork } from '../../entities/ship/shipCombatNetwork';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { playLocalHaptic } from '../../fx/haptics';
@@ -242,7 +243,18 @@ export class ConnectionManager {
   private lastAcceptedSnapshotSequence = 0;
   private lastDamageStateLogAt = 0;
 
+  readonly combatNetwork: ShipCombatNetwork;
+
   private constructor() {
+    const connection = this;
+    this.combatNetwork = {
+      get isConnected() {
+        return connection.isConnected();
+      },
+      sendShoot: (laser) => this.sendShootEvent(laser),
+      sendAbility: (data) =>
+        this.sendMessage({ type: 'useAbility', id: this.getLocalPlayerId(), data }),
+    };
     this.state = {
       isConnected: false,
       socket: null,
@@ -1371,6 +1383,7 @@ export class ConnectionManager {
           }
 
           entity ??= entityFactory.createPlayer({
+            combatNetwork: this.combatNetwork,
             id: entityData.id,
             name: entityData.name,
             type: 'remote',

@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -9,6 +9,11 @@ import { canvasManager } from '../../../src/rendering/canvasSurface';
 import * as contourLasers from '../../../src/rendering/contourLaserRenderer';
 
 import { TestPath2D } from '../../support/TestPath2D';
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 afterEach(() => {
   canvasManager.destroy();

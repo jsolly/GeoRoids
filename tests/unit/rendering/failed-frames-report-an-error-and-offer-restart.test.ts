@@ -1,4 +1,5 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
+import { EventLoop } from '../../../src/core/eventLoop';
 import { GameController } from '../../../src/core/gameController';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { PlayerNetwork } from '../../../src/entities/player/playerNetwork';
@@ -9,7 +10,16 @@ import { logger } from '../../../src/utils/Logger';
 
 import { TestPath2D } from '../../support/TestPath2D';
 
+let eventLoop: EventLoop | undefined;
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
+
 afterEach(() => {
+  eventLoop?.dispose();
+  eventLoop = undefined;
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -17,7 +27,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test('an actual game-loop frame failure stops work and offers one restart notice', async () => {
+test('an actual game-loop frame failure stops work and offers one restart notice', () => {
   vi.useFakeTimers();
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const scheduled: FrameRequestCallback[] = [];
@@ -51,7 +61,14 @@ test('an actual game-loop frame failure stops work and offers one restart notice
     .mockImplementation(() => undefined);
   const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
-  await import('../../../src/core/eventLoop');
+  eventLoop = new EventLoop(controller, {
+    window,
+    document,
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
+    now: () => performance.now(),
+    paintDebugHud: () => undefined,
+  });
   window.dispatchEvent(new CustomEvent('gameStart'));
   expect(scheduled).toHaveLength(1);
   scheduled.shift()?.(performance.now());

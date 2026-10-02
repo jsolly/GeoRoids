@@ -1,82 +1,122 @@
 import { noteDebugFrame } from '../diagnostics/debugHudMetrics';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
-import { canvasManager } from '../rendering/canvasSurface';
 import { reportRenderError } from '../rendering/renderError';
-import '../ui/mainMenu'; // wires nickname + Enter Game listeners
-import { paintDebugHud } from '../ui/debugHud';
-import { initNetworkStatusUI } from '../ui/networkStatus';
-import { initializeSchematicEquipHint } from '../ui/schematicEquipHint';
-import { installGlobalErrorLogging } from '../utils/globalErrorLogging';
-import { GameController } from './gameController';
 
-const gameController = GameController.getInstance();
-installGlobalErrorLogging();
-initializeSchematicEquipHint();
-
-// Surface a visible banner whenever the game-server connection drops.
-initNetworkStatusUI();
-
-// Initialize canvas with proper scaling after DOM is loaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => canvasManager.initialize());
-} else {
-  canvasManager.initialize();
+export interface EventLoopLifecycle {
+  getIsGameRunning(): boolean;
+  getCurrPlayer(): { ship: { exploding: boolean } } | null | undefined;
+  resetPresentationClock(): void;
+  updateGame(dtMs: number): void;
+  renderGame(): void;
+  stopAfterFrameFailure(): void;
+  getNetworkManager(): {
+    readonly isConnected: boolean;
+    sendMessage(message: { type: 'snapshotResync'; data: Record<string, never> }): boolean;
+  };
 }
 
-// Game loop with updates and rendering
-let gameLoopScheduled = false;
-let presentationReset = false;
-let hiddenAt: number | undefined;
-document.addEventListener('visibilitychange', () => {
-  presentationReset = true;
-  if (document.hidden) {
-    hiddenAt = performance.now();
-    clientPerformance.setPhase('hidden');
-    clientPerformance.count('hiddenPeriods');
-  } else if (gameController.getIsGameRunning()) {
-    if (hiddenAt !== undefined) {
-      clientPerformance.record('hiddenDurationMs', performance.now() - hiddenAt);
+export interface EventLoopHost {
+  window: Pick<Window, 'addEventListener' | 'removeEventListener'>;
+  document: Pick<Document, 'addEventListener' | 'removeEventListener' | 'hidden' | 'body'>;
+  requestAnimationFrame(callback: FrameRequestCallback): number;
+  cancelAnimationFrame(id: number): void;
+  now(): number;
+  paintDebugHud(now: number): void;
+}
+
+export class EventLoop {
+  private disposed = false;
+  private gameLoopScheduled = false;
+  private presentationReset = false;
+  private hiddenAt: number | undefined;
+  private lastTime = 0;
+  private pendingFrame: number | undefined;
+
+  constructor(
+    private readonly lifecycle: EventLoopLifecycle,
+    private readonly host: EventLoopHost
+  ) {
+    host.document.addEventListener('visibilitychange', this.visibilityChanged);
+    host.window.addEventListener('gameStart', this.start);
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
     }
-    hiddenAt = undefined;
-    gameController.resetPresentationClock();
-    clientPerformance.recover(performance.now());
-    const network = gameController.getNetworkManager();
-    if (network.isConnected) {
-      if (network.sendMessage({ type: 'snapshotResync', data: {} })) {
+    this.disposed = true;
+    this.gameLoopScheduled = false;
+    if (this.pendingFrame !== undefined) {
+      this.host.cancelAnimationFrame(this.pendingFrame);
+      this.pendingFrame = undefined;
+    }
+    this.host.document.removeEventListener('visibilitychange', this.visibilityChanged);
+    this.host.window.removeEventListener('gameStart', this.start);
+  }
+
+  private readonly visibilityChanged = (): void => {
+    if (this.disposed) {
+      return;
+    }
+    this.presentationReset = true;
+    if (this.host.document.hidden) {
+      this.hiddenAt = this.host.now();
+      clientPerformance.setPhase('hidden');
+      clientPerformance.count('hiddenPeriods');
+    } else if (this.lifecycle.getIsGameRunning()) {
+      if (this.hiddenAt !== undefined) {
+        clientPerformance.record('hiddenDurationMs', this.host.now() - this.hiddenAt);
+      }
+      this.hiddenAt = undefined;
+      this.lifecycle.resetPresentationClock();
+      clientPerformance.recover(this.host.now());
+      const network = this.lifecycle.getNetworkManager();
+      if (network.isConnected && network.sendMessage({ type: 'snapshotResync', data: {} })) {
         clientPerformance.count('resyncs');
       }
     }
-  }
-});
-window.addEventListener('gameStart', () => {
-  if (gameLoopScheduled) {
-    return;
-  }
-  gameLoopScheduled = true;
-  let lastTime = performance.now();
+  };
 
-  function gameLoop(now: number): void {
-    if (!gameController.getIsGameRunning()) {
-      clientPerformance.setPhase('menu');
-      gameLoopScheduled = false;
+  private readonly start = (): void => {
+    if (this.disposed || this.gameLoopScheduled) {
       return;
     }
+    this.gameLoopScheduled = true;
+    this.lastTime = this.host.now();
+    this.scheduleFrame();
+  };
 
+  private scheduleFrame(): void {
+    if (!this.disposed && this.gameLoopScheduled && this.pendingFrame === undefined) {
+      this.pendingFrame = this.host.requestAnimationFrame(this.frame);
+    }
+  }
+
+  private readonly frame = (now: number): void => {
+    if (this.disposed) {
+      return;
+    }
+    this.pendingFrame = undefined;
+    if (!this.lifecycle.getIsGameRunning()) {
+      clientPerformance.setPhase('menu');
+      this.gameLoopScheduled = false;
+      return;
+    }
     try {
-      const dtMs = presentationReset ? 0 : now - lastTime;
-      presentationReset = false;
-      lastTime = now;
-      if (document.hidden) {
-        window.requestAnimationFrame(gameLoop);
+      const dtMs = this.presentationReset ? 0 : now - this.lastTime;
+      this.presentationReset = false;
+      this.lastTime = now;
+      if (this.host.document.hidden) {
+        this.scheduleFrame();
         return;
       }
       const observing = clientPerformance.enabled;
-      const debugHudOn = document.body.classList.contains('debug-on');
+      const debugHudOn = this.host.document.body.classList.contains('debug-on');
       if (observing) {
         clientPerformance.setPhase(
-          document.hidden
+          this.host.document.hidden
             ? 'hidden'
-            : gameController.getCurrPlayer()?.ship.exploding
+            : this.lifecycle.getCurrPlayer()?.ship.exploding
               ? 'respawn'
               : 'play'
         );
@@ -85,31 +125,35 @@ window.addEventListener('gameStart', () => {
       if (debugHudOn) {
         noteDebugFrame(dtMs);
       }
-      const started = observing ? performance.now() : 0;
-      gameController.updateGame(dtMs);
-      const updated = observing ? performance.now() : 0;
+      const started = observing ? this.host.now() : 0;
+      this.lifecycle.updateGame(dtMs);
+      if (this.disposed) {
+        return;
+      }
+      const updated = observing ? this.host.now() : 0;
 
       // Then render the current game state
-      gameController.renderGame();
+      this.lifecycle.renderGame();
+      if (this.disposed) {
+        return;
+      }
       if (debugHudOn) {
-        paintDebugHud(now);
+        this.host.paintDebugHud(now);
       }
       if (observing) {
-        const rendered = performance.now();
+        const rendered = this.host.now();
         clientPerformance.record('updateMs', updated - started);
         clientPerformance.record('renderMs', rendered - updated);
         clientPerformance.record('frameCpuMs', rendered - started);
         clientPerformance.rendered(rendered);
         clientPerformance.exportIfDue(rendered);
       }
-      window.requestAnimationFrame(gameLoop);
+      this.scheduleFrame();
     } catch (error) {
-      gameLoopScheduled = false;
+      this.gameLoopScheduled = false;
       clientPerformance.count('frameFailures');
-      gameController.stopAfterFrameFailure();
+      this.lifecycle.stopAfterFrameFailure();
       reportRenderError(error);
     }
-  }
-
-  window.requestAnimationFrame(gameLoop);
-});
+  };
+}

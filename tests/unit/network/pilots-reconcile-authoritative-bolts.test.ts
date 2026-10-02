@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { PlayerProjectileState, ServerGameSnapshot } from '../../../shared-types';
 import { LASER } from '../../../src/constants';
@@ -60,6 +60,11 @@ function frame(projectiles: PlayerProjectileState[]): ServerGameSnapshot {
   state.playerProjectiles = projectiles;
   return state;
 }
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 describe('pilots reconcile complete authoritative bolts through the actual socket receiver', () => {
   let manager: ConnectionManager;

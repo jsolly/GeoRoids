@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeAll, expect, test } from 'vitest';
 
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { initializeTouchControls, syncTouchChrome } from '../../../src/input/touchControls';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { setPlayView } from '../../../src/ui/uiUtils';
 
 const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
@@ -11,6 +13,11 @@ const productionPackage: { dependencies?: Record<string, string> } = JSON.parse(
   readFileSync(resolve(__dirname, '../../../package.json'), 'utf8')
 );
 const agentsGuide = readFileSync(resolve(__dirname, '../../../AGENTS.md'), 'utf8');
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 afterEach(() => {
   setPlayView(false);

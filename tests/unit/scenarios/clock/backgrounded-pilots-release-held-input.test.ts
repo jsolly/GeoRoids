@@ -1,4 +1,5 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
+import { EventLoop } from '../../../../src/core/eventLoop';
 import { GameController } from '../../../../src/core/gameController';
 import { GameStateManager } from '../../../../src/core/services/GameStateManager';
 import { InputManager } from '../../../../src/core/services/InputManager';
@@ -8,13 +9,22 @@ import { getPressedKeysForPlayer, keys } from '../../../../src/input/keybindings
 import { NetworkManager } from '../../../../src/network/networkManager';
 import { canvasManager } from '../../../../src/rendering/canvasSurface';
 
+let eventLoop: EventLoop | undefined;
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
+
 afterEach(() => {
+  eventLoop?.dispose();
+  eventLoop = undefined;
   canvasManager.destroy();
   vi.restoreAllMocks();
   Reflect.deleteProperty(window, 'requestAnimationFrame');
 });
 
-test('hiding a pilot with held movement releases the controls and resumes without stale steps', async () => {
+test('hiding a pilot with held movement releases the controls and resumes without stale steps', () => {
   const player = PlayerManager.getInstance().createLocalPlayer();
   GameStateManager.getInstance().setIsGameRunning(true);
   InputManager.getInstance().initializeListeners();
@@ -35,7 +45,14 @@ test('hiding a pilot with held movement releases the controls and resumes withou
   const updates = vi.spyOn(controller, 'updateGame').mockImplementation(() => undefined);
   vi.spyOn(controller, 'renderGame').mockImplementation(() => undefined);
   vi.spyOn(NetworkManager.getInstance(), 'isConnected', 'get').mockReturnValue(false);
-  await import('../../../../src/core/eventLoop');
+  eventLoop = new EventLoop(controller, {
+    window,
+    document,
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
+    now: () => performance.now(),
+    paintDebugHud: () => undefined,
+  });
   window.dispatchEvent(new Event('gameStart'));
   const initial = performance.now();
   frames.shift()?.(initial);

@@ -17,6 +17,7 @@ import { preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
 import { applySharedHarpoonLatch } from '../ship/shipAbilities';
+import type { ShipCombatNetwork } from '../ship/shipCombatNetwork';
 import { applyShipKitToShip, hullRadiusForKit } from '../ship/shipKits';
 import {
   applySharedShipExplodingFlag,
@@ -83,6 +84,7 @@ export class Player {
     type: 'local' | 'remote';
     input: PlayerInput;
     kitId?: ShipKitId;
+    combatNetwork?: ShipCombatNetwork;
   }) {
     this.id = params.id;
     this.name = params.name;
@@ -91,6 +93,7 @@ export class Player {
     this.color = getPlayerColor(this.type);
 
     this.ship = new Ship({
+      ...(params.combatNetwork !== undefined ? { combatNetwork: params.combatNetwork } : {}),
       color: this.color,
       isLocalPlayer: this.type === 'local',
       frictionCoefficient: 0.01,

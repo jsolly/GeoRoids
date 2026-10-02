@@ -1,10 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { ExplorationMap } from '../../../shared/exploration';
 import { CIVIC_LOTS, civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
-import {
-  bindPlayerNetworkPort,
-  resetPlayerNetworkPort,
-} from '../../../src/entities/player/playerNetworkPort';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import {
   setWorldExploration,
   setWorldMapAssets,
@@ -21,7 +19,6 @@ afterEach(() => {
   worldFurnaces.replaceLit([]);
   setWorldMapAssets([]);
   setWorldExploration([]);
-  resetPlayerNetworkPort();
   document.body.classList.remove('in-play');
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -44,12 +41,10 @@ function mountUniverseMap(): { toggle: HTMLButtonElement; ctx: CanvasRenderingCo
       },
     },
   });
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+  vi.spyOn(network, 'getAllPlayers').mockReturnValue([]);
   document.body.classList.add('in-play');
-  bindPlayerNetworkPort({
-    getAllPlayers: () => [],
-    setLocalPlayerName: () => undefined,
-    updatePlayerState: () => undefined,
-  });
   initializeUniverseMap();
   const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
   const canvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement;

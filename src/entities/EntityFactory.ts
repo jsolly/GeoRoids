@@ -5,6 +5,7 @@ import { getRandomPositionInAsteroidField, resolveSpawnPosition } from '../utils
 import { Laser } from './laser/Laser';
 import { Player } from './player/Player';
 import { Roid, RoidBelt } from './roid/Roid';
+import type { ShipCombatNetwork } from './ship/shipCombatNetwork';
 
 interface PlayerConfig {
   id?: string;
@@ -14,6 +15,7 @@ interface PlayerConfig {
   color?: string;
   shotCooldown?: number;
   kitId?: ShipKitId;
+  combatNetwork?: ShipCombatNetwork;
 }
 
 interface RoidConfig {
@@ -41,20 +43,33 @@ class EntityFactory {
     return player;
   }
 
-  createLocalPlayer(name: string, position?: Position, kitId?: ShipKitId): Player {
+  createLocalPlayer(
+    name: string,
+    position?: Position,
+    kitId?: ShipKitId,
+    combatNetwork?: ShipCombatNetwork
+  ): Player {
     return this.createPlayer({
       name,
       type: 'local',
+      ...(combatNetwork !== undefined ? { combatNetwork } : {}),
       ...(position !== undefined ? { position: position } : {}),
       ...(kitId !== undefined ? { kitId: kitId } : {}),
     });
   }
 
-  createRemotePlayer(id: string, name: string, position: Position, color?: string): Player {
+  createRemotePlayer(
+    id: string,
+    name: string,
+    position: Position,
+    color?: string,
+    combatNetwork?: ShipCombatNetwork
+  ): Player {
     return this.createPlayer({
       id,
       name,
       type: 'remote',
+      ...(combatNetwork !== undefined ? { combatNetwork } : {}),
       position,
       ...(color !== undefined ? { color: color } : {}),
     });
@@ -93,6 +108,7 @@ class EntityFactory {
       name: config.name,
       type: config.type,
       input: new MockPlayerInput(),
+      ...(config.combatNetwork !== undefined ? { combatNetwork: config.combatNetwork } : {}),
       ...(config.kitId !== undefined ? { kitId: config.kitId } : {}),
     });
   }

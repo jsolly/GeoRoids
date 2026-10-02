@@ -6,15 +6,13 @@ import { checkBoundaryCollision } from './collisionDetection';
 
 export class CollisionManager {
   private static instance: CollisionManager;
-  private networkManager: NetworkManager;
-
-  private constructor() {
-    this.networkManager = NetworkManager.getInstance();
-  }
+  constructor(
+    private readonly networkManager: Pick<NetworkManager, 'getLocalPlayerId' | 'sendMessage'>
+  ) {}
 
   static getInstance(): CollisionManager {
     if (!CollisionManager.instance) {
-      CollisionManager.instance = new CollisionManager();
+      CollisionManager.instance = new CollisionManager(NetworkManager.getInstance());
     }
     return CollisionManager.instance;
   }

@@ -1,5 +1,7 @@
-import { expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
 import type { PlayerJoin } from '../../../shared-types';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 
 type TestSocket = {
@@ -14,6 +16,11 @@ type TestConnectionManager = {
   hasInitializedAsteroidsForConnection: boolean;
   handleJoined: (data: PlayerJoin) => void;
 };
+
+beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+});
 
 test('rejoining after a server restart requests asteroids despite a cached belt', () => {
   const manager = ConnectionManager.getInstance() as unknown as TestConnectionManager;

@@ -98,9 +98,12 @@ export class GameController {
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
-    this.playerManager = PlayerManager.getInstance();
-    this.inputManager = InputManager.getInstance();
     this.networkManager = NetworkManager.getInstance();
+    this.playerManager = PlayerManager.getInstance({
+      networkPort: this.networkManager,
+      combatNetwork: this.networkManager.combatNetwork,
+    });
+    this.inputManager = InputManager.getInstance();
     this.collisionManager = CollisionManager.getInstance();
     PlayerNetwork.getInstance().bindTick(() => this.updateNetworkPlayerState());
     bindGameAudio({

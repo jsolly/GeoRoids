@@ -603,6 +603,10 @@ test('touch input targets the game canvas while the title terrain stays passive'
   const oldTouchContent = touchControls?.innerHTML;
   const bodyClass = document.body.className;
   try {
+    const { NetworkManager } = await import('../../../src/network/networkManager');
+    const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
+    const network = NetworkManager.getInstance();
+    PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
     InputManager.getInstance().initializeListeners();
     const gameCanvas = document.querySelector('#gameCanvas');
     const titleTerrain = document.querySelector('#title-terrain');

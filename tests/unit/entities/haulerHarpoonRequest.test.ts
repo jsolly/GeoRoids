@@ -1,34 +1,29 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { resetPlayerNetworkPort } from '../../../src/entities/player/playerNetworkPort';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { Ship } from '../../../src/entities/ship/Ship';
-import {
-  bindShipCombatNetwork,
-  resetShipCombatNetwork,
-} from '../../../src/entities/ship/shipCombatNetwork';
 import { GameServerWorld } from '../scenarios/support/gameServerWorld';
 
 const mockSendAbility = vi.fn<(data: { kitId: string; abilityId: string }) => boolean>(() => true);
 afterEach(() => {
   mockSendAbility.mockReset();
   mockSendAbility.mockReturnValue(true);
-  resetShipCombatNetwork();
-  resetPlayerNetworkPort();
   publishHarpoonField([]);
 });
 
-function bindTestCombatNetwork(): void {
-  bindShipCombatNetwork({
+function testCombatNetwork() {
+  return {
     isConnected: true,
-    localPlayerId: 'alice',
     sendShoot: () => undefined,
-    sendAbility: (data) => mockSendAbility(data),
-  });
+    sendAbility: (data: { kitId: string; abilityId: string }) => mockSendAbility(data),
+  };
 }
 
 test('a Hauler asks the server even when its visible field has no eligible target', () => {
-  bindTestCombatNetwork();
-  const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
+  const ship = new Ship({
+    kitId: 'hauler',
+    isLocalPlayer: true,
+    combatNetwork: testCombatNetwork(),
+  });
   expect(ship.activateAbility()).toBe(true);
   expect(mockSendAbility).toHaveBeenCalledWith({ kitId: 'hauler', abilityId: 'harpoon' });
   expect(ship.abilityCooldownFrames).toBe(0);
@@ -36,9 +31,12 @@ test('a Hauler asks the server even when its visible field has no eligible targe
 });
 
 test('a rejected send cannot invent a local attachment or start its cooldown', () => {
-  bindTestCombatNetwork();
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
-  const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
+  const ship = new Ship({
+    kitId: 'hauler',
+    isLocalPlayer: true,
+    combatNetwork: testCombatNetwork(),
+  });
   mockSendAbility.mockReturnValue(false);
   expect(ship.activateAbility()).toBe(false);
   expect(ship.harpoonTargetId).toBeNull();
@@ -46,7 +44,6 @@ test('a rejected send cannot invent a local attachment or start its cooldown', (
 });
 
 test('two rapid presses reach the server in order without a predicted cooldown dropping release', () => {
-  bindTestCombatNetwork();
   const world = new GameServerWorld();
   try {
     const pilot = world.joinWithId('alice', 'Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
@@ -64,7 +61,11 @@ test('two rapid presses reach the server in order without a predicted cooldown d
       vertices: 8,
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
-    const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
+    const ship = new Ship({
+      kitId: 'hauler',
+      isLocalPlayer: true,
+      combatNetwork: testCombatNetwork(),
+    });
     expect(ship.activateAbility()).toBe(true);
     expect(ship.activateAbility()).toBe(true);
     expect(mockSendAbility).toHaveBeenCalledTimes(2);
@@ -90,8 +91,11 @@ test('two rapid presses reach the server in order without a predicted cooldown d
 });
 
 test('an acknowledged Hauler tow releases during cooldown while a detached hull stays cooling', () => {
-  bindTestCombatNetwork();
-  const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
+  const ship = new Ship({
+    kitId: 'hauler',
+    isLocalPlayer: true,
+    combatNetwork: testCombatNetwork(),
+  });
   ship.harpoonTargetId = 'acknowledged-rock';
   ship.abilityCooldownFrames = 170;
   expect(ship.activateAbility()).toBe(true);
@@ -104,8 +108,11 @@ test('an acknowledged Hauler tow releases during cooldown while a detached hull 
 });
 
 test('Scout does not send a failed ability request', () => {
-  bindTestCombatNetwork();
-  const ship = new Ship({ kitId: 'scout', isLocalPlayer: true });
+  const ship = new Ship({
+    kitId: 'scout',
+    isLocalPlayer: true,
+    combatNetwork: testCombatNetwork(),
+  });
   ship.abilityCooldownFrames = 40;
   expect(ship.activateAbility()).toBe(false);
   expect(mockSendAbility).not.toHaveBeenCalled();

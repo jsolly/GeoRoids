@@ -1,6 +1,7 @@
 # Backlog implementation plan
 
-The approved sequence contains 16 PRs. Status describes implementation progress,
+The approved sequence contains 16 feature groups. PR 7 is split into runtime
+capability injection and a separate measured loot-index repair PR. Status describes implementation progress,
 not Todoist completion. Each PR starts from fresh `origin/main`, ships through
 `/ship` semantic review and the full local gate, and merges by squash when CI is
 green. Verify exact Vercel and Railway releases as applicable, then complete the
@@ -20,8 +21,8 @@ only after fresh evidence covers the PR's acceptance criteria.
 | 3 | Fix WebKit audio and obtain cross-architecture proof for #714 and #717. Run 20 focused repetitions and three full suites on native ARM and x64. | Shipped [#740](https://github.com/jsolly/GeoRoids/pull/740)–[#743](https://github.com/jsolly/GeoRoids/pull/743); native 20+3 sample passed on both architectures at `38b79c1a`; historical criteria remain open | Audio `6hg2qp9cFGqMMCFM`; umbrella `6hg2qp7XVWfCCQGv`; same triage, harness parent and human schedule as PR 2 |
 | 4 | Prove authoritative firing in production. A correlated non-null `shotAcknowledged` is sufficient even if a collision consumes the bolt before a snapshot. Reject missing, null, wrong or stale acknowledgements; malformed snapshots still fail. | Shipped [#739](https://github.com/jsolly/GeoRoids/pull/739) | Projectile `6hfP8334Q638373M` |
 | 5 | Run six isolated integration shards three times, each run under 600 seconds; retain 300 seconds as a future performance target. Preserve isolation and failure evidence. | Shipped [#746](https://github.com/jsolly/GeoRoids/pull/746); approved 600s bar met | Shards `6hcHJM3WrR7Hh9CM` |
-| 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | In progress | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
-| 7 | Audit targeted dependency injection and indexes. Use measured ownership and query needs to choose changes. | Planned | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
+| 6 | Normalize full pre-commit checks, preserving the existing fleet documentation fast path exception, and scope Wiki source review to affected behavior. | Shipped [#747](https://github.com/jsolly/GeoRoids/pull/747), `abb78c0b` | Gate `6hcHJJjhGW7p6rFM`; Wiki `6hcHJJmG74wPCghv` |
+| 7 | Inject targeted runtime capabilities, then repair measured global loot scans in a separate PR. Preserve atlas knowledge, loot motion/expiry and guard discovery ordering; leave already-bounded indexes unchanged. | Runtime implementation in progress; index design reviewed | Singleton `6hcHJJrWqGh6qFqM`; index `6hfGCG7hM6rmgCfv` |
 | 8 | Improve furnace travel and delivery feedback, including pinching, drop-off and shortage feedback. | Planned | Pinch `6hfFVMfQvxvm7JHv`; drop-off `6hfG7J5m99CC75mM`; shortage `6hfGfjj459h5v7Wv` |
 | 9 | Add cargo shielding and hauling pressure. Apply immunity first, then eject recoverable loot at 10 cargo points per HP. Hull health falls only for residual damage after cargo reaches zero. Cargo speed scales from 1 empty to 0.7 full. Reduce loot magnetic pull and give spills outward motion beyond immediate pickup reach; tune against current values during implementation. Prove physical conservation of recoverable hit spills, concurrent pickup, identity and expiry, no loot consumption for full-cargo ships, retention of partial remainders and remaining cargo dropping once on death. Use a bounded temporary own-spill recollection lockout only if the spatial kick and reduced pull still allow automatic overlap to negate the hit. | Planned | Cargo `6hfGfwppj5j2hPmv`; roles `6hfFGqVW7vrcCWhv` |
 | 10 | Add travelling tow/probe behavior at speed 1200. Preserve solo Hauler Tow Cable access to hives. Misses retract; each attempt incurs cooldown, enforced by the authoritative server. | Planned | Tow `6hfG7XPr4P73WcwM` |
@@ -629,3 +630,26 @@ Three consecutive complete runs on identical source passed all 91 files and 210 
 PR5 shipped in [#746](https://github.com/jsolly/GeoRoids/pull/746), merge `c1d401ab296deb7932861c65d87f214907f64187`. CI and full local gate passed; final gate integration passed all 91 files and 210 cases in 378.25 seconds, with 120 frame-work vectors and both constrained-client scenarios. Full semantic review fixed the temporary Git fixture environment, stale unit evidence mocks and operating instructions; both review-round checkout fingerprints were unchanged. Vercel and Railway independently serve the exact merge, with healthy worker persistence and zero loop stalls. [Fresh production smoke](https://github.com/jsolly/GeoRoids/actions/runs/36912124654) passed for deployment/request `6792855590`, including exact server admission, 40 accepted snapshots and a correlated authoritative shot acknowledgement. The sharding Todoist record is complete; its parents remain open.
 
 PR6 starts from that merge with independently accepted design. One complete gate entry sits behind the existing hook preamble; manual gate uses the same hook with the fleet-docs fast path disabled. Exact content/tool/install and final stage/cleanup receipts permit reuse only for unchanged verified work. Literal-only changes may reuse graph evidence while still running gameplay checks. Wiki acceptance patches only explicitly reviewed changed sources and affected topics. Final benchmark cleanup receipts and the CI gate-wiring contract are included in this phase.
+
+PR 6 shipped as [#747](https://github.com/jsolly/GeoRoids/pull/747), `abb78c0b`.
+The final merged-branch gate passed 1,771 unit cases and all 91 integration files /
+210 cases in 336.391 seconds, plus frame and constrained-client checks and cleanup.
+CI run `36940106475` passed; Vercel and Railway independently served that release
+with healthy worker persistence and zero stalls. Fresh production smoke
+`36940611110`, request `6797452725`, passed. Gate and Wiki Todoist records are closed;
+historical investigations and parents remain open.
+
+An existing development-only `brace-expansion` 5.0.9 vulnerability was identified
+by the dependency-install audit and was present before PR 6. A separate dependency
+fix follows both PR 7 changes before PR 8; preserve the audit evidence and validate the patched
+lockfile. This is ordinary own-repository repair, without a Dependabot drain.
+
+The PR 7 index audit identifies global restored-point-loot scans in collection,
+motion/expiry, snapshot materialization, laser targets and guard-resource discovery.
+The index repair remains part of this phase and follows the runtime injection PR
+before controls work. It requires local spatial queries and motion/expiry subsets,
+with an independent incremental chart-asset catalog so distant known salvage and
+existing guard markers are retained. SQLite, asteroids, contours, the finite civic
+furnace catalog and capped spider-body queries already meet the measured locality
+bar; no speculative indexes are added. Detailed measured baselines and the reviewed
+algorithm design remain in the external implementation evidence directory.

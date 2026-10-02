@@ -3,10 +3,6 @@ import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
-import {
-  bindPlayerNetworkPort,
-  resetPlayerNetworkPort,
-} from '../../../src/entities/player/playerNetworkPort';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
@@ -25,6 +21,8 @@ import {
 import { isTownStoreOpen } from '../../../src/ui/townStoreState';
 
 beforeAll(() => {
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
   Object.defineProperties(HTMLDialogElement.prototype, {
     showModal: {
       configurable: true,
@@ -41,18 +39,14 @@ beforeAll(() => {
   });
   document.body.classList.add('in-play');
   PlayerManager.getInstance().createLocalPlayer('hauler');
-  bindPlayerNetworkPort({
-    getAllPlayers: () => [],
-    setLocalPlayerName: () => undefined,
-    updatePlayerState: () => undefined,
-  });
+  vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([]);
   initializeTownStore();
   InputManager.getInstance().initializeListeners();
 });
 
 afterAll(() => {
   closeTownStore();
-  resetPlayerNetworkPort();
+  vi.restoreAllMocks();
   document.body.classList.remove('in-play');
   Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
   Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');

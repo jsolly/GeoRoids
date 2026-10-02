@@ -1,8 +1,6 @@
 import type { PlayerUpdate } from '../../shared-types';
 import type { Laser } from '../entities/laser/Laser';
 import type { Player } from '../entities/player/Player';
-import { bindPlayerNetworkPort } from '../entities/player/playerNetworkPort';
-import { bindShipCombatNetwork } from '../entities/ship/shipCombatNetwork';
 import { logger } from '../utils/Logger';
 import { ConnectionManager } from './services/ConnectionManager';
 
@@ -17,30 +15,6 @@ export class NetworkManager {
   private constructor() {
     this.connectionManager = ConnectionManager.getInstance();
     this.setupConnectionHandlers();
-    bindPlayerNetworkPort({
-      getAllPlayers: () => this.getAllPlayers(),
-      setLocalPlayerName: (name) => this.setLocalPlayerName(name),
-      updatePlayerState: (playerState) => this.updatePlayerState(playerState),
-    });
-    bindShipCombatNetwork({
-      get isConnected() {
-        return NetworkManager.getInstance().isConnected;
-      },
-      get localPlayerId() {
-        return NetworkManager.getInstance().getLocalPlayerId();
-      },
-      sendShoot: (laser) => {
-        NetworkManager.getInstance().sendShootEvent(laser);
-      },
-      sendAbility: (data) => {
-        const network = NetworkManager.getInstance();
-        return network.sendMessage({
-          type: 'useAbility',
-          id: network.getLocalPlayerId(),
-          data,
-        });
-      },
-    });
   }
 
   static getInstance(): NetworkManager {
@@ -48,6 +22,10 @@ export class NetworkManager {
       NetworkManager.instance = new NetworkManager();
     }
     return NetworkManager.instance;
+  }
+
+  get combatNetwork() {
+    return this.connectionManager.combatNetwork;
   }
 
   // Connection management

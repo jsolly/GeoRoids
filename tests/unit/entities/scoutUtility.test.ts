@@ -14,10 +14,6 @@ import {
   activateAbilityOnHost,
   setScoutUtilityOnHost,
 } from '../../../src/entities/ship/shipAbilities';
-import {
-  bindShipCombatNetwork,
-  resetShipCombatNetwork,
-} from '../../../src/entities/ship/shipCombatNetwork';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   getStoredItem,
@@ -43,7 +39,6 @@ function host(kitId: AbilityHost['kitId'] = 'scout'): AbilityHost {
 afterEach(() => {
   removeStoredItem(SCOUT_UTILITY_STORAGE_KEY);
   resetSafeStorage();
-  resetShipCombatNetwork();
 });
 
 test('a new Scout starts with Mineral Scan and remembers a selected probe across reconnects', () => {
@@ -84,17 +79,16 @@ test('Survey Probe activation predicts its cooldown without creating a local sca
 
 test('a connected Scout predicts probe cooldown without a local world effect', () => {
   let sent = 0;
-  bindShipCombatNetwork({
+  const combatNetwork = {
     isConnected: true,
-    localPlayerId: 'local',
     sendShoot: () => undefined,
     sendAbility: () => {
       sent += 1;
       return true;
     },
-  });
+  };
 
-  const ship = new Ship({ kitId: 'scout', isLocalPlayer: true });
+  const ship = new Ship({ kitId: 'scout', isLocalPlayer: true, combatNetwork: combatNetwork });
   ship.scoutUtility = 'survey_probe';
 
   expect(ship.activateAbility()).toBe(true);

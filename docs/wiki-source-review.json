@@ -7,7 +7,7 @@
     "index.css": "sha256:266f8e48116cf1dd6940e73d06fe52fee0f095df144feab67c90c99c4cb6eb4e",
     "index.html": "sha256:60a6824fe5c5084a62f133e8937aa3add5f55cc007aee2475ec15c1552729b27",
     "middleware.ts": "sha256:b1804785a737be08e3410c647ce88f86b06da2de7161e0af4277ab07830ce4ee",
-    "package.json": "sha256:d36c7248a2f487515517163c04662f8dc305832eae604bcf75a0ff723dee0d83",
+    "package.json": "sha256:a84fc89e5377077df28dd0fcda1d3741ef7817868b04ac48d2c18b9da02f4fec",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -628,6 +628,15 @@
       "owners": {
         "tests/unit/server/loot-manager.test.ts": "loot-growth",
         "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "terrain"
+      }
+    },
+    {
+      "note": "Reviewed the manifest-only Knip cache setting and compatible development-only brace-expansion patch: gameplay rules, generated references, renderers and demonstrations are unchanged. Full gate static/types and 1,794 unit cases passed before the source-review stop; the actual desktop/mobile field-manual browser scenario passed. Only package.json is accepted; full gate and shipping still pending.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
       }
     }
   ]

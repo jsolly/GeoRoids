@@ -156,6 +156,19 @@ export class AsteroidSpatialIndex {
     return [...found].sort((a, b) => a.order - b.order).map((entry) => entry.rock);
   }
 
+  /** A multi-view union retains global source order, independent of query order or overlap. */
+  queryMany(bounds: readonly QueryBounds[]): AsteroidData[] {
+    const found = new Set<Entry>();
+    for (const rectangle of bounds) {
+      this.visitCells(rectangle, (key) => {
+        for (const entry of this.cells.get(key) ?? []) {
+          found.add(entry);
+        }
+      });
+    }
+    return [...found].sort((a, b) => a.order - b.order).map((entry) => entry.rock);
+  }
+
   private visitCells(bounds: QueryBounds, visit: (key: number) => void): void {
     for (
       let y = Math.floor(bounds.minY / CELL_SIZE);

@@ -57,6 +57,7 @@ import { readReleaseId, releaseField } from '../../shared/releaseId';
 import { GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
+import { SPIDER } from '../../shared/terrainSpider';
 import {
   insideTownStore,
   purchasedHullColor,
@@ -119,6 +120,7 @@ import { crawlerEvidence, FixtureCombatRecorder } from '../testing/FixtureCombat
 import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
+import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import {
   type PersistentPilot,
   type RestorableFlight,
@@ -272,7 +274,7 @@ export class GameEngine {
   private settlement = emptySettlement();
   private lastSavedEconomy: { settlement: SettlementState; pointRevision: number } | undefined;
   private exploration = new ExplorationMap();
-  private mapAssets = new MapAssets();
+  private mapAssets = new MapAssets(this.exploration);
   private readonly furnaces = new FurnaceField();
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
@@ -442,8 +444,9 @@ export class GameEngine {
         this.gameTime
       );
     });
-    this.lootManager = new LootManager(this.rngService);
+    this.lootManager = new LootManager(this.rngService, this.mapAssets);
     this.lootManager.restorePoints(loaded?.economy?.pointLoot ?? []);
+    this.mapAssets.primeInitialLoot();
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
     this.spiderManager = new TerrainSpiderManager(() => this.rngService.random(), this.furnaces);
     ensureTerrain(this.worldSeed);
@@ -811,7 +814,11 @@ export class GameEngine {
   }
 
   public revealArea(position: Position, range: number): void {
-    this.exploration.reveal(position, range);
+    for (const cell of this.exploration.reveal(position, range)) {
+      for (const drop of this.lootManager.queryExplorationCell(cell)) {
+        this.mapAssets.discovered(drop.id);
+      }
+    }
   }
 
   private choosePilotSpawn(requested?: Position): Position {
@@ -1397,16 +1404,44 @@ export class GameEngine {
         this.lootManager.spawnNestCache(nest.position, this.gameTime);
         this.satellitePickupManager.spawnNestPickup(nest.position);
       },
-      dormantResource: (id, home) => {
-        const rock = this.regionalField.dormantAsteroid(id, home);
-        return rock ? spiderResources([rock], [], [])[0] : undefined;
+      resource: (id, home) => {
+        // The former resource Map let later domains overwrite earlier matching IDs.
+        const pickup = this.satellitePickupManager.getPickup(id);
+        if (pickup && !pickup.nestSalvage && pickup.state === 'loose' && pickup.health > 0) {
+          return spiderResources([], [], [pickup])[0];
+        }
+        const drop = this.lootManager.getNestResource(id);
+        if (drop) {
+          return spiderResources([], [drop], [])[0];
+        }
+        const live = this.asteroidManager.getAsteroid(id);
+        const resource = live ? spiderResources([live], [], [])[0] : undefined;
+        if (resource) {
+          return resource;
+        }
+        const dormant = this.regionalField.dormantAsteroid(id, home);
+        return dormant ? spiderResources([dormant], [], [])[0] : undefined;
       },
-      resources: () =>
-        spiderResources(
-          this.asteroidManager.getAllAsteroids(),
-          this.lootManager.getNestResources(),
+      resources: (players) => {
+        const positions = players.map((player) => player.position);
+        const rocks = this.asteroidManager
+          .spatialIndex()
+          .queryMany(
+            positions.map((position) => spatialQueryBounds(position, SPIDER.NEST_WAKE_DISTANCE))
+          )
+          .filter((rock) =>
+            positions.some(
+              (position) =>
+                Math.hypot(position.x - rock.position.x, position.y - rock.position.y) <=
+                SPIDER.NEST_WAKE_DISTANCE
+            )
+          );
+        return spiderResources(
+          rocks,
+          this.lootManager.getNestResourcesNear(positions, SPIDER.NEST_WAKE_DISTANCE),
           this.satellitePickupManager.getNestResources()
-        ),
+        );
+      },
     });
     this.pendingSpiderAttacks.push(
       ...attacks,
@@ -2451,7 +2486,7 @@ export class GameEngine {
             ...(pickup.ownerId === null ? {} : { ownerId: pickup.ownerId }),
             kind: 'satellitePickup' as const,
           })),
-        ...this.getLoot()
+        ...(owner ? this.lootManager.queryCircle(owner.position, LOOT_BLAST.ARM_RANGE) : [])
           .filter(
             (loot) =>
               owner &&
@@ -2742,10 +2777,21 @@ export class GameEngine {
   }
 
   // Game state
-  public getGameState() {
+  public getGameState(): ServerGameState {
+    return {
+      ...this.getSnapshotState(),
+      asteroids: this.asteroidManager.getAllAsteroids(),
+      loot: this.lootManager.getAll(),
+    };
+  }
+
+  public getNearbyLoot(position: Position): LootData[] {
+    return this.lootManager.queryNearby(position);
+  }
+
+  public getSnapshotState(): Omit<ServerGameState, 'asteroids' | 'loot'> {
     const allEntities = this.entityManager.getAllEntities();
     const exploration = this.exploration.snapshot();
-    const loot = this.lootManager.getAll();
     const satellitePickups = this.satellitePickupManager.getAllPickups();
     const moduleNames = new Map(
       this.furnaces.litModules().map((module) => [module.id, this.furnaces.displayName(module.id)])
@@ -2754,8 +2800,8 @@ export class GameEngine {
       serverTime: this.getServerTime(),
       settlement: this.settlement,
       civicModules: [...this.furnaces.litModules()],
-      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups, moduleNames),
-      exploration: this.exploration.snapshot(),
+      mapAssets: this.mapAssets.snapshot(satellitePickups, moduleNames),
+      exploration,
       entities: allEntities.map(
         (entity) =>
           ({
@@ -2800,15 +2846,13 @@ export class GameEngine {
             ...(entity.deathCause !== undefined ? { deathCause: entity.deathCause } : {}),
           }) satisfies ServerEntityData
       ),
-      asteroids: this.asteroidManager.getAllAsteroids(),
-      loot,
       satellitePickups,
       gameTime: this.gameTime,
       isPaused: this.isPaused,
       terrainSeed: getTerrainSeed(),
       spiderField: this.getSpiderField(),
       beltRecovery: this.regionalField.recoveryWarnings(this.getServerTime()),
-    } satisfies ServerGameState & Record<keyof ServerGameState, unknown>;
+    } satisfies Omit<ServerGameState, 'asteroids' | 'loot'>;
 
     return gameState;
   }
@@ -2905,7 +2949,7 @@ export class GameEngine {
     asteroids: readonly AsteroidData[],
     range: number
   ): void {
-    this.exploration.reveal(position, range);
+    this.revealArea(position, range);
     for (const rock of asteroids) {
       if (
         rock.health <= 0 ||
@@ -3161,7 +3205,7 @@ export class GameEngine {
     }
     for (const entity of this.entityManager.getAllEntities()) {
       if (!entity.exploding && entity.health > 0 && entity.respawnTimer === undefined) {
-        this.exploration.reveal(
+        this.revealArea(
           entity.position,
           entity.kitId === 'scout' && entity.abilityActiveFrames > 0
             ? SHIP_ABILITY.SCAN_RANGE

@@ -150,7 +150,7 @@ export class GameStateBroadcaster {
         this.broadcastToAll(message);
       }
     }
-    const gameState = this.gameEngine.getGameState();
+    const gameState = this.gameEngine.getSnapshotState();
     // Snapshot rows are the engine's live rows, so the engine's frame index covers them.
     const asteroidIndex = this.gameEngine.getAsteroidSpatialIndex();
     const timestamp = Date.now();
@@ -201,9 +201,9 @@ export class GameStateBroadcaster {
         const canonical = new SnapshotEncoder({
           ...gameState,
           asteroids,
-          loot: nearbyWorldRows(gameState.loot, player.position).filter(
-            (drop) => !isEquipmentId(drop.kind) || canCollectEquipment(player, drop.kind)
-          ),
+          loot: this.gameEngine
+            .getNearbyLoot(player.position)
+            .filter((drop) => !isEquipmentId(drop.kind) || canCollectEquipment(player, drop.kind)),
           satellitePickups: [
             ...gameState.satellitePickups.filter((pickup) => pickup.ownerId === player.id),
             ...nearbyWorldRows(

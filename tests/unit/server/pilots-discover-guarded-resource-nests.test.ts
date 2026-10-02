@@ -1,11 +1,14 @@
 import { expect, test } from 'vitest';
+import { instrumentLootIndex } from '../../../benchmarks/loot-index-instrumentation';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
+import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { type SpiderResource, spiderResources } from '../../../server/core/spiderResources';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { FurnaceField } from '../../../shared/furnaceField';
 import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
+import { GROWTH } from '../../../shared/shipGrowth';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { AsteroidData, Position } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
@@ -329,7 +332,12 @@ test.each(['collected', 'moved'] as const)(
         players: [pilot],
         nowFrame,
         resources: () => spiderResources(rocks.getAllAsteroids(), [], []),
-        dormantResource: (id, position) => {
+        resource: (id, position) => {
+          const live = rocks.getAsteroid(id);
+          const resource = live ? spiderResources([live], [], [])[0] : undefined;
+          if (resource) {
+            return resource;
+          }
           const dormant = field.dormantAsteroid(id, position);
           return dormant ? spiderResources([dormant], [], [])[0] : undefined;
         },
@@ -398,6 +406,66 @@ test('nearby resource cells each have ten guards and seed treasure only on first
   advance(121);
   expect(created).toEqual(['west-ore', 'east-ore']);
   expect(manager.snapshot().spiders).toEqual([]);
+});
+
+test('treasure that evicts an older guarded deposit changes its marker on the next resource refresh', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  const loot = new LootManager(new RNGService(7));
+  const west = { x: 14_800, y: 5_000 };
+  const east = { x: 15_200, y: 5_000 };
+  const pilot = { id: 'pilot', position: { x: 15_000, y: 7_000 }, health: 100, exploding: false };
+  const older = loot.spawnShard(west, 0, 0.75);
+  const created: string[] = [];
+  const advance = (nowFrame: number) =>
+    manager.advance({
+      players: [pilot],
+      nowFrame,
+      resources: (players) =>
+        spiderResources(
+          [],
+          loot.getNestResourcesNear(
+            players.map((player) => player.position),
+            SPIDER.NEST_WAKE_DISTANCE
+          ),
+          []
+        ),
+      resource: (id) => {
+        const drop = loot.getNestResource(id);
+        return drop ? spiderResources([], [drop], [])[0] : undefined;
+      },
+      onNestCreated: (nest) => {
+        created.push(nest.resourceId);
+        loot.spawnNestCache(nest.position, nowFrame);
+      },
+    });
+  const olderMarker = { id: '2,1', resourceId: older.id, position: west };
+  advance(1);
+  expect(manager.snapshot().nests).toEqual([olderMarker]);
+  const originalGuardIds = manager.snapshot().spiders.map((spider) => spider.id);
+  expect(originalGuardIds).toHaveLength(SPIDER.NEST_GUARDS);
+
+  const observation = instrumentLootIndex(loot);
+  while (observation.snapshot().disposableRows < GROWTH.MAX_LOOT - 1) {
+    loot.spawnShard({ x: -30_000, y: -30_000 }, 1);
+  }
+  const newer = loot.spawnShard(east, 61, 0.75);
+  expect(loot.get(older.id)).toBeDefined();
+  advance(61);
+  const newerMarker = { id: '3,1', resourceId: newer.id, position: east };
+  expect(loot.get(older.id)).toBeUndefined();
+  expect(manager.snapshot().nests).toEqual([olderMarker, newerMarker]);
+  expect(created).toEqual([older.id, newer.id]);
+  const guardIds = manager.snapshot().spiders.map((spider) => spider.id);
+  expect(guardIds).toHaveLength(SPIDER.NEST_GUARDS * 2);
+  expect(guardIds).toEqual(expect.arrayContaining(originalGuardIds));
+
+  advance(120);
+  expect(manager.snapshot().nests).toEqual([olderMarker, newerMarker]);
+  advance(121);
+  expect(manager.snapshot().nests).toEqual([newerMarker]);
+  expect(manager.snapshot().spiders.map((spider) => spider.id)).toEqual(guardIds);
+  expect(created).toEqual([older.id, newer.id]);
+  observation.dispose();
 });
 
 test('resource-centered nests still leave the starter area safe', () => {

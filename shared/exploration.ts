@@ -118,8 +118,8 @@ export class ExplorationMap {
   private tiles = new Map<string, string>();
   private encoded: ExplorationTile[] = [];
 
-  reveal(position: Position, range: number): void {
-    let changed = false;
+  reveal(position: Position, range: number): number[] {
+    const changed: number[] = [];
     for (const cell of explorationCellsInView({ cx: position.x, cy: position.y, radius: range })) {
       const bounds = cellWorldBounds(cell);
       if (
@@ -140,11 +140,12 @@ export class ExplorationMap {
         address.id,
         bits.slice(0, offset) + after.toString(16).padStart(2, '0') + bits.slice(offset + 2)
       );
-      changed = true;
+      changed.push(cell);
     }
-    if (changed) {
+    if (changed.length > 0) {
       this.encoded = Array.from(this.tiles, ([id, bits]) => ({ id, bits }));
     }
+    return changed;
   }
 
   snapshot(): ExplorationTile[] {

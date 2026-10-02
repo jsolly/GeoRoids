@@ -637,9 +637,9 @@ describe('current pilots share the production handler and broadcaster', () => {
     const second = socket();
     joinPilot(handler, first.ws, 'first');
     joinPilot(handler, second.ws, 'second');
-    const broken = engine.getGameState();
+    const broken = engine.getSnapshotState();
     Object.assign(broken, { badField: broken });
-    vi.spyOn(engine, 'getGameState').mockReturnValue(broken);
+    vi.spyOn(engine, 'getSnapshotState').mockReturnValue(broken);
     first.close.mockImplementation(() => {
       throw new Error('close failure');
     });

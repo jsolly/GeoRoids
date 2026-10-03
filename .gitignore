@@ -18,7 +18,10 @@ dist/*
 .vercel
 
 # Codex local environment metadata
-/.codex/
+/.codex/*
+!/.codex/environments/
+/.codex/environments/*
+!/.codex/environments/environment.toml
 
 # Railway CLI local link metadata; keep the tracked IaC source and README.
 .railway/*.json

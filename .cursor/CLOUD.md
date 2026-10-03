@@ -8,6 +8,13 @@ normalized-remote project index and relevant topics. Curated recall is separate 
 current evidence overrides dated facts, and missing files permit an honest repository-evidence
 fallback. Published snapshots are read-only; saves go through isolated dotagents `/ship` PRs.
 
+## Frontend stack
+
+The fleet default is Svelte + shadcn-svelte; follow this repo's `AGENTS.md` for
+explicit purpose-specific exceptions. Read `rules/frontend-stack.md` from the
+installed cloud rules package before frontend work. Use installed `shadcn-svelte`
+and Svelte skills for supported UI changes; do not substitute React shadcn/ui.
+
 ## Skills package (private checkout)
 
 `.cursor/install-cloud-skills.sh` (via `.cursor/environment.json` `install`) finds or

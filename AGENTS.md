@@ -18,6 +18,15 @@ GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, ast
 
 `AGENTS.md` (plus `tests/AGENTS.md`) is the only agent instruction file. Claude Code 2.1.277+ reads it natively; do not add a `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md`, because any of them makes Claude Code ignore `AGENTS.md`.
 
+## Frontend stack
+
+Svelte + shadcn-svelte is the fleet default for product interfaces. GeoRoids is a
+user-authorized exception: keep its TypeScript canvas game, existing HUD, Wiki
+and performance tooling on the current rendering stack. Do not add unused Svelte
+or shadcn dependencies to satisfy an installation check. New standalone product
+interfaces follow the fleet default; expanding this exception or migrating the
+game needs user direction. Canon: dotagents `rules/frontend-stack.md`.
+
 ## Deploy
 
 Vite static client and authoritative WebSocket server deploy independently from `main`. Before configuration or release work, read [deployment operations](docs/agent-operations.md#deploy) and [world operations](docs/persistent-world.md). Never use the retired geoasteroids hostnames. No automatic Vercel Preview deployments.

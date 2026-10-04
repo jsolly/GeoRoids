@@ -51,7 +51,6 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
             primaryWire: readWireCounters(pilotWire),
             peerWire: readWireCounters(peerWire),
           });
-        await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
         const game = new GameInteractions(page);
         const peer = new GameInteractions(peerPage);
         async function join(pilot: GameInteractions, pilotPage: typeof page, name: string) {
@@ -87,6 +86,9 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
         }
         await game.waitForRemotePlayers(1);
         await peer.waitForRemotePlayers(1);
+        // Constrain the recovery exercise, after cold loading and arranging the fixture.
+        // Throttling setup can exhaust the test deadline and let teardown reset a live scene.
+        await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
         await native.observeGame();
         native.pinDocument();
         const admittedShots: string[] = [];

@@ -15,15 +15,15 @@ media:
 
 ## Mineral scan
 
-Scout starts with Mineral Scan and turns faster than Hauler. Select Mineral Scan in Inventory, then press E or Scan to send one pulse that shares nearby mineral classification and earns banked credit when ore-bearing rocks are delivered. That pulse also repels spiders in range, then the scan must recharge before it can fire again.
+Scout starts with Mineral Scan and turns faster than Hauler. Select Mineral Scan in Inventory, then press E or Scan to send one pulse that shares nearby mineral classification and earns banked credit whenever a scanned rock is delivered (barren rocks pay only a token amount). The pulse also reveals the chart across its whole range and repels spiders in range while it lasts, then the scan must recharge before it can fire again.
 
 ## Survey probe
 
-Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip it in Inventory and press E to fire a beacon at a rock or spider; a miss costs no cooldown. It scans along its host's route for the crew, so tagging a guard can reveal its resource nest. Beacons can be shot off and expire when their batteries run out; probes do not repel spiders.
+Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip it in Inventory and press E to fire a beacon at a rock or spider; a miss costs no cooldown and gives no message, but a probe shares the Scan recharge, so it waits after a Scan. It scans along its host's route for the crew and earns you delivery credit, so tagging a guard can reveal its resource nest. Beacons can be shot off, expire when their batteries run out, and are lost on a server restart; probes do not repel spiders.
 
 ## Build
 
-At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. Failed builds spend nothing.
+At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. A failed build spends nothing and shows why (not enough banked points, or the inward furnace is unlit), but it uses up that E press, so no Scan or Probe fires.
 
 ## Build a refuge
 

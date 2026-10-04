@@ -36,4 +36,4 @@ Exploration, built furnaces, and the asteroid field survive server restarts unti
 
 ## Build the settlement
 
-Everyone shares settlement progress. Reaching the next level requires the current level times 2,000 deposited points, 40 ice, 60 metal, 80 rubble, and 20 crystal. All requirements must be met; the recipe is consumed and surplus carries forward. The central docking station grows as the settlement levels up. Higher levels unlock more store placeholders; these spend banked points but grant no upgrade or gameplay effect.
+Everyone shares settlement progress. Reaching the next level requires deposited points and four materials, each scaling with the current level (per-level amounts are in the reference below). Deposits and every contributor's delivery reward count toward it. All requirements must be met; the recipe is consumed and surplus carries forward. The central docking station grows as the settlement levels up. Higher levels unlock more store placeholders; these spend banked points but grant no upgrade or gameplay effect.

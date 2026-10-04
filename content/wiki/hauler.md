@@ -25,7 +25,7 @@ Press E near a rock to extract collectible canisters without destroying it; E ag
 
 ## Tow cable E
 
-Press E near a rock or spider to latch, fly it into a lit furnace, and press E again to release early. Cargo keeps its momentum, so leave room for it to trail behind you. Delivery pays the Hauler and scanning contributors; the red shatter and smoke mark ore intake.
+Press E near a rock or spider to latch, fly it close to a lit furnace's intake, and press E again to release early; only one Hauler can tow an ordinary rock, and no one can shoot a rock while it is latched. Cargo keeps its momentum, so leave room for it to trail behind you. Delivery pays the Hauler and scanning contributors; the red shatter and smoke mark ore intake.
 
 ## Cargo collisions
 
@@ -33,7 +33,7 @@ Ordinary towed rocks break when they hit another rock or ship, damaging other sh
 
 ## Boost Coupling E
 
-Press E to arm a rock toward its nearest furnace, then E again to ignite autonomous delivery. One coupling pushes a colossal deposit at a crawl; a second Hauler's coupling, before or after ignition, brings it to full speed. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and other tools until delivery pays its launchers and recorded scanning pilots.
+Press E to arm a rock (not a spider) toward its nearest furnace, then E again to ignite autonomous delivery. One coupling pushes a colossal deposit at a crawl; a second Hauler's coupling, before or after ignition, brings it to full speed. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and other tools until delivery pays its launchers and recorded scanning pilots.
 
 ## Spider bites
 

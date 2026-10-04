@@ -18,7 +18,7 @@ media:
 
 ## Firing while moving
 
-Hold fire to repeat shots, which inherit your ship's motion. Direct crew shots mine rocks and kill spiders without hurting pilots. After a wall, reflective-rock, or court-panel bounce, a shot becomes a dangerous ricochet that can hit anyone.
+Shots inherit your ship's motion; hold Space to repeat them, while a mouse click fires once. Direct crew shots mine rocks and kill spiders without hurting pilots. After a wall, reflective-rock, or court-panel bounce, a shot becomes a dangerous ricochet that can hit anyone.
 
 ## Ricochet Court
 
@@ -26,11 +26,11 @@ Meet at the cyan court northeast of Town Square for informal bank-shot duels; it
 
 ## Damage and protection
 
-Asteroid impacts remove health; the outer wall and a spider bite each kill a vulnerable ship outright. Spawn blinking and open map, schematic, or store menus protect your hull. Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls.
+Asteroid impacts remove health; the outer wall and a spider bite each kill a vulnerable ship outright. Spawn blinking and open map, schematic, or store menus protect your hull. A vulnerable ship that rams an ordinary rock also breaks it, leaving its points and a shard, while a protected ship passes through unharmed. Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls.
 
 ## Lives and respawn
 
-Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, silk, and paint remain safe. There are no lives or game over.
+Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, and silk remain safe. Death also releases any tow and drops satellites. There are no lives or game over. Returning after a brief disconnect skips spawn protection.
 
 ## Recovery
 

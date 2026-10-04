@@ -124,7 +124,7 @@
     "shared/gameClock.ts": "sha256:eef197b547c95a0adb5d9e817687bef5ea5fc83befb32d282533d6ddcacc8646",
     "shared/laserSurface.ts": "sha256:5787072f4911a50bfac12d34f7a324be71661de48a39e57c78a019e0df2b26b0",
     "shared/logRecords.ts": "sha256:815bfa939c4eb3289270cfba3794c794276739449f28dd81d45a68b3d7713023",
-    "shared/lootBlast.ts": "sha256:138a6a554213be39d1ebec682486bb43cceece1e561337b36abeacc2f720fd0e",
+    "shared/lootBlast.ts": "sha256:33052320b3cf9d6eed83d8a86f6bdc31660dc27059a25932faef6fd8949e11ab",
     "shared/playerMotion.ts": "sha256:dfdbb62c8d095e10265b3c806ba9c06c8208bab57be143ada268e112e9f7bc84",
     "shared/releaseId.ts": "sha256:1295d5656e89d16b1ff84636f6376144356ce79139566d6bb062f1382d34a405",
     "shared/ricochetCourt.ts": "sha256:37d79178d40c2a15f9e96ce8d86f48cfd316031d9840758d5ed87e75f74223f5",
@@ -311,7 +311,7 @@
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:e65b287c6d24dd76d21db83a3ddf46b42ff5949eeb6ee177a8bc34adc940a08e",
-    "src/wiki/gameReference.ts": "sha256:59e3e8117b2b45a8be577b49afdbad398d001a1638ba23c3971a0b1e94dfec22",
+    "src/wiki/gameReference.ts": "sha256:e409c3338ac07a44fb840c0a5cbdb635503721a7d21307a5eaa9cda70d8639ab",
     "src/wiki/main.ts": "sha256:55e2f9bc2a01cc11b571eaf4e2cc227e4e1b814d13c1598769d4bfe4b9093222",
     "src/wiki/media.ts": "sha256:a29ed22df989d675f285414ee0f08968338e64717a6ea9ca3e5222c30d7262b9",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
@@ -322,7 +322,7 @@
     "src/wiki/wiki.css": "sha256:d47f0c7fb925815758b7578ba53df525f58aa0d6da11a8f08992fae3c55edf58",
     "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts": "sha256:373966a635386b7224a348b68dc4c7208b3e1eea91ef0883c41cdeb5537368bd",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts": "sha256:62bbd3172f534672d15065503dfb5bc08e4ee93eed2a008aa8dda654b1a01397",
-    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:243e4f2b694f8dedfed9b574df32bd3f4facfe85b9a0da7f6263d870609aecf9",
+    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:ca758f07d38d8c3aa546ab7260793195a0dfc38f6b0e9686ab693d2ab2e739bd",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts": "sha256:8c4bace46e35ffa928dc9ae7fdf905135067628b41fa710b700d83c173cea208",
     "tests/integration/browser/e2e/hauler-extracts-silk-and-tows-spiders-into-furnaces.test.ts": "sha256:ffc5ace3399f3e71249f3bd5441373d4371ffcef055ba790b7185960e26127ca",
     "tests/integration/browser/e2e/menus-hold-the-ship-still-and-protect-it.test.ts": "sha256:c43038734765bb272d9e323127b5c451d464fc024e98ba6c06e4efa998ee7e1c",
@@ -823,6 +823,37 @@
       "owners": {
         "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "combat-survival"
       }
+    },
+    {
+      "note": "Source-traced audit of all shipped mechanics against the Wiki (five area audits at 9fcfc7f); corrected stale or wrong prose and generated reference values. shared/lootBlast.ts is comment-only. Loot demo reviewed: wiki:media:check reproduces all 10 GIFs unchanged. Run: tsc, biome, unit suite, check:md, build, and desktop plus 375px mobile browser checks of the changed articles (text and reference values present, no overflow); no gameplay or two-client validation, as no behavior changed.",
+      "sources": ["shared/lootBlast.ts", "src/wiki/gameReference.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["loot"],
+      "owners": {
+        "shared/lootBlast.ts": "loot-growth",
+        "src/wiki/gameReference.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Test pinned the old HUD article sentence about discovered furnaces; updated to the corrected minimap-versus-chart wording (universeMap.ts and minimap.ts verified in the audit). Controls and teamwork articles were edited and reviewed in the same change. Test passes; no demonstration or rule changes.",
+      "sources": [
+        "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts"
+      ],
+      "topics": ["controls", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

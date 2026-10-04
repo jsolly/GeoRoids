@@ -646,7 +646,7 @@ test.each([
       await page.locator('#content h1').waitFor({ state: 'visible' });
       await page
         .getByText(
-          article === 'terrain' ? 'Red map webs' : 'Discovered furnaces appear as flames',
+          article === 'terrain' ? 'Red map webs' : 'The minimap shows furnaces once explored',
           { exact: false }
         )
         .scrollIntoViewIfNeeded();

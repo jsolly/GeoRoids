@@ -10,6 +10,7 @@ import {
 import { CONTOUR_LOCK } from '../../shared/contourLock';
 import { ECONOMY, settlementRecipe } from '../../shared/economy';
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
+import { EQUIPMENT_DROPS } from '../../shared/equipment';
 import { EXPLORATION_RANGE } from '../../shared/exploration';
 import { FURNACE_BUILD } from '../../shared/furnaceField';
 import {
@@ -26,6 +27,7 @@ import { PLAYER_MOTION } from '../../shared/playerMotion';
 import { GROWTH } from '../../shared/shipGrowth';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
+import { STORE_OFFERS, TOWN_STORE_RADIUS } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import {
@@ -39,6 +41,8 @@ import {
   SHOCKWAVE,
 } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
+import { CONNECTION_STALE_TIMEOUT_MS } from '../network/services/connectionHealth';
+import { RECONNECT_DELAYS_MS } from '../network/services/connectionReconnect';
 import { getGameBoundary } from '../physics/boundary';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 
@@ -86,15 +90,14 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Movement values',
       paragraphs: [
-        `Automatic movement defaults: thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, and turn rate ${SHIP.TURN_SPEED} degrees per second. Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
-        `Shift, right-click, or the Contour Lock button catches the nearest visible contour within ${CONTOUR_LOCK.captureRadius} world units. Locked travel follows its curves at ${CONTOUR_LOCK.speedMultiplier} times maximum contour cruise. Tap the same control again to release. Steering is ignored while locked; physical contact releases the lock even if hull protection prevents damage, while lasers pass through invulnerable hulls without releasing it. There is no charge or cooldown.`,
-        `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
+        `Both kits share maximum velocity ${SHIP.MAX_VELOCITY}; thrust and turn rate differ per kit (see the ship pages). Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
+        `Shift, right-click, or the Contour Lock button catches the nearest visible contour within ${CONTOUR_LOCK.captureRadius} world units. Locked travel follows its curves at ${CONTOUR_LOCK.speedMultiplier} times maximum contour cruise. Tap the same control again to release. Steering is ignored while locked; damage, the wall, asteroid contact even while protected, a shove above cruise speed, opening a menu or map, death, and furnace travel also release it, while lasers pass through invulnerable hulls without releasing it. There is no charge or cooldown.`,
       ],
     },
     {
       heading: 'Town store values',
       paragraphs: [
-        `Inside any lit furnace’s visible footprint, press E on desktop or tap the travel prompt on mobile to open Furnace travel. B toggles the same menu. The mobile ability button keeps the equipped tool; the approach prompt shows Tap to travel. Select another lit furnace on the destination map for a free rocket ride along the pipe network, lasting ${FURNACE_TRAVEL.MIN_DURATION_MS / 1000}–${FURNACE_TRAVEL.MAX_DURATION_MS / 1000} seconds. Boarding releases towed cargo and couplings; the ship is protected and cannot act during the ride. The menu holds the ship like the map and schematic. Town Square offers level-gated placeholder purchases that spend banked points with no gameplay effect.`,
+        `Inside any lit furnace’s visible footprint, press E on desktop or tap the travel prompt on mobile to open Furnace travel. B toggles the same menu. The mobile ability button keeps the equipped tool; the approach prompt shows Tap to travel. Select another lit furnace on the destination map for a free rocket ride along the pipe network, lasting ${FURNACE_TRAVEL.MIN_DURATION_MS / 1000}–${FURNACE_TRAVEL.MAX_DURATION_MS / 1000} seconds. Boarding releases towed cargo and couplings; the ship is protected and cannot act during the ride. The menu holds the ship like the map and schematic. Town Square’s store, within ${TOWN_STORE_RADIUS} units of the square, sells each placeholder once: ${STORE_OFFERS.map((offer) => `${offer.name} at level ${offer.level} for ${offer.cost} banked points`).join(', ')}. They have no gameplay effect.`,
       ],
     },
   ],
@@ -112,9 +115,9 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Ability and exploration values',
       paragraphs: [
-        `With Mineral Scan equipped, E runs one radar pulse lasting ${seconds(SHIP_ABILITY.SCAN_FRAMES)} within ${SHIP_ABILITY.SCAN_RANGE} units. The camera zooms out to fit the whole scan range while that thin cyan sweep expands to the view edge, then eases back; neither visual cue expands the scan range. Spiders inside that range flee and cannot bite while the pulse is active. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.scout)}; each identified rock keeps its classification and records the Scout player ID for a later furnace delivery.`,
+        `With Mineral Scan equipped, E runs one radar pulse lasting ${seconds(SHIP_ABILITY.SCAN_FRAMES)} within ${SHIP_ABILITY.SCAN_RANGE} units. The camera zooms out to fit the whole scan range while that thin cyan sweep expands to the view edge, then eases back; neither visual cue expands the scan range. Spiders inside that range flee and cannot bite while the pulse is active. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.scout)}; each identified rock keeps its classification and records the Scout player ID for a later furnace delivery. A probe shares the scan cooldown. Beacons are lost on a server restart.`,
         `Survey Probe: launch range ${SURVEY_PROBE.LAUNCH_RANGE} units; beacon scan radius ${SURVEY_PROBE.RANGE} units every ${SURVEY_PROBE.PULSE_MS / 1000} seconds; battery ${SURVEY_PROBE.LIFETIME_MS / 60000} minutes with a warning during the last ${SURVEY_PROBE.WARNING_MS / 1000} seconds. Health: ${SURVEY_PROBE.MAX_HEALTH}. Maximum ${SURVEY_PROBE.MAX_PER_OWNER} active probes per Scout; a successful extra attachment replaces the oldest. Attachment cooldown: ${seconds(SURVEY_PROBE.COOLDOWN_FRAMES)}.`,
-        `Passive shared exploration reaches ${EXPLORATION_RANGE.scout} world units for Scout and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist for the match.`,
+        `Passive shared exploration reaches ${EXPLORATION_RANGE.scout} world units for Scout and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist with the world, including server restarts. An active Mineral Scan charts its whole scan range, and live probes chart around their host.`,
       ],
     },
   ],
@@ -128,7 +131,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids, cooperative large rocks, and colossal deposits. The ability has no ship-targeting mode.`,
         `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Ordinary towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable. A colossal deposit needs ${ROID.COLOSSAL_CREW} Tow Cables before it will haul, and ${ROID.COLOSSAL_CREW} Boost Couplings for full burn speed (fewer crawl at ${ASTEROID_BOOST.undercrewedFactor * 100}% speed); ramming it or dragging it into another rock does not shatter it.`,
-        `Furnace intakes are ${TOWN_HEARTH.radius} units. At size 25, delivery rewards are ice ${furnaceReward({ id: 'reference', ore: 'ice', material: 'ice', size: 25 })}, metal ${furnaceReward({ id: 'reference', ore: 'metal', material: 'metal', size: 25 })}, and rubble ${furnaceReward({ id: 'reference', ore: 'rubble', material: 'rubble', size: 25 })} points for the Hauler and each recorded Scout. A lit furnace shows a right-angle fire trail from its grate through each inward lot on its parent chain to ${TOWN_HEARTH.name}. A delivery sends a brighter head along that trail at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
+        `Furnace intakes are ${TOWN_HEARTH.radius} units, and a towed rock delivers only while its Hauler is within ${TOWN_HEARTH.radius + SHIP_ABILITY.HARPOON_RANGE * SHIP_ABILITY.HARPOON_SLACK} units of the furnace centre. At size 25, delivery rewards are ice ${furnaceReward({ id: 'reference', ore: 'ice', material: 'ice', size: 25 })}, metal ${furnaceReward({ id: 'reference', ore: 'metal', material: 'metal', size: 25 })}, rubble ${furnaceReward({ id: 'reference', ore: 'rubble', material: 'rubble', size: 25 })}, and crystal ${furnaceReward({ id: 'reference', ore: 'crystal', material: 'crystal', size: 25 })} points for each launcher and every recorded scanner (Scout scan, Survey Probe, or deployed satellite); a barren rock pays only a token amount. A lit furnace shows a right-angle fire trail from its grate through each inward lot on its parent chain to ${TOWN_HEARTH.name}. A delivery sends a brighter head along that trail at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
       ],
     },
   ],
@@ -136,7 +139,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Loot and salvage values',
       paragraphs: [
-        `Pickups leave ship mass, health capacity, current health, hull size, and flight tuning unchanged. Environmental death drops at most ${GROWTH.MAX_PELLETS} wreckage pellets; the live loot limit is ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
+        `Pickups leave ship mass, health capacity, current health, hull size, and flight tuning unchanged. Environmental death drops at most ${GROWTH.MAX_PELLETS} wreckage pellets; the live loot limit is ${GROWTH.MAX_LOOT}. Shards, wreckage, Tap canisters, and silk last ${seconds(GROWTH.LOOT_TTL_FRAMES)}; point drops from mined rocks and deaths last ${ECONOMY.deathLootFrames / GAME.FPS} seconds of real time and survive restarts; equipment and nest caches last ${EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES / GAME.FPS / 60} minutes. A nest holds a tool with ${EQUIPMENT_DROPS.NEST_CHANCE * 100}% chance, and an ordinary laser-killed rock with ${EQUIPMENT_DROPS.ASTEROID_CHANCE * 100}%. Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}.`,
         `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}. Tap canisters have radius ${GROWTH.TAP_LOOT_RADIUS} and score ${GROWTH.TAP_LOOT_SCORE}. A living ship magnetizes ordinary drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL}. Tap loot uses range ${GROWTH.TAP_LOOT_MAGNET_RANGE} and acceleration ${GROWTH.TAP_LOOT_MAGNET_ACCEL} toward a Hauler. Pickup overlap uses each kit's hull radius plus the drop radius.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. Reflected shots can reach a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
       ],
@@ -201,6 +204,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `The lethal boundary radius is ${getGameBoundary().radius.toLocaleString('en-US')} units. The asteroid field radius is ${ROID.FIELD_RADIUS} units and boundary contact destroys a vulnerable ship regardless of hull health. Asteroids and lasers bounce inward; after a bounce, a laser damages any live ship it hits.`,
         `A terrain spider has ${SPIDER.MAX_HEALTH} health. One ordinary hit, including a ricochet, removes the spider.`,
+        `Nests spawn ${SPIDER.NEST_GUARDS} guards that patrol within ${SPIDER.NEST_PATROL_RADIUS} units, notice prey within ${SPIDER.NEST_ACQUIRE_DISTANCE}, chase for at most ${SPIDER.NEST_CHASE_FRAMES / GAME.FPS} seconds, and turn back at ${SPIDER.NEST_LEASH_DISTANCE} units from home. Up to ${SPIDER.MAX_ROAMERS} roaming hunter${SPIDER.MAX_ROAMERS === 1 ? '' : 's'} appear${SPIDER.MAX_ROAMERS === 1 ? 's' : ''} at a time, noticing prey within ${SPIDER.HUNT_ACQUIRE_DISTANCE} units and giving up past ${SPIDER.HUNT_RELEASE_DISTANCE}. A towed spider draws up to ${SPIDER.MAX_RESCUE_ROAMERS} rescuers, one every ${SPIDER.RESCUE_SPAWN_INTERVAL_FRAMES / GAME.FPS} seconds. A bite reaches ${SPIDER.BITE_DISTANCE} units. Spiders avoid ${SPIDER.FURNACE_SAFE_RADIUS} units around a lit furnace and ${SPIDER.STARTER_SAFE_RADIUS} around Town Square. Tapping a spider yields ${SPIDER.SILK_BURSTS} silk.`,
       ],
     },
   ],
@@ -236,7 +240,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Connection and protocol values',
       paragraphs: [
-        `The client allows at most ${MAX_CATCH_UP_TICKS} catch-up frames after a stall. Live socket grace is ${PLAYER_MOTION.reconnectGraceMs / 1000} seconds; after the socket is gone, Enter Game returns you to the same ship for ${PLAYER_MOTION.returnToShipMs / 1000} seconds. Join records the client and server releases that issued the resume token and last wrote the score, plus the server times of those writes. Server-only score writes omit a client release.`,
+        `The client allows at most ${MAX_CATCH_UP_TICKS} catch-up frames after a stall. The client retries a dropped connection after ${RECONNECT_DELAYS_MS.join(', ')} ms, and treats ${CONNECTION_STALE_TIMEOUT_MS / 1000} seconds of server silence as a drop. Live socket grace is ${PLAYER_MOTION.reconnectGraceMs / 1000} seconds; after the socket is gone, Enter Game returns you to the same ship for ${PLAYER_MOTION.returnToShipMs / 1000} seconds. Join records the client and server releases that issued the resume token and last wrote the score, plus the server times of those writes. Server-only score writes omit a client release.`,
       ],
     },
   ],
@@ -245,8 +249,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Shared field values',
       paragraphs: [
         `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Scout ${EXPLORATION_RANGE.scout} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Scout scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. Mined regions stay flyable while their harvested deposits regrow out of sight.`,
-        `Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}. The next settlement tier costs the current level times ${settlementRecipe(1).points} banked deliveries, ${settlementRecipe(1).resources.ice} ice, ${settlementRecipe(1).resources.metal} metal, ${settlementRecipe(1).resources.rubble} rubble, and ${settlementRecipe(1).resources.crystal} crystal. All five requirements must be met; surplus carries forward.`,
-        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${furnaceLots(1).length} furnace lots sit in the first band, then ${furnaceLots(2).length} and ${furnaceLots(3).length} farther lots scattered through outer bands. A Scout builds the next dark foundation with their own score once its inward parent lot is burning and that score covers ${furnaceCost(1)}, ${furnaceCost(2)}, or ${furnaceCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Scout receives the size-scaled material reward. Size-25 base values are ice ${furnaceReward({ id: 'reference', ore: 'ice', material: 'ice', size: 25 })}, metal ${furnaceReward({ id: 'reference', ore: 'metal', material: 'metal', size: 25 })}, and rubble ${furnaceReward({ id: 'reference', ore: 'rubble', material: 'rubble', size: 25 })}. The Town Square store sells level-gated placeholders with no gameplay effect.`,
+        `Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}. Each requirement scales with the current level: the next settlement tier costs the current level times ${settlementRecipe(1).points} points, ${settlementRecipe(1).resources.ice} ice, ${settlementRecipe(1).resources.metal} metal, ${settlementRecipe(1).resources.rubble} rubble, and ${settlementRecipe(1).resources.crystal} crystal. All five requirements must be met; surplus carries forward.`,
+        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${furnaceLots(1).length} furnace lots sit in the first band, then ${furnaceLots(2).length} and ${furnaceLots(3).length} farther lots scattered through outer bands. A Scout builds the next dark foundation with their own score once its inward parent lot is burning and that score covers ${furnaceCost(1)}, ${furnaceCost(2)}, or ${furnaceCost(3)}. The furnace keeps the builder's name. Each launcher and every recorded scanner receives the size-scaled material reward. Size-25 base values are ice ${furnaceReward({ id: 'reference', ore: 'ice', material: 'ice', size: 25 })}, metal ${furnaceReward({ id: 'reference', ore: 'metal', material: 'metal', size: 25 })}, and rubble ${furnaceReward({ id: 'reference', ore: 'rubble', material: 'rubble', size: 25 })}. The Town Square store sells level-gated placeholders with no gameplay effect.`,
       ],
     },
   ],

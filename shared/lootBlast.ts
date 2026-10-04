@@ -3,7 +3,7 @@ import { GAME } from '../src/constants';
 
 /**
  * Shoot-a-drop blast (GH #313 / Todoist destroy-drop).
- * Applies to every loot kind.
+ * Applies to shard, wreckage, Tap canister, and silk drops; point drops and equipment are not shootable.
  */
 export const LOOT_BLAST = {
   RADIUS: 80,

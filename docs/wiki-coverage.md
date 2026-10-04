@@ -81,8 +81,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 ## Known rule discrepancies and maintenance notes
 
-- Hauler E uses a fixed 280-unit hull-gap reach and selects only a living
-  asteroid. The equipped utility is Resource Tap, Tow Cable, or Boost Coupling. Resource Tap
+- Hauler E uses a fixed 280-unit hull-gap reach and selects a living
+  asteroid or spider (Boost Coupling cannot couple a spider). The equipped utility is Resource Tap, Tow Cable, or Boost Coupling. Resource Tap
   extracts four spaced canister bursts across 90 frames and leaves the rock intact. E again
   releases the persistent tow cable. The asteroid
   keeps its momentum and trails behind normal Hauler movement; the cable applies
@@ -100,8 +100,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   and towed collisions do not shatter it.
 - Boost Coupling arms the nearest available asteroid and points it at its nearest
   furnace. Ordinary rocks ignite on the second E and pay that launcher plus recorded
-  Scouts at intake. A colossal deposit stays armed until two couplings are latched;
-  those launchers and recorded Scouts are paid. Dropping one colossal coupling
+  Scouts at intake. One coupling ignites a colossal deposit at a crawl and a second brings it to full speed;
+  those launchers and recorded scanners are paid. Dropping one colossal coupling
   leaves the other armed. Swapping tools, losing range, dying, or disconnecting
   cancels an ordinary armed coupling.
   Ignited cargo passes through objects and ignores
@@ -120,10 +120,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   Uncharted asteroid and loot positions remain hidden.
 - Hauler mining damage is doubled for metal asteroids, cooperative large rocks,
   and colossal deposits;
-  normal asteroid mining damage remains configured per material. Large ice
-  collaboration requires distinct pilot IDs; both contributors receive the
-  collaboration score. Every miner and recorded Scout receives the full
-  mining reward; partial-rock contributor history survives saved-region reloads
+  normal asteroid mining damage remains configured per material. Large ice or crystal
+  collaboration requires distinct pilot IDs; mining a rock leaves collectible point drops (two minutes) plus a shard, not a direct bank payment. Delivery credit goes to launchers and recorded scanners; partial-rock scan history survives saved-region reloads
   and server restarts, and offline pilots retain their credit.
 - Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
   never damage crew hulls. After a bounce off the arena wall or a reflective
@@ -148,9 +146,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   health intact. Broken or exhausted hardware respawns loose and full.
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
-  cargo, bank, settlement, current ability, and kit. The leaderboard includes every active
-  player.
-- A laser detonation of any loot kind removes the drop and leaves every nearby
+  cargo, bank, settlement, and kit (on touch, a tool button with a cooldown ring). The leaderboard ranks by bank, top ten on desktop and top three on touch.
+- A laser detonation of a shard, wreckage, Tap canister, or silk drop removes the drop and leaves every nearby
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
   pickups take damage from asteroid impacts and ricochets while deployed;
   ordinary crew shots pass through owned hardware.
@@ -185,8 +182,8 @@ and the thicker arcade laser core without changing projectile physics.
 
 Furnace travel follows shared pipe geometry between lit destinations. E opens
 the furnace menu inside the hearth’s visible footprint, with Town Square retaining
-level-gated placeholder purchases. Death drops cargo while banks, silk, equipment,
-and paint remain safe.
+level-gated placeholder purchases. Death drops cargo while banks, silk, and equipment
+remain safe.
 Verify server socket/proximity/destination checks, transit action suppression,
 arrival reconciliation, reconnect behavior, and desktop/mobile equipped-hull travel visuals.
 

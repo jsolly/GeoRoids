@@ -18,11 +18,11 @@ media:
 
 ## Six Earth-observation hulls
 
-Glowing Landsat 7, Terra, Aqua, GOES-16, ENVISAT, and WorldView-3 satellites are collectible scanning hardware. Find them loose in the field or among nest salvage while supply remains. Fly close to claim one automatically for your inventory and fill point cargo; loose satellites are invulnerable.
+Glowing Landsat 7, Terra, Aqua, GOES-16, ENVISAT, and WorldView-3 satellites are collectible scanning hardware. Find them loose in the field or among nest salvage while supply remains. Fly close to claim one automatically for your inventory and add a cargo bonus (lost if your hold is full); loose satellites are invulnerable.
 
 ## Equipped satellites
 
-Open Inventory with V or its button and choose Equip to deploy one satellite alongside your normal tool. It identifies nearby minerals for the crew and records you for shared rewards. Health drains with time and impacts, so damage shortens its scanning lifetime.
+Open Inventory with V or its button and choose Equip to deploy one satellite alongside your normal tool (one active at a time). It identifies nearby minerals for the crew and records you for shared rewards. Health drains with time and impacts, so damage shortens its scanning lifetime.
 
 ## Storage and loss
 

@@ -349,7 +349,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect(
       (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')
-    ).toContain('Hold and drag one finger to steer');
+    ).toContain('Hold or drag one finger to steer');
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#satellites`);
     await expect.poll(() => page.locator('h1').textContent()).toBe('Satellites and pickups');

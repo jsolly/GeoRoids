@@ -16,9 +16,9 @@ media:
 
 ## Contour travel
 
-Follow the neutral gray contours in either direction for the most extra speed; diagonal travel earns less, while perpendicular crossings and empty space keep normal cruise. Curved streamlines trail behind your ship as the terrain bonus builds, then fade as you turn across the grain. Ordinary terrain travel causes no damage, sideways pull, or shot deflection.
+Follow the neutral gray contours in either direction for extra speed, most where lines are packed tightly and little where they are widely spaced; diagonal travel earns less, while perpendicular crossings and empty space keep normal cruise. Curved streamlines trail behind your ship as the terrain bonus builds, then fade as you turn across the grain. Ordinary terrain travel causes no damage, sideways pull, or shot deflection.
 
-Tap Contour Lock near a visible line to catch it and follow its curves at stronger speed. Steering is ignored until you tap the control again or collide with something; physical contact releases the lock even while protected, but lasers pass through invulnerable hulls. Locking has no charge or cooldown.
+Tap Contour Lock near a visible line to catch it and follow its curves at stronger speed. Steering is ignored until you tap the control again, take damage, hit the wall or an asteroid (even while protected), are shoved hard, or open a menu; see [Controls](/wiki/#controls) for the full list. Lasers pass through invulnerable hulls. Locking has no charge or cooldown.
 
 ## Outer boundary
 
@@ -30,7 +30,7 @@ Northeast of Town Square, cyan court panels reflect lasers but let ships pass th
 
 ## Spider nests
 
-Each new nest has ten guards and mixed salvage, often including [rare equipment](/wiki/#loot-growth). Caches last up to 30 minutes, subject to the shared pickup limit, and do not refill when you return. Red map webs mark discovered guarded resources; the mark disappears when the resource is collected or moved.
+Each new nest has a fixed guard pack and mixed salvage, often including [rare equipment](/wiki/#loot-growth); guard and cache numbers are in the reference below. Caches are time-limited, subject to the shared pickup limit, and do not refill when you return. Red map webs mark discovered guarded resources; the mark disappears when the resource is collected or moved.
 
 ## Guard patrols
 
@@ -38,7 +38,7 @@ Guards chase briefly and return home, while rare roaming hunters pursue farther.
 
 ## Survive a hunt
 
-One bite kills, and one ordinary laser hit kills the spider; otherwise escape its range or reach a lit furnace's safe area. Mineral Scan repels spiders while they remain in range; probes and dark foundations offer no protection. A Scout can also [build a refuge during a chase](/wiki/#scout), even during tool cooldown or over a nest, to send living spiders fleeing.
+One bite kills, and one ordinary laser hit kills the spider; otherwise escape its range or reach a lit furnace's safe area; Town Square has a larger sanctuary where spiders will not hunt. Mineral Scan makes spiders in range flee only during its short pulse, then they can return; probes and dark foundations offer no protection. A Scout can also [build a refuge during a chase](/wiki/#scout), even during tool cooldown or over a nest, to send living spiders fleeing.
 
 ## Spider tools
 

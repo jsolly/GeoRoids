@@ -25,7 +25,7 @@ for (const viewport of [
     const instructions = page
       .locator('article .article-body')
       .getByText(
-        'If the game requests an update, reload; joining can remain unavailable until both client and server updates have finished.',
+        'Right after a release an old tab may show a generic connection error until it refreshes; reload if it does not.',
         { exact: false }
       );
     await instructions.waitFor({ state: 'visible' });

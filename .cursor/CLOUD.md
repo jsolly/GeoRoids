@@ -8,13 +8,6 @@ normalized-remote project index and relevant topics. Curated recall is separate 
 current evidence overrides dated facts, and missing files permit an honest repository-evidence
 fallback. Published snapshots are read-only; saves go through isolated dotagents `/ship` PRs.
 
-## Frontend stack
-
-The fleet default is Svelte + shadcn-svelte; follow this repo's `AGENTS.md` for
-explicit purpose-specific exceptions. Read `rules/frontend-stack.md` from the
-installed cloud rules package before frontend work. Use installed `shadcn-svelte`
-and Svelte skills for supported UI changes; do not substitute React shadcn/ui.
-
 ## Skills package (private checkout)
 
 `.cursor/install-cloud-skills.sh` (via `.cursor/environment.json` `install`) finds or
@@ -147,6 +140,12 @@ missing, follow this repo's `AGENTS.md` **Local UI verification** stanza instead
 
 Product UI must not load runtime CSS/JS from third-party CDNs (jsDelivr, unpkg, cdnjs, esm.sh,
 Google Fonts CSS, and similar). Prefer npm/local packages and first-party origins. Detailed policy: `~/.cursor/dotagents-package/rules/no-cdn-app-assets.md`; also read this repo's `AGENTS.md` when present.
+
+Use Svelte + shadcn-svelte for new frontends. Existing Svelte repos use
+shadcn-svelte for new or replaced standard controls; load `/shadcn-svelte`.
+Framework migrations and alternative stacks require explicit user direction.
+Policy: `~/.cursor/dotagents-package/rules/frontend-stack.md`. Record the stack
+and any user-directed exception in this repo's `AGENTS.md`.
 
 Vercel Git repos must not auto-Preview every branch. Production stays on `main`; opt-in `/preview`
 only when John asks. Canon: laptop global brief **No automatic Vercel Previews**; also this repo's

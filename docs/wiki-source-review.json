@@ -234,9 +234,9 @@
     "src/physics/shockwave.ts": "sha256:27ce668f18a44e3af82bd39c12e040720bdb9d00edf8dffcb80dc7c936134f4c",
     "src/physics/terrain/contourCapture.ts": "sha256:6f5fb7e29eea69982301f88f2dfda31ef0d81d0d1c06197bd445a3d006fab1c3",
     "src/physics/terrain/contourLaser.ts": "sha256:51538f48d4540d178c320236a971e6123887b99ad093fda50e5c64252d7acaa6",
-    "src/physics/terrain/contours.ts": "sha256:963e9c9cc165f90bfdf1815f8f702b42d7cd84230a94210d3c542a326912df86",
-    "src/physics/terrain/heightfield.ts": "sha256:f4136f2e44fe4d85585886ab31a144e84ee87694c4d177b21f7bbc89f32d2afe",
-    "src/physics/terrain/passages.ts": "sha256:192ae113372181868e6e558667f998bbfbc639bcca2416ffe87ab6d028f13108",
+    "src/physics/terrain/contours.ts": "sha256:1bdb783db5b9ff3383f91a4a0903d3bd0dce2ad1bda92ce73cdba7afb2ec7d1a",
+    "src/physics/terrain/heightfield.ts": "sha256:9a30ace0af895b0af51523df4d79ec818e6d1874811aaf934cef4f77c54fa8d0",
+    "src/physics/terrain/passages.ts": "sha256:681c1117dca8b8086c8a494830f75376d1850d03969f41e6be81ef8586ae3cb4",
     "src/physics/terrain/spiderSession.ts": "sha256:8ae891f49a86df951538e072669ade773f4bfa52ed7ca02ead695cf4123eaafa",
     "src/physics/terrain/terrainConfig.ts": "sha256:716c4521339f2ae42b21d77bd94c8abc72f85855cded69ab5e41403301b60934",
     "src/physics/terrain/terrainSession.ts": "sha256:7be444705b3d79c266df3a0d2839e471c6dc4a4d57a5b0a707db3780e6104f3d",
@@ -853,6 +853,17 @@
       ],
       "topics": ["controls", "hud-network", "teamwork"],
       "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed terrain article and contour-travel demonstration against the shared numeric refactor. Exact grid, point, gradient and ordered-contour witnesses preserve world shape, contour lock and travel rules; controls, limitations and the existing demonstration remain accurate.",
+      "sources": [
+        "src/physics/terrain/contours.ts",
+        "src/physics/terrain/heightfield.ts",
+        "src/physics/terrain/passages.ts"
+      ],
+      "topics": ["terrain"],
+      "media": ["terrain"],
       "owners": {}
     }
   ]

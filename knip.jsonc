@@ -16,6 +16,8 @@
     "benchmarks/sample.ts",
     "benchmarks/realtime-client.ts",
     "benchmarks/load.ts",
+    "benchmarks/terrain-grid/entry.ts",
+    "benchmarks/terrain-grid/run.mjs",
     "tests/**/*.test.ts"
   ],
   "project": [

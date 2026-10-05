@@ -1,4 +1,4 @@
-import { type Heightfield, sampleHeight } from './heightfield';
+import { createHeightGrid, type Heightfield } from './heightfield';
 import { TERRAIN } from './terrainConfig';
 
 interface ContourSegment {
@@ -62,22 +62,7 @@ export function extractIsoContours(
   const originX = bounds.cx - bounds.radius;
   const originY = bounds.cy - bounds.radius;
   const dim = n + 1;
-  const heights = new Float64Array(dim * dim);
-
-  let minH = Number.POSITIVE_INFINITY;
-  let maxH = Number.NEGATIVE_INFINITY;
-  for (let j = 0; j < dim; j++) {
-    for (let i = 0; i < dim; i++) {
-      const h = sampleHeight(field, originX + i * cell, originY + j * cell);
-      heights[j * dim + i] = h;
-      if (h < minH) {
-        minH = h;
-      }
-      if (h > maxH) {
-        maxH = h;
-      }
-    }
-  }
+  const { heights, minH, maxH } = createHeightGrid(field, gridSize, bounds);
 
   const span = maxH - minH;
   if (!Number.isFinite(span) || span < 1e-6) {

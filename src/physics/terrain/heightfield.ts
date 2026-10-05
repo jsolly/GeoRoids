@@ -1,4 +1,11 @@
-import { PASSAGES, passageStrength } from './passages';
+import {
+  PASSAGES,
+  passageAxis,
+  passageBand,
+  passageEnvelope,
+  passagePhase,
+  passageStrength,
+} from './passages';
 import { TERRAIN } from './terrainConfig';
 
 interface Landmark {
@@ -47,30 +54,51 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function valueNoise(x: number, y: number, seed: number): number {
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const fx = fade(x - x0);
-  const fy = fade(y - y0);
-  const v00 = hash2(x0, y0, seed);
-  const v10 = hash2(x0 + 1, y0, seed);
-  const v01 = hash2(x0, y0 + 1, seed);
-  const v11 = hash2(x0 + 1, y0 + 1, seed);
+function latticeNoise(ix: number, iy: number, fx: number, fy: number, seed: number): number {
+  const v00 = hash2(ix, iy, seed);
+  const v10 = hash2(ix + 1, iy, seed);
+  const v01 = hash2(ix, iy + 1, seed);
+  const v11 = hash2(ix + 1, iy + 1, seed);
   return lerp(lerp(v00, v10, fx), lerp(v01, v11, fx), fy) * 2 - 1;
 }
 
-function fbm(x: number, y: number, seed: number): number {
-  let amp = 1;
-  let freq = 1;
-  let sum = 0;
-  let norm = 0;
+interface NoiseOctave {
+  amplitude: number;
+  frequency: number;
+  seedOffset: number;
+}
+
+function noiseOctaves(): {
+  octaves: NoiseOctave[];
+  normalization: number;
+} {
+  const octaves: NoiseOctave[] = [];
+  let amplitude = 1;
+  let frequency = 1;
+  let normalization = 0;
   for (let i = 0; i < TERRAIN.OCTAVES; i++) {
-    sum += amp * valueNoise(x * freq, y * freq, seed + i * 1013);
-    norm += amp;
-    amp *= TERRAIN.PERSISTENCE;
-    freq *= TERRAIN.LACUNARITY;
+    octaves.push({ amplitude, frequency, seedOffset: i * 1013 });
+    normalization += amplitude;
+    amplitude *= TERRAIN.PERSISTENCE;
+    frequency *= TERRAIN.LACUNARITY;
   }
-  return norm > 0 ? sum / norm : 0;
+  return { octaves, normalization };
+}
+
+const NOISE = noiseOctaves();
+
+function fbm(x: number, y: number, seed: number): number {
+  let sum = 0;
+  for (const octave of NOISE.octaves) {
+    const nx = x * octave.frequency;
+    const ny = y * octave.frequency;
+    const ix = Math.floor(nx);
+    const iy = Math.floor(ny);
+    sum +=
+      octave.amplitude *
+      latticeNoise(ix, iy, fade(nx - ix), fade(ny - iy), seed + octave.seedOffset);
+  }
+  return NOISE.normalization > 0 ? sum / NOISE.normalization : 0;
 }
 
 function buildLandmarks(seed: number, radius: number): Landmark[] {
@@ -114,7 +142,25 @@ export function sampleHeight(field: Heightfield, x: number, y: number): number {
     return 0;
   }
 
-  let h = fbm(lx / TERRAIN.FEATURE_SCALE, ly / TERRAIN.FEATURE_SCALE, field.seed);
+  return shapeHeight(
+    field,
+    lx,
+    ly,
+    r2,
+    fbm(lx / TERRAIN.FEATURE_SCALE, ly / TERRAIN.FEATURE_SCALE, field.seed),
+    passageStrength(field, x, y)
+  );
+}
+
+function shapeHeight(
+  field: Heightfield,
+  lx: number,
+  ly: number,
+  r2: number,
+  noise: number,
+  passages: number
+): number {
+  let h = noise;
   for (const landmark of field.landmarks) {
     const dx = lx - landmark.x;
     const dy = ly - landmark.y;
@@ -123,12 +169,115 @@ export function sampleHeight(field: Heightfield, x: number, y: number): number {
       h += landmark.amp * Math.exp(-q);
     }
   }
-
   const flatten = 1 - Math.exp(-r2 / (2 * TERRAIN.FLATTEN_SIGMA * TERRAIN.FLATTEN_SIGMA));
-  // Blend the outer ring to zero so finite differences never see a height cliff at the rim.
-  const rim = Math.min(1, Math.max(0, (radius - Math.sqrt(r2)) / TERRAIN.RIM_FADE_WIDTH));
-  const cut = 1 - (1 - PASSAGES.RELIEF_RETAINED) * passageStrength(field, x, y);
+  // Preserve sqrt for the rim and hypot for passage fading: their rounding can differ.
+  const rim = Math.min(1, Math.max(0, (field.radius - Math.sqrt(r2)) / TERRAIN.RIM_FADE_WIDTH));
+  const cut = 1 - (1 - PASSAGES.RELIEF_RETAINED) * passages;
   return h * flatten * fade(rim) * cut;
+}
+
+/** Build one bounded row-major grid, reusing calculations shared by each axis. */
+export function createHeightGrid(
+  field: Heightfield,
+  gridSize: number,
+  bounds: Pick<Heightfield, 'cx' | 'cy' | 'radius'>
+): { heights: Float64Array; minH: number; maxH: number } {
+  const dim = gridSize + 1;
+  const cell = (2 * bounds.radius) / gridSize;
+  const originX = bounds.cx - bounds.radius;
+  const originY = bounds.cy - bounds.radius;
+  const octaves = NOISE.octaves.length;
+  const xs = new Float64Array(dim);
+  const ys = new Float64Array(dim);
+  const xIndex = new Float64Array(dim * octaves);
+  const yIndex = new Float64Array(dim * octaves);
+  const xFade = new Float64Array(dim * octaves);
+  const yFade = new Float64Array(dim * octaves);
+  const xPassageOffset = new Float64Array(dim);
+  const yPassageOffset = new Float64Array(dim);
+  const xPassageWidth = new Float64Array(dim);
+  const yPassageWidth = new Float64Array(dim);
+  const phase = passagePhase(field.seed);
+  for (let index = 0; index < dim; index++) {
+    const lx = originX + index * cell - field.cx;
+    const ly = originY + index * cell - field.cy;
+    xs[index] = lx;
+    ys[index] = ly;
+    const x = lx / TERRAIN.FEATURE_SCALE;
+    const y = ly / TERRAIN.FEATURE_SCALE;
+    for (let octave = 0; octave < octaves; octave++) {
+      const frequency = NOISE.octaves[octave]?.frequency ?? 0;
+      const nx = x * frequency;
+      const ny = y * frequency;
+      const ix = Math.floor(nx);
+      const iy = Math.floor(ny);
+      const offset = index * octaves + octave;
+      xIndex[offset] = ix;
+      yIndex[offset] = iy;
+      xFade[offset] = fade(nx - ix);
+      yFade[offset] = fade(ny - iy);
+    }
+    const horizontal = passageAxis(lx, phase);
+    const vertical = passageAxis(ly, phase + PASSAGES.VERTICAL_PHASE);
+    xPassageOffset[index] = horizontal.offset;
+    yPassageOffset[index] = vertical.offset;
+    xPassageWidth[index] = horizontal.width;
+    yPassageWidth[index] = vertical.width;
+  }
+
+  const heights = new Float64Array(dim * dim);
+  let minH = Number.POSITIVE_INFINITY;
+  let maxH = Number.NEGATIVE_INFINITY;
+  for (let j = 0; j < dim; j++) {
+    const ly = ys[j] ?? 0;
+    const yBase = j * octaves;
+    for (let i = 0; i < dim; i++) {
+      const lx = xs[i] ?? 0;
+      const r2 = lx * lx + ly * ly;
+      let height = 0;
+      if (!(r2 > field.radius * field.radius)) {
+        let sum = 0;
+        let octaveIndex = 0;
+        for (const octave of NOISE.octaves) {
+          const xOffset = i * octaves + octaveIndex;
+          const yOffset = yBase + octaveIndex;
+          sum +=
+            octave.amplitude *
+            latticeNoise(
+              xIndex[xOffset] ?? 0,
+              yIndex[yOffset] ?? 0,
+              xFade[xOffset] ?? 0,
+              yFade[yOffset] ?? 0,
+              field.seed + octave.seedOffset
+            );
+          octaveIndex++;
+        }
+        const noise = NOISE.normalization > 0 ? sum / NOISE.normalization : 0;
+        const envelope = passageEnvelope(lx, ly, field.radius);
+        const passages = Math.max(
+          passageBand(
+            ly - (xPassageOffset[i] ?? 0) - PASSAGES.HORIZONTAL_OFFSET,
+            xPassageWidth[i] ?? 0,
+            envelope
+          ),
+          passageBand(
+            lx - (yPassageOffset[j] ?? 0) - PASSAGES.VERTICAL_OFFSET,
+            yPassageWidth[j] ?? 0,
+            envelope
+          )
+        );
+        height = shapeHeight(field, lx, ly, r2, noise, passages);
+      }
+      heights[j * dim + i] = height;
+      if (height < minH) {
+        minH = height;
+      }
+      if (height > maxH) {
+        maxH = height;
+      }
+    }
+  }
+  return { heights, minH, maxH };
 }
 
 export function sampleGradientInto(

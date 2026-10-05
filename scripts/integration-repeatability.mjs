@@ -10,86 +10,137 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { arch, cpus, freemem, loadavg, platform, release, totalmem } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const focusedScenarios = [
-  {
+/**
+ * Reviewed focused files with their exact case counts. Sample runs verify the real counts; a
+ * change that adds or removes cases in a listed file updates its count here.
+ */
+export const focusedFiles = {
+  titleMusic: {
     path: 'tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts',
     count: 6,
   },
-  {
+  furnaceTravel: {
     path: 'tests/integration/browser/sanity/pilots-ride-furnace-pipes-between-travel-stops.test.ts',
     count: 7,
   },
-  {
+  resourceSound: {
     path: 'tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts',
     count: 2,
   },
-  {
+  mutedSample: {
     path: 'tests/integration/browser/sanity/muted-pilot-stops-sample-after-howler-wall-clock-end.test.ts',
     count: 3,
   },
-  {
+  beltCrawlers: {
     path: 'tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts',
     count: 4,
   },
-  {
+  crewDelivery: {
     path: 'tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts',
     count: 1,
   },
-];
-const focusedPaths = focusedScenarios.map(({ path }) => path);
-const focusedTestCount = focusedScenarios.reduce((total, { count }) => total + count, 0);
+  repeatedDeaths: {
+    path: 'tests/integration/browser/e2e/pilot-keeps-playing-after-repeated-deaths.test.ts',
+    count: 1,
+  },
+  beltSpiders: {
+    path: 'tests/integration/browser/e2e/belt-spiders-pursue-a-crew-across-living-rocks.test.ts',
+    count: 2,
+  },
+};
+/** Reviewed focused manifests, as keys of focusedFiles. */
+export const manifests = {
+  current: [
+    'titleMusic',
+    'furnaceTravel',
+    'resourceSound',
+    'mutedSample',
+    'beltCrawlers',
+    'crewDelivery',
+  ],
+  crawler: ['beltCrawlers'],
+  furnace: ['furnaceTravel'],
+  'flake-classification': ['repeatedDeaths', 'beltSpiders', 'resourceSound', 'crewDelivery'],
+};
+const sampleCaps = { focused: 20, full: 3 };
+// scripts/test-runner.sh owns this 1200 s default and its positive-integer validation.
+const defaultRunnerDeadlineSeconds = 1200;
+/** A full attempt above this wall-clock duration is listed in the report as data, not a failure. */
+export const fullPassWatchSeconds = 1100;
+
+/** Resolves manifest keys to reviewed focused files, rejecting any key without a reviewed entry. */
+export function resolveManifest(keys, files = focusedFiles) {
+  return keys.map((key) => {
+    if (!Object.hasOwn(files, key)) {
+      throw new Error(`Manifest key ${JSON.stringify(key)} has no reviewed focused file`);
+    }
+    return files[key];
+  });
+}
+
+/**
+ * Validates a sample selection from CLI or workflow strings and resolves its manifest once.
+ * The workflow calls this before native setup.
+ */
+export function validateSampleOptions({
+  manifest = 'current',
+  focused = String(sampleCaps.focused),
+  full = String(sampleCaps.full),
+}) {
+  if (!Object.hasOwn(manifests, manifest)) {
+    throw new Error(
+      `Unknown manifest ${JSON.stringify(manifest)}; choose one of ${Object.keys(manifests).join(', ')}`
+    );
+  }
+  const counts = {};
+  for (const [name, value] of Object.entries({ focused, full })) {
+    if (!/^\d+$/u.test(value)) {
+      throw new Error(`Invalid count for --${name}`);
+    }
+    counts[name] = Number(value);
+    if (counts[name] > sampleCaps[name]) {
+      throw new Error(`--${name} exceeds the approved sample of ${sampleCaps[name]}`);
+    }
+  }
+  if (counts.focused + counts.full === 0) {
+    throw new Error('At least one attempt is required');
+  }
+  return {
+    manifest,
+    ...counts,
+    focusedScenarios: resolveManifest(manifests[manifest]),
+  };
+}
 
 export function parseOptions(args) {
-  const options = { sha: '', output: '', focused: 20, full: 3 };
+  const raw = {};
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index];
     const value = args[index + 1];
     if (value === undefined) {
       throw new Error(`Missing value for ${key}`);
     }
-    switch (key) {
-      case '--sha':
-        options.sha = value;
-        break;
-      case '--output':
-        options.output = resolve(value);
-        break;
-      case '--focused':
-      case '--full': {
-        if (!/^\d+$/u.test(value)) {
-          throw new Error(`Invalid count for ${key}`);
-        }
-        const count = Number(value);
-        const maximum = key === '--focused' ? 20 : 3;
-        if (count > maximum) {
-          throw new Error(`${key} exceeds the approved sample of ${maximum}`);
-        }
-        if (key === '--focused') {
-          options.focused = count;
-        } else {
-          options.full = count;
-        }
-        break;
-      }
-      default:
-        throw new Error(`Unknown option ${key}`);
+    if (!['--sha', '--output', '--manifest', '--focused', '--full'].includes(key)) {
+      throw new Error(`Unknown option ${key}`);
     }
+    raw[key.slice(2)] = value;
   }
-  if (!/^[a-f0-9]{40}$/u.test(options.sha)) {
+  if (!/^[a-f0-9]{40}$/u.test(raw.sha ?? '')) {
     throw new Error('--sha requires a full lowercase commit SHA');
   }
-  if (!options.output) {
+  if (!raw.output) {
     throw new Error('--output requires a fresh artifact directory');
   }
-  if (options.focused + options.full === 0) {
-    throw new Error('At least one attempt is required');
-  }
-  return options;
+  return {
+    sha: raw.sha,
+    output: resolve(raw.output),
+    ...validateSampleOptions(raw),
+  };
 }
 
 function git(args) {
@@ -308,8 +359,38 @@ export function retainArtifacts({ source, destination, previousScreenshots }) {
   writeJson(join(destination, 'artifact-index.json'), index);
 }
 
-export function readTestEvidence(path, expectedFiles, expectedScenarios = []) {
-  const evidence = JSON.parse(readFileSync(path, 'utf8'));
+/** Normalizes a Vitest result name or reviewed path to one repository-relative form. */
+function repoPath(file) {
+  return relative(root, resolve(root, String(file)));
+}
+
+function firstLine(message) {
+  return typeof message === 'string'
+    ? (message.split('\n').find((line) => line.trim() !== '') ?? null)
+    : null;
+}
+
+/** Every reported case, plus any file-level error, with the first line of its failure. */
+function caseResults(testResults) {
+  return testResults.flatMap((result) => {
+    const file = repoPath(result.name);
+    const fileError = firstLine(result.message);
+    const cases = fileError
+      ? [{ file, fullName: null, status: result.status ?? null, failure: fileError }]
+      : [];
+    for (const assertion of Array.isArray(result.assertionResults) ? result.assertionResults : []) {
+      cases.push({
+        file,
+        fullName: assertion.fullName ?? assertion.title ?? null,
+        status: assertion.status ?? null,
+        failure: firstLine(assertion.failureMessages?.[0]),
+      });
+    }
+    return cases;
+  });
+}
+
+function verifyTestEvidence(evidence, expectedFiles, expectedScenarios) {
   if (
     !Array.isArray(evidence.testResults) ||
     !Number.isSafeInteger(evidence.numTotalTests) ||
@@ -328,17 +409,12 @@ export function readTestEvidence(path, expectedFiles, expectedScenarios = []) {
   ) {
     throw new Error('Vitest reported failed, skipped, todo or incomplete tests');
   }
-  const actualFiles = evidence.testResults.map((result) => resolve(result.name)).sort();
-  if (
-    JSON.stringify(actualFiles) !==
-    JSON.stringify(expectedFiles.map((file) => resolve(root, file)).sort())
-  ) {
+  const actualFiles = evidence.testResults.map((result) => repoPath(result.name)).sort();
+  if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles.map(repoPath).sort())) {
     throw new Error('Vitest discovery differs from the pinned integration file set');
   }
   for (const { path: file, count } of expectedScenarios) {
-    const result = evidence.testResults.find(
-      (entry) => resolve(entry.name) === resolve(root, file)
-    );
+    const result = evidence.testResults.find((entry) => repoPath(entry.name) === repoPath(file));
     if (
       result?.status !== 'passed' ||
       !Array.isArray(result.assertionResults) ||
@@ -361,6 +437,94 @@ export function readTestEvidence(path, expectedFiles, expectedScenarios = []) {
   };
 }
 
+/**
+ * Reads an attempt's Vitest JSON once and never throws. `error` is the strict verdict: any
+ * missing, unreadable, failed, skipped, todo or miscounted evidence. `cases` retains per-case
+ * detail whenever Vitest wrote readable per-file results.
+ */
+export function readTestEvidence(path, expectedFiles, expectedScenarios = []) {
+  let cases = null;
+  try {
+    const evidence = JSON.parse(readFileSync(path, 'utf8'));
+    cases = Array.isArray(evidence.testResults) ? caseResults(evidence.testResults) : null;
+    return {
+      error: null,
+      summary: verifyTestEvidence(evidence, expectedFiles, expectedScenarios),
+      cases,
+    };
+  } catch (error) {
+    return { error: String(error), summary: null, cases };
+  }
+}
+
+/**
+ * Mirrors scripts/test-runner.sh: unset or empty uses its default, and digits other than a
+ * bare 0 pass its valid_positive_integer check. A value it rejects yields null.
+ */
+export function runnerDeadlineSeconds(env) {
+  const value = env['GEOROIDS_TEST_MAX_DURATION_SECONDS'];
+  if (value === undefined || value === '') {
+    return defaultRunnerDeadlineSeconds;
+  }
+  return /^\d+$/u.test(value) && value !== '0' ? Number(value) : null;
+}
+
+/**
+ * Report-level view of the retained attempts: non-passing cases grouped across attempts,
+ * attempts whose Vitest results could not be read, and deadline-watched attempts slower than
+ * fullPassWatchSeconds with their outcome. None of these changes whether the sample passed.
+ */
+export function summarizeAttempts(attempts) {
+  const tallies = new Map();
+  for (const { stage, attempt, cases } of attempts) {
+    for (const { file, fullName, status, failure } of cases ?? []) {
+      const key = JSON.stringify([file, fullName]);
+      const tally = tallies.get(key) ?? { file, fullName, observed: 0, notPassed: 0, failures: [] };
+      tally.observed += 1;
+      if (status !== 'passed') {
+        tally.notPassed += 1;
+        tally.failures.push({ stage, attempt, status, failure });
+      }
+      tallies.set(key, tally);
+    }
+  }
+  return {
+    caseFailureTallies: [...tallies.values()]
+      .filter(({ notPassed }) => notPassed > 0)
+      .sort(
+        (left, right) =>
+          right.notPassed - left.notPassed ||
+          left.file.localeCompare(right.file) ||
+          String(left.fullName).localeCompare(String(right.fullName))
+      ),
+    attemptsWithoutCaseEvidence: attempts
+      .filter(({ cases }) => cases === null)
+      .map(({ stage, attempt, evidenceError }) => ({
+        stage,
+        attempt,
+        evidenceError: firstLine(evidenceError),
+      })),
+    // Only deadline-watched stages record a margin.
+    slowFullAttempts: attempts
+      .filter(
+        (entry) =>
+          Object.hasOwn(entry, 'deadlineMarginSeconds') &&
+          entry.durationMs / 1000 > fullPassWatchSeconds
+      )
+      .map(
+        ({ stage, attempt, durationMs, deadlineMarginSeconds, code, signal, evidenceError }) => ({
+          stage,
+          attempt,
+          durationSeconds: durationMs / 1000,
+          deadlineMarginSeconds,
+          code,
+          signal,
+          evidenceFailed: evidenceError !== null,
+        })
+      ),
+  };
+}
+
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   if (git(['rev-parse', 'HEAD']) !== options.sha) {
@@ -373,11 +537,9 @@ async function main() {
     throw new Error('Artifact directory already exists; previous attempts must remain intact');
   }
   mkdirSync(options.output, { recursive: true });
+  const deadlineSeconds = runnerDeadlineSeconds(process.env);
   const report = {
     ...options,
-    focusedPaths,
-    focusedScenarios,
-    focusedTestCount,
     status: 'incomplete',
     startedAt: new Date().toISOString(),
     environment: {
@@ -399,11 +561,12 @@ async function main() {
       order: 'repository runner defaults; serial isolated workers; no sequence overrides',
       randomness:
         'Repository fixtures and production terrain seed are unchanged; unseeded randomness is not replaced.',
-      deadlineSeconds:
-        process.env['GEOROIDS_TEST_MAX_DURATION_SECONDS'] ?? '1200 (repository default)',
+      deadlineSeconds,
     },
     browsers: [],
     attempts: [],
+    fullPassWatchSeconds,
+    ...summarizeAttempts([]),
     stageFailures: [],
   };
   const reportPath = join(options.output, 'report.json');
@@ -433,10 +596,31 @@ async function main() {
         .filter((line) => line.includes('DEFAULT_SEED')),
     };
     retainReport();
-    for (const [stage, count, paths] of [
-      ['focused', options.focused, focusedPaths],
-      ['full', options.full, ['tests/integration/']],
-    ]) {
+    const focusedPaths = options.focusedScenarios.map(({ path }) => path);
+    const integrationFiles = git(['ls-files', 'tests/integration/'])
+      .split('\n')
+      .filter((file) => file.endsWith('.test.ts'));
+    const stages = [
+      {
+        stage: 'focused',
+        count: options.focused,
+        paths: focusedPaths,
+        expectedFiles: focusedPaths,
+        scenarios: options.focusedScenarios,
+        label: ` (${options.manifest})`,
+        watchDeadline: false,
+      },
+      {
+        stage: 'full',
+        count: options.full,
+        paths: ['tests/integration/'],
+        expectedFiles: integrationFiles,
+        scenarios: [],
+        label: '',
+        watchDeadline: true,
+      },
+    ];
+    for (const { stage, count, paths, expectedFiles, scenarios, label, watchDeadline } of stages) {
       for (let attempt = 1; attempt <= count; attempt++) {
         const directory = join(options.output, `${stage}-${String(attempt).padStart(2, '0')}`);
         const before = machineSnapshot();
@@ -447,7 +631,7 @@ async function main() {
           ])
         );
         const progressFailure = await writeProgress(
-          `Starting ${stage} attempt ${attempt}/${count}\n`
+          `Starting ${stage} attempt ${attempt}/${count}${label}\n`
         );
         if (progressFailure) {
           report.stageFailures.push({ stage: 'console-progress', message: progressFailure });
@@ -464,23 +648,7 @@ async function main() {
           cwd: root,
           env: process.env,
         });
-        let evidenceError = null;
-        let testEvidence = null;
-        try {
-          const expectedFiles =
-            stage === 'focused'
-              ? focusedPaths
-              : git(['ls-files', 'tests/integration/'])
-                  .split('\n')
-                  .filter((file) => file.endsWith('.test.ts'));
-          testEvidence = readTestEvidence(
-            join(directory, 'vitest.json'),
-            expectedFiles,
-            stage === 'focused' ? focusedScenarios : []
-          );
-        } catch (error) {
-          evidenceError = String(error);
-        }
+        const evidence = readTestEvidence(join(directory, 'vitest.json'), expectedFiles, scenarios);
         let artifactError = null;
         try {
           retainArtifacts({ source: root, destination: directory, previousScreenshots });
@@ -494,10 +662,16 @@ async function main() {
           after: machineSnapshot(),
           ...receipt,
           artifactError,
-          evidenceError,
-          testEvidence,
+          evidenceError: evidence.error,
+          testEvidence: evidence.summary,
+          cases: evidence.cases,
+          ...(watchDeadline && {
+            deadlineMarginSeconds:
+              deadlineSeconds === null ? null : deadlineSeconds - receipt.durationMs / 1000,
+          }),
         };
         report.attempts.push(result);
+        Object.assign(report, summarizeAttempts(report.attempts));
         try {
           writeJson(join(directory, 'attempt.json'), result);
         } catch (error) {

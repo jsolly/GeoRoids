@@ -94,9 +94,9 @@ checks still apply. This changes verification only; gameplay and Wiki instructio
 are unchanged.
 
 The optional manually dispatched [native repeatability sample](integration-repeatability.md)
-runs 20 focused audio lifecycle repetitions and three full integration suites on
-both native Ubuntu architectures at one pinned SHA. It retains every failed attempt
-and never substitutes retries for a passing sample.
+runs up to 20 focused attempts of one reviewed manifest and up to three full
+integration suites on both native Ubuntu architectures at one pinned SHA. It
+retains every failed attempt and never substitutes retries for a passing sample.
 
 ## Exact validation receipts
 

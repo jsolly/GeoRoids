@@ -1,19 +1,10 @@
 # Native integration repeatability
 
 The manually dispatched **Integration repeatability** workflow runs the same full
-`main` commit SHA on native Ubuntu 24.04 x64 and ARM64. Each architecture runs 20
-serialized focused attempts covering six reviewed files together: title music
-lifecycle (six cases), furnace travel and resized prompt (seven), resource sound
-(two), and native sample ownership after an injected early Howler wall-clock end
-plus visible desktop/mobile Sound Effects mute (three), desktop/mobile belt crew
-mining and crawler windup (four), and Scout/Hauler crew delivery (one).
-Each focused attempt must report all six files and exactly 23 passing
-cases, including all six title music cases. It then runs three complete integration
-suites. Title music includes Chromium and WebKit at desktop, mobile, and landscape
-sizes, so each audio combination has 20 attempts. The report records the selected
-paths and per-file counts. A failed attempt
-remains a failure even when later attempts pass. The two matrix jobs do not cancel
-each other.
+`main` commit SHA on native Ubuntu 24.04 x64 and ARM64. Each architecture runs up to
+20 serialized focused attempts of one reviewed manifest, then up to three complete
+integration suites. A failed attempt remains a failure even when later attempts
+pass. The two matrix jobs do not cancel each other.
 
 The approved sample is evidence of repeatability, not proof of zero flakiness.
 Setup failure, cancellation, timeout, missing attempts, missing reports, skipped or
@@ -22,12 +13,45 @@ The workflow has a 180-minute outer deadline. Individual runner deadlines, brows
 scenario budgets, native audio policy, and serialized worker configuration remain
 unchanged. A job that reaches its outer deadline has an incomplete sample.
 
+## Focused manifests
+
+`scripts/integration-repeatability.mjs` keeps one `focusedFiles` table of reviewed
+paths with exact case counts; each manifest lists keys from that table.
+`scripts/integration-repeatability.test.mjs` pins those reviewed values and checks
+the paths are tracked; only a sample run verifies each file's real case count.
+Every focused attempt must report exactly the manifest's files and cases, all
+passing. A change that adds or removes cases in a listed file updates its count
+and the pin together.
+
+| Manifest | Files (cases) |
+| --- | --- |
+| `current` (default) | title music lifecycle (6), furnace travel and resized prompt (7), resource sound (2), native sample ownership after an early Howler wall-clock end plus Sound Effects mute (3), belt crew mining and crawler windup (4), Scout/Hauler crew delivery (1): 23 cases |
+| `crawler` | belt crew mining and crawler windup (4) |
+| `furnace` | furnace travel and resized prompt (7) |
+| `flake-classification` | repeated deaths (1), belt spider pursuit (2), resource sound (2), Scout/Hauler crew delivery (1): 6 cases |
+
+Title music includes Chromium and WebKit at desktop, mobile, and landscape sizes,
+so a 20-attempt `current` sample gives each audio combination 20 attempts.
+
 ## Run and retain a sample
 
-Dispatch the workflow with one full lowercase `main` SHA. It rejects revisions
-outside `origin/main`, preventing a fork or unmerged branch from supplying the
-executable test code. The workflow uses read-only repository permissions and does
-not pass secrets to test code. Locked npm dependencies and their pinned Playwright
+Dispatch the workflow with one full lowercase `main` SHA, a manifest, and counts.
+`focused` accepts 0–20 and `full` 0–3; at least one must be nonzero, so focused-only
+and full-only samples need no workflow edit. The SHA is checked before checkout.
+After Node setup, the checked-out script's `validateSampleOptions` checks the
+manifest and counts before native setup and writes the selection to the job
+summary.
+
+```shell
+cd /Users/johnsolly/code/GeoRoids
+gh workflow run integration-repeatability.yml \
+  -f sha="$(gh api repos/jsolly/GeoRoids/commits/main --jq .sha)" \
+  -f manifest=crawler -f focused=20 -f full=0
+```
+
+The workflow rejects revisions outside `origin/main`, preventing a fork or
+unmerged branch from supplying the executable test code. The workflow uses
+read-only repository permissions and does not pass secrets to test code. Locked npm dependencies and their pinned Playwright
 browser binaries are installed on each native runner. Before `npm ci`, the
 workflow installs Ubuntu's build tools, pkg-config, Cairo/Pango, JPEG, GIF and SVG
 development headers. The locked canvas 3.2.3 README lists Linux x64 prebuilt
@@ -41,14 +65,14 @@ Playwright browsers. This Mac ARM sample supplements the Ubuntu matrix.
 ```shell
 cd /Users/johnsolly/code/GeoRoids
 node scripts/integration-repeatability.mjs \
-  --sha "$(git rev-parse HEAD)" --focused 20 --full 3 \
+  --sha "$(git rev-parse HEAD)" --manifest current --focused 20 --full 3 \
   --output "$PWD/.performance/native-repeatability-$(date +%Y%m%dT%H%M%S)"
 ```
 
-Use a fresh output directory. The script rejects a different checkout SHA or
-checkout changes. Smaller explicit counts are available for an approved diagnostic
-sample, including `--full 0`; they must be reported as a smaller sample rather than
-the full acceptance sample. There are no retry options.
+Use a fresh output directory. The script rejects a different checkout SHA,
+checkout changes, or an unknown manifest. The acceptance sample is `current` with
+20 focused attempts and three full suites; report any other selection as a smaller
+diagnostic sample. There are no retry options.
 
 The report records the exact SHA, lockfile hash, Node/browser versions, native
 architecture, OS/kernel/runner image, CPU/memory/load, repository seed defaults,
@@ -66,6 +90,21 @@ failure even if the runner exits zero. A failed runner-receipt write is retained
 alongside the original output failure. Small Node contracts exercise real file
 write errors and console-stream failures while an owned child is running, then
 verify that child has stopped.
+
+Each attempt reads its Vitest JSON once. `evidenceError` is the strict verdict:
+missing files, wrong counts, skipped or todo tests and failed suites still fail
+the sample. `cases` lists every reported case, and any file-level error, with its
+file, full test name, status and first failure line. In `report.json`,
+`caseFailureTallies` groups non-passing cases across attempts with how often each
+was observed, and `attemptsWithoutCaseEvidence` names attempts whose Vitest
+results could not be read.
+
+Each full attempt records `deadlineMarginSeconds` against the runner deadline
+(`GEOROIDS_TEST_MAX_DURATION_SECONDS`, default 1200). Its runner wall-clock time
+includes server startup before the Vitest watchdog starts, so the margin is
+conservative. `slowFullAttempts` lists full attempts above `fullPassWatchSeconds`
+(1100) with their runner code, signal and evidence outcome, so a deadline-killed
+attempt is not mistaken for a slow pass. It is data, not a failure.
 
 ## Read native audio evidence
 

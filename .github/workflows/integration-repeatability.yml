@@ -8,6 +8,21 @@ name: Integration repeatability
         description: Full main commit SHA to run on both native architectures
         required: true
         type: string
+      manifest:
+        description: Reviewed focused manifest in scripts/integration-repeatability.mjs
+        required: true
+        default: current
+        type: string
+      focused:
+        description: Focused attempts per architecture (0-20; focused plus full at least 1)
+        required: true
+        default: '20'
+        type: string
+      full:
+        description: Complete integration suites per architecture (0-3)
+        required: true
+        default: '3'
+        type: string
 
 permissions:
   contents: read
@@ -26,6 +41,9 @@ jobs:
     timeout-minutes: 180
     env:
       SAMPLE_SHA: ${{ inputs.sha }}
+      SAMPLE_MANIFEST: ${{ inputs.manifest }}
+      SAMPLE_FOCUSED: ${{ inputs.focused }}
+      SAMPLE_FULL: ${{ inputs.full }}
       EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
     steps:
       - name: Validate the pinned revision
@@ -57,6 +75,26 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Validate the sample selection before native setup
+        run: |
+          node --input-type=module -e '
+            import { appendFileSync } from "node:fs";
+            import { validateSampleOptions } from "./scripts/integration-repeatability.mjs";
+            const env = process.env;
+            let sample;
+            try {
+              sample = validateSampleOptions({
+                manifest: env.SAMPLE_MANIFEST, focused: env.SAMPLE_FOCUSED, full: env.SAMPLE_FULL,
+              });
+            } catch (error) {
+              console.error(error.message);
+              process.exit(64);
+            }
+            const line = [env.EXPECTED_ARCHITECTURE, env.SAMPLE_SHA + ":", "manifest", sample.manifest + ",",
+              sample.focused, "focused,", sample.full, "full"].join(" ") + "\n";
+            appendFileSync(env.GITHUB_STEP_SUMMARY, line);
+            appendFileSync(env.ARTIFACTS + "/setup.txt", line);
+          '
       - name: Install native canvas build prerequisites
         run: |
           set -o pipefail
@@ -74,7 +112,8 @@ jobs:
         run: |
           test "$(node -p 'process.arch')" = "$EXPECTED_ARCHITECTURE"
           node scripts/integration-repeatability.mjs \
-            --sha "$SAMPLE_SHA" --focused 20 --full 3 \
+            --sha "$SAMPLE_SHA" --manifest "$SAMPLE_MANIFEST" \
+            --focused "$SAMPLE_FOCUSED" --full "$SAMPLE_FULL" \
             --output "$ARTIFACTS/sample"
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}

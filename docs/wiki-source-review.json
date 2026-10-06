@@ -310,7 +310,7 @@
     "src/utils/safeStorage.ts": "sha256:9540743d8a87bca16e1243f389113f48a14bfda169475115e4b1ead9eaae6874",
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:021e8ceca2e5516824de7e8455cfeed4bd499f9d78b87f168486811f0bd560ac",
+    "src/wiki/articleSources.json": "sha256:298d37c446ca6143c1ffa7cf8d2049c3b7856366119ef167c9bf9f6eeeb14344",
     "src/wiki/gameReference.ts": "sha256:e409c3338ac07a44fb840c0a5cbdb635503721a7d21307a5eaa9cda70d8639ab",
     "src/wiki/main.ts": "sha256:55e2f9bc2a01cc11b571eaf4e2cc227e4e1b814d13c1598769d4bfe4b9093222",
     "src/wiki/media.ts": "sha256:a29ed22df989d675f285414ee0f08968338e64717a6ea9ca3e5222c30d7262b9",
@@ -481,7 +481,8 @@
     "src/diagnostics/performanceMetrics.ts": "sha256:6da5c23dc1451f6c6201e57b5d87317b7a28d0d51f73d203e10934c236ac3a4a",
     "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts": "sha256:7b5add8d4d85cb66b5f86931a3690f969f49d8b3e5fa1c29d0d1c7d597ec2cce",
     "tests/integration/browser/sanity/gpu-pilots-keep-playing-through-context-loss.test.ts": "sha256:e4588893a008166ff49ccf01d4a03e2f4f72a32e2a0c55278042e537356c9b00",
-    "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts": "sha256:78bfe06f01b23d5d124e853d185d9a6c8e75c47138cbdcdafa106977e7abed39"
+    "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts": "sha256:78bfe06f01b23d5d124e853d185d9a6c8e75c47138cbdcdafa106977e7abed39",
+    "tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts": "sha256:68e8d25fcf62d46b8965ba45da5d5a35b761b264b346c7bfa257f9e19afa8d4f"
   },
   "reviews": [
     {
@@ -922,6 +923,24 @@
       "owners": {
         "src/wiki/articleSources.json": "field-manual",
         "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Reviewed native resource audio observations against the retained setup pickup and actual canister collection events. The scenario starts a fresh phrase after equipment setup and excludes prior samples; desktop and mobile focused scenarios pass with the original notes, authoritative collection and deadlines. Player rules and demonstrations are unchanged.",
+      "sources": [
+        "tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the ownership-map addition for the native resource audio scenario under HUD/network; source paths exist and player guidance and demonstration placements are unchanged.",
+      "sources": ["src/wiki/articleSources.json"],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
       }
     }
   ]

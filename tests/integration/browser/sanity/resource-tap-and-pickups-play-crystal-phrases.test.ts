@@ -106,6 +106,13 @@ for (const viewport of [
           return { mass: ship.mass, maxHealth: ship.maxHealth };
         });
       const hullBeforeCollection = await readHull();
+      // Equipment setup plays a pickup note. Start a fresh phrase and observe
+      // only the extraction and real canister pickups triggered below.
+      const audioBaseline: number = await page.evaluate(`(async () => {
+        const { resetResourceMusic } = await import('/src/audio/resourceMusic.ts');
+        resetResourceMusic();
+        return JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]').length;
+      })()`);
       if (mobile) {
         await page.locator('#touch-ability').tap();
       } else {
@@ -154,8 +161,10 @@ for (const viewport of [
       await game.waitForAnimationFrames(12);
       const hullAfterCollection = await readHull();
       expect(hullAfterCollection).toEqual(hullBeforeCollection);
-      const events: Array<{ duration: number; rate: number }> = await page.evaluate(() =>
-        JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
+      const events: Array<{ duration: number; rate: number }> = await page.evaluate(
+        (baseline) =>
+          JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]').slice(baseline),
+        audioBaseline
       );
       const ejectionRates = events
         .filter((event) => Math.abs(event.duration - durations.ejection) < 0.00001)

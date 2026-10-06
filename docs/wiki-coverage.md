@@ -346,6 +346,11 @@ It verifies that guard's death before firing at the cleared deposit, rather than
 assuming the first projectile always reaches the rock. The deposit must still
 lose health, and its impact must name the admitted mining projectile and host.
 
+The native resource-audio scenario excludes the equipment pickup played during
+setup. It starts a fresh phrase before extraction and observes only subsequent
+sample events, so the three real canister pickups must play the expected notes
+on both desktop and touch. Sample pitches and scenario deadlines are unchanged.
+
 ### Source observations outside the documentation change
 
 PR #760's observations were checked against the audit baseline. Detailed join

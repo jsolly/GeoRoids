@@ -5,6 +5,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
+import { beltAsteroid, beltSlots } from '../../../shared/asteroidBelt';
 import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
 import {
   applyColossalDeposit,
@@ -134,6 +135,43 @@ describe('Colossal asteroids need a crew', () => {
     world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
     world.tick();
     expect(rock.velocity.x).toBeLessThan(0);
+  });
+
+  test('the largest natural belt rocks need two Haulers while a smaller neighbor moves with one', () => {
+    const rocks = beltSlots().map((slot) => beltAsteroid(82, slot, 0));
+    const large = rocks.find((rock) => isColossalAsteroid(rock.size));
+    const small = rocks.find((rock) => !isColossalAsteroid(rock.size));
+    if (!large || !small) {
+      throw new Error('Belt fixture needs both natural size classes');
+    }
+    world = new GameServerWorld();
+    const alice = world.join('Alice', { x: -40, y: 0 }, { kitId: 'hauler' });
+    const bob = world.join('Bob', { x: 40, y: 0 }, { kitId: 'hauler' });
+    world.clearAsteroids();
+    large.position = { x: 0, y: 0 };
+    world.engine.addAsteroid(large);
+    activate(alice);
+    expect(world.entity(alice).harpoonTargetId).toBe(large.id);
+    world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
+    world.tick();
+    expect(large.velocity).toEqual({ x: 0, y: 0 });
+    activate(bob);
+    expect(world.entity(bob).harpoonTargetId).toBe(large.id);
+    world.tick();
+    expect(large.velocity.x).toBeLessThan(0);
+
+    activate(alice);
+    activate(bob);
+    world.clearAsteroids();
+    small.position = { x: 0, y: 0 };
+    world.engine.addAsteroid(small);
+    world.engine.updatePlayer(alice.id, { position: { x: -40, y: 0 } });
+    world.entity(alice).abilityCooldownFrames = 0;
+    activate(alice);
+    expect(world.entity(alice).harpoonTargetId).toBe(small.id);
+    world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
+    world.tick();
+    expect(small.velocity.x).toBeLessThan(0);
   });
 
   test('one Boost Coupling ignites a colossal deposit at a crawl; two launch and both are paid', () => {

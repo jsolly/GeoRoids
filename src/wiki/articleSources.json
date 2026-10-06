@@ -93,7 +93,12 @@
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
     "src/rendering/travelCamera.ts",
     "src/rendering/canvasSurface.ts",
-    "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts"
+    "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts",
+    "src/ui/spawnFlyIn.ts",
+    "src/ui/furnaceTravelMap.ts",
+    "src/entities/loot/lootRenderer.ts",
+    "src/entities/ship/shipRenderer.ts",
+    "src/wiki/mediaPlayback.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -198,7 +203,8 @@
     "shared/asteroidBelt.ts",
     "shared/beltCrawler.ts",
     "server/core/BeltCrawlerManager.ts",
-    "src/rendering/beltRenderer.ts"
+    "src/rendering/beltRenderer.ts",
+    "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",
@@ -332,7 +338,9 @@
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
     "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
     "shared/economy.ts",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+    "shared/constants/health.ts",
+    "tests/unit/server/health-regeneration.test.ts"
   ],
   "hud-network": [
     "shared/gameClock.ts",
@@ -346,6 +354,9 @@
     "src/ui/debugHud.ts",
     "src/diagnostics/debugHudMetrics.ts",
     "src/diagnostics/clientDiagnostics.ts",
+    "src/diagnostics/performanceMetrics.ts",
+    "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts",
+    "tests/integration/browser/sanity/gpu-pilots-keep-playing-through-context-loss.test.ts",
     "src/utils/Logger.ts",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts",
     "src/utils/clientLogContext.ts",

@@ -122,6 +122,56 @@ for (const viewport of [
           );
           expect(admitted?.projectileId).toBeTypeOf('string');
           await stage('shot-admitted');
+          // A guard on the near rim can intercept the first mining shot.
+          // Observe that actual impact before firing at the cleared deposit.
+          await expect
+            .poll(
+              async () =>
+                (await getFixtureState([selectedHostId])).combat.events.find(
+                  (event) =>
+                    event.kind === 'terminal' && event.projectileId === admitted?.projectileId
+                ),
+              { timeout: 5000 }
+            )
+            .toBeDefined();
+          const firstImpact = (await getFixtureState([selectedHostId])).combat.events.find(
+            (event) => event.kind === 'terminal' && event.projectileId === admitted?.projectileId
+          );
+          if (firstImpact?.kind !== 'terminal') {
+            throw new Error('The admitted mining shot has no terminal impact');
+          }
+          expect(['asteroid', 'belt-crawler']).toContain(firstImpact?.reason);
+          let miningProjectileId = admitted?.projectileId;
+          if (firstImpact?.reason === 'belt-crawler') {
+            expect(firstImpact.targetId).toBe(crawler.id);
+            await expect
+              .poll(
+                async () =>
+                  (await field(page)).spiders.find((s) => s.id === crawler.id)?.health ?? 0
+              )
+              .toBe(0);
+            await game.placeControlledShipAt(home.x - 300, home.y + 90);
+            await stage('guard-cleared');
+            await game.fireLaserToward(home.x, home.y);
+            await expect
+              .poll(
+                () =>
+                  wire.acknowledgements.find(
+                    (ack) =>
+                      ack.projectileId !== admitted?.projectileId &&
+                      wire.shots.some((shot) => shot.requestId === ack.requestId)
+                  ),
+                { timeout: 5000 }
+              )
+              .toBeDefined();
+            miningProjectileId = wire.acknowledgements.find(
+              (ack) =>
+                ack.projectileId !== admitted?.projectileId &&
+                wire.shots.some((shot) => shot.requestId === ack.requestId)
+            )?.projectileId;
+            expect(miningProjectileId).toBeTypeOf('string');
+            await stage('cleared-deposit-shot-admitted');
+          }
           await expect
             .poll(
               async () =>
@@ -142,7 +192,7 @@ for (const viewport of [
           expect(terminal.events).toContainEqual(
             expect.objectContaining({
               kind: 'terminal',
-              projectileId: admitted?.projectileId,
+              projectileId: miningProjectileId,
               reason: 'asteroid',
               targetId: selectedHostId,
             })

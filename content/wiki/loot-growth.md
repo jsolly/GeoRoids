@@ -17,6 +17,8 @@ media:
 
 Mined rocks and destroyed ships leave point drops, the main source of cargo; they pull toward any ship and expire after two minutes. Shards and Tap canisters add smaller amounts, wreckage is worthless debris, and Tap canisters and silk pull toward Haulers while one is flying. Pickups leave your ship’s mass, health, hull size, and flight speed unchanged, and collecting loot keeps Contour Lock engaged.
 
+Shards, wreckage, Tap canisters, and silk normally expire quickly; nest caches last longer, with lifetimes in the reference below. A Scout can collect Tap canisters and silk by touching them even when their attraction favors a nearby Hauler.
+
 ## Salvaged equipment
 
 Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, glowing hardware in spider nests, which have a 65% chance to contain a tool, or among rocks destroyed by an ordinary laser kill, with a 1.5% chance; ramming and tough-rock chip breaks never roll one. Each ship sees only tools its kit can use and does not already own, and every eligible pilot can take their own copy from the same drop.

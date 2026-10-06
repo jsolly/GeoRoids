@@ -96,7 +96,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   deposit breaks the other rock and keeps its cables. Towed ordinary cargo that
   overlaps another ship deals an asteroid impact, then breaks and drops the
   cable. The Hauler remains unharmed by its own cargo. A colossal deposit needs
-  two Tow Cables before it hauls and two Boost Couplings before ignition; rams
+  two Tow Cables before it hauls; one Boost Coupling ignites it at a crawl and two give full speed; rams
   and towed collisions do not shatter it.
 - Boost Coupling arms the nearest available asteroid and points it at its nearest
   furnace. Ordinary rocks ignite on the second E and pay that launcher plus recorded
@@ -201,3 +201,159 @@ scan results and reduced ore from fragments. Teamwork covers the five settlement
 requirements, surplus, station growth and level-gated placeholder purchases.
 Combat and survival covers unlimited respawns. Controls covers inert store
 transactions; HUD and network covers the shared progress display.
+
+## Mechanic audit baseline
+
+Audited against `e769791fe59e3e078a67faa56c1f91999c71026f` on 2026-10-05,
+following the partial corrections in PR #760. This ledger supplements the article
+inventory with distinct actions, admission rules, exceptions and lifecycle state.
+The source-to-topic arrays remain in `src/wiki/articleSources.json`; the paths
+below identify the rule owner and the scenario evidence to inspect. A cited test
+is evidence of coverage, not a claim that it was run during this audit.
+
+Each row names the published article and heading. Its rule column records the
+trigger, prerequisite, effect and failure or cancellation boundary. The lifecycle
+column distinguishes personal state from shared state and relevant losses.
+Exact tuning belongs in the article's expandable reference. Media names refer to
+`src/wiki/media.ts`; "text" gives the reason motion adds no necessary information.
+
+### Joining, controls and navigation
+
+| Mechanic and Wiki home | Rule and exception | Ownership and lifecycle | Sources and scenario evidence | Illustration |
+| --- | --- | --- | --- | --- |
+| Join and callsign: field-manual / Start flying | Select a kit and Enter Game; blank name is generated, online duplicate names are rejected. | Browser remembers name and private pilot identity; another device is another pilot. | `src/core/gameController.ts`, `server/communication/MessageHandler.ts`; `tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts` | Text: form choices and failure advice. |
+| Spawn dive: field-manual / Start flying | New pilot starts at Town Square; any key or tap skips the dive, reduced motion skips automatically. | Presentation only; normal flight follows. | `src/ui/spawnFlyIn.ts`, `shared/crewSpawn.ts` | Text: skip action. |
+| Kits: scout / Mineral scan; hauler / Utility slot | Scout turns faster; Hauler has larger hull, stronger mining and larger hold. Shared cruise cap; starter tools are always available. | Kit chosen at join; changing kit keeps bank/tools and spills cargo beyond capacity. | `src/entities/ship/shipKits.ts`, `shared/economy.ts`, `GameEngine` join/fitCargo; `tests/unit/entities/shipKits.test.ts` | Ship scorecards and movement. |
+| Automatic thrust and steering: controls / Keyboard, Mouse, Touch | A/D or arrows turn; pointer aims with capped turning and a hull dead zone; touch release keeps heading. | Personal input; tab/app interruption releases held controls. | `src/input/`, `shared/shipFlight.ts`; `tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts` | movement. |
+| Fire: combat-survival / Firing while moving | Space or second touch holds repeated fire; mouse click or quick touch fires once. Shots inherit ship motion. | Shots are authoritative and temporary; death/transit blocks firing. | `src/input/touchControls.ts`, `src/input/PlayerInput.ts`, `GameEngine.spawnPlayerLaser`; touch-input scenarios | movement, reflection. |
+| Contour speed: terrain / Contour travel | Along contours gains speed in either direction; crossings/void keep cruise, no ordinary terrain damage or drift. | Personal movement; pickups preserve tuning. | `src/physics/terrain/terrainTravel.ts`, `shared/shipFlight.ts`; `tests/integration/browser/sanity/pilots-follow-contours-for-speed.test.ts` | terrain. |
+| Contour Lock: controls / Contour Lock | Shift, right click or button catches nearby rail; ignores steering, no charge/cooldown. Explicit release, damage, impulse, wall/rock contact even protected, menus, death and travel end lock. | Temporary personal guidance; cannot capture during knockback/hold. | `shared/contourLock.ts`, `src/physics/terrain/contourCapture.ts`; `tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts` | terrain. |
+| Menu hold: controls / Inventory and menus | Map, schematic or furnace/store menu freezes/protects ship; cannot scoop pickups; world continues, satellite drains. Escape/close resumes with blink. | Personal temporary hold, no shockwave movement; releases lock. | `src/core/services/InputManager.ts`, `shared/combat.ts`, `GameEngine`; authoritative combat tests | Text: explicit pause boundary. |
+| Tool inventory: controls / Inventory and menus | V/button shows compatible owned utilities; salvage unlocks cards; swapping cancels latch or scan pulse but preserves cooldown. | Ownership persists through death/restart; selected tool remembered by browser. | `shared/equipment.ts`, `src/ui/shipSchematic.ts`, `src/entities/ship/shipAbilities.ts`; `tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts` | Text: inventory labels explain choices. |
+| Universe chart controls: controls / Map | M/button opens; drag/arrows pan; wheel,+/−/buttons zoom; Home/Locate resets zoom and centers. Touch has buttons, no pinch on audited main. | Shared exploration, personal view; map holds hull. | `src/ui/universeMap.ts`; `tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts` | Text: controls and keyboard alternatives. |
+| Accessibility: controls / Keyboard access and motion | Tab and native button activation; focus chart for pan/zoom; landmark text list. Reduced motion skips dive, steadies loot/flame and shows Wiki posters. | Device/browser preference; does not stop gameplay. | `src/input/touchControls.ts`, `src/ui/universeMap.ts`, `src/ui/furnaceTravelMap.ts`, `src/wiki/mediaPlayback.ts` | Posters for every GIF; text explains controls. |
+| Radar/fog: hud-network / Radar and universe map | Minimap is local; full chart shows shared discovered assets, hides uncharted loot/rocks; furnaces/foundations always on full chart, crew rim markers local. | Shared reveal persists; pilots and presentation update live. | `shared/exploration.ts`, `server/world/MapAssets.ts`, `src/rendering/hud/minimap.ts`; `tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts` | scout shows shared mineral marks. |
+
+### Combat, cargo and pickups
+
+| Mechanic and Wiki home | Rule and exception | Ownership and lifecycle | Sources and scenario evidence | Illustration |
+| --- | --- | --- | --- | --- |
+| Direct crew safety: teamwork / One crew | Direct shots, ship rams, cables and loot blasts do not damage crew hulls; world hazards do. | Shared team; no separate duel team. | `shared/combat.ts`, `server/core/CollisionAuthority.ts`; `tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts` | reflection separates hazardous bounce. |
+| Ricochets: combat-survival / Firing while moving | Wall/metal/court bounce arms shot against anyone, including owner; first vulnerable hull consumes it. | Temporary global hazard, energy/lifetime bounded. | `shared/asteroidReflection.ts`, `GameEngine.resolveEnhancedLaser`; `tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts` | reflection. |
+| Ricochet Court: combat-survival / Ricochet Court | Both panel sides reflect without energy gain; hulls pass; gaps let shots escape. | Fixed shared geometry and always-visible map mark; ordinary deaths/rewards. | `shared/ricochetCourt.ts`, `shared/laserSurface.ts`; `tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts` | Text: marker and panel rule; reflection illustrates bounce. |
+| Asteroid impacts: combat-survival / Damage and protection | Vulnerable hull loses health and ordinary rock breaks; protected hull passes unharmed. Towed rock spares own Hauler. | World hazard; lethal impact triggers final death. | `server/core/CollisionAuthority.ts`, `GameEngine.resolveTowedAsteroidImpacts`; authoritative combat tests | survival. |
+| Outer wall: terrain / Outer boundary | Vulnerable ship dies on contact; rocks bounce and lasers ricochet. | Fixed shared boundary; normal respawn. | `shared/worldBoundary.ts`, `GameEngine`; `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts` | Text: single contact rule. |
+| Protection: combat-survival / Damage and protection | Spawn/return blink and menu hold prevent hull damage; laser passes through protected hull. Furnace safety repels terrain spiders, not every hazard. | Temporary personal protection; contact still releases lock. | `shared/combat.ts`, `server/core/EntityManager.ts`; `tests/integration/browser/sanity/protected-pilots-lose-contour-lock-on-asteroid-contact.test.ts` | survival plus text exceptions. |
+| Regeneration: combat-survival / Recovery | Surviving health loss starts delay; repeated health loss resets, protected hits do not. Heals to kit max; dead waits for respawn. | Personal health; fresh life restores hull. | `shared/constants/health.ts`, `EntityManager.updateHealthRegeneration`; `tests/unit/server/health-regeneration.test.ts` | Text: timing in generated reference. |
+| Death and respawn: combat-survival / Lives and respawn | Drops point cargo and satellites, releases tow; respawns near nearest lit furnace, full health and protection, unlimited lives. | Bank/tools/silk safe; anyone can recover death points before expiry. | `GameEngine.applyShipDeath`, `EntityManager`; `tests/unit/scenarios/session/death-disconnect-rejoin-leaves-no-ghost-or-corpse.test.ts` | Text: retained/lost inventory. |
+| Point cargo: loot-growth / Cargo and banks | Finite hold; automatic overlap collection, overflow discarded and drop consumed even full on audited main. | Personal carried score; death transferable stash, smaller kit spills excess. | `shared/economy.ts`, `LootManager.collectOverlaps`, `GameEngine.fitCargo`; `tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts` | Text: capacity/failure rule. |
+| FULL reminder: loot-growth / Cargo and banks | Full hold produces brief local reminder, periodically repeated; no remote FULL mechanic on audited main. | Presentation only, no shield or speed penalty. | `src/ui/cargoFullHint.ts`, `shared/economy.ts` | Text: visible label is sufficient. |
+| Point drops: loot-growth / Collecting loot | Mining/death leaves magnetized points for either kit; lasers pass through; wall-clock expiry continues offline. | Shared recoverable drops saved through restart until deadline. | `LootManager.spawnPoints`, `savedPoints`, `restorePoints`; `tests/unit/server/loot-manager.test.ts` | Text: distinct expiry and immunity. |
+| Shards and wreckage: loot-growth / Collecting loot | Either kit collects; shards add small cargo, wreckage none; short frame-clock lifetime outside caches. | Shared temporary loot; no hull/stat growth. | `shared/shipGrowth.ts`, `LootManager`, `GameEngine.collectLoot`; `tests/unit/systems/shipGrowth.test.ts` | loot. |
+| Tap canisters and silk: loot-growth / Collecting loot, Spider silk | Ejection delays pickup/pull; prefer Hauler attraction when one is live, either kit can overlap collect. Tap adds points; silk separate inventory, no crafting. | Shared transient drops; collected silk persists with pilot. | `LootManager.expire`, `GameEngine.collectLoot`; `tests/unit/server/hauler-taps-silk-and-tows-spiders-to-a-furnace.test.ts` | loot shows attraction; text distinguishes eligibility. |
+| Loot blast: loot-growth / Shoot a drop | Nearby shot detonates shard/wreckage/Tap/silk and pushes small rocks; points/equipment immune; crew safe. | Consumes drop; powered rocks ignore impulse. | `shared/lootBlast.ts`, `GameEngine.handleLootExplode`; `tests/unit/systems/lootBlast.test.ts` | loot. |
+| Equipment salvage: loot-growth / Salvaged equipment | Compatible kit missing tool takes personal copy; drop remains for teammates. Ordinary laser kills/nest caches can yield tools; ram/chip cannot. | Durable per-pilot unlock, no score; duplicate hidden, not shootable; cache expiry applies. | `shared/equipment.ts`, `LootManager.collectOverlaps`, `GameEngine.handleAsteroidDamage`; equipment salvage scenarios | Text: labeled glowing hardware and locked inventory cards. |
+| Satellite collection: satellites / Six Earth-observation hulls | Automatic nearby claim, both kits; loose hull stationary/invulnerable; cargo bonus overflow lost; menus block collection. | Shared finite stock, exclusive owner; separate from equipment copying. | `shared/eoSatellites.ts`, `GameEngine.collectNearbySatellitePickups`, `SatellitePickupManager`; pickup collision tests | satellites. |
+| Satellite equip/damage: satellites / Equipped satellites, Storage and loss | Equip one alongside tool; scans/contributor credit; health drains and impacts/ricochets shorten life; cannot stow/replace active. | Stored health retained; death/leave/grace expiry drops, brief disconnect reserved; restart loses inventory; exhaustion respawns healthy. | `server/core/SatellitePickupManager.ts`; `tests/unit/server/satellite-inventory-survives-snapshots-and-brief-disconnects.test.ts` | pickups. |
+
+### Tools, spiders and asteroids
+
+| Mechanic and Wiki home | Rule and exception | Ownership and lifecycle | Sources and scenario evidence | Illustration |
+| --- | --- | --- | --- | --- |
+| Mineral Scan: scout / Mineral scan | Owned starter E pulse charts/reveals minerals and repels terrain spiders in range; cooldown required, furnace Build takes priority. | Crew classifications and contributor IDs persist on saved rocks; pulse temporary personal. | `shipAbilities.ts`, `GameEngine.surveyFromPosition`, `shared/exploration.ts`; `tests/unit/server/mineral-scans-drive-spiders-away.test.ts` | scout. |
+| Survey Probe: scout / Survey probe, Probe limits | Nose-directed hitscan finds living empty host before wall; miss no cooldown/message; battery, health and owner cap, extra replaces oldest. | Attached host follows translation/rotation, shares reveal/credit; tool swap does not cancel, host death/expiry/restart removes. | `shared/surveyProbe.ts`, `server/core/SurveyProbeManager.ts`; `tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts` | Text: no travelling launch on baseline; host/radar marker explained. |
+| Resource Tap: hauler / Resource Tap E | Near eligible rock extracts bursts intact; E/swap/range cancels. Rock can be tapped again; spider has finite silk and is provoked. | Temporary extraction; resulting loot shared, ownership unlock personal. | `shipAbilities.ts`, `GameEngine.tickAbilities`, `TerrainSpiderManager.extractSilk`; `tests/unit/server/tap-extract-spawns-tap-loot.test.ts` | Text: bursts/cancellation in reference; loot illustrates collection. |
+| Tow targeting: hauler / Tow cable E, Reach and release | Nearest eligible hull gap, heading tie-break; attach starts cooldown, miss does not; ordinary exclusive, colossal shared. | E release available during cooldown; swap/death/disconnect/travel cancel; host loss/excess range detach. | `shipAbilities.ts`, `GameEngine.haulerCanTarget`; `tests/unit/entities/shipAbilities.test.ts` | hauler. |
+| Tow momentum/collisions: hauler / Cargo collisions | Stretched cable pulls, never reels/throws; ordinary cargo collision breaks rocks and can hurt other pilots; colossal survives. | Shared rock velocity, own Hauler protected from cargo; untowed rocks pass each other. | `towCable.ts`, `GameEngine.resolveTowedAsteroidImpacts`; authoritative combat tests | hauler. |
+| Colossal towing: asteroids / Colossal deposits | Two live Tow Cables required to haul size-qualified rock; one holds it; rams do not break. | Shared cargo and contributor rewards; loses force if crew drops below requirement. | `shared/asteroidScale.ts`, `GameEngine.tickAbilities`; `tests/unit/server/colossal-asteroids-need-a-crew.test.ts` | Text: crew threshold, hauler shows ordinary cable. |
+| Boost Coupling: hauler / Boost Coupling E | Arm rock toward nearest lit furnace, E ignites; spider invalid; one colossal coupling crawls, second speeds, third refused. | Swap/range/death/disconnect cancel armed ownership; burning immune and autonomous, saved delivery owners survive restart/offline. | `shared/asteroidBoost.ts`, `shipAbilities.ts`, `GameEngine`; `tests/unit/entities/boosted-cargo-steers-to-its-nearest-furnace.test.ts` | Text: arrow/exhaust identify phase. |
+| Guarded nest caches: terrain / Spider nests | Fixed guards/cache seeded once; resource discovery shows web until collected/moved; caches expire and cap can evict. | Session guard clearance, surviving guards remain after resource removed; no queen objective. | `TerrainSpiderManager.refreshNestMarkers`, `LootManager.spawnNestCache`; `tests/unit/server/pilots-discover-guarded-resource-nests.test.ts` | Text: map marker and finite cache. |
+| Spider pursuit/bite: terrain / Guard patrols, Survive a hunt | Nearest eligible pilot, guard leash/time vs longer roamer chase; edge/terrain warning; single hit kills spider, bite kills vulnerable hull. | Shared actors; no cargo preference on baseline, no permanent queen clearance. | `shared/terrainSpider.ts`, `TerrainSpiderManager.findHuntTarget`; spider field scenarios | Text: warning, range and refuge advice. |
+| Spider refuge: scout / Build a refuge; terrain / Survive a hunt | Scan pulse repels briefly; Town Square/lit furnace exclude hunts; building over nest repels living guards, displaced become roamers. | Shared permanent furnace, temporary scan; dark lots/probes offer no safety. | `TerrainSpiderManager.canOccupy`, `repelProtectedSpiders`; `tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts` | scout for pulse; text for refuge. |
+| Spider tow/rescue: hauler / Spider bites, Spider rescue | Live captive bites by proximity, cable safe; rescuers attracted and can sever tow; release ends rescue call, furnace consumes captive. | Temporary shared rescue, finite silk retained per living spider; no cargo-based reinforcements. | `TerrainSpiderManager`, `server/core/spiderRescueTarget.ts`; `tests/unit/server/hauler-taps-silk-and-tows-spiders-to-a-furnace.test.ts` | Text: captive proximity and rescue warning. |
+| Material/ore: asteroids / Field and materials, Ore and refining | Hull material governs damage, ore independent and often barren; scan reveals; intact refining gives more than fragments. | Shared persistent rock, mining drops cargo rather than bank. | `shared/asteroidMaterials.ts`, `shared/economy.ts`, `AsteroidManager`; asteroid material tests | scout, split. |
+| Cooperative splits: asteroids / Cooperative splits and score | Distinct pilots within window split large ice/crystal; repeat/expired hits ordinary break; tougher marked rock chips without split. | Shared short contributor window; shockwaves push without damage; fragments reduce ore. | `AsteroidManager`, `shared/asteroidPhenomena.ts`; split/reflection scenarios | split. |
+| Reflection/charge: asteroids / Reflection and charge | Reflective metal multiplies energy up to cap; absorbed charge can break rock and release ordinary salvage. | Shared temporary charge/projectiles; bounded chains and ricochet hazards. | `shared/asteroidReflection.ts`, `shared/asteroidPhenomena.ts`; reflection scenarios | reflection. |
+| Ordinary regrowth: teamwork / Persistent world | Missing deposits slowly refill outside nearby pilot/probe visibility; sleeping sector catches up, restart not refill. | Shared saved field and reveal; mined ground remains flyable. | `server/world/RegionalAsteroidField.ts`, `server/world/depositLayout.ts`; `tests/unit/server/harvested-ground-stays-flyable.test.ts` | Text: return condition in reference. |
+| Eastern belt: asteroids / Asteroid belt | Fixed metal rows/lane gaps; remove/move deposit starts timer, warning then replacement even occupied; damage alone no reset/heal. | Shared timer survives sleeping sectors and restart; carried host remains separate from new home deposit. | `shared/asteroidBelt.ts`, `RegionalAsteroidField`; `tests/unit/server/miners-return-to-a-recovering-asteroid-belt.test.ts` | Text: location and amber warning. |
+| Belt crawlers: asteroids / Belt spiders | Rock-cover pursuit/hops/telegraphed lunge; shots blocked by cover, exposed crawler one hit; no direct Tap/Tow/Probe or scan repel. | Shared host-linked life; host loss jumps or dies; returns only when host replaced. | `shared/beltCrawler.ts`, `server/core/BeltCrawlerManager.ts`; `tests/integration/browser/e2e/belt-spiders-pursue-a-crew-across-living-rocks.test.ts` | Text: different tool and cover rules. |
+
+### Furnaces, cooperation and troubleshooting
+
+| Mechanic and Wiki home | Rule and exception | Ownership and lifecycle | Sources and scenario evidence | Illustration |
+| --- | --- | --- | --- | --- |
+| Build/name furnace: scout / Build | Scout E on dark grate spends bank, needs inward lit parent; failure reports shortfall/dependency, spends nothing and consumes E. Cooldown does not block Build. | Shared named permanent furnace, personal construction cost; lit safety/respawn/travel. | `shared/furnaces.ts`, `shared/furnaceField.ts`, `GameEngine.furnaceBuildIssue`; `tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts` | Text: grate/dependency, no new movement rule. |
+| Ore intake: teamwork / Scan, tow, deliver | Towed or burning rock enters lit intake; loose rock not consumed; ore added once, each distinct launcher/scanner gets equal base bank reward. | Shared resources; individual banks incl saved offline contributors, settlement points per recipient; rock removed once. | `GameEngine.processFurnaceDeliveries`, `deliverAsteroid`, `shared/furnaces.ts`; `tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts` | hauler. |
+| Carried cargo bank: loot-growth / Cargo and banks | Pilot center in lit intake banks carried points automatically; store spends bank only. Distinct from physical ore intake. | Personal bank safe on death; shared settlement credited once. | `GameEngine.depositCargo`, `shared/economy.ts`; `tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts` | Text: distinguishes the two intakes. |
+| Furnace travel: controls / Furnace travel and store | E/B/prompt from lit footprint; choose other lit stop, free pipe ride; menu freezes, ride blocks actions and cancels attachments. | Personal transit and arrival protection; disconnect finalizes position; no dark destination. | `shared/furnaceTravel.ts`, `GameEngine.travelFurnace`, `removePlayer`; `tests/unit/server/pilots-travel-between-lit-furnaces.test.ts` | Text: route/selection, keyboard alternative. |
+| Settlement: teamwork / Build the settlement | Points plus all four materials required; consume level recipe, carry surplus, station grows, store gates by level. | Shared durable progress, no counterattack/loss mechanic. | `shared/economy.ts`, `GameEngine`, station renderer; settlement scenarios | Text: HUD requirements and generated exact recipe. |
+| Placeholder store/paint: controls / Furnace travel and store | Town Square, live pilot, level/bank required; once per offer, receipt grants no upgrade. Paint cannot be bought. | Personal purchases saved; old owned paint retained only. | `shared/townStore.ts`, `GameEngine.buyStoreItem`; town store scenarios | Text: offer/cost and explicit limitation. |
+| Cooperation roles: teamwork / Scan, tow, deliver, Shared chart | Crew shares discoveries/rewards; Scout surveys, Hauler delivers; guards/ricochets/towed rocks still hazardous. | Shared map/settlement vs personal bank/tools; no selectable factions. | `GameEngine.surveyFromPosition`, `GameStateBroadcaster`, shared types; two-client scan/tow scenario | scout, hauler. |
+| HUD feedback: hud-network / Read the HUD, Travel prompt, Probe beacons | Health capsule, bank/hold, settlement, ranked crew, tool/cooldown on touch, delivery/build notice, cyan probe and battery warning. | Personal presentation of authoritative shared state; no death message, desktop cooldown absent. | `src/rendering/hud/`, `src/ui/furnaceTravelPrompt.ts`, probe renderer; crew scoreboard scenarios | scout for radar; text for labels. |
+| Audio/haptics: hud-network / Sound and haptics; loot-growth / Pickup melody; satellites / Orbit sound | Title preferences, sound off/music on default; touch vibration only supported browser; tap retries interrupted audio. | Browser saved preferences; pickup melody and orbit cue optional. | `src/constants/user-preferences.ts`, `src/audio/`, `src/fx/haptics.ts`; audio/touch scenarios | Text: toggles and hardware support. |
+| Disconnect/identity: hud-network / Connection interruptions | Retry then title; private resume credential returns same pilot; short grace retains ship, cargo allows longer field return, brief resume no spawn protection. | Bank/tools/silk/pilot and world saved; transient probe/satellite inventory exceptions documented; crash may lose last checkpoint. | `GameEngine` pilot capture/restore, `server/world/WorldStore.ts`, `src/network/services/ConnectionManager.ts`; `tests/integration/server/current-pilots-recover-after-reconnect.test.ts` | Text: recovery procedure, no visual mechanic. |
+| Release mismatch/join failure: hud-network / Can't join, Connection interruptions | Outdated protocol rejected; two identity checks trigger auto refresh; generic banner may mean duplicate/full/outdated, reload guidance. | Browser refresh guard per loaded release; no guaranteed detailed reason shown. | `shared/snapshotProtocol.ts`, `src/release/clientReleaseWatcher.ts`, `gameController.ts`; release/admission tests | Text: actionable troubleshooting. |
+| Diagnostics/renderer: hud-network / Diagnostics, Graphics option | Advanced Debug exposes IDs/connection/frame info; Copy Diagnostics; opt-in WebGL falls back, standard URL restores renderer. | Browser preference/presentation only, same game rules. | `src/ui/debugIdentity.ts`, `src/ui/debugHud.ts`, `src/rendering/`; graphics and diagnostics scenarios | Text: diagnostic actions. |
+
+## Explicit exclusions and concurrent work
+
+This task audits the shipped game. A requested mechanic absent from the reviewed
+implementation is excluded from player instructions, not silently declared covered.
+Before publication, fetch main again and reconcile any newly landed mechanic and
+its feature-owned documentation. Concurrent working trees are never evidence of
+playable production behavior.
+
+| Requested area | Classification at audited main | Evidence and next ownership |
+| --- | --- | --- |
+| Downing, revive, bleed-out, Give Up | Absent; final death immediately schedules respawn. | `EntityManager.damageEntity`, `GameEngine.applyShipDeath`, command/schema types. Feature PR must own future behavior. |
+| Hive queens, shields, egg sacs, permanent queen-clear, ruins | Absent; ordinary guarded-resource nests and belt crawlers only. | `TerrainSpiderManager`, `BeltCrawlerManager`, shared entity types. No hive objective is promised. |
+| Cargo shield, damage conversion/spills, loaded speed, partial retained pickup, remote FULL | Absent; cargo capacity and overflow disposal only. | `damageEntity`, `LootManager.collectOverlaps`, `shared/shipFlight.ts`, `shared/economy.ts`. Future cargo PR must migrate this ledger and affected articles. |
+| Cargo-prioritized spiders and two extra roamers | Absent; nearest eligible target, ordinary roamer cap vs live-spider rescue cap. | `TerrainSpiderManager.findHuntTarget`, `shared/terrainSpider.ts`. Do not infer cargo targeting from rescue behavior. |
+| Deep Scanner, scheduled global hazards, frontier restoration/supply routes | Absent; construction is named furnace lots and settlement recipes. | GameEngine action/tick paths, shared state/protocol, world persistence. `epochField.ts` validates a saved timestamp, not a scheduled event. |
+| Player pings/rescue signals | Absent; Survey Probe is an attached scanning beacon, network ping is transport heartbeat. | `MessageHandler` ping routes to health response, `src/network/services/connectionHealth.ts`; no placement action in input or protocol. |
+| Travelling tow/probe launches and furnace pinch/drag, shortfall popup, gradual banking | In flight in separate Codex chats on 2026-10-05; baseline documents current instant targeting, scrollable travel map and automatic bank. | Chats “Add launched tow line and probe”, “Add mobile zoom to furnace travel”, and cargo dropoff work. Reconcile merged source and feature documentation before shipping audit. |
+| Infrastructure, snapshot compression/sequence, disk workers, log internals | Non-player-facing internals excluded; player-visible connection/restart limitations are covered. | `shared/epochField.ts`, snapshot DTO/precision/protocol, `server/world/WorldPersistence.ts`; developer operational docs own maintenance. |
+
+## Audit evidence home
+
+The completion receipt for this baseline is maintained on
+[the Wiki audit task](https://app.todoist.com/app/task/6hgH24P48f2phQ7v).
+It must identify the merged PR, deployed release, full gate, desktop/touch Wiki
+observations, two-client delivery, genuine reconnect, SQLite restart evidence and
+media verification. The ledger and the source-review hash do not prove those
+checks passed. Each future mechanic's feature PR owns its inventory row, source
+mapping, reference values, demonstrations and validation.
+
+The natural-belt towing exception is proved by the real two-pilot scenario in
+`tests/unit/server/colossal-asteroids-need-a-crew.test.ts`. Healing resets and
+restart/offline delivery credit have their own scenarios in
+`tests/unit/server/health-regeneration.test.ts` and
+`tests/unit/server/crew-resumes-a-persistent-open-world.test.ts`. The ten existing
+GIFs and posters were visually reviewed and reproduced with Pillow 12.3.0 during
+this audit; no generator or media baseline was changed.
+
+### Validation corrections
+
+Native GPU recovery exposed two ordering problems. The browser scenario now
+verifies both crew placement epochs before waiting for either pilot's combat
+readiness. Reconnect telemetry counts the first transport retry independently of
+visibility recovery, so a returning touch pilot cannot lose its disconnect count.
+The owning diagnostic source and strict lifecycle scenario are mapped to
+HUD/network; gameplay, recovery policy and scenario deadlines are unchanged.
+
+The belt-mining scenario also records a crawler intercepting the initial shot.
+It verifies that guard's death before firing at the cleared deposit, rather than
+assuming the first projectile always reaches the rock. The deposit must still
+lose health, and its impact must name the admitted mining projectile and host.
+
+### Source observations outside the documentation change
+
+PR #760's observations were checked against the audit baseline. Detailed join
+rejection reasons still collapse to "Cannot connect" in
+`src/core/gameController.ts`; HUD/network gives the actionable generic advice.
+The Hauler kit's internal ability display name remains "Harpoon" in
+`src/entities/ship/shipKits.ts`, while the manual calls the actual starter tool
+Tow Cable. The obsolete `buyShipPaint`/`buyExtraLife` strings remain in
+`server/communication/MessageHandler.ts`'s ownership-check list, but neither is
+an accepted command or a playable purchase. These source cleanups are separate
+from the shipped mechanic inventory; the audit adds no gameplay capability.

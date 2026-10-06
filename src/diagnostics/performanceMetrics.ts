@@ -327,6 +327,13 @@ export class ClientPerformanceMetrics {
     this.authoritativeStateReady = false;
   }
 
+  reconnect(attempt: number, now: number): void {
+    if (attempt === 1) {
+      this.count('disconnects');
+    }
+    this.recover(now);
+  }
+
   joinFailed(): void {
     if (this.joinStartedAt === undefined) {
       return;
@@ -496,11 +503,16 @@ if (clientPerformance.enabled) {
       }
     );
   }
-  window.addEventListener('networkReconnecting', () => {
-    if (!clientPerformance.read().pendingRecovery) {
-      clientPerformance.count('disconnects');
+  window.addEventListener('networkReconnecting', (event) => {
+    const detail: unknown = event instanceof CustomEvent ? event.detail : undefined;
+    if (
+      typeof detail === 'object' &&
+      detail !== null &&
+      'attempt' in detail &&
+      typeof detail.attempt === 'number'
+    ) {
+      clientPerformance.reconnect(detail.attempt, performance.now());
     }
-    clientPerformance.recover(performance.now());
   });
   window.addEventListener('networkPermanentlyDisconnected', () => {
     clientPerformance.joinFailed();

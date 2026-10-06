@@ -34,4 +34,4 @@ Death drops your carried points in a stash anyone can collect. Stashes expire af
 
 ## Recovery
 
-Health regenerates after a delay without damage. Bank cargo at a lit furnace, then spend banked points on placeholders at [Town Square](/wiki/#controls).
+Health regenerates after a delay without damage, up to your kit's full hull health. Each hit that removes health restarts that delay; protected hits do not, and dead ships wait for respawn. Bank cargo at a lit furnace, then spend banked points on placeholders at [Town Square](/wiki/#controls).

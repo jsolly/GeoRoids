@@ -331,10 +331,11 @@ process.stdout.write(JSON.stringify(result.map(file=>file.moduleId))+'\\n');
       fixture,
       `
 import {spawn,spawnSync} from 'node:child_process';
-import {mkdirSync,writeFileSync,readFileSync} from 'node:fs';
+import {mkdirSync,writeFileSync,readFileSync,chmodSync,renameSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
 const worktree=process.argv[2], helper=process.argv[3], mode=process.argv[4], loader=process.argv[5];
+const {writeJson}=await import(helper);
 const sequence=mode.startsWith('sequencer'), index=Number(mode.split('-')[1])||1, maxActive=Number(process.argv[6]);
 const lock=join(worktree,'.git/georoids-test-runner.lock'), runDirectory=join(worktree,'.performance/integration-shards/run-fixture'), directory=join(runDirectory,'shard-'+index);
 mkdirSync(directory,{recursive:true});
@@ -354,7 +355,8 @@ if(mode==='birth')record.childStart='wrong';
 if(mode==='capacity'||mode==='sequencer-capacity')record.maxActive=maxActive===3?2:3;
 if(mode==='worktree')record.worktree='/wrong';
 if(mode==='lock')writeFileSync(join(lock,'pid'),'1\\n');
-if(mode!=='missing-manifest')setTimeout(()=>writeFileSync(join(directory,'child.json'),JSON.stringify(record),{mode:mode==='permissions'?0o644:0o600}),100);
+// Publish completed bytes atomically, as the real coordinator does. Set forged permissions before publication too.
+if(mode!=='missing-manifest')setTimeout(()=>{const manifest=join(directory,'child.json');if(mode==='permissions'){const staged=manifest+'.unissued';writeJson(staged,record);chmodSync(staged,0o644);renameSync(staged,manifest);}else writeJson(manifest,record);},100);
 if(mode==='sequencer-ancestry')setTimeout(()=>{const outside=spawn(process.execPath,['--import',loader,join(worktree,'sequence.mjs')],{env:{...process.env,GEOROIDS_SHARD_MANIFEST:join(directory,'child.json'),GEOROIDS_SHARD_NONCE:nonce,GEOROIDS_SHARD_RUN_ID:runId},stdio:['ignore','pipe','pipe']});outside.stdout.pipe(process.stdout);outside.stderr.pipe(process.stderr);outside.once('close',code=>{process.exitCode=code;child.kill('SIGTERM');});},250);
 child.once('exit',(code)=>{if(process.exitCode===undefined)process.exitCode=code??1;});
 `

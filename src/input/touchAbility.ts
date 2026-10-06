@@ -1,5 +1,5 @@
 import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
-import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
+import type { HaulerUtilityId, ScoutUtilityId, ShipKitId, UtilityFlight } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { scoutUtilityOf } from '../entities/ship/scoutUtility';
 import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
@@ -28,6 +28,7 @@ type AbilityChromeHost = {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
   harpoonTargetId?: string | null;
+  utilityFlight?: UtilityFlight | null;
   haulerUtility?: HaulerUtilityId | null;
   scoutUtility?: ScoutUtilityId | null;
   furnaceTransit?: unknown;
@@ -89,38 +90,49 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
   const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
+  const recalling =
+    kit.id === 'hauler' &&
+    !towing &&
+    host.utilityFlight?.kind === 'tow' &&
+    host.utilityFlight.phase === 'outbound';
   const offeringBuild = scoutOffersBuild(host);
   const readyLabel =
     kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
-    towing || (Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0);
+    towing ||
+    recalling ||
+    (Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0);
   return {
-    label: towing
-      ? haulerUtilityOf(host) === 'boost_coupling'
-        ? 'IGNITE'
-        : 'RELEASE'
-      : offeringBuild
-        ? 'BUILD'
-        : kit.id === 'scout'
-          ? touchAbilityLabel(kit.id, host.scoutUtility)
-          : readyLabel,
-    name: towing
-      ? haulerUtilityOf(host) === 'boost_coupling'
-        ? 'Ignite asteroid boost'
-        : 'Release asteroid'
-      : offeringBuild
-        ? 'Build furnace'
-        : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
-          ? 'Arm asteroid boost'
+    label: recalling
+      ? 'REEL'
+      : towing
+        ? haulerUtilityOf(host) === 'boost_coupling'
+          ? 'IGNITE'
+          : 'RELEASE'
+        : offeringBuild
+          ? 'BUILD'
           : kit.id === 'scout'
-            ? touchAbilityName(kit.id, host.scoutUtility)
-            : touchAbilityName(kit.id),
-    ready: alive && (towing || offeringBuild || !cooling),
+            ? touchAbilityLabel(kit.id, host.scoutUtility)
+            : readyLabel,
+    name: recalling
+      ? 'Recall tow line'
+      : towing
+        ? haulerUtilityOf(host) === 'boost_coupling'
+          ? 'Ignite asteroid boost'
+          : 'Release asteroid'
+        : offeringBuild
+          ? 'Build furnace'
+          : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+            ? 'Arm asteroid boost'
+            : kit.id === 'scout'
+              ? touchAbilityName(kit.id, host.scoutUtility)
+              : touchAbilityName(kit.id),
+    ready: alive && (towing || recalling || offeringBuild || !cooling),
     active,
     cooling: offeringBuild ? false : cooling,
     unavailable,
     cooldownRatio:
-      towing || offeringBuild
+      towing || recalling || offeringBuild
         ? 0
         : abilityCooldownRatio(
             kit.id,

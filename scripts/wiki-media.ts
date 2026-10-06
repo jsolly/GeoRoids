@@ -57,6 +57,7 @@ import {
   activateAbilityOnHost,
   pullHarpoonTarget,
   tickAbilityHost,
+  tickTowLine,
 } from '../src/entities/ship/shipAbilities';
 import { getShipKit, hullRadiusForKit } from '../src/entities/ship/shipKits';
 import {
@@ -639,7 +640,7 @@ function makeHaulerDemo(): Demo {
     throw new Error('wiki-media verification failed: no furnace destination');
   }
   const anchor = furnace.position;
-  const host = makeAbilityHost('hauler', { x: anchor.x - 140, y: anchor.y });
+  const host = makeAbilityHost('hauler', { x: anchor.x - 140, y: anchor.y }, Math.PI);
   const target = {
     ...makeAsteroid('demo-rock', { x: anchor.x - 220, y: anchor.y }, 34, 'metal'),
     kind: 'asteroid' as const,
@@ -658,7 +659,7 @@ function makeHaulerDemo(): Demo {
     result.activated && result.abilityId === 'harpoon',
     'Hauler E did not latch a nearby rock'
   );
-  invariant(host.harpoonTargetId === target.id, 'Hauler selected the wrong target');
+  invariant(host.utilityFlight?.phase === 'outbound', 'Hauler did not shoot a tow line');
   let attachedTicks = 0;
   let sawMomentumPreserved = false;
   let delivered = false;
@@ -692,13 +693,14 @@ function makeHaulerDemo(): Demo {
       drawFrameChrome(
         ctx,
         'HAULER · TOW CABLE',
-        'E attach → keep momentum → tow to furnace → shared score',
+        'Aim + E → contact → tow to furnace → shared score',
         frame,
         '#FDE68A'
       );
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
           if (!delivered) {
+            tickTowLine(host, bodies);
             pullHarpoonTarget(host, bodies);
             attachedTicks += host.harpoonTargetId === target.id ? 1 : 0;
             sawMomentumPreserved ||= Math.abs(target.velocity.x - targetSpeed) < 0.02;
@@ -738,6 +740,9 @@ function makeHaulerDemo(): Demo {
       if (!delivered) {
         drawRoid(ctx, { ...target, position: sceneTarget, rotation: targetRotation }, displayScale);
       }
+      if (host.utilityFlight) {
+        drawCable(ctx, displayHost, toScene(host.utilityFlight.position));
+      }
       if (host.harpoonTargetId === target.id && !delivered) {
         drawCable(ctx, displayHost, displayTarget);
       }
@@ -745,7 +750,7 @@ function makeHaulerDemo(): Demo {
         ctx,
         'hauler',
         displayHost,
-        0,
+        host.utilityFlight ? Math.PI : 0,
         PALETTE.LOCAL,
         hullRadiusForKit('hauler') * displayScale
       );
@@ -772,7 +777,7 @@ function makeHaulerDemo(): Demo {
           ? `DELIVERED · ${furnaceReward(target)} points each`
           : host.harpoonTargetId === target.id
             ? 'tow cable active · rock trails behind'
-            : 'E · attach an asteroid',
+            : 'Aim + E · shoot a tow line',
         310,
         110,
         '#FDE68A'

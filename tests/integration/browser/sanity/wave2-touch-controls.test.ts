@@ -389,24 +389,53 @@ test.each(KITS)(
     expect(await page.locator('#touch-stick').count()).toBe(0);
 
     // E must remain usable while the two continuous canvas touch sources are held.
-    await tapTouchPoint(session, heldTouchPoints, {
-      x: ability.x,
-      y: ability.y,
-      id: 13,
-    });
-    if (kitId === 'scout') {
-      await expect
-        .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
-        .toBeGreaterThan(0);
+    const [observedAbility] = await Promise.all([
+      page.waitForFunction(
+        (kit) => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          const button = document.querySelector('#touch-ability');
+          if (!ship || !button || ship.abilityCooldownFrames <= 0) {
+            return false;
+          }
+          const phase = ship.utilityFlight?.phase;
+          const buttonLabel = button.textContent;
+          const disabled = button.getAttribute('aria-disabled');
+          if (
+            kit === 'hauler' &&
+            (phase !== 'outbound' || buttonLabel !== 'REEL' || disabled !== 'false')
+          ) {
+            return false;
+          }
+          return {
+            phase,
+            label: buttonLabel,
+            disabled,
+            thrusting: ship.thrusting,
+            abilityCooldownFrames: ship.abilityCooldownFrames,
+          };
+        },
+        kitId,
+        { timeout: 1000 }
+      ),
+      tapTouchPoint(session, heldTouchPoints, {
+        x: ability.x,
+        y: ability.y,
+        id: 13,
+      }),
+    ]);
+    const abilityWhileHeld = await observedAbility.jsonValue();
+    await observedAbility.dispose();
+    if (!abilityWhileHeld) {
+      throw new Error('Expected the observed ability state');
     }
-    await game.waitForAnimationFrames(2);
-    const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.thrusting).toBe(true);
     if (kitId === 'hauler') {
-      // A miss leaves the persistent tow action ready: there is no scan-style
-      // cooldown when no cargo was attached.
-      expect(abilityWhileHeld.abilityCooldownFrames).toBe(0);
-      expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('false');
+      // Launch consumes recharge, but E can recall the outbound line while
+      // steering and firing remain held.
+      expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
+      expect(abilityWhileHeld.phase).toBe('outbound');
+      expect(abilityWhileHeld.label).toBe('REEL');
+      expect(abilityWhileHeld.disabled).toBe('false');
     } else {
       expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
       await tapTouchPoint(session, heldTouchPoints, {

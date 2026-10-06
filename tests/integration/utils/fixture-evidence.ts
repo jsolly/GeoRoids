@@ -11,6 +11,25 @@ import { getFixtureState } from './test-server-control';
 const GIT_TIMEOUT_MS = 30_000;
 const GIT_STDERR_LIMIT = 16 * 1024;
 const GIT_PATH_LIMIT = 64 * 1024;
+const CAPTURE_TIMEOUT_MS = 5000;
+
+/** Evidence must settle so the caller can close its owned browsers on failure. */
+async function captureWithinDeadline<T>(source: string, capture: () => T | Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(capture),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Fixture ${source} evidence capture timed out`)),
+          CAPTURE_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Consume stdout as bytes; never retain the whole binary diff or accept a partial hash. */
 async function streamGit(
@@ -298,8 +317,8 @@ export async function withFixtureEvidence(
   const stage = async (name: string) => {
     const now = performance.now();
     const [server, client, scenarioEvidence, retainedEvidence] = await Promise.allSettled([
-      Promise.resolve().then(() => getFixtureState(observations.asteroidIds?.() ?? [])),
-      Promise.resolve().then(() =>
+      captureWithinDeadline('server', () => getFixtureState(observations.asteroidIds?.() ?? [])),
+      captureWithinDeadline('client', () =>
         page.isClosed()
           ? null
           : page.evaluate((lot) => {
@@ -341,10 +360,12 @@ export async function withFixtureEvidence(
               };
             }, civicLot('street-1-0'))
       ),
-      Promise.resolve().then(async () =>
+      captureWithinDeadline('scenario', async () =>
         structuredClone((await observations.evidence?.()) ?? null)
       ),
-      Promise.resolve().then(() => structuredClone(observations.retainedEvidence?.() ?? null)),
+      captureWithinDeadline('retained', () =>
+        structuredClone(observations.retainedEvidence?.() ?? null)
+      ),
     ]);
     const failures: unknown[] = [];
     const captureFailures: {
@@ -397,7 +418,9 @@ export async function withFixtureEvidence(
       failures.push(observationError);
     }
     try {
-      await page.screenshot({ path: `${path}-failed.png` });
+      await captureWithinDeadline('screenshot', () =>
+        page.screenshot({ path: `${path}-failed.png`, timeout: CAPTURE_TIMEOUT_MS })
+      );
     } catch (screenshotError) {
       failures.push(screenshotError);
     }

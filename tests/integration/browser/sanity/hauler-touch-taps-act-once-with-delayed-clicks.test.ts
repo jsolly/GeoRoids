@@ -112,11 +112,21 @@ for (const browserType of [chromium, webkit]) {
             .getRoids()
             .some((rock) => rock.id === 'crew-fixture-ore')
         );
+        const target = (await game.getAsteroidPositions()).find(
+          (rock) => rock.id === 'crew-fixture-ore'
+        );
+        if (!target) {
+          throw new Error('Missing tow target');
+        }
+        await game.aimAtWorldPosition(target);
         const ability = page.locator('#touch-ability');
         await page.waitForTimeout(firstTapDelayMs);
         await ability.tap();
-        await expect.poll(() => targets, POLL).toEqual(['crew-fixture-ore']);
+        await expect.poll(() => targets, POLL).toEqual([null]);
         await expect.poll(() => ability.textContent(), POLL).toBe('RELEASE');
+        expect(
+          await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId)
+        ).toBe('crew-fixture-ore');
         // Emulate the follow-up pointer click independently of the browser's tap
         // heuristic. It may arrive in a later task after the server confirms Hook.
         await page.waitForTimeout(clickDelayMs);
@@ -124,7 +134,7 @@ for (const browserType of [chromium, webkit]) {
         const afterHook = snapshots;
         await expect.poll(() => snapshots, POLL).toBeGreaterThan(afterHook + 4);
         expect(requests).toBe(1);
-        expect(targets).toEqual(['crew-fixture-ore']);
+        expect(targets).toEqual([null]);
         expect(await ability.textContent()).toBe('RELEASE');
         expect(
           await page.evaluate(
@@ -143,16 +153,16 @@ for (const browserType of [chromium, webkit]) {
           await page.waitForFunction(
             () => window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames === 0
           );
-          expect(targets).toEqual(['crew-fixture-ore']);
+          expect(targets).toEqual([null]);
         }
         await ability.tap();
-        await expect.poll(() => targets, POLL).toEqual(['crew-fixture-ore', null]);
+        await expect.poll(() => targets, POLL).toEqual([null, null]);
         await page.waitForTimeout(clickDelayMs);
         await ability.dispatchEvent('click', { bubbles: true, detail: 1 });
         const afterRelease = snapshots;
         await expect.poll(() => snapshots, POLL).toBeGreaterThan(afterRelease + 4);
         expect(requests).toBe(2);
-        expect(targets).toEqual(['crew-fixture-ore', null]);
+        expect(targets).toEqual([null, null]);
         expect(await ability.textContent()).toBe('HOOK');
         expect(
           await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId)

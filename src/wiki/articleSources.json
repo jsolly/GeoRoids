@@ -160,7 +160,13 @@
     "shared/economy.ts",
     "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
     "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts",
-    "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts"
+    "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts",
+    "shared/utilityFlight.ts",
+    "shared/toolFlightContact.ts",
+    "server/world/AsteroidSpatialIndex.ts",
+    "tests/unit/entities/launched-tools-hit-or-return.test.ts",
+    "tests/integration/browser/sanity/hauler-touch-taps-act-once-with-delayed-clicks.test.ts",
+    "tests/integration/browser/e2e/hauler-swaps-hardware-and-taps-loot-in-bursts.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -502,7 +508,12 @@
     "shared/economy.ts",
     "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
     "src/rendering/canvasSurface.ts",
-    "src/rendering/canvas.ts"
+    "src/rendering/canvas.ts",
+    "shared/utilityFlight.ts",
+    "shared/toolFlightContact.ts",
+    "server/world/AsteroidSpatialIndex.ts",
+    "tests/unit/entities/launched-tools-hit-or-return.test.ts",
+    "tests/integration/browser/sanity/scout-launches-a-shared-moving-probe.test.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",

@@ -5,15 +5,29 @@ import {
   igniteBoost,
   removeBoostOwner,
 } from '../../../shared/asteroidBoost';
+import { segmentCircleContact } from '../../../shared/asteroidPhenomena';
 import { asteroidCrewNeeded, isColossalAsteroid } from '../../../shared/asteroidScale';
 import type { FurnaceField } from '../../../shared/furnaceField';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
+import {
+  firstToolFlightContact,
+  movingAsteroidContact,
+  relativeFlightStart,
+} from '../../../shared/toolFlightContact';
+import {
+  advanceUtilityFlight,
+  launchUtilityFlight,
+  missUtilityFlight,
+} from '../../../shared/utilityFlight';
 import type {
   AsteroidBoost,
+  AsteroidData,
   HaulerUtilityId,
   Position,
   ScoutUtilityId,
   ShipKitId,
+  ToolTargetPose,
+  UtilityFlight,
   Velocity,
 } from '../../../shared-types';
 import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
@@ -40,6 +54,7 @@ export interface AbilityHost {
 
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
+  utilityFlight?: UtilityFlight | null;
   haulerUtility?: HaulerUtilityId;
   scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
@@ -48,7 +63,8 @@ export interface AbilityHost {
 }
 
 /** Asteroid geometry shared by offline ability simulation and authoritative towing. */
-export interface AbilityBody {
+export interface AbilityBody
+  extends Partial<Pick<AsteroidData, 'rotation' | 'vertices' | 'offsets'>> {
   kind?: 'spider' | 'asteroid';
   boost?: AsteroidBoost | null;
   id: string;
@@ -73,6 +89,7 @@ interface AbilityActivation {
 interface HarpoonLatchSnapshot {
   harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
+  utilityFlight?: UtilityFlight | null;
 }
 
 function rememberLatchPos(
@@ -93,7 +110,9 @@ export function canActivateAbility(host: AbilityHost): boolean {
   return (
     !host.exploding &&
     host.health > 0 &&
-    (host.abilityCooldownFrames <= 0 || (host.kitId === 'hauler' && Boolean(host.harpoonTargetId)))
+    (host.abilityCooldownFrames <= 0 ||
+      (host.utilityFlight?.kind === 'tow' && host.utilityFlight.phase === 'outbound') ||
+      (host.kitId === 'hauler' && Boolean(host.harpoonTargetId)))
   );
 }
 
@@ -138,6 +157,7 @@ export function setHaulerUtilityOnHost(
     | 'harpoonLatchPos'
     | 'tapExtractFrames'
     | 'tapExtractCompleted'
+    | 'utilityFlight'
   >,
   utilityId: unknown
 ): boolean {
@@ -147,13 +167,14 @@ export function setHaulerUtilityOnHost(
   const changed = haulerUtilityOf(host) !== utilityId;
   host.haulerUtility = utilityId;
   if (changed) {
+    host.utilityFlight = null;
     clearHaulerLatch(host);
   }
   return true;
 }
 
 export function setScoutUtilityOnHost(
-  host: Pick<AbilityHost, 'kitId' | 'scoutUtility' | 'abilityActiveFrames'>,
+  host: Pick<AbilityHost, 'kitId' | 'scoutUtility' | 'abilityActiveFrames' | 'utilityFlight'>,
   utilityId: unknown
 ): boolean {
   if (host.kitId !== 'scout' || !isScoutUtilityId(utilityId)) {
@@ -165,6 +186,7 @@ export function setScoutUtilityOnHost(
     // A tool swap cannot leave a predicted Mineral Scan pulse running while
     // another tool is equipped. The authoritative cooldown is preserved.
     host.abilityActiveFrames = 0;
+    host.utilityFlight = null;
   }
   return true;
 }
@@ -183,6 +205,9 @@ export function tickAbilityHost(host: AbilityHost): void {
   }
   if (host.abilityActiveFrames > 0) {
     host.abilityActiveFrames -= 1;
+  }
+  if (host.exploding || host.health <= 0) {
+    host.utilityFlight = null;
   }
   if (host.kitId !== 'hauler' || host.exploding || host.health <= 0) {
     clearHarpoonLatch(host);
@@ -434,6 +459,13 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     return { activated: true, abilityId: 'harpoon' };
   }
 
+  if (host.utilityFlight?.kind === 'tow' && host.utilityFlight.phase === 'outbound') {
+    missUtilityFlight(host);
+    return { activated: true, abilityId: 'harpoon' };
+  }
+  if (host.utilityFlight) {
+    return { activated: false };
+  }
   const kit = getShipKit(host.kitId);
   if (kit.abilityId === 'surveyScan') {
     host.abilityCooldownFrames = abilityCooldownFramesFor(host);
@@ -441,13 +473,22 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       scoutUtilityOf(host) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
     return { activated: true, abilityId: kit.abilityId };
   }
-  if (!world) {
-    syncHarpoonFieldFromPlay();
-  }
-
   if (kit.abilityId === 'harpoon') {
     if (host.kitId !== 'hauler') {
       return { activated: false };
+    }
+    if (isTowCableUtility(host)) {
+      host.utilityFlight = launchUtilityFlight(
+        host,
+        'tow',
+        hostHullRadius(host),
+        SHIP_ABILITY.HARPOON_RANGE
+      );
+      host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
+      return { activated: true, abilityId: 'harpoon' };
+    }
+    if (!world) {
+      syncHarpoonFieldFromPlay();
     }
     const latchRange = SHIP_ABILITY.HARPOON_RANGE;
     const target = findHarpoonTarget(
@@ -490,4 +531,77 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
   }
 
   return { activated: false };
+}
+
+/** Swept contact latches the first live hull struck, never a nearby off-axis body. */
+export function tickTowLine(
+  host: AbilityHost,
+  bodies: readonly AbilityBody[],
+  canLatch: (body: AbilityBody) => boolean = () => true,
+  previousPositions: ReadonlyMap<string, ToolTargetPose> = new Map()
+): void {
+  if (host.utilityFlight?.kind !== 'tow') {
+    return;
+  }
+  if (!isTowCableUtility(host) || host.exploding || host.health <= 0) {
+    host.utilityFlight = null;
+    return;
+  }
+  const segment = advanceUtilityFlight(host);
+  if (!segment) {
+    return;
+  }
+  const hit = firstToolFlightContact(
+    segment.start,
+    segment.end,
+    bodies.filter(isHarpoonableBody),
+    (body) => {
+      const previous = previousPositions.get(body.id) ?? body.position;
+      return body.size !== undefined &&
+        body.rotation !== undefined &&
+        body.vertices !== undefined &&
+        body.offsets !== undefined
+        ? movingAsteroidContact(
+            segment.start,
+            segment.end,
+            {
+              id: body.id,
+              position: body.position,
+              size: body.size,
+              rotation: body.rotation,
+              vertices: body.vertices,
+              offsets: body.offsets,
+            },
+            previous
+          )
+        : segmentCircleContact(
+            relativeFlightStart(segment.start, body.position, previous),
+            segment.end,
+            body.position,
+            bodyRadius(body)
+          );
+    }
+  );
+  if (hit && host.utilityFlight) {
+    host.utilityFlight.position = { ...hit.point };
+  }
+  if (hit?.kind === 'boundary') {
+    missUtilityFlight(host);
+    return;
+  }
+  if (hit) {
+    if (!canLatch(hit.body) || !canLatchBoostedBody(host, hit.body)) {
+      missUtilityFlight(host);
+      return;
+    }
+    host.harpoonTargetId = hit.body.id;
+    host.harpoonLatchPos = { ...hit.body.position };
+    host.utilityFlight = null;
+    attachTowCable(host, hit.body);
+  } else if (
+    host.utilityFlight?.phase === 'outbound' &&
+    host.utilityFlight.remainingDistance <= 0
+  ) {
+    missUtilityFlight(host);
+  }
 }

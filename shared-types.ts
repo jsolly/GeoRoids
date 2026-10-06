@@ -65,12 +65,28 @@ export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 /** Scout v1 utility slot. Same E key; one option active. */
 export type ScoutUtilityId = 'mineral_scan' | 'survey_probe';
 
+/** Target pose at the start of a tool collision frame. */
+export type ToolTargetPose = Position & { rotation?: number };
+
+/** A single server-owned tool shot, carried by its pilot's snapshot row. */
+export type UtilityFlight =
+  | {
+      kind: 'tow' | 'probe';
+      phase: 'outbound';
+      position: Position;
+      velocity: Velocity;
+      remainingDistance: number;
+    }
+  | { kind: 'tow'; phase: 'reeling'; position: Position; framesLeft: number }
+  | { kind: 'probe'; phase: 'disintegrating'; position: Position; framesLeft: number };
+
 export interface AbilityUsedEvent {
   id: string;
   kitId: ShipKitId;
   abilityId: 'harpoon' | 'surveyScan';
   harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
+  utilityFlight?: UtilityFlight | null;
   abilityActiveFrames: number;
   /** Present only on an accepted ignition, never on a snapshot or ordinary release. */
   boostIgnitionPosition?: Position;
@@ -410,6 +426,7 @@ export interface ServerEntityData {
 
   harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
+  utilityFlight?: UtilityFlight | null;
   /** Equipped Hauler utility. Omitted on other kits. Missing means tow cable. */
   haulerUtility?: HaulerUtilityId;
   /** Equipped Scout utility. Omitted on other kits. Missing means mineral scan. */

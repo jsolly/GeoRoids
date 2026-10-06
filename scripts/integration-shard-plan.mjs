@@ -1,6 +1,16 @@
 import { relative, resolve } from 'node:path';
 
 export const MAX_ACTIVE_SHARDS = 3;
+export function isShardCapacity(value) {
+  return Number.isInteger(value) && value >= 1 && value <= MAX_ACTIVE_SHARDS;
+}
+export function parseShardCapacity(value = String(MAX_ACTIVE_SHARDS)) {
+  requireValue(
+    typeof value === 'string' && /^[1-3]$/u.test(value),
+    'GEOROIDS_TEST_MAX_ACTIVE_SHARDS must be 1, 2 or 3'
+  );
+  return Number(value);
+}
 const allocationWeights = [1, 1, 1, 1, 1, 1];
 
 function requireValue(condition, message) {
@@ -8,8 +18,20 @@ function requireValue(condition, message) {
     throw new Error(message);
   }
 }
-export function planShards({ worktree, files, discovery, weights, runId, total = 6 }) {
+export function planShards({
+  worktree,
+  files,
+  discovery,
+  weights,
+  runId,
+  total = 6,
+  maxActive = MAX_ACTIVE_SHARDS,
+}) {
   requireValue(total === 6, 'Exactly six shards are required');
+  requireValue(
+    isShardCapacity(maxActive),
+    'Active shard capacity must be an integer from 1 through 3'
+  );
   requireValue(weights.version === 2 && Array.isArray(weights.entries), 'Invalid weight schema');
   const references = new Map();
   for (const entry of weights.entries) {
@@ -87,7 +109,7 @@ export function planShards({ worktree, files, discovery, weights, runId, total =
     runId,
     worktree,
     total,
-    maxActive: MAX_ACTIVE_SHARDS,
+    maxActive,
     weightStatus: weights.status,
     weightRevision: weights.revision,
     weightSourceArtifactSha256: weights.sourceArtifactSha256,
@@ -102,7 +124,7 @@ export function planShards({ worktree, files, discovery, weights, runId, total =
 export function selectShard(plan, files, index, count) {
   requireValue(
     plan.version === 2 &&
-      plan.maxActive === MAX_ACTIVE_SHARDS &&
+      isShardCapacity(plan.maxActive) &&
       count === 6 &&
       plan.total === count &&
       Number.isInteger(index) &&

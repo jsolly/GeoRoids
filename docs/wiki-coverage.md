@@ -81,15 +81,15 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 ## Known rule discrepancies and maintenance notes
 
-- Hauler E uses a fixed 280-unit hull-gap reach and selects a living
-  asteroid or spider (Boost Coupling cannot couple a spider). The equipped utility is Resource Tap, Tow Cable, or Boost Coupling. Resource Tap
-  extracts four spaced canister bursts across 90 frames and leaves the rock intact. E again
-  releases the persistent tow cable. The asteroid
-  keeps its momentum and trails behind normal Hauler movement; the cable applies
-  a correction only while stretched and never reels or throws the rock. A
-  successful attachment starts the three-second ability cooldown, but E again
-  releases the cable immediately; an out-of-range attempt leaves the cooldown
-  unchanged. A towed rock delivered inside a furnace's
+- Hauler E fires Tow Cable along the aimed heading for 280 units from the nose;
+  its first hull contact can attach to a living asteroid or spider. A missed or
+  obstructed tip reels back, and E again recalls an outbound tip or releases an
+  attached cable. Launch starts the three-second recharge even on a miss.
+  Resource Tap and Boost Coupling instead select a living host within a fixed
+  280-unit hull gap; Boost Coupling cannot couple a spider. Resource Tap extracts
+  four spaced canister bursts across 90 frames and leaves the rock intact.
+  The attached cable preserves the asteroid's momentum and applies a correction
+  only while stretched; it never reels or throws attached cargo. A towed rock delivered inside a furnace's
   85-unit intake is consumed and awards the Hauler plus every recorded Scout
   the full material reward. Towed ordinary cargo that overlaps another asteroid uses the
   ordinary collision break on both rocks and drops the cable; a towed colossal
@@ -261,9 +261,9 @@ Exact tuning belongs in the article's expandable reference. Media names refer to
 | Mechanic and Wiki home | Rule and exception | Ownership and lifecycle | Sources and scenario evidence | Illustration |
 | --- | --- | --- | --- | --- |
 | Mineral Scan: scout / Mineral scan | Owned starter E pulse charts/reveals minerals and repels terrain spiders in range; cooldown required, furnace Build takes priority. | Crew classifications and contributor IDs persist on saved rocks; pulse temporary personal. | `shipAbilities.ts`, `GameEngine.surveyFromPosition`, `shared/exploration.ts`; `tests/unit/server/mineral-scans-drive-spiders-away.test.ts` | scout. |
-| Survey Probe: scout / Survey probe, Probe limits | Nose-directed hitscan finds living empty host before wall; miss no cooldown/message; battery, health and owner cap, extra replaces oldest. | Attached host follows translation/rotation, shares reveal/credit; tool swap does not cancel, host death/expiry/restart removes. | `shared/surveyProbe.ts`, `server/core/SurveyProbeManager.ts`; `tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts` | Text: no travelling launch on baseline; host/radar marker explained. |
+| Survey Probe: scout / Survey probe, Probe limits | Aimed travelling beacon attaches on first eligible contact; miss or obstruction disintegrates; launch spends shared Scan recharge; battery, health and owner cap, extra replaces oldest. | Attached host follows translation/rotation, shares reveal/credit; tool swap does not cancel, host death/expiry/restart removes. | `shared/surveyProbe.ts`, `shared/toolFlightContact.ts`, `server/core/SurveyProbeManager.ts`; `tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts` | Text: aimed launch, disintegration and host/radar marker explained. |
 | Resource Tap: hauler / Resource Tap E | Near eligible rock extracts bursts intact; E/swap/range cancels. Rock can be tapped again; spider has finite silk and is provoked. | Temporary extraction; resulting loot shared, ownership unlock personal. | `shipAbilities.ts`, `GameEngine.tickAbilities`, `TerrainSpiderManager.extractSilk`; `tests/unit/server/tap-extract-spawns-tap-loot.test.ts` | Text: bursts/cancellation in reference; loot illustrates collection. |
-| Tow targeting: hauler / Tow cable E, Reach and release | Nearest eligible hull gap, heading tie-break; attach starts cooldown, miss does not; ordinary exclusive, colossal shared. | E release available during cooldown; swap/death/disconnect/travel cancel; host loss/excess range detach. | `shipAbilities.ts`, `GameEngine.haulerCanTarget`; `tests/unit/entities/shipAbilities.test.ts` | hauler. |
+| Tow targeting: hauler / Tow cable E, Reach and release | Aimed travelling line attaches on first eligible contact; miss or obstruction reels back; launch spends recharge; ordinary exclusive, colossal shared. | E recalls outbound line or releases cargo during recharge; swap/death/disconnect/travel cancel; host loss/excess range detach. | `shipAbilities.ts`, `shared/toolFlightContact.ts`, `GameEngine.haulerCanTarget`; `tests/unit/entities/launched-tools-hit-or-return.test.ts` | hauler shows launch and real contact. |
 | Tow momentum/collisions: hauler / Cargo collisions | Stretched cable pulls, never reels/throws; ordinary cargo collision breaks rocks and can hurt other pilots; colossal survives. | Shared rock velocity, own Hauler protected from cargo; untowed rocks pass each other. | `towCable.ts`, `GameEngine.resolveTowedAsteroidImpacts`; authoritative combat tests | hauler. |
 | Colossal towing: asteroids / Colossal deposits | Two live Tow Cables required to haul size-qualified rock; one holds it; rams do not break. | Shared cargo and contributor rewards; loses force if crew drops below requirement. | `shared/asteroidScale.ts`, `GameEngine.tickAbilities`; `tests/unit/server/colossal-asteroids-need-a-crew.test.ts` | Text: crew threshold, hauler shows ordinary cable. |
 | Boost Coupling: hauler / Boost Coupling E | Arm rock toward nearest lit furnace, E ignites; spider invalid; one colossal coupling crawls, second speeds, third refused. | Swap/range/death/disconnect cancel armed ownership; burning immune and autonomous, saved delivery owners survive restart/offline. | `shared/asteroidBoost.ts`, `shipAbilities.ts`, `GameEngine`; `tests/unit/entities/boosted-cargo-steers-to-its-nearest-furnace.test.ts` | Text: arrow/exhaust identify phase. |
@@ -311,7 +311,7 @@ playable production behavior.
 | Cargo-prioritized spiders and two extra roamers | Absent; nearest eligible target, ordinary roamer cap vs live-spider rescue cap. | `TerrainSpiderManager.findHuntTarget`, `shared/terrainSpider.ts`. Do not infer cargo targeting from rescue behavior. |
 | Deep Scanner, scheduled global hazards, frontier restoration/supply routes | Absent; construction is named furnace lots and settlement recipes. | GameEngine action/tick paths, shared state/protocol, world persistence. `epochField.ts` validates a saved timestamp, not a scheduled event. |
 | Player pings/rescue signals | Absent; Survey Probe is an attached scanning beacon, network ping is transport heartbeat. | `MessageHandler` ping routes to health response, `src/network/services/connectionHealth.ts`; no placement action in input or protocol. |
-| Travelling tow/probe launches and furnace pinch/drag, shortfall popup, gradual banking | In flight in separate Codex chats on 2026-10-05; baseline documents current instant targeting, scrollable travel map and automatic bank. | Chats “Add launched tow line and probe”, “Add mobile zoom to furnace travel”, and cargo dropoff work. Reconcile merged source and feature documentation before shipping audit. |
+| Furnace pinch/drag, shortfall popup, gradual banking | In flight in separate Codex chats on 2026-10-05; baseline documents scrollable travel map and automatic bank. | Furnace travel and cargo dropoff feature PRs own reconciliation. Travelling tow/probe launches are covered by this feature's updated Scout and Hauler inventory rows above. |
 | Infrastructure, snapshot compression/sequence, disk workers, log internals | Non-player-facing internals excluded; player-visible connection/restart limitations are covered. | `shared/epochField.ts`, snapshot DTO/precision/protocol, `server/world/WorldPersistence.ts`; developer operational docs own maintenance. |
 
 ## Audit evidence home

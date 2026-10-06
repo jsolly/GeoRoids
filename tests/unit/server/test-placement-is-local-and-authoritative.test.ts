@@ -1,3 +1,4 @@
+import { resolveToolFlights } from '../../support/tool-flight';
 /* @vitest-environment node */
 
 import { strict as assert } from 'node:assert';
@@ -706,6 +707,7 @@ test('finite tow admission preserves health and cooldown, then atomic release al
   }
   expect(player.health).toBe(health);
   expect(server.gameEngine.useAbility(player.id)).toBe(true);
+  resolveToolFlights(server.gameEngine);
   const spiderId = player.harpoonTargetId;
   assert.ok(spiderId);
   const spider = server.gameEngine.getSpiderField().spiders.find((body) => body.id === spiderId);
@@ -797,6 +799,7 @@ test('tow-preserving placement rejects invalid identity or target before mutatio
   });
   expect(arranged.status).toBe(200);
   expect(server.gameEngine.useAbility(player.id)).toBe(true);
+  resolveToolFlights(server.gameEngine);
   const target = player.harpoonTargetId;
   assert.ok(target);
   const observe = () =>
@@ -881,6 +884,7 @@ test('a missing owner motion session rejects tow-preserving release without chan
     ).status
   ).toBe(200);
   expect(server.gameEngine.useAbility(player.id)).toBe(true);
+  resolveToolFlights(server.gameEngine);
   const target = player.harpoonTargetId;
   assert.ok(target);
   server.gameEngine.playerMotion.forgetActor(player.id);
@@ -921,6 +925,7 @@ test('explicit tow release rejects stale victim or owner actor identity without 
     ).status
   ).toBe(200);
   expect(server.gameEngine.useAbility(player.id)).toBe(true);
+  resolveToolFlights(server.gameEngine);
   const target = player.harpoonTargetId;
   assert.ok(target);
   const witnessSocket = new RecordingSocket();

@@ -13,6 +13,7 @@ import {
   harpoonSurfaceGap,
   pullHarpoonTarget,
   tickAbilityHost,
+  tickTowLine,
 } from '../../../src/entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { attachTowCable, tickTowCable } from '../../../src/entities/ship/towCable';
@@ -49,6 +50,10 @@ test('Hauler attaches the nearest rock and only pulls that rock when the cable i
     velocity: { x: 0, y: 0 },
   };
   const result = activateAbilityOnHost(hauler, { asteroids: [near, far] });
+  expect(hauler.harpoonTargetId).toBeNull();
+  for (let i = 0; i < 40; i++) {
+    tickTowLine(hauler, [near, far]);
+  }
   expect(result.activated).toBe(true);
   expect(result.abilityId).toBe('harpoon');
   expect(hauler.harpoonTargetId).toBe('near-rock');
@@ -63,9 +68,10 @@ test('Hauler attaches the nearest rock and only pulls that rock when the cable i
   expect(Math.abs(near.velocity.x)).toBeLessThan(1);
 });
 
-test('harpoon latches the nearer rock even if a farther rock is ahead', () => {
+test('Resource Tap targets a nearer rock behind the hull', () => {
   const hauler = host('hauler');
   hauler.angle = 0;
+  hauler.haulerUtility = 'resource_tap';
   const behind = { id: 'behind', position: { x: -40, y: 0 }, velocity: { x: 0, y: 0 } };
   const ahead = { id: 'ahead', position: { x: 90, y: 0 }, velocity: { x: 0, y: 0 } };
   expect(findHarpoonTarget(hauler, [behind, ahead])?.id).toBe('behind');
@@ -94,6 +100,9 @@ test('physical reach keeps an intake-bound rock near enough to tow', () => {
     asteroids: [liveNear],
   });
   expect(result.activated).toBe(true);
+  for (let i = 0; i < 40; i++) {
+    tickTowLine(hauler, [liveNear]);
+  }
   expect(hauler.harpoonTargetId).toBe('live-near');
   expect(hauler.harpoonLatchPos?.x).toBe(260);
 });
@@ -116,12 +125,13 @@ test('overlapping a rock still latches', () => {
   expect(findHarpoonTarget(hauler, [rock])?.id).toBe('on-top');
 });
 
-test('Hauler E syncs the live belt so an unpublished field still latches', () => {
+test('Hauler E refreshes an unpublished live belt for Boost Coupling', () => {
   publishHarpoonField([]);
   bindHarpoonFieldSource(() => [
     { id: 'live-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } },
   ]);
   const hauler = host('hauler');
+  hauler.haulerUtility = 'boost_coupling';
   const result = activateAbilityOnHost(hauler);
   expect(result.activated).toBe(true);
   expect(hauler.harpoonTargetId).toBe('live-rock');
@@ -131,8 +141,12 @@ test('Hauler E syncs the live belt so an unpublished field still latches', () =>
 test('Hauler harpoon whiffs without a rock in range', () => {
   const hauler = host('hauler');
   const result = activateAbilityOnHost(hauler, { asteroids: [] });
-  expect(result.activated).toBe(false);
-  expect(hauler.abilityCooldownFrames).toBe(0);
+  expect(result.activated).toBe(true);
+  expect(hauler.abilityCooldownFrames).toBe(180);
+  for (let i = 0; i < 40; i++) {
+    tickTowLine(hauler, []);
+  }
+  expect(hauler.utilityFlight?.phase).toBe('reeling');
   expect(hauler.harpoonTargetId).toBeNull();
 });
 
@@ -146,7 +160,11 @@ test('a depleted rock is not a tow target', () => {
     r: 40,
   };
   expect(findHarpoonTarget(hauler, [rock])).toBeUndefined();
-  expect(activateAbilityOnHost(hauler, { asteroids: [rock] }).activated).toBe(false);
+  expect(activateAbilityOnHost(hauler, { asteroids: [rock] }).activated).toBe(true);
+  for (let i = 0; i < 40; i++) {
+    tickTowLine(hauler, [rock]);
+  }
+  expect(hauler.harpoonTargetId).toBeNull();
 });
 
 test('pull clears a latch when its asteroid leaves the authoritative world', () => {
@@ -206,7 +224,11 @@ test('a rock beyond physical reach stays untowable regardless of zoom', () => {
     r: 40,
   };
   expect(findHarpoonTarget(hauler, [liveNear])).toBeUndefined();
-  expect(activateAbilityOnHost(hauler, { asteroids: [liveNear] }).activated).toBe(false);
+  expect(activateAbilityOnHost(hauler, { asteroids: [liveNear] }).activated).toBe(true);
+  for (let i = 0; i < 40; i++) {
+    tickTowLine(hauler, [liveNear]);
+  }
+  expect(hauler.harpoonTargetId).toBeNull();
 });
 
 test('attaching a tow cable preserves the rock pose and momentum', () => {
@@ -267,7 +289,7 @@ test('a Hauler E release detaches the tow without a delayed launch', () => {
   expect(rock.velocity).toEqual(beforeRelease);
 });
 
-test('local latch prediction records the target while leaving server rock momentum alone', () => {
+test('a launched local tow leaves the target and its momentum alone before contact', () => {
   const hauler: AbilityHost = { ...host('hauler'), id: 'hauler' };
   const rock = {
     id: 'rock',
@@ -277,6 +299,7 @@ test('local latch prediction records the target while leaving server rock moment
   publishHarpoonField([rock]);
   const before = { ...rock.velocity };
   expect(activateAbilityOnHost(hauler).activated).toBe(true);
-  expect(hauler.harpoonTargetId).toBe('rock');
+  expect(hauler.harpoonTargetId).toBeNull();
+  expect(hauler.utilityFlight?.phase).toBe('outbound');
   expect(rock.velocity).toEqual(before);
 });

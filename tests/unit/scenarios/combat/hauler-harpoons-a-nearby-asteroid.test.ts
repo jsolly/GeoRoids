@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE } from '../../../../src/constants';
+import { resolveToolFlights } from '../../../support/tool-flight';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -41,6 +42,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
       id: alice.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
 
     const rock = world.engine.getAsteroid('haul-rock');
     expect(rock).toBeDefined();
@@ -66,6 +68,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
       id: alice.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
     const rock = world.engine.getAsteroid('haul-rock');
     expect(rock).toBeDefined();
     const beforeRelease = { ...rock?.velocity };
@@ -75,6 +78,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
       id: alice.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
 
     expect(world.entity(alice).harpoonTargetId).toBeNull();
     expect(rock?.velocity).toEqual(beforeRelease);
@@ -102,6 +106,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
       id: alice.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
     expect(world.entity(alice).harpoonTargetId).toBe('haul-rock');
 
     const healthBefore = world.entity(alice).health;
@@ -123,6 +128,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
       id: alice.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
     world.engine.entityManager.updateEntity(alice.id, { spawnProtectionTimer: 0 });
     world.engine.entityManager.updateEntity(bob.id, { spawnProtectionTimer: 0 });
     expect(world.entity(alice).harpoonTargetId).toBe('haul-rock');
@@ -145,6 +151,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
       id: alice.id,
       data: { kitId: 'scout', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
 
     expect(world.entity(alice).harpoonTargetId).toBeNull();
     expect(world.engine.getAsteroid('haul-rock')?.velocity).toEqual({ x: 0, y: 0 });

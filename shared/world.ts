@@ -51,15 +51,18 @@ export function sectorAt(position: Position): { x: number; y: number; id: string
   return { x, y, id: sectorId(x, y) };
 }
 
+export function isWithinWorldInterest(position: Position, center: Position): boolean {
+  return (
+    Math.abs(position.x - center.x) <= WORLD.interestRadius &&
+    Math.abs(position.y - center.y) <= WORLD.interestRadius
+  );
+}
+
 export function nearbyWorldRows<T extends { position: Position }>(
   rows: readonly T[],
   center: Position
 ): T[] {
-  return rows.filter(
-    (row) =>
-      Math.abs(row.position.x - center.x) <= WORLD.interestRadius &&
-      Math.abs(row.position.y - center.y) <= WORLD.interestRadius
-  );
+  return rows.filter((row) => isWithinWorldInterest(row.position, center));
 }
 
 /** Half-width of the square that bounds a pilot's asteroid rows. */

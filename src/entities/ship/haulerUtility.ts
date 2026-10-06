@@ -27,7 +27,7 @@ export const HAULER_UTILITY = {
     id: 'tow_cable',
     name: 'Tow Cable',
     hint: 'Tap to equip',
-    copy: 'Latch and haul an asteroid, wreck, or spider.',
+    copy: 'Aim and fire a tow line at an asteroid, wreck, or spider. Missed lines reel back. E again releases cargo.',
   },
 } as const;
 

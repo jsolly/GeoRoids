@@ -9,12 +9,13 @@ import type {
   ScoutUtilityId,
   ShipKitId,
 } from '../../../shared-types';
-import { playRespawn } from '../../audio/interactionSounds';
+import { playHarpoonLatch, playRespawn } from '../../audio/interactionSounds';
 import { playLocalHaptic } from '../../fx/haptics';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getPlayerColor } from '../../utils/colorUtils';
 import { preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
+import { recordAsteroidLatch } from '../roid/roidRenderer';
 import { Ship } from '../ship/Ship';
 import { applySharedHarpoonLatch } from '../ship/shipAbilities';
 import type { ShipCombatNetwork } from '../ship/shipCombatNetwork';
@@ -134,6 +135,7 @@ export class Player {
     abilityCooldownFrames?: number;
     abilityActiveFrames?: number;
 
+    utilityFlight?: import('../../../shared-types').UtilityFlight | null;
     harpoonTargetId?: string | null;
     harpoonLatchPos?: { x: number; y: number };
     haulerUtility?: HaulerUtilityId;
@@ -343,6 +345,17 @@ export class Player {
       if (data.abilityActiveFrames !== undefined) {
         this.ship.abilityActiveFrames = data.abilityActiveFrames;
       }
+    }
+    if (
+      this.ship.utilityFlight?.kind === 'tow' &&
+      this.ship.utilityFlight.phase === 'outbound' &&
+      data.harpoonTargetId
+    ) {
+      playHarpoonLatch(data.harpoonLatchPos ?? this.ship.position);
+      recordAsteroidLatch(data.harpoonTargetId);
+    }
+    if (data.utilityFlight !== undefined) {
+      this.ship.utilityFlight = data.utilityFlight ? structuredClone(data.utilityFlight) : null;
     }
     applySharedHarpoonLatch(this.ship, {
       ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),

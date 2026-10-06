@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { Ship } from '../../../src/entities/ship/Ship';
+import { resolveToolFlights } from '../../support/tool-flight';
 import { GameServerWorld } from '../scenarios/support/gameServerWorld';
 
 const mockSendAbility = vi.fn<(data: { kitId: string; abilityId: string }) => boolean>(() => true);
@@ -47,6 +48,11 @@ test('two rapid presses reach the server in order without a predicted cooldown d
   const world = new GameServerWorld();
   try {
     const pilot = world.joinWithId('alice', 'Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    world.engine.playerMotion.placeActorForTesting(
+      pilot.id,
+      { x: 0, y: 0 },
+      world.engine.getServerTime()
+    );
     world.clearAsteroids();
     world.engine.addAsteroid({
       id: 'tow-rock',
@@ -80,6 +86,7 @@ test('two rapid presses reach the server in order without a predicted cooldown d
       throw new Error('Missing ability commands');
     }
     world.send(pilot, first);
+    resolveToolFlights(world.engine);
     expect(world.entity(pilot).harpoonTargetId).toBe('tow-rock');
     expect(world.entity(pilot).abilityCooldownFrames).toBe(180);
     world.send(pilot, second);

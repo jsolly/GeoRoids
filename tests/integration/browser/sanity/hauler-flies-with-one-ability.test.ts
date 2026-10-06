@@ -75,7 +75,59 @@ test.each([
       waitForCombatReady: false,
     });
     const playerId = await game.getLocalPlayerId();
-    await arrangeCrewField([playerId], 'delivery');
+    const observer = await browserManager.createPage();
+    const observerDiagnostics = watchBrowserDiagnostics(observer);
+    const teammate = new GameInteractions(observer);
+    await teammate.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    const observerId = await teammate.getLocalPlayerId();
+    await arrangeCrewField([playerId, observerId], 'empty');
+    await page.bringToFront();
+    await useAbility();
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.utilityFlight?.phase === 'outbound'
+    );
+    expect(
+      await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId)
+    ).toBeNull();
+    await observer.waitForFunction(
+      (id) =>
+        window.gameController
+          ?.getNetworkManager()
+          .getAllPlayers()
+          .find((pilot) => pilot.id === id)?.ship.utilityFlight?.phase === 'outbound',
+      playerId
+    );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`tow-outgoing-${viewport.width}.png`),
+    });
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.utilityFlight?.phase === 'reeling'
+    );
+    await observer.waitForFunction(
+      (id) =>
+        window.gameController
+          ?.getNetworkManager()
+          .getAllPlayers()
+          .find((pilot) => pilot.id === id)?.ship.utilityFlight?.phase === 'reeling',
+      playerId
+    );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`tow-reeling-${viewport.width}.png`),
+    });
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.utilityFlight === null
+    );
+    await observer.waitForFunction(
+      (id) =>
+        window.gameController
+          ?.getNetworkManager()
+          .getAllPlayers()
+          .find((pilot) => pilot.id === id)?.ship.utilityFlight === null,
+      playerId
+    );
+    abilityTargets.length = 0;
+
+    await arrangeCrewField([playerId, observerId], 'delivery');
     await page.waitForFunction(
       (asteroidId) => {
         const controller = window.gameController;
@@ -163,7 +215,15 @@ test.each([
     }, FIXTURE_ASTEROID_ID);
     expect(duringTow.towId).toBe(FIXTURE_ASTEROID_ID);
     expect(duringTow.cooldown).toBeGreaterThan(0);
-    expect(abilityTargets).toEqual([FIXTURE_ASTEROID_ID]);
+    expect(abilityTargets).toEqual([null]);
+    await observer.waitForFunction(
+      (id) =>
+        window.gameController
+          ?.getNetworkManager()
+          .getAllPlayers()
+          .find((pilot) => pilot.id === id)?.ship.harpoonTargetId === 'crew-fixture-ore',
+      playerId
+    );
     expect(duringTow.hasRemovedTimer).toBe(false);
     if (mobile) {
       expect(await page.locator('#touch-ability').textContent()).toBe('RELEASE');
@@ -175,7 +235,7 @@ test.each([
     expect(duringTow.asteroid.y).not.toBe(atAttach.y);
 
     await useAbility();
-    await expect.poll(() => abilityTargets).toEqual([FIXTURE_ASTEROID_ID, null]);
+    await expect.poll(() => abilityTargets).toEqual([null, null]);
     await expect
       .poll(
         () => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId),
@@ -223,7 +283,13 @@ test.each([
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`hauler-tow-${viewport.width}.png`),
     });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
+    await page.getByRole('heading', { name: 'Tow cable E', exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`tow-wiki-${viewport.width}.png`),
+    });
     assertNoBrowserDiagnostics(diagnostics);
+    assertNoBrowserDiagnostics(observerDiagnostics);
     expect(protocolErrors).toEqual([]);
   },
   TestConfig.DEFAULT_TIMEOUT

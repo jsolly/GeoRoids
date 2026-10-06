@@ -328,6 +328,7 @@ export class PlayerMotionService {
   private clearHarpoon(actor: GameEntity): void {
     actor.abilityActiveFrames = 0;
     actor.harpoonTargetId = null;
+    actor.utilityFlight = null;
     delete actor.harpoonLatchPos;
   }
 

@@ -59,13 +59,15 @@ for (const width of [1280, 390]) {
     const id = await game.getLocalPlayerId();
     const works = TOWN_HEARTH;
     await arrangeCrewField([id], 'spider-tools');
-    await game.placeShipAt(works.position.x + 400, works.position.y);
+    // Keep real travel plus snapshot delivery inside the existing assertion
+    // window; the farther hitscan-era placement used nearly all of it in flight.
+    await game.placeShipAt(works.position.x + 700, works.position.y);
     await expect.poll(async () => (await field(page)).spiders.length).toBe(1);
     const target = (await field(page)).spiders[0];
     if (!target) {
       throw new Error('Missing spider');
     }
-    // A probe is a server hitscan: track the moving spider until both the
+    // Aim the traveling probe: track the moving spider until both the
     // predicted ship and its acknowledged pose point at the current target.
     await expect
       .poll(
@@ -147,11 +149,16 @@ for (const width of [1280, 390]) {
             route === 'hauler'
               ? 'Tap a spider for limited silk'
               : route === 'scout'
-                ? 'tagging a guard can reveal its resource nest'
+                ? 'Missed probes disintegrate and still use the shared Scan recharge'
                 : 'Scouts can attach a probe to follow a guard home',
         })
         .first();
       await changedText.waitFor();
+      if (route === 'scout') {
+        expect(await changedText.textContent()).toContain(
+          'shoot a beacon that attaches on contact'
+        );
+      }
       await changedText.evaluate((element) =>
         element.scrollIntoView({ block: 'center', behavior: 'instant' })
       );

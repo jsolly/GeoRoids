@@ -3,6 +3,7 @@ import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { HaulerUtilityId } from '../../../shared-types';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
+import { resolveToolFlights } from '../../support/tool-flight';
 import {
   GameServerWorld,
   type Pilot,
@@ -36,6 +37,7 @@ describe('Hauler tools interact with living spiders', () => {
       id: pilot.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
   }
 
   test('tap provokes a spider, extracts finite silk without ore, and preserves collected silk on reconnect', () => {

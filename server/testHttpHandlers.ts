@@ -582,13 +582,13 @@ export function handleTestArrangeCrewField(
       // Delivery faces screen-up, which decreases world y, from the positive-y
       // approach into Town Square. Tow uses that same heading from the
       // negative-y side so the hooked rock moves farther from the hearth.
-      player.angle = ['spider-tools', 'spider-rescue', 'spider-tow-bite'].includes(
-        String(body['scenario'])
-      )
+      player.angle = ['spider-tools'].includes(String(body['scenario']))
         ? Math.PI
         : body['scenario'] === 'reflection' ||
             body['scenario'] === 'probe' ||
-            body['scenario'] === 'boundary'
+            body['scenario'] === 'boundary' ||
+            body['scenario'] === 'spider-rescue' ||
+            body['scenario'] === 'spider-tow-bite'
           ? 0
           : Math.PI / 2;
       player.spawnProtectionTimer = [

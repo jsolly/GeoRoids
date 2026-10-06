@@ -19,7 +19,7 @@ import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { MAX_ACTIVE_SHARDS, planShards } from './integration-shard-plan.mjs';
+import { isShardCapacity, parseShardCapacity, planShards } from './integration-shard-plan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const totalShards = 6;
@@ -552,8 +552,8 @@ function validateIssuedChild(
       run.coordinatorPid === coordinatorPid &&
       run.ownerPid === record.ownerPid &&
       run.worktree === canonicalWorktree &&
-      run.maxActive === MAX_ACTIVE_SHARDS &&
-      record.maxActive === MAX_ACTIVE_SHARDS,
+      isShardCapacity(run.maxActive) &&
+      record.maxActive === run.maxActive,
     'Run manifest differs'
   );
   required(
@@ -599,7 +599,7 @@ function validateIssuedChild(
     plan.runId === runId &&
       plan.worktree === canonicalWorktree &&
       plan.total === totalShards &&
-      plan.maxActive === MAX_ACTIVE_SHARDS,
+      plan.maxActive === run.maxActive,
     'Assignment identity differs'
   );
   return { ...record, plan };
@@ -931,6 +931,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
     !nativeCompileCacheTreatment || discoveryMode === 'node',
     'Native compile-cache treatment requires owned Node discovery only'
   );
+  const maxActive = parseShardCapacity(process.env.GEOROIDS_TEST_MAX_ACTIVE_SHARDS);
   const discoverOnly = discoveryMode !== 'shards';
   const discoveryEnvironment = discoveryMode === 'jsdom' ? 'jsdom' : 'node';
   const startedAt = Date.now(),
@@ -953,7 +954,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
     coordinatorPid: process.pid,
     coordinatorStart: startTime(process.pid),
     total: totalShards,
-    maxActive: MAX_ACTIVE_SHARDS,
+    maxActive,
     startedAt,
     deadlineMs: END_TO_END_DEADLINE_MS,
     discoveryEnvironment,
@@ -1186,6 +1187,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
     required(!interrupted, 'Coordinator interrupted during discovery');
     if (!discoverOnly) {
       const plan = planShards({
+        maxActive,
         worktree,
         files,
         discovery,
@@ -1312,7 +1314,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
         if (interrupted) {
           break;
         }
-        while (queue.length > 0 && active.size < MAX_ACTIVE_SHARDS) {
+        while (queue.length > 0 && active.size < maxActive) {
           if (interrupted) {
             break;
           }
@@ -1324,7 +1326,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
       }
       await Promise.all(children.map((child) => child.task ?? child.completion));
       writeJson(join(runDirectory, 'queue.json'), {
-        maxActive: MAX_ACTIVE_SHARDS,
+        maxActive,
         launched: children.map((child) => child.index),
         cancelled: queue.map((child) => child.index),
         interrupted,
@@ -1396,7 +1398,7 @@ async function runCoordinator(lockPath, ownerPid, discoveryMode, nativeCompileCa
     }
     try {
       writeJson(join(runDirectory, 'queue.json'), {
-        maxActive: MAX_ACTIVE_SHARDS,
+        maxActive,
         launched: children.map((child) => child.index),
         cancelled: queue.map((child) => child.index),
         interrupted,

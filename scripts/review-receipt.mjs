@@ -16,6 +16,8 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { isShardCapacity } from './integration-shard-plan.mjs';
+
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const stages = ['integration', 'frame', 'traversal', 'combat'];
@@ -193,7 +195,7 @@ function validateIntegration(path, root) {
   assert.equal(receipt.discoveryOnly, false);
   assert.equal(receipt.equivalencePassed, true);
   assert.equal(receipt.total, 6);
-  assert.equal(receipt.maxActive, 3);
+  assert(isShardCapacity(receipt.maxActive), 'Invalid coordinator active shard capacity');
   assert.equal(receipt.deadlineMs, 600000);
   assert.deepEqual(receipt.errors, []);
   assert(Number.isFinite(receipt.elapsedMs) && receipt.elapsedMs < 600000);
@@ -219,7 +221,7 @@ function validateIntegration(path, root) {
     maxConcurrency: 1,
   });
   const queue = readJson(join(home, 'queue.json'));
-  assert.equal(queue.maxActive, 3);
+  assert.equal(queue.maxActive, receipt.maxActive, 'Coordinator queue capacity differs');
   assert.equal(queue.interrupted, false);
   assert.deepEqual(queue.cancelled, []);
   assert.deepEqual(

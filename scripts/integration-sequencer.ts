@@ -4,9 +4,9 @@ import { BaseSequencer, type TestSpecification } from 'vitest/node';
 const require = createRequire(import.meta.url);
 const {
   selectShard,
-  MAX_ACTIVE_SHARDS,
+  isShardCapacity,
 }: {
-  MAX_ACTIVE_SHARDS: number;
+  isShardCapacity: (value: unknown) => boolean;
   selectShard: (plan: unknown, files: string[], index: number, count: number) => string[];
 } = require('./integration-shard-plan.mjs');
 const {
@@ -23,7 +23,7 @@ export class IntegrationSequencer extends BaseSequencer {
       !shard ||
       shard.index !== record.index ||
       shard.count !== record.total ||
-      record.maxActive !== MAX_ACTIVE_SHARDS
+      !isShardCapacity(record.maxActive)
     ) {
       throw new Error('Vitest shard differs from issued child assignment');
     }

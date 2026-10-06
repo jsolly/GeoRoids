@@ -47,6 +47,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.resetAllMocks();
 });
 
@@ -78,6 +79,83 @@ test('receipt writing failures retain the original scenario error and screenshot
   }
   expect(failure.errors).toEqual([original, writeFailure, screenshotFailure, writeFailure]);
   expect(boundary.write).toHaveBeenCalledTimes(3);
+});
+
+test('stalled failure evidence releases both owned browsers before world teardown and retains every error', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  const original = new Error('Native lifecycle read timed out');
+  const stalled = () => new Promise<never>(() => undefined);
+  boundary.observe.mockResolvedValueOnce({ seed: 42 }).mockImplementation(stalled);
+  const evaluate = vi.fn().mockResolvedValueOnce({ health: 17 }).mockImplementation(stalled);
+  const screenshot = vi.fn().mockImplementation(stalled);
+  const page = { ...evidencePage(evaluate), screenshot } as unknown as Page;
+  const scenarioEvidence = vi
+    .fn()
+    .mockResolvedValueOnce({ joined: true })
+    .mockImplementation(stalled);
+  const primaryClose = vi.fn();
+  const peerClose = vi.fn();
+  const reset = vi.fn(() => {
+    expect(primaryClose).toHaveBeenCalledOnce();
+    expect(peerClose).toHaveBeenCalledOnce();
+  });
+  const started = Date.now();
+  async function runWithOwnedCleanup() {
+    try {
+      await withFixtureEvidence(page, 'stalled-evidence', () => Promise.reject(original), {
+        evidence: scenarioEvidence,
+        retainedEvidence: () => ({ retained: true }),
+      });
+    } finally {
+      await peerClose();
+      await primaryClose();
+    }
+  }
+  const outcome = runWithOwnedCleanup().catch((error: unknown) => error);
+  await vi.runAllTimersAsync();
+  expect(primaryClose).toHaveBeenCalledOnce();
+  expect(peerClose).toHaveBeenCalledOnce();
+  reset();
+  expect(Date.now() - started).toBeLessThan(60_000);
+  const failure = await outcome;
+  expect(failure).toBeInstanceOf(AggregateError);
+  if (!(failure instanceof AggregateError)) {
+    throw new Error('Expected retained evidence failures');
+  }
+  expect(failure.errors[0]).toBe(original);
+  expect(screenshot).toHaveBeenCalledWith(expect.objectContaining({ timeout: 5000 }));
+  expect(finalReceipt()).toMatchObject({
+    stages: expect.arrayContaining([
+      expect.objectContaining({
+        name: 'failed',
+        retainedEvidence: { retained: true },
+        captureFailures: [
+          {
+            source: 'server',
+            error: expect.objectContaining({
+              message: 'Fixture server evidence capture timed out',
+            }),
+          },
+          {
+            source: 'client',
+            error: expect.objectContaining({
+              message: 'Fixture client evidence capture timed out',
+            }),
+          },
+          {
+            source: 'scenario',
+            error: expect.objectContaining({
+              message: 'Fixture scenario evidence capture timed out',
+            }),
+          },
+        ],
+      }),
+    ]),
+    failures: expect.arrayContaining([
+      expect.objectContaining({ message: original.message }),
+      expect.objectContaining({ message: 'Fixture screenshot evidence capture timed out' }),
+    ]),
+  });
 });
 
 function evidencePage(evaluate = vi.fn().mockResolvedValue({ health: 17, motionEpoch: 4 })): Page {

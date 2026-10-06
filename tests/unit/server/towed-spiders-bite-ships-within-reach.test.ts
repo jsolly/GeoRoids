@@ -3,6 +3,7 @@ import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager'
 import { FurnaceField } from '../../../shared/furnaceField';
 import { civicLot } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
+import { resolveToolFlights } from '../../support/tool-flight';
 import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 
 useQuietServerConsole();
@@ -108,6 +109,7 @@ test.each(['passer', 'owner', 'protected'] as const)(
       }
       world.entity(owner).abilityCooldownFrames = 0;
       expect(world.engine.useAbility(owner.id)).toBe(true);
+      resolveToolFlights(world.engine);
       expect(world.entity(owner).harpoonTargetId).toBe(spider.id);
       const target = victim === 'owner' ? owner : passer;
       world.entity(target).spawnProtectionTimer = victim === 'protected' ? 600 : 0;

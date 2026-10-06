@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { FURNACES } from '../../../shared/furnaces';
+import { resolveToolFlights } from '../../support/tool-flight';
 import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 
 useQuietServerConsole();
@@ -41,6 +42,8 @@ test('furnace intake tells every client the rock was consumed so they play the r
       id: hauler.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    expect(actor.harpoonTargetId).toBeNull();
+    resolveToolFlights(world.engine);
     expect(actor.harpoonTargetId).toBe(rock.id);
     hauler.socket.clear();
     world.engine.processFurnaceDeliveries();

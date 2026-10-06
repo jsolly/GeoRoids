@@ -158,7 +158,8 @@ test('touch ability uses the kit tool over Town Square without opening the store
   activate.mockRestore();
   player.ship.position = { x: TOWN_STORE_RADIUS + 50, y: 0 };
   expect(readAbilityChrome(player.ship).label).toBe('HOOK');
-  expect(triggerTouchAbility(player)).toBe(false);
+  expect(triggerTouchAbility(player)).toBe(true);
+  expect(player.ship.utilityFlight?.phase).toBe('outbound');
   expect(isTownStoreOpen()).toBe(false);
 });
 

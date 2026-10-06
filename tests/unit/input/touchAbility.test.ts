@@ -211,3 +211,23 @@ test('a Scout can build an escape furnace while its scan or probe is cooling dow
     expect(chrome.cooldownRatio).toBe(0);
   }
 });
+
+test('a launched tow keeps a ready recall button during cooldown', () => {
+  const chrome = readAbilityChrome({
+    kitId: 'hauler',
+    health: 140,
+    exploding: false,
+    abilityCooldownFrames: 170,
+    abilityActiveFrames: 0,
+    harpoonTargetId: null,
+    utilityFlight: {
+      kind: 'tow',
+      phase: 'outbound',
+      position: { x: 100, y: 0 },
+      velocity: { x: 8, y: 0 },
+      remainingDistance: 200,
+    },
+  });
+  expect(chrome.label).toBe('REEL');
+  expect(chrome.ready).toBe(true);
+});

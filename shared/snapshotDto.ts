@@ -21,6 +21,7 @@ import type {
   SnapshotCollabTag,
   SpiderFieldState,
   TerrainSpider,
+  UtilityFlight,
 } from '../shared-types';
 import type { BeltRecoveryWarning } from './asteroidBelt';
 import { ASTEROID_BELT } from './asteroidBelt';
@@ -90,6 +91,28 @@ const shape = <T>(rules: Shape<T>): Rule => {
   };
 };
 const position = shape<{ x: number; y: number }>({ x: number, y: number });
+const outboundFlight = shape<Extract<UtilityFlight, { phase: 'outbound' }>>({
+  kind: choice('tow', 'probe'),
+  phase: choice('outbound'),
+  position,
+  velocity: position,
+  remainingDistance: (candidate) =>
+    number(candidate) && typeof candidate === 'number' && candidate >= 0,
+});
+const reelingFlight = shape<Extract<UtilityFlight, { phase: 'reeling' }>>({
+  kind: choice('tow'),
+  phase: choice('reeling'),
+  position,
+  framesLeft: counter,
+});
+const disintegratingFlight = shape<Extract<UtilityFlight, { phase: 'disintegrating' }>>({
+  kind: choice('probe'),
+  phase: choice('disintegrating'),
+  position,
+  framesLeft: counter,
+});
+const utilityFlight: Rule = (value) =>
+  outboundFlight(value) || reelingFlight(value) || disintegratingFlight(value);
 const energy: Rule = (value) => number(value) && (value as number) >= 0 && (value as number) <= 8;
 const material = enumeration<AsteroidMaterial>({
   ice: true,
@@ -159,6 +182,7 @@ const entity = shape<ServerEntityData>({
 
   harpoonTargetId: optional((value) => value === null || string(value)),
   harpoonLatchPos: optional(position),
+  utilityFlight: optional((value) => value === null || utilityFlight(value)),
   haulerUtility: optional(haulerUtility),
   scoutUtility: optional(scoutUtility),
   deathCause: optional(string),

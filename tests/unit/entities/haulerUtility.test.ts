@@ -15,6 +15,7 @@ import {
   pullHarpoonTarget,
   setHaulerUtilityOnHost,
   tickTapExtract,
+  tickTowLine,
 } from '../../../src/entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 
@@ -43,6 +44,10 @@ test('selecting Resource Tap then Tow Cable switches the one Hauler slot and dro
   const hauler = host();
   const rock: AbilityBody = { id: 'rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } };
   expect(activateAbilityOnHost(hauler, { asteroids: [rock] }).activated).toBe(true);
+  expect(hauler.harpoonTargetId).toBeNull();
+  for (let frame = 0; frame < 10; frame++) {
+    tickTowLine(hauler, [rock]);
+  }
   expect(hauler.harpoonTargetId).toBe('rock');
 
   expect(setHaulerUtilityOnHost(hauler, 'resource_tap')).toBe(true);

@@ -159,8 +159,9 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       WHITESPACE_COLLAPSE_PATTERN,
       ' '
     );
-    expect(haulerContent).toContain('Press E near a rock or spider to latch');
-    expect(haulerContent).toContain('Cargo keeps its momentum');
+    expect(haulerContent).toContain('Aim at a rock or spider and press E to shoot a tow line');
+    expect(haulerContent).toContain('it attaches on contact, and a miss reels back');
+    expect(haulerContent).toContain('press E again to release it early');
     expect(haulerContent).not.toMatch(HAULER_LEGACY_TERMS_PATTERN);
     expect(haulerContent).toContain('Boost Coupling E');
     expect(haulerContent).toContain('then E again to ignite autonomous delivery');

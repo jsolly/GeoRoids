@@ -4,7 +4,7 @@ import type { AsteroidProbe, Position } from '../shared-types';
 export const SURVEY_PROBE = {
   /** Radius of the scan around the beacon. */
   RANGE: 600,
-  /** Maximum forward distance used by a launch hitscan. */
+  /** Maximum distance traveled by a launched probe. */
   LAUNCH_RANGE: 700,
   /** Time between authoritative scan pulses. */
   PULSE_MS: 3_000,

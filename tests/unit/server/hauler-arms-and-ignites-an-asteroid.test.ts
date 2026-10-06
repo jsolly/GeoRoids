@@ -7,6 +7,7 @@ import { validateAsteroidDto } from '../../../shared/snapshotDto';
 import type { AsteroidData, HaulerUtilityId } from '../../../shared-types';
 import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
 import { applyAsteroidKinematics } from '../../../src/network/services/asteroidFieldSync';
+import { resolveToolFlights } from '../../support/tool-flight';
 import {
   GameServerWorld,
   type Pilot,
@@ -33,6 +34,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
       id: pilot.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
   }
   function step(frames: number): void {
     for (let frame = 0; frame < frames; frame++) {
@@ -149,6 +151,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
         id: alice.id,
         data: { kitId: 'hauler', abilityId: 'harpoon' },
       });
+      resolveToolFlights(world.engine);
       expect(rock.boost?.phase).toBe('armed');
       activate(alice);
       activate(bob);
@@ -257,6 +260,10 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     equip(bob, 'tow_cable');
     const towed = { ...rock, id: 'other-cargo', boost: null, position: { x: 0, y: 250 } };
     world.engine.addAsteroid(towed);
+    bobActor.angle = Math.atan2(
+      bobActor.position.y - towed.position.y,
+      towed.position.x - bobActor.position.x
+    );
     activate(bob);
     expect(bobActor.harpoonTargetId).toBe(towed.id);
     bobActor.position = { ...rock.position };

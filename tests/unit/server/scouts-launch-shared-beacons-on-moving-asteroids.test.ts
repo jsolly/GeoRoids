@@ -14,6 +14,7 @@ import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { fireProbe, resolveToolFlights } from '../../support/tool-flight';
 
 function asteroidAt(id: string, position: { x: number; y: number }): AsteroidData {
   return {
@@ -84,6 +85,7 @@ describe('authoritative Scout probes', () => {
     engine.addAsteroid(fartherHost);
 
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     assert.ok(host.probe);
     expect(host.probe.ownerId).toBe(scout.id);
     expect(host.probe.health).toBe(SURVEY_PROBE.MAX_HEALTH);
@@ -103,6 +105,7 @@ describe('authoritative Scout probes', () => {
     const host = asteroidAt('moving-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     assert.ok(host.probe);
     const before = probePosition(host, host.probe);
 
@@ -134,32 +137,34 @@ describe('authoritative Scout probes', () => {
     const near = asteroidAt('near-host', { x: 300, y: 0 });
     const far = asteroidAt('far-host', { x: 500, y: 0 });
 
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([near, far]), 1_000)).toMatchObject({
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([near, far]), 1_000)).toMatchObject({
       host: near,
     });
     expect(far.probe).toBeUndefined();
 
     pilot.abilityCooldownFrames = 0;
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([near]), 1_001)).toBeNull();
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([near]), 1_001)).toBeNull();
 
     pilot.position = { x: 0, y: 1_000 };
     pilot.abilityCooldownFrames = 0;
     const outside = asteroidAt('outside-launch-range', { x: 800, y: 1_000 });
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([outside]), 1_002)).toBeNull();
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([outside]), 1_002)).toBeNull();
 
     pilot.position = { x: 1_800, y: 1_000 };
     pilot.abilityCooldownFrames = 0;
     const distantHost = asteroidAt('distant-host', { x: 2_100, y: 1_000 });
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([distantHost]), 1_003)).toMatchObject({
-      host: distantHost,
-    });
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([distantHost]), 1_003)).toMatchObject(
+      {
+        host: distantHost,
+      }
+    );
   });
 
   test('idle pulse ticks do not materialize the asteroid source before a due pulse', () => {
     const manager = new SurveyProbeManager();
     const pilot = probePilot({ x: 0, y: 0 });
     const host = asteroidAt('lazy-host', { x: 300, y: 0 });
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([host]), 1_000)).not.toBeNull();
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([host]), 1_000)).not.toBeNull();
     let materializations = 0;
     const source = () => {
       materializations++;
@@ -181,6 +186,7 @@ describe('authoritative Scout probes', () => {
     engine.addAsteroid(largeHost);
 
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     assert.ok(largeHost.probe);
     const beacon = probePosition(largeHost, largeHost.probe);
     expect(
@@ -201,6 +207,7 @@ describe('authoritative Scout probes', () => {
       scout.abilityCooldownFrames = 0;
       now.value += 1_000;
       expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+      resolveToolFlights(engine);
       if (index < 3) {
         expect(host.probe).toBeDefined();
       }
@@ -211,7 +218,9 @@ describe('authoritative Scout probes', () => {
     scout.position = { x: 0, y: -400 };
     scout.abilityCooldownFrames = 0;
     now.value += 1_000;
-    expect(engine.useAbility(scout.id, 'scout')).toBe(false);
+    expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
+    expect(scout.utilityFlight?.phase).toBe('disintegrating');
     expect(hosts[1]?.probe).toBeDefined();
     expect(hosts[2]?.probe).toBeDefined();
     expect(hosts[3]?.probe).toBeDefined();
@@ -223,6 +232,7 @@ describe('authoritative Scout probes', () => {
     const host = asteroidAt('projectile-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     assert.ok(host.probe);
 
     engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
@@ -242,6 +252,7 @@ describe('authoritative Scout probes', () => {
     const host = asteroidAt('expiring-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     now.value += SURVEY_PROBE.LIFETIME_MS;
     scout.lastUpdate = now.value;
     engine.advanceOneFrame(now.value);
@@ -250,6 +261,7 @@ describe('authoritative Scout probes', () => {
     scout.abilityCooldownFrames = 0;
     now.value += 1;
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     engine.removeAsteroid(host.id);
     expect(engine.getAsteroid(host.id)).toBeUndefined();
   });
@@ -260,6 +272,7 @@ describe('authoritative Scout probes', () => {
     const host = asteroidAt('distant-host', { x: 200, y: 0 });
     engine.addAsteroid(host);
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     assert.ok(host.probe);
 
     host.position = { x: 5_000, y: 0 };

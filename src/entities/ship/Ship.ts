@@ -33,6 +33,7 @@ import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileFi
 import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
+import { getHarpoonField } from './harpoonField';
 import { scoutUtilityOf } from './scoutUtility';
 import {
   type AbilityWorld,
@@ -40,6 +41,7 @@ import {
   activateAbilityOnHost,
   canActivateAbility,
   tickAbilityHost,
+  tickTowLine,
 } from './shipAbilities';
 import type { ShipCombatNetwork } from './shipCombatNetwork';
 import {
@@ -107,6 +109,7 @@ class Ship {
   abilityCooldownFrames: number = 0;
   abilityActiveFrames: number = 0;
 
+  utilityFlight: import('../../../shared-types').UtilityFlight | null = null;
   harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
   furnaceTransit: FurnaceTransit | null = null;
@@ -177,6 +180,7 @@ class Ship {
   }
 
   explode(cause?: string): void {
+    this.utilityFlight = null;
     if (this.exploding) {
       return;
     }
@@ -472,12 +476,14 @@ class Ship {
   updateLifecycle(lifecycleFrames = 1): void {
     const steps = Math.max(0, Math.floor(lifecycleFrames));
     if (this.exploding) {
+      this.utilityFlight = null;
       for (let i = 0; i < steps; i++) {
         this.updateExplosion();
       }
       return;
     }
     if (this.health <= 0) {
+      this.utilityFlight = null;
       return;
     }
 
@@ -485,6 +491,9 @@ class Ship {
       this.updateInvincibility();
       tickShipImpactFlash(this);
       tickAbilityHost(this);
+      if (!this.combatNetwork?.isConnected) {
+        tickTowLine(this, getHarpoonField());
+      }
       this.updateHealth();
     }
   }

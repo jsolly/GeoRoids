@@ -132,6 +132,17 @@ test.each([1280, 954, 390])(
       // The shared server can retain earlier runs' canisters. Observe new
       // drops only after this pilot starts the Resource Tap action.
       observingTap = utility === 'resource_tap';
+      if (utility === 'tow_cable') {
+        const target = (await game.getAsteroidPositions()).find(
+          (rock) => rock.id === 'crew-fixture-ore'
+        );
+        if (!target) {
+          throw new Error('Missing tow target');
+        }
+        // Leave enough launch range for the automatic cruise while the pilot turns.
+        await game.placeControlledShipAt(target.x - 160, target.y);
+        await game.aimAtWorldPosition(target);
+      }
       await useAbility();
       await expect
         .poll(() =>

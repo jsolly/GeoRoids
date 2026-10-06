@@ -16,6 +16,7 @@ import type {
   Position,
   ScoutUtilityId,
   ShipKitId,
+  UtilityFlight,
   Velocity,
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
@@ -66,6 +67,7 @@ export interface GameEntity {
 
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
+  utilityFlight?: UtilityFlight | null;
   haulerUtility?: HaulerUtilityId;
   scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;

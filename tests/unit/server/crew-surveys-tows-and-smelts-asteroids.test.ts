@@ -7,6 +7,7 @@ import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { resolveToolFlights } from '../../support/tool-flight';
 
 let engine: GameEngine;
 beforeEach(() => {
@@ -51,8 +52,10 @@ test('a Scout identifies cargo and both pilots receive the full furnace reward e
   engine.addAsteroid(rock);
   const initial = { scout: actor('scout').score, hauler: actor('hauler').score };
   expect(engine.useAbility('scout')).toBe(true);
+  resolveToolFlights(engine);
   expect(rock.surveyedBy).toEqual(['scout']);
   expect(engine.useAbility('hauler')).toBe(true);
+  resolveToolFlights(engine);
   expect(actor('hauler').harpoonTargetId).toBe(rock.id);
   const furnace = FURNACES[0];
   assert(furnace);
@@ -77,8 +80,10 @@ test('towing preserves attachment momentum, follows the moving Hauler, and relea
   const hauler = actor('hauler');
   const rock = deposit('cargo', { x: 0, y: 0 });
   engine.addAsteroid(rock);
+  hauler.angle = Math.PI;
   const original = structuredClone(rock);
   expect(engine.useAbility('hauler')).toBe(true);
+  resolveToolFlights(engine);
   expect(rock.position).toEqual(original.position);
   expect(rock.velocity).toEqual(original.velocity);
   for (let frame = 0; frame < 400; frame++) {
@@ -93,6 +98,7 @@ test('towing preserves attachment momentum, follows the moving Hauler, and relea
   expect(hauler.position.x - rock.position.x).toBeLessThan(125);
   expect(hauler.harpoonTargetId).toBe(rock.id);
   expect(engine.useAbility('hauler')).toBe(true);
+  resolveToolFlights(engine);
   expect(hauler.harpoonTargetId).toBeNull();
   const releasedVelocity = { ...rock.velocity };
   hauler.position.x += 200;
@@ -108,7 +114,9 @@ test('an owned player motion session still pulls cargo on the authoritative serv
   expect(engine.playerMotion.register(hauler, ws, 1, engine.getServerTime()).ok).toBe(true);
   const rock = deposit('cargo', { x: 0, y: 0 });
   engine.addAsteroid(rock);
+  hauler.angle = Math.PI;
   expect(engine.useAbility('hauler')).toBe(true);
+  resolveToolFlights(engine);
   hauler.position.x += 30;
   hauler.velocity.x = 1;
   engine.tickAbilities();
@@ -123,8 +131,12 @@ test('a second Hauler cannot steal attached cargo and loose rocks do not pay at 
   const rock = deposit();
   engine.addAsteroid(rock);
   expect(engine.useAbility('hauler')).toBe(true);
-  expect(engine.useAbility('other')).toBe(false);
-  expect(actor('other').abilityCooldownFrames).toBe(0);
+  resolveToolFlights(engine);
+  expect(engine.useAbility('other')).toBe(true);
+  resolveToolFlights(engine);
+  expect(actor('other').harpoonTargetId).toBeNull();
+  expect(actor('other').utilityFlight?.phase).toBe('reeling');
+  expect(actor('other').abilityCooldownFrames).toBe(180);
   const furnace = FURNACES[0];
   assert(furnace);
   const loose = deposit('loose', { ...furnace.position });
@@ -140,6 +152,7 @@ test('scans retain map discoveries after expiry without crediting distant Scouts
   const far = deposit('far', { x: SHIP_ABILITY.SCAN_RANGE + 10, y: 0 });
   engine.addAsteroid(far);
   expect(engine.useAbility('scout')).toBe(true);
+  resolveToolFlights(engine);
   for (let frame = 0; frame < SHIP_ABILITY.SCAN_FRAMES + 1; frame++) {
     engine.tickAbilities();
   }

@@ -23,6 +23,7 @@ for (const viewport of [
     await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     await game.collectEquipment(['survey_probe']);
     const observer = await browserManager.createPage();
+    await observer.setViewportSize(viewport);
     const observerDiagnostics = watchBrowserDiagnostics(observer);
     const hauler = new GameInteractions(observer);
     await hauler.bootGame({ kitId: 'hauler', waitForCombatReady: false });
@@ -52,6 +53,58 @@ for (const viewport of [
     } else {
       await back.click();
     }
+    // Observe the miss from farther along the flight path so the dust remains on screen.
+    await hauler.placeControlledShipAt(120, -950);
+    await observer.bringToFront();
+    await observer.keyboard.press('Escape');
+    await observer.locator('#spawn-fly-in').waitFor({ state: 'hidden', timeout: 3000 });
+    await page.bringToFront();
+    if (viewport.touch) {
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.utilityFlight?.phase === 'outbound'
+    );
+    await observer.waitForFunction(
+      (id) =>
+        window.gameController
+          ?.getNetworkManager()
+          .getAllPlayers()
+          .find((pilot) => pilot.id === id)?.ship.utilityFlight?.phase === 'outbound',
+      playerId
+    );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`probe-outgoing-${viewport.width}.png`),
+    });
+    await observer.bringToFront();
+    await hauler.waitForAnimationFrames(2);
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.utilityFlight?.phase === 'disintegrating'
+    );
+    await observer.waitForFunction((id) => {
+      const flight = window.gameController
+        ?.getNetworkManager()
+        .getAllPlayers()
+        .find((pilot) => pilot.id === id)?.ship.utilityFlight;
+      return flight?.phase === 'disintegrating' && flight.framesLeft <= 16;
+    }, playerId);
+    await observer.screenshot({
+      path: screenshotManager.getScreenshotPath(`probe-disintegrating-${viewport.width}.png`),
+    });
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.utilityFlight === null
+    );
+    await observer.waitForFunction(
+      (id) =>
+        window.gameController
+          ?.getNetworkManager()
+          .getAllPlayers()
+          .find((pilot) => pilot.id === id)?.ship.utilityFlight === null,
+      playerId
+    );
+    await page.bringToFront();
     await arrangeCrewField([playerId, observerId], 'probe');
     await page.waitForFunction(() =>
       window.gameController

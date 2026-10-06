@@ -7,6 +7,7 @@ import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE, SHIP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { attachTowForScenario } from '../../support/tool-flight';
 
 function testAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
   return {
@@ -76,7 +77,7 @@ describe('server-authoritative combat', () => {
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     expect(hauler?.harpoonTargetId).toBe('attached');
@@ -94,7 +95,7 @@ describe('server-authoritative combat', () => {
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     expect(hauler.harpoonTargetId).toBe('attached');
@@ -114,7 +115,7 @@ describe('server-authoritative combat', () => {
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 28, y: 0 } }));
     engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: -28, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     expect(hauler.harpoonTargetId).toBe('attached');
@@ -134,7 +135,7 @@ describe('server-authoritative combat', () => {
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
     engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 80, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     expect(hauler.harpoonTargetId).toBe('attached');
@@ -155,7 +156,7 @@ describe('server-authoritative combat', () => {
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
     engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     const healthBefore = hauler.health;
@@ -177,7 +178,7 @@ describe('server-authoritative combat', () => {
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
     engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     const pilot = engine.getPlayer('pilot');
     assert.ok(hauler, 'hauler');
@@ -203,8 +204,8 @@ describe('server-authoritative combat', () => {
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
     engine.addAsteroid(testAsteroid({ id: 'other-cargo', position: { x: 0, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
-    expect(engine.useAbility('hauler-2', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
+    attachTowForScenario(engine, 'hauler-2', 'other-cargo');
     const hauler = engine.getPlayer('hauler');
     const partner = engine.getPlayer('hauler-2');
     assert.ok(hauler, 'hauler');
@@ -245,7 +246,7 @@ describe('server-authoritative combat', () => {
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
 
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     const pilot = engine.getPlayer('pilot');
     assert.ok(hauler, 'hauler');

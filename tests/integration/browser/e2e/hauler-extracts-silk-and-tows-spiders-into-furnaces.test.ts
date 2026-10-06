@@ -83,15 +83,17 @@ for (const width of [1280, 390]) {
     });
     await page.locator('[data-utility-id="tow_cable"]').click();
     await page.locator('#ship-schematic-return').click();
-    await arrange(Math.PI);
+    await arrange(0);
     const cargo = (await field(page)).spiders[0];
     if (!cargo) {
       throw new Error('Missing tow target');
     }
+    await game.aimAtWorldPosition(cargo.position);
     await use();
     await expect
       .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId))
       .toBe(cargo.id);
+    await game.aimAtWorldPosition(works.position);
     await expect
       .poll(
         async () =>

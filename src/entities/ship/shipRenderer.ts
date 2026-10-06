@@ -1,4 +1,5 @@
 import { planFurnaceRoute } from '../../../shared/furnaceTravel';
+import { UTILITY_FLIGHT } from '../../../shared/utilityFlight';
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
@@ -806,6 +807,9 @@ export function drawHaulerHarpoonVfx(
   screenY: number,
   cameraShipPosition: { x: number; y: number }
 ): void {
+  if (ship.utilityFlight) {
+    drawUtilityFlight(ctx, ship, screenX, screenY, cameraShipPosition);
+  }
   if (ship.kitId !== 'hauler' || ship.harpoonTargetId === null) {
     return;
   }
@@ -1049,6 +1053,64 @@ function drawFloatingHealthCapsule(
     ctx.font = '10px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(`${Math.ceil(ship.health)}/${ship.maxHealth}`, screenX, barY - 10);
+  }
+  ctx.restore();
+}
+
+function drawUtilityFlight(
+  ctx: DrawingContext,
+  ship: Ship,
+  screenX: number,
+  screenY: number,
+  camera: Position
+): void {
+  const flight = ship.utilityFlight;
+  if (!flight) {
+    return;
+  }
+  const tip = canvasManager.worldToScreen(flight.position, camera);
+  ctx.save();
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  if (flight.kind === 'tow') {
+    ctx.strokeStyle = '#E8D5A3';
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.stroke();
+    ctx.fillStyle = '#FDE68A';
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = '#67E8F9';
+    ctx.fillStyle = '#E0F2FE';
+    if (flight.phase === 'disintegrating') {
+      const age = 1 - flight.framesLeft / UTILITY_FLIGHT.DISINTEGRATE_FRAMES;
+      ctx.globalAlpha = 1 - age;
+      for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI) / 4;
+        const radius = 3 + age * 22;
+        ctx.beginPath();
+        ctx.arc(
+          tip.x + Math.cos(angle) * radius,
+          tip.y + Math.sin(angle) * radius,
+          1.5,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y - 5);
+      ctx.lineTo(tip.x + 5, tip.y);
+      ctx.lineTo(tip.x, tip.y + 5);
+      ctx.lineTo(tip.x - 5, tip.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }

@@ -403,9 +403,13 @@ test.each(KITS)(
     const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.thrusting).toBe(true);
     if (kitId === 'hauler') {
-      // A miss leaves the persistent tow action ready: there is no scan-style
-      // cooldown when no cargo was attached.
-      expect(abilityWhileHeld.abilityCooldownFrames).toBe(0);
+      // Launch consumes recharge, but E can recall the outbound line while
+      // steering and firing remain held.
+      expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
+      expect(
+        await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.utilityFlight?.phase)
+      ).toBe('outbound');
+      expect(await page.locator('#touch-ability').textContent()).toBe('REEL');
       expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('false');
     } else {
       expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);

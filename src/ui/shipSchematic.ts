@@ -632,7 +632,7 @@ function drawToolLoop(
     const midY = height * 0.5;
     const radius = 18;
     const elapsed = now % 2600;
-    const launching = elapsed < 520;
+
     const rockX = width * 0.76 + Math.sin(now / 520) * 5;
     const rockY = midY + Math.sin(now / 680) * 4;
     const pulse = 0.5 + 0.5 * Math.sin(now / 260);
@@ -656,17 +656,11 @@ function drawToolLoop(
       }
       ctx.globalAlpha = 1;
     } else {
-      const probeX = rockX;
-      const probeY = rockY - 15;
+      const progress = Math.min(1, elapsed / 520);
+      const probeX = shipX + radius + (rockX - shipX - radius) * progress;
+      const probeY = midY + (rockY - 15 - midY) * progress;
       ctx.strokeStyle = PALETTE.LOOT;
-      if (launching) {
-        ctx.globalAlpha = 1 - elapsed / 520;
-        ctx.beginPath();
-        ctx.moveTo(shipX + radius, midY);
-        ctx.lineTo(probeX, probeY);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
+
       ctx.beginPath();
       ctx.moveTo(probeX, probeY - 7);
       ctx.lineTo(probeX + 7, probeY);
@@ -711,11 +705,18 @@ function drawToolLoop(
     ctx.moveTo(shipX + radius * 0.72, midY);
     ctx.lineTo(rockX - 14, rockY);
     ctx.stroke();
-  } else if (attached && selectedUtility !== 'boost_coupling') {
+  } else if (
+    (attached || (elapsed < 250 && selectedUtility === 'tow_cable')) &&
+    selectedUtility !== 'boost_coupling'
+  ) {
     ctx.strokeStyle = PALETTE.LOOT;
     ctx.beginPath();
     ctx.moveTo(shipX + radius * 0.72, midY);
-    ctx.lineTo(rockX - 14, rockY);
+    const tipX =
+      selectedUtility === 'tow_cable' && elapsed < 250
+        ? shipX + radius + ((rockX - 14 - shipX - radius) * elapsed) / 250
+        : rockX - 14;
+    ctx.lineTo(tipX, rockY);
     ctx.stroke();
   }
   if (selectedUtility === 'boost_coupling') {

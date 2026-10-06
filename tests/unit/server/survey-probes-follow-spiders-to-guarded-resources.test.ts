@@ -9,6 +9,7 @@ import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { AsteroidData, TerrainSpider } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { fireProbe, resolveToolFlights } from '../../support/tool-flight';
 
 const pilot = {
   id: 'scout',
@@ -51,22 +52,22 @@ describe('spiders carry Scout probes', () => {
     const manager = new SurveyProbeManager();
     const spider = spiderAt('spider', 200);
     const rock = rockAt('rock', 400);
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([rock]), 100, [spider])?.host).toBe(
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([rock]), 100, [spider])?.host).toBe(
       spider
     );
     expect(rock.probe).toBeUndefined();
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([rock]), 101, [spider])).toBeNull();
+    expect(fireProbe(manager, pilot, new AsteroidSpatialIndex([rock]), 101, [spider])).toBeNull();
     const blocker = rockAt('blocker', 100);
-    expect(manager.launch(pilot, new AsteroidSpatialIndex([blocker]), 102, [spider])?.host).toBe(
-      blocker
-    );
+    expect(
+      fireProbe(manager, pilot, new AsteroidSpatialIndex([blocker]), 102, [spider])?.host
+    ).toBe(blocker);
   });
 
   test('a probe rotates with its spider and scans resources after the spider travels home', () => {
     const manager = new SurveyProbeManager();
     const spider = spiderAt('spider', 200);
     const rock = rockAt('nest-resource', 2000, 100);
-    assert.ok(manager.launch(pilot, new AsteroidSpatialIndex([]), 100, [spider]));
+    assert.ok(fireProbe(manager, pilot, new AsteroidSpatialIndex([]), 100, [spider]));
     assert.ok(spider.probe);
     const before = probePosition(spider, spider.probe);
     spider.position = { x: 2000, y: 0 };
@@ -107,7 +108,8 @@ describe('spiders carry Scout probes', () => {
       spiders.advance({ ...options, nowFrame: frame });
     }
     assert.ok(
-      probes.launch(
+      fireProbe(
+        probes,
         { ...pilot, position: { x: guard.position.x - 200, y: guard.position.y } },
         new AsteroidSpatialIndex([]),
         100,
@@ -136,11 +138,12 @@ describe('spiders carry Scout probes', () => {
   test('asteroid and spider probes share the owner cap, damage, expiry, and host loss cleanup', () => {
     const manager = new SurveyProbeManager();
     const rock = rockAt('oldest', 200);
-    assert.ok(manager.launch(pilot, new AsteroidSpatialIndex([rock]), 100));
+    assert.ok(fireProbe(manager, pilot, new AsteroidSpatialIndex([rock]), 100));
     const spiders = [0, 1, 2].map((i) => spiderAt(`spider-${i}`, 200, (i + 1) * 200));
     for (const [i, spider] of spiders.entries()) {
       assert.ok(
-        manager.launch(
+        fireProbe(
+          manager,
           { ...pilot, position: { x: 0, y: spider.position.y } },
           new AsteroidSpatialIndex([]),
           101 + i,
@@ -173,6 +176,7 @@ describe('spiders carry Scout probes', () => {
     const spider = engine.spawnTerrainSpider({ x: 200, y: 0 });
     assert.ok(spider);
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
+    resolveToolFlights(engine);
     expect(
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.ownerId
     ).toBe(scout.id);

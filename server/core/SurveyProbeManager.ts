@@ -1,10 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
-import { findNearestAsteroidImpact } from '../../shared/asteroidReflection';
 import { probePosition, SURVEY_PROBE } from '../../shared/surveyProbe';
 import { spiderHitRadius } from '../../shared/terrainSpider';
-import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
-import type { AsteroidData, AsteroidProbe, Position, TerrainSpider } from '../../shared-types';
+import {
+  firstToolFlightContact,
+  movingAsteroidContact,
+  relativeFlightStart,
+} from '../../shared/toolFlightContact';
+import {
+  advanceUtilityFlight,
+  launchUtilityFlight,
+  missUtilityFlight,
+} from '../../shared/utilityFlight';
+import type {
+  AsteroidData,
+  AsteroidProbe,
+  Position,
+  TerrainSpider,
+  ToolTargetPose,
+} from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 
@@ -17,6 +31,7 @@ interface SurveyProbeLaunchHost {
   health: number;
   respawnTimer?: number;
   abilityCooldownFrames: number;
+  utilityFlight?: import('../../shared-types').UtilityFlight | null;
 }
 
 interface SurveyProbeTarget {
@@ -83,80 +98,92 @@ export class SurveyProbeManager {
     }
   }
 
-  public launch(
-    scout: SurveyProbeLaunchHost,
-    index: AsteroidSpatialIndex,
-    now: number,
-    spiders: readonly TerrainSpider[] = []
-  ): { host: ProbeHost; probe: AsteroidProbe } | null {
+  public launch(scout: SurveyProbeLaunchHost): boolean {
     if (
       scout.kitId !== 'scout' ||
       scout.exploding ||
       scout.health <= 0 ||
       scout.respawnTimer !== undefined ||
-      scout.abilityCooldownFrames > 0
+      scout.abilityCooldownFrames > 0 ||
+      scout.utilityFlight
     ) {
+      return false;
+    }
+    scout.utilityFlight = launchUtilityFlight(
+      scout,
+      'probe',
+      hullRadiusForKit(scout.kitId),
+      SURVEY_PROBE.LAUNCH_RANGE
+    );
+    scout.abilityCooldownFrames = SURVEY_PROBE.COOLDOWN_FRAMES;
+    return true;
+  }
+
+  public advanceFlight(
+    scout: SurveyProbeLaunchHost,
+    index: AsteroidSpatialIndex,
+    now: number,
+    spiders: readonly TerrainSpider[] = [],
+    previousPositions: ReadonlyMap<string, ToolTargetPose> = new Map()
+  ): { host: ProbeHost; probe: AsteroidProbe } | null {
+    if (scout.utilityFlight?.kind !== 'probe') {
       return null;
     }
-
-    const direction = { x: Math.cos(scout.angle), y: -Math.sin(scout.angle) };
-    const nose = hullRadiusForKit(scout.kitId);
-    const start = {
-      x: scout.position.x + direction.x * nose,
-      y: scout.position.y + direction.y * nose,
-    };
-    const end = {
-      x: start.x + direction.x * SURVEY_PROBE.LAUNCH_RANGE,
-      y: start.y + direction.y * SURVEY_PROBE.LAUNCH_RANGE,
-    };
-    const candidates = index.query({
+    if (scout.exploding || scout.health <= 0 || scout.respawnTimer !== undefined) {
+      scout.utilityFlight = null;
+      return null;
+    }
+    const segment = advanceUtilityFlight(scout);
+    if (!segment) {
+      return null;
+    }
+    const { start, end } = segment;
+    const candidates = index.queryMotion({
       minX: Math.min(start.x, end.x),
       minY: Math.min(start.y, end.y),
       maxX: Math.max(start.x, end.x),
       maxY: Math.max(start.y, end.y),
     });
-    const asteroidImpact = findNearestAsteroidImpact(start, end, candidates);
-    let impact: { host: ProbeHost; point: Position; distance: number } | undefined;
-    if (asteroidImpact) {
-      const host = candidates.find((candidate) => candidate.id === asteroidImpact.asteroidId);
-      if (host) {
-        impact = { host, point: asteroidImpact.point, distance: asteroidImpact.distance };
-      }
+    const impact = firstToolFlightContact<ProbeHost>(
+      start,
+      end,
+      [...candidates, ...spiders],
+      (candidate) =>
+        'rotation' in candidate
+          ? movingAsteroidContact(
+              start,
+              end,
+              candidate,
+              index.previousPose(candidate.id) ?? previousPositions.get(candidate.id)
+            )
+          : segmentCircleContact(
+              relativeFlightStart(
+                start,
+                candidate.position,
+                previousPositions.get(candidate.id) ?? candidate.position
+              ),
+              end,
+              candidate.position,
+              spiderHitRadius(candidate.id)
+            )
+    );
+    if (impact && scout.utilityFlight) {
+      scout.utilityFlight.position = { ...impact.point };
     }
-    for (const spider of spiders) {
-      const fraction = segmentCircleContact(
-        start,
-        end,
-        spider.position,
-        spiderHitRadius(spider.id)
-      );
-      if (fraction === undefined) {
-        continue;
-      }
-      const distance = fraction * SURVEY_PROBE.LAUNCH_RANGE;
-      if (impact && impact.distance <= distance) {
-        continue;
-      }
-      impact = {
-        host: spider,
-        point: {
-          x: start.x + (end.x - start.x) * fraction,
-          y: start.y + (end.y - start.y) * fraction,
-        },
-        distance,
-      };
+    if (impact?.kind === 'boundary') {
+      missUtilityFlight(scout);
+      return null;
     }
     if (!impact) {
+      if (scout.utilityFlight?.phase === 'outbound' && scout.utilityFlight.remainingDistance <= 0) {
+        missUtilityFlight(scout);
+      }
       return null;
     }
 
-    const boundary = findWorldBoundaryImpact(start, end);
-    if (boundary && boundary.distance <= impact.distance) {
-      return null;
-    }
-
-    const host = impact.host;
+    const host = impact.body;
     if (host.health <= 0 || ('boost' in host && host.boost?.phase === 'burning') || host.probe) {
+      missUtilityFlight(scout);
       return null;
     }
 
@@ -176,13 +203,22 @@ export class SurveyProbeManager {
       }
     }
 
-    const radialDistance = Math.hypot(
-      impact.point.x - host.position.x,
-      impact.point.y - host.position.y
+    const fraction = impact.fraction;
+    const previous = index.previousPose(host.id) ??
+      previousPositions.get(host.id) ?? {
+        ...host.position,
+        rotation: 'rotation' in host ? host.rotation : host.angle,
+      };
+    const localX = impact.point.x - (previous.x + (host.position.x - previous.x) * fraction);
+    const localY = impact.point.y - (previous.y + (host.position.y - previous.y) * fraction);
+    const radialDistance = Math.hypot(localX, localY);
+    const rotation = 'rotation' in host ? host.rotation : host.angle;
+    const priorRotation = previous.rotation ?? rotation;
+    const rotationDelta = Math.atan2(
+      Math.sin(rotation - priorRotation),
+      Math.cos(rotation - priorRotation)
     );
-    const radialAngle =
-      Math.atan2(impact.point.y - host.position.y, impact.point.x - host.position.x) -
-      ('rotation' in host ? host.rotation : host.angle);
+    const radialAngle = Math.atan2(localY, localX) - (priorRotation + rotationDelta * fraction);
     const probe: AsteroidProbe = {
       id: `survey-probe-${randomUUID()}`,
       ownerId: scout.id,
@@ -193,6 +229,7 @@ export class SurveyProbeManager {
       angle: Math.atan2(Math.sin(radialAngle), Math.cos(radialAngle)),
       radialOffset: radialDistance + SURVEY_PROBE.RADIUS,
     };
+    scout.utilityFlight = null;
     host.probe = probe;
     this.hosts.set(host.id, host);
     this.pulseAt.set(host.id, now);

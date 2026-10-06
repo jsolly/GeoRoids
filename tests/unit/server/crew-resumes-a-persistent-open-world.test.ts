@@ -17,6 +17,7 @@ import { nearbyWorldRows, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { DEPOSIT_FIELD } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { resolveToolFlights } from '../../support/tool-flight';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -76,9 +77,11 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   const rock = cargo('delivery', { x: 180, y: 0 });
   first.addAsteroid(rock);
   expect(first.useAbility(scout.actor.id)).toBe(true);
+  resolveToolFlights(first);
   expect(rock.surveyedBy).toEqual(['scout']);
   first.removePlayer('scout');
   expect(first.useAbility(hauler.actor.id)).toBe(true);
+  resolveToolFlights(first);
   const station = FURNACES[0];
   assert(station);
   rock.position = { ...station.position };

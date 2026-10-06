@@ -1,3 +1,4 @@
+import { resolveToolFlights } from '../../support/tool-flight';
 /* @vitest-environment node */
 
 import assert from 'node:assert/strict';
@@ -319,9 +320,11 @@ test('offline delivery credit restamps the server score without copying the last
   const rock = cargo('delivery', { x: 180, y: 0 });
   engine.addAsteroid(rock);
   expect(engine.useAbility(scout.id)).toBe(true);
+  resolveToolFlights(engine);
   expect(rock.surveyedBy).toEqual(['scout']);
   engine.removePlayer('scout');
   expect(engine.useAbility(hauler.id)).toBe(true);
+  resolveToolFlights(engine);
   const station = FURNACES[0];
   assert(station);
   rock.position = { ...station.position };

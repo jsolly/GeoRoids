@@ -608,6 +608,7 @@ export class MessageHandler {
           ? { harpoonLatchPos: entity.harpoonLatchPos }
           : {}),
 
+        utilityFlight: entity.utilityFlight ?? null,
         abilityActiveFrames: entity.abilityActiveFrames,
         ...(wasArmed && latchedTarget?.boost?.phase === 'burning'
           ? { boostIgnitionPosition: { ...latchedTarget.position } }

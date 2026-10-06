@@ -18,6 +18,7 @@ import { WORLD } from '../../../shared/world';
 import type { AsteroidData, HaulerUtilityId } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
+import { attachTowForScenario, resolveToolFlights } from '../../support/tool-flight';
 import {
   GameServerWorld,
   type Pilot,
@@ -70,12 +71,23 @@ describe('Colossal asteroids need a crew', () => {
     world.send(pilot, { type: 'setHaulerUtility', id: pilot.id, data: { utilityId } });
   }
 
-  function activate(pilot: Pilot): void {
+  function activate(pilot: Pilot, targetId?: string): void {
+    const actor = world.entity(pilot);
+    const target = world.engine
+      .getAllAsteroids()
+      .find((rock) => (targetId ? rock.id === targetId : rock.id.startsWith('colossal')));
+    if (target && actor.haulerUtility === 'tow_cable') {
+      actor.angle = Math.atan2(
+        actor.position.y - target.position.y,
+        target.position.x - actor.position.x
+      );
+    }
     world.send(pilot, {
       type: 'useAbility',
       id: pilot.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
+    resolveToolFlights(world.engine);
   }
 
   test('the launch neighborhood stays free of colossal deposits and crew size follows rock scale', () => {
@@ -150,12 +162,12 @@ describe('Colossal asteroids need a crew', () => {
     world.clearAsteroids();
     large.position = { x: 0, y: 0 };
     world.engine.addAsteroid(large);
-    activate(alice);
+    activate(alice, large.id);
     expect(world.entity(alice).harpoonTargetId).toBe(large.id);
     world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
     world.tick();
     expect(large.velocity).toEqual({ x: 0, y: 0 });
-    activate(bob);
+    activate(bob, large.id);
     expect(world.entity(bob).harpoonTargetId).toBe(large.id);
     world.tick();
     expect(large.velocity.x).toBeLessThan(0);
@@ -167,7 +179,7 @@ describe('Colossal asteroids need a crew', () => {
     world.engine.addAsteroid(small);
     world.engine.updatePlayer(alice.id, { position: { x: -40, y: 0 } });
     world.entity(alice).abilityCooldownFrames = 0;
-    activate(alice);
+    activate(alice, small.id);
     expect(world.entity(alice).harpoonTargetId).toBe(small.id);
     world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
     world.tick();
@@ -375,8 +387,8 @@ describe('Colossal asteroids need a crew', () => {
     });
     equip(alice, 'tow_cable');
     equip(bob, 'tow_cable');
-    activate(alice);
-    activate(bob);
+    attachTowForScenario(world.engine, alice.id, rock.id);
+    attachTowForScenario(world.engine, bob.id, rock.id);
     expect(world.entity(alice).harpoonTargetId).toBe(rock.id);
     expect(world.entity(bob).harpoonTargetId).toBe(rock.id);
     world.engine.entityManager.updateEntity(alice.id, { spawnProtectionTimer: 0 });

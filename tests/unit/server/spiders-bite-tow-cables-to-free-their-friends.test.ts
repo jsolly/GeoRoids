@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { SPIDER } from '../../../shared/terrainSpider';
+import { resolveToolFlights } from '../../support/tool-flight';
 import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 
 useQuietServerConsole();
@@ -130,6 +131,7 @@ test('the authoritative game clears the actual tow latch when a rescuer bites', 
     world.engine.setHaulerUtility(pilot.id, 'tow_cable');
     world.entity(pilot).abilityCooldownFrames = 0;
     expect(world.engine.useAbility(pilot.id)).toBe(true);
+    resolveToolFlights(world.engine);
     expect(world.entity(pilot).harpoonTargetId).toBe(friend.id);
     world.engine.spawnTerrainSpider({ x: 4450, y: 2220 });
     const health = world.entity(pilot).health;

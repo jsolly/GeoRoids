@@ -57,13 +57,14 @@ import { readReleaseId, releaseField } from '../../shared/releaseId';
 import { GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
-import { SPIDER } from '../../shared/terrainSpider';
+import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
 import {
   insideTownStore,
   purchasedHullColor,
   storeOffer,
   TOWN_STORE_ISSUE,
 } from '../../shared/townStore';
+import { advanceUtilityFlight } from '../../shared/utilityFlight';
 import { WORLD } from '../../shared/world';
 import type {
   ActiveCollabTag,
@@ -83,6 +84,8 @@ import type {
   SettlementState,
   ShipKitId,
   TapEjected,
+  TerrainSpider,
+  ToolTargetPose,
   Velocity,
 } from '../../shared-types';
 import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
@@ -100,6 +103,7 @@ import {
   setHaulerUtilityOnHost,
   setScoutUtilityOnHost,
   tickTapExtract,
+  tickTowLine,
 } from '../../src/entities/ship/shipAbilities';
 import {
   applyShipKitStats,
@@ -614,8 +618,12 @@ export class GameEngine {
     this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
     this.collectLoot();
     this.tickSatellitePickups();
-    this.asteroidManager.updateMotion();
+    const toolStartPositions = this.captureToolStartPositions();
+    this.asteroidManager.updateMotion(
+      this.entityManager.getAllEntities().some((pilot) => pilot.utilityFlight?.phase === 'outbound')
+    );
     this.advanceSpiderField();
+    this.tickToolFlights(toolStartPositions);
     this.processFurnaceDeliveries();
     if (this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
@@ -2849,6 +2857,7 @@ export class GameEngine {
             kitId: entity.kitId,
             abilityCooldownFrames: entity.abilityCooldownFrames,
             abilityActiveFrames: entity.abilityActiveFrames,
+            utilityFlight: entity.utilityFlight ?? null,
 
             ...(entity.harpoonTargetId !== undefined
               ? { harpoonTargetId: entity.harpoonTargetId }
@@ -2897,6 +2906,9 @@ export class GameEngine {
         this.surveyNearbyAsteroids(entity);
       }
       return activated;
+    }
+    if (isTowCableUtility(entity) && !entity.harpoonTargetId) {
+      return activateAbilityOnHost(entity).activated;
     }
     const cargo = new Set(
       this.entityManager.getAllEntities().map((actor) => actor.harpoonTargetId)
@@ -3055,6 +3067,7 @@ export class GameEngine {
     actor.velocity = { x: 0, y: 0 };
     actor.thrusting = false;
     actor.overlayHold = true;
+    actor.utilityFlight = null;
     actor.furnaceTransit = {
       sourceId: source.id,
       destinationId,
@@ -3175,16 +3188,24 @@ export class GameEngine {
       now,
       (hostId) => this.getAsteroid(hostId) ?? this.spiderManager.getBody(hostId)
     );
-    const result = this.surveyProbeManager.launch(
+    return this.surveyProbeManager.launch(scout);
+  }
+
+  private advanceSurveyProbe(
+    scout: GameEntity,
+    spiders: readonly TerrainSpider[],
+    previousPositions: ReadonlyMap<string, ToolTargetPose>
+  ): void {
+    const result = this.surveyProbeManager.advanceFlight(
       scout,
       this.asteroidManager.spatialIndex(),
-      now,
-      this.spiderManager.getBodies()
+      this.getServerTime(),
+      spiders,
+      previousPositions
     );
     if (!result) {
-      return false;
+      return;
     }
-    scout.abilityCooldownFrames = SURVEY_PROBE.COOLDOWN_FRAMES;
     this.surveyProbeManager.pulseNow(
       result.host,
       result.probe,
@@ -3198,11 +3219,103 @@ export class GameEngine {
         result.host.surveyedBy.push(result.probe.ownerId);
       }
     }
-    return true;
   }
 
   private damageSurveyProbe(hostId: string, damage: number): boolean {
     return this.surveyProbeManager.damage(hostId, damage);
+  }
+
+  private toolFlightBounds(
+    flight: Extract<NonNullable<GameEntity['utilityFlight']>, { phase: 'outbound' }>
+  ) {
+    const end = {
+      x: flight.position.x + flight.velocity.x,
+      y: flight.position.y + flight.velocity.y,
+    };
+    return {
+      minX: Math.min(flight.position.x, end.x),
+      minY: Math.min(flight.position.y, end.y),
+      maxX: Math.max(flight.position.x, end.x),
+      maxY: Math.max(flight.position.y, end.y),
+    };
+  }
+
+  private captureToolStartPositions(): Map<string, ToolTargetPose> {
+    const positions = new Map<string, ToolTargetPose>();
+    const pilots = this.entityManager
+      .getAllEntities()
+      .filter((pilot) => pilot.utilityFlight?.phase === 'outbound');
+    if (pilots.length === 0) {
+      return positions;
+    }
+    for (const spider of this.spiderManager.getBodies()) {
+      positions.set(spider.id, { ...spider.position, rotation: spider.angle });
+    }
+    return positions;
+  }
+
+  /** Resolve tool travel after world motion, using each target's complete frame trajectory. */
+  public tickToolFlights(previousPositions: ReadonlyMap<string, ToolTargetPose> = new Map()): void {
+    const pilots = this.entityManager.getAllEntities();
+    const cargo = new Set(pilots.map((pilot) => pilot.harpoonTargetId));
+    const spiders = pilots.some((pilot) => pilot.utilityFlight?.phase === 'outbound')
+      ? this.spiderManager.getBodies()
+      : [];
+    for (const pilot of pilots) {
+      const flight = pilot.utilityFlight;
+      if (!flight) {
+        continue;
+      }
+      if (
+        pilot.exploding ||
+        pilot.health <= 0 ||
+        pilot.respawnTimer !== undefined ||
+        pilot.furnaceTransit
+      ) {
+        pilot.utilityFlight = null;
+        continue;
+      }
+      if (flight.phase !== 'outbound') {
+        advanceUtilityFlight(pilot);
+        continue;
+      }
+      const bounds = this.toolFlightBounds(flight);
+      const nearbySpiders = spiders.filter((spider) => {
+        const previous = previousPositions.get(spider.id) ?? spider.position;
+        const r = spiderHitRadius(spider.id);
+        return (
+          Math.min(previous.x, spider.position.x) - r <= bounds.maxX &&
+          Math.max(previous.x, spider.position.x) + r >= bounds.minX &&
+          Math.min(previous.y, spider.position.y) - r <= bounds.maxY &&
+          Math.max(previous.y, spider.position.y) + r >= bounds.minY
+        );
+      });
+      if (flight.kind === 'probe') {
+        this.advanceSurveyProbe(pilot, nearbySpiders, previousPositions);
+      } else {
+        const index = this.asteroidManager.spatialIndex();
+        const nearby = index.queryMotion(bounds);
+        const targetPoses = new Map(previousPositions);
+        for (const rock of nearby) {
+          const previous = index.previousPose(rock.id);
+          if (previous) {
+            targetPoses.set(rock.id, previous);
+          }
+        }
+        tickTowLine(
+          pilot,
+          [...nearby, ...nearbySpiders],
+          (body) => {
+            const rock = this.getAsteroid(body.id);
+            return rock ? this.haulerCanTarget(pilot, rock, cargo) : !cargo.has(body.id);
+          },
+          targetPoses
+        );
+        if (pilot.harpoonTargetId) {
+          cargo.add(pilot.harpoonTargetId);
+        }
+      }
+    }
   }
 
   public tickAbilities(): void {

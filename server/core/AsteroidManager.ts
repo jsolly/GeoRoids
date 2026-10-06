@@ -173,12 +173,16 @@ export class AsteroidManager {
    * velocity is pixels per 60 FPS tick). Debug placement modes stay frozen so
    * collision tests that pin roids on ships do not drift.
    */
-  public updateMotion(): void {
+  public updateMotion(captureMotion = false): void {
+    this.index.beginMotion(captureMotion);
     if (DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER) {
       return;
     }
 
     for (const asteroid of this.asteroids.values()) {
+      const previous = captureMotion
+        ? { ...asteroid.position, rotation: asteroid.rotation }
+        : undefined;
       tickAsteroidBoost(asteroid, asteroid.size, this.furnaces);
       stepAsteroidMotionInto(
         asteroid.position,
@@ -188,7 +192,7 @@ export class AsteroidManager {
         asteroid.velocity
       );
       asteroid.rotation += asteroid.angularVelocity;
-      this.index.move(asteroid);
+      this.index.move(asteroid, previous);
     }
   }
 

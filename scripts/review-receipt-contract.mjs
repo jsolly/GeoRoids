@@ -79,7 +79,7 @@ const cli = (...args) => command(process.execPath, [helper, ...args]);
 function fixtureRunner(path, mode, home = '') {
   cli('runner', home, path, mode, repo, '42', '1', '0', 'true', 'false', 'false', '', '');
 }
-function integration(directory) {
+function integration(directory, maxActive = 3) {
   const home = join(directory, 'coordinator');
   mkdirSync(home, { recursive: true });
   const manifest = {
@@ -87,7 +87,7 @@ function integration(directory) {
     runId: 'fixture-integration',
     worktree: repo,
     total: 6,
-    maxActive: 3,
+    maxActive,
     deadlineMs: 600000,
     discoveryOptions: {
       staticParse: false,
@@ -103,7 +103,7 @@ function integration(directory) {
   };
   json(join(home, 'manifest.json'), manifest);
   json(join(home, 'queue.json'), {
-    maxActive: 3,
+    maxActive,
     launched: [1, 2, 3, 4, 5, 6],
     cancelled: [],
     interrupted: false,
@@ -185,12 +185,12 @@ function setupRun() {
   cli('start', directory, repo);
   return directory;
 }
-function complete(directory) {
+function complete(directory, maxActive = 3) {
   for (const name of ['integration', 'frame', 'traversal', 'combat']) {
     mkdirSync(join(directory, name));
     writeFileSync(join(directory, name, 'output.log'), `${name} passed\n`);
     if (name === 'integration') {
-      integration(directory);
+      integration(directory, maxActive);
     } else if (name === 'frame') {
       json(join(directory, 'frame-work.json'), {
         kind: 'frame-work',
@@ -227,8 +227,19 @@ try {
   writeFileSync(join(repo, 'input.txt'), 'source\n');
   mkdirSync(join(repo, '.performance'));
   copyFileSync(helper, join(repo, 'scripts/review-receipt.mjs'));
+  copyFileSync(
+    join(root, 'scripts/integration-shard-plan.mjs'),
+    join(repo, 'scripts/integration-shard-plan.mjs')
+  );
   command('git', ['add', '.']);
   const path = complete(setupRun());
+  for (const maxActive of [1, 2]) {
+    const limited = validateReviewReceipt(complete(setupRun(), maxActive));
+    assert.equal(limited.stages.length, 4);
+  }
+  for (const maxActive of [0, 4, 1.5, '2']) {
+    assert.throws(() => complete(setupRun(), maxActive));
+  }
   const before = readFileSync(path);
   const receipt = validateReviewReceipt(path);
   assert.equal(receipt.stages.length, 4);

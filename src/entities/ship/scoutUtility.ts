@@ -18,7 +18,7 @@ export const SCOUT_UTILITY = {
     id: 'survey_probe',
     name: 'Survey Probe',
     hint: `Tap to equip · ${SURVEY_PROBE.MAX_PER_OWNER} max`,
-    copy: `Fire a beacon forward. It scans a ${SURVEY_PROBE.RANGE}-unit radius for ${SURVEY_PROBE.LIFETIME_MS / 60_000} minutes, with ${SURVEY_PROBE.MAX_HEALTH} health. Everyone benefits.`,
+    copy: `Aim and fire a beacon forward; misses disintegrate. It scans a ${SURVEY_PROBE.RANGE}-unit radius for ${SURVEY_PROBE.LIFETIME_MS / 60_000} minutes, with ${SURVEY_PROBE.MAX_HEALTH} health. Everyone benefits.`,
   },
 } as const;
 

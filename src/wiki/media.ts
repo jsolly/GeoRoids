@@ -30,7 +30,7 @@ export const media: Record<string, WikiMediaEntry> = {
     title: 'Hauler tow cable and furnace delivery',
     alt: 'A Hauler tows a spinning asteroid behind its hull toward a furnace while a Scout watches the shared delivery score.',
     caption:
-      'Controlled demonstration: E attaches a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Scout credit.',
+      'Controlled demonstration: aim and E shoot a line that attaches on contact with a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Scout credit.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
@@ -38,6 +38,8 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipRenderer.ts',
       'src/entities/ship/hullOutlines.ts',
+      'shared/utilityFlight.ts',
+      'shared/toolFlightContact.ts',
       'shared/furnaces.ts',
       'src/rendering/furnaceRenderer.ts',
       'server/core/GameEngine.ts',

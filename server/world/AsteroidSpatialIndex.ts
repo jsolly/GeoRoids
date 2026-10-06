@@ -1,4 +1,4 @@
-import type { AsteroidData } from '../../shared-types';
+import type { AsteroidData, ToolTargetPose } from '../../shared-types';
 
 interface QueryBounds {
   minX: number;
@@ -10,6 +10,8 @@ interface QueryBounds {
 interface Entry {
   rock: AsteroidData;
   order: number;
+  previous?: ToolTargetPose | undefined;
+  motionFrame?: number;
   /** Inclusive cell range the rock's hull covers. */
   x0: number;
   x1: number;
@@ -45,6 +47,9 @@ export class AsteroidSpatialIndex {
   private readonly cells = new Map<number, Entry[]>();
   private readonly entries = new Map<string, Entry>();
   private nextOrder = 0;
+  private readonly motionCells = new Map<number, Entry[]>();
+  private capturingMotion = false;
+  private motionFrame = 0;
 
   constructor(asteroids: Iterable<AsteroidData>) {
     for (const rock of asteroids) {
@@ -79,16 +84,59 @@ export class AsteroidSpatialIndex {
 
   clear(): void {
     this.cells.clear();
+    this.motionCells.clear();
     this.entries.clear();
   }
 
+  /** Start a frame; collect swept hulls only while a tool is traveling. */
+  beginMotion(capture: boolean): void {
+    this.motionCells.clear();
+    this.capturingMotion = capture;
+    this.motionFrame++;
+  }
+
+  previousPose(id: string): ToolTargetPose | undefined {
+    const entry = this.entries.get(id);
+    return this.capturingMotion && entry?.motionFrame === this.motionFrame
+      ? entry.previous
+      : undefined;
+  }
+
   /** Re-file a rock whose position changed; most drift stays inside its cells. */
-  move(rock: AsteroidData): void {
+  move(rock: AsteroidData, previous?: ToolTargetPose): void {
     const entry = this.entries.get(rock.id);
     if (!entry) {
       return;
     }
     const radius = hullRadius(rock);
+    entry.previous = previous;
+    entry.motionFrame = this.motionFrame;
+    if (this.capturingMotion && previous) {
+      const swept = {
+        minX: Math.min(previous.x, rock.position.x) - radius,
+        maxX: Math.max(previous.x, rock.position.x) + radius,
+        minY: Math.min(previous.y, rock.position.y) - radius,
+        maxY: Math.max(previous.y, rock.position.y) + radius,
+      };
+      const x0 = Math.floor((rock.position.x - radius) / CELL_SIZE);
+      const x1 = Math.floor((rock.position.x + radius) / CELL_SIZE);
+      const y0 = Math.floor((rock.position.y - radius) / CELL_SIZE);
+      const y1 = Math.floor((rock.position.y + radius) / CELL_SIZE);
+      this.visitCells(swept, (key) => {
+        const x = Math.floor(key / CELL_KEY_STRIDE) - CELL_KEY_OFFSET;
+        const y = (key % CELL_KEY_STRIDE) - CELL_KEY_OFFSET;
+        // The ordinary index already covers the final cells. Only retain crossed cells.
+        if (x >= x0 && x <= x1 && y >= y0 && y <= y1) {
+          return;
+        }
+        const cell = this.motionCells.get(key);
+        if (cell) {
+          cell.push(entry);
+        } else {
+          this.motionCells.set(key, [entry]);
+        }
+      });
+    }
     if (
       Math.floor((rock.position.x - radius) / CELL_SIZE) === entry.x0 &&
       Math.floor((rock.position.x + radius) / CELL_SIZE) === entry.x1 &&
@@ -151,6 +199,22 @@ export class AsteroidSpatialIndex {
     this.visitCells(bounds, (key) => {
       for (const entry of this.cells.get(key) ?? []) {
         found.add(entry);
+      }
+    });
+    return [...found].sort((a, b) => a.order - b.order).map((entry) => entry.rock);
+  }
+
+  /** Local candidates include every hull crossed during this frame, regardless of speed. */
+  queryMotion(bounds: QueryBounds): AsteroidData[] {
+    const found = new Set<Entry>();
+    this.visitCells(bounds, (key) => {
+      for (const entry of this.cells.get(key) ?? []) {
+        found.add(entry);
+      }
+      for (const entry of this.motionCells.get(key) ?? []) {
+        if (this.entries.get(entry.rock.id) === entry) {
+          found.add(entry);
+        }
       }
     });
     return [...found].sort((a, b) => a.order - b.order).map((entry) => entry.rock);

@@ -9,7 +9,12 @@ import {
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
-import { asteroidReach, nearbyAsteroidRows, nearbyWorldRows } from '../../shared/world';
+import {
+  asteroidReach,
+  isWithinWorldInterest,
+  nearbyAsteroidRows,
+  nearbyWorldRows,
+} from '../../shared/world';
 import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
 import { isActiveScanner } from '../../src/entities/ship/surveyScan';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
@@ -233,6 +238,13 @@ export class GameStateBroadcaster {
         const canonical = new SnapshotEncoder(
           {
             ...gameState,
+            entities: gameState.entities.map((entity) =>
+              entity.id === player.id ||
+              !entity.utilityFlight ||
+              isWithinWorldInterest(entity.utilityFlight.position, player.position)
+                ? entity
+                : { ...entity, utilityFlight: null }
+            ),
             asteroids,
             loot: this.gameEngine
               .getNearbyLoot(player.position)

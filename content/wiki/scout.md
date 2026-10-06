@@ -19,7 +19,7 @@ Scout starts with Mineral Scan and turns faster than Hauler. Select Mineral Scan
 
 ## Survey probe
 
-Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip it in Inventory and press E to fire a beacon at a rock or spider; a miss costs no cooldown and gives no message, but a probe shares the Scan recharge, so it waits after a Scan. It scans along its host's route for the crew and earns you delivery credit, so tagging a guard can reveal its resource nest. Beacons can be shot off, expire when their batteries run out, and are lost on a server restart; probes do not repel spiders.
+Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip it in Inventory and aim at a rock or spider and press E to shoot a beacon that attaches on contact. Missed probes disintegrate and still use the shared Scan recharge. An attached beacon scans along its host's route and earns delivery credit, but can be shot off, expires, and is lost on a server restart; probes do not repel spiders.
 
 ## Probe limits
 

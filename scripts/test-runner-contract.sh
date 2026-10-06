@@ -6,6 +6,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/process-tree.sh
+source "$ROOT/scripts/process-tree.sh"
 RUNNER="$ROOT/scripts/test-runner.sh"
 TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/georoids-test-runner-contract.XXXXXX")"
 LISTENER_PID=""
@@ -64,6 +66,7 @@ printf '// explicit browser selector fixture\n' > "$CONTRACT_ROOT/tests/integrat
 printf '// explicit server selector fixture\n' > "$CONTRACT_ROOT/tests/integration/server/selected-pilot.test.ts"
 cp "$ROOT/scripts/process-tree.sh" "$CONTRACT_ROOT/scripts/process-tree.sh"
 cp "$ROOT/scripts/review-receipt.mjs" "$CONTRACT_ROOT/scripts/review-receipt.mjs"
+cp "$ROOT/scripts/integration-shard-plan.mjs" "$CONTRACT_ROOT/scripts/integration-shard-plan.mjs"
 cp "$ROOT/scripts/benchmark-build-receipt.mjs" "$CONTRACT_ROOT/scripts/benchmark-build-receipt.mjs"
 cp "$ROOT/.env.example" "$CONTRACT_ROOT/.env.example"
 printf '{"lockfileVersion":3}\n' > "$CONTRACT_ROOT/package-lock.json"
@@ -124,13 +127,55 @@ assert_pid_stopped() {
     local label="$2"
     local pid=""
     local attempt
+    local state
     [ -s "$pid_file" ] || fail "$label did not record its PID"
     IFS= read -r pid < "$pid_file" || true
     for ((attempt = 0; attempt < 10; attempt++)); do
-        kill -0 "$pid" 2>/dev/null || return 0
+        state="$(process_state "$pid")" || fail "$label process $pid could not be inspected"
+        case "$state" in
+            Z*|'') return 0 ;;
+        esac
         sleep 0.05
     done
     fail "$label process $pid survived runner cleanup"
+}
+
+assert_cleanup_state_contract() {
+    local state_bin="$TEMP_DIR/state-bin"
+    local pid_file="$TEMP_DIR/state-fixture.pid"
+    local output_file="$TEMP_DIR/state-fixture.txt"
+    local mode
+    local expected
+    local status
+    mkdir -p "$state_bin"
+    printf '900000000\n' > "$pid_file"
+    cat > "$state_bin/ps" <<'EOF'
+#!/usr/bin/env bash
+case "$GEOROIDS_CONTRACT_STATE" in
+    live) printf 'S\n' ;;
+    zombie) printf 'Z\n' ;;
+    absent) exit 1 ;;
+    error) echo 'inspection failed' >&2; exit 2 ;;
+    diagnostic) echo 'inspection failed' >&2; exit 1 ;;
+    *) exit 70 ;;
+esac
+EOF
+    chmod +x "$state_bin/ps"
+    for mode in live zombie absent error diagnostic; do
+        expected=1
+        case "$mode" in zombie|absent) expected=0 ;; esac
+        status=0
+        (
+            export PATH="$state_bin:$PATH" GEOROIDS_CONTRACT_STATE="$mode"
+            assert_pid_stopped "$pid_file" "$mode fixture"
+        ) > "$output_file" 2>&1 || status=$?
+        [ "$status" -eq "$expected" ] || { cat "$output_file" >&2; fail "$mode cleanup state exit $status, expected $expected"; }
+        if [ "$mode" = live ]; then
+            grep -Fq 'survived runner cleanup' "$output_file" || fail 'live process lost rejection reason'
+        elif [ "$expected" -eq 1 ]; then
+            grep -Fq 'could not be inspected' "$output_file" || fail 'inspection failure was accepted as cleanup'
+        fi
+    done
 }
 
 assert_rejected() {
@@ -617,7 +662,11 @@ assert_impaired_benchmark_cleanup() {
     local output_file="$TEMP_DIR/proxy-$mode.txt"
     local status=0
     local session
-    run_mock_runner "$mode" 1 "$output_file" --benchmark-client --network degraded --seconds 1 || status=$?
+    local max_duration=10
+    # Success measures proxy cleanup; only the timeout fixture exercises the
+    # one-second watchdog. Success uses the other success fixtures' budget.
+    if [ "$mode" = timeout ]; then max_duration=1; fi
+    run_mock_runner "$mode" "$max_duration" "$output_file" --benchmark-client --network degraded --seconds 1 || status=$?
     [ "$status" -eq "$expected" ] || { cat "$output_file" >&2; fail "proxy $mode exit $status, expected $expected"; }
     grep -Fxq 'ws://localhost:59995/ws' "$MOCK_DEV_PID_FILE.build" || fail 'client build bypassed ready proxy'
     assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "proxy $mode"
@@ -922,6 +971,7 @@ assert_port_inspection_failure_is_not_success \
     port-inspection-failure 2 "simulated lsof inspection failure (status 2)"
 assert_port_inspection_failure_is_not_success \
     port-inspection-status-one 2 "simulated lsof inspection failure (status 1)"
+assert_cleanup_state_contract
 assert_vitest_config "default-discovery" vitest.browser.config.ts
 assert_vitest_config "default-with-options" vitest.browser.config.ts --reporter=verbose
 assert_vitest_config "integration-parent" vitest.browser.config.ts tests/integration/

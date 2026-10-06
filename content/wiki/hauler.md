@@ -25,7 +25,7 @@ Press E near a rock to extract collectible canisters without destroying it; E ag
 
 ## Tow cable E
 
-Press E near a rock or spider to latch, fly it close to a lit furnace's intake, and press E again to release early; only one Hauler can tow an ordinary rock, and no one can shoot a rock while it is latched. Cargo keeps its momentum, so leave room for it to trail behind you. Delivery pays the Hauler and scanning contributors; the red shatter and smoke mark ore intake.
+Aim at a rock or spider and press E to shoot a tow line; it attaches on contact, and a miss reels back. Fly latched cargo close to a lit furnace's intake, or press E again to release it early; only one Hauler can tow an ordinary rock, and no one can shoot a latched rock. Leave room for cargo to trail behind you; [delivery pays contributors](/wiki/#teamwork) when the furnace takes it in.
 
 ## Cargo collisions
 
@@ -33,7 +33,7 @@ Ordinary towed rocks break when they hit another rock or ship, damaging other sh
 
 ## Reach and release
 
-Your tool chooses the nearest eligible hull within reach, using your heading to choose between close neighbors; an empty attempt costs no cooldown and shows no failure message. E can release or cancel an attachment during recharge, and changing utilities also releases it. An attachment breaks if its host dies or gets too far away; towing preserves momentum rather than reeling the cargo in.
+Resource Tap and Boost Coupling choose a nearby eligible hull; an empty attempt costs no cooldown. Tow Cable follows your aim, uses recharge even on a miss, and E can recall the outgoing line or release latched cargo during recharge. Changing utilities releases attachments, and they break if their host dies or gets too far away; towing preserves momentum rather than reeling the cargo in.
 
 ## Boost Coupling E
 

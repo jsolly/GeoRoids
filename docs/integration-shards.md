@@ -16,6 +16,13 @@ sequence and maximum concurrency one. Individual test and hook budgets remain
 unchanged. Standalone file/directory runs retain their 1,200-second default and
 own Vite/server pair. Benchmark modes remain serial.
 
+Set `GEOROIDS_TEST_MAX_ACTIVE_SHARDS=2` on a memory-constrained local host
+to run at most two children. Values `1`, `2`, and `3` are accepted; the default
+remains three. All six shards and every discovered case still run, with the same
+600-second aggregate deadline and individual budgets. The selected cap is bound
+to the coordinator, assignments, authenticated children, queue, and review receipt.
+Lower concurrency does not waive the complete gate or its timing requirement.
+
 Collection uses Node with dynamic registration and per-file isolation. Playwright
 scenario files select Node workers and still drive real Chromium/WebKit pages.
 Entity and unit DOM tests retain their existing environments; all gameplay

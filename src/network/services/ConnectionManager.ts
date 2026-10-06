@@ -1323,7 +1323,10 @@ export class ConnectionManager {
       return;
     }
     const abilityId = getShipKit(data.kitId ?? entity.ship.kitId).abilityId;
-    const isHarpoonRelease = abilityId === 'harpoon' && data.harpoonTargetId === null;
+    const isHarpoonRelease =
+      abilityId === 'harpoon' &&
+      data.harpoonTargetId === null &&
+      data.utilityFlight?.phase !== 'outbound';
     const isLocalAbility =
       data.id === localPlayer?.id || data.id === this.getLocalPlayerId() || entity.type === 'local';
     if (!isHarpoonRelease) {
@@ -1337,7 +1340,7 @@ export class ConnectionManager {
           playFeedback('boostIgnite', data.boostIgnitionPosition);
           playLocalHaptic(isLocalAbility, 'asteroidIgnition');
         }
-      } else {
+      } else if (data.harpoonTargetId) {
         const targetPosition = isFinitePosition(data.harpoonLatchPos)
           ? data.harpoonLatchPos
           : typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0
@@ -1350,6 +1353,7 @@ export class ConnectionManager {
       }
     }
     const latch = {
+      ...(data.utilityFlight !== undefined ? { utilityFlight: data.utilityFlight } : {}),
       ...(data.abilityActiveFrames !== undefined
         ? { abilityActiveFrames: data.abilityActiveFrames }
         : {}),

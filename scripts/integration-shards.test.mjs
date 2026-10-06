@@ -22,7 +22,7 @@ import { basename, join, relative as relativePath, resolve } from 'node:path';
 import process from 'node:process';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { planShards, selectShard } from './integration-shard-plan.mjs';
+import { parseShardCapacity, planShards, selectShard } from './integration-shard-plan.mjs';
 import {
   aggregateReports,
   captureChild,
@@ -232,7 +232,7 @@ test('discovery requires all integration files and excludes nested unit copies',
 // The fixture coordinator is an actual child of this test process, with actual
 // Bash children. Authorization runs in its ordinary helper subprocess so PID,
 // parent chain, process birth times and common-lock ownership are not mocked.
-async function handshake(mode) {
+async function handshake(mode, maxActive = 3) {
   const sharedCacheBefore = sharedVitestCache();
   const directory = mkdtempSync(join(tmpdir(), 'geo-shard-auth-'));
   let processOutput;
@@ -321,6 +321,7 @@ process.stdout.write(JSON.stringify(result.map(file=>file.moduleId))+'\\n');
             discovery,
             weights,
             runId: 'fixture-run',
+            maxActive,
           })
         )
       );
@@ -334,14 +335,14 @@ import {mkdirSync,writeFileSync,readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
 const worktree=process.argv[2], helper=process.argv[3], mode=process.argv[4], loader=process.argv[5];
-const sequence=mode.startsWith('sequencer'), index=Number(mode.split('-')[1])||1;
+const sequence=mode.startsWith('sequencer'), index=Number(mode.split('-')[1])||1, maxActive=Number(process.argv[6]);
 const lock=join(worktree,'.git/georoids-test-runner.lock'), runDirectory=join(worktree,'.performance/integration-shards/run-fixture'), directory=join(runDirectory,'shard-'+index);
 mkdirSync(directory,{recursive:true});
 const birth=pid=>spawnSync('ps',['-p',String(pid),'-o','lstart='],{encoding:'utf8'}).stdout.trim();
 const runId='fixture-run', nonce='a'.repeat(64);
-const common={version:1,runId,worktree,lock,ownerPid:process.ppid,ownerStart:birth(process.ppid),coordinatorPid:process.pid,coordinatorStart:birth(process.pid),total:6,maxActive:3,sourceFingerprint:{sha256:'fixture-source'}};
+const common={version:1,runId,worktree,lock,ownerPid:process.ppid,ownerStart:birth(process.ppid),coordinatorPid:process.pid,coordinatorStart:birth(process.pid),total:6,maxActive,sourceFingerprint:{sha256:'fixture-source'}};
 writeFileSync(join(runDirectory,'manifest.json'),JSON.stringify(common),{mode:0o600});
-const assignmentPath=join(runDirectory,'assignments.json');writeFileSync(assignmentPath,sequence?readFileSync(join(worktree,'planned.json')):JSON.stringify({version:2,runId,worktree,total:6,maxActive:3,inventory:Array.from({length:6},(_,i)=>({file:join(worktree,'tests/integration/file-'+i+'.test.ts')})),shards:Array.from({length:6},(_,i)=>({index:i+1,allocationWeight:1,files:[join(worktree,'tests/integration/file-'+i+'.test.ts')]}))}),{mode:0o600});
+const assignmentPath=join(runDirectory,'assignments.json');writeFileSync(assignmentPath,sequence?readFileSync(join(worktree,'planned.json')):JSON.stringify({version:2,runId,worktree,total:6,maxActive,inventory:Array.from({length:6},(_,i)=>({file:join(worktree,'tests/integration/file-'+i+'.test.ts')})),shards:Array.from({length:6},(_,i)=>({index:i+1,allocationWeight:1,files:[join(worktree,'tests/integration/file-'+i+'.test.ts')]}))}),{mode:0o600});
 const assignmentSha256=createHash('sha256').update(readFileSync(assignmentPath)).digest('hex');
 const script=mode.startsWith('installed-timing')?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; node "$2/node_modules/vitest/vitest.mjs" run "$2/tests/integration" --root="$2" --config="$2/vitest.config.ts" --shard=1/6 --reporter="$4"':mode==='sequencer-ancestry'?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; exec sleep 5':sequence?'node "$1" authorize "$$" "$PPID" "$2" "$3" >/dev/null || exit $?; node --import "$4" "$2/sequence.mjs"':'node "$1" authorize "$$" "$PPID" "$2" "$3"; status=$?; exit "$status"';
 const child=spawn('bash',['-c',script,'fixture',helper,worktree,lock,mode==='installed-timing-sink'?join(worktree,'scripts/timing-failure-reporter.mjs'):mode==='installed-timing'?join(worktree,'scripts/integration-timing-reporter.mjs'):loader],{env:{...process.env,GEOROIDS_SHARD_MANIFEST:join(directory,'child.json'),GEOROIDS_SHARD_NONCE:mode==='nonce'?'b'.repeat(64):nonce,GEOROIDS_SHARD_RUN_ID:mode==='run'?'other-run':runId,SEQUENCE_FAULT:mode==='sequencer-digest'?'digest':mode==='sequencer-late'?'late':''},stdio:['ignore','pipe','pipe']});
@@ -350,6 +351,7 @@ const record={...common,index,directory,runDirectory,nonce,assignmentPath,assign
 if(mode==='pid')record.childPid++;
 if(mode==='owner')record.ownerPid++;
 if(mode==='birth')record.childStart='wrong';
+if(mode==='capacity'||mode==='sequencer-capacity')record.maxActive=maxActive===3?2:3;
 if(mode==='worktree')record.worktree='/wrong';
 if(mode==='lock')writeFileSync(join(lock,'pid'),'1\\n');
 if(mode!=='missing-manifest')setTimeout(()=>writeFileSync(join(directory,'child.json'),JSON.stringify(record),{mode:mode==='permissions'?0o644:0o600}),100);
@@ -360,7 +362,14 @@ child.once('exit',(code)=>{if(process.exitCode===undefined)process.exitCode=code
     const result = await new Promise((accept, reject) => {
       const child = spawn(
         process.execPath,
-        [fixture, worktree, testedHelper, mode, join(root, 'node_modules/tsx/dist/loader.mjs')],
+        [
+          fixture,
+          worktree,
+          testedHelper,
+          mode,
+          join(root, 'node_modules/tsx/dist/loader.mjs'),
+          String(maxActive),
+        ],
         {
           stdio: ['ignore', 'pipe', 'pipe'],
         }
@@ -438,7 +447,7 @@ test('actual child handshake waits for its issued PID manifest and rejects forge
   }
 });
 
-async function coordinatedFixture(mode) {
+async function coordinatedFixture(mode, maxActive = 3) {
   const directory = mkdtempSync(join(tmpdir(), 'geo-shard-command-'));
   let processOutput;
   try {
@@ -656,6 +665,7 @@ else {
             ...process.env,
             PATH: `${join(directory, 'bin')}:${process.env.PATH}`,
             FAULT: mode,
+            GEOROIDS_TEST_MAX_ACTIVE_SHARDS: String(maxActive),
             GEOROIDS_TEST_MAX_DURATION_SECONDS: mode === 'timeout' ? '1' : '1200',
             GEOROIDS_TEST_SHARD_RECEIPT:
               mode === 'output-sink' ? join(directory, 'missing-sink', 'review.json') : '',
@@ -741,6 +751,7 @@ else {
                   ...process.env,
                   PATH: `${join(directory, 'bin')}:${process.env.PATH}`,
                   FAULT: mode,
+                  GEOROIDS_TEST_MAX_ACTIVE_SHARDS: String(maxActive),
                 },
                 encoding: 'utf8',
               }
@@ -875,20 +886,20 @@ else {
     let active = 0;
     for (const [, delta] of events.sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
       active += delta;
-      assert.ok(active <= 3);
+      assert.ok(active <= maxActive);
     }
     if (mode === 'valid' || mode === 'late-source-change') {
       assert.equal(queue.launched.length, 6);
       const plan = JSON.parse(readFileSync(join(run, 'assignments.json'), 'utf8'));
       const heaviest = [...plan.shards]
         .sort((a, b) => b.estimatedFileMs - a.estimatedFileMs || a.index - b.index)
-        .slice(0, 3)
+        .slice(0, maxActive)
         .map((shard) => shard.index);
-      assert.deepEqual(queue.launched.slice(0, 3), heaviest);
+      assert.deepEqual(queue.launched.slice(0, maxActive), heaviest);
       assert.ok(queue.launched.every((index) => plan.shards[index - 1].allocationWeight === 1));
-      for (const later of manifests.slice(3)) {
+      for (const later of manifests.slice(maxActive)) {
         assert.ok(
-          manifests.slice(0, 3).some((earlier) => {
+          manifests.slice(0, maxActive).some((earlier) => {
             const cleanup = JSON.parse(
               readFileSync(join(run, `shard-${earlier.index}`, 'runner.json'), 'utf8')
             );
@@ -1030,6 +1041,15 @@ test('six actual authenticated runner commands retain isolation and fail closed 
   assert.equal(valid.receipt.success, true);
   assert.equal(valid.receipt.equivalencePassed, true);
   assert.equal(valid.receipt.summary.cases, 6);
+  for (const maxActive of [1, 2]) {
+    const limited = await coordinatedFixture('valid', maxActive);
+    assert.equal(limited.code, 0, `${limited.stdout}\n${limited.stderr}`);
+    assert.equal(limited.receipt.success, true);
+    assert.equal(limited.receipt.maxActive, maxActive);
+    assert.equal(limited.receipt.summary.cases, 6);
+    assert.equal(limited.queue.maxActive, maxActive);
+    assert.equal(limited.queue.launched.length, 6);
+  }
   const reusedPorts = await coordinatedFixture('reused-port-allocation');
   assert.equal(reusedPorts.code, 0, `${reusedPorts.stdout}\n${reusedPorts.stderr}`);
   assert.equal(reusedPorts.receipt.success, true);
@@ -1164,6 +1184,22 @@ test('proposed whole-file weights balance every current integration file without
     [1, 1, 1, 1, 1, 1]
   );
   assert.equal(plan.maxActive, 3);
+  assert.equal(parseShardCapacity(), 3);
+  for (const maxActive of [1, 2, 3]) {
+    assert.equal(parseShardCapacity(String(maxActive)), maxActive);
+    const limited = planShards({ ...input, maxActive });
+    assert.deepEqual(limited.shards, plan.shards);
+    assert.deepEqual(limited.inventory, plan.inventory);
+    for (let index = 1; index <= 6; index++) {
+      assert.deepEqual(selectShard(limited, files, index, 6), selectShard(plan, files, index, 6));
+    }
+  }
+  for (const value of ['', '0', '4', '-1', '1.5', '02', '2 ', 2, null]) {
+    assert.throws(() => parseShardCapacity(value), /must be 1, 2 or 3/u);
+  }
+  for (const maxActive of [0, 4, 1.5, '2']) {
+    assert.throws(() => planShards({ ...input, maxActive }), /capacity/u);
+  }
   assert.ok(
     Math.abs(
       plan.shards.reduce((sum, shard) => sum + shard.estimatedFileMs, 0) -
@@ -1301,6 +1337,19 @@ test('the installed Vitest sequencer selects each issued bucket and rejects chan
   }
   assert.equal(new Set(selected).size, inventory.length);
   assert.deepEqual([...selected].sort(), inventory.map(relative).sort());
+  for (const maxActive of [1, 2]) {
+    for (let index = 1; index <= 6; index++) {
+      const result = await handshake(`sequencer-${index}`, maxActive);
+      assert.equal(result.code, 0, result.stderr);
+      assert.deepEqual(
+        JSON.parse(result.stdout.trim()).map(relative).sort(),
+        expected.shards[index - 1].files.map(relative).sort()
+      );
+    }
+    const inconsistent = await handshake('sequencer-capacity', maxActive);
+    assert.notEqual(inconsistent.code, 0);
+    assert.match(inconsistent.stderr, /Run manifest differs/u);
+  }
   for (const mode of ['sequencer-digest', 'sequencer-late', 'sequencer-ancestry']) {
     const result = await handshake(mode);
     assert.notEqual(result.code, 0, `${mode}: ${result.stderr}`);

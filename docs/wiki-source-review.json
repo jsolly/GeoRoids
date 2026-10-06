@@ -351,7 +351,7 @@
     "tests/integration/browser/sanity/scout-radar-pulses-cover-the-viewport.test.ts": "sha256:ff2fc244e8e643e4c5bb9e341e860b44b46faf44c168556ffd236771d37426e9",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:f76279f6c010bf3bb720ecc32f896125ee039d06d258c425dc9b7fc1e953cf94",
     "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:7cb9cffa83ea560f133379f279afc1cd4a66b0e9c024e6838ac35f5b2153e0b9",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:6556b93d56a6960d3fe16b65e1161740e62b144193c5568df1b97d4934a186f3",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:00c35967540755c206175886eefb683cef8db73068e8998e13f7c945b20999e5",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:d7c87bc468f141449e4b4765b2cf497e9613f3d720928126aaae31b096cf74ab",
     "tests/integration/entities/input/mouse.test.ts": "sha256:622e8cb4a162a8771934519c131561a0044531118cf8a7b36a05c26377820fe1",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:7edd880a02bf776be1d3fe15f028792843e1a2a9ed7a184625342c165d2d5582",
@@ -1097,6 +1097,13 @@
       "owners": {
         "tests/integration/browser/e2e/scout-tags-a-spider-with-a-moving-beacon.test.ts": "scout"
       }
+    },
+    {
+      "note": "Reviewed the held-touch tool scenario after changing observation to capture the live flight phase, button label, disabled state, thrust and launch cooldown together. TypeScript and Biome pass; all nine real touch scenarios and the desktop/mobile field-manual browser scenario pass. Existing Controls, Hauler and Scout explanations and demonstrations remain accurate; no gameplay rules or media changed.",
+      "sources": ["tests/integration/browser/sanity/wave2-touch-controls.test.ts"],
+      "topics": ["controls"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

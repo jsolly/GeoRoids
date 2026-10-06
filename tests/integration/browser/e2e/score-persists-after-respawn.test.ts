@@ -28,9 +28,10 @@ test('death keeps the bank and another pilot can recover and bank the dropped ca
   await expect.poll(() => game.getScore()).toBe(300);
   const deathPosition = await game.dieOnceViaBoundary();
   await expect.poll(() => game.getCargo()).toBe(0);
+  const deathDistance = Math.hypot(deathPosition.x, deathPosition.y);
   await peer.placeControlledShipAt(
-    (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
-    (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
+    (deathPosition.x * (WORLD.radius - 100)) / deathDistance,
+    (deathPosition.y * (WORLD.radius - 100)) / deathDistance
   );
   await peer.waitForAnimationFrames(ECONOMY.cargoSpillEjectFrames + 1);
   await expect

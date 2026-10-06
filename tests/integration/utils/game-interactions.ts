@@ -1172,51 +1172,19 @@ export class GameInteractions {
     if (!deathPosition) {
       throw new Error('No boundary crossing position available');
     }
-    // Place once. Cargo can absorb a crossing, but health snapshots can also
-    // overtake the brief death state: a second fixture request must never target
-    // a dead pilot or overwrite the respawn being observed.
-    await this.placeShipAt(
-      (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
-      (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
-    );
-    const crossingEpoch = await this.page.evaluate(
-      () => window.gameController?.getCurrPlayer()?.ship.playerMotion?.epoch
-    );
-    if (crossingEpoch === undefined) {
-      throw new Error('Boundary crossing requires an authoritative motion epoch');
+    // Arrange one authoritative wall contact. Leave enough clearance beyond the
+    // edge that a cargo-protected hull cannot drift back inside before the next
+    // hit. The real collision resolver owns damage, death and respawn.
+    const contactPosition = {
+      x: (deathPosition.x * (WORLD.radius + 1000)) / (WORLD.radius + 50),
+      y: (deathPosition.y * (WORLD.radius + 1000)) / (WORLD.radius + 50),
+    };
+    await this.placeShipAt(contactPosition.x, contactPosition.y);
+    await this.requireObservedDeathCause('boundary');
+    if (await this.isGameRunning()) {
+      await this.waitForRandomRespawnPlacement(contactPosition, 25000);
     }
-    const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
-      const observedDeath = await this.page.evaluate(
-        ({ position, epoch }) => {
-          const deathCause = (window as typeof window & { __testDeathCause?: string })
-            .__testDeathCause;
-          if (deathCause) {
-            return true;
-          }
-          const ship = window.gameController?.getCurrPlayer()?.ship;
-          // Check and cross in the same browser task. Await the event when the
-          // hull is dead or its epoch changed; never move the replacement hull.
-          if (ship && ship.health > 0 && !ship.exploding && ship.playerMotion?.epoch === epoch) {
-            ship.position = { x: position.x, y: position.y };
-            ship.velocity = { x: 0, y: 0 };
-            ship.thrusting = false;
-            ship.angularVelocity = 0;
-          }
-          return false;
-        },
-        { position: deathPosition, epoch: crossingEpoch }
-      );
-      if (observedDeath) {
-        await this.requireObservedDeathCause('boundary');
-        if (await this.isGameRunning()) {
-          await this.waitForRandomRespawnPlacement(deathPosition, 25000);
-        }
-        return { x: deathPosition.x, y: deathPosition.y };
-      }
-      await this.waitForAnimationFrames(4);
-    }
-    throw new Error('boundary crossing should destroy the ship');
+    return contactPosition;
   }
 
   /** Wait until the local ship is alive again (ignores respawn placement). */

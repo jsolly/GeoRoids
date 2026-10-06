@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { TOWN_HEARTH } from '../../../../shared/furnaces';
 import { Player } from '../../../../src/entities/player/Player';
 import { publishHarpoonField } from '../../../../src/entities/ship/harpoonField';
+import { controlSources, resetControlSources } from '../../../../src/input/controlSources';
 import { keyDown, keyUp, reconcilePlayerInput } from '../../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { setSelectedShipKitId } from '../../../../src/ui/shipKitSelect';
@@ -15,6 +17,7 @@ const press = (code: string): void => keyDown(new KeyboardEvent('keydown', { cod
 const release = (code: string): void => keyUp(new KeyboardEvent('keyup', { code }), player);
 
 beforeEach(() => {
+  resetControlSources();
   player = new Player({ id: 'p', name: 'P', type: 'local', input: new MockPlayerInput() });
   reconcilePlayerInput(player);
 });
@@ -118,3 +121,68 @@ test('WASD is ignored while dead', () => {
   expect(player.ship.thrusting).toBe(false);
   expect(player.ship.angularVelocity).toBeCloseTo(0, 10);
 });
+
+test('a cargo pilot hovers on a furnace, steering releases that visit and an empty hold resumes cruise', () => {
+  player.cargo = 400;
+  player.ship.position = { x: 0, y: 0 };
+  player.ship.velocity = { x: 3, y: 1 };
+  reconcilePlayerInput(player);
+  player.ship.update();
+  expect(player.ship.cargoHover).toBe(true);
+  expect(player.ship.velocity).toEqual({ x: 0, y: 0 });
+  expect(player.ship.thrusting).toBe(false);
+  press('ArrowLeft');
+  expect(player.ship.cargoHover).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
+  release('ArrowLeft');
+  reconcilePlayerInput(player);
+  expect(player.ship.cargoHover).toBe(false);
+  player.ship.position = { x: 200, y: 0 };
+  reconcilePlayerInput(player);
+  player.ship.position = { x: 0, y: 0 };
+  reconcilePlayerInput(player);
+  expect(player.ship.cargoHover).toBe(true);
+  player.cargo = 0;
+  reconcilePlayerInput(player);
+  expect(player.ship.cargoHover).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
+});
+
+test.each(['scout', 'hauler'] as const)(
+  '%s catches the furnace rim despite its approach heading and releases on fresh steering',
+  (kitId) => {
+    player = new Player({
+      id: 'rim-pilot',
+      name: 'Pilot',
+      type: 'local',
+      kitId,
+      input: new MockPlayerInput(),
+    });
+    player.cargo = 400;
+    player.ship.angle = 0;
+    const rim = TOWN_HEARTH.radius + player.ship.r;
+    player.ship.position = { x: rim + 1, y: 0 };
+    controlSources.pointerHeading = Math.PI / 2;
+    reconcilePlayerInput(player);
+    expect(player.ship.cargoHover).toBe(false);
+    expect(player.ship.angularVelocity).not.toBe(0);
+    player.ship.position = { x: rim - 1, y: 0 };
+    player.ship.velocity = { x: -3, y: 0 };
+    const touchEpoch = controlSources.steeringEpoch;
+    reconcilePlayerInput(player);
+    player.ship.update();
+    expect(player.ship.position.x).toBeGreaterThan(TOWN_HEARTH.radius);
+    expect(player.ship.velocity).toEqual({ x: 0, y: 0 });
+    expect(player.ship.cargoHover).toBe(true);
+    expect(player.ship.angularVelocity).toBe(0);
+    expect(controlSources.steeringEpoch).toBe(touchEpoch);
+    controlSources.pointerHeading = Math.PI / 2;
+    reconcilePlayerInput(player);
+    expect(player.ship.cargoHover).toBe(false);
+    player.ship.update();
+    expect(player.ship.velocity).not.toEqual({ x: 0, y: 0 });
+    controlSources.pointerHeading = null;
+    reconcilePlayerInput(player);
+    expect(player.ship.cargoHover).toBe(false);
+  }
+);

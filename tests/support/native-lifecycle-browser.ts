@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type JSHandle } from 'playwright';
 import type { TouchControlDiagnostics } from '../../src/input/touchControls';
 
@@ -185,7 +186,10 @@ export function ownedGroupAbsentInInventory(inventory: string, pgid: number): bo
 /** A separate browser avoids Playwright's per-session visible capture handle.
  * noDefaults only applies to the existing default context, never newContext().
  */
-export async function createNativeLifecycleBrowser(options: Viewport & { hasTouch: boolean }) {
+export async function createNativeLifecycleBrowser(
+  options: Viewport & { hasTouch: boolean },
+  ownCleanup: (cleanup: () => Promise<void>) => void
+) {
   const profile = await mkdtemp(join(tmpdir(), 'georoids-native-lifecycle-'));
   const executablePath = chromium.executablePath();
   const launchArgs = [
@@ -202,10 +206,17 @@ export async function createNativeLifecycleBrowser(options: Viewport & { hasTouc
     `--window-size=${options.width},${options.height}`,
     'about:blank',
   ];
-  const child = spawn(executablePath, launchArgs, {
-    detached: true,
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  const child = spawn(
+    process.execPath,
+    [
+      fileURLToPath(new URL('./owned-native-browser.mjs', import.meta.url)),
+      executablePath,
+      ...launchArgs,
+    ],
+    { detached: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] }
+  );
+  const childStderr = child.stderr;
+  assert(childStderr, 'Owned native launcher requires a piped stderr');
   let spawnFailed = false;
   const exited = new Promise<void>((resolve) => {
     child.once('exit', () => resolve());
@@ -421,10 +432,11 @@ export async function createNativeLifecycleBrowser(options: Viewport & { hasTouc
     })();
     return closing;
   }
+  ownCleanup(close);
   try {
     const endpoint = await bounded(
       new Promise<string>((resolve, reject) => {
-        child.stderr.on('data', (chunk: Buffer) => {
+        childStderr.on('data', (chunk: Buffer) => {
           stderr = `${stderr}${chunk.toString()}`.slice(-16384);
           const match = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/u);
           if (match?.[1]) {

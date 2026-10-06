@@ -26,6 +26,8 @@ import { drawBeltEncounters } from './beltRenderer';
 import { drawFieryBoundary } from './boundaryRenderer';
 import { paintOpaqueBackground } from './canvasBackground';
 import { canvasManager } from './canvasSurface';
+import { drawCargoHolds } from './cargoHoldRenderer';
+import { drawCargoOffloads } from './cargoOffloadRenderer';
 import {
   drawContourLaserTicks,
   type LiveLaserSource,
@@ -180,6 +182,9 @@ function drawWorldLayers(
       drawThrusterAtPosition(ship, currShip.position, shipColor);
     }
   }
+
+  drawCargoHolds(allPlayers, currShip.position);
+  drawCargoOffloads(allPlayers, currShip.position);
 
   drawShockwaves(currShip.position);
 

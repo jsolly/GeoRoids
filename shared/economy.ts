@@ -3,6 +3,11 @@ import type { AsteroidData, AsteroidMaterial, SettlementState, ShipKitId } from 
 export const ECONOMY = {
   scoutCapacity: 500,
   haulerCapacity: 1500,
+  cargoPointsPerHp: 10,
+  cargoSpillEjectFrames: 30,
+  cargoSpillSpeed: 9,
+  offloadIntervalFrames: 12,
+  offloadPoints: 25,
   deathLootFrames: 120 * 60,
 } as const;
 export const RESOURCES = ['ice', 'metal', 'rubble', 'crystal'] as const;

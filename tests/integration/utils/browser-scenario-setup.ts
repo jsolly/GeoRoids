@@ -13,9 +13,11 @@ export function createBrowserScenarioHooks(
 ): {
   browserManager: BrowserManager;
   screenshotManager: ScreenshotManager;
+  ownCleanup: (cleanup: () => Promise<void>) => void;
 } {
   const browserManager = new BrowserManager();
   const screenshotManager = new ScreenshotManager(testDir);
+  const ownedCleanup: (() => Promise<void>)[] = [];
 
   beforeAll(async () => {
     await checkAllServers();
@@ -37,6 +39,15 @@ export function createBrowserScenarioHooks(
     const teardown = async () => {
       teardownAttempted = true;
       const failures: unknown[] = [];
+      // Test timeouts may interrupt the scenario's finally block. Retire native
+      // resources before resetting the world so they cannot reconnect into it.
+      for (const cleanup of ownedCleanup.splice(0).reverse()) {
+        try {
+          await cleanup();
+        } catch (error) {
+          failures.push(error);
+        }
+      }
       try {
         await browserManager.closeAllPages();
       } catch (error) {
@@ -78,5 +89,9 @@ export function createBrowserScenarioHooks(
     }
   });
 
-  return { browserManager, screenshotManager };
+  return {
+    browserManager,
+    screenshotManager,
+    ownCleanup: (cleanup) => ownedCleanup.push(cleanup),
+  };
 }

@@ -149,7 +149,7 @@
       }
     },
     {
-      "path": "tests/integration/browser/e2e/full-holds-consume-loot-without-overflow.test.ts",
+      "path": "tests/integration/browser/e2e/full-holds-leave-loot-for-crew-to-collect.test.ts",
       "cases": 2,
       "wholeFileMs": 6805.767791,
       "provenance": "partial-child-ended-row",

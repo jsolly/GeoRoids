@@ -202,9 +202,15 @@ export async function resetWorld(): Promise<void> {
 export async function placePlayer(
   playerId: string,
   position: { x: number; y: number },
-  options: { clearSpawnProtection?: boolean; expectedTowTargetId?: string } = {}
+  options: {
+    clearSpawnProtection?: boolean;
+    expectedTowTargetId?: string;
+    atTowTarget?: boolean;
+  } = {}
 ): Promise<{
   motionEpoch?: number;
+  position: { x: number; y: number };
+  atTowTarget: boolean;
   expectedTowTargetId: string | null;
   towOwnerId: string | null;
   towTargetId: string | null;
@@ -225,6 +231,8 @@ export async function placePlayer(
   if (
     typeof result !== 'object' ||
     result === null ||
+    !('atTowTarget' in result) ||
+    result.atTowTarget !== (options.atTowTarget === true) ||
     !('expectedTowTargetId' in result) ||
     result.expectedTowTargetId !== (options.expectedTowTargetId ?? null) ||
     !('towOwnerId' in result) ||
@@ -252,9 +260,13 @@ export async function placePlayer(
     typeof result.position !== 'object' ||
     result.position === null ||
     !('x' in result.position) ||
-    result.position.x !== position.x ||
+    typeof result.position.x !== 'number' ||
+    !Number.isFinite(result.position.x) ||
     !('y' in result.position) ||
-    result.position.y !== position.y
+    typeof result.position.y !== 'number' ||
+    !Number.isFinite(result.position.y) ||
+    (options.atTowTarget !== true &&
+      (result.position.x !== position.x || result.position.y !== position.y))
   ) {
     throw new Error('Player fixture placement returned an invalid response');
   }
@@ -267,6 +279,8 @@ export async function placePlayer(
     throw new Error('Player fixture placement returned an invalid motion epoch');
   }
   return {
+    position: { x: result.position.x, y: result.position.y },
+    atTowTarget: result.atTowTarget,
     expectedTowTargetId: result.expectedTowTargetId as string | null,
     towOwnerId: result.towOwnerId as string | null,
     towTargetId: result.towTargetId as string | null,

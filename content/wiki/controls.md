@@ -19,7 +19,7 @@ The viewport and maps keep north at the top while your ship turns. Point or drag
 
 ## Keyboard
 
-Steer with A/D or Left/Right, hold Space to fire, and press E for your equipped tool. Thrust is automatic; Shift toggles Contour Lock.
+Steer with A/D or Left/Right, hold Space to fire, and press E for your equipped tool. Thrust is automatic; reaching a lit furnace ring with cargo stops either ship to [offload](/wiki/#loot-growth) until the hold empties or you steer away. Shift toggles Contour Lock.
 
 ## Mouse
 

@@ -46,9 +46,9 @@ for (const width of [1280, 390]) {
         .toBe(true);
       const prompt = page.locator('#furnace-travel-prompt');
       await prompt.waitFor({ state: 'visible' });
-      expect(await prompt.locator(width === 390 ? 'button' : 'span').textContent()).toBe(
-        width === 390 ? 'Tap to travel' : 'Press E to travel'
-      );
+      await expect
+        .poll(() => prompt.locator(width === 390 ? 'button' : 'span').textContent())
+        .toBe(width === 390 ? 'Tap to travel' : 'Press E to travel');
       expect(await page.locator('[data-audio-restart]').count()).toBe(0);
       await page.keyboard.down('ArrowRight');
       try {

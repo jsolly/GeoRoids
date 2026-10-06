@@ -51,7 +51,7 @@ When a check fails:
 4. Run lint, types, relevant gameplay tests, and desktop/mobile wiki checks.
 5. Record only the completed scope with `npm run wiki:review`: repeat `--source` for each reviewed changed path, `--topic` for every affected article, and `--media` for every affected demonstration, with a nonempty `--note`. Unmapped or deleted sources also need an explicit `--owner source/path=topic-id` using a selected real topic. Then run `npm run test` and `npm run build`, including the review-invalidation contract test. Commit the resulting `docs/wiki-source-review.json` with the change.
 
-Do not regenerate the baseline automatically in CI or as part of a build. The digest detects review work; it cannot write or validate the explanation for you. Review notes should describe actual completed checks.
+Do not regenerate the baseline automatically in CI or as part of a build. The digest detects review work; it cannot write or validate the explanation for you. Review notes should describe actual completed checks. Explicit acceptance formats the ledger with the pinned Biome installation before replacing it atomically; a formatter failure leaves the previous review intact.
 
 Acceptance updates only the selected source hashes, adding or removing those keys as needed. It preserves unrelated pending hashes, the legacy review note and earlier review batches. A scoped acceptance can succeed while reporting other pending sources; the ordinary check still fails until those sources are reviewed. Unknown, duplicate or incomplete selectors fail before writing. Build and CI never accept a review automatically.
 

@@ -74,6 +74,19 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/Ship.ts',
     ],
   },
+  cargo: {
+    title: 'Cargo furnace offload',
+    alt: 'A Scout hovers beside a lit furnace while gold crates empty from its aft cargo bay and stream into the fire in small pulses. The remaining cargo counts down, bank and settlement totals rise, and Cargo Banked flashes at completion.',
+    caption:
+      'Controlled demonstration: a Scout unloads 400 cargo through the authoritative deposit cadence. Steering away would keep the remainder aboard.',
+    sources: [
+      'server/core/GameEngine.ts',
+      'shared/economy.ts',
+      'shared/furnaceField.ts',
+      'src/rendering/cargoOffloadRenderer.ts',
+      'src/rendering/cargoHoldRenderer.ts',
+    ],
+  },
   loot: {
     title: 'Loot blast and collect',
     alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Scout and is collected without changing the hull size.',

@@ -26,7 +26,7 @@ Meet at the cyan court northeast of Town Square for informal bank-shot duels; it
 
 ## Damage and protection
 
-Asteroid impacts remove health; the outer wall and a spider bite each kill a vulnerable ship outright. Spawn blinking and open map, schematic, or store menus protect your hull. A vulnerable ship that rams an ordinary rock also breaks it, leaving its points and a shard, while a protected ship passes through unharmed. Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls.
+Hazards spill [cargo](/wiki/#loot-growth) before damaging your hull; with an empty hold, the outer wall and a spider bite can kill outright. Spawn blinking and open map, schematic, or store menus protect your hull. A vulnerable ship that rams an ordinary rock also breaks it, leaving its points and a shard, while a protected ship passes through unharmed. Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls.
 
 ## Lives and respawn
 

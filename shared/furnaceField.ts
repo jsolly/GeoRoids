@@ -146,6 +146,15 @@ export class FurnaceField {
     return found;
   }
 
+  /** Hull contact can reach the intake rim; point deliveries use the grate itself. */
+  intakeAt(position: Position, hullRadius = 0): Hearth | undefined {
+    return this.nearby(position, TOWN_HEARTH.radius + hullRadius).find(
+      (site) =>
+        Math.hypot(position.x - site.position.x, position.y - site.position.y) <=
+        site.radius + hullRadius
+    );
+  }
+
   nearest(position: Position): Hearth {
     let nearest: Hearth = nearestFurnace(position);
     let distance = Math.hypot(position.x - nearest.position.x, position.y - nearest.position.y);

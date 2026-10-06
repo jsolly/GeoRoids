@@ -307,7 +307,15 @@ export class GameInteractions {
   }
 
   async getLoot(): Promise<
-    Array<{ id: string; x: number; y: number; mass: number; radius: number; kind: string }>
+    Array<{
+      id: string;
+      x: number;
+      y: number;
+      mass: number;
+      radius: number;
+      kind: string;
+      points?: number;
+    }>
   > {
     return await this.page.evaluate(() => {
       const gameController = window.gameController;
@@ -322,6 +330,7 @@ export class GameInteractions {
         mass: drop.mass,
         radius: drop.radius,
         kind: drop.kind ?? 'wreckage',
+        ...(drop.points !== undefined ? { points: drop.points } : {}),
       }));
     });
   }
@@ -919,8 +928,11 @@ export class GameInteractions {
 
   /** Arrange one real fatal asteroid impact without unrelated world hazards. */
   async dieFromAsteroidImpact(): Promise<{ x: number; y: number }> {
+    const id = await this.getLocalPlayerId();
+    // A lethal hull-impact scene needs an empty hold now that cargo absorbs hits.
+    await arrangeCrewField([id], 'delivery');
     await this.observeNextDeathCause();
-    await arrangeCrewField([await this.getLocalPlayerId()], 'impact');
+    await arrangeCrewField([id], 'impact');
     await this.requireObservedDeathCause('asteroid');
     return this.page.evaluate(() => {
       const position = (
@@ -1160,26 +1172,49 @@ export class GameInteractions {
     if (!deathPosition) {
       throw new Error('No boundary crossing position available');
     }
+    // Place once. Cargo can absorb a crossing, but health snapshots can also
+    // overtake the brief death state: a second fixture request must never target
+    // a dead pilot or overwrite the respawn being observed.
+    await this.placeShipAt(
+      (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
+      (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
+    );
+    const crossingEpoch = await this.page.evaluate(
+      () => window.gameController?.getCurrPlayer()?.ship.playerMotion?.epoch
+    );
+    if (crossingEpoch === undefined) {
+      throw new Error('Boundary crossing requires an authoritative motion epoch');
+    }
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
-      // Finish fixture placement inside the arena, then cross the wall through
-      // the real client collision path.
-      await this.placeShipAt(
-        (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
-        (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
+      const observedDeath = await this.page.evaluate(
+        ({ position, epoch }) => {
+          const deathCause = (window as typeof window & { __testDeathCause?: string })
+            .__testDeathCause;
+          if (deathCause) {
+            return true;
+          }
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          // Check and cross in the same browser task. Await the event when the
+          // hull is dead or its epoch changed; never move the replacement hull.
+          if (ship && ship.health > 0 && !ship.exploding && ship.playerMotion?.epoch === epoch) {
+            ship.position = { x: position.x, y: position.y };
+            ship.velocity = { x: 0, y: 0 };
+            ship.thrusting = false;
+            ship.angularVelocity = 0;
+          }
+          return false;
+        },
+        { position: deathPosition, epoch: crossingEpoch }
       );
-      await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
-      // Observe enough collision frames for a ship whose collected mass raised
-      // its health above the base 100, before waiting for the authoritative death event.
-      await this.waitForAnimationFrames(4);
-      await this.page.waitForTimeout(100);
-      if ((await this.getShipHealth()) <= 0) {
+      if (observedDeath) {
         await this.requireObservedDeathCause('boundary');
         if (await this.isGameRunning()) {
           await this.waitForRandomRespawnPlacement(deathPosition, 25000);
         }
         return { x: deathPosition.x, y: deathPosition.y };
       }
+      await this.waitForAnimationFrames(4);
     }
     throw new Error('boundary crossing should destroy the ship');
   }
@@ -1394,6 +1429,7 @@ export class GameInteractions {
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
     waitForCombatReady?: boolean;
+    field?: 'natural' | 'controlled';
     kitId?: 'scout' | 'hauler';
     haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
@@ -1416,7 +1452,9 @@ export class GameInteractions {
     await this.startGame();
     await this.waitForGameReady();
     await this.waitForServerJoin();
-    await this.waitForNetworkAsteroids(1);
+    if (options?.field !== 'controlled') {
+      await this.waitForNetworkAsteroids(1);
+    }
     if (options?.haulerUtility) {
       await this.page.waitForFunction(
         (utility) => window.gameController?.getCurrPlayer()?.ship.haulerUtility === utility,

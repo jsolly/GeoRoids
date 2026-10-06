@@ -25,12 +25,51 @@ const KITS = [
   { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
 ];
 
+async function bootInEmptyField(
+  page: Page,
+  game: GameInteractions,
+  kitId: 'scout' | 'hauler'
+): Promise<void> {
+  await game.bootGame({ field: 'controlled', waitForCombatReady: false, kitId });
+  const id = await game.getLocalPlayerId();
+  const epochs = await arrangeCrewField([id], 'empty');
+  await game.waitForControlledFixture(epochs.get(id));
+  await game.placeControlledShipAt(0, -500);
+  await page.waitForFunction(
+    () => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      return ship?.playerMotion?.mode === 'free' && !ship.serverOwnsMotion;
+    },
+    undefined,
+    { timeout: 5000 }
+  );
+}
+
 /** Observe real steering against the camera presented before each simulation step. */
 async function expectPointerSteering(page: Page, heading = Math.PI / 2): Promise<void> {
   const camera = await page.evaluateHandle<
     typeof import('../../../../src/rendering/canvasSurface').canvasManager
   >("import('/src/rendering/canvasSurface.ts').then(module => module.canvasManager)");
   try {
+    const touch = await page.evaluateHandle<typeof import('../../../../src/input/touchControls')>(
+      "import('/src/input/touchControls.ts')"
+    );
+    try {
+      // A new held finger first crosses the game's tap-versus-steer boundary.
+      await expect
+        .poll(() =>
+          touch.evaluate((controls, expected) => {
+            const actual = controls.readTouchControlDiagnostics().pointerHeading;
+            return (
+              actual !== null &&
+              Math.abs(Math.atan2(Math.sin(actual - expected), Math.cos(actual - expected))) < 1e-9
+            );
+          }, heading)
+        )
+        .toBe(true);
+    } finally {
+      await touch.dispose();
+    }
     const steps = await camera.evaluate(
       async (surface, { fps, heading: screenHeading }) => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -103,7 +142,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
+    await bootInEmptyField(page, game, 'hauler');
     const center = await centerOf(page, '#gameCanvas');
     const session = await page.context().newCDPSession(page);
     let touchActive = false;
@@ -178,7 +217,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
+    await bootInEmptyField(page, game, 'scout');
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
     const beforeTap = await readLocalTouchState(page);
     // Observe the press inside the browser; runner round trips must not turn

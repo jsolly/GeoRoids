@@ -1,5 +1,6 @@
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
+import { worldFurnaces } from '../network/worldExploration';
 import { canvasManager } from '../rendering/canvasSurface';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { isTownStoreOpen } from '../ui/townStoreState';
@@ -51,10 +52,37 @@ export function togglePlayerContourLock(player: Player): boolean {
   return active;
 }
 
-/** The live local ship cruises regardless of which controls are held. */
+const cargoHoverSessions = new WeakMap<Player, { furnaceId: string; released: boolean }>();
+
+/** Cargo catches a lit intake rim; fresh steering releases the current visit. */
 function updateCruise(player: Player): void {
   const alive = player.ship.health > 0 && !player.ship.exploding;
-  player.ship.thrusting = alive && !player.ship.movementLocked;
+  const furnace =
+    alive && player.cargo > 0
+      ? worldFurnaces.intakeAt(player.ship.position, player.ship.r)
+      : undefined;
+  if (!furnace) {
+    cargoHoverSessions.delete(player);
+    player.ship.cargoHover = false;
+  } else {
+    let visit = cargoHoverSessions.get(player);
+    if (!visit || visit.furnaceId !== furnace.id) {
+      visit = { furnaceId: furnace.id, released: false };
+      cargoHoverSessions.set(player, visit);
+      // Discard the approach heading so an unfinished mouse/touch turn cannot
+      // defeat docking. Held keys and subsequent steering still release it.
+      controlSources.pointerHeading = null;
+      player.ship.angularVelocity = 0;
+    }
+    const steering =
+      player.ship.angularVelocity !== 0 ||
+      [...getPressedKeysForPlayer(player)].some((code) => TURN_KEYS.has(code));
+    if (steering) {
+      visit.released = true;
+    }
+    player.ship.cargoHover = !visit.released;
+  }
+  player.ship.thrusting = alive && !player.ship.movementLocked && !player.ship.cargoHover;
   if (!alive) {
     player.ship.releaseContourLock();
   }

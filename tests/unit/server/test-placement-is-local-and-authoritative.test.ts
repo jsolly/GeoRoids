@@ -100,6 +100,7 @@ test('production never exposes placement, crew fixtures or world reset', async (
         position: { x: 1800, y: 0 },
         clearSpawnProtection: true,
         expectedTowTargetId: 'live-spider',
+        atTowTarget: true,
       }),
       signal: AbortSignal.timeout(3000),
     });
@@ -791,6 +792,61 @@ test('finite tow admission preserves health and cooldown, then atomic release al
   expect(player.exploding).toBe(true);
 });
 
+test('releasing beside a moving captive resolves its current position without manufacturing a bite', async () => {
+  const { origin, player, server } = await pilot('hauler');
+  expect(
+    (
+      await fetch(`${origin}/test/arrange-crew-field`, {
+        method: 'POST',
+        body: JSON.stringify({ playerIds: [player.id], scenario: 'spider-tow-bite' }),
+      })
+    ).status
+  ).toBe(200);
+  expect(server.gameEngine.useAbility(player.id)).toBe(true);
+  resolveToolFlights(server.gameEngine);
+  const target = player.harpoonTargetId;
+  assert.ok(target);
+  const stale = server.gameEngine.getSpiderField().spiders.find((spider) => spider.id === target);
+  assert.ok(stale);
+  const oldPosition = { ...stale.position };
+  expect(
+    (
+      await post(origin, {
+        playerId: player.id,
+        position: { x: oldPosition.x - 300, y: oldPosition.y },
+        expectedTowTargetId: target,
+      })
+    ).status
+  ).toBe(200);
+  for (let frame = 0; frame < 20; frame++) {
+    server.gameEngine.advanceOneFrame();
+  }
+  const current = server.gameEngine.getSpiderField().spiders.find((spider) => spider.id === target);
+  assert.ok(current);
+  expect(current.position).not.toEqual(oldPosition);
+  const health = player.health;
+  const release = await post(origin, {
+    playerId: player.id,
+    position: oldPosition,
+    expectedTowTargetId: target,
+    clearSpawnProtection: true,
+    atTowTarget: true,
+  });
+  expect(release.status).toBe(200);
+  expect(await release.json()).toMatchObject({
+    position: current.position,
+    expectedTowTargetId: target,
+    atTowTarget: true,
+    spawnProtectionCleared: true,
+    placedActorTowTargetId: target,
+  });
+  expect(player.position).toEqual(current.position);
+  expect(player.health).toBe(health);
+  expect(player.exploding).toBe(false);
+  expect(player.spawnProtectionTimer).toBe(0);
+  expect(player.harpoonTargetId).toBe(target);
+});
+
 test('tow-preserving placement rejects invalid identity or target before mutation and default placement still clears tow', async () => {
   const { origin, player, server } = await pilot('hauler');
   const arranged = await fetch(`${origin}/test/arrange-crew-field`, {
@@ -819,8 +875,22 @@ test('tow-preserving placement rejects invalid identity or target before mutatio
       position: { x: 4500, y: 2200 },
       clearSpawnProtection: true,
       expectedTowTargetId,
+      atTowTarget: true,
     });
     expect(response.ok).toBe(false);
+    expect(observe()).toBe(before);
+  }
+  for (const atTowTarget of [null, 1, 'true', {}, []]) {
+    expect(
+      (
+        await post(origin, {
+          playerId: player.id,
+          position: { x: 4500, y: 2200 },
+          expectedTowTargetId: target,
+          atTowTarget,
+        })
+      ).status
+    ).toBe(400);
     expect(observe()).toBe(before);
   }
   expect(

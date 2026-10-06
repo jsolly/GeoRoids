@@ -1,5 +1,6 @@
-import type { Position } from '../shared-types';
+import type { Position, ShipKitId } from '../shared-types';
 import { GAME, SHIP } from '../src/constants';
+import { cargoCapacity } from './economy';
 
 /**
  * Shared salvage rules and persisted ship mass, health, and handling. Hull draw size and collision
@@ -27,11 +28,11 @@ export const GROWTH = {
   /** Let the ejection read before magnetism or pickup can consume it. */
   TAP_LOOT_EJECT_FRAMES: 18,
   TAP_LOOT_MAGNET_RANGE: 160,
-  TAP_LOOT_MAGNET_ACCEL: 0.4 * GAME.MOTION_SCALE,
+  TAP_LOOT_MAGNET_ACCEL: 0.12 * GAME.MOTION_SCALE,
   /** Pull loot toward living ships from beyond hull overlap without inflating the hull. */
-  LOOT_MAGNET_RANGE: 96,
+  LOOT_MAGNET_RANGE: 80,
   LOOT_DRAG: 0.92,
-  LOOT_MAGNET_ACCEL: 0.24 * GAME.MOTION_SCALE,
+  LOOT_MAGNET_ACCEL: 0.08 * GAME.MOTION_SCALE,
   SCATTER_MIN: 16,
   SCATTER_MAX: 40,
   MAX_LOOT: 192,
@@ -106,12 +107,15 @@ export function canCollectLoot(entity: {
   health: number;
   respawnTimer?: number;
   overlayHold?: boolean;
+  cargo?: number;
+  kitId?: ShipKitId;
 }): boolean {
   return (
     !entity.exploding &&
     entity.health > 0 &&
     entity.respawnTimer === undefined &&
-    entity.overlayHold !== true
+    entity.overlayHold !== true &&
+    (entity.cargo === undefined || entity.cargo < cargoCapacity(entity.kitId))
   );
 }
 

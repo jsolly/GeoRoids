@@ -24,7 +24,7 @@ import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 import { canvasPoint, centerOf, dispatchTouch } from '../../utils/touch-input';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager, ownCleanup } = createBrowserScenarioHooks(__dirname);
 
 for (const device of [
   { name: 'desktop', width: 1280, height: 900, hasTouch: false },
@@ -34,13 +34,13 @@ for (const device of [
     `two ${device.name} GPU pilots keep flying and firing through loss, resize, resume and reconnect`,
     async () => {
       await browserManager.closeAllPages();
-      const native = await createNativeLifecycleBrowser(device);
+      const native = await createNativeLifecycleBrowser(device, ownCleanup);
       const { page, session } = native;
       let peerNative: Awaited<ReturnType<typeof createNativeLifecycleBrowser>> | undefined;
       let captureEvidence: () => Promise<unknown> = () => Promise.resolve(null);
       let retainedEvidence: () => unknown = () => ({ nativeHost: native.diagnostics() });
       async function runScene(stage: (name: string) => Promise<void>): Promise<void> {
-        const crewNative = await createNativeLifecycleBrowser(device);
+        const crewNative = await createNativeLifecycleBrowser(device, ownCleanup);
         peerNative = crewNative;
         const peerPage = crewNative.page;
         const primaryDiagnostics = watchBrowserDiagnostics(page);

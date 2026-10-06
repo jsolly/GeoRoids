@@ -42,6 +42,7 @@ export class Player {
   silk = 0;
   lastUpdate: number = Date.now();
   cargo = 0;
+  bankedCargo = 0;
   purchases: string[] = [];
   color: string; // Player's unique color for lasers and other visual elements
   deathCause?: string; // Environmental death cause
@@ -115,6 +116,7 @@ export class Player {
     velocity?: Position;
     angle?: number;
     cargo?: number;
+    bankedCargo?: number;
     purchases?: string[];
     score?: number;
     silk?: number;
@@ -232,6 +234,9 @@ export class Player {
     }
     if (data.score !== undefined) {
       this.score = data.score;
+    }
+    if (data.bankedCargo !== undefined) {
+      this.bankedCargo = data.bankedCargo;
     }
     if (data.cargo !== undefined) {
       this.cargo = data.cargo;

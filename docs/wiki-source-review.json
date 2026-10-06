@@ -310,7 +310,7 @@
     "src/utils/safeStorage.ts": "sha256:9540743d8a87bca16e1243f389113f48a14bfda169475115e4b1ead9eaae6874",
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:e65b287c6d24dd76d21db83a3ddf46b42ff5949eeb6ee177a8bc34adc940a08e",
+    "src/wiki/articleSources.json": "sha256:298d37c446ca6143c1ffa7cf8d2049c3b7856366119ef167c9bf9f6eeeb14344",
     "src/wiki/gameReference.ts": "sha256:e409c3338ac07a44fb840c0a5cbdb635503721a7d21307a5eaa9cda70d8639ab",
     "src/wiki/main.ts": "sha256:55e2f9bc2a01cc11b571eaf4e2cc227e4e1b814d13c1598769d4bfe4b9093222",
     "src/wiki/media.ts": "sha256:a29ed22df989d675f285414ee0f08968338e64717a6ea9ca3e5222c30d7262b9",
@@ -414,7 +414,7 @@
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:d4b9b6851cd9728b0c893374fe8419e5172359788761aae5f7b7683ee4487c5f",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:1e0147b9774ff7bdb876361b90696eefb69f222345c991f12e9f3b8253f6d8d6",
     "tests/unit/server/collaborative-asteroid-split.test.ts": "sha256:e8a45e42cbdea8eddadc4428931431bf8ff518566245b73f49df8f39b3053952",
-    "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:06ff4c4da17945a35c216523212c1a0987f8cc8adcd9cadc2d3673d54061d0cc",
+    "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:34d7a2d7b1422abb5965094d7f688a8173c9d56a56c9c69fbb64422bd58b67b2",
     "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:f37fe17461e867da81e2f63f09f111099ddb0a6f54365998ee925ccc5bff2013",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:b969e9ae05083bec14f237cdf004bc4676e7fc4b8496cc40fee805fa8383f30e",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:cee38cd86364b3f872948d7d38f961bd7ade8b0e15dc4ac42dc064a63dbc3971",
@@ -476,7 +476,13 @@
     "src/rendering/gpuResources.ts": "sha256:4771865e5866b12493b676e8b61f37af7e719738786388e0e59fa88e296ccef6",
     "src/rendering/gpuShaders.ts": "sha256:487f46f7739da0c11d11a559173533fc961dacdfdb5532e46a8e2955b324fe23",
     "src/rendering/nativeStarPainter.ts": "sha256:99ceed7fc237a7ad8bea8689cc5f0e8560256942f6912b586546ab4d6e9ce2ba",
-    "src/rendering/rasterSurface.ts": "sha256:9a3d40c04f3245c7f73a6680f8e3d83fe025ad83b72d3ed0054957f7ae26d834"
+    "src/rendering/rasterSurface.ts": "sha256:9a3d40c04f3245c7f73a6680f8e3d83fe025ad83b72d3ed0054957f7ae26d834",
+    "tests/unit/server/health-regeneration.test.ts": "sha256:7ec0e1f0088249b3e8eb31359c2bf4c350531b1ab630d5c29cf4a4180fbc3b42",
+    "src/diagnostics/performanceMetrics.ts": "sha256:6da5c23dc1451f6c6201e57b5d87317b7a28d0d51f73d203e10934c236ac3a4a",
+    "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts": "sha256:7b5add8d4d85cb66b5f86931a3690f969f49d8b3e5fa1c29d0d1c7d597ec2cce",
+    "tests/integration/browser/sanity/gpu-pilots-keep-playing-through-context-loss.test.ts": "sha256:e4588893a008166ff49ccf01d4a03e2f4f72a32e2a0c55278042e537356c9b00",
+    "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts": "sha256:78bfe06f01b23d5d124e853d185d9a6c8e75c47138cbdcdafa106977e7abed39",
+    "tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts": "sha256:68e8d25fcf62d46b8965ba45da5d5a35b761b264b346c7bfa257f9e19afa8d4f"
   },
   "reviews": [
     {
@@ -865,6 +871,77 @@
       "topics": ["terrain"],
       "media": ["terrain"],
       "owners": {}
+    },
+    {
+      "note": "Audited scoped source ownership, keyboard and reduced-motion access, probe lifecycle, tool targeting, loot eligibility and regeneration resets. Focused authoritative towing/healing/SQLite persistence scenarios passed 22 tests; natural belt size classes demonstrate two-vs-one Hauler towing. Ten existing demonstrations visually inspected and reproduced with Pillow 12.3.0; Markdown, types and Biome passed. Full gate and desktop/touch browser evidence follow separately.",
+      "sources": [
+        "src/wiki/articleSources.json",
+        "tests/unit/server/colossal-asteroids-need-a-crew.test.ts",
+        "tests/unit/server/health-regeneration.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "loot-growth",
+        "scout",
+        "teamwork"
+      ],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual",
+        "tests/unit/server/health-regeneration.test.ts": "combat-survival"
+      }
+    },
+    {
+      "note": "Reviewed the Wiki ownership map and diagnostic-only recovery fixes. Both crew epochs are verified before combat readiness waits; disconnect counting follows the first transport retry regardless of visibility recovery ordering. Two pure ordering tests passed. Gameplay recovery policy, Wiki advice, media and browser deadlines remain unchanged; full validation is pending.",
+      "sources": [
+        "src/diagnostics/performanceMetrics.ts",
+        "src/wiki/articleSources.json",
+        "tests/integration/browser/sanity/gpu-pilots-keep-playing-through-context-loss.test.ts",
+        "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts"
+      ],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual",
+        "src/diagnostics/performanceMetrics.ts": "hud-network",
+        "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts": "hud-network",
+        "tests/integration/browser/sanity/gpu-pilots-keep-playing-through-context-loss.test.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed belt mining evidence: an admitted projectile can kill the rim crawler before reaching the rock. The scenario observes that guard impact and death, then requires a separately admitted shot to damage the identified deposit. Gameplay and existing damage assertions remain unchanged.",
+      "sources": [
+        "src/wiki/articleSources.json",
+        "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts"
+      ],
+      "topics": ["asteroids", "field-manual"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual",
+        "tests/integration/browser/e2e/crew-mines-the-belt-and-sees-attached-crawlers.test.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Reviewed native resource audio observations against the retained setup pickup and actual canister collection events. The scenario starts a fresh phrase after equipment setup and excludes prior samples; desktop and mobile focused scenarios pass with the original notes, authoritative collection and deadlines. Player rules and demonstrations are unchanged.",
+      "sources": [
+        "tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the ownership-map addition for the native resource audio scenario under HUD/network; source paths exist and player guidance and demonstration placements are unchanged.",
+      "sources": ["src/wiki/articleSources.json"],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
+      }
     }
   ]
 }

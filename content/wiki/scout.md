@@ -21,6 +21,10 @@ Scout starts with Mineral Scan and turns faster than Hauler. Select Mineral Scan
 
 Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip it in Inventory and press E to fire a beacon at a rock or spider; a miss costs no cooldown and gives no message, but a probe shares the Scan recharge, so it waits after a Scan. It scans along its host's route for the crew and earns you delivery credit, so tagging a guard can reveal its resource nest. Beacons can be shot off, expire when their batteries run out, and are lost on a server restart; probes do not repel spiders.
 
+## Probe limits
+
+Aim your nose at a living host without a beacon; powered rocks cannot take a probe. Launching beyond your active-beacon limit replaces your oldest beacon. Destroying the host removes its beacon, while changing tools leaves already attached beacons working.
+
 ## Build
 
 At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. A failed build spends nothing and shows why (not enough banked points, or the inward furnace is unlit), but it uses up that E press, so no Scan or Probe fires.

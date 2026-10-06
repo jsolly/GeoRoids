@@ -39,9 +39,13 @@ A cream arrow marks an armed Boost Coupling; exhaust means the rock is deliverin
 
 Head east to mine the belt of metal-hulled rocks, only some of which carry ore (scan first) or tow its deposits to a furnace; explored belt locations stay marked on the universe map. Mining or carrying away a deposit starts its recovery timer, which continues through absences and server restarts. An amber warning marks a returning rock even when pilots are nearby; chipping a deposit does not heal it or restart the timer.
 
+The largest belt rocks follow the colossal towing rule: one cable holds them, and two Haulers move them. Smaller belt rocks move with one Hauler; scan for ore before committing the crew.
+
 ## Belt spiders
 
 Black, red-eyed crawlers round rock cover and hop between nearby rocks to chase you. One shot kills an exposed body without destroying its rock; retreat beyond their telegraphed lunges, and solid rock blocks both attacks and shots. When a host breaks, living crawlers leap to a reachable rock, or die if none is reachable. A killed crawler returns only when its host deposit is replaced.
+
+Crawlers cannot be tapped, probed, towed directly, or repelled by Mineral Scan. Tow their host instead; they travel with it and cannot bite during a hop.
 
 ## Ore and refining
 

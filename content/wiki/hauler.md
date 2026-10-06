@@ -31,6 +31,10 @@ Press E near a rock or spider to latch, fly it close to a lit furnace's intake, 
 
 Ordinary towed rocks break when they hit another rock or ship, damaging other ships but sparing their own Hauler. Colossal deposits survive these collisions and need two Haulers towing together to move. Untowed rocks pass through each other.
 
+## Reach and release
+
+Your tool chooses the nearest eligible hull within reach, using your heading to choose between close neighbors; an empty attempt costs no cooldown and shows no failure message. E can release or cancel an attachment during recharge, and changing utilities also releases it. An attachment breaks if its host dies or gets too far away; towing preserves momentum rather than reeling the cargo in.
+
 ## Boost Coupling E
 
 Press E to arm a rock (not a spider) toward its nearest furnace, then E again to ignite autonomous delivery. One coupling pushes a colossal deposit at a crawl; a second Hauler's coupling, before or after ignition, brings it to full speed. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and other tools until delivery pays its launchers and recorded scanning pilots.

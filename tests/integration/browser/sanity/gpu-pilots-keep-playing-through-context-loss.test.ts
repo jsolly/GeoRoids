@@ -77,11 +77,14 @@ for (const device of [
         expect(peerId).not.toBe(pilotId);
         expect(peerPage.context()).not.toBe(page.context());
         const epochs = await arrangeCrewField([pilotId, peerId], 'empty');
-        for (const [pilot, id, x] of [
-          [game, pilotId, 0],
-          [peer, peerId, 120],
+        await Promise.all([
+          game.waitForControlledFixture(epochs.get(pilotId)),
+          peer.waitForControlledFixture(epochs.get(peerId)),
+        ]);
+        for (const [pilot, x] of [
+          [game, 0],
+          [peer, 120],
         ] as const) {
-          await pilot.waitForControlledFixture(epochs.get(id));
           await pilot.placeControlledShipAt(x, -360);
           await pilot.waitForCombatReady();
         }

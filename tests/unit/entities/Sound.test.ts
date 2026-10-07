@@ -146,8 +146,8 @@ function context() {
   return ctx;
 }
 
-// Invoke the registered listener with a trusted-event double. Browser coverage
-// separately verifies that native gestures recover a frozen AudioContext.
+// Invoke the registered listener with a trusted-event double.
+// Native gesture recovery of a frozen AudioContext requires manual browser evidence.
 function trustedPointerDown(): void {
   const listener = vi
     .mocked(document.addEventListener)

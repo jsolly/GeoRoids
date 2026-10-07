@@ -8,7 +8,7 @@ import {
 } from '../../../benchmarks/transport-qualification';
 
 test.each(['deflate-level1-no-context', 'deflate-level1-no-context-8k'] as const)(
-  'a %s candidate proves both no-context directions in its actual browser handshake',
+  'a %s compression declaration requires both no-context directions',
   (mode) => {
     expect(() => requireNegotiatedCompression('none', '')).not.toThrow();
     expect(() => requireNegotiatedCompression('none', 'permessage-deflate')).toThrow();

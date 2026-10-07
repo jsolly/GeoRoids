@@ -338,7 +338,11 @@ restart/offline delivery credit have their own scenarios in
 GIFs and posters were visually reviewed and reproduced with Pillow 12.3.0 during
 this audit; no generator or media baseline was changed.
 
-### Validation corrections
+### Historical validation corrections
+
+These browser scenarios were retired with the browser suite. The descriptions
+below record earlier validation; the current code gate supplies no native
+GPU, gesture, audio or desktop/touch evidence from these scenarios.
 
 Native GPU recovery exposed two ordering problems. The browser scenario now
 verifies both crew placement epochs before waiting for either pilot's combat

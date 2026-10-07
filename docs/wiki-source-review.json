@@ -338,7 +338,7 @@
     "src/wiki/wiki.css": "sha256:d47f0c7fb925815758b7578ba53df525f58aa0d6da11a8f08992fae3c55edf58",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:d7c87bc468f141449e4b4765b2cf497e9613f3d720928126aaae31b096cf74ab",
     "tests/integration/entities/input/mouse.test.ts": "sha256:622e8cb4a162a8771934519c131561a0044531118cf8a7b36a05c26377820fe1",
-    "tests/unit/audio/title-and-play-loop-music-beds.test.ts": "sha256:99a42504808ea6494966f9767c03cea44ec68c60cf8342352a6027632600f5f5",
+    "tests/unit/audio/title-and-play-loop-music-beds.test.ts": "sha256:b0fd9b8a53e7e1672556b70edd6a9a003004ddc6cfc122cc0b6e0abdc2861b8d",
     "tests/unit/diagnostics/debugHudMetrics.test.ts": "sha256:30bef1e4766b95b7c5923bb6816b958581d68ec2f7cf79194ef132adf28216e0",
     "tests/unit/entities/asteroidSplitting.test.ts": "sha256:f8c49a25d4cbc8c8da1ae5b5bda3a7a789e8423e6b2afb896efa9a713220aadf",
     "tests/unit/entities/asteroids.test.ts": "sha256:62dc849ff1583c360a13b467e09b07ccfdb5261e8b4806f6413ee4487e7444d6",
@@ -449,7 +449,7 @@
     "tests/unit/ui/shipSchematic.test.ts": "sha256:6a7d248b9f9e6081db21492a3b04d3e2b35672a9928e5ab4f9b1e28961c86a97",
     "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "sha256:6bff8f35625976817326652a492213aa3eedb7c1936450e3b0700c643842f2b5",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:bdd73236b08a2583bad6309520a9b3340f7357abeaf2d8e2a9aed5f0b5a2df12",
-    "tests/unit/ui/universeMap.test.ts": "sha256:fbd9ce112be5bfb36697fb4f6f0529c20dea26948398faf38b637cff74e4cf33",
+    "tests/unit/ui/universeMap.test.ts": "sha256:827f6e9547cb8d0901fc398dd2ed9d97531a8a7180e72c99f81b496985f03696",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "vite.config.ts": "sha256:efa0b06e756456a39bb5740710a0f6a53c208630f212fec4428e194918898022",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677",
@@ -2169,6 +2169,16 @@
       "note": "Made the desktop hint lines private after retiring their only exported test consumer; rendering, hint text, timing rules and articles remain unchanged.",
       "sources": ["src/ui/schematicEquipHint.ts"],
       "topics": ["controls", "hauler", "hud-network", "satellites", "scout"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed coverage-attribution comments only: mocked audio gestures and dialog wiring remain the code proofs; native browser gesture recovery and modality require manual evidence. Assertions, rules, articles and media are unchanged.",
+      "sources": [
+        "tests/unit/audio/title-and-play-loop-music-beds.test.ts",
+        "tests/unit/ui/universeMap.test.ts"
+      ],
+      "topics": ["controls", "hud-network"],
       "media": [],
       "owners": {}
     }

@@ -91,7 +91,7 @@ async function runStage(command, args, { artifact, ...options }) {
         stream.on('data', (chunk) => writeSync(output, chunk));
         createInterface({ input: stream }).on('line', (line) => {
           if (
-            /^(Waiting for heavy validation admission,|Heavy validation admitted,|Review artifacts:|Review exit )/u.test(
+            /^(Waiting for heavy validation (?:admission,|ticket allocation:)|Heavy validation admitted,|Review artifacts:|Review exit )/u.test(
               line
             )
           ) {

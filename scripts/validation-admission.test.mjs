@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -21,7 +22,7 @@ const childScript = `
 const fs = require('node:fs');
 const [started, release, proof] = process.argv.slice(1);
 const start = require('node:child_process').spawnSync('ps', ['-p', String(process.pid), '-o', 'lstart='], {encoding:'utf8'}).stdout.trim();
-fs.writeFileSync(started, JSON.stringify({pid:process.pid, start, env:Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('GEOROIDS_VALIDATION_')))}));
+fs.writeFileSync(started, JSON.stringify({pid:process.pid, start, at:Date.now(), root:process.cwd(), env:Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('GEOROIDS_VALIDATION_')))}));
 function finish() {
   if (process.env.GEOROIDS_TEST_RUNNER_RECEIPT && proof !== 'missing') {
     fs.writeFileSync(process.env.GEOROIDS_TEST_RUNNER_RECEIPT, JSON.stringify({
@@ -30,6 +31,7 @@ function finish() {
       lockReleased:true, sessionRemoved:true
     }));
   }
+  fs.writeFileSync(started + '.ended', String(Date.now()));
   process.exit(proof === 'test-failed' ? 1 : 0);
 }
 let cleaning = false;
@@ -67,7 +69,7 @@ async function until(predicate, description) {
   }
 }
 function fixture(t) {
-  const directory = mkdtempSync(join(tmpdir(), 'georoids-admission-'));
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'georoids-admission-')));
   const root = join(directory, 'primary');
   mkdirSync(root);
   const env = Object.fromEntries(
@@ -133,7 +135,7 @@ function fixture(t) {
   }
   function start(
     name,
-    { cwd = root, kind = 'review', proof = 'clean', environment = {}, command } = {}
+    { cwd = root, kind = 'review', proof = 'clean', environment = {}, command, preload } = {}
   ) {
     const started = join(directory, `${name}.started`);
     const release = join(directory, `${name}.release`);
@@ -141,6 +143,7 @@ function fixture(t) {
     const child = spawn(
       process.execPath,
       [
+        ...(preload ? ['--import', preload] : []),
         helper,
         kind,
         '--',
@@ -576,3 +579,245 @@ test('inherited Git redirection cannot move ownership into another repository', 
   runner.finish();
   assert.equal((await runner.child.completed).code, 0, runner.child.output);
 });
+
+// Pause real filesystem publication in a native supervisor. Production code has
+// no test switches; all Git state and process ownership belongs to this fixture.
+function pausePublication(f, phase = 'ticket') {
+  const ready = join(f.directory, `${phase}.ready`);
+  const release = join(f.directory, `${phase}.resume`);
+  const preload = join(f.directory, `${phase}.mjs`);
+  const queue = join(f.common, 'georoids-validation-queue');
+  const allocation = join(f.common, 'georoids-validation-allocation.lock');
+  writeFileSync(
+    preload,
+    `
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const mkdir = fs.mkdirSync;
+const rename = fs.renameSync;
+let paused = false;
+function pause() {
+  if (paused) return;
+  paused = true;
+  fs.writeFileSync(${JSON.stringify(ready)}, '');
+  const deadline = Date.now() + 10000;
+  while (!fs.existsSync(${JSON.stringify(release)})) {
+    if (Date.now() > deadline) throw new Error('Publication fixture timed out');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+  }
+}
+fs.mkdirSync = function(path, ...args) {
+  if (${JSON.stringify(phase)} === 'ticket' &&
+      String(path) === ${JSON.stringify(join(queue, '000000000001'))}) pause();
+  return mkdir.call(this, path, ...args);
+};
+fs.renameSync = function(from, to) {
+  if (${JSON.stringify(phase)} === 'allocation-owner' &&
+      String(to) === ${JSON.stringify(join(allocation, 'owner.json'))}) pause();
+  if (${JSON.stringify(phase)} === 'ticket-owner' &&
+      String(to) === ${JSON.stringify(join(queue, '000000000001', 'owner.json'))}) pause();
+  return rename.call(this, from, to);
+};
+syncBuiltinESMExports();
+`
+  );
+  return { preload, ready, resume: () => writeFileSync(release, '') };
+}
+function assertReleased(f, runs) {
+  assert.deepEqual(f.queue(), []);
+  assert.equal(existsSync(join(f.common, 'georoids-validation-allocation.lock')), false);
+  for (const run of runs) {
+    if (!existsSync(run.started)) {
+      continue;
+    }
+    const owned = JSON.parse(readFileSync(run.started, 'utf8'));
+    const groups = spawnSync('ps', ['-axo', 'pgid=,stat='], { encoding: 'utf8' });
+    assert.equal(groups.status, 0, groups.stderr);
+    assert.equal(
+      groups.stdout.split('\n').some((line) => {
+        const [group, state] = line.trim().split(/\s+/u);
+        return Number(group) === owned.pid && !state.includes('Z');
+      }),
+      false,
+      `Command group ${owned.pid} remains`
+    );
+    const gitDir = f.git(owned.root, 'rev-parse', '--absolute-git-dir');
+    assert.equal(existsSync(join(gitDir, 'georoids-validation-checkout.lock')), false);
+  }
+}
+
+test('a delayed ticket publisher cannot reuse a released lower ticket beside an active sibling', async (t) => {
+  const f = fixture(t);
+  const pause = pausePublication(f);
+  const a = f.start('a', { kind: 'runner', preload: pause.preload });
+  await until(() => existsSync(pause.ready), 'A selected ticket one before publication');
+  const b = f.start('b', { kind: 'runner', cwd: f.sibling('b') });
+  await until(
+    () => existsSync(b.started) || b.child.output.includes('ticket allocation'),
+    'B allocation result'
+  );
+  const c = f.start('c', { kind: 'runner', cwd: f.sibling('c') });
+  await until(() => c.child.output.includes('Waiting for heavy'), 'C waiting');
+  if (existsSync(b.started)) {
+    // Original code admits B as ticket one and queues C as ticket two. Let C
+    // enter after B leaves, then resume A's stale choice of ticket one.
+    b.finish();
+    assert.equal((await b.child.completed).code, 0, b.child.output);
+    await until(() => existsSync(c.started), 'C admitted after B');
+    pause.resume();
+    await until(() => existsSync(a.started), 'delayed A admitted');
+    a.finish();
+    c.finish();
+  } else {
+    assert.deepEqual(f.queue(), []);
+    assert.equal(existsSync(c.started), false);
+    pause.resume();
+    await until(() => existsSync(a.started), 'A admitted after complete publication');
+    await until(
+      () =>
+        f.queue().length === 3 &&
+        f
+          .queue()
+          .every((ticket) =>
+            existsSync(join(f.common, 'georoids-validation-queue', ticket, 'owner.json'))
+          ),
+      'all three published tickets'
+    );
+    const ordered = f
+      .queue()
+      .sort()
+      .map(
+        (ticket) =>
+          JSON.parse(
+            readFileSync(join(f.common, 'georoids-validation-queue', ticket, 'owner.json'), 'utf8')
+          ).pid
+      );
+    assert.equal(ordered[0], a.child.pid);
+    const runs = [a, b, c];
+    for (const pid of ordered) {
+      const current = runs.find((run) => run.child.pid === pid);
+      await until(() => existsSync(current.started), 'next published ticket admitted');
+      for (const later of runs.filter(
+        (run) => ordered.indexOf(run.child.pid) > ordered.indexOf(pid)
+      )) {
+        assert.equal(existsSync(later.started), false, 'Later ticket overtook its predecessor');
+      }
+      current.finish();
+      assert.equal((await current.child.completed).code, 0, current.child.output);
+    }
+  }
+  for (const run of [a, b, c]) {
+    assert.equal((await run.child.completed).code, 0, run.child.output);
+  }
+  const intervals = [a, b, c]
+    .map((run) => ({
+      start: JSON.parse(readFileSync(run.started, 'utf8')).at,
+      end: Number(readFileSync(`${run.started}.ended`, 'utf8')),
+    }))
+    .sort((left, right) => left.start - right.start);
+  for (let i = 1; i < intervals.length; i += 1) {
+    assert(intervals[i].start >= intervals[i - 1].end, 'Heavy command intervals overlapped');
+  }
+  assertReleased(f, [a, b, c]);
+});
+
+test('cancelling an allocation waiter leaves the live publisher owned and permits later progress', async (t) => {
+  const f = fixture(t);
+  const pause = pausePublication(f);
+  const a = f.start('a', { preload: pause.preload });
+  await until(() => existsSync(pause.ready), 'paused allocator');
+  const bRoot = f.sibling('b');
+  const b = f.start('b', { cwd: bRoot });
+  await until(() => b.child.output.includes('ticket allocation'), 'allocation waiter');
+  b.child.kill('SIGTERM');
+  assert.notEqual((await b.child.completed).code, 0);
+  assert.match(b.child.output, /allocation cancelled/u);
+  assert.equal(existsSync(b.started), false);
+  assert.equal(
+    existsSync(
+      join(f.git(bRoot, 'rev-parse', '--absolute-git-dir'), 'georoids-validation-checkout.lock')
+    ),
+    false
+  );
+  assert.equal(
+    JSON.parse(
+      readFileSync(join(f.common, 'georoids-validation-allocation.lock', 'owner.json'), 'utf8')
+    ).pid,
+    a.child.pid
+  );
+  pause.resume();
+  await until(() => existsSync(a.started), 'original publisher admitted');
+  const c = f.start('c', { cwd: bRoot });
+  await until(() => c.child.output.includes('Waiting for heavy'), 'replacement waiter');
+  a.finish();
+  assert.equal((await a.child.completed).code, 0, a.child.output);
+  await until(() => existsSync(c.started), 'replacement admitted');
+  c.finish();
+  assert.equal((await c.child.completed).code, 0, c.child.output);
+  assertReleased(f, [a, c]);
+});
+
+for (const phase of ['ticket', 'allocation-owner', 'ticket-owner']) {
+  test(`a dead allocator during ${phase} publication preserves its ownership and refuses new work`, async (t) => {
+    const f = fixture(t);
+    const pause = pausePublication(f, phase);
+    const a = f.start('a', { preload: pause.preload });
+    await until(() => existsSync(pause.ready), 'paused allocator');
+    a.child.kill('SIGKILL');
+    await a.child.completed;
+    const allocation = join(f.common, 'georoids-validation-allocation.lock');
+    const before = readdirSync(allocation).map((name) => [
+      name,
+      readFileSync(join(allocation, name), 'utf8'),
+    ]);
+    const b = f.start('b', { cwd: f.sibling('b') });
+    assert.notEqual((await b.child.completed).code, 0);
+    assert.match(
+      b.child.output,
+      phase === 'allocation-owner'
+        ? /Untrustworthy validation allocation/u
+        : /Dead validation allocator/u
+    );
+    assert.equal(existsSync(b.started), false);
+    assert.deepEqual(f.queue(), phase === 'ticket-owner' ? ['000000000001'] : []);
+    assert.deepEqual(
+      readdirSync(allocation).map((name) => [name, readFileSync(join(allocation, name), 'utf8')]),
+      before
+    );
+  });
+}
+
+for (const target of ['allocation', 'ticket']) {
+  test(`failed ${target} owner publication releases its own incomplete allocation before another checkout enters`, async (t) => {
+    const f = fixture(t);
+    const preload = join(f.directory, 'failed-publication.mjs');
+    const destination =
+      target === 'allocation'
+        ? join(f.common, 'georoids-validation-allocation.lock', 'owner.json')
+        : join(f.common, 'georoids-validation-queue', '000000000001', 'owner.json');
+    writeFileSync(
+      preload,
+      `
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const rename = fs.renameSync;
+fs.renameSync = function(from, to) {
+  if (String(to) === ${JSON.stringify(destination)}) throw new Error('fixture publication failed');
+  return rename.call(this, from, to);
+};
+syncBuiltinESMExports();
+`
+    );
+    const a = f.start('failed', { preload });
+    assert.notEqual((await a.child.completed).code, 0);
+    assert.match(a.child.output, /fixture publication failed/u);
+    assert.equal(existsSync(a.started), false);
+    assertReleased(f, []);
+    assert.equal(existsSync(join(f.common, 'georoids-validation-checkout.lock')), false);
+    const b = f.start('next', { kind: 'runner' });
+    await until(() => existsSync(b.started), 'next allocation after failed publication');
+    b.finish();
+    assert.equal((await b.child.completed).code, 0, b.child.output);
+    assertReleased(f, [b]);
+  });
+}

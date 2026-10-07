@@ -243,27 +243,70 @@ function legacyBusy(home) {
     ), `Unresolved runner cleanup blocks validation: ${directory}`);
   return false;
 }
-async function acquireHeavy(home, owner, cancelled) {
+async function allocateTicket(home, owner, cancelled) {
   const queue = join(home.common, 'georoids-validation-queue');
+  const allocation = join(home.common, 'georoids-validation-allocation.lock');
   mkdirSync(queue, { recursive: true, mode: 0o700 });
-  let ticket;
-  let directory;
+  let reported = 0;
   for (;;) {
-    const names = readdirSync(queue).filter((name) => /^\d{12}$/u.test(name));
-    const number = Math.max(0, ...names.map(Number)) + 1;
-    require(number < 1e12, 'Validation queue ticket space exhausted');
-    ticket = String(number).padStart(12, '0');
-    directory = join(queue, ticket);
+    require(!cancelled(), 'Validation queue allocation cancelled');
     try {
-      mkdirSync(directory, { mode: 0o700 });
+      mkdirSync(allocation, { mode: 0o700 });
       break;
     } catch (error) {
       if (error.code !== 'EEXIST') {
         throw error;
       }
     }
+    let prior;
+    try {
+      prior = json(join(allocation, 'owner.json'));
+    } catch (error) {
+      const metadata = statSync(allocation, { throwIfNoEntry: false });
+      if (!metadata) {
+        continue;
+      }
+      require(error.code === 'ENOENT' &&
+        Date.now() - metadata.mtimeMs <
+          5000, `Untrustworthy validation allocation blocks admission: ${allocation}`);
+    }
+    if (prior) {
+      require(live(prior), `Dead validation allocator requires inspection: ${allocation}`);
+    }
+    if (Date.now() - reported > 10000) {
+      process.stderr.write(`Waiting for heavy validation ticket allocation: ${allocation}\n`);
+      reported = Date.now();
+    }
+    await delay(100);
   }
-  write(join(directory, 'owner.json'), owner);
+  let directory;
+  let created = false;
+  try {
+    write(join(allocation, 'owner.json'), owner);
+    // Selection and complete publication share one lock. A delayed allocator
+    // must never publish a reused lower ticket after a later ticket is admitted.
+    const names = readdirSync(queue).filter((name) => /^\d{12}$/u.test(name));
+    const number = Math.max(0, ...names.map(Number)) + 1;
+    require(number < 1e12, 'Validation queue ticket space exhausted');
+    const ticket = String(number).padStart(12, '0');
+    directory = join(queue, ticket);
+    mkdirSync(directory, { mode: 0o700 });
+    created = true;
+    write(join(directory, 'owner.json'), owner);
+    return { queue, ticket, directory };
+  } catch (error) {
+    if (created) {
+      rmSync(directory, { recursive: true });
+    }
+    throw error;
+  } finally {
+    // Only its creator removes this lock. Dead or incomplete ownership is
+    // preserved for inspection, never reclaimed with a racy check then unlink.
+    rmSync(allocation, { recursive: true });
+  }
+}
+async function acquireHeavy(home, owner, cancelled) {
+  const { queue, ticket, directory } = await allocateTicket(home, owner, cancelled);
   let admitted = false;
   try {
     let reported = 0;

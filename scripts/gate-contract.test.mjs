@@ -230,7 +230,7 @@ test('queued stage reports progress before completion and retains failed subproc
       `#!${process.execPath}
 import { existsSync, writeFileSync } from 'node:fs';
 process.stdout.write('private stdout diagnostics\\nReview artifacts: fixture-review\\n');
-process.stderr.write('private stderr diagnostics\\nWaiting for heavy validation admission,');
+process.stderr.write('private stderr diagnostics\\nWaiting for heavy validation ticket allocation: fixture-allocation\\nWaiting for heavy validation admission,');
 setTimeout(() => process.stderr.write(' ticket fixture: fixture-queue\\n'), 10);
 const timer = setInterval(() => {
   if (existsSync(${JSON.stringify(release)})) {
@@ -276,7 +276,8 @@ try {
       output += chunk;
       if (
         output.includes('Waiting for heavy validation admission, ticket fixture: fixture-queue') &&
-        output.includes('Review artifacts: fixture-review')
+        output.includes('Review artifacts: fixture-review') &&
+        output.includes('Waiting for heavy validation ticket allocation: fixture-allocation')
       ) {
         progress(true);
       }
@@ -297,6 +298,7 @@ try {
       'private stderr diagnostics',
       'last stdout diagnostics',
       'last stderr diagnostics',
+      'Waiting for heavy validation ticket allocation: fixture-allocation',
       'Waiting for heavy validation admission, ticket fixture: fixture-queue',
       'Review artifacts: fixture-review',
     ]) {

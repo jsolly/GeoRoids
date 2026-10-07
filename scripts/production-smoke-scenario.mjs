@@ -97,7 +97,7 @@ export async function waitForClientRelease({
         );
         const body = await response.text();
         requireEvidence(body.length > 0, 'Client bundle asset is empty');
-        if (modules.includes(url) && new RegExp(`["']${expectedSha}["']`, 'u').test(body)) {
+        if (modules.includes(url) && new RegExp(`(["'\`])${expectedSha}\\1`, 'u').test(body)) {
           embeddedRelease = true;
         }
       }

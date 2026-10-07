@@ -89,7 +89,8 @@
     "src/ui/furnaceTravelMap.ts",
     "src/entities/loot/lootRenderer.ts",
     "src/entities/ship/shipRenderer.ts",
-    "src/wiki/mediaPlayback.ts"
+    "src/wiki/mediaPlayback.ts",
+    "src/ui/furnaceTravelPrompt.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -463,7 +464,9 @@
     "shared/utilityFlight.ts",
     "shared/toolFlightContact.ts",
     "server/world/AsteroidSpatialIndex.ts",
-    "tests/unit/entities/launched-tools-hit-or-return.test.ts"
+    "tests/unit/entities/launched-tools-hit-or-return.test.ts",
+    "src/ui/furnaceTravelPrompt.ts",
+    "tests/unit/ui/town-store-opens-beside-town-square.test.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",

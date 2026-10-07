@@ -188,6 +188,19 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
 - **Playwright browsers** (manual benchmarks and Wiki media only): install the browser required by that tool with `npx --no-install playwright install chromium`. Browser binaries are not needed for code-test validation. Preserve owned media and measurement outputs; these tools remain outside the gate.
 
+### Local playground
+
+`npm run dev` automatically enables `GEOROIDS_LOCAL_PLAYGROUND=1` in development.
+Each server startup places all three tool pickups and all six satellite hulls
+near Town Square and lights three first-band furnaces without replacing saved
+player-built furnaces. New pilots start with 5,000 banked points; saved pilots
+restored after a restart keep at least that amount. A live reconnect preserves
+its current balance. Pickups use the ordinary collection and expiry rules.
+
+Set `GEOROIDS_LOCAL_PLAYGROUND=0` before `npm run dev` to use the normal world.
+Production never enables the preset, and integration runners' in-memory worlds
+retain their scenario-owned fixtures.
+
 ### Services
 
 | Service | Port | Health / URL |

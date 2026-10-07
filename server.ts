@@ -25,7 +25,12 @@ if (!localWorld) {
     throw new Error('Production world database must be directly inside RAILWAY_VOLUME_MOUNT_PATH');
   }
 }
-const server = createServerInstance({ ...configuration, worldPath });
+const server = createServerInstance({
+  ...configuration,
+  worldPath,
+  // Integration runners explicitly use an in-memory world and own their fixtures.
+  localPlayground: configuration.localPlayground && worldPath !== ':memory:',
+});
 let shuttingDown = false;
 let requestedExitCode = 0;
 

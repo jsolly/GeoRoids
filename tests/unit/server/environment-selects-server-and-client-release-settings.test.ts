@@ -8,6 +8,7 @@ test('an unconfigured server uses production defaults and port 3001', () => {
   expect(readServerConfiguration({})).toEqual({
     port: 3001,
     nodeEnv: 'production',
+    localPlayground: false,
   });
 });
 
@@ -15,11 +16,13 @@ test('configured server values select the listener and environment', () => {
   expect(readServerConfiguration({ PORT: '8080', NODE_ENV: 'development' })).toEqual({
     port: 8080,
     nodeEnv: 'development',
+    localPlayground: false,
   });
   expect(readServerConfiguration({ PORT: '0' }).port).toBe(0);
   expect(readServerConfiguration({ PORT: '', NODE_ENV: '' })).toMatchObject({
     port: 3001,
     nodeEnv: 'production',
+    localPlayground: false,
   });
 });
 

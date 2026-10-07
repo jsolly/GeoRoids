@@ -113,7 +113,9 @@ test('a Scout builds only the furnace foundation they are standing in and pays w
   );
   bystander.score = furnace.cost * 2;
   expect(engine.useAbility(scout.actor.id)).toBe(false);
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(`You need ${furnace.cost} more score`);
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(
+    `You need ${furnace.cost} more points to build this furnace`
+  );
   expect(scout.actor.score).toBe(0);
   expect(scout.actor.abilityCooldownFrames).toBe(0);
   scout.actor.score = furnace.cost;

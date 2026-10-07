@@ -27,7 +27,7 @@ Aim your nose at a living host without a beacon; powered rocks cannot take a pro
 
 ## Build
 
-At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. A failed build spends nothing and shows why (not enough banked points, or the inward furnace is unlit), but it uses up that E press, so no Scan or Probe fires.
+At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. A popup on a dark foundation shows how many more points you need to build. A failed build spends nothing and shows why (not enough banked points, or the inward furnace is unlit), but it uses up that E press, so no Scan or Probe fires.
 
 ## Exploration
 

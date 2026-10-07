@@ -358,6 +358,7 @@ start() {
     echo "✅ Development ports are free; starting GeoRoids servers..."
     (
         export NODE_ENV=development
+        export GEOROIDS_LOCAL_PLAYGROUND="${GEOROIDS_LOCAL_PLAYGROUND:-1}"
         export VITEST=false
         export PORT="$DEV_SERVER_PORT"
         # Keep gameplay on the page origin so LAN clients and HTTPS tunnels work.

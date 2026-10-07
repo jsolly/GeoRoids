@@ -33,6 +33,7 @@ import {
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
 import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import {
+  CIVIC_LOTS,
   civicLot,
   civicLotAt,
   civicModuleName,
@@ -408,7 +409,8 @@ export class GameEngine {
   constructor(
     rngSeed?: number,
     private readonly serverClock = new ServerClock(),
-    private readonly persistence?: WorldPersistence
+    private readonly persistence?: WorldPersistence,
+    private readonly localPlayground = false
   ) {
     // The saved world is read exactly once, here, before the loop starts.
     let loaded = persistence?.load();
@@ -456,6 +458,30 @@ export class GameEngine {
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
     this.spiderManager = new TerrainSpiderManager(() => this.rngService.random(), this.furnaces);
     ensureTerrain(this.worldSeed);
+    if (this.localPlayground) {
+      this.prepareLocalPlayground();
+    }
+  }
+
+  /** Development startup only. Keep saved player-built furnaces and normal collection rules. */
+  private prepareLocalPlayground(): void {
+    for (const lot of CIVIC_LOTS.filter((candidate) => candidate.parentId === TOWN_HEARTH.id).slice(
+      0,
+      3
+    )) {
+      this.furnaces.light(lot.id, 'Local test');
+    }
+    for (const [index, equipment] of EQUIPMENT_IDS.entries()) {
+      const angle = (index * Math.PI * 2) / EQUIPMENT_IDS.length;
+      this.dropEquipmentAt(
+        {
+          x: TOWN_HEARTH.position.x + Math.cos(angle) * 550,
+          y: TOWN_HEARTH.position.y + Math.sin(angle) * 550,
+        },
+        equipment
+      );
+    }
+    this.satellitePickupManager.createPickups();
   }
 
   public setCombatSink(sink: CombatSink | null): void {
@@ -839,6 +865,9 @@ export class GameEngine {
   ): GameEntity {
     const spawn = this.choosePilotSpawn(position);
     const entity = this.entityManager.addPlayer(id, name, ws, spawn, kitId);
+    if (this.localPlayground) {
+      entity.score = 5_000;
+    }
     this.updatePauseState();
     return entity;
   }
@@ -1066,7 +1095,7 @@ export class GameEngine {
       actor.color = saved.hullColor;
     }
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
-    actor.score = saved.score;
+    actor.score = this.localPlayground ? Math.max(5_000, saved.score) : saved.score;
     actor.cargo = saved.cargo ?? 0;
     actor.purchases = [...(saved.purchases ?? [])];
     this.fitCargo(actor);
@@ -3048,7 +3077,8 @@ export class GameEngine {
     }
     const score = Number.isSafeInteger(scout.score) ? scout.score : 0;
     if (score < lot.cost) {
-      return `You need ${lot.cost - Math.max(0, score)} more score`;
+      const remaining = lot.cost - Math.max(0, score);
+      return `You need ${remaining} more ${remaining === 1 ? 'point' : 'points'} to build this furnace`;
     }
     return undefined;
   }

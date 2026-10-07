@@ -364,8 +364,18 @@ test('a Hauler on an unbuilt furnace footprint is told only Scouts can build it'
   expect(shown()).toBe(false);
 
   player.ship.position = { ...lot.position };
+  const score = player.score;
   player.ship.kitId = 'scout';
+  player.score = lot.cost - 25;
+  syncFurnaceTravelPrompt();
+  expect(shown()).toBe(true);
+  expect(hint()?.textContent).toBe('You need 25 more points to build this furnace');
+  player.score = lot.cost - 1;
+  syncFurnaceTravelPrompt();
+  expect(hint()?.textContent).toBe('You need 1 more point to build this furnace');
+  player.score = lot.cost;
   syncFurnaceTravelPrompt();
   expect(shown()).toBe(false);
+  player.score = score;
   player.ship.kitId = 'hauler';
 });

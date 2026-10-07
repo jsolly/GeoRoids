@@ -45,13 +45,13 @@ V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-gro
 
 Inside a lit furnace's visible footprint, press E or tap the travel prompt to open the destination map (on desktop E opens the menu instead of your tool there; fly off the footprint to use the tool); B also toggles the menu. At Town Square, tap Enter or press E, then choose Store or Fast Travel; Back to Town Square returns to that choice. The mobile ability button keeps your equipped tool available over a furnace.
 
-Choose another lit furnace for a free ride along the pipes in your equipped ship; dark foundations are not destinations. Boarding releases your tow or armed coupling, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
+Pinch the destination map to zoom in or out, and drag to explore. Keyboard users can focus the map and use +/− to zoom. Choose another lit furnace for a free ride along the pipes in your equipped ship; dark foundations are not destinations. Boarding releases your tow or armed coupling, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
 
 Town Square's Store offers placeholders purchased with banked points. Higher settlement levels unlock more offers; each placeholder can be bought once and has no gameplay effect.
 
 ## Map
 
-M or Map opens the shared universe chart centred on your ship. Drag or use the arrow keys to pan, use the wheel, +/−, or zoom buttons (touch zooms with the buttons, not by pinching), and use Locate or Home to return to your ship. M, Escape, or Close returns to flight.
+M or Map opens the shared universe chart centred on your ship. Drag to pan and pinch to zoom; desktop also supports arrow keys, the mouse wheel, and +/− keys. Use Locate or Home to restore the nearby ship view. M, Escape, or Close returns to flight.
 
 ## Keyboard access and motion
 

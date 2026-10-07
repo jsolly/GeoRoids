@@ -43,9 +43,6 @@ export const UNIVERSE_MAP_IDS = {
   toggle: 'universe-map-toggle',
   close: 'universe-map-close',
   center: 'universe-map-center',
-  zoomIn: 'universe-map-zoom-in',
-  zoomOut: 'universe-map-zoom-out',
-  status: 'universe-map-status',
   locations: 'universe-map-locations',
 } as const;
 
@@ -57,11 +54,6 @@ export const UNIVERSE_MAP_ZOOM = {
 } as const;
 
 export const UNIVERSE_MAP_LOCATE_LABEL = 'Center on you';
-export const DESKTOP_MAP_HELP =
-  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · Rocks pass through until you return and blink.';
-export const TOUCH_MAP_HELP =
-  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · Rocks pass through until you return and blink.';
-
 const MAP_RASTER_SIZE = 960;
 const CELLS_PER_SECTOR = 16;
 const CELL_SIZE = WORLD.sectorSize / CELLS_PER_SECTOR;
@@ -104,13 +96,9 @@ type UniverseMapElements = {
   toggle: HTMLButtonElement;
   close: HTMLButtonElement;
   center: HTMLButtonElement;
-  zoomIn: HTMLButtonElement;
-  zoomOut: HTMLButtonElement;
-  zoomControls: HTMLElement;
-  status: HTMLElement;
   locations: HTMLUListElement;
-  help: HTMLElement;
   compass: HTMLElement;
+  legend: HTMLElement;
 };
 
 type ExplorationRaster = {
@@ -134,7 +122,7 @@ let elements: UniverseMapElements | null = null;
 let dimensions: MapCanvasDimensions = { width: 1, height: 1, dpr: 1 };
 const view: MapView = { center: { x: 0, y: 0 }, zoom: UNIVERSE_MAP_ZOOM.initial };
 let nextLocationUpdateAt = 0;
-let pointerPan: { id: number; x: number; y: number } | null = null;
+const mapPointers = new Map<number, Position>();
 const explorationRaster: ExplorationRaster = {
   source: null,
   canvas: null,
@@ -254,10 +242,12 @@ function positionMapOverlayControls(): void {
   elements.center.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
   elements.center.style.right = 'auto';
   elements.center.style.bottom = 'auto';
-  elements.zoomControls.style.left = `${Math.round(frame.x + inset)}px`;
-  elements.zoomControls.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
-  elements.zoomControls.style.right = 'auto';
-  elements.zoomControls.style.bottom = 'auto';
+  elements.compass.style.left = `${Math.round(frame.x + inset)}px`;
+  elements.compass.style.top = `${Math.round(frame.y + inset)}px`;
+  elements.compass.style.right = 'auto';
+  elements.legend.style.maxWidth = `${Math.max(0, frame.size - inset * 3 - size)}px`;
+  elements.legend.style.left = `${Math.round(frame.x + inset)}px`;
+  elements.legend.style.top = `${Math.round(frame.y + frame.size - inset - elements.legend.offsetHeight)}px`;
 }
 
 function updateLocateControl(): void {
@@ -274,7 +264,6 @@ function syncMapInputChrome(): void {
   const touch = shouldUseTouchControls();
   elements.dialog.classList.toggle('universe-map-touch', touch);
   elements.toggle.classList.toggle('universe-map-touch', touch);
-  elements.help.textContent = touch ? TOUCH_MAP_HELP : DESKTOP_MAP_HELP;
   elements.toggle.setAttribute('aria-label', touch ? 'Open universe map' : 'Open universe map (M)');
   if (touch) {
     elements.toggle.removeAttribute('aria-keyshortcuts');
@@ -369,17 +358,9 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       <canvas id="${UNIVERSE_MAP_IDS.canvas}" tabindex="0" role="img" aria-label="Shared universe map" aria-details="${UNIVERSE_MAP_IDS.locations}"></canvas>
       <ul id="${UNIVERSE_MAP_IDS.locations}" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
       <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i></div>
-      <div class="universe-map-zoom">
-        <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
-        <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
-      </div>
       ${locateControlMarkup()}
-    </div>
-    <footer class="universe-map-footer">
       <div class="universe-map-legend"></div>
-      <p id="${UNIVERSE_MAP_IDS.status}" aria-live="polite"></p>
-      <p class="universe-map-help">${DESKTOP_MAP_HELP}</p>
-    </footer>`;
+    </div>`;
 }
 
 function drawMapLegend(dialog: HTMLDialogElement): void {
@@ -458,34 +439,15 @@ function ensureElements(): UniverseMapElements | null {
   const close = dialog.querySelector(`#${UNIVERSE_MAP_IDS.close}`) as HTMLButtonElement | null;
   const center = dialog.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement | null;
   const stage = dialog.querySelector('.universe-map-stage');
-  const zoomControls = dialog.querySelector('.universe-map-zoom') as HTMLElement | null;
-  const zoomIn = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement | null;
-  const zoomOut = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement | null;
-  const status = dialog.querySelector(`#${UNIVERSE_MAP_IDS.status}`) as HTMLElement | null;
   const locations = dialog.querySelector(
     `#${UNIVERSE_MAP_IDS.locations}`
   ) as HTMLUListElement | null;
-  const help = dialog.querySelector('.universe-map-help') as HTMLElement | null;
   const compass = dialog.querySelector('.universe-map-compass') as HTMLElement | null;
-  if (
-    !canvas ||
-    !close ||
-    !center ||
-    !stage ||
-    !zoomControls ||
-    !zoomIn ||
-    !zoomOut ||
-    !status ||
-    !locations ||
-    !help ||
-    !compass
-  ) {
+  const legend = dialog.querySelector<HTMLElement>('.universe-map-legend');
+  if (!canvas || !close || !center || !stage || !locations || !compass || !legend) {
     return null;
   }
   decorateLocateControl(center, stage);
-  if (zoomControls.parentElement !== stage) {
-    stage.append(zoomControls);
-  }
   close.setAttribute('aria-label', 'Close');
   return {
     dialog,
@@ -493,13 +455,9 @@ function ensureElements(): UniverseMapElements | null {
     toggle,
     close,
     center,
-    zoomIn,
-    zoomOut,
-    zoomControls,
-    status,
     locations,
-    help,
     compass,
+    legend,
   };
 }
 
@@ -831,7 +789,7 @@ function drawCrew(
   context: CanvasRenderingContext2D,
   frame: MapFrame,
   occupied: MapLabelRect[]
-): number {
+): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
   const crew = PlayerManager.getInstance().getNonLocalPlayers();
   const players = local ? [local, ...crew] : crew;
@@ -889,32 +847,10 @@ function drawCrew(
     }
     context.restore();
   }
-  return players.length;
 }
 
 function formatCoordinate(value: number): string {
   return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
-}
-
-const NIBBLE_POPCOUNT = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
-
-function exploredCellCount(tiles: readonly ExplorationTile[]): number {
-  let count = 0;
-  for (const tile of tiles) {
-    for (const char of tile.bits) {
-      const nibble = Number.parseInt(char, 16);
-      count += NIBBLE_POPCOUNT[nibble] ?? 0;
-    }
-  }
-  return count;
-}
-
-function updateStatus(revealedAssetCount: number, crewCount: number): void {
-  if (!elements) {
-    return;
-  }
-  const exploredCells = exploredCellCount(getWorldExploration());
-  elements.status.textContent = `X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored cells`;
 }
 
 function updateAccessibleLocations(assets: readonly MapAsset[]): void {
@@ -1033,23 +969,24 @@ function renderMap(): void {
   drawLitFurnacePipes(context, frame);
   drawNearbyResources(context, frame, exploration);
   drawDiscoveredBelt(context, frame, exploration);
-  let revealedAssetCount = 0;
   let drawnLabelCount = 0;
   const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));
   updateAccessibleLocations(revealedAssets);
   // Labels use upright camera-relative coordinates; reserve the visible controls too.
   const canvasBounds = elements.canvas.getBoundingClientRect();
-  const labelRects: MapLabelRect[] = [elements.zoomControls, elements.center].map((control) => {
-    const bounds = control.getBoundingClientRect();
-    const centerX = canvasBounds.left + frame.x + frame.size / 2;
-    const centerY = canvasBounds.top + frame.y + frame.size / 2;
-    return {
-      left: (bounds.left - centerX) / frame.scale,
-      right: (bounds.right - centerX) / frame.scale,
-      top: (bounds.top - centerY) / frame.scale,
-      bottom: (bounds.bottom - centerY) / frame.scale,
-    };
-  });
+  const labelRects: MapLabelRect[] = [elements.center, elements.compass, elements.legend].map(
+    (control) => {
+      const bounds = control.getBoundingClientRect();
+      const centerX = canvasBounds.left + frame.x + frame.size / 2;
+      const centerY = canvasBounds.top + frame.y + frame.size / 2;
+      return {
+        left: (bounds.left - centerX) / frame.scale,
+        right: (bounds.right - centerX) / frame.scale,
+        top: (bounds.top - centerY) / frame.scale,
+        bottom: (bounds.bottom - centerY) / frame.scale,
+      };
+    }
+  );
   drawCourtLandmark(context, frame, labelRects);
   revealedAssets.sort((left, right) => {
     const furnacePriority = Number(right.kind === 'furnace') - Number(left.kind === 'furnace');
@@ -1069,7 +1006,6 @@ function renderMap(): void {
     return outsideRadarPriority !== 0 ? outsideRadarPriority : leftDistance - rightDistance;
   });
   for (const asset of revealedAssets) {
-    revealedAssetCount++;
     const labelAllowed = mapAssetNameVisible(asset.kind, view.zoom, drawnLabelCount);
     const showLabel =
       labelAllowed &&
@@ -1080,7 +1016,7 @@ function renderMap(): void {
     drawMapAsset(context, asset, frame, showLabel);
   }
   drawNestMarks(context, frame, exploration);
-  const crewCount = drawCrew(context, frame, labelRects);
+  drawCrew(context, frame, labelRects);
   context.restore();
 
   context.save();
@@ -1097,7 +1033,6 @@ function renderMap(): void {
     frame.y + 8
   );
   context.restore();
-  updateStatus(revealedAssetCount, crewCount);
 }
 
 function renderLoop(): void {
@@ -1161,7 +1096,7 @@ function closeMap(): void {
   }
   closeInProgress = true;
   mapOpen = false;
-  pointerPan = null;
+  mapPointers.clear();
   stopRenderLoop();
   elements.dialog.close();
   closeInProgress = false;
@@ -1174,7 +1109,7 @@ function handleDialogClosed(): void {
     return;
   }
   mapOpen = false;
-  pointerPan = null;
+  mapPointers.clear();
   stopRenderLoop();
   window.dispatchEvent(new CustomEvent('gameMapClose'));
   playFeedback('interface');
@@ -1279,6 +1214,21 @@ function centerOnLocalPlayer(): void {
   setViewCenter(local?.ship.position ?? { x: 0, y: 0 });
 }
 
+function mapGesture(): { center: Position; distance: number } | undefined {
+  const contacts = [...mapPointers.values()];
+  const first = contacts[0];
+  if (!first) {
+    return undefined;
+  }
+  const second = contacts[1];
+  return second
+    ? {
+        center: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 },
+        distance: Math.hypot(second.x - first.x, second.y - first.y),
+      }
+    : { center: first, distance: 0 };
+}
+
 function onPointerDown(ev: PointerEvent): void {
   if (!elements || !mapOpen || (ev.button !== 0 && ev.pointerType !== 'touch')) {
     return;
@@ -1287,41 +1237,46 @@ function onPointerDown(ev: PointerEvent): void {
   if (!point) {
     return;
   }
-  pointerPan = { id: ev.pointerId, x: point.x, y: point.y };
+  mapPointers.set(ev.pointerId, point);
   elements.canvas.setPointerCapture?.(ev.pointerId);
   ev.preventDefault();
 }
 
 function onPointerMove(ev: PointerEvent): void {
-  if (!elements || !pointerPan || pointerPan.id !== ev.pointerId) {
+  if (!elements || !mapOpen || !mapPointers.has(ev.pointerId)) {
     return;
   }
   const point = canvasPoint(ev);
-  if (!point) {
+  const before = mapGesture();
+  if (!point || !before) {
     return;
+  }
+  mapPointers.set(ev.pointerId, point);
+  const after = mapGesture();
+  if (!after) {
+    return;
+  }
+  if (before.distance > 0 && after.distance > 0) {
+    setViewZoom((view.zoom * after.distance) / before.distance, before.center);
   }
   const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
   const pan = mapScreenDeltaToWorld(
-    point.x - pointerPan.x,
-    point.y - pointerPan.y,
+    after.center.x - before.center.x,
+    after.center.y - before.center.y,
     frame.scale,
     chartHeadingRotation()
   );
-  setViewCenter({
-    x: view.center.x - pan.x,
-    y: view.center.y - pan.y,
-  });
-  pointerPan.x = point.x;
-  pointerPan.y = point.y;
+  setViewCenter({ x: view.center.x - pan.x, y: view.center.y - pan.y });
   ev.preventDefault();
 }
 
 function onPointerUp(ev: PointerEvent): void {
-  if (!elements || !pointerPan || pointerPan.id !== ev.pointerId) {
+  if (!elements || !mapPointers.delete(ev.pointerId)) {
     return;
   }
-  elements.canvas.releasePointerCapture?.(ev.pointerId);
-  pointerPan = null;
+  if (elements.canvas.hasPointerCapture?.(ev.pointerId)) {
+    elements.canvas.releasePointerCapture(ev.pointerId);
+  }
 }
 
 function onWheel(ev: WheelEvent): void {
@@ -1359,8 +1314,6 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
   });
   elements.close.addEventListener('click', closeMap);
   elements.center.addEventListener('click', centerOnLocalPlayer);
-  elements.zoomIn.addEventListener('click', () => setViewZoom(view.zoom * UNIVERSE_MAP_ZOOM.step));
-  elements.zoomOut.addEventListener('click', () => setViewZoom(view.zoom / UNIVERSE_MAP_ZOOM.step));
   elements.dialog.addEventListener('close', handleDialogClosed);
   elements.dialog.addEventListener('cancel', (ev) => {
     ev.preventDefault();
@@ -1370,6 +1323,7 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
   elements.canvas.addEventListener('pointermove', onPointerMove);
   elements.canvas.addEventListener('pointerup', onPointerUp);
   elements.canvas.addEventListener('pointercancel', onPointerUp);
+  elements.canvas.addEventListener('lostpointercapture', onPointerUp);
   elements.canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keydown', handleMapKeydown, true);
   window.addEventListener('resize', () => {

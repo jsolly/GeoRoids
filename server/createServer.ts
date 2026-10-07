@@ -35,6 +35,7 @@ type CreateServerOptions = {
   nodeEnv?: string;
   seed?: number;
   worldPath?: string;
+  localPlayground?: boolean;
   /** Apply production connection budgets even when test or development would skip them. */
   enforceConnectionLimits?: boolean;
   /** Explicit transport injection; the production entry keeps compression disabled. */
@@ -284,7 +285,12 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   });
 
   const persistence = options.worldPath ? openWorldPersistence(options.worldPath) : undefined;
-  const gameEngine = new GameEngine(options.seed, undefined, persistence);
+  const gameEngine = new GameEngine(
+    options.seed,
+    undefined,
+    persistence,
+    NODE_ENV === 'development' && (options.localPlayground ?? configuration.localPlayground)
+  );
   acquireServerPerformanceMetrics();
   // Ensure the server-side game loop runs
   gameEngine.startGameLoop();

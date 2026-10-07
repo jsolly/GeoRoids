@@ -1,4 +1,5 @@
 import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
+import { civicLotAt } from '../../shared/furnaces';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { worldFurnaces } from '../network/worldExploration';
 import { SCOUT_ONLY_BUILD_HINT } from './constants';
@@ -9,16 +10,28 @@ import { isTownStoreOpen } from './townStoreState';
 import { isUniverseMapOpen } from './universeMap';
 import { shouldUseTouchControls } from './viewportChrome';
 
-/** A Hauler on a dark lot's footprint learns who can light it. */
-function haulerOnDarkLot(): boolean {
+/** Explain who can build, or the Scout's missing points, on a dark foundation. */
+function darkLotBuildHint(): string | undefined {
   if (!document.body.classList.contains('in-play')) {
-    return false;
+    return undefined;
   }
-  const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
-  if (ship?.kitId !== 'hauler' || ship.exploding || ship.health <= 0 || ship.furnaceTransit) {
-    return false;
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  const ship = player?.ship;
+  if (!player || !ship || ship.exploding || ship.health <= 0 || ship.furnaceTransit) {
+    return undefined;
   }
-  return onDarkFurnaceFootprint(ship.position, (id) => worldFurnaces.isLit(id));
+  if (!onDarkFurnaceFootprint(ship.position, (id) => worldFurnaces.isLit(id))) {
+    return undefined;
+  }
+  if (ship.kitId === 'hauler') {
+    return SCOUT_ONLY_BUILD_HINT;
+  }
+  const lot = civicLotAt(ship.position);
+  if (ship.kitId === 'scout' && lot && player.score < lot.cost) {
+    const remaining = lot.cost - Math.max(0, player.score);
+    return `You need ${remaining} more ${remaining === 1 ? 'point' : 'points'} to build this furnace`;
+  }
+  return undefined;
 }
 
 function boardFromTap(): void {
@@ -51,9 +64,12 @@ export function syncFurnaceTravelPrompt(): void {
     // Hidden hints ignore content; skip viewport/media queries until boarding is available.
     setFieldHint('furnace-travel-prompt', false);
   }
-  setFieldHint('furnace-build-hint', overlaysClosed && !travel && haulerOnDarkLot(), {
-    text: SCOUT_ONLY_BUILD_HINT,
-  });
+  const buildHint = overlaysClosed && !travel ? darkLotBuildHint() : undefined;
+  setFieldHint(
+    'furnace-build-hint',
+    buildHint !== undefined,
+    buildHint === undefined ? {} : { text: buildHint }
+  );
 }
 
 if (typeof window !== 'undefined') {

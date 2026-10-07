@@ -67,7 +67,7 @@ export function renderFurnaceTravelMap(
   viewport.setAttribute('role', 'region');
   viewport.setAttribute(
     'aria-label',
-    'Furnace destination map. Scroll to explore; Tab to choose a furnace.'
+    'Furnace destination map. Pinch or use +/− keys to zoom, drag or scroll to explore; Tab to choose a furnace.'
   );
   const map = document.createElement('div');
   map.className = 'furnace-travel-map';
@@ -128,13 +128,125 @@ export function renderFurnaceTravelMap(
     }
     map.append(marker);
   }
-  viewport.append(map);
+  const bounds = document.createElement('div');
+  bounds.style.position = 'relative';
+  map.style.position = 'absolute';
+  bounds.style.width = `${size}px`;
+  bounds.style.height = `${size}px`;
+  map.style.transformOrigin = 'top left';
+  bounds.append(map);
+  viewport.append(bounds);
+  let zoom = 1;
+  let dragged = false;
+  const pointers = new Map<number, Position>();
+  const gesture = () => {
+    const contacts = [...pointers.values()];
+    const first = contacts[0];
+    if (!first) {
+      return undefined;
+    }
+    const second = contacts[1];
+    return second
+      ? {
+          x: (first.x + second.x) / 2,
+          y: (first.y + second.y) / 2,
+          distance: Math.hypot(second.x - first.x, second.y - first.y),
+        }
+      : { ...first, distance: 0 };
+  };
+  viewport.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    if (pointers.size === 0) {
+      dragged = false;
+    }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    // Preserve the original button target for taps, and keep drags inside the map.
+    if (event.target instanceof Element) {
+      event.target.setPointerCapture(event.pointerId);
+    }
+    if (pointers.size > 1) {
+      dragged = true;
+    }
+  });
+  const applyZoom = (
+    nextZoom: number,
+    anchorX: number,
+    anchorY: number,
+    deltaX = 0,
+    deltaY = 0
+  ) => {
+    const ratio = nextZoom / zoom;
+    const left = (viewport.scrollLeft + anchorX) * ratio - anchorX - deltaX;
+    const top = (viewport.scrollTop + anchorY) * ratio - anchorY - deltaY;
+    zoom = nextZoom;
+    map.style.transform = `scale(${zoom})`;
+    bounds.style.width = `${size * zoom}px`;
+    bounds.style.height = `${size * zoom}px`;
+    viewport.scrollLeft = left;
+    viewport.scrollTop = top;
+  };
+  viewport.addEventListener('keydown', (event) => {
+    if (event.target !== viewport || !['+', '=', '-', '_'].includes(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const multiplier = event.key === '+' || event.key === '=' ? 1.25 : 1 / 1.25;
+    applyZoom(
+      Math.max(0.4, Math.min(3, zoom * multiplier)),
+      viewport.clientWidth / 2,
+      viewport.clientHeight / 2
+    );
+  });
+  viewport.addEventListener('pointermove', (event) => {
+    const previous = pointers.get(event.pointerId);
+    if (!previous) {
+      return;
+    }
+    const before = gesture();
+    if (!dragged && Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 5) {
+      return;
+    }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const after = gesture();
+    if (!before || !after) {
+      return;
+    }
+    dragged = true;
+    event.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    const anchorX = before.x - rect.left - viewport.clientLeft;
+    const anchorY = before.y - rect.top - viewport.clientTop;
+    const nextZoom =
+      before.distance > 0 && after.distance > 0
+        ? Math.max(0.4, Math.min(3, (zoom * after.distance) / before.distance))
+        : zoom;
+    applyZoom(nextZoom, anchorX, anchorY, after.x - before.x, after.y - before.y);
+  });
+  const release = (event: PointerEvent) => {
+    pointers.delete(event.pointerId);
+  };
+  viewport.addEventListener('pointerup', release);
+  viewport.addEventListener('pointercancel', release);
+  viewport.addEventListener('lostpointercapture', release);
+  viewport.addEventListener(
+    'click',
+    (event) => {
+      if (dragged && event.detail !== 0) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    },
+    true
+  );
   const hint = document.createElement('p');
   hint.className = 'furnace-travel-hint';
   hint.textContent =
     destinations.length === 0
       ? 'No other furnaces are lit yet. Build a furnace to open a route.'
-      : 'Select a lit furnace to travel. Scroll the map to explore.';
+      : 'Select a lit furnace to travel. Pinch or use +/− keys to zoom; drag or scroll to explore.';
   container.replaceChildren(viewport, caption, hint);
   // Center the departure furnace on dense maps without smooth motion.
   const origin = project(projectBearing(source.position));

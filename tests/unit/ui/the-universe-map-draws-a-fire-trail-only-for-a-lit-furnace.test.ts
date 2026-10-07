@@ -55,6 +55,73 @@ function mountUniverseMap(): { toggle: HTMLButtonElement; ctx: CanvasRenderingCo
   return { toggle, ctx };
 }
 
+test('a pilot pinches the universe chart, keeps dragging after lifting one finger, and locates home', () => {
+  const { toggle, ctx } = mountUniverseMap();
+  const canvas = document.querySelector<HTMLCanvasElement>(`#${UNIVERSE_MAP_IDS.canvas}`);
+  const locate = document.querySelector<HTMLButtonElement>(`#${UNIVERSE_MAP_IDS.center}`);
+  if (!canvas || !locate) {
+    throw new Error('Missing chart controls');
+  }
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 400));
+  setWorldMapAssets([
+    { id: 'foundation:a', kind: 'foundation', name: 'A', position: { x: 0, y: 0 } },
+    { id: 'foundation:b', kind: 'foundation', name: 'B', position: { x: 1_000, y: 0 } },
+  ]);
+  const marks: Array<{ x: number; y: number }> = [];
+  const arc = ctx.arc.bind(ctx);
+  vi.spyOn(ctx, 'arc').mockImplementation(function (
+    this: CanvasRenderingContext2D,
+    ...args: Parameters<CanvasRenderingContext2D['arc']>
+  ) {
+    if (this.getLineDash().length > 0) {
+      const transform = this.getTransform();
+      marks.push({ x: transform.e, y: transform.f });
+    }
+    arc(...args);
+  });
+  const draw = () => {
+    marks.length = 0;
+    window.dispatchEvent(new Event('resize'));
+    expect(marks).toHaveLength(2);
+    const [a, b] = marks;
+    if (!a || !b) {
+      throw new Error('Missing foundation marks');
+    }
+    return { a: { ...a }, distance: b.x - a.x };
+  };
+  const pointer = (type: string, id: number, x: number, y: number) => {
+    const event = new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'pointerId', { value: id });
+    canvas.dispatchEvent(event);
+  };
+  toggle.click();
+  const initial = draw();
+  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  pointer('pointerdown', 1, 150, 200);
+  pointer('pointerdown', 2, 250, 200);
+  pointer('pointermove', 2, 350, 200);
+  const pinched = draw();
+  expect(pinched.distance).toBeCloseTo(initial.distance * 2);
+  expect(pinched.a.x).toBeCloseTo(initial.a.x + 50 * dpr);
+  expect(pinched.a.y).toBeCloseTo(initial.a.y);
+  pointer('pointerup', 2, 350, 200);
+  pointer('pointermove', 1, 170, 210);
+  const dragged = draw();
+  expect(dragged.distance).toBeCloseTo(pinched.distance);
+  expect(dragged.a.x).toBeCloseTo(pinched.a.x + 20 * dpr);
+  expect(dragged.a.y).toBeCloseTo(pinched.a.y + 10 * dpr);
+  pointer('pointercancel', 1, 170, 210);
+  pointer('pointermove', 1, 300, 300);
+  expect(draw()).toEqual(dragged);
+  locate.click();
+  expect(draw()).toEqual(initial);
+  pointer('pointerdown', 3, 150, 200);
+  closeUniverseMap();
+  toggle.click();
+  pointer('pointermove', 3, 300, 300);
+  expect(draw()).toEqual(initial);
+});
+
 test('the universe map draws a fire trail only for a lit furnace', () => {
   const furnace = civicLot('street-1-0');
   if (!furnace) {

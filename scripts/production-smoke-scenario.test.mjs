@@ -49,16 +49,25 @@ for (const world of [
   });
 }
 
-test('Enter Game without a successful multiplayer join fails production smoke', async () => {
+test('a pilot enters through the current menu but an unsuccessful join fails production smoke', async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(300);
+    const menuMarkup = (await readFile(new URL('../index.html', import.meta.url), 'utf8'))
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gu, '')
+      .replace('<html ', `<html data-client-release="${sha}" `);
+    await page.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelector('#start-game')?.addEventListener('click', () => {
+          document.documentElement.dataset['smokeEntered'] = 'true';
+        });
+      });
+    });
     await page.route('**/*', (route) =>
-      route.fulfill({
-        contentType: 'text/html',
-        body: `<html data-client-release="${sha}"><label>Your Nickname<input></label><button>Enter Game</button></html>`,
-      })
+      route.request().isNavigationRequest()
+        ? route.fulfill({ contentType: 'text/html', body: menuMarkup })
+        : route.abort()
     );
     await page.goto(productionUrl);
     await assert.rejects(
@@ -71,6 +80,8 @@ test('Enter Game without a successful multiplayer join fails production smoke', 
       }),
       /Timeout/u
     );
+    assert.match(await page.locator('#playerNameInput').inputValue(), /^Smoke/u);
+    assert.equal(await page.locator('html').getAttribute('data-smoke-entered'), 'true');
   } finally {
     await browser.close();
   }

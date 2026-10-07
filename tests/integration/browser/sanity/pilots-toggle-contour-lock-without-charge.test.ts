@@ -102,9 +102,8 @@ test('a narrow-phone Debug overlay keeps Contour Lock and the ability disc fully
   const page = await browserManager.recreatePage({ hasTouch: true });
   const diagnostics = watchBrowserDiagnostics(page);
   await page.setViewportSize({ width: 390, height: 650 });
-  await page.addInitScript(() => localStorage.setItem('debugOn', 'true'));
   const game = new GameInteractions(page);
-  await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
+  await game.bootGame({ route: '/debug', waitForCombatReady: false, kitId: 'scout' });
   await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
   const panel = page.locator('#debug-hud');
   const contourLock = page.locator('#touch-contour-lock');

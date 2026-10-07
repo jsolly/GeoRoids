@@ -68,13 +68,13 @@ const scoutUtility: Rule = (value) =>
   value === 'mineral_scan' || value === 'survey_probe' || value === 'build_furnace';
 const lootKind = enumeration<LootKind>({
   shard: true,
-  wreckage: true,
   tap: true,
   silk: true,
   resource_tap: true,
   boost_coupling: true,
   survey_probe: true,
   points: true,
+  wreckage: true,
 });
 const array =
   (rule: Rule): Rule =>
@@ -369,14 +369,7 @@ const nest = shape<SpiderFieldState['nests'][number]>({
   resourceId: (value) => typeof value === 'string' && value.length > 0,
   position,
 });
-const consumedSpider = shape<NonNullable<SpiderFieldState['consumed']>[number]>({
-  id: string,
-  position,
-  furnaceId: string,
-  frame: number,
-});
 const spiderField = shape<SpiderFieldState>({
-  consumed: optional(uniqueRows(consumedSpider, SPIDER.MAX_ACTIVE)),
   spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE + BELT_CRAWLER.MAX_ACTIVE),
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });

@@ -8,7 +8,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager } = createBrowserScenarioHooks();
 
-test('death keeps the bank and another pilot can recover and bank the dropped cargo', async () => {
+test('a lethal boundary hit keeps the bank and lets a teammate recover cargo shielding spills', async () => {
   const page = browserManager.getCurrentPage();
   if (!page) {
     throw new Error('Page not available');

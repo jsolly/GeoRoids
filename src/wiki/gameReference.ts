@@ -3,10 +3,7 @@ import { ASTEROID_BOOST } from '../../shared/asteroidBoost';
 import { ASTEROID_INTERACTIONS } from '../../shared/asteroidPhenomena';
 import { colossalMiningHealth } from '../../shared/asteroidScale';
 import { BELT_CRAWLER } from '../../shared/beltCrawler';
-import {
-  calculateHealthRegenDelayFrames,
-  calculateHealthRegenPerFrame,
-} from '../../shared/constants/health';
+import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { CONTOUR_LOCK } from '../../shared/contourLock';
 import { ECONOMY, settlementRecipe } from '../../shared/economy';
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
@@ -82,7 +79,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Players respawn indefinitely. Points start banked at ${GAME.STARTING_SCORE}; collected points must be hauled to a furnace. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
         `${TOWN_HEARTH.name} is the only pre-lit hearth. ${CIVIC_LOTS.length} furnace foundations start dark: ${furnaceLots(1).length} at score ${furnaceCost(1)}, ${furnaceLots(2).length} at score ${furnaceCost(2)}, and ${furnaceLots(3).length} at score ${furnaceCost(3)}.`,
-        `Death drops carried points for anyone to recover for ${ECONOMY.deathLootFrames / GAME.FPS} seconds. Banked points persist. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; longer gaps preserve cargo and bank.`,
+        `Death discards carried points. Banked points persist. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; longer gaps preserve cargo and bank.`,
       ],
     },
   ],
@@ -105,7 +102,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Furnace construction',
       paragraphs: [
-        `Inside a dark furnace lot's footprint, E becomes Build instead of Mineral Scan or Survey Probe. Build spends the Scout's own score to light the ${FURNACE_BUILD.RADIUS}-unit furnace foundation under the ship. The inward lot on that pipeline must already be burning, and that pilot's score must cover the lot (${furnaceCost(1)}, ${furnaceCost(2)}, or ${furnaceCost(3)}). Building works during tool cooldown and inside a nest. Lighting immediately breaks hunts within the ${SPIDER.FURNACE_SAFE_RADIUS}-unit safe area and sends living spiders fleeing; covered nest guards become roamers. The lit furnace keeps the builder's name. Success spends that cost without resetting the current tool cooldown. Lit furnaces persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
+        `Inside a dark furnace lot's footprint, E becomes Build instead of Mineral Scan or Survey Probe. Build spends the Scout's own score to light the ${FURNACE_BUILD.RADIUS}-unit furnace foundation under the ship. The inward lot on that pipeline must already be burning, and that pilot's score must cover the lot (${furnaceCost(1)}, ${furnaceCost(2)}, or ${furnaceCost(3)}). Building works during tool cooldown. Lit furnaces provide the normal safe area; construction does not clear nests or convert their guards. The lit furnace keeps the builder's name. Success spends that cost without resetting the current tool cooldown. Lit furnaces persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
       ],
     },
     {
@@ -139,8 +136,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Loot and salvage values',
       paragraphs: [
-        `Pickups leave ship mass, health capacity, current health, hull size, and flight tuning unchanged. Environmental death drops at most ${GROWTH.MAX_PELLETS} wreckage pellets; the live loot limit is ${GROWTH.MAX_LOOT}. Shards, wreckage, Tap canisters, and silk last ${seconds(GROWTH.LOOT_TTL_FRAMES)}; point drops from mined rocks and deaths last ${ECONOMY.deathLootFrames / GAME.FPS} seconds of real time and survive restarts; equipment and nest caches last ${EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES / GAME.FPS / 60} minutes. A nest holds a tool with ${EQUIPMENT_DROPS.NEST_CHANCE * 100}% chance, and an ordinary laser-killed rock with ${EQUIPMENT_DROPS.ASTEROID_CHANCE * 100}%. Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}.`,
-        `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}. Tap canisters have radius ${GROWTH.TAP_LOOT_RADIUS} and score ${GROWTH.TAP_LOOT_SCORE}. A living ship magnetizes ordinary drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL}. Tap loot uses range ${GROWTH.TAP_LOOT_MAGNET_RANGE} and acceleration ${GROWTH.TAP_LOOT_MAGNET_ACCEL} toward a Hauler. Pickup overlap uses each kit's hull radius plus the drop radius.`,
+        `Pickups leave ship mass, health capacity, current health, hull size, and flight tuning unchanged. The live loot limit is ${GROWTH.MAX_LOOT}. Shards, Tap canisters, and silk last ${seconds(GROWTH.LOOT_TTL_FRAMES)}; point drops from mined rocks last ${ECONOMY.pointLootFrames / GAME.FPS} seconds of real time and survive restarts; equipment and nest caches last ${EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES / GAME.FPS / 60} minutes. A nest holds a tool with ${EQUIPMENT_DROPS.NEST_CHANCE * 100}% chance, and an ordinary laser-killed rock with ${EQUIPMENT_DROPS.ASTEROID_CHANCE * 100}%. Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}.`,
+        `Shard drops have radius ${GROWTH.LOOT_RADIUS}. Tap canisters have radius ${GROWTH.TAP_LOOT_RADIUS} and score ${GROWTH.TAP_LOOT_SCORE}. A living ship magnetizes ordinary drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL}. Tap loot uses range ${GROWTH.TAP_LOOT_MAGNET_RANGE} and acceleration ${GROWTH.TAP_LOOT_MAGNET_ACCEL} toward a Hauler. Pickup overlap uses each kit's hull radius plus the drop radius.`,
         `Furnace offloading transfers ${ECONOMY.offloadPoints} points every ${ECONOMY.offloadIntervalFrames / GAME.FPS} seconds. Cargo protects one HP per ${ECONOMY.cargoPointsPerHp} points ejected; hit spills pause magnetism and collection for ${ECONOMY.cargoSpillEjectFrames / GAME.FPS} seconds and launch at ${ECONOMY.cargoSpillSpeed} units per frame.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. Reflected shots can reach a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
       ],
@@ -220,8 +217,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}. Players always respawn at the nearest lit hearth with a ${TOWN_SPAWN_RADIUS}-unit offset. Carried points drop on death and expire after ${ECONOMY.deathLootFrames / GAME.FPS} seconds; banked points survive.`,
-        `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
+        `Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}. Players always respawn at the nearest lit hearth with a ${TOWN_SPAWN_RADIUS}-unit offset. Carried points are lost on death; banked points survive.`,
+        `Health regeneration restores ${SHIP.HEALTH_REGEN_FRACTION_PER_SECOND * 100}% of current max health per second after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },
     {

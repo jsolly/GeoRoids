@@ -79,19 +79,29 @@ test('both kits keep partial pickup remainders and full holds reject further loo
   }
 });
 
-test('death repeatedly drops cargo, preserves the bank, and always respawns', () => {
+test('death repeatedly discards cargo, preserves the bank, and always respawns', () => {
   const engine = new GameEngine(42);
   const { actor } = pilot(engine);
   actor.score = 731;
   for (let death = 0; death < 8; death++) {
     actor.cargo = 90;
     actor.spawnProtectionTimer = 0;
+    const beforeDeath = engine.getLoot();
     engine.handleShipDamage(
       actor.id,
       'boundary',
       actor.health + actor.cargo / ECONOMY.cargoPointsPerHp
     );
     expect(actor.cargo).toBe(0);
+    expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toEqual(
+      beforeDeath.filter((drop) => drop.kind !== 'points')
+    );
+    expect(
+      engine
+        .getLoot()
+        .filter((drop) => drop.kind === 'points')
+        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
+    ).toBe((death + 1) * 90);
     expect(actor.score).toBe(731);
     expect(actor.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
     for (let frame = 0; frame <= SHIP.RESPAWN_DELAY_FRAMES; frame++) {
@@ -261,7 +271,7 @@ test('most old rocks are barren and breaking mineral rocks sacrifices harvest wh
   expect(engine.getGameState().settlement.resources.metal).toBe(0);
 });
 
-test('point stashes survive disposable-loot pressure and expire by elapsed time', () => {
+test('mined cargo pickups survive disposable-loot pressure and expire by elapsed time', () => {
   vi.useFakeTimers();
   vi.setSystemTime(1000000);
   const loot = new LootManager(new RNGService(42));
@@ -311,7 +321,7 @@ test('dummy purchases enforce bank, level, proximity and socket ownership withou
   expect(engine.getGameState().settlement.points).toBe(0);
 });
 
-test('restart preserves bank, cargo, receipts, settlement and unexpired death loot', () => {
+test('restart preserves bank, receipts, settlement and unexpired mined cargo after death', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-economy-'));
   const path = join(directory, 'world.sqlite');
   let store = new WorldStore(path);
@@ -330,13 +340,34 @@ test('restart preserves bank, cargo, receipts, settlement and unexpired death lo
     }
     engine.buyStoreItem(actor.id, 'placeholder-1');
     actor.position = { x: 1000, y: 1000 };
+    const deposit = rock('persistent-mined-rock', 'metal', 12);
+    deposit.position = { x: 1400, y: 1000 };
+    deposit.health = 0;
+    engine.addAsteroid(deposit);
+    engine.handleAsteroidHit(deposit.id, actor.id, 'laser');
+    const mined = engine.getLoot().filter((drop) => drop.kind === 'points');
+    expect(mined.length).toBeGreaterThan(0);
+    engine.checkpointWorld();
+    const saved = store.load().economy?.pointLoot;
+    expect(saved).toBeDefined();
+    expect(saved?.length).toBeGreaterThan(0);
     actor.cargo = 123;
     engine.handleShipDamage(
       actor.id,
       'asteroid',
       actor.health + actor.cargo / ECONOMY.cargoPointsPerHp
     );
+    const afterHit = engine.getLoot().filter((drop) => drop.kind === 'points');
+    expect(
+      afterHit
+        .filter((drop) => !mined.some((rockDrop) => rockDrop.id === drop.id))
+        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
+    ).toBe(123);
     engine.checkpointWorld();
+    const savedAfterHit = store.load().economy?.pointLoot;
+    expect(
+      savedAfterHit?.filter((drop) => saved?.some((minedDrop) => minedDrop.id === drop.id))
+    ).toEqual(saved);
     store.close();
     store = new WorldStore(path);
     const restarted = new GameEngine(42, undefined, new InlineWorldPersistence(store));
@@ -349,12 +380,8 @@ test('restart preserves bank, cargo, receipts, settlement and unexpired death lo
     expect(resumed.actor.purchases).toEqual(['placeholder-1']);
     expect(resumed.actor.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
     expect(restarted.getGameState().settlement.points).toBe(300);
-    expect(
-      restarted
-        .getLoot()
-        .filter((drop) => drop.kind === 'points')
-        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
-    ).toBe(123);
+    expect(restarted.getLoot().filter((drop) => drop.kind === 'points')).toEqual(afterHit);
+    expect(store.load().economy?.pointLoot).toEqual(savedAfterHit);
     expect(settlementRecipe(1).resources.crystal).toBeGreaterThan(0);
   } finally {
     store.close();
@@ -376,7 +403,7 @@ test('shooting cannot destroy recoverable points spilled by a lethal hit', () =>
   expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(333);
 });
 
-test('a long absence and a smaller kit preserve cargo at its field position with excess dropped', () => {
+test('a long absence and a smaller kit preserve cargo at its field position with excess discarded', () => {
   vi.useFakeTimers();
   vi.setSystemTime(1000000);
   const engine = new GameEngine(42);
@@ -401,5 +428,5 @@ test('a long absence and a smaller kit preserve cargo at its field position with
       .getLoot()
       .filter((drop) => drop.kind === 'points')
       .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
-  ).toBe(700);
+  ).toBe(0);
 });

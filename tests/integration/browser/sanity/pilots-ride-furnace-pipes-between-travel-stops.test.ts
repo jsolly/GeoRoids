@@ -11,7 +11,7 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField, getFixtureState } from '../../utils/test-server-control';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+const { browserManager, screenshotManager, ownCleanup } = createBrowserScenarioHooks();
 
 for (const width of [1280, 390]) {
   test(`a pilot rides their ship from a built furnace to Town Square and back at ${width}px`, async () => {
@@ -21,6 +21,25 @@ for (const width of [1280, 390]) {
     await withFixtureEvidence(page, `furnace-roundtrip-${width}`, async (stage) => {
       const game = new GameInteractions(page);
       await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+      // Hold the UI fixture still while native input, snapshots and healing continue.
+      const pageThrust = await page.evaluate(() => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        if (!ship) {
+          throw new Error('Fixture ship unavailable');
+        }
+        const thrust = ship.thrust;
+        ship.thrust = 0;
+        return thrust;
+      });
+      ownCleanup(() =>
+        page.evaluate((thrust) => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          if (!ship) {
+            throw new Error('Fixture ship unavailable during cleanup');
+          }
+          ship.thrust = thrust;
+        }, pageThrust)
+      );
       const lot = civicLot('street-1-0');
       if (!lot) {
         throw new Error('Missing street travel fixture');

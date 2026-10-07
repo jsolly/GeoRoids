@@ -40,7 +40,7 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionHtml).toContain('class="sound-toggle"');
   expect(productionHtml).toContain('id="hapticsPref"');
   expect(productionHtml).toContain('class="preference-toggles"');
-  expect(productionCss).toMatch(/\.preference-toggles \{[^}]*flex-direction: column;/su);
+  expect(productionCss).toMatch(/\.preference-toggles \{[^}]*flex-wrap: wrap;/su);
   expect(productionCss).not.toMatch(
     /\.preference-toggles \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/su
   );
@@ -57,7 +57,7 @@ test('title shell exposes a terrain canvas and keeps stock credit empty', () => 
   expect(document.querySelector('#attribution')?.textContent?.trim()).toBe('');
 });
 
-test('Enter Game is an outline phosphor control in the title menu', () => {
+test('the pilot enters through the first-party title menu button', () => {
   const start = document.querySelector('#start-game');
   expect(start?.tagName).toBe('BUTTON');
   expect(start?.classList.contains('enter-game')).toBe(true);
@@ -94,57 +94,17 @@ test('playfield chrome sizes to the visible box instead of overflowing 100dvw', 
   );
 });
 
-test('title menu stacks Enter Game, preference toggles, and Advanced at one control width', () => {
-  expect(productionCss).toMatch(/#start-screen \{[^}]*--start-control-width: 280px;/su);
-  expect(productionCss).toMatch(
-    /@media \(min-width: 800px\) \{[\s\S]*?#start-screen \{[^}]*--start-control-width: 320px;/u
-  );
-  expect(productionCss).toMatch(
-    /@media \(max-width: 430px\) \{[\s\S]*?#start-screen \{[^}]*--start-control-width: 100%;/u
-  );
-  expect(productionCss).toMatch(
-    /\.start-actions,\s*\.settings \{[^}]*width: min\(100%, var\(--start-control-width, 280px\)\);/su
-  );
-  expect(productionCss).toMatch(
-    /\.enter-game,\s*\.preference-toggles,\s*\.sound-toggle-row,\s*\.advanced-settings \{[^}]*width: 100%;[^}]*max-width: none;/su
-  );
-  expect(productionCss).toMatch(/\.sound-toggle-row \{[^}]*justify-content: flex-start;/su);
-  expect(productionCss).not.toMatch(/\.enter-game \{[^}]*max-width: (?:280px|320px|100%);/su);
-  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*min-width: 2(?:00|20)px;/su);
-  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*justify-content: center;/su);
-  expect(productionCss).not.toMatch(/\.preference-toggles \{[^}]*width: min\(100%, 40rem\);/su);
-  expect(productionCss).not.toMatch(/\.advanced-settings \{[^}]*width: min\(100%, 260px\);/su);
-});
-
-test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
-  const advanced = document.querySelector<HTMLDetailsElement>('#advanced-settings');
-  expect(advanced?.tagName).toBe('DETAILS');
-  expect(advanced?.open).toBe(false);
-  expect(advanced?.querySelector('summary')?.textContent).toBe('Advanced');
-  expect(document.querySelector('#debugPref')?.classList.contains('sound-toggle')).toBe(true);
-  expect(document.querySelector('label[for="debugPref"]')?.textContent).toBe('Debug');
-  expect(document.querySelector('#debug-player-id')?.getAttribute('readonly')).not.toBeNull();
-  expect(document.querySelector('#copy-debug-player-id')?.tagName).toBe('BUTTON');
-  expect(productionHtml).toMatch(/<details id="advanced-settings"[^>]*>/u);
-  expect(productionHtml).not.toMatch(/<details id="advanced-settings"[^>]*\sopen[\s>]/u);
-  expect(productionHtml).toContain('Paste this to an agent. Railway filter: @playerId:');
-  expect(productionHtml).toContain('id="debug-session-id"');
-  expect(productionHtml).toContain('id="copy-debug-diagnostics"');
-  expect(productionHtml).toContain('id="debug-hud"');
-  expect(productionHtml).toContain('id="debug-hud-fps"');
-  expect(productionCss).toContain('.advanced-settings');
-  expect(productionCss).toContain('.debug-hud');
-  expect(productionCss).not.toMatch(/#ff0|#ffff00|yellow/iu);
-});
-
-test('title menu presents the keyboard and ability control hint', () => {
-  const hint = document.querySelector('#controls-hint');
-  expect(hint?.closest('#start-screen')).toBeTruthy();
-  expect(hint?.textContent).toContain('Always thrust');
-  expect(hint?.textContent).toContain('Space fires');
-  expect(hint?.textContent).toContain('Shift or right-click Contour Lock');
-  expect(hint?.textContent).toContain('E ability');
-  expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
+test('the player menu keeps instructions and diagnostics out of the join flow', () => {
+  expect(document.querySelector('#advanced-settings')).toBeNull();
+  expect(document.querySelector('#debugPref')).toBeNull();
+  expect(document.querySelector('#debug-log-level')).toBeNull();
+  expect(document.querySelector('#controls-hint')).toBeNull();
+  expect(document.querySelector('.terrain-eyebrow')).toBeNull();
+  expect(document.querySelector('.game-description')).toBeNull();
+  expect(document.querySelector<HTMLElement>('#debug-identity')?.hidden).toBe(true);
+  expect(document.querySelector<HTMLInputElement>('#debug-player-id')?.readOnly).toBe(true);
+  expect(document.querySelector('#debug-session-id')).toBeTruthy();
+  expect(document.querySelector('.manual-entry a')?.getAttribute('href')).toBe('/wiki/');
 });
 
 test('playfield chrome ships an Inventory button with the V shortcut', () => {
@@ -167,10 +127,8 @@ test('playfield chrome ships an Inventory button with the V shortcut', () => {
 
 test('title menu exposes the ship kit picker before entering play', () => {
   const grid = document.querySelector('#ship-kit-grid');
-  expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Ship kit');
-  expect(document.querySelector('.ship-kit-placeholder-note')?.textContent).toContain(
-    'AD v2 silhouettes'
-  );
+  expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Choose your ship');
+  expect(document.querySelector('.ship-kit-placeholder-note')).toBeNull();
 });
 
 test('in-play chrome disables text highlight and copy-paste callouts', () => {
@@ -186,10 +144,10 @@ test('in-play chrome disables text highlight and copy-paste callouts', () => {
   expect(productionCss).toMatch(/#gameCanvas \{[^}]*-webkit-touch-callout: none;/su);
 });
 
-test('play view keeps the controls hint in title chrome and toggles the game area', () => {
+test('joining swaps the menu for the playfield and returning restores the menu', () => {
   const hint = document.querySelector('#controls-hint');
   const gameArea = document.querySelector<HTMLElement>('#gameArea');
-  expect(hint?.closest('#gameArea')).toBeNull();
+  expect(hint).toBeNull();
 
   setPlayView(true);
   expect(document.body.classList.contains('in-play')).toBe(true);

@@ -122,10 +122,9 @@ test('a spider released near a furnace retreats out of protection without attack
     furnace.position.x + SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
   );
   expect(body.targetId).toBeNull();
-  expect(manager.snapshot().consumed).toEqual([]);
 });
 
-test('a released spider inside Town Square burns as it leaves the grate', () => {
+test('a released spider inside Town Square retreats alive from the grate', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
   const spawned = manager.spawnSpider({ x: 0, y: -80 });
   const body = spawned ? manager.getBody(spawned.id) : undefined;
@@ -135,10 +134,9 @@ test('a released spider inside Town Square burns as it leaves the grate', () => 
   body.displaced = true;
   const pilot = actorAt({ x: 0, y: -900 });
   manager.advance({ players: [pilot], nowFrame: 1 });
-  expect(manager.getBody(body.id)).toBeUndefined();
-  expect(manager.snapshot().consumed).toEqual([
-    expect.objectContaining({ id: body.id, furnaceId: 'town-square' }),
-  ]);
+  expect(manager.getBody(body.id)).toBe(body);
+  expect(body.position.y).toBeLessThan(-80);
+  expect(body.targetId).toBeNull();
 });
 
 for (const site of ['town-square', 'street-1-0']) {

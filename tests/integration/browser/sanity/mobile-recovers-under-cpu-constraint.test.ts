@@ -62,6 +62,15 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
           await pilot.startGame();
           await pilot.waitForGameReady();
           await pilot.waitForServerJoin();
+          const setupThrust = await pilotPage.evaluate(() => {
+            const ship = window.gameController?.getCurrPlayer()?.ship;
+            if (!ship) {
+              throw new Error('Setup ship unavailable');
+            }
+            const thrust = ship.thrust;
+            ship.thrust = 0;
+            return thrust;
+          });
           await pilotPage.evaluate(() => {
             const collection = document.querySelector<HTMLElement>(
               '[aria-label="Performance collection"]'
@@ -70,11 +79,12 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
               collection.hidden = true;
             }
           });
+          return setupThrust;
         }
-        await join(game, page, 'Constrained mobile');
+        const primaryThrust = await join(game, page, 'Constrained mobile');
         const pilotId = await game.getLocalPlayerId();
         await arrangeCrewField([pilotId], 'empty');
-        await join(peer, peerPage, 'Mobile crew');
+        const peerThrust = await join(peer, peerPage, 'Mobile crew');
         const peerId = await peer.getLocalPlayerId();
         expect(peerId).not.toBe(pilotId);
         expect(peerPage.context()).not.toBe(page.context());
@@ -89,6 +99,19 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
         }
         await game.waitForRemotePlayers(1);
         await peer.waitForRemotePlayers(1);
+        // Placement and readiness are stationary setup; the measured exercise uses real cruise.
+        for (const [pilotPage, thrust] of [
+          [page, primaryThrust],
+          [peerPage, peerThrust],
+        ] as const) {
+          await pilotPage.evaluate((value) => {
+            const ship = window.gameController?.getCurrPlayer()?.ship;
+            if (!ship) {
+              throw new Error('Ready ship unavailable');
+            }
+            ship.thrust = value;
+          }, thrust);
+        }
         // Constrain the recovery exercise, after cold loading and arranging the fixture.
         // Throttling setup can exhaust the test deadline and let teardown reset a live scene.
         await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });

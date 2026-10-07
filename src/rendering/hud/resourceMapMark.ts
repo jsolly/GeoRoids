@@ -98,19 +98,11 @@ export function addResourceMapPath(
       }
       return;
     case 'wreckage':
-      // Broken ship hull and a detached panel, rather than another rock.
-      move(-0.9, 0.75);
-      line(-0.45, -0.8);
-      line(0.15, -0.25);
-      line(-0.05, 0.1);
-      line(0.35, 0.35);
-      line(0.05, 0.85);
+      move(0, -1);
+      line(0.85, 0);
+      line(0, 1);
+      line(-0.85, 0);
       ctx.closePath();
-      move(0.4, -0.75);
-      line(0.95, -0.1);
-      line(0.65, 0.2);
-      move(-0.55, 0.2);
-      line(-0.25, 0.5);
       return;
     case 'shard':
       move(-0.65, 0.7);

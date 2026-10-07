@@ -165,7 +165,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           position: { x: -75 + index * 30, y: 75 },
           mass: 1,
           radius: 4,
-          kind: 'wreckage',
+          kind: 'shard',
         }))
       );
       const pickups = SatellitePickupManager.getInstance();

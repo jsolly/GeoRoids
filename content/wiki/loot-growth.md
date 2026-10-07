@@ -17,9 +17,9 @@ media:
 
 ## Collecting loot
 
-Mined rocks and destroyed ships leave point drops, the main source of cargo; they pull toward any ship and expire after two minutes. Shards and Tap canisters add smaller amounts, wreckage is worthless debris, and Tap canisters and silk pull toward Haulers while one is flying. Pickups leave your ship’s mass, health, hull size, and flight speed unchanged, and collecting loot keeps Contour Lock engaged.
+Mined rocks leave point drops, the main source of cargo; they pull toward any ship and expire after two minutes. Shards and Tap canisters add smaller amounts, and Tap canisters and silk pull toward Haulers while one is flying. Pickups leave your ship’s mass, health, hull size, and flight speed unchanged, and collecting loot keeps Contour Lock engaged.
 
-Shards, wreckage, Tap canisters, and silk normally expire quickly; nest caches last longer, with lifetimes in the reference below. A Scout can collect Tap canisters and silk by touching them even when their attraction favors a nearby Hauler.
+Shards, Tap canisters, and silk normally expire quickly; nest caches last longer, with lifetimes in the reference below. A Scout can collect Tap canisters and silk by touching them even when their attraction favors a nearby Hauler.
 
 ## Salvaged equipment
 
@@ -29,7 +29,7 @@ Tools add no score and survive ordinary deaths, reconnects, and server restarts.
 
 ## Shoot a drop
 
-Shoot a shard, wreckage, Tap canister, or silk drop from nearby to detonate it and push small rocks away. Lasers pass through point drops (including death stashes) and equipment. The blast consumes the drop but cannot hurt any crew hull.
+Shoot a shard, Tap canister, or silk drop from nearby to detonate it and push small rocks away. Lasers pass through point drops and equipment. The blast consumes the drop but cannot hurt any crew hull.
 
 ## Spider silk
 
@@ -41,7 +41,7 @@ With Sound Effects on, quick pickups play successive notes of a short melody. Ta
 
 ## Cargo and banks
 
-Every ship has an aft cargo bay that fills with gold crates as you collect points; a full bay pulses with a Cargo Full badge. Full ships leave pickups for the crew, and a nearly full hold takes only the points that fit, leaving the same drop and expiry for the remainder. Switching to a smaller kit drops excess cargo as a recoverable stash.
+Every ship has an aft cargo bay that fills with gold crates as you collect points; a full bay pulses with a Cargo Full badge. Full ships leave pickups for the crew, and a nearly full hold takes only the points that fit, leaving the same drop and expiry for the remainder. Switching to a smaller kit discards cargo above the new hold.
 
 ## Furnace offloading
 
@@ -49,6 +49,6 @@ Approach a lit furnace with cargo; both ships lock onto the intake ring when the
 
 ## Cargo protection
 
-Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills, while a protected hit still delays health regeneration; any cargo left on death drops once.
+Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills, while a protected hit still delays health regeneration; any cargo left on death is discarded without an extra stash.
 
 Store purchases spend your bank, never carried cargo. See [Town Square](/wiki/#controls) for the store and [survival](/wiki/#combat-survival) for damage and respawns.

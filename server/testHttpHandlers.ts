@@ -474,6 +474,7 @@ export function handleTestArrangeCrewField(
         'boundary',
         'impact',
         'mining',
+        'hull-recovery',
         'cooperative',
         'reflection',
         'satellite',
@@ -622,7 +623,7 @@ export function handleTestArrangeCrewField(
         player.health = DAMAGE.ASTEROID_COLLISION;
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
-      if (body['scenario'] === 'tow') {
+      if (body['scenario'] === 'tow' || body['scenario'] === 'hull-recovery') {
         player.health = player.maxHealth;
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }

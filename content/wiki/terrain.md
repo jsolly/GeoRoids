@@ -38,11 +38,11 @@ Guards chase briefly and return home, while rare roaming hunters pursue farther.
 
 ## Survive a hunt
 
-One bite kills, and one ordinary laser hit kills the spider; otherwise escape its range or reach a lit furnace's safe area; Town Square has a larger sanctuary where spiders will not hunt. Mineral Scan makes spiders in range flee only during its short pulse, then they can return; probes and dark foundations offer no protection. A Scout can also [build a refuge during a chase](/wiki/#scout), even during tool cooldown or over a nest, to send living spiders fleeing.
+One bite kills, and one ordinary laser hit kills the spider; otherwise escape its range or reach a lit furnace's safe area; Town Square has a larger sanctuary where spiders will not hunt. Mineral Scan makes spiders in range flee only during its short pulse, then they can return; probes and dark foundations offer no protection.
 
 ## Spider tools
 
-Haulers can extract silk or tow a spider into a furnace, but the captive can still bite ships within reach, including its Hauler, and towing calls rescuers that can cut the cable. Scouts can attach a probe to follow a guard home to its resource. See the [Hauler](/wiki/#hauler) and [Scout](/wiki/#scout) tools.
+Haulers can extract silk or tow a living spider, but the captive can still bite ships within reach, including its Hauler, and towing calls rescuers that can cut the cable. Scouts can attach a probe to follow a guard home to its resource. See the [Hauler](/wiki/#hauler) and [Scout](/wiki/#scout) tools.
 
 ## Belt crawlers
 

@@ -22,4 +22,4 @@ Everyone shares one crew, one chart, and a persistent world. Mine rocks, collect
 
 ## Your next life
 
-[Cargo](/wiki/#loot-growth) protects your hull by spilling recoverable points on a hit. Deaths drop any remaining carried points in a stash that expires after two minutes. Banked points, salvaged tools, and silk remain safe. Respawns are unlimited. A brief disconnect returns you to the same ship. Returning with the other kit keeps your bank and tools, resets your health, and spills cargo above the new hold as a point stash at your ship.
+[Cargo](/wiki/#loot-growth) protects your hull by spilling recoverable points on a hit. Deaths lose your carried points. Banked points, salvaged tools, and silk remain safe. Respawns are unlimited. A brief disconnect returns you to the same ship. Returning with the other kit keeps your bank and tools, resets your health, and discards cargo above the new hold.

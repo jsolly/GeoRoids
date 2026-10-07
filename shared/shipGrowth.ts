@@ -3,22 +3,16 @@ import { GAME, SHIP } from '../src/constants';
 import { cargoCapacity } from './economy';
 
 /**
- * Shared salvage rules and persisted ship mass, health, and handling. Hull draw size and collision
+ * Shared pickup rules and persisted ship mass, health, and handling. Hull draw size and collision
  * radius stay at the kit base; mass does not scale the silhouette.
- * Existing ship mass is bounded; collecting salvage does not change it.
+ * Existing ship mass is bounded; collecting pickups does not change it.
  */
 export const GROWTH = {
   BASE_MASS: 1,
   SOFT_MAX_MASS: 8,
-  /** Always drop at least this much so a fresh-ship kill still yields loot. */
-  BASE_KILL_MASS: 0.4,
-  /** Fraction of growable mass (above BASE) converted to pellets. */
-  DROP_FRACTION: 0.85,
-  PELLET_MASS: 0.4,
   /** Small nibble from a destroyed roid — uses the same collection path. */
   SHARD_MASS: 0.25,
   SHARD_SCORE: 5,
-  MAX_PELLETS: 7,
   LOOT_RADIUS: 12,
   /** Outline canister from a Resource Tap extract. ~2.3× normal loot. */
   TAP_LOOT_RADIUS: 28,
@@ -33,8 +27,6 @@ export const GROWTH = {
   LOOT_MAGNET_RANGE: 80,
   LOOT_DRAG: 0.92,
   LOOT_MAGNET_ACCEL: 0.08 * GAME.MOTION_SCALE,
-  SCATTER_MIN: 16,
-  SCATTER_MAX: 40,
   MAX_LOOT: 192,
   LOOT_TTL_FRAMES: 20 * 60,
   /** Scout-base HP multiplier at SOFT_MAX_MASS. */
@@ -92,14 +84,6 @@ export function applyShipMass(ship: GrowableShip, nextMass: number): void {
 export function resetShipMass(ship: GrowableShip): void {
   ship.mass = GROWTH.BASE_MASS;
   ship.maxHealth = maxHealthFromMass(GROWTH.BASE_MASS);
-}
-
-export function planKillLoot(mass: number): { pelletMasses: number[] } {
-  const extra = Math.max(0, clampMass(mass) - GROWTH.BASE_MASS);
-  const total = extra * GROWTH.DROP_FRACTION + GROWTH.BASE_KILL_MASS;
-  const count = Math.max(1, Math.min(GROWTH.MAX_PELLETS, Math.round(total / GROWTH.PELLET_MASS)));
-  const each = total / count;
-  return { pelletMasses: Array.from({ length: count }, () => each) };
 }
 
 export function canCollectLoot(entity: {

@@ -113,7 +113,7 @@ test('a scanning pilot keeps mixed pickup styles independent while reusing and f
   view.clear(1);
   drawLootRelative(ship, [
     point,
-    { ...point, id: 'wreckage', kind: 'wreckage', position: { x: 110, y: 60 } },
+    { ...point, id: 'shard', kind: 'shard', position: { x: 110, y: 60 } },
     { ...point, id: 'points-c', position: { x: 180, y: 60 } },
   ]);
   expect(view.sources()[0]).toBe(originalPoint);

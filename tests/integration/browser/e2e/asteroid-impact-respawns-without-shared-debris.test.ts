@@ -1,7 +1,6 @@
 // @vitest-environment node
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
-import { GROWTH } from '../../../../shared/shipGrowth';
 import { DAMAGE } from '../../../../src/constants';
 import {
   assertNoBrowserDiagnostics,
@@ -35,7 +34,7 @@ function isAsteroidDeathMessage(message: unknown, targetPlayerId: string): boole
 }
 
 test(
-  'an asteroid impact drops shared crew loot that another pilot can collect',
+  'an asteroid impact respawns the pilot without leaving debris for either client',
   async () => {
     const impactedPilotPage = browserManager.getCurrentPage();
     if (!impactedPilotPage) {
@@ -74,15 +73,11 @@ test(
 
     const healthBefore = await impactedPilot.getShipHealth();
     expect(healthBefore).toBeGreaterThan(0);
-    const scoreBefore = await collector.getScore();
-    const knownLoot = new Set((await collector.getLoot()).map((drop) => drop.id));
     damageMessages.length = 0;
 
-    // Clear incidental launch pickups before arranging an unshielded lethal hit.
-    await arrangeCrewFieldWithEvidence([impactedPilotId, collectorId], 'delivery');
-
     // Start the first pilot at one impact's worth of health, then let the
-    // real asteroid collision loop kill it and publish wreckage to both clients.
+    // real asteroid collision loop kill it and publish the death to the crew.
+    await arrangeCrewFieldWithEvidence([impactedPilotId, collectorId], 'delivery');
     const fixture = await arrangeCrewFieldWithEvidence([impactedPilotId, collectorId], 'impact');
     // Respawn can finish before either browser observes the death. Retain the
     // acknowledged impact pose instead of reading the pilot's latest pose.
@@ -99,78 +94,25 @@ test(
       )
       .toBe(true);
 
-    const isImpactWreckage = (
-      drop: Awaited<ReturnType<GameInteractions['getLoot']>>[number]
-    ): boolean => {
-      const scatter = Math.hypot(drop.x - deathPosition.x, drop.y - deathPosition.y);
-      return (
-        drop.kind === 'wreckage' &&
-        drop.id.startsWith('loot-') &&
-        !knownLoot.has(drop.id) &&
-        scatter >= GROWTH.SCATTER_MIN - 0.001 &&
-        scatter <= GROWTH.SCATTER_MAX + 0.001
-      );
-    };
-
-    await expect
-      .poll(
-        async () => {
-          const [impactedPilotLoot, collectorLoot] = await Promise.all([
-            impactedPilot.getLoot(),
-            collector.getLoot(),
-          ]);
-          const impactedPilotIds = impactedPilotLoot
-            .filter(isImpactWreckage)
-            .map((drop) => drop.id)
-            .sort();
-          const collectorIds = collectorLoot
-            .filter(isImpactWreckage)
-            .map((drop) => drop.id)
-            .sort();
-          return (
-            impactedPilotIds.length > 0 && impactedPilotIds.join(',') === collectorIds.join(',')
-          );
-        },
-        {
-          timeout: 8000,
-          message: 'both clients should receive the wreckage from the environmental impact',
-        }
-      )
-      .toBe(true);
-
-    const sharedLoot = (await collector.getLoot()).filter(isImpactWreckage);
-    expect(sharedLoot.length).toBeGreaterThan(0);
-    const impactedPilotView = await impactedPilot.getLoot();
-    for (const drop of sharedLoot) {
-      const peer = impactedPilotView.find((other) => other.id === drop.id);
-      assert.ok(peer, `impactedPilot view is missing shared loot ${drop.id}`);
-      expect(Math.abs(peer.x - drop.x)).toBeLessThan(8);
-      expect(Math.abs(peer.y - drop.y)).toBeLessThan(8);
-    }
-
+    await impactedPilot.waitForShipAlive();
+    const [victimLoot, peerLoot] = await Promise.all([
+      impactedPilot.getLoot(),
+      collector.getLoot(),
+    ]);
+    // Ramming also breaks the ore rock: keep its one cargo pickup and shard.
+    // Ship death must contribute no additional pickup.
+    const atImpact = (loot: typeof victimLoot) =>
+      loot
+        .filter((drop) => Math.hypot(drop.x - deathPosition.x, drop.y - deathPosition.y) < 60)
+        .map((drop) => drop.kind)
+        .sort();
+    expect(atImpact(victimLoot)).toEqual(['points', 'shard']);
+    expect(atImpact(peerLoot)).toEqual(['points', 'shard']);
+    expect(await impactedPilot.getCargo()).toBe(0);
+    expect(await impactedPilot.isGameRunning()).toBe(true);
     await collectorPage.screenshot({
-      path: screenshotManager.getScreenshotPath('asteroid-impact-shared-loot.png'),
+      path: screenshotManager.getScreenshotPath('asteroid-impact-without-debris.png'),
     });
-
-    const pellet = sharedLoot[0];
-    assert.ok(pellet, 'shared impact wreckage is required for collection');
-    const startMass = await collector.getShipMass();
-    const startRadius = await collector.getShipRadius();
-    const startMaxHealth = await collector.getShipMaxHealth();
-    await collector.placeShipAt(pellet.x, pellet.y);
-    await expect
-      .poll(async () => (await collector.getLoot()).some((drop) => drop.id === pellet.id), {
-        timeout: 8000,
-        message: 'the collector should remove the shared wreckage after pickup',
-      })
-      .toBe(false);
-
-    await collector.waitForAnimationFrames(12);
-    expect(await collector.getShipMass()).toBe(startMass);
-    expect(await collector.getShipRadius()).toBe(startRadius);
-    expect(await collector.getShipMaxHealth()).toBe(startMaxHealth);
-    expect(await collector.getScore()).toBe(scoreBefore);
-
     assertNoBrowserDiagnostics(impactedPilotDiagnostics);
     assertNoBrowserDiagnostics(collectorDiagnostics);
   },

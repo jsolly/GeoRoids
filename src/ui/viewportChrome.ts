@@ -50,14 +50,3 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
   }
   return query.maxTouchPoints > 0 && Math.min(query.width, query.height) <= TOUCH.TABLET_MIN_SIDE;
 }
-
-export const DESKTOP_CONTROLS_HINT =
-  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click Contour Lock · E ability · V inventory · B furnace travel · M map';
-export const TOUCH_CONTROLS_HINT =
-  'Always thrust · Drag to steer · Tap to fire · Contour Lock · Ability · Inventory button · Enter Town Square or tap Travel over a lit furnace · Map button';
-
-export function controlsHintFor(
-  query: ViewportQuery = queryViewport()
-): typeof DESKTOP_CONTROLS_HINT | typeof TOUCH_CONTROLS_HINT {
-  return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;
-}

@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
@@ -278,4 +278,32 @@ test('resuming during an explosion keeps the pending respawn until the server re
   expect(resumed.actor.exploding).toBe(false);
   expect(resumed.actor.spawnProtectionTimer).toBeGreaterThan(0);
   engine.stopGameLoop();
+});
+
+test('a restart preserves the damaged pilot recovery wait across saved flight restoration', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-regen-'));
+  directories.push(directory);
+  const path = join(directory, 'world.sqlite');
+  const firstStore = database(path);
+  const first = new GameEngine(82, undefined, new InlineWorldPersistence(firstStore));
+  vi.spyOn(first, 'getServerTime').mockReturnValue(10_000);
+  const original = pilot(first, 'damaged', 'scout');
+  delete original.actor.spawnProtectionTimer;
+  first.handleShipDamage(original.actor.id, 'asteroid', 20);
+  first.removePlayer(original.actor.id);
+  first.checkpointWorld();
+  firstStore.close();
+  stores.splice(stores.indexOf(firstStore), 1);
+  const second = new GameEngine(82, undefined, new InlineWorldPersistence(database(path)));
+  vi.spyOn(second, 'getServerTime').mockReturnValue(11_000);
+  const resumed = second.resumePilot(original.token, new RecordingSocket());
+  assert(resumed.ok);
+  expect(resumed.actor.health).toBe(80);
+  expect(resumed.actor.healthRegenTimer).toBe(240);
+  for (let frame = 0; frame < 240; frame++) {
+    second.advanceCombatFrame();
+  }
+  expect(resumed.actor.health).toBe(80);
+  second.advanceCombatFrame();
+  expect(resumed.actor.health).toBeGreaterThan(80);
 });

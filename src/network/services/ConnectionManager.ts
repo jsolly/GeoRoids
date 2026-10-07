@@ -149,13 +149,7 @@ function isFinitePosition(value: unknown): value is Position {
 }
 
 function isLootKind(value: unknown): value is LootKind {
-  return (
-    value === 'shard' ||
-    value === 'wreckage' ||
-    value === 'tap' ||
-    value === 'silk' ||
-    isEquipmentId(value)
-  );
+  return value === 'shard' || value === 'tap' || value === 'silk' || isEquipmentId(value);
 }
 
 function isLootCollectedEvent(value: unknown): value is LootCollected {

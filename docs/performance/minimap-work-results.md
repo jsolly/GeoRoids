@@ -43,7 +43,7 @@ would be required before making a current frame-rate claim from this policy.
 A September 10, 2026 observation of the restored marks used the same seed 42,
 30 warmup frames, and 120 measured touch-portrait frames. The fixture then
 contained 24 asteroids, six wreckage drops, three hostile satellites, and three
-loose pickups. Hostile satellite NPCs are gone; current play draws six EO
+loose pickups. Wreckage is now retired; this fixture remains historical measurement evidence. Hostile satellite NPCs are gone; current play draws six EO
 pickups as lilac circles (loose) or diamonds (orbiting). Every measured frame
 used 110 Canvas strokes, compared with the historical player-only reference of
 107. Satellite and pickup position reads were six each, compared with three

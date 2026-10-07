@@ -1,10 +1,4 @@
-import { LOG_LEVEL_NAMES, LOGGING } from '../constants';
-import {
-  debugIsOn,
-  setDebugPreference,
-  setLogLevelPreference,
-  storedLogLevel,
-} from '../constants/user-preferences';
+import { debugIsOn } from '../constants/user-preferences';
 import { buildClientDiagnostics } from '../diagnostics/clientDiagnostics';
 import { getClientLogContext } from '../utils/clientLogContext';
 import { attachEventListener } from '../utils/dom';
@@ -100,31 +94,16 @@ function selectReadableId(input: HTMLInputElement): void {
   input.setSelectionRange(0, input.value.length);
 }
 
-export function applyDebugPreference(enabled: boolean): void {
-  setDebugPreference(enabled);
+export function syncDebugMode(): void {
   if (typeof document === 'undefined') {
     return;
   }
+  const enabled = debugIsOn();
   document.body.classList.toggle('debug-on', enabled);
-  const checkbox = document.querySelector<HTMLInputElement>('#debugPref');
-  if (checkbox) {
-    checkbox.checked = enabled;
-  }
-  const details = document.querySelector<HTMLDetailsElement>('#advanced-settings');
-  if (details && enabled) {
-    details.open = true;
-  }
   setHidden(document.querySelector('#debug-identity'), !enabled);
-  const logLevelSelect = document.querySelector<HTMLSelectElement>('#debug-log-level');
-  if (logLevelSelect) {
-    logLevelSelect.value = storedLogLevel() ?? LOGGING.GLOBAL_LOG_LEVEL;
-  }
   logger.applyConfiguredLogLevel();
   syncDebugIdentity();
   syncDebugHudVisibility();
-  if (enabled) {
-    document.querySelector('#debug-identity')?.scrollIntoView?.({ block: 'nearest' });
-  }
 }
 
 function syncDebugIdentity(override?: { playerId?: string; sessionId?: string }): void {
@@ -137,6 +116,14 @@ function syncDebugIdentity(override?: { playerId?: string; sessionId?: string })
   const sessionInput = document.querySelector<HTMLInputElement>('#debug-session-id');
   const copyPlayer = document.querySelector<HTMLButtonElement>('#copy-debug-player-id');
 
+  const hudPlayer = document.querySelector('#debug-hud-player-id');
+  const hudSession = document.querySelector('#debug-hud-session-id');
+  if (hudPlayer) {
+    hudPlayer.textContent = playerId || 'Not joined';
+  }
+  if (hudSession) {
+    hudSession.textContent = sessionId;
+  }
   if (sessionInput) {
     sessionInput.value = sessionId;
   }
@@ -158,25 +145,11 @@ export function mountDebugIdentity(): void {
   if (typeof document === 'undefined') {
     return;
   }
-  applyDebugPreference(debugIsOn());
+  syncDebugMode();
   if (listenersBound) {
     return;
   }
   listenersBound = true;
-
-  const checkbox = document.querySelector<HTMLInputElement>('#debugPref');
-  attachEventListener(checkbox, 'change', () => {
-    applyDebugPreference(Boolean(checkbox?.checked));
-  });
-
-  const logLevelSelect = document.querySelector<HTMLSelectElement>('#debug-log-level');
-  attachEventListener(logLevelSelect, 'change', () => {
-    const level = LOG_LEVEL_NAMES.find((name) => name === logLevelSelect?.value);
-    if (level) {
-      setLogLevelPreference(level);
-      logger.applyConfiguredLogLevel();
-    }
-  });
 
   const playerInput = document.querySelector<HTMLInputElement>('#debug-player-id');
   const sessionInput = document.querySelector<HTMLInputElement>('#debug-session-id');

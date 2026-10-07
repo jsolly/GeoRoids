@@ -105,10 +105,15 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
     await expectSharedHealth(damagedHealth);
     clock.mockReturnValue(10_000 + ((delay + 1) * 1000) / GAME.FPS);
     engine.advanceCombatFrame();
-    const firstHealedHealth = damagedHealth + calculateHealthRegenPerFrame();
+    const firstHealedHealth = damagedHealth + calculateHealthRegenPerFrame(maxHealth);
     expect(firstHealedHealth).toBeGreaterThan(damagedHealth);
     expect(firstHealedHealth).toBeLessThan(maxHealth);
     await expectSharedHealth(firstHealedHealth);
+    for (let frame = 2; frame <= GAME.FPS; frame++) {
+      clock.mockReturnValue(10_000 + ((delay + frame) * 1000) / GAME.FPS);
+      engine.advanceCombatFrame();
+    }
+    await expectSharedHealth(damagedHealth + maxHealth * 0.02);
   } finally {
     clock.mockRestore();
     await server.close();

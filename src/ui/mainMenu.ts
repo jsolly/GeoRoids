@@ -13,7 +13,6 @@ import { sanitizePlayerName } from '../utils/playerName';
 import { mountDebugHud } from './debugHud';
 import { mountDebugIdentity } from './debugIdentity';
 import { getSelectedShipKitId, mountShipKitSelect } from './shipKitSelect';
-import { controlsHintFor } from './viewportChrome';
 
 // UI element references
 const soundCheckBox = getElementById<HTMLInputElement>('soundPref');
@@ -230,17 +229,6 @@ initTitleTerrain();
 mountShipKitSelect();
 mountDebugIdentity();
 mountDebugHud();
-
-function syncControlsHint(): void {
-  const hint = getElementById<HTMLElement>('controls-hint');
-  if (hint) {
-    hint.textContent = controlsHintFor();
-  }
-}
-
-syncControlsHint();
-window.addEventListener('resize', syncControlsHint);
-window.visualViewport?.addEventListener('resize', syncControlsHint);
 
 // Generate a nickname once and use it consistently
 const generatedNickname = generateFunNickname();

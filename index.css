@@ -55,6 +55,7 @@
   }
 
   #title-terrain {
+    opacity: 0.45;
     position: fixed;
     inset: 0;
     width: 100vw;
@@ -64,22 +65,23 @@
     background-color: var(--palette-bg, #000011);
   }
 
-  .terrain-eyebrow {
-    margin: 0 0 1rem;
-    color: #a5b6c7;
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+  :where(#start-screen) * {
+    font-size: inherit;
   }
 
   #start-screen {
     --start-control-width: 280px;
+    width: min(92%, 560px);
+    max-width: 560px;
+    max-height: calc(100dvh - 40px);
+    padding: 32px;
     font-size: 1rem;
-    padding: 1.6rem 2rem 1.35rem;
-    background: rgba(8, 15, 25, 0.84);
-    border-color: color-mix(in srgb, var(--palette-hud-muted, #64748b) 55%, transparent);
+    background: rgba(8, 18, 25, 0.96);
+    border: 1px solid #354952;
+    border-radius: 12px;
+    box-shadow: 0 16px 64px #0008;
     backdrop-filter: none;
+    text-align: left;
   }
 
   /* Ensure the game wrapper doesn't create black areas */
@@ -794,51 +796,23 @@
   }
 
   #start-screen h1 {
-    font-size: 2.55em;
-    margin-bottom: 0.35em;
+    margin: 0 0 28px;
+    color: #e2eee9;
+    font-size: 2.5rem;
+    font-weight: 650;
+    letter-spacing: -0.06em;
+    text-align: left;
+    text-shadow: none;
   }
 
   .screen h1::after {
-    content: "";
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 3px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--palette-accent, #a78bfa) 70%, transparent),
-      transparent
-    );
-    border-radius: 2px;
+    content: none;
   }
 
   /* Title/menu only — phosphor control legend. Hidden in live play via body.in-play. */
-  .game-description {
-    max-width: 34rem;
-    margin: 0 auto 1rem;
-    color: #e2e8f0;
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-
-  .controls-hint {
-    margin: 0.35em 0 1.15em;
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.72rem;
-    font-weight: 500;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--palette-accent, #a78bfa);
-    text-shadow: 0 0 8px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
-    opacity: 0.82;
-  }
 
   body.in-play #title-terrain,
-  body.in-play #attribution,
-  body.in-play .controls-hint {
+  body.in-play #attribution {
     display: none;
   }
 
@@ -858,32 +832,32 @@
   }
 
   .ship-kit-select legend {
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.18em;
+    font: 500 0.75rem / 1.5 var(--font-mono);
+    color: #9cafa9;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--palette-hud-muted, #64748b);
-    margin-bottom: 0.55em;
+    margin-bottom: 12px;
   }
 
   .ship-kit-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-    gap: 0.45em;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .ship-kit-card {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.2em;
-    padding: 0.55em 0.4em;
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 55%, transparent);
-    color: var(--palette-hud, #e2e8f0);
-    border-radius: 8px;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 16px 14px;
+    background: #0c1a22;
+    border: 1px solid #34464f;
+    color: #e2eee9;
+    border-radius: 6px;
     cursor: pointer;
-    min-height: 88px;
+    min-height: 156px;
+    text-align: left;
   }
 
   .ship-kit-silhouette {
@@ -894,27 +868,26 @@
 
   .ship-kit-card.is-selected,
   .ship-kit-card:focus-visible {
-    border-color: var(--palette-accent, #a78bfa);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-accent, #a78bfa) 35%, transparent);
+    border-color: #7ad6bb;
+    background: #10292b;
+    box-shadow: inset 0 0 0 1px #7ad6bb;
   }
 
   .ship-kit-name {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: 1rem;
+    font-weight: 600;
   }
 
   .ship-kit-ability {
-    font-size: 0.55rem;
-    letter-spacing: 0.03em;
-    color: var(--palette-hud-muted, #64748b);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #a9bbb8;
   }
 
   .ship-kit-role {
-    font-size: 0.6rem;
-    line-height: 1.4;
-    text-align: center;
-    color: var(--palette-hud, #e2e8f0);
+    font: 0.65rem / 1.5 var(--font-mono);
+    color: #7ad6bb;
+    margin-top: auto;
   }
 
   .game-modes {
@@ -931,61 +904,36 @@
     margin-inline: auto;
   }
 
-  .enter-game,
-  .preference-toggles,
-  .sound-toggle-row,
-  .advanced-settings {
-    box-sizing: border-box;
-    width: 100%;
-    max-width: none;
-    min-width: 0;
-  }
-
   .enter-game {
+    width: 100%;
     appearance: none;
-    display: inline-block;
-    padding: 0.8em 1.2em;
-    font-family: inherit;
-    font-size: 1.1em;
-    font-weight: 600;
-    line-height: 1.5;
-    text-align: center;
-    text-decoration: none;
-    user-select: none;
+    display: block;
+    min-height: 48px;
+    padding: 12px 20px;
+    font:
+      600 1rem / 1.5 system-ui,
+      sans-serif;
+    color: #0c2020;
+    background: #7ad6bb;
+    border: 1px solid #7ad6bb;
+    border-radius: 6px;
     cursor: pointer;
-    color: var(--palette-accent, #a78bfa);
-    text-shadow: 0 0 8px color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent);
-    background: transparent;
-    border: 1.5px solid var(--palette-accent, #a78bfa);
-    border-radius: 12px;
-    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-accent, #a78bfa) 35%, transparent);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
+    text-shadow: none;
+    box-shadow: none;
+    transition: background 0.15s;
   }
 
   .enter-game:hover,
   .enter-game:focus-visible {
-    background: color-mix(in srgb, var(--palette-accent, #a78bfa) 12%, transparent);
-    color: var(--palette-accent, #a78bfa);
-    border-color: var(--palette-accent, #a78bfa);
-    box-shadow: 0 0 16px color-mix(in srgb, var(--palette-accent, #a78bfa) 50%, transparent);
-    transform: translateY(-1px);
+    background: #9be5d0;
+    color: #0c2020;
+    border-color: #9be5d0;
+    box-shadow: none;
+    transform: none;
   }
 
   .enter-game::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    transition: left 0.5s;
-  }
-
-  .enter-game:hover::before {
-    left: 100%;
+    content: none;
   }
 
   .settings {
@@ -994,16 +942,8 @@
 
   .preference-toggles {
     display: flex;
-    flex-direction: column;
-    gap: 0.45em;
-  }
-
-  #start-screen .terrain-eyebrow {
-    margin-bottom: 0.45rem;
-  }
-
-  #start-screen .controls-hint {
-    margin: 0.25em 0 0.7em;
+    flex-wrap: wrap;
+    gap: 8px 20px;
   }
 
   #start-screen .game-modes {
@@ -1015,47 +955,35 @@
     gap: 0.45em;
   }
 
-  #start-screen .game-description {
-    margin-bottom: 0;
-  }
-
   .sound-toggle-row {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 0.8em;
-    padding: 0.4em 0.8em;
-    background-color: rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    transition: all 0.3s ease;
-    position: relative;
+    gap: 8px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    min-height: 44px;
   }
 
   .sound-toggle-row:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.25);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    background: transparent;
   }
 
   .sound-toggle-label {
     cursor: pointer;
-    user-select: none;
-    font-weight: 500;
-    margin: 0;
-    color: #f0f0f0;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    font:
+      400 0.8rem / 1.5 system-ui,
+      sans-serif;
+    color: #a9bbb8;
   }
 
   .sound-toggle {
-    flex-shrink: 0;
-    width: 1.3em;
-    height: 1.3em;
+    width: 16px;
+    height: 16px;
     margin: 0;
     cursor: pointer;
-    accent-color: var(--palette-accent, #a78bfa);
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    accent-color: #7ad6bb;
   }
 
   .sound-toggle:disabled,
@@ -1077,7 +1005,7 @@
 
   .preference-toggles .sound-toggle-row {
     min-width: 0;
-    width: 100%;
+    width: auto;
     max-width: none;
   }
 
@@ -1085,56 +1013,10 @@
     display: none;
   }
 
-  .advanced-settings {
-    margin: 0;
-    padding: 0.15rem 0.65rem 0.45rem;
-    text-align: left;
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 40%, transparent);
-    border-radius: 6px;
-  }
-
-  .advanced-settings summary {
-    cursor: pointer;
-    list-style: none;
-    padding: 0.4rem 0;
-    color: var(--palette-hud-muted, #64748b);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-
-  .advanced-settings summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .advanced-settings summary::after {
-    content: "+";
-    float: right;
-    color: var(--palette-accent, #a78bfa);
-  }
-
-  .advanced-settings[open] summary::after {
-    content: "–";
-  }
-
-  .advanced-settings summary:hover,
-  .advanced-settings summary:focus-visible {
-    color: var(--palette-hud, #e2e8f0);
-    outline: none;
-  }
-
-  .debug-toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.65em;
-    margin: 0.15rem 0 0.55rem;
-  }
-
   .debug-identity {
+    text-align: left;
+    padding-top: 12px;
+    border-top: 1px solid #34464f;
     display: grid;
     gap: 0.7rem;
   }
@@ -1217,6 +1099,36 @@
     cursor: default;
   }
 
+  .debug-play-identity {
+    display: none;
+    margin: 0;
+    padding: 8px;
+    background: #081219e8;
+    border: 1px solid #34464f;
+    border-radius: 4px;
+    max-width: 100%;
+  }
+
+  body.debug-on .debug-play-identity {
+    display: block;
+  }
+
+  .debug-play-identity dt,
+  .debug-play-identity dd {
+    margin: 0;
+    font: 10px / 1.4 var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .debug-play-identity dt {
+    color: #a9bbb8;
+  }
+
+  .debug-play-identity dd {
+    color: #7ad6bb;
+    user-select: text;
+  }
+
   .debug-play-stack {
     position: absolute;
     left: max(10px, env(safe-area-inset-left, 0px));
@@ -1296,6 +1208,7 @@
   }
 
   .debug-hud dd {
+    overflow-wrap: anywhere;
     margin: 0;
     min-width: 0;
     overflow: hidden;
@@ -1333,11 +1246,6 @@
     .screen h1 {
       font-size: 2.8em;
       margin-bottom: 1em;
-    }
-
-    .controls-hint {
-      font-size: 0.64rem;
-      margin-bottom: 0.9em;
     }
 
     .game-modes {
@@ -1378,7 +1286,7 @@
     }
 
     #start-screen {
-      padding: 1.1rem 0.85rem 1rem;
+      padding: 24px;
     }
   }
 
@@ -1390,44 +1298,40 @@
 
     #start-screen {
       --start-control-width: 320px;
-      padding: 1.85rem 2.4rem 1.5rem;
+      padding: 36px;
     }
   }
 
   .nickname-label {
-    color: #f0f0f0;
-    font-size: 1em;
-    margin-bottom: 0.5em;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
     display: block;
-    text-align: center;
+    margin-bottom: 8px;
+    color: #9cafa9;
+    font: 500 0.75rem / 1.5 var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .nickname-input {
     display: block;
     box-sizing: border-box;
-    appearance: none;
     width: 100%;
-    font-family: inherit;
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #ffffff;
-    font-size: 16px;
-    padding: 0.6em 0.8em;
-    transition: all 0.3s ease;
-    text-align: center;
-    backdrop-filter: blur(5px);
-    margin-bottom: 1em;
+    min-height: 48px;
+    margin-bottom: 24px;
+    padding: 12px 14px;
+    color: #e2eee9;
+    font:
+      16px / 1.5 system-ui,
+      sans-serif;
+    background: #0c1a22;
+    border: 1px solid #34464f;
+    border-radius: 6px;
   }
 
   .nickname-input:focus {
-    background-color: rgba(255, 255, 255, 0.15);
-    border-color: var(--palette-accent, #a78bfa);
-    box-shadow: 0 0 15px color-mix(in srgb, var(--palette-accent, #a78bfa) 35%, transparent);
-    outline: none;
+    border-color: #7ad6bb;
+    outline: 2px solid #7ad6bb;
+    outline-offset: 2px;
+    box-shadow: none;
   }
 
   .nickname-input::placeholder {
@@ -1439,38 +1343,9 @@
     background-color: rgba(255, 255, 255, 0.12);
   }
 
-  #playerNameInput {
-    width: 100%;
-    padding: 0.8em;
-    margin-bottom: 1.5em;
-    border-radius: 8px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    background-color: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 1.1em;
-    transition: border-color 0.3s ease;
-  }
-
-  #playerNameInput:focus {
-    outline: none;
-    border-color: #4fc3f7;
-    box-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
-  }
-
-  #playerNameInput::placeholder {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
   /* Additional visual enhancements */
   .screen::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-    border-radius: 22px;
-    z-index: -1;
-    opacity: 0.6;
-    pointer-events: none;
+    content: none;
   }
 
   /* Build info styling */
@@ -1616,11 +1491,6 @@
       font-size: 1.6em;
       margin-bottom: 0.4em;
     }
-
-    .controls-hint {
-      font-size: 0.58rem;
-      margin-bottom: 0.55em;
-    }
   }
 
   @media (max-width: 430px) {
@@ -1636,13 +1506,9 @@
       margin-bottom: 0.55em;
     }
 
-    .controls-hint {
-      font-size: 0.58rem;
-      letter-spacing: 0.1em;
-    }
-
     #start-screen {
       --start-control-width: 100%;
+      padding: 24px 20px;
     }
   }
 
@@ -1698,9 +1564,16 @@
     margin-right: calc(var(--action-width) + 6px);
   }
 
+  body.touch-play .debug-play-identity {
+    position: absolute;
+    left: 0;
+    top: 60px;
+    max-width: min(210px, calc(100vw - 96px));
+  }
+
   body.touch-play .debug-hud {
     position: absolute;
-    top: 104px;
+    top: 150px;
     right: 0;
     width: min(240px, calc(100% - 128px));
     max-width: calc(100vw - 24px);
@@ -1710,34 +1583,24 @@
     left: calc(var(--action-left) + (var(--action-width) + 6px) * 3);
   }
 
+  @media (orientation: landscape) and (max-height: 500px) {
+    body.touch-play .debug-play-identity,
+    body.touch-play .debug-hud {
+      top: 52px;
+    }
+  }
+
   .touch-controls.is-desktop .touch-ability {
     display: none;
   }
 
   .nickname-input.default-nickname {
-    border-color: rgba(79, 195, 247, 0.6);
-    background-color: rgba(79, 195, 247, 0.15);
-    color: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 0 8px rgba(79, 195, 247, 0.3);
-    transition: all 0.3s ease;
-    position: relative;
-  }
-
-  .nickname-input.default-nickname::after {
-    content: "✨ Generated";
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.8em;
-    color: rgba(79, 195, 247, 0.8);
-    pointer-events: none;
-    opacity: 0.7;
+    color: #e2eee9;
   }
 
   /* Companion reference, reachable before joining a game. */
   .manual-entry {
-    margin: 0;
+    margin: 8px 0 0;
   }
   .manual-entry a {
     display: inline-flex;

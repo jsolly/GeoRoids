@@ -28,14 +28,15 @@ describe('client ship health regeneration', () => {
     ship.takeDamage(20);
     const healthAfterDamage = ship.health;
 
-    tickShip(ship, GAME.FPS + calculateHealthRegenDelayFrames() - 1);
+    tickShip(ship, calculateHealthRegenDelayFrames());
 
-    expect(ship.lastDamageTime).toBe(0);
     expect(ship.healthRegenTimer).toBe(0);
     expect(ship.health).toBe(healthAfterDamage);
 
     tickShip(ship, 1);
-    expect(ship.health).toBeCloseTo(healthAfterDamage + calculateHealthRegenPerFrame());
+    expect(ship.health).toBeCloseTo(
+      healthAfterDamage + calculateHealthRegenPerFrame(ship.maxHealth)
+    );
   });
 
   test('a second hit restarts the cooldown before regeneration can resume', () => {
@@ -44,19 +45,33 @@ describe('client ship health regeneration', () => {
     ship.takeDamage(15);
     const healthAfterSecondHit = ship.health;
 
-    expect(ship.lastDamageTime).toBe(GAME.FPS);
     expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
-    tickShip(ship, GAME.FPS + calculateHealthRegenDelayFrames() - 1);
+    tickShip(ship, calculateHealthRegenDelayFrames());
     expect(ship.health).toBe(healthAfterSecondHit);
     tickShip(ship, 1);
-    expect(ship.health).toBeCloseTo(healthAfterSecondHit + calculateHealthRegenPerFrame());
+    expect(ship.health).toBeCloseTo(
+      healthAfterSecondHit + calculateHealthRegenPerFrame(ship.maxHealth)
+    );
   });
+
+  test.each([100, 140, 220])(
+    'a client hull with %s max health predicts two percent recovery per second',
+    (maxHealth) => {
+      ship.maxHealth = maxHealth;
+      ship.health = maxHealth;
+      ship.takeDamage(20);
+      tickShip(ship, 5 * GAME.FPS);
+      expect(ship.health).toBe(maxHealth - 20);
+      tickShip(ship, GAME.FPS);
+      expect(ship.health).toBeCloseTo(maxHealth - 20 + maxHealth * 0.02, 8);
+    }
+  );
 
   test('hulls cap regeneration at max health', () => {
     const testedShip = new Ship();
-    testedShip.health = testedShip.maxHealth - calculateHealthRegenPerFrame() / 2;
-    testedShip.lastDamageTime = 0;
+    testedShip.health =
+      testedShip.maxHealth - calculateHealthRegenPerFrame(testedShip.maxHealth) / 2;
     testedShip.healthRegenTimer = 0;
 
     testedShip.updateHealth();
@@ -67,12 +82,11 @@ describe('client ship health regeneration', () => {
   test('exploding and dead hulls do not regenerate before a server respawn', () => {
     ship.takeDamage(ship.maxHealth);
     const explodingHealth = ship.health;
-    tickShip(ship, GAME.FPS + calculateHealthRegenDelayFrames() + 1);
+    tickShip(ship, calculateHealthRegenDelayFrames() + 1);
     expect(ship.exploding).toBe(true);
     expect(ship.health).toBe(explodingHealth);
 
     ship.exploding = false;
-    ship.lastDamageTime = 0;
     ship.healthRegenTimer = 0;
     tickShip(ship, GAME.FPS + 1);
     expect(ship.health).toBe(0);
@@ -85,19 +99,24 @@ describe('client ship health regeneration', () => {
     expect(shouldStartHealthRegeneration(0, 50, SHIP.MAX_HEALTH)).toBe(true);
   });
 
-  test('a remote hull accepts ordered server health echoes through Player.updateFromServer', () => {
-    const player = new Player({
-      id: 'remote-player',
-      name: 'Remote Player',
-      type: 'remote',
-      input: new MockPlayerInput(),
-    });
-    player.ship.health = 80;
+  test.each(['local', 'remote'] as const)(
+    '%s multiplayer hulls wait for authoritative recovery snapshots',
+    (type) => {
+      const player = new Player({
+        id: 'remote-player',
+        name: 'Remote Player',
+        type,
+        input: new MockPlayerInput(),
+      });
+      player.ship.health = 80;
 
-    player.updateFromServer({ health: 75, maxHealth: player.ship.maxHealth, exploding: false });
-    expect(player.ship.health).toBe(75);
+      player.updateFromServer({ health: 75, maxHealth: player.ship.maxHealth, exploding: false });
+      expect(player.ship.health).toBe(75);
+      tickShip(player.ship, calculateHealthRegenDelayFrames() + 10 * GAME.FPS);
+      expect(player.ship.health).toBe(75);
 
-    player.updateFromServer({ health: 76, maxHealth: player.ship.maxHealth, exploding: false });
-    expect(player.ship.health).toBe(76);
-  });
+      player.updateFromServer({ health: 76, maxHealth: player.ship.maxHealth, exploding: false });
+      expect(player.ship.health).toBe(76);
+    }
+  );
 });

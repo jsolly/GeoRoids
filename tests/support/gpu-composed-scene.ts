@@ -279,7 +279,7 @@ export async function createFrozenGpuScene() {
         position: { x: center.x - 90 + index * 35, y: center.y + 140 },
         mass: 1,
         radius: 4,
-        kind: 'wreckage' as const,
+        kind: 'shard' as const,
       }))
     );
     const frameRandom = random;

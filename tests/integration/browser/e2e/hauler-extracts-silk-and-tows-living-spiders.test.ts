@@ -18,7 +18,7 @@ function field(page: Page): Promise<SpiderFieldState> {
   );
 }
 for (const width of [1280, 390]) {
-  test(`a Hauler extracts silk and tows a spider into the furnace at ${width}px`, async () => {
+  test(`a Hauler extracts silk and tows a living spider at ${width}px`, async () => {
     const mobile = width === 390;
     const page = await browserManager.recreatePage({ hasTouch: mobile });
     await page.setViewportSize({ width, height: mobile ? 844 : 900 });
@@ -102,19 +102,6 @@ for (const width of [1280, 390]) {
       )
       .toBeLessThan(cargo.position.x - 10);
     await page.screenshot({ path: screenshotManager.getScreenshotPath(`spider-tow-${width}.png`) });
-    await expect
-      .poll(
-        async () =>
-          (await field(page)).consumed?.some(
-            (event) => event.id === cargo.id && event.furnaceId === TOWN_HEARTH.id
-          ),
-        { timeout: 20000 }
-      )
-      .toBe(true);
-    expect((await field(page)).spiders.some((spider) => spider.id === cargo.id)).toBe(false);
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`spider-furnace-${width}.png`),
-    });
     assertNoBrowserDiagnostics(diagnostics);
   }, 60000);
 }

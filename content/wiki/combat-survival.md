@@ -30,8 +30,8 @@ Hazards spill [cargo](/wiki/#loot-growth) before damaging your hull; with an emp
 
 ## Lives and respawn
 
-Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, and silk remain safe. Death also releases any tow and drops satellites. There are no lives or game over. Returning after a brief disconnect skips spawn protection.
+Death loses your carried points. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, and silk remain safe. Death also releases any tow and drops satellites. There are no lives or game over. Returning after a brief disconnect skips spawn protection.
 
 ## Recovery
 
-Health regenerates after a delay without damage, up to your kit's full hull health. Each hit that removes health restarts that delay; protected hits do not, and dead ships wait for respawn. Bank cargo at a lit furnace, then spend banked points on placeholders at [Town Square](/wiki/#controls).
+Avoid damage for a short time and your hull repairs itself automatically. A hit that removes health or spills protective cargo restarts the wait; repairs stop at full health and never revive a destroyed ship. Bank cargo at a lit furnace, then spend banked points on placeholders at [Town Square](/wiki/#controls).

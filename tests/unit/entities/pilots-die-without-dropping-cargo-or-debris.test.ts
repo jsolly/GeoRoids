@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { applyShipMass, GROWTH, planKillLoot } from '../../../shared/shipGrowth';
+import { LootManager } from '../../../server/core/LootManager';
+import { RNGService } from '../../../server/core/RNGService';
+import { applyShipMass, GROWTH } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-describe('death salvage and saved mass', () => {
+describe('death, shared pickups and saved mass', () => {
   let engine: GameEngine;
 
   beforeEach(() => {
@@ -15,63 +17,60 @@ describe('death salvage and saved mass', () => {
     engine.stopGameLoop();
   });
 
-  test('two player deaths drop the same pellet count for the same mass', () => {
-    const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    applyShipMass(player, 4);
-
-    const partner = engine.addPlayer('p2', 'Partner', new RecordingSocket(), { x: -20, y: 0 });
-    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
-    applyShipMass(partner, 4);
-
-    const expected = planKillLoot(4).pelletMasses.length;
-    engine.handleShipDamage('p1', 'asteroid', player.health);
-    engine.handleShipDamage('p2', 'asteroid', partner.health);
-
-    const loot = engine.getLoot();
-    expect(loot.length).toBe(expected * 2);
-    expect(loot.every((drop) => drop.kind === 'wreckage')).toBe(true);
-    expect(engine.getGameState().loot.map((drop) => drop.id)).toEqual(loot.map((drop) => drop.id));
-  });
-
-  test('two game-state snapshots share the same loot ids and poses', () => {
-    const ws = new RecordingSocket();
-    const victim = engine.addPlayer('victim', 'Victim', ws, { x: 50, y: 25 });
-    engine.entityManager.updateEntity('victim', { spawnProtectionTimer: 0 });
-    engine.handleShipDamage('victim', 'boundary', victim.health);
-
+  test('a lethal cargo-shield hit ejects points once without extra death debris', () => {
+    const victim = engine.addPlayer('victim', 'Victim', new RecordingSocket(), { x: 50, y: 25 });
+    engine.entityManager.updateEntity(victim.id, { spawnProtectionTimer: 0 });
+    victim.cargo = 400;
+    victim.score = 300;
+    victim.equipment = ['survey_probe'];
+    const before = engine.getLoot();
+    engine.handleShipDamage(victim.id, 'boundary', victim.health + 40);
+    expect(victim.cargo).toBe(0);
+    expect(victim.score).toBe(300);
+    expect(victim.equipment).toEqual(['survey_probe']);
+    const after = engine.getLoot();
+    expect(after.filter((drop) => drop.kind !== 'points')).toEqual(
+      before.filter((drop) => drop.kind !== 'points')
+    );
+    expect(
+      after
+        .filter((drop) => drop.kind === 'points')
+        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
+    ).toBe(400);
+    expect(victim.health).toBe(0);
     const first = engine.getGameState();
     const second = engine.getGameState();
-    expect(first.loot.length).toBeGreaterThan(0);
+    expect(first.loot).toEqual(after);
     expect(second.loot).toEqual(first.loot);
   });
 
-  test('collecting wreckage removes the drop without changing the collector', () => {
+  test('collecting a shard removes the drop without changing the collector', () => {
     const ws = new RecordingSocket();
     const collector = engine.addPlayer('p1', 'Collector', ws, { x: 200, y: 0 });
     const victim = engine.addPlayer('p2', 'Victim', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
 
-    engine.handleShipDamage('p2', 'boundary', victim.health);
-    const loot = engine.getLoot();
-    const pellet = loot[0];
-    assert.ok(pellet);
+    const lootManager = new LootManager(new RNGService(42));
+    lootManager.spawnShard(victim.position, 0);
+    const loot = lootManager.getAll();
+    const shard = loot[0];
+    assert.ok(shard);
 
-    engine.updatePlayer('p1', { position: { ...pellet.position } });
+    engine.updatePlayer('p1', { position: { ...shard.position } });
     const before = {
       mass: collector.mass,
       maxHealth: collector.maxHealth,
       health: collector.health,
     };
-    const collected = engine.collectLoot();
+    const collected = lootManager.collectOverlaps([collector]);
 
     expect(collected).toHaveLength(1);
-    expect(collected[0]?.collectorId).toBe('p1');
+    expect(collected[0]?.collector.id).toBe('p1');
     expect(collector.mass).toBe(before.mass);
     expect(collector.maxHealth).toBe(before.maxHealth);
     expect(collector.health).toBe(before.health);
-    expect(engine.getLoot().some((drop) => drop.id === pellet.id)).toBe(false);
+    expect(lootManager.getAll().some((drop) => drop.id === shard.id)).toBe(false);
   });
 
   test('only the first overlapping ship collects a drop', () => {
@@ -83,18 +82,19 @@ describe('death salvage and saved mass', () => {
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p3', { spawnProtectionTimer: 0 });
 
-    engine.handleShipDamage('p3', 'boundary', victim.health);
-    const pellet = engine.getLoot()[0];
-    assert.ok(pellet);
+    const lootManager = new LootManager(new RNGService(42));
+    lootManager.spawnShard(victim.position, 0);
+    const shard = lootManager.getAll()[0];
+    assert.ok(shard);
 
-    engine.updatePlayer('p1', { position: { ...pellet.position } });
-    engine.updatePlayer('p2', { position: { ...pellet.position } });
-    const collected = engine.collectLoot();
+    engine.updatePlayer('p1', { position: { ...shard.position } });
+    engine.updatePlayer('p2', { position: { ...shard.position } });
+    const collected = lootManager.collectOverlaps([first, second]);
 
     expect(collected).toHaveLength(1);
-    expect(collected[0]?.collectorId).toBe('p1');
+    expect(collected[0]?.collector.id).toBe('p1');
     expect(first.mass).toBe(GROWTH.BASE_MASS);
-    expect(engine.getLoot().some((drop) => drop.id === pellet.id)).toBe(false);
+    expect(lootManager.getAll().some((drop) => drop.id === shard.id)).toBe(false);
     expect(second.mass).toBe(GROWTH.BASE_MASS);
   });
 

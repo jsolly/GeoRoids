@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
-import { LOCAL_STORAGE_KEYS } from '../../../../src/constants/user-preferences';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -19,12 +18,8 @@ for (const viewport of [
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize(viewport);
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.addInitScript(
-      (key) => localStorage.setItem(key, 'true'),
-      LOCAL_STORAGE_KEYS.debugOn
-    );
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    await game.bootGame({ route: '/debug', kitId: 'hauler', waitForCombatReady: false });
     const copy = page.locator('#copy-debug-diagnostics');
     await copy.waitFor({ state: 'visible' });
     expect(await page.locator('#debug-play-chip').count()).toBe(0);

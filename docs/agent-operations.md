@@ -160,10 +160,15 @@ the tested independent graphs do not represent two complete games or sockets.
 
 ### Debug & logging
 
-Debug behavior is **constants, not env vars**. To enable debug mode, edit `src/constants/index.ts`:
+For client diagnostics, visit `/debug`; add `?log-level=debug` for verbose client
+logs, or `?log-level=info` or `?log-level=warn` to select a quieter threshold.
+The normal `/` page uses Info and never remembers debug mode.
 
-1. `LOGGING.GLOBAL_LOG_LEVEL = 'debug'`
-2. `DEBUG.ENABLED = true`
+Simulation debug overrides remain compile-time constants, not URL or environment
+settings. Set both `DEBUG.ENABLED = true` and
+`LOGGING.GLOBAL_LOG_LEVEL = 'debug'` in `src/constants/index.ts` when those
+local world overrides are needed. That global constant gates simulation debug
+behavior; it does not select client log verbosity.
 
 Notable flags under `DEBUG.*`: `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_LOCAL_PLAYER}`, `PLACE_PLAYERS_NEAR_BOUNDARY`. Client logs forward over `/logs` to the server; both ends append to:
 

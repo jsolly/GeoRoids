@@ -44,14 +44,13 @@ for (const width of [1280, 390]) {
       .poll(() =>
         page.evaluate(() => {
           const loot = window.gameController?.getLoot() ?? [];
-          return ['wreckage', 'shard', 'tap', 'silk'].map((kind) => ({
+          return ['shard', 'tap', 'silk'].map((kind) => ({
             kind,
             count: loot.filter((drop) => drop.kind === kind).length,
           }));
         })
       )
       .toEqual([
-        { kind: 'wreckage', count: 1 },
         { kind: 'shard', count: 3 },
         { kind: 'tap', count: 1 },
         { kind: 'silk', count: 1 },

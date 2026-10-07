@@ -1,5 +1,5 @@
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
-import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
+import { FurnaceField } from '../../shared/furnaceField';
 import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-types';
@@ -136,7 +136,6 @@ function liveActor(actor: SpiderActor): boolean {
 
 /** Server-owned terrain predators and swept laser interactions. */
 export class TerrainSpiderManager {
-  private consumed: NonNullable<SpiderFieldState['consumed']> = [];
   private readonly spiders = new Map<string, RuntimeSpider>();
   private spiderSequence = 0;
   private nextSpawnFrame: number | null = null;
@@ -157,10 +156,6 @@ export class TerrainSpiderManager {
       spiders: [...this.spiders.values()].sort((a, b) => a.id.localeCompare(b.id)).map(copySpider),
       // Rebuilt with the resource refresh; snapshots never scan dormant nest history.
       nests: this.nestMarkers,
-      consumed: this.consumed.map((event) => ({
-        ...event,
-        position: copyPosition(event.position),
-      })),
     };
   }
 
@@ -179,7 +174,6 @@ export class TerrainSpiderManager {
 
   public clear(): void {
     this.spiders.clear();
-    this.consumed = [];
     this.nextSpawnFrame = null;
     this.nextRescueFrame = null;
     this.nextNestFrame = 0;
@@ -281,9 +275,6 @@ export class TerrainSpiderManager {
       .sort((a, b) => a.id.localeCompare(b.id));
     const playerById = new Map(players.map((player) => [player.id, player]));
 
-    this.consumed = this.consumed.filter(
-      (event) => nowFrame - event.frame <= SPIDER.CONSUMED_HISTORY_FRAMES
-    );
     for (const spider of this.spiders.values()) {
       spider.shudderFrames = Math.max(0, (spider.shudderFrames ?? 0) - 1);
       if (options.towedIds?.has(spider.id)) {
@@ -324,9 +315,7 @@ export class TerrainSpiderManager {
           x: start.x + spider.velocity.x,
           y: start.y + spider.velocity.y,
         });
-        if (!this.consumeAtFurnace(spider, start)) {
-          this.biteWhileTowed(spider, players, nowFrame, attacks);
-        }
+        this.biteWhileTowed(spider, players, nowFrame, attacks);
         continue;
       }
       spider.velocity.x = 0;
@@ -424,23 +413,11 @@ export class TerrainSpiderManager {
     return hit;
   }
 
-  /** A newly lit hearth breaks nearby hunts; living spiders walk out instead of vanishing. */
-  public repelProtectedSpiders(): void {
+  /** Keep untowed spiders outside ordinary protected areas. */
+  private repelProtectedSpiders(): void {
     for (const spider of this.spiders.values()) {
-      if (
-        spider.territory.kind === 'guard' &&
-        !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS)
-      ) {
-        const nest = this.nests.get(spider.territory.nestId);
-        if (nest) {
-          nest.guards = nest.guards.filter((guard) => guard.id !== spider.id);
-        }
-        spider.territory = { kind: 'roaming' };
-        spider.targetId = null;
-        spider.phase = 'scuttling';
-      }
       if (!spider.displaced && !this.canOccupy(spider.position, spider.size)) {
-        this.retreatFromProtection(spider, false);
+        this.retreatFromProtection(spider);
       }
     }
   }
@@ -566,11 +543,7 @@ export class TerrainSpiderManager {
     // Check only those known homes once a second, never scan dormant sectors.
     for (const [id, nest] of this.nests) {
       const resource = observedResources.get(id);
-      if (
-        resource &&
-        distanceBetween(nest.home, resource.position) <= POSITION_EPSILON &&
-        this.canOccupy(nest.home, SPIDER.HIT_RADIUS)
-      ) {
+      if (resource && distanceBetween(nest.home, resource.position) <= POSITION_EPSILON) {
         markers.push({ id, resourceId: nest.resourceId, position: copyPosition(nest.home) });
       }
     }
@@ -585,11 +558,6 @@ export class TerrainSpiderManager {
           if (!nest || distanceBetween(nest.home, player.position) > SPIDER.NEST_WAKE_DISTANCE) {
             continue;
           }
-          nest.guards = nest.guards.filter(
-            (guard) =>
-              this.canOccupy(nest.home, SPIDER.HIT_RADIUS) &&
-              (guard.displaced || this.canOccupy(guard.position, guard.size))
-          );
           for (const guard of nest.guards) {
             if (this.spiders.size >= SPIDER.MAX_ACTIVE) {
               break;
@@ -858,30 +826,8 @@ export class TerrainSpiderManager {
     }
   }
 
-  private consumeAtFurnace(spider: RuntimeSpider, start: Position): boolean {
-    const midpoint = { x: (start.x + spider.position.x) / 2, y: (start.y + spider.position.y) / 2 };
-    const furnace = this.furnaces
-      .nearby(midpoint, distanceBetween(start, spider.position) / 2 + FURNACE_BUILD.RADIUS)
-      .find(
-        (site) =>
-          segmentCircleContact(start, spider.position, site.position, site.radius) !== undefined
-      );
-    if (!furnace) {
-      return false;
-    }
-    this.consumed.push({
-      id: spider.id,
-      position: copyPosition(spider.position),
-      furnaceId: furnace.id,
-      frame: this.nowFrame,
-    });
-    this.consumed = this.consumed.slice(-SPIDER.MAX_ACTIVE);
-    this.removeSpider(spider.id);
-    return true;
-  }
-
   /** Released cargo walks out of safe areas instead of freezing or attacking inside them. */
-  private retreatFromProtection(spider: RuntimeSpider, consume = true): boolean {
+  private retreatFromProtection(spider: RuntimeSpider): boolean {
     const furnace = this.furnaces
       .nearby(spider.position, SPIDER.FURNACE_SAFE_RADIUS + spider.size)
       .find(
@@ -902,11 +848,7 @@ export class TerrainSpiderManager {
     spider.phase = 'scuttling';
     spider.targetId = null;
     spider.angle = angle;
-    const start = spider.position;
     spider.position = next;
-    if (consume) {
-      this.consumeAtFurnace(spider, start);
-    }
     return true;
   }
 

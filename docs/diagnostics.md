@@ -80,8 +80,7 @@ restart notice, retaining the original error for diagnosis.
 
 ## Search production logs
 
-A player can opt in on the title screen: open **Advanced**, enable **Debug**,
-enter the game, and copy the Player ID. That value is the same `playerId`
+Visit `/debug`, enter the game, and copy the Player ID. That value is the same `playerId`
 already written on `player_joined` and motion `STATE` records. Do not invent a
 second correlator. Filter Railway logs with the pasted value:
 
@@ -90,12 +89,11 @@ second correlator. Filter Railway logs with the pasted value:
 @category:STATE AND @playerId:PASTE
 ```
 
-The same panel has a **Log level** selector. It applies only to that browser
-while Debug is on, persists across reloads, and needs no constants edit or
-deploy. Turning Debug off restores `LOGGING.GLOBAL_LOG_LEVEL`. `Debug` is
-verbose enough to stutter play; use it briefly. Server-side `DEBUG.*` world
-overrides stay compile-time on purpose so one player cannot reshape the shared
-world.
+The debug route defaults to Info. Add `?log-level=debug`, `?log-level=info`,
+or `?log-level=warn` to override that visit. Unsupported values fall back to
+Info. Returning to `/` turns diagnostics off and restores Info, regardless of
+old saved preferences. Server-side `DEBUG.*` world overrides stay compile-time
+so one player cannot reshape the shared world.
 
 The optional page session ID on that same Debug panel is the `sessionId` used
 for forwarded client records:
@@ -104,7 +102,7 @@ for forwarded client records:
 @source:client AND @sessionId:PASTE
 ```
 
-Debug is stored in this browser only. It does not log player names or resume
+Debug remains enabled while visiting `/debug`, including reloads. It does not log player names or resume
 tokens. The playfield Debug overlay (FPS, ping, snapshot age) is on-screen
 only and does not add Railway records.
 

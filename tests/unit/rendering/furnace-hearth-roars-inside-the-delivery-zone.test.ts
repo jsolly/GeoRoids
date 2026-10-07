@@ -2,10 +2,21 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { ExplorationMap } from '../../../shared/exploration';
 import { TOWN_HEARTH } from '../../../shared/furnaces';
 import { CAMERA, PALETTE } from '../../../src/constants';
+import { entityFactory } from '../../../src/entities/EntityFactory';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { RoidBelt } from '../../../src/entities/roid/Roid';
+import * as shipRenderer from '../../../src/entities/ship/shipRenderer';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { resetWorldExploration, setWorldExploration } from '../../../src/network/worldExploration';
+import { drawGame } from '../../../src/rendering/canvas';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import { drawFurnaceArtwork, drawFurnacesRelative } from '../../../src/rendering/furnaceRenderer';
+import {
+  drawFurnaceArtwork,
+  drawFurnaceLabels,
+  drawFurnacesRelative,
+} from '../../../src/rendering/furnaceRenderer';
 import { hexToRgba } from '../../../src/utils/colorUtils';
+import { TestPath2D } from '../../support/TestPath2D';
 import { setWindowViewport } from '../../support/viewport';
 
 interface RecordedPath {
@@ -31,6 +42,7 @@ afterEach(() => {
   canvas = undefined;
   previousCanvas = null;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   restoreViewport();
 });
 
@@ -273,8 +285,44 @@ test('Town Square docking arms turn with travel while its label stays upright', 
     labelAngles.push(Math.atan2(matrix.b, matrix.a));
   });
   drawFurnacesRelative(TOWN_HEARTH.position);
+  expect(labelAngles).toHaveLength(0);
+  const outline = vi.spyOn(ctx, 'strokeText');
+  drawFurnaceLabels(TOWN_HEARTH.position);
+  expect(outline).toHaveBeenCalledWith(TOWN_HEARTH.name, expect.any(Number), expect.any(Number));
   expect(armAngles.length).toBeGreaterThanOrEqual(4);
   expect(armAngles[0]).toBeCloseTo(-Math.PI / 4, 5);
   expect(labelAngles.length).toBeGreaterThan(0);
   expect(labelAngles.every((angle) => Math.abs(angle) < 0.001)).toBe(true);
+});
+
+test('furnace text paints after ships and laser fire in a live frame', () => {
+  vi.stubGlobal('Path2D', TestPath2D);
+  const network = NetworkManager.getInstance();
+  PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
+  const { ctx } = recordingContext();
+  const exploration = new ExplorationMap();
+  exploration.reveal(TOWN_HEARTH.position, 800);
+  setWorldExploration(exploration.snapshot());
+  const pilot = entityFactory.createPlayer({
+    id: 'label-observer',
+    name: 'Observer',
+    type: 'remote',
+    position: { ...TOWN_HEARTH.position },
+  });
+  const ships = vi.spyOn(shipRenderer, 'drawShipAtPosition');
+  const lasers = vi.spyOn(shipRenderer, 'drawLasers');
+  const text = vi.spyOn(ctx, 'fillText');
+  drawGame(pilot, new RoidBelt(), 0, 0, '', [pilot]);
+  const nameIndex = text.mock.calls.findIndex(([label]) => label === TOWN_HEARTH.name);
+  const subtitleIndex = text.mock.calls.findIndex(([label]) => label === 'STORE');
+  expect(nameIndex).toBeGreaterThanOrEqual(0);
+  expect(subtitleIndex).toBeGreaterThanOrEqual(0);
+  expect(ships).toHaveBeenCalled();
+  expect(lasers).toHaveBeenCalled();
+  const lastWorldPaint = Math.max(
+    ...ships.mock.invocationCallOrder,
+    ...lasers.mock.invocationCallOrder
+  );
+  expect(text.mock.invocationCallOrder[nameIndex]).toBeGreaterThan(lastWorldPaint);
+  expect(text.mock.invocationCallOrder[subtitleIndex]).toBeGreaterThan(lastWorldPaint);
 });

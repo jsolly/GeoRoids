@@ -27,7 +27,7 @@ test('ordinary loot skips motion queries while newly visible rare salvage follow
   const images = vi.spyOn(ctx, 'drawImage');
   const labels = vi.spyOn(ctx, 'fillText');
   const ordinary: LootData[] = [
-    { id: 'wreckage', position: { x: -80, y: -30 }, mass: 0, radius: 14, kind: 'wreckage' },
+    { id: 'shard-light', position: { x: -80, y: -30 }, mass: 0, radius: 14, kind: 'shard' },
     { id: 'shard', position: { x: 80, y: -30 }, mass: 0.75, radius: 14, kind: 'shard' },
   ];
   const malformed: LootData = {

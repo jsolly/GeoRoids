@@ -19,8 +19,8 @@ export class GameInteractions {
   /**
    * Navigate to the game
    */
-  async navigateToGame(): Promise<void> {
-    await this.page.goto(TestConfig.GAME_URL, {
+  async navigateToGame(route: '/' | '/debug' = '/'): Promise<void> {
+    await this.page.goto(new URL(route, TestConfig.GAME_URL).href, {
       waitUntil: 'load',
       timeout: 30000,
     });
@@ -329,7 +329,7 @@ export class GameInteractions {
         y: drop.position.y,
         mass: drop.mass,
         radius: drop.radius,
-        kind: drop.kind ?? 'wreckage',
+        kind: drop.kind ?? 'shard',
         ...(drop.points !== undefined ? { points: drop.points } : {}),
       }));
     });
@@ -1396,12 +1396,13 @@ export class GameInteractions {
 
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
+    route?: '/' | '/debug';
     waitForCombatReady?: boolean;
     field?: 'natural' | 'controlled';
     kitId?: 'scout' | 'hauler';
     haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
-    await this.navigateToGame();
+    await this.navigateToGame(options?.route);
     // Distinct scenario pilots must not collide in the menu's random nickname pool.
     await this.page.locator('#playerNameInput').fill(`Test pilot ${nextPilotNumber++}`);
     if (options?.haulerUtility) {

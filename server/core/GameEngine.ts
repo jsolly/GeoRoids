@@ -910,6 +910,7 @@ export class GameEngine {
       angle: arrival?.angle ?? actor.angle,
       mass: actor.mass,
       health: actor.health,
+      healthRegenTimer: actor.healthRegenTimer,
       ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
@@ -1127,6 +1128,10 @@ export class GameEngine {
     if (!requestedKit || requestedKit === flight.kitId) {
       actor.mass = flight.mass;
       actor.health = flight.health > 0 ? Math.min(flight.health, actor.maxHealth) : actor.maxHealth;
+      const elapsedFrames = Math.floor(
+        (Math.max(0, this.getServerTime() - flight.lastSeenAt) * GAME.FPS) / 1000
+      );
+      actor.healthRegenTimer = Math.max(0, (flight.healthRegenTimer ?? 0) - elapsedFrames);
     }
     if (flight.velocity) {
       actor.velocity = { x: flight.velocity.x, y: flight.velocity.y };
@@ -2129,7 +2134,7 @@ export class GameEngine {
     }
   }
 
-  /** One death path: drop carried points and respawn; banked points survive. */
+  /** One death path: discard carried points and respawn; banked points survive. */
   private applyShipDeath(entity: GameEntity, attackerId: string): void {
     if (attackerId) {
       entity.deathCause = attackerId;
@@ -2137,8 +2142,6 @@ export class GameEngine {
     this.cancelArmedBoost(entity.id, entity.harpoonTargetId);
     this.playerMotion.invalidateLife(entity.id, this.getServerTime());
     this.satellitePickupManager.releaseOwner(entity.id);
-    this.lootManager.spawnFromKill(entity, this.gameTime);
-    this.lootManager.spawnPoints(entity.position, entity.cargo);
     entity.cargo = 0;
     this.entityManager.scheduleShipRespawn(entity);
     this.capturePilot(entity.id);
@@ -3192,7 +3195,6 @@ export class GameEngine {
     scout.score -= lot.cost;
     this.capturePilot(scout.id);
     this.furnaces.light(lot.id, builderName, scout.id);
-    this.spiderManager.repelProtectedSpiders();
     this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
     return true;
   }
@@ -3788,9 +3790,7 @@ export class GameEngine {
   }
 
   private fitCargo(entity: GameEntity): void {
-    const excess = Math.max(0, entity.cargo - cargoCapacity(entity.kitId));
-    entity.cargo -= excess;
-    this.lootManager.spawnPoints(entity.position, excess);
+    entity.cargo = Math.min(entity.cargo, cargoCapacity(entity.kitId));
   }
 
   private readonly cargoOffloadTicks = new WeakMap<

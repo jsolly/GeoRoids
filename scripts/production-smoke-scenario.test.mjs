@@ -73,6 +73,7 @@ function response(url, body, type = 'application/json', status = 200) {
 function clientHttp({
   manifest = release,
   bundle = release,
+  bundleSource,
   world = healthy,
   status = 200,
   assetType = 'application/javascript',
@@ -86,7 +87,7 @@ function clientHttp({
     } else if (url.endsWith('/health')) {
       result = response(url, world);
     } else if (url.endsWith('.js')) {
-      result = response(url, `const release = "${bundle}";`, assetType, status);
+      result = response(url, bundleSource ?? `const release = "${bundle}";`, assetType, status);
     } else if (url.endsWith('.css')) {
       result = response(url, 'canvas { display: block; }', 'text/css');
     } else {
@@ -353,6 +354,9 @@ for (const world of [
 for (const options of [
   { manifest: oldRelease },
   { bundle: oldRelease },
+  { bundleSource: `const env = { VITE_COMMIT_SHA: \`${oldRelease}\` };` },
+  { bundleSource: `const env = { VITE_COMMIT_SHA: "${release}' };` },
+  { bundleSource: `const env = { VITE_COMMIT_SHA: \`${release}\${suffix}\` };` },
   { assetType: 'text/html' },
   {
     html: '<html><canvas id="gameCanvas"></canvas><script type="module" src="https://cdn.example/game.js"></script></html>',
@@ -372,6 +376,23 @@ for (const options of [
       /Client release readiness deadline/u
     );
     assert.equal(clock.now(), 100);
+  });
+}
+
+for (const quote of ['"', "'", '`']) {
+  test(`client release accepts the deployed identity in a ${quote} JavaScript literal`, async () => {
+    const clock = controlledClock();
+    const observed = await waitForClientRelease({
+      expectedSha: release,
+      verifyHttp: clientHttp({
+        bundleSource: `const env = { VITE_COMMIT_SHA: ${quote}${release}${quote} };`,
+      }),
+      clock,
+      readinessMs: 100,
+      pollMs: 10,
+    });
+    assert.deepEqual(observed, { releaseSha: release, assetCount: 2 });
+    assert.equal(clock.now(), 0);
   });
 }
 

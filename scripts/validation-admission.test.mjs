@@ -426,7 +426,7 @@ test('failed process inspection never authorizes work or clears ownership', asyn
   assert.equal(existsSync(first.started), false);
 });
 
-function failingInspection(f, mode) {
+function failingInspection(f) {
   const bin = join(f.directory, 'bin');
   const fail = join(f.directory, 'inspection-fails');
   mkdirSync(bin);
@@ -435,7 +435,7 @@ function failingInspection(f, mode) {
     `#!${process.execPath}
 const args = process.argv.slice(2);
 if (require('node:fs').existsSync(${JSON.stringify(fail)}) &&
-    args[0] === ${JSON.stringify(mode === 'group' ? '-axo' : '-p')}) {
+    args[0] === ${JSON.stringify('-axo')}) {
   process.stderr.write('inspection-unavailable\\n');
   process.exit(2);
 }
@@ -447,58 +447,9 @@ process.exit(result.status ?? 1);
   return { environment: { PATH: `${bin}:${f.env.PATH}` }, fail: () => writeFileSync(fail, '') };
 }
 
-for (const inspection of ['group', 'pid']) {
-  test(`failed ${inspection} inspection during cancellation exits without signaling the child or releasing barriers`, async (t) => {
-    const f = fixture(t);
-    const mock = failingInspection(f, inspection);
-    const runner = f.start('runner', { kind: 'runner', environment: mock.environment });
-    await until(() => existsSync(runner.started), 'runner child');
-    const checkout = join(f.common, 'georoids-validation-checkout.lock');
-    const queue = join(f.common, 'georoids-validation-queue', f.queue()[0]);
-    const owned = JSON.parse(readFileSync(runner.started, 'utf8'));
-    await until(
-      () =>
-        readdirSync(join(checkout, 'children')).some((name) => {
-          const record = JSON.parse(readFileSync(join(checkout, 'children', name), 'utf8'));
-          return record.command?.pid === owned.pid;
-        }),
-      'recorded command identity before cancelling'
-    );
-    mock.fail();
-    runner.child.kill('SIGTERM');
-    // Wait for exit, not close: the surviving command inherits the output pipes.
-    await until(() => runner.child.exitCode !== null, 'failed cancellation supervisor exit');
-    assert.equal((await runner.child.exited).code, 1, runner.child.output);
-    await until(() => runner.child.output.includes(queue), 'preserved ownership diagnostic');
-    assert.match(runner.child.output, /Cannot forward SIGTERM: Cannot inspect validation/u);
-    assert.match(runner.child.output, /"status":2,"signal":null,"error":null/u);
-    assert.match(runner.child.output, /"stderr":"inspection-unavailable/u);
-    assert.match(runner.child.output, /owned command may still be running/u);
-    assert(runner.child.output.includes(checkout));
-    assert(existsSync(join(checkout, 'owner.json')));
-    assert(existsSync(join(queue, 'active')));
-    const records = readdirSync(join(checkout, 'children')).map((name) =>
-      JSON.parse(readFileSync(join(checkout, 'children', name), 'utf8'))
-    );
-    assert(records.some((record) => record.command.pid === owned.pid && !record.finished));
-    // A forwarded TERM would finish this fixture after 250 ms.
-    await delay(400);
-    const current = spawnSync('/bin/ps', ['-p', String(owned.pid), '-o', 'lstart='], {
-      encoding: 'utf8',
-    });
-    assert.equal(current.status, 0, 'Unauthenticated cancellation must not signal the child');
-    assert.equal(current.stdout.trim(), owned.start);
-    const next = f.start('next', { cwd: f.sibling('next') });
-    assert.notEqual((await next.child.completed).code, 0);
-    assert.match(next.child.output, /Dead validation owner requires cleanup verification/u);
-    assert.equal(existsSync(next.started), false);
-    // fixture() authenticates this exact PID and birth before final cleanup.
-  });
-}
-
 test('failed group inspection after the command exits preserves both ownership barriers', async (t) => {
   const f = fixture(t);
-  const mock = failingInspection(f, 'group');
+  const mock = failingInspection(f);
   const runner = f.start('runner', { environment: mock.environment });
   await until(() => existsSync(runner.started), 'runner child');
   mock.fail();

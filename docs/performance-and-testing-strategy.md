@@ -273,7 +273,7 @@ npm run benchmark -- measure transport --revision HEAD --seed 42
 npm run benchmark -- compare client --baseline REV --candidate REV --seed 42 --viewport desktop
 npm run benchmark -- compare server --baseline REV --candidate REV --seed 42
 npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
-./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts
+./scripts/test-runner.sh tests/integration/server/
 ```
 
 The full unit and server/entity suites run through `npm run test:all`. Run timed benchmarks

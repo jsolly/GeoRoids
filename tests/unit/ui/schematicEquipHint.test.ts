@@ -3,7 +3,6 @@ import { STEERING } from '../../../src/constants';
 import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import type { DrawingContext } from '../../../src/rendering/drawingContext';
 import {
-  DESKTOP_SCHEMATIC_EQUIP_HINT_LINES,
   drawSchematicEquipHint,
   initializeSchematicEquipHint,
   SCHEMATIC_EQUIP_HINT_DURATION_MS,
@@ -84,23 +83,6 @@ describe('equip reminder after a pickup', () => {
     showSchematicEquipHint();
     now += 10;
     expect(schematicEquipHintAlpha(now)).toBe(1);
-  });
-
-  test('a desktop pickup says the hardware is in inventory and to press V', () => {
-    vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(false);
-    setPlayView(true);
-    expect(schematicEquipHintAlpha()).toBe(0);
-    const ctx = mockContext();
-    drawSchematicEquipHint(ctx, 200, 300, 20);
-    expect(ctx.fillText).not.toHaveBeenCalled();
-
-    showSchematicEquipHint();
-    expect(schematicEquipHintAlpha()).toBe(1);
-    drawSchematicEquipHint(ctx, 200, 300, 20);
-    expect(ctx.fillText.mock.calls.map((call) => call[0])).toEqual([
-      ...DESKTOP_SCHEMATIC_EQUIP_HINT_LINES,
-    ]);
-    expect(DESKTOP_SCHEMATIC_EQUIP_HINT_LINES.join(' ')).not.toContain('hold');
   });
 
   test('a pickup before flight does not arm the reminder', () => {

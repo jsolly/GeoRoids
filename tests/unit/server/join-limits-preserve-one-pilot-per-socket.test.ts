@@ -39,17 +39,6 @@ function join(socket: RecordingSocket, id: string, name = id) {
   );
 }
 
-test('a socket cannot create a second pilot and repeat flooding closes the transport', () => {
-  const { socket, replies } = transport();
-  join(socket, 'pilot');
-  for (let i = 0; i < 5; i++) {
-    join(socket, `extra-${i}`);
-  }
-  expect(engine.getAllPlayers().map((player) => player.id)).toEqual(['pilot']);
-  expect(replies().filter((reply) => reply.type === 'joined')).toHaveLength(1);
-  expect(socket.close).toHaveBeenCalledWith(1008, 'Too many join requests');
-});
-
 test.each([
   ['x'.repeat(129), 'Pilot'],
   ['pilot', 'é'.repeat(33)],

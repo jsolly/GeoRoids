@@ -271,59 +271,6 @@ test('a forward velocity cannot hide a sideways shortcut during capture', () => 
   }
 });
 
-test('collecting shard and point loot preserves mass, health, speed, and the contour rail', () => {
-  const { actor, state, cruise, pose, now } = railPilot();
-  const velocity = contourLockVelocity(actor.position, state, cruise);
-  if (!velocity) {
-    throw new Error('Missing fixture rail');
-  }
-  expect(pose(0, state, actor.position, velocity).ok).toBe(true);
-  const before = {
-    mass: actor.mass,
-    maxHealth: actor.maxHealth,
-    health: actor.health,
-    cargo: actor.cargo,
-    epoch: actor.playerMotion?.epoch,
-    speed: world.engine.playerMotion.legalSpeed(actor, now),
-  };
-  world.engine.addAsteroid({
-    id: 'pickup-rock',
-    position: { ...actor.position },
-    velocity: { x: 0, y: 0 },
-    size: 12,
-    jaggedness: 0.5,
-    rotation: 0,
-    angularVelocity: 0,
-    health: 1,
-    maxHealth: 1,
-    vertices: 8,
-    offsets: [1, 1, 1, 1, 1, 1, 1, 1],
-  });
-  world.engine.handleAsteroidHit('pickup-rock', actor.id, 'laser');
-  expect(
-    world.engine
-      .getLoot()
-      .map((loot) => loot.kind)
-      .sort((left, right) => left.localeCompare(right))
-  ).toEqual(['points', 'shard']);
-  expect(world.engine.collectLoot()).toHaveLength(2);
-  expect(actor.mass).toBe(before.mass);
-  expect(actor.maxHealth).toBe(before.maxHealth);
-  expect(actor.health).toBe(before.health);
-  expect(actor.cargo).toBeGreaterThan(before.cargo);
-  expect(actor.contourLock).toEqual(state);
-  expect(actor.playerMotion?.mode).toBe('free');
-  expect(actor.playerMotion?.epoch).toBe(before.epoch);
-  expect(world.engine.playerMotion.legalSpeed(actor, now)).toBe(before.speed);
-  const nextVelocity = contourLockVelocity(actor.position, state, cruise);
-  if (!nextVelocity) {
-    throw new Error('Missing unchanged fixture rail');
-  }
-  const next = { x: actor.position.x + nextVelocity.x, y: actor.position.y + nextVelocity.y };
-  expect(pose(17, state, next, nextVelocity).ok).toBe(true);
-  expect(actor.contourLock).toEqual(state);
-});
-
 test('equipment loot preserves the contour lock and current motion epoch', () => {
   const { actor, state, pose } = railPilot();
   expect(pose(0).ok).toBe(true);

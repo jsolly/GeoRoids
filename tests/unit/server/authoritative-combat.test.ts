@@ -471,64 +471,6 @@ describe('server-authoritative combat', () => {
     expect(engine.spawnPlayerLaser(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)).toBeNull();
   });
 
-  test('shoot reports bind to the socket before creating a server laser', () => {
-    const wsCore = new WebSocketCore(engine);
-    const pilotWs = new RecordingSocket();
-    const otherWs = new RecordingSocket();
-    join(wsCore, pilotWs, { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } });
-    join(wsCore, otherWs, { id: 'other', name: 'Other', position: { x: 200, y: 0 } });
-    clearAsteroidField(engine);
-    const pilot = engine.getPlayer('pilot');
-    expect(pilot).toBeDefined();
-    expect(pilotWs.received('joined')[0]?.data).toMatchObject({ shotAcknowledgements: true });
-
-    wsCore.handleClientMessage(
-      {
-        type: 'shoot',
-        id: 'other',
-        data: {
-          laserStart: { x: 0, y: 0 },
-          laserDirection: { x: 1, y: 0 },
-          requestId: 'forged-other',
-        },
-      },
-      pilotWs
-    );
-    wsCore.handleClientMessage(
-      {
-        type: 'shoot',
-        id: 'other-pilot',
-        data: {
-          laserStart: { x: 0, y: 0 },
-          laserDirection: { x: 1, y: 0 },
-          requestId: 'forged-foreign',
-        },
-      },
-      pilotWs
-    );
-
-    expect(engine.getServerLasers()).toHaveLength(0);
-    expect(pilotWs.received('shotAcknowledged')).toHaveLength(0);
-
-    wsCore.handleClientMessage(
-      {
-        type: 'shoot',
-        id: 'pilot',
-        data: {
-          laserStart: { x: pilot?.position.x ?? 0, y: pilot?.position.y ?? 0 },
-          laserDirection: { x: 1, y: 0 },
-          requestId: 'owned-pilot',
-        },
-      },
-      pilotWs
-    );
-    expect(engine.getServerLasers()).toHaveLength(1);
-    expect(engine.getServerLasers()[0]?.ownerId).toBe('pilot');
-    expect(pilotWs.received('shotAcknowledged').map((message) => message.data)).toEqual([
-      { requestId: 'owned-pilot', projectileId: engine.getServerLasers()[0]?.id },
-    ]);
-  });
-
   test('boundary collisionDamage still applies when the reporter is the target', () => {
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();

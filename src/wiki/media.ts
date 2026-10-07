@@ -162,7 +162,6 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/constants/index.ts',
       'shared/combat.ts',
       'server/core/CollisionAuthority.ts',
-      'tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts',
     ],
   },
 };

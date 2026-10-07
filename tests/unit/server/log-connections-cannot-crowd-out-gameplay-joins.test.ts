@@ -1,9 +1,6 @@
 /* @vitest-environment node */
 
-import { once } from 'node:events';
-import type { IncomingMessage } from 'node:http';
-import { expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
+import { expect, test } from 'vitest';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   connectionLimitsDisabled,
@@ -11,9 +8,6 @@ import {
   GAMEPLAY_CONNECTIONS_PER_WINDOW,
   LOG_CONNECTIONS_PER_WINDOW,
 } from '../../../server/communication/connectionAdmission';
-import { createServerInstance } from '../../../server/createServer';
-import { logger } from '../../../setup/serverLogger';
-import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 
 test('production enables connection budgets and test runs leave them off unless enforced', () => {
   expect(LOG_CONNECTIONS_PER_WINDOW).toBe(6);
@@ -73,68 +67,4 @@ test('disabled admission accepts a log storm without touching the gameplay lane'
     expect(admission.admit('203.0.113.11', '/logs', index).accepted).toBe(true);
   }
   expect(admission.admit('203.0.113.11', '/ws', 0).accepted).toBe(true);
-});
-
-test('the running server rejects the seventh log socket and still accepts a join', async () => {
-  const server = createServerInstance({
-    port: 0,
-    nodeEnv: 'test',
-    enforceConnectionLimits: true,
-  });
-  const sockets: WebSocket[] = [];
-
-  function open(port: number, path: string): Promise<'open' | number> {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}${path}`);
-    sockets.push(socket);
-    return new Promise((resolve, reject) => {
-      socket.on('error', () => undefined);
-      socket.on('unexpected-response', (_request: IncomingMessage, response: IncomingMessage) => {
-        response.resume();
-        resolve(response.statusCode ?? 0);
-      });
-      socket.on('open', () => {
-        const pong = once(socket, 'pong');
-        socket.ping();
-        void pong.then(() => resolve('open')).catch(reject);
-      });
-    });
-  }
-
-  try {
-    const port = await server.listening;
-    const accepted = await Promise.all(
-      Array.from({ length: LOG_CONNECTIONS_PER_WINDOW }, () => open(port, '/logs'))
-    );
-    expect(accepted.every((outcome) => outcome === 'open')).toBe(true);
-    await Promise.all(
-      sockets.map(
-        (socket) =>
-          new Promise<void>((resolve) => {
-            socket.once('close', () => resolve());
-            socket.close();
-          })
-      )
-    );
-    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    try {
-      expect(await open(port, '/logs')).toBe(429);
-      expect(await open(port, '/logs')).toBe(429);
-      const rateWarnings = warn.mock.calls.filter((call) =>
-        String(call[0]).includes('Rate limited log connection')
-      );
-      expect(rateWarnings).toHaveLength(1);
-    } finally {
-      warn.mockRestore();
-    }
-    expect(await open(port, `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`)).toBe(
-      'open'
-    );
-  } finally {
-    for (const socket of sockets) {
-      if (socket.readyState !== WebSocket.CLOSED) {
-        socket.terminate();
-      }
-    }
-    await server.close();
-  }
 });

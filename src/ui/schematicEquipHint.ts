@@ -8,7 +8,7 @@ export const TOUCH_SCHEMATIC_EQUIP_HINT_LINES = [
   'Equipment is in your inventory',
   'Tap Inventory to equip',
 ] as const;
-export const DESKTOP_SCHEMATIC_EQUIP_HINT_LINES = [
+const DESKTOP_SCHEMATIC_EQUIP_HINT_LINES = [
   'Equipment is in your inventory',
   'Press V to equip',
 ] as const;

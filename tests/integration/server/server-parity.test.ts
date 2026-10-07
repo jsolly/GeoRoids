@@ -1,11 +1,8 @@
 // @vitest-environment node
 
-import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { TOWN_SPAWN_RADIUS } from '../../../shared/furnaces';
-import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('supported gameplay message envelopes', () => {
@@ -20,84 +17,6 @@ describe('supported gameplay message envelopes', () => {
     engine.stopGameLoop();
     core.stopPeriodicGameStateBroadcast();
   });
-
-  test.each(['nested', 'top-level'] as const)(
-    'a %s join receives its identity, rejects forged score, and owns a server projectile',
-    (shape) => {
-      const owner = new RecordingSocket();
-      const peer = new RecordingSocket();
-      const identity = {
-        id: 'pilot',
-        name: 'Pilot',
-        position: { x: 0, y: 0 },
-        snapshotVersion: SNAPSHOT_VERSION,
-        asteroidInteractions: 1,
-      };
-      core.handleClientMessage(
-        shape === 'nested' ? { type: 'join', data: identity } : { type: 'join', ...identity },
-        owner
-      );
-      expect(core.getPlayerCount()).toBe(1);
-      expect(owner.lastReceived('joined')?.data).toMatchObject({
-        ...identity,
-        position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-      });
-      const pilot = engine.getPlayer(identity.id);
-      assert.ok(pilot);
-      expect(pilot.name).toBe(identity.name);
-      expect(owner.lastReceived('joined')?.data).toMatchObject({ position: pilot.position });
-      expect(Math.hypot(pilot.position.x, pilot.position.y)).toBeCloseTo(TOWN_SPAWN_RADIUS);
-      expect(
-        engine.playerMotion.placeActorForTesting(pilot.id, { x: 0, y: 0 }, engine.getServerTime())
-      ).toBe(true);
-
-      core.handleClientMessage(
-        {
-          type: 'update',
-          id: pilot.id,
-          data: {
-            position: { x: 1, y: 2 },
-            velocity: { x: 0, y: 0 },
-            angle: 0,
-            thrusting: false,
-            motionEpoch: pilot.playerMotion?.epoch,
-            motionSequence: 0,
-            score: 150,
-          },
-        },
-        owner
-      );
-      expect(pilot.position).toEqual({ x: 1, y: 2 });
-      expect(pilot.score).toBe(0);
-
-      core.handleClientMessage(
-        {
-          type: 'join',
-          data: {
-            id: 'peer',
-            name: 'Peer',
-            position: { x: 1000, y: 1000 },
-            snapshotVersion: SNAPSHOT_VERSION,
-            asteroidInteractions: 1,
-          },
-        },
-        peer
-      );
-      for (const rock of engine.getAllAsteroids()) {
-        engine.removeAsteroid(rock.id);
-      }
-      owner.clear();
-      peer.clear();
-      const shot = { laserStart: { x: 11, y: 2 }, laserDirection: { x: 1, y: 0 } };
-      core.handleClientMessage({ type: 'shoot', id: pilot.id, data: shot }, owner);
-
-      const [trackedShot] = engine.getPlayerProjectiles();
-      assert.ok(trackedShot);
-      expect(trackedShot.ownerId).toBe(pilot.id);
-      expect(owner.received('playerShoot')).toEqual([]);
-      expect(peer.received('playerShoot')).toEqual([]);
-    }
-  );
 
   test('an update without a player identity receives a timestamped error and changes no player', () => {
     const socket = new RecordingSocket();

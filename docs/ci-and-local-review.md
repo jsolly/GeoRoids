@@ -8,7 +8,7 @@ Heavy tests run in the local review/fix loop and the full gate before push.
 `static-checks`, `runner-contracts`, and `behavioral-smoke` start concurrently.
 Static checks cover lint policy, formatting, unused code, Markdown, YAML, Actions,
 TypeScript, benchmark types, Wiki source review, and the production build.
-Runner contracts run the unchanged test-runner and dev-server commands once.
+Runner contracts run the test-runner and dev-server commands once; local runner fault contracts use the shared heavy queue.
 The smoke runs these scenarios through the serialized integration runner:
 
 - Desktop boot, movement, and authoritative firing.
@@ -51,11 +51,9 @@ include `--with-deps` to install their system libraries.
 The pre-commit hook owns the complete static/unit/build and integration/performance battery. `npm run gate` uses the same entry even with an empty index, with the fleet documentation fast path disabled. For focused iteration, `npm run test:review` runs only the heavy
 integration/performance portion. Standalone integration runs retain their existing
 20-minute deadline, process ownership, and cleanup. Full coordinated runs require
-less than 600 seconds including discovery and cleanup; 300 seconds remains a future performance target; see [isolated shards](integration-shards.md). Choose unused ports with
-`GEOROIDS_TEST_VITE_PORT` and `GEOROIDS_TEST_SERVER_PORT` when another dev session
-owns the defaults; the repository-wide lock still allows only one coordinator or standalone integration run.
+less than 600 seconds including discovery and cleanup; 300 seconds remains a future performance target; see [isolated shards](integration-shards.md). Each checkout owns its gate artifacts independently. Runner fault contracts, heavy reviews and standalone integration or frame measurements enter a repository-wide FIFO queue before their execution deadlines begin. Queue tickets print while waiting; interrupting a waiter cancels it. Standalone runners select unused Vite, server and proxy ports automatically; explicit `GEOROIDS_TEST_*_PORT` overrides remain available for diagnostics. Same-checkout validation refuses overlap, and failed cleanup retains its ownership barrier.
 
-Each heavy run keeps console output, client/server logs, screenshots, benchmark
+Gate runner contracts also retain their isolated fault-fixture evidence under their issued session directory. Each heavy run keeps console output, client/server logs, screenshots, benchmark
 JSON, and its exit status in a unique ignored `.performance/review/run.*` directory.
 The command prints that directory on start and completion. Integration receipts
 point to the separate retained directory for all six isolated children. Retain both for review;

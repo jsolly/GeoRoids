@@ -24,6 +24,7 @@ REAL_TOUCH="$(command -v touch)"
 REAL_MKDIR="$(command -v mkdir)"
 
 cleanup() {
+    local status=$?
     local pid_file
     local pid
     if [ -n "$LISTENER_PID" ] && kill -0 "$LISTENER_PID" 2>/dev/null; then
@@ -43,7 +44,11 @@ cleanup() {
             fi
         fi
     done
-    rm -rf "$TEMP_DIR"
+    if ((status == 0)); then
+        rm -rf "$TEMP_DIR"
+    else
+        echo "Test-runner contract diagnostics retained at $TEMP_DIR" >&2
+    fi
 }
 
 trap cleanup EXIT
@@ -56,6 +61,7 @@ CONTRACT_ROOT="$TEMP_DIR/repository"
 for git_variable in "${!GIT_@}"; do
     unset "$git_variable"
 done
+unset GEOROIDS_VALIDATION_CHECKOUT GEOROIDS_VALIDATION_ADMISSION GEOROIDS_VALIDATION_CHILD
 export HOME="$TEMP_DIR/home"
 export XDG_CONFIG_HOME="$TEMP_DIR/xdg"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -64,10 +70,14 @@ mkdir -p "$CONTRACT_ROOT/scripts"
 mkdir -p "$CONTRACT_ROOT/tests/integration/browser/sanity" "$CONTRACT_ROOT/tests/integration/server"
 printf '// explicit browser selector fixture\n' > "$CONTRACT_ROOT/tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts"
 printf '// explicit server selector fixture\n' > "$CONTRACT_ROOT/tests/integration/server/selected-pilot.test.ts"
+cp "$ROOT/scripts/test-runner.sh" "$CONTRACT_ROOT/scripts/test-runner.sh"
 cp "$ROOT/scripts/process-tree.sh" "$CONTRACT_ROOT/scripts/process-tree.sh"
 cp "$ROOT/scripts/review-receipt.mjs" "$CONTRACT_ROOT/scripts/review-receipt.mjs"
 cp "$ROOT/scripts/integration-shard-plan.mjs" "$CONTRACT_ROOT/scripts/integration-shard-plan.mjs"
 cp "$ROOT/scripts/benchmark-build-receipt.mjs" "$CONTRACT_ROOT/scripts/benchmark-build-receipt.mjs"
+cp "$ROOT/scripts/test-ports.mjs" "$CONTRACT_ROOT/scripts/test-ports.mjs"
+cp "$ROOT/scripts/test-runner-ports.sh" "$CONTRACT_ROOT/scripts/test-runner-ports.sh"
+cp "$ROOT/scripts/validation-admission.mjs" "$CONTRACT_ROOT/scripts/validation-admission.mjs"
 cp "$ROOT/.env.example" "$CONTRACT_ROOT/.env.example"
 printf '{"lockfileVersion":3}\n' > "$CONTRACT_ROOT/package-lock.json"
 git -C "$CONTRACT_ROOT" init -q
@@ -206,17 +216,6 @@ assert_rejected() {
     assert_lock_released
 }
 
-find_free_port() {
-    local candidate
-    for ((candidate = 52000; candidate < 53000; candidate++)); do
-        if ! lsof -nP -iTCP:"$candidate" -sTCP:LISTEN > /dev/null 2>&1; then
-            printf '%s' "$candidate"
-            return 0
-        fi
-    done
-    return 1
-}
-
 assert_occupied_port_rejected() {
     local occupied_port
     local server_port
@@ -226,24 +225,27 @@ assert_occupied_port_rejected() {
     command -v lsof > /dev/null 2>&1 || fail "lsof is required for the occupied-port contract check"
     command -v node > /dev/null 2>&1 || fail "node is required for the occupied-port contract check"
 
-    occupied_port="$(find_free_port)" || fail "could not find a free port for the occupied-port check"
-    server_port=$((occupied_port + 1))
-    while lsof -nP -iTCP:"$server_port" -sTCP:LISTEN > /dev/null 2>&1; do
-        server_port=$((server_port + 1))
-    done
-
-    node -e 'require("net").createServer().listen(Number(process.argv[1]), "127.0.0.1")' \
-        "$occupied_port" &
+    local ready_file="$TEMP_DIR/occupied-listener.ready"
+    local listener_log="$TEMP_DIR/occupied-listener.log"
+    local ready_pid=""
+    local attempt
+    node "$ROOT/scripts/contract-listener.mjs" "$ready_file" >"$listener_log" 2>&1 &
     LISTENER_PID=$!
-
-    for _ in {1..20}; do
-        if lsof -nP -iTCP:"$occupied_port" -sTCP:LISTEN > /dev/null 2>&1; then
-            break
-        fi
+    for ((attempt = 0; attempt < 100; attempt++)); do
+        [ -s "$ready_file" ] && break
+        kill -0 "$LISTENER_PID" 2>/dev/null || break
         sleep 0.05
     done
-    lsof -nP -iTCP:"$occupied_port" -sTCP:LISTEN > /dev/null 2>&1 || \
-        fail "the occupied-port listener did not start"
+    if [ ! -s "$ready_file" ]; then
+        cat "$listener_log" >&2
+        fail "the occupied-port listener did not publish readiness"
+    fi
+    read -r ready_pid occupied_port server_port < "$ready_file"
+    if [ "$ready_pid" != "$LISTENER_PID" ] ||
+        ! lsof -a -p "$LISTENER_PID" -nP -iTCP:"$occupied_port" -sTCP:LISTEN -t | grep -Fxq "$LISTENER_PID"; then
+        cat "$listener_log" >&2
+        fail "the occupied-port fixture does not own its recorded listener"
+    fi
 
     if GEOROIDS_TEST_VITE_PORT="$occupied_port" GEOROIDS_TEST_SERVER_PORT="$server_port" \
         "$RUNNER" tests/integration/server/ > "$output_file" 2>&1; then
@@ -265,6 +267,7 @@ assert_occupied_port_rejected() {
         fail "occupied test port error did not provide the custom-port remedy"
     }
     assert_lock_released
+    kill -0 "$LISTENER_PID" 2>/dev/null || fail "occupied-port refusal killed the unrelated listener"
 
     kill "$LISTENER_PID" 2>/dev/null || true
     wait "$LISTENER_PID" 2>/dev/null || true
@@ -286,7 +289,7 @@ EOF
 
     cat > "$MOCK_BIN/lsof" <<'EOF'
 #!/usr/bin/env bash
-# Contract processes never bind ports; report them free.
+# Availability probes see free ports; readiness sees the owned mock server.
     if [ "${GEOROIDS_CONTRACT_MODE:-}" = port-inspection-status-one ]; then
         echo "simulated lsof inspection failure (status 1)" >&2
         exit 1
@@ -295,6 +298,18 @@ EOF
         echo "simulated lsof inspection failure (status 2)" >&2
         exit 2
     fi
+if [[ " $* " == *" -t "* ]] && [ -s "$GEOROIDS_CONTRACT_DEV_PID_FILE" ]; then
+    if [ "$GEOROIDS_CONTRACT_MODE" = readiness-inspection-failure ]; then
+        echo "simulated owned-listener inspection failure (status 1)" >&2
+        exit 1
+    fi
+    if [ "$GEOROIDS_CONTRACT_MODE" = readiness-unowned-listener ]; then
+        printf '%s\n' 900000000
+        exit 0
+    fi
+    cat "$GEOROIDS_CONTRACT_DEV_PID_FILE"
+    exit 0
+fi
 exit 1
 EOF
 
@@ -368,12 +383,16 @@ EOF
 
     cat > "$MOCK_BIN/ps" <<'EOF'
 #!/usr/bin/env bash
-if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-status-one ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+# Admission inspects its supervisor independently of runner cleanup fixtures.
+case " $* " in
+    *" ppid=,stat=,lstart= "*|*" pid=,pgid=,stat= "*) exec /bin/ps "$@" ;;
+esac
+if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-status-one ] && [ -s "$GEOROIDS_CONTRACT_TEST_PID_FILE" ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
     : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
     echo "simulated ps inspection failure (status 1)" >&2
     exit 1
 fi
-if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-failure ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-failure ] && [ -s "$GEOROIDS_CONTRACT_TEST_PID_FILE" ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
     : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
     exit 2
 fi
@@ -386,6 +405,29 @@ for arg in "$@"; do
     fi
     previous="$arg"
 done
+
+if [ "$GEOROIDS_CONTRACT_MODE" = watchdog-cleanup-alarm ] &&
+    [ -s "$GEOROIDS_CONTRACT_TEST_PID_FILE" ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+    case " $* " in
+        *" lstart="*)
+            IFS= read -r test_pid < "$GEOROIDS_CONTRACT_TEST_PID_FILE"
+            # The mocked test must already be gone. Authenticate the runner as
+            # our ancestor and the inspected watchdog as its direct child.
+            if ! kill -0 "$test_pid" 2>/dev/null; then
+                IFS= read -r runner_pid < "$GEOROIDS_CONTRACT_LOCK_DIR/pid"
+                ancestor="$PPID"
+                for ((depth = 0; depth < 16 && ancestor != runner_pid && ancestor > 1; depth++)); do
+                    ancestor="$(/bin/ps -p "$ancestor" -o ppid=)" || exit 2
+                done
+                [ "$ancestor" -eq "$runner_pid" ] || exit 2
+                inspected_parent="$(/bin/ps -p "$pid" -o ppid=)" || exit 2
+                [ "$inspected_parent" -eq "$runner_pid" ] || exit 2
+                printf '%s\n' 'completed test; injecting alarm during watchdog cleanup' > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
+                kill -ALRM "$runner_pid" || exit 2
+            fi
+            ;;
+    esac
+fi
 
 sticky_pid=""
 if [ -s "$GEOROIDS_CONTRACT_DEV_PID_FILE" ]; then
@@ -408,7 +450,7 @@ EOF
 
     cat > "$MOCK_BIN/pgrep" <<'EOF'
 #!/usr/bin/env bash
-if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-pgrep-failure ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-pgrep-failure ] && [ -s "$GEOROIDS_CONTRACT_TEST_PID_FILE" ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
     : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
     exit 2
 fi
@@ -461,6 +503,12 @@ run_mock_runner() {
     local max_duration="$2"
     local output_file="$3"
     shift 3
+    local vite_port=59993 server_port=59994 proxy_port="${GEOROIDS_TEST_PROXY_PORT:-59995}"
+    if [ "${GEOROIDS_CONTRACT_AUTOMATIC_PORTS:-false}" = true ]; then
+        vite_port="${GEOROIDS_TEST_VITE_PORT:-}"
+        server_port="${GEOROIDS_TEST_SERVER_PORT:-}"
+        proxy_port="${GEOROIDS_TEST_PROXY_PORT:-}"
+    fi
     rm -f \
         "$MOCK_DEV_PID_FILE" \
         "$MOCK_TEST_PID_FILE" \
@@ -485,8 +533,9 @@ run_mock_runner() {
         GEOROIDS_CONTRACT_FAILURE_MARKER="$MOCK_FAILURE_MARKER_FILE" \
         GEOROIDS_TEST_RUNNER_RECEIPT="$TEMP_DIR/final-runner.json" \
         GEOROIDS_TEST_MAX_DURATION_SECONDS="$max_duration" \
-        GEOROIDS_TEST_VITE_PORT=59993 \
-        GEOROIDS_TEST_SERVER_PORT=59994 \
+        GEOROIDS_TEST_VITE_PORT="$vite_port" \
+        GEOROIDS_TEST_SERVER_PORT="$server_port" \
+        GEOROIDS_TEST_PROXY_PORT="$proxy_port" \
         "$RUNNER" "$@" > "$output_file" 2>&1
 }
 
@@ -599,6 +648,27 @@ assert_test_timeout_cleans_owned_processes() {
     assert_lock_released
 }
 
+clear_proven_fixture_barriers() {
+    local pid_file
+    # Only this script's isolated Git fixture is eligible for recovery. Every
+    # recorded real process must be dead before clearing deliberately failed proof.
+    for pid_file in "$MOCK_DEV_PID_FILE.proxy" "$MOCK_TEST_CHILD_PID_FILE" \
+        "$MOCK_TEST_PID_FILE" "$MOCK_DEV_CHILD_PID_FILE" "$MOCK_DEV_PID_FILE"; do
+        if [ -s "$pid_file" ]; then assert_pid_stopped "$pid_file" "fixture recovery"; fi
+    done
+    [ "$CONTRACT_GIT_DIR" = "$EXPECTED_GIT_DIR" ] || fail "recovery escaped the private fixture"
+    [ -d "$CONTRACT_GIT_DIR/georoids-validation-checkout.lock" ] || fail "unproven cleanup released checkout ownership"
+    [ -f "$CONTRACT_GIT_DIR/georoids-validation-queue/000000000001/active" ] || fail "unproven cleanup released heavy admission"
+    "$REAL_RM" -rf "$LOCK_DIR" "$CONTRACT_GIT_DIR/georoids-validation-checkout.lock" \
+        "$CONTRACT_GIT_DIR/georoids-validation-queue"
+    assert_lock_released
+}
+
+assert_cleanup_barriers_retained() {
+    [ -f "$LOCK_DIR/cleanup-failed.json" ] || fail "failed cleanup did not retain its runner barrier"
+    clear_proven_fixture_barriers
+}
+
 assert_cleanup_failure_is_not_success() {
     local output_file="$TEMP_DIR/cleanup-failure.txt"
     local exit_code
@@ -618,7 +688,7 @@ assert_cleanup_failure_is_not_success() {
     assert_pid_stopped "$MOCK_TEST_PID_FILE" "successful mock test"
     assert_pid_stopped "$MOCK_DEV_PID_FILE" "cleanup-failure dev server"
     assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "cleanup-failure dev-server child"
-    assert_lock_released
+    assert_cleanup_barriers_retained
 }
 
 assert_cleanup_failure_preserves_test_failure() {
@@ -640,7 +710,7 @@ assert_cleanup_failure_preserves_test_failure() {
     assert_pid_stopped "$MOCK_TEST_PID_FILE" "failed mock test"
     assert_pid_stopped "$MOCK_DEV_PID_FILE" "nonzero cleanup-failure dev server"
     assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "nonzero cleanup-failure dev-server child"
-    assert_lock_released
+    assert_cleanup_barriers_retained
 }
 
 assert_final_failure_receipt() {
@@ -750,6 +820,80 @@ assert_frozen_benchmark_reuse() {
     [ ! -e "$MOCK_TEST_PID_FILE" ] || fail "invalid reuse started the measurement driver"
     assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "rejected reuse proxy"
     assert_lock_released
+}
+
+assert_completed_test_ignores_watchdog_cleanup_alarm() {
+    local output_file="$TEMP_DIR/watchdog-cleanup-alarm.txt"
+    if ! run_mock_runner watchdog-cleanup-alarm 10 "$output_file" tests/integration/server/; then
+        cat "$output_file" >&2
+        fail 'completed test became a timeout during watchdog cleanup'
+    fi
+    [ -s "$MOCK_FAILURE_MARKER_FILE" ] || fail 'watchdog cleanup alarm was not injected'
+    node - "$TEMP_DIR/final-runner.json" <<'NODE'
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const receipt = JSON.parse(fs.readFileSync(process.argv[2]));
+assert.equal(receipt.exitCode, 0);
+assert.equal(receipt.timedOut, false);
+assert.equal(receipt.cleanupSucceeded, true);
+assert.equal(receipt.success, true);
+NODE
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" 'completed test'
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" 'completed-test dev server'
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" 'completed-test dev-server child'
+    assert_lock_released
+}
+
+assert_automatic_frozen_benchmark_reuse() {
+    local build_output="$TEMP_DIR/automatic-build.txt"
+    local reuse_output="$TEMP_DIR/automatic-reuse.txt"
+    local receipt="$CONTRACT_ROOT/.performance/benchmark-client-build.json"
+    local GEOROIDS_CONTRACT_AUTOMATIC_PORTS=true
+    local GEOROIDS_TEST_VITE_PORT='' GEOROIDS_TEST_SERVER_PORT='' GEOROIDS_TEST_PROXY_PORT=''
+    if ! run_mock_runner success 10 "$build_output" --benchmark-client --seconds 1; then
+        cat "$build_output" >&2
+        fail 'automatic-port client build failed'
+    fi
+    cp "$receipt" "$TEMP_DIR/automatic-build.before.json"
+    if ! run_mock_runner success 10 "$reuse_output" --benchmark-client --reuse-build --seconds 1; then
+        cat "$reuse_output" >&2
+        fail 'automatic-port frozen client could not be reused'
+    fi
+    [ "$(grep '^Owned test ports:' "$build_output")" = "$(grep '^Owned test ports:' "$reuse_output")" ] || fail 'reuse changed automatically selected endpoints'
+    [ ! -e "$MOCK_DEV_PID_FILE.build" ] || fail 'automatic reuse rebuilt the frozen client'
+    cmp "$receipt" "$TEMP_DIR/automatic-build.before.json" || fail 'automatic reuse replaced its build proof'
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" 'automatic reuse driver'
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" 'automatic reuse server'
+    assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" 'automatic reuse proxy'
+    assert_lock_released
+
+    # A recorded endpoint is not authority over a new listener. Use real socket
+    # and process inspection here, with no mock tools or explicit port overrides.
+    local ready_file="$TEMP_DIR/reused-port.ready"
+    node --input-type=module - "$receipt" "$ready_file" <<'NODE' > "$TEMP_DIR/reused-port-listener.log" 2>&1 &
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
+const [receipt, ready] = process.argv.slice(2);
+const port = JSON.parse(readFileSync(receipt)).inputs.ports[0];
+createServer().listen(port, '127.0.0.1', () => writeFileSync(ready, String(port)));
+NODE
+    LISTENER_PID=$!
+    local attempt status=0
+    for ((attempt = 0; attempt < 100; attempt++)); do
+        [ -s "$ready_file" ] && break
+        kill -0 "$LISTENER_PID" 2>/dev/null || break
+        sleep 0.05
+    done
+    [ -s "$ready_file" ] || fail 'reused-port listener failed to bind'
+    env -u GEOROIDS_TEST_VITE_PORT -u GEOROIDS_TEST_SERVER_PORT -u GEOROIDS_TEST_PROXY_PORT \
+        "$RUNNER" --benchmark-client --reuse-build --seconds 1 > "$reuse_output" 2>&1 || status=$?
+    [ "$status" -eq 1 ] || { cat "$reuse_output" >&2; fail 'occupied recovered port was not refused'; }
+    grep -Fq 'already in use' "$reuse_output" || fail 'recovered port refusal lost its reason'
+    kill -0 "$LISTENER_PID" 2>/dev/null || fail 'recovered port refusal killed the unrelated listener'
+    assert_lock_released
+    kill "$LISTENER_PID"
+    wait "$LISTENER_PID" 2>/dev/null || true
+    LISTENER_PID=''
 }
 
 assert_invalid_proxy_ports_rejected() {
@@ -869,8 +1013,7 @@ assert_lock_release_failure_is_not_success() {
     assert_pid_stopped "$MOCK_TEST_PID_FILE" "lock-release-failure mock test"
     assert_pid_stopped "$MOCK_DEV_PID_FILE" "lock-release-failure dev server"
     assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "lock-release-failure dev-server child"
-    "$REAL_RMDIR" "$LOCK_DIR"
-    assert_lock_released
+    clear_proven_fixture_barriers
 }
 
 assert_process_inspection_failure_is_not_success() {
@@ -899,6 +1042,24 @@ assert_process_inspection_failure_is_not_success() {
         }
     fi
     assert_pid_stopped "$MOCK_TEST_PID_FILE" "$mode mock test"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "$mode dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "$mode dev-server child"
+    assert_cleanup_barriers_retained
+}
+
+assert_readiness_failure_stops_before_tests() {
+    local mode="$1"
+    local expected_message="$2"
+    local output_file="$TEMP_DIR/$mode.txt"
+    local status=0
+    run_mock_runner "$mode" 10 "$output_file" tests/integration/server/ || status=$?
+    [ "$status" -eq 1 ] || { cat "$output_file" >&2; fail "$mode did not refuse startup (exit $status)"; }
+    grep -Fq "$expected_message" "$output_file" || {
+        cat "$output_file" >&2
+        fail "$mode did not preserve its readiness failure reason"
+    }
+    [ ! -e "$MOCK_TEST_PID_FILE" ] || fail "$mode launched tests without an owned, inspected listener"
+    [ ! -e "$MOCK_TEST_PID_FILE.command" ] || fail "$mode invoked tests before readiness"
     assert_pid_stopped "$MOCK_DEV_PID_FILE" "$mode dev server"
     assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "$mode dev-server child"
     assert_lock_released
@@ -971,6 +1132,10 @@ assert_port_inspection_failure_is_not_success \
     port-inspection-failure 2 "simulated lsof inspection failure (status 2)"
 assert_port_inspection_failure_is_not_success \
     port-inspection-status-one 2 "simulated lsof inspection failure (status 1)"
+assert_readiness_failure_stops_before_tests \
+    readiness-inspection-failure "simulated owned-listener inspection failure (status 1)"
+assert_readiness_failure_stops_before_tests \
+    readiness-unowned-listener "belongs to unowned listener PID 900000000"
 assert_cleanup_state_contract
 assert_vitest_config "default-discovery" vitest.browser.config.ts
 assert_vitest_config "default-with-options" vitest.browser.config.ts --reporter=verbose
@@ -989,15 +1154,17 @@ assert_live_benchmark_mode benchmark-client realtime-client
 assert_invalid_proxy_ports_rejected
 assert_live_benchmark_mode benchmark-load load
 assert_frozen_benchmark_reuse
+assert_automatic_frozen_benchmark_reuse
+assert_completed_test_ignores_watchdog_cleanup_alarm
 assert_invalid_build_reuse_rejected tests --reuse-build
 assert_invalid_build_reuse_rejected load --benchmark-load --reuse-build
 assert_invalid_build_reuse_rejected misplaced --benchmark-client --seconds 1 --reuse-build
 assert_invalid_build_reuse_rejected value --benchmark-client --reuse-build=true
 assert_test_timeout_cleans_owned_processes
 assert_cleanup_failure_is_not_success
-assert_final_failure_receipt 1 true
+assert_final_failure_receipt 1 false
 assert_cleanup_failure_preserves_test_failure
-assert_final_failure_receipt 7 true
+assert_final_failure_receipt 7 false
 assert_lock_release_failure_is_not_success
 assert_final_failure_receipt 1 false
 assert_process_inspection_failure_is_not_success \

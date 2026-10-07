@@ -50,7 +50,9 @@ assert.equal(
   JSON.parse(read('package.json')).scripts.gate,
   'FLEET_DOC_FAST=0 bash .git-hooks/pre-commit'
 );
-assert.match(read('.git-hooks/pre-commit'), /run_step "complete gate" node scripts\/gate\.mjs/u);
+const hook = read('.git-hooks/pre-commit');
+assert.match(hook, /^node scripts\/gate\.mjs$/mu);
+assert.doesNotMatch(hook, /run_step\s+"complete gate"/u);
 assert.doesNotMatch(read('scripts/gate.mjs'), /pre-commit|npm.*gate/u);
 assert.equal(
   JSON.parse(read('package.json')).scripts['test:review'],

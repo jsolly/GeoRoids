@@ -27,7 +27,7 @@
     "test:integration:browser:sanity": "./scripts/test-runner.sh tests/integration/browser/sanity/ --reporter=verbose",
     "test:integration:server": "./scripts/test-runner.sh tests/integration/server/",
     "test:integration:entities": "./scripts/test-runner.sh tests/integration/entities/",
-    "check:test-runner": "bash scripts/test-runner-contract.sh && node --test scripts/integration-shards.test.mjs",
+    "check:test-runner": "node scripts/validation-admission.mjs contracts -- bash -c 'bash scripts/test-runner-contract.sh && node --test scripts/integration-shards.test.mjs scripts/test-ports.test.mjs scripts/validation-admission.test.mjs'",
     "check:dev-server": "bash scripts/dev-server-contract.sh",
     "check:ts": "tsc --noEmit",
     "check:benchmarks": "tsc -p tsconfig.benchmarks.json",

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type JSHandle } from 'playwright';
 import type { TouchControlDiagnostics } from '../../src/input/touchControls';
+import { ownedProcessGroupAbsent } from './owned-process-group';
 
 type Viewport = { width: number; height: number };
 type InputBoundary = {
@@ -160,29 +161,6 @@ export function disableViteClientTransport(source: string) {
   return { body, originalSha256: sha256(source), transformedSha256: sha256(body) };
 }
 
-/** Verify the whole detached group, including children after its leader exits. */
-export function ownedGroupAbsentInInventory(inventory: string, pgid: number): boolean {
-  assert(Number.isSafeInteger(pgid) && pgid > 0, 'Invalid owned process group');
-  const rows = inventory
-    .split('\n')
-    .map((row) => row.trim())
-    .filter(Boolean);
-  assert(rows.length > 0, 'Process inventory is empty');
-  const pids = new Set<number>();
-  let present = false;
-  for (const row of rows) {
-    const match = /^(\d+)\s+(\d+)$/u.exec(row);
-    assert(match, 'Process inventory has an unreadable row');
-    const pid = Number(match[1]);
-    const group = Number(match[2]);
-    assert(Number.isSafeInteger(pid) && Number.isSafeInteger(group), 'Invalid inventory PID');
-    assert(!pids.has(pid), 'Process inventory repeats a PID');
-    pids.add(pid);
-    present ||= group === pgid;
-  }
-  return !present;
-}
-
 /** A separate browser avoids Playwright's per-session visible capture handle.
  * noDefaults only applies to the existing default context, never newContext().
  */
@@ -332,53 +310,19 @@ export async function createNativeLifecycleBrowser(
           assert(spawnFailed, 'Missing owned Chromium PID without a failed spawn');
           return true;
         }
-        let signalFailure: unknown;
-        try {
-          process.kill(-child.pid, 0);
-          return false;
-        } catch (error) {
-          signalFailure = error;
-        }
-        if (
-          signalFailure instanceof Error &&
-          'code' in signalFailure &&
-          signalFailure.code === 'ESRCH'
-        ) {
-          return true;
-        }
-        recordHost('group-absence-error', {
-          pid: child.pid,
-          error: safeNativeText(String(signalFailure)),
+        return await ownedProcessGroupAbsent(child.pid, (observation) => {
+          if (observation.kind === 'signal-error') {
+            recordHost('group-absence-error', {
+              pid: child.pid,
+              error: safeNativeText(String(observation.error)),
+            });
+          } else {
+            recordHost('owned-group-inventory-proof', {
+              pgid: child.pid,
+              absent: observation.absent,
+            });
+          }
         });
-        if (
-          !(
-            signalFailure instanceof Error &&
-            'code' in signalFailure &&
-            signalFailure.code === 'EPERM'
-          )
-        ) {
-          throw signalFailure;
-        }
-        let inventoryFailure: unknown;
-        try {
-          const inventory = await new Promise<string>((resolve, reject) => {
-            execFile(
-              '/bin/ps',
-              ['-axo', 'pid=,pgid='],
-              { timeout: 2000, maxBuffer: 1024 * 1024, encoding: 'utf8' },
-              (failure, stdout) => (failure ? reject(failure) : resolve(stdout))
-            );
-          });
-          const absent = ownedGroupAbsentInInventory(inventory, child.pid);
-          recordHost('owned-group-inventory-proof', { pgid: child.pid, absent });
-          return absent;
-        } catch (error) {
-          inventoryFailure = error;
-        }
-        throw new AggregateError(
-          [signalFailure, inventoryFailure],
-          'Owned browser process group could not be verified'
-        );
       }
       async function waitForGroupAbsent(milliseconds: number): Promise<boolean> {
         const deadline = Date.now() + milliseconds;

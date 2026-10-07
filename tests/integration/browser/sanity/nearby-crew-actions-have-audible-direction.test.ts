@@ -276,8 +276,12 @@ test(
           );
         };
         let currentStage = 'fetch';
+        let contextSnapshot:
+          | (() => { x: number; state: AudioContextState; currentTime: number; sampleRate: number })
+          | undefined;
         const timer = setTimeout(
-          () => recordStage('pending-at-45-seconds', { currentStage }),
+          () =>
+            recordStage('pending-at-45-seconds', { currentStage, context: contextSnapshot?.() }),
           45000
         );
         try {
@@ -297,6 +301,7 @@ test(
               currentTime: context.currentTime,
               sampleRate: context.sampleRate,
             });
+            contextSnapshot = contextDetails;
             context.onstatechange = () => recordStage('context-state-change', contextDetails());
             context.oncomplete = () => recordStage('context-complete', contextDetails());
             const source = context.createBufferSource();
@@ -319,6 +324,7 @@ test(
             recordStage('render-start', contextDetails());
             const rendered = await context.startRendering();
             recordStage('render-complete', contextDetails());
+            contextSnapshot = undefined;
             results.push(
               [0, 1].map((channel) =>
                 rendered.getChannelData(channel).reduce((sum, value) => sum + value * value, 0)

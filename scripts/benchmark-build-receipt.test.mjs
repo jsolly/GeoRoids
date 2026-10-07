@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const helper = fileURLToPath(new URL('./benchmark-build-receipt.mjs', import.meta.url));
-const websocketUrl = 'ws://localhost:59994/ws';
+const websocketUrl = 'ws://localhost:59995/ws';
 
 test('repeated owned sessions reuse only the exact successfully built client', () => {
   const root = mkdtempSync(join(tmpdir(), 'georoids-frozen-build-'));
@@ -19,11 +19,21 @@ test('repeated owned sessions reuse only the exact successfully built client', (
   );
   const git = (...args) => execFileSync('git', args, { cwd: root, env, stdio: 'pipe' });
   const run = (action, url = websocketUrl, extraEnvironment = {}) =>
-    spawnSync(process.execPath, [helper, action, root, url, prepared], {
-      env: { ...env, ...extraEnvironment },
-      encoding: 'utf8',
-      timeout: 10_000,
-    });
+    spawnSync(
+      process.execPath,
+      [helper, action, root, ...(action === 'ports' ? [] : [url, prepared])],
+      {
+        env: {
+          ...env,
+          GEOROIDS_TEST_VITE_PORT: '59993',
+          GEOROIDS_TEST_SERVER_PORT: '59994',
+          GEOROIDS_TEST_PROXY_PORT: '59995',
+          ...extraEnvironment,
+        },
+        encoding: 'utf8',
+        timeout: 10_000,
+      }
+    );
   const passes = (result) => assert.equal(result.status, 0, result.stderr);
   const rejects = (result, message) => {
     assert.equal(result.status, 1, result.stderr);
@@ -65,6 +75,32 @@ test('repeated owned sessions reuse only the exact successfully built client', (
     passes(run('prepare'));
     passes(run('record'));
     const originalReceipt = readFileSync(receipt, 'utf8');
+    const recovered = run('ports');
+    passes(recovered);
+    assert.equal(recovered.stdout, '59993\n59994\n59995\n');
+    for (const [field, value, diagnostic] of [
+      ['schemaVersion', 1, /Unsupported benchmark build receipt/u],
+      [
+        'inputs',
+        { ...JSON.parse(originalReceipt).inputs, ports: [0, 59994, 59995] },
+        /valid, distinct benchmark ports/u,
+      ],
+      [
+        'inputs',
+        { ...JSON.parse(originalReceipt).inputs, ports: [59993, 59993, 59995] },
+        /valid, distinct benchmark ports/u,
+      ],
+      [
+        'inputs',
+        { ...JSON.parse(originalReceipt).inputs, worktree: '/another/worktree' },
+        /another worktree/u,
+      ],
+    ]) {
+      writeFileSync(receipt, JSON.stringify({ ...JSON.parse(originalReceipt), [field]: value }));
+      rejects(run('ports'), diagnostic);
+      rejects(run('verify'), diagnostic);
+    }
+    writeFileSync(receipt, originalReceipt);
     for (let index = 0; index < 3; index++) {
       passes(run('verify'));
       assert.equal(readFileSync(receipt, 'utf8'), originalReceipt);
@@ -91,9 +127,23 @@ test('repeated owned sessions reuse only the exact successfully built client', (
     writeFileSync(join(root, 'dist/extra.js'), 'unexpected asset');
     rejects(run('verify'), /Reusable production assets differ/u);
     rmSync(join(root, 'dist/extra.js'));
-    rejects(run('verify', 'ws://localhost:59995/ws'), /Reusable build inputs differ/u);
+    rejects(run('verify', 'ws://localhost:59996/ws'), /Reusable build inputs differ/u);
+    for (const variable of [
+      'GEOROIDS_TEST_VITE_PORT',
+      'GEOROIDS_TEST_SERVER_PORT',
+      'GEOROIDS_TEST_PROXY_PORT',
+    ]) {
+      rejects(
+        run('verify', websocketUrl, { [variable]: '59996' }),
+        /Reusable build inputs differ/u
+      );
+    }
     rejects(
       run('verify', websocketUrl, { VITE_OTHER: 'changed' }),
+      /Reusable build inputs differ/u
+    );
+    rejects(
+      run('verify', websocketUrl, { GEOROIDS_TEST_SESSION_DIR: '/another/session' }),
       /Reusable build inputs differ/u
     );
     passes(run('prepare'));

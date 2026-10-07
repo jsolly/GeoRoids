@@ -5,6 +5,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+if [[ "${1:-}" == --validation-child ]]; then
+  shift
+  node scripts/validation-admission.mjs verify review "$$" || exit 1
+else
+  exec node scripts/validation-admission.mjs review -- "$BASH" "$ROOT/scripts/test-review.sh" --validation-child "$@"
+fi
 mkdir -p .performance/review
 ARTIFACTS="$(mktemp -d "$ROOT/.performance/review/run.XXXXXX")"
 echo "Review artifacts: $ARTIFACTS"

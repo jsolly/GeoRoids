@@ -22,6 +22,7 @@ REAL_LSOF="$(command -v lsof)"
 REAL_PS="$(command -v ps)"
 
 cleanup() {
+  local status=$?
   local owned_child_pid=""
   if [[ -n "$LISTENER_PID" ]] && kill -0 "$LISTENER_PID" 2>/dev/null; then
     kill "$LISTENER_PID" 2>/dev/null || true
@@ -43,9 +44,15 @@ cleanup() {
     rm -f "$STATE_DIR/pid" "$STATE_DIR/start" "$STATE_DIR/root" 2>/dev/null || true
     rmdir "$STATE_DIR" 2>/dev/null || true
   fi
-  rm -rf "$TMP_DIR"
+  if ((status == 0)); then
+    rm -rf "$TMP_DIR"
+  else
+    echo "Dev-server contract diagnostics retained at $TMP_DIR" >&2
+  fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if ! command -v lsof >/dev/null 2>&1; then
   echo "dev-server contract requires lsof" >&2
@@ -56,19 +63,31 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-find_free_port() {
-  local port
-  for port in $(seq 52000 52999); do
-    if [[ "$port" == "${1:-}" ]]; then
-      continue
-    fi
-    if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
-      echo "$port"
-      return 0
-    fi
+start_contract_listener() {
+  local name="$1"
+  local ready_file="$TMP_DIR/$name.ready"
+  local ready_pid=""
+  local attempt
+  node "$ROOT/scripts/contract-listener.mjs" "$ready_file" >"$TMP_DIR/$name.log" 2>&1 &
+  LISTENER_PID=$!
+  for ((attempt = 0; attempt < 100; attempt++)); do
+    [[ -s "$ready_file" ]] && break
+    kill -0 "$LISTENER_PID" 2>/dev/null || break
+    sleep 0.05
   done
-  echo "could not find a free contract-test port" >&2
-  return 1
+  if [[ ! -s "$ready_file" ]]; then
+    echo "$name did not publish readiness" >&2
+    cat "$TMP_DIR/$name.log" >&2
+    exit 1
+  fi
+  read -r ready_pid VITE_PORT SERVER_PORT <"$ready_file"
+  if [[ "$ready_pid" != "$LISTENER_PID" ]] ||
+    ! "$REAL_LSOF" -a -p "$LISTENER_PID" -nP -iTCP:"$VITE_PORT" -sTCP:LISTEN -t | grep -Fxq "$LISTENER_PID"; then
+    echo "$name does not own its recorded listener" >&2
+    cat "$TMP_DIR/$name.log" >&2
+    exit 1
+  fi
+  STATE_DIR="${TMPDIR:-/tmp}/georoids-dev-$(printf '%s' "$ROOT:$VITE_PORT:$SERVER_PORT" | shasum -a 256 | cut -c1-16)"
 }
 
 assert_process_stopped() {
@@ -87,24 +106,7 @@ assert_process_stopped() {
   exit 1
 }
 
-VITE_PORT="$(find_free_port)"
-SERVER_PORT="$(find_free_port "$VITE_PORT")"
-STATE_DIR="${TMPDIR:-/tmp}/georoids-dev-$(printf '%s' "$ROOT:$VITE_PORT:$SERVER_PORT" | shasum -a 256 | cut -c1-16)"
-
-node -e 'require("net").createServer().listen(Number(process.argv[1]), "127.0.0.1")' "$VITE_PORT" \
-  >"$TMP_DIR/listener.log" 2>&1 &
-LISTENER_PID=$!
-
-for _ in $(seq 1 20); do
-  if lsof -nP -iTCP:"$VITE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    break
-  fi
-  sleep 0.05
-done
-if ! lsof -nP -iTCP:"$VITE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "contract listener did not start" >&2
-  exit 1
-fi
+start_contract_listener listener
 
 if GEOROIDS_DEV_VITE_PORT="$VITE_PORT" GEOROIDS_DEV_SERVER_PORT="$SERVER_PORT" \
   "$RUNNER" start >"$TMP_DIR/occupied.log" 2>&1; then
@@ -175,19 +177,7 @@ exit 2
 EOF
 chmod +x "$LSOF_MOCK_BIN/lsof"
 
-node -e 'require("net").createServer().listen(Number(process.argv[1]), "127.0.0.1")' "$VITE_PORT" \
-  >"$TMP_DIR/lsof-failure-listener.log" 2>&1 &
-LISTENER_PID=$!
-for _ in $(seq 1 20); do
-  if "$REAL_LSOF" -nP -iTCP:"$VITE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    break
-  fi
-  sleep 0.05
-done
-if ! "$REAL_LSOF" -nP -iTCP:"$VITE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "lsof-failure contract listener did not start" >&2
-  exit 1
-fi
+start_contract_listener lsof-failure-listener
 
 if PATH="$LSOF_MOCK_BIN:$PATH" GEOROIDS_DEV_VITE_PORT="$VITE_PORT" GEOROIDS_DEV_SERVER_PORT="$SERVER_PORT" \
   "$RUNNER" start >"$TMP_DIR/lsof-failure-start.log" 2>&1; then

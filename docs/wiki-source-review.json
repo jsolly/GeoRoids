@@ -7,7 +7,7 @@
     "index.css": "sha256:ac098824b34f8937d608dd0c005785d83b3777461e19b9e2c3370f7209364570",
     "index.html": "sha256:60a6824fe5c5084a62f133e8937aa3add5f55cc007aee2475ec15c1552729b27",
     "middleware.ts": "sha256:b1804785a737be08e3410c647ce88f86b06da2de7161e0af4277ab07830ce4ee",
-    "package.json": "sha256:a84fc89e5377077df28dd0fcda1d3741ef7817868b04ac48d2c18b9da02f4fec",
+    "package.json": "sha256:1d632351df06f8076ffc0cdc25294e448d70e11aaf551b3cf4aa29ee5a8529c8",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -361,7 +361,7 @@
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:728d82c029c1e4272e3376db67ee549a77d7a0e5bf003b05ff1af309529084b5",
     "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts": "sha256:9086f92863879f8fc8bb761e7cc5c4049b4621e103a05ea5d320c8a30d55f9b4",
     "tests/integration/browser/sanity/hauler-touch-taps-act-once-with-delayed-clicks.test.ts": "sha256:2a8a8d8de51efdd9bfe0a7bcf9648f3e674837706589226a181d972810e3d1e6",
-    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:7a4754427c3575e7055363f52f67c7777fb3eb7010c96faf85ee1261a73fa780",
+    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts": "sha256:0a25a0a31386696eb1caf10531e1e60935b5783273f6755dfdd0de20e8464906",
     "tests/integration/browser/sanity/pilot-views-follow-travel-like-gps.test.ts": "sha256:8850fe0f4da3e4a34a8ceabf5fcb9635ca80ad53c218e5a730ee7b4c91d0534f",
     "tests/integration/browser/sanity/pilots-copy-diagnostics.test.ts": "sha256:80f0990a793ed71da543f5d93b6898b623e358aad37910604120cc4f8efe8950",
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts": "sha256:fef2684b46c2f5c6727f3bca8ba446c312bd6d1376f8904cac9963713c02d0e8",
@@ -445,7 +445,7 @@
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:6c3ab0981e1de37f54d495f79adcb2b2a4d459a331f67ba772e8911d7e7f0de9",
     "tests/unit/server/collaborative-asteroid-split.test.ts": "sha256:e8a45e42cbdea8eddadc4428931431bf8ff518566245b73f49df8f39b3053952",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:ddd89a5c4e40dee948822ac97d5c90cc22d671eb62cd0397ecbc2345a94e32b2",
-    "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:f37fe17461e867da81e2f63f09f111099ddb0a6f54365998ee925ccc5bff2013",
+    "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:19105b35ab957fe5e71240eb162433a54be6d634ebb939536a0e32681f458f83",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:b969e9ae05083bec14f237cdf004bc4676e7fc4b8496cc40fee805fa8383f30e",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:e77b161df77b5ce1d89174f2c77441a7d771889bb4f2ed80bd40cefde5792944",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:8288b2c5d73e29d553bff1990a2d24d57ced8d35d77442e9a208e27c408f9b15",
@@ -1440,6 +1440,54 @@
         "tests/integration/browser/e2e/full-holds-leave-loot-for-crew-to-collect.test.ts"
       ],
       "topics": ["loot-growth"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed unchanged contour-lock assertions using the fixture clock for authoritative placement; all 28 rail scenarios passed. Player controls, rules and demonstrations are unchanged.",
+      "sources": ["tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts"],
+      "topics": ["controls"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed harness contract additions only; dependencies, game startup commands, player rules and demonstrations remain unchanged. Port and admission subprocess contracts, types and unused-code checks passed.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed runner fault-contract admission only. The unchanged tests now share heavy capacity; all 20 admission contracts passed. Dependencies, game commands, player controls, Wiki prose and illustrations are unchanged.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed live state/currentTime capture in the existing 45-second native HRTF diagnostic. The original graph, shipped sound, nearer-ear assertions and 60-second deadline remain unchanged. No player behavior, controls, Wiki prose or demonstrations changed; the full sibling failure is retained and its precise cause remains unproven.",
+      "sources": [
+        "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed test-only native cleanup and spider rescue admission against the field manual, Hauler and terrain guidance. Cleanup shares the existing bounded strict inventory proof for Darwin EPERM; permanent failure-boundary checks and an actual held-zombie control pass. Rescue provenance and observation loading precede the moving scene, with evidence after ordinary input; exact desktop/mobile scenarios and a delayed evidence-boundary control pass with real cable drawing, attachment, rescuer release and original deadlines. Gameplay rules, controls, Wiki prose and demonstrations are unchanged; complete paired gates remain pending.",
+      "sources": [
+        "tests/integration/browser/e2e/spiders-bite-a-haulers-cable-to-free-a-captured-spider.test.ts",
+        "tests/support/native-lifecycle-browser.ts",
+        "tests/support/owned-process-group.ts",
+        "tests/unit/testing/cancelled-native-pilots-retire-their-owned-browser-group.test.ts",
+        "tests/unit/testing/native-browser-groups-require-proof-of-disappearance.test.ts",
+        "tests/unit/testing/native-pilots-freeze-without-a-development-socket-reloading-the-game.test.ts"
+      ],
+      "topics": ["field-manual", "hauler", "terrain"],
       "media": [],
       "owners": {}
     }

@@ -2,8 +2,10 @@
 
 From `/Users/johnsolly/code/GeoRoids`, or the absolute feature-worktree path, run
 `npm run test:integration:sharded`. The existing `scripts/test-runner.sh` owns the
-run and its common-Git lock. `npm run test:review` uses the same six-shard path
-before running its performance measurements serially.
+run and its common-Git ownership lock. `npm run test:review` holds heavyweight
+admission across the six-shard run and all subsequent performance measurements.
+Independent worktrees may run ship gates together: static checks overlap, while
+runner fault contracts and heavyweight workloads queue automatically.
 
 The coordinator collects every integration file and expanded case, then starts
 six runner children using Vitest `--shard=1/6` through `--shard=6/6`, with at most
@@ -32,6 +34,32 @@ collected or unhandled errors. Missing evidence fails the run. Exact comparison
 against gameplay reports rejects environment-dependent registration differences.
 The discovery probe checks the reviewed Vitest 5.0.1 runtime accessor explicitly;
 an incompatible upgrade requires a reviewed probe update.
+
+## Concurrent worktree admission
+
+The admission supervisor excludes simultaneous gates, reviews or standalone
+harnesses in one checkout, protecting its build output, logs and receipts.
+Authenticated descendants reuse that checkout ownership. Across linked worktrees,
+a FIFO queue in the common Git directory admits one complete review, standalone
+integration run, benchmark or direct frame measurement at a time. This bounds
+browser and CPU contention on local machines; the six-shard inventory and selected
+child cap remain unchanged. Separate clones have separate queues.
+
+Waiting prints the ticket and queue home. INT/TERM cancels a waiting ticket without
+starting services. Admission wait is outside the admitted coordinator’s existing
+600-second deadline; collection, startup, execution and verified cleanup still
+count inside that deadline. The supervisor holds admission until its owned process
+group is empty and each nested runner has an invocation-specific cleanup receipt.
+A test failure with proven cleanup frees capacity. Missing cleanup, inspection
+failure or unexpected active-owner death retains a barrier and names its evidence
+home. A dead owner alone never authorizes deletion or killing processes. Inspect
+and resolve only that recorded ownership before retiring a retained barrier.
+
+Nested authorization checks the canonical Git directory, nonce, live process birth
+and ancestry. Environment variables alone do not bypass the queue. The established
+runner lock, pending-cleanup markers and shard authentication remain in force,
+including when an older checkout still owns the runner. Standalone services use
+automatic distinct ports and reject foreign listeners rather than sharing them.
 
 ## Ownership and isolation
 

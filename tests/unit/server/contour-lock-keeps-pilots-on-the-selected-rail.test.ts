@@ -222,7 +222,7 @@ test('a new lock cannot disguise a larger backwards jump as free-flight residue'
 test.each([1, 3])(
   'a cruising pilot catches a rail after %s unreported free-flight ticks',
   (ticks) => {
-    const { actor, pose } = railPilot();
+    const { actor, pose, now } = railPilot();
     for (const y of [10, 20, 30]) {
       const ship = new Ship({ position: { x: 2200, y }, kitId: actor.kitId });
       const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
@@ -232,11 +232,7 @@ test.each([1, 3])(
         ship.angle,
         cruiseSpeed(ship.mass, ship.maxVelocity)
       );
-      world.engine.playerMotion.placeActorForTesting(
-        actor.id,
-        ship.position,
-        world.engine.getServerTime()
-      );
+      world.engine.playerMotion.placeActorForTesting(actor.id, ship.position, now);
       actor.velocity = { ...ship.velocity };
       for (let frame = 0; frame < ticks; frame++) {
         ship.update();

@@ -5,6 +5,7 @@ import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, it as test } from 'vitest';
+import { ownedProcessGroupAbsent } from '../../support/owned-process-group';
 
 const launcher = fileURLToPath(new URL('../../support/owned-native-browser.mjs', import.meta.url));
 
@@ -31,22 +32,12 @@ async function bounded<T>(operation: Promise<T>): Promise<T> {
   }
 }
 
-function groupAbsent(group: number): boolean {
-  try {
-    process.kill(-group, 0);
-    return false;
-  } catch (error) {
-    assert(error instanceof Error && 'code' in error && error.code === 'ESRCH');
-    return true;
-  }
-}
-
 async function waitForGroupExit(group: number): Promise<void> {
   const deadline = Date.now() + 5000;
-  while (!groupAbsent(group) && Date.now() < deadline) {
+  while (!(await ownedProcessGroupAbsent(group)) && Date.now() < deadline) {
     await delay(25);
   }
-  expect(groupAbsent(group)).toBe(true);
+  expect(await ownedProcessGroupAbsent(group)).toBe(true);
 }
 
 test('a native pilot closing normally retires its launcher', async () => {
@@ -60,7 +51,7 @@ test('a native pilot closing normally retires its launcher', async () => {
     expect(await bounded(exited(child))).toEqual({ code: null, signal: 'SIGKILL' });
     await waitForGroupExit(group);
   } finally {
-    if (!groupAbsent(group)) {
+    if (!(await ownedProcessGroupAbsent(group))) {
       process.kill(-group, 'SIGKILL');
     }
   }
@@ -95,7 +86,7 @@ test('a crashed browser leader leaves no surviving descendants in its owned grou
     expect(stderr).toContain('Owned Chromium exited 7/null');
     await waitForGroupExit(group);
   } finally {
-    if (!groupAbsent(group)) {
+    if (!(await ownedProcessGroupAbsent(group))) {
       process.kill(-group, 'SIGKILL');
     }
   }
@@ -146,14 +137,14 @@ test('killing a native pilot worker retires its browser and descendants that ign
     assert(typeof ready === 'object' && ready !== null && 'group' in ready);
     assert(typeof ready.group === 'number' && Number.isSafeInteger(ready.group));
     group = ready.group;
-    expect(groupAbsent(group)).toBe(false);
+    expect(await ownedProcessGroupAbsent(group)).toBe(false);
     owner.kill('SIGKILL');
     await bounded(ownerExit);
     await waitForGroupExit(group);
   } finally {
     owner.kill('SIGKILL');
     await bounded(ownerExit);
-    if (group !== undefined && !groupAbsent(group)) {
+    if (group !== undefined && !(await ownedProcessGroupAbsent(group))) {
       process.kill(-group, 'SIGKILL');
     }
   }

@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 
-# Run integration tests with one repository-wide owner at a time. The lock lives
-# in Git's common directory so linked worktrees sharing ports 3001/5173 also
-# share the same serialization boundary.
+# Queue heavy validation across linked worktrees, then own the service pair.
+# The common-Git runner lock also preserves legacy ownership and authenticates
+# coordinator children; each standalone pair selects unused ports.
 ((BASH_VERSINFO[0] >= 5)) || { echo "✗ $0 requires Bash >= 5, not $BASH_VERSION. Fix: brew install bash; rerun bash ~/code/dotagents/setup/install-local-agent-runtime.sh; open a new shell." >&2; exit 1; }
 set -uo pipefail
+ORIGINAL_RUNNER_ARGS=("$@")
+VALIDATION_CHILD=false
+if [[ "${1:-}" == --validation-child ]]; then
+    VALIDATION_CHILD=true
+    shift
+fi
 
 if ! REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
     echo "❌ test-runner.sh must be launched from a Git worktree" >&2
@@ -28,6 +34,8 @@ cd "$REPO_ROOT" || {
 
 # shellcheck source=scripts/process-tree.sh
 source "$REPO_ROOT/scripts/process-tree.sh"
+# shellcheck source=scripts/test-runner-ports.sh
+source "$REPO_ROOT/scripts/test-runner-ports.sh"
 
 valid_port() {
     case "${1:-}" in
@@ -45,6 +53,9 @@ valid_positive_integer() {
 
 TEST_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-5173}"
 TEST_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-3001}"
+REQUESTED_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-}"
+REQUESTED_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-}"
+REQUESTED_PROXY_PORT="${GEOROIDS_TEST_PROXY_PORT:-}"
 MAX_TEST_DURATION_SECONDS="${GEOROIDS_TEST_MAX_DURATION_SECONDS:-1200}"
 RUN_MODE=tests
 REUSE_BENCHMARK_BUILD=false
@@ -102,11 +113,6 @@ if ! valid_positive_integer "$MAX_TEST_DURATION_SECONDS"; then
     echo "❌ GEOROIDS_TEST_MAX_DURATION_SECONDS must be a positive integer" >&2
     exit 64
 fi
-
-# Integration helpers read these values so a linked worktree can run against
-# its own Vite/server pair while another checkout owns the default ports.
-export GEOROIDS_TEST_VITE_PORT="$TEST_VITE_PORT"
-export GEOROIDS_TEST_SERVER_PORT="$TEST_SERVER_PORT"
 
 is_boolean_vitest_option() {
     # CAC returns non-boolean values following these flags to its positional
@@ -209,6 +215,22 @@ reject_missing_test_files() {
 if [ "$RUN_MODE" = tests ] && [ "$SHARD_CHILD" = false ]; then
     reject_missing_test_files "$@" || exit 64
 fi
+
+# Authenticated coordinator children keep their existing direct-parent protocol.
+# Every other runner has an asynchronous supervisor that holds heavy admission
+# until this runner's final cleanup receipt has been checked.
+if [ "$SHARD_CHILD" != true ]; then
+    if [ "$VALIDATION_CHILD" = true ]; then
+        node "$REPO_ROOT/scripts/validation-admission.mjs" verify runner "$$" || exit 1
+    else
+        exec node "$REPO_ROOT/scripts/validation-admission.mjs" runner -- "$BASH" "$REPO_ROOT/scripts/test-runner.sh" --validation-child "${ORIGINAL_RUNNER_ARGS[@]}"
+    fi
+fi
+
+# Publish defaults only inside the issued runner. The outer wrapper must preserve
+# absent port selections so its child can allocate automatic ports.
+export GEOROIDS_TEST_VITE_PORT="$TEST_VITE_PORT"
+export GEOROIDS_TEST_SERVER_PORT="$TEST_SERVER_PORT"
 
 LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
@@ -495,6 +517,13 @@ cleanup() {
             exit_code=1
         fi
     fi
+    if [ "$cleanup_succeeded" != true ] && [ "$LOCK_HELD" = true ]; then
+        # Retain the original common lock too, including for older entrypoints
+        # that do not participate in validation admission.
+        if ! printf '{"ownerPid":%s,"cleanupSucceeded":false}\n' "$$" > "$LOCK_DIR/cleanup-failed.json"; then
+            echo "❌ Could not record unresolved runner cleanup" >&2
+        fi
+    fi
     if ! release_lock; then
         cleanup_succeeded=false
         if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
@@ -538,11 +567,6 @@ trap 'on_interrupt SIGINT 130' INT
 trap 'on_interrupt SIGTERM 143' TERM
 trap on_test_timeout ALRM
 
-servers_ready() {
-    curl -sf --connect-timeout 1 --max-time 5 "http://localhost:$TEST_VITE_PORT/" > /dev/null 2>&1 && \
-        curl -sf --connect-timeout 1 --max-time 5 "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1
-}
-
 port_in_use() {
     local port="$1"
     local lsof_status
@@ -559,11 +583,16 @@ port_in_use() {
 
 wait_for_servers() {
     local retries=0
+    local readiness_status
     while [ "$retries" -lt 20 ]; do
-        if servers_ready; then
+        kill -0 "$DEV_PID" 2>/dev/null || return 1
+        readiness_status=0
+        servers_ready || readiness_status=$?
+        if [ "$readiness_status" -eq 0 ]; then
             echo "✅ Dev servers are running"
             return 0
         fi
+        if [ "$readiness_status" -gt 1 ]; then return "$readiness_status"; fi
         retries=$((retries + 1))
         echo "⏳ Waiting for servers... (attempt $retries/20)"
         sleep 2
@@ -841,6 +870,9 @@ run_tests() {
     fi
     wait "$test_wait_pid" 2>/dev/null || true
 
+    # The deadline covers test execution. Watchdog cleanup can itself take time;
+    # a late alarm must not turn a completed test into a timeout.
+    trap '' ALRM
     if ! stop_watchdog; then
         CLEANUP_FAILED=true
         if [ "$exit_code" -eq 0 ]; then exit_code=1; fi
@@ -939,6 +971,7 @@ main() {
         return "$coordinator_status"
     fi
 
+    if [ "$SHARD_CHILD" != true ]; then select_test_ports || return $?; fi
     local startup_status=0
     start_dev_servers || startup_status=$?
     if [ "$startup_status" -ne 0 ]; then

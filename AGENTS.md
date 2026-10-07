@@ -37,7 +37,7 @@ The dotagents dispatcher runs the tracked pre-commit gate. The tracked pre-commi
 
 ## Commands
 
-Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns and serializes the local Vite/server pair. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
+Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns the local Vite/server pair and queues heavy validation across linked worktrees. The runner fault-contract battery shares this admission capacity. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
 
 Full suites use six authenticated serial shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. See [isolated shards](docs/integration-shards.md).
 
@@ -52,7 +52,7 @@ Vite serves the client; the Node WebSocket server owns authoritative world state
 - `tests/integration/entities/` — vitest against entity interactions and input behavior.
 - `tests/integration/browser/` — Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`, `e2e/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `ship-respawns-near-furnace-after-asteroid-death.test.ts` (what happens) over `test-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
 
-Integration tests start their own dev servers through `scripts/test-runner.sh` on unused configured ports. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
+Integration tests start their own dev servers through `scripts/test-runner.sh` on automatically selected unused ports; explicit diagnostic overrides remain supported. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
 
 ## Project conventions
 

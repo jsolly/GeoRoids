@@ -4,7 +4,7 @@ Read root `AGENTS.md` for controls. This guide owns commands, deployment procedu
 
 ## Ship
 
-Run `npm run gate` before publication and again after review fixes. It includes the full unit/integration suites, frame-work validation and constrained-client scenarios. GitHub independently runs parallel static checks and bounded gameplay/touch/reconnect smoke; both must pass `CI / ci`. Read [CI and local review](ci-and-local-review.md).
+Run `npm run gate` before publication and again after review fixes. Runner fault contracts share the heavy queue because their process inspection and cleanup contend with integration runs. It includes the full unit/integration suites, frame-work validation and constrained-client scenarios. GitHub independently runs parallel static checks and bounded gameplay/touch/reconnect smoke; both must pass `CI / ci`. Read [CI and local review](ci-and-local-review.md).
 
 After merging, verify Vercel's Git deployment is READY for the merged commit at <https://www.georoids.com>. Classify server inputs with the classifier's `--changed` mode with the actual base and merge SHAs from the ship receipt. If the graph requires a server deployment, independently verify Railway's exact release; client success alone is insufficient. Railway auto-deploys main. If deployment is absent or red, inspect the actual trigger and staged platform changes before any exact-commit fallback; never use `railway redeploy` or upload a local tree as proof of the merged release.
 
@@ -112,7 +112,7 @@ npm run benchmark          # see benchmarks/README.md
 npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 ```
 
-**Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. Full suites use six authenticated shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. Each child retains serial execution. See [isolated shards](integration-shards.md). The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
+**Use `./scripts/test-runner.sh` for integration tests** — it queues heavy validation across linked worktrees and excludes simultaneous validation in the same checkout. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. Full suites use six authenticated shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. Each child retains serial execution. See [isolated shards](integration-shards.md). The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
 
 Use repository-relative or absolute paths for explicit test files; missing files fail before services start. Plain substrings such as `selected-pilot` remain text filters. A file location may have one numeric `:line` suffix. Put selectors directly after the runner command: Vitest ignores a nonempty `--` tail, so the runner refuses that tail instead of silently running a partial selection.
 
@@ -174,7 +174,9 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 
 ## Local development
 
-- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes.
+- **Validation admission:** different worktrees can run ship gates together. Static checks overlap; complete reviews, focused integration and direct frame measurements wait for one heavyweight slot in the common Git directory. Queue waits print their ticket and can be cancelled with INT/TERM. A checkout admits one gate, review or standalone harness at a time because builds and live artifacts belong to that checkout.
+- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes. Admission wait precedes the runner and does not consume its execution deadline or the full suite’s 600-second deadline.
+- **Test ports:** standalone harnesses automatically select distinct Vite, server and benchmark-proxy ports. Use explicit `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` only for diagnostics. Startup checks listener ownership and refuses occupied ports; interactive development retains its defaults.
 - **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
 - **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.

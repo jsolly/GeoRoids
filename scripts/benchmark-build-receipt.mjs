@@ -20,6 +20,27 @@ const digest = (value) => createHash('sha256').update(value).digest('hex');
 const receiptPath = (root) => join(root, '.performance/benchmark-client-build.json');
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
+function selectedPorts(ports) {
+  assert(
+    ports.length === 3 &&
+      ports.every((port) => Number.isInteger(port) && port > 0 && port <= 65535) &&
+      new Set(ports).size === 3,
+    'Expected three valid, distinct benchmark ports'
+  );
+  return ports;
+}
+
+function successfulReceipt(root) {
+  assert(existsSync(receiptPath(root)), 'Missing successful benchmark-client build receipt');
+  const receipt = readJson(receiptPath(root));
+  assert.equal(receipt.schemaVersion, 2, 'Unsupported benchmark build receipt');
+  assert.equal(receipt.kind, 'benchmark-client-production-build');
+  assert.equal(receipt.inputs.worktree, root, 'Reusable build belongs to another worktree');
+  const ports = selectedPorts(receipt.inputs.ports);
+  assert.equal(receipt.inputs.websocketUrl, `ws://localhost:${ports[2]}/ws`);
+  return receipt;
+}
+
 function git(root, args) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))
@@ -73,6 +94,11 @@ function inputs(root, websocketUrl) {
     commit: git(root, ['rev-parse', 'HEAD']).trim(),
     nodeVersion: process.version,
     websocketUrl,
+    ports: selectedPorts([
+      Number(process.env.GEOROIDS_TEST_VITE_PORT),
+      Number(process.env.GEOROIDS_TEST_SERVER_PORT),
+      Number(process.env.GEOROIDS_TEST_PROXY_PORT),
+    ]),
     sourceSha256: digest(JSON.stringify(rows)),
     environmentSha256: digest(
       JSON.stringify(Object.entries(environment).sort(([a], [b]) => a.localeCompare(b)))
@@ -115,7 +141,11 @@ function atomicJson(path, value) {
 
 export function benchmarkBuildReceipt(action, directory, websocketUrl, preparedPath) {
   const root = realpathSync(directory);
-  if (action === 'prepare') {
+  if (action === 'ports') {
+    // These are candidates, never permission to attach to or stop a listener.
+    // The runner still checks availability, ownership and the full build proof.
+    return successfulReceipt(root).inputs.ports;
+  } else if (action === 'prepare') {
     assert(preparedPath, 'Missing prepared input receipt path');
     // A failed new build must never leave an older successful receipt reusable.
     rmSync(receiptPath(root), { force: true });
@@ -126,29 +156,32 @@ export function benchmarkBuildReceipt(action, directory, websocketUrl, preparedP
     assert.deepEqual(inputs(root, websocketUrl), prepared, 'Build inputs changed during build');
     const assets = build(root);
     atomicJson(receiptPath(root), {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: 'benchmark-client-production-build',
       completedAt: new Date().toISOString(),
       inputs: prepared,
       assets,
     });
   } else if (action === 'verify') {
-    assert(existsSync(receiptPath(root)), 'Missing successful benchmark-client build receipt');
-    const receipt = readJson(receiptPath(root));
-    assert.equal(receipt.schemaVersion, 1, 'Unsupported benchmark build receipt');
-    assert.equal(receipt.kind, 'benchmark-client-production-build');
+    const receipt = successfulReceipt(root);
     assert.deepEqual(inputs(root, websocketUrl), receipt.inputs, 'Reusable build inputs differ');
     assert.deepEqual(build(root), receipt.assets, 'Reusable production assets differ');
   } else {
-    throw new Error('Expected prepare, record or verify');
+    throw new Error('Expected ports, prepare, record or verify');
   }
 }
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   try {
     const [action, root, websocketUrl, preparedPath] = process.argv.slice(2);
-    assert(root && websocketUrl, 'Expected action, worktree and owned WS URL');
-    benchmarkBuildReceipt(action, root, websocketUrl, preparedPath);
+    assert(
+      root && (action === 'ports' || websocketUrl),
+      'Expected action, worktree and owned WS URL'
+    );
+    const result = benchmarkBuildReceipt(action, root, websocketUrl, preparedPath);
+    if (action === 'ports') {
+      process.stdout.write(`${result.join('\n')}\n`);
+    }
   } catch (error) {
     process.stderr.write(`${error.stack ?? error}\n`);
     process.exitCode = 1;

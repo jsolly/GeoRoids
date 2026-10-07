@@ -4,10 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
-import {
-  disableViteClientTransport,
-  ownedGroupAbsentInInventory,
-} from '../../support/native-lifecycle-browser';
+import { disableViteClientTransport } from '../../support/native-lifecycle-browser';
 
 const require = createRequire(import.meta.url);
 const vitePackage = require.resolve('vite/package.json');
@@ -46,13 +43,3 @@ test.each([
 ])('native pilots fail closed when the Vite transport bootstrap is %s', (_case, changed) => {
   expect(() => disableViteClientTransport(changed)).toThrow('Vite');
 });
-
-test('native browser cleanup retains a surviving child after its group leader exits', () => {
-  expect(ownedGroupAbsentInInventory('  1 1\n  65300 63527\n  65301 65301\n', 63527)).toBe(false);
-  expect(ownedGroupAbsentInInventory('  1 1\n  65301 65301\n', 63527)).toBe(true);
-});
-
-test.each(['', 'PID PGID\n1 1\n', '1 1\n2 ?\n', '1 1\n1 2\n'])(
-  'native browser cleanup retains its profile when the process inventory cannot prove group absence',
-  (inventory) => expect(() => ownedGroupAbsentInInventory(inventory, 63527)).toThrow()
-);

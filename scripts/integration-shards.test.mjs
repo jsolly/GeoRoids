@@ -38,7 +38,11 @@ import { createTimingRecorder } from './integration-timing-reporter.mjs';
 
 function fixtureEnv(inherited = process.env) {
   return {
-    ...Object.fromEntries(Object.entries(inherited).filter(([key]) => !key.startsWith('GIT_'))),
+    ...Object.fromEntries(
+      Object.entries(inherited).filter(
+        ([key]) => !key.startsWith('GIT_') && !key.startsWith('GEOROIDS_VALIDATION_')
+      )
+    ),
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'fixture',
@@ -469,6 +473,10 @@ async function coordinatedFixture(mode, maxActive = 3) {
     }
     for (const name of [
       'test-runner.sh',
+      'test-runner-ports.sh',
+      'test-ports.mjs',
+      'validation-admission.mjs',
+      'review-receipt.mjs',
       'process-tree.sh',
       'integration-shards.mjs',
       'integration-shard-plan.mjs',
@@ -544,7 +552,7 @@ export function createServer() {
     );
     writeFileSync(
       join(directory, 'bin/lsof'),
-      '#!/usr/bin/env bash\nif [ "$FAULT" = port-inspection ]; then echo "inspection failed" >&2; exit 2; fi\nexit 1\n',
+      '#!/usr/bin/env bash\nif [ "$FAULT" = port-inspection ]; then echo "inspection failed" >&2; exit 2; fi\nif [ -f "$GEOROIDS_TEST_SESSION_DIR/fixture-service.pid" ]; then cat "$GEOROIDS_TEST_SESSION_DIR/fixture-service.pid"; exit 0; fi\nexit 1\n',
       { mode: 0o755 }
     );
     writeFileSync(join(directory, 'bin/curl'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
@@ -555,6 +563,7 @@ import {readFileSync,writeFileSync,mkdirSync,unlinkSync,symlinkSync} from 'node:
 import {spawn} from 'node:child_process';
 if(process.argv.includes('concurrently')) {
  const home=process.env.GEOROIDS_TEST_SESSION_DIR;
+ writeFileSync(home+'/fixture-service.pid',String(process.pid));
  if(process.env.FAULT.startsWith('console-fault')&&home.endsWith('shard-1')) {
   unlinkSync(home+'/output.log'); symlinkSync('/dev/full',home+'/output.log');
   if(process.env.FAULT==='console-fault-receipt')mkdirSync(home+'/console-receipt.json');
@@ -742,7 +751,18 @@ else {
           return;
         }
         if (mode === 'owner-killed') {
-          child.kill('SIGKILL');
+          // The admission supervisor is now the spawned entrypoint; this
+          // scenario kills the issued runner that actually owns the legacy lock.
+          const issuedOwner = spawnSync(
+            'ps',
+            ['-p', String(manifest.ownerPid), '-o', 'ppid=,lstart='],
+            { encoding: 'utf8' }
+          );
+          assert.equal(issuedOwner.status, 0, issuedOwner.stderr);
+          const issuedIdentity = issuedOwner.stdout.trim().match(/^(\d+)\s+(.+)$/u);
+          assert.equal(Number(issuedIdentity?.[1]), child.pid);
+          assert.equal(issuedIdentity?.[2], manifest.ownerStart);
+          process.kill(manifest.ownerPid, 'SIGKILL');
           setTimeout(() => {
             const blocked = spawnSync(
               'bash',
@@ -759,7 +779,10 @@ else {
               }
             );
             assert.notEqual(blocked.status, 0);
-            assert.match(blocked.stderr, /Unresolved coordinated cleanup/u);
+            assert.match(
+              blocked.stderr,
+              /Unresolved coordinated cleanup|Checkout validation already owned/u
+            );
             process.kill(manifest.coordinatorPid, 'SIGTERM');
           }, 50);
           return;
@@ -799,6 +822,10 @@ else {
       });
     });
     processOutput = result;
+    assert.ok(
+      existsSync(join(directory, '.performance/integration-shards')),
+      `${result.stdout}\n${result.stderr}`
+    );
     const runs = readdirSync(join(directory, '.performance/integration-shards')).filter((name) =>
       name.startsWith('run-')
     );
@@ -844,7 +871,10 @@ else {
         encoding: 'utf8',
       });
       assert.notEqual(blocked.status, 0);
-      assert.match(blocked.stderr, /Unresolved coordinated cleanup/u);
+      assert.match(
+        blocked.stderr,
+        /Unresolved coordinated cleanup|Checkout validation already owned/u
+      );
       const deadline = Date.now() + 8000;
       while (Date.now() < deadline) {
         const probe = spawnSync('ps', ['-axo', 'pgid=,stat='], { encoding: 'utf8' });
@@ -973,7 +1003,10 @@ else {
         encoding: 'utf8',
       });
       assert.notEqual(blocked.status, 0);
-      assert.match(blocked.stderr, /Unresolved coordinated cleanup/u);
+      assert.match(
+        blocked.stderr,
+        /Unresolved coordinated cleanup|Checkout validation already owned/u
+      );
       for (const manifest of manifests) {
         const birth = spawnSync('ps', ['-p', String(manifest.childPid), '-o', 'lstart='], {
           encoding: 'utf8',
@@ -1003,6 +1036,7 @@ else {
       existsSync(join(directory, '.git/georoids-test-runner.lock')),
       [
         'owner-provenance-failure',
+        'owner-unresponsive',
         'port-inspection',
         'owner-killed',
         'owner-issuance-crash',
@@ -1028,6 +1062,9 @@ else {
       queue,
       ownerReceipt,
       stopReceipt,
+      admissionReleased:
+        !existsSync(join(directory, '.git/georoids-validation-checkout.lock')) &&
+        readdirSync(join(directory, '.git/georoids-validation-queue')).length === 0,
       discovery: existsSync(join(run, 'discovery.json'))
         ? JSON.parse(readFileSync(join(run, 'discovery.json'), 'utf8'))
         : null,
@@ -1378,6 +1415,7 @@ test('actual owner TERM and INT preserve queued cancellation receipts despite re
     assert.equal(result.queue.interrupted, true);
     assert.equal(new Set(result.stopReceipt.termSentPids).size, 3);
     assert.equal(result.stopReceipt.termSentPids.length, 3);
+    assert.equal(result.admissionReleased, true, result.stderr);
     if (mode.startsWith('owner-')) {
       assert.equal(result.ownerReceipt.receiptValidated, true, result.stderr);
       assert.equal(result.ownerReceipt.fallbackUsed, false, result.stderr);
@@ -1440,6 +1478,32 @@ test('cleanup refuses a reused leader or permanently empty group without signali
       await Promise.resolve(closed);
       rmSync(directory, { recursive: true, force: true });
     }
+  }
+});
+
+test('an interrupted group inspection retains its native signal and fails ownership proof', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'geo-group-inspection-'));
+  try {
+    writeFileSync(join(directory, 'ps'), '#!/bin/sh\nkill -TERM $$\n', { mode: 0o755 });
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { retainGroup } from ${JSON.stringify(new URL('./integration-shards.mjs', import.meta.url).href)};
+         retainGroup({ pid: process.pid, directory: process.argv[1] });`,
+        directory,
+      ],
+      { encoding: 'utf8', env: { ...process.env, PATH: `${directory}:${process.env.PATH}` } }
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /Cannot inspect group ownership: \{"status":null,"signal":"SIGTERM","error":null,"stderr":""\}/u
+    );
+    assert.equal(existsSync(join(directory, 'group-ownership.json')), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -1598,6 +1662,10 @@ async function installedDiscoveryFixture(
     writeFileSync(join(directory, 'package.json'), '{"type":"module"}');
     for (const name of [
       'test-runner.sh',
+      'test-runner-ports.sh',
+      'test-ports.mjs',
+      'validation-admission.mjs',
+      'review-receipt.mjs',
       'process-tree.sh',
       'integration-shards.mjs',
       'integration-shard-plan.mjs',
@@ -1707,6 +1775,7 @@ import {it} from 'vitest';it('pragma retains its actual DOM environment',()=>{th
       return { ...output, receipt: { success: false } };
     }
     const home = join(directory, '.performance/integration-shards');
+    assert.ok(existsSync(home), `${output.stdout}\n${output.stderr}`);
     const runName = readdirSync(home).find((name) => name.startsWith('run-'));
     const run = join(home, runName);
     const receipt = JSON.parse(readFileSync(join(run, 'result.json'), 'utf8'));

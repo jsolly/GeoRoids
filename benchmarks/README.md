@@ -261,9 +261,12 @@ the same checkout/revision, Git-visible files, ignored environment files, build
 environment, lockfile, Node version and every built asset. It starts a fresh
 owned preview/server pair and never attaches to existing services. Changed or
 missing inputs, assets or receipt fail before measurement. Other build commands
-can change `dist/` and invalidate reuse. An impaired-network proxy receives an
-ephemeral port, so reuse is rejected unless its actual WebSocket URL exactly
-matches the successful build; use clean network for frozen renderer cohorts.
+can change `dist/` and invalidate reuse. The first session selects unused Vite,
+server and proxy ports; reuse restores those recorded choices unless explicit
+overrides are supplied. An occupied recorded port fails without attaching to or
+stopping its listener. Changing the actual WebSocket endpoint invalidates reuse.
+Use clean network for frozen renderer cohorts. Older build receipts require a
+fresh build.
 The receipt is local benchmark evidence and does not replace `npm run gate`.
 
 These runs measure the current worktree and real scheduling. They do not use the

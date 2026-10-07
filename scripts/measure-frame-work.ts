@@ -2,10 +2,32 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { runClientSample } from '../benchmarks/client';
 import { evaluateFrameWorkBudget } from '../benchmarks/frame-work-budget';
 import { collectLiveReportMetadata } from '../benchmarks/live-report';
+import { runAdmitted, verifyChild } from './validation-admission.mjs';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+if (process.argv[2] === '--validation-child') {
+  verifyChild(root, 'frame');
+  process.argv.splice(2, 1);
+} else {
+  process.exit(
+    await runAdmitted(
+      'frame',
+      [
+        process.execPath,
+        ...process.execArgv,
+        fileURLToPath(import.meta.url),
+        '--validation-child',
+        ...process.argv.slice(2),
+      ],
+      { root }
+    )
+  );
+}
 
 const { values } = parseArgs({
   options: {

@@ -13,6 +13,7 @@ import {
 import { homedir } from 'node:os';
 import { join, relative as relativePath, resolve, sep } from 'node:path';
 import process from 'node:process';
+import { receiptEnvironment } from './validation-admission.mjs';
 
 export const RECEIPT_VERSION = 1;
 export const STAGES = [
@@ -186,7 +187,8 @@ function consumedFile(path) {
   const resolved = realpathSync(path);
   return { link: fileRecord(path), payload: fileRecord(resolved), resolved };
 }
-export function identity(root, env = process.env) {
+export function identity(root, inputEnvironment = process.env) {
+  const env = receiptEnvironment(root, inputEnvironment);
   const source = sourceRows(root);
   const runtimes = ['node', 'npm', 'bash', 'git', 'uvx'].map((name) => {
     const path = executable(name, env);

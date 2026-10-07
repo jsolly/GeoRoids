@@ -31,55 +31,63 @@ for (const width of [1280, 390]) {
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'hauler', haulerUtility: 'tow_cable', waitForCombatReady: false });
     const id = await game.getLocalPlayerId();
-    const epochs = await arrangeCrewField([id], 'spider-rescue');
-    await game.waitForControlledFixture(epochs.get(id));
-    await expect.poll(async () => (await field(page)).spiders.length).toBe(2);
-    const spiders = (await field(page)).spiders.sort((a, b) => a.position.y - b.position.y);
-    const captive = spiders[0];
-    const rescuer = spiders[1];
-    if (!captive || !rescuer) {
-      throw new Error('Expected captive and rescuer');
-    }
-    const latch = () =>
-      page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId);
-    const epoch = epochs.get(id);
-    if (epoch === undefined) {
-      throw new Error('Rescue fixture omitted its epoch');
-    }
-    const observation = await observeRenderedTow(page, {
-      pilotId: id,
-      targetId: captive.id,
-      epoch,
-    });
+    // Load observation code and provenance before the moving encounter starts.
+    await page.evaluate("import('/tests/support/towLifecycle.ts').then(() => undefined)");
+    let observation: Awaited<ReturnType<typeof observeRenderedTow>> | undefined;
     const failures: unknown[] = [];
     try {
       await withFixtureEvidence(
         page,
         `spider-rescue-${width}`,
         async (stage) => {
-          await game.aimAtWorldPosition(captive.position);
-          await stage('aimed-before-launch');
+          const epochs = await arrangeCrewField([id], 'spider-rescue');
+          await game.waitForControlledFixture(epochs.get(id));
+          await expect.poll(async () => (await field(page)).spiders.length).toBe(2);
+          const spiders = (await field(page)).spiders.sort((a, b) => a.position.y - b.position.y);
+          const captive = spiders[0];
+          const rescuer = spiders[1];
+          if (!captive || !rescuer) {
+            throw new Error('Expected captive and rescuer');
+          }
+          const latch = () =>
+            page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId);
+          const epoch = epochs.get(id);
+          if (epoch === undefined) {
+            throw new Error('Rescue fixture omitted its epoch');
+          }
+          observation = await observeRenderedTow(page, {
+            pilotId: id,
+            targetId: captive.id,
+            epoch,
+          });
+          const activeObservation = observation;
+          const target = (await field(page)).spiders.find((spider) => spider.id === captive.id);
+          if (!target || target.health <= 0) {
+            throw new Error('Rescue captive disappeared before launch');
+          }
+          await game.aimAtWorldPosition(target.position);
+          // The scene is already moving: capture evidence after ordinary input.
           if (mobile) {
             await page.locator('#touch-ability').tap();
           } else {
             await page.keyboard.press('e');
           }
           await expect
-            .poll(() => observation.evaluate((observer) => observer.read().attached), {
+            .poll(() => activeObservation.evaluate((observer) => observer.read().attached), {
               timeout: 5000,
             })
             .not.toBeNull();
           await expect
-            .poll(() => observation.evaluate((observer) => observer.read().released), {
+            .poll(() => activeObservation.evaluate((observer) => observer.read().released), {
               timeout: 15000,
             })
             .not.toBeNull();
           // Inspect only after release: the driver's delay cannot erase the draw.
-          const retained = await observation.evaluate((observer) => observer.read());
+          const retained = await activeObservation.evaluate((observer) => observer.read());
           expect(retained.attached?.targetId).toBe(captive.id);
           expect(retained.released?.targetId).toBeNull();
           await expect.poll(latch).toBeNull();
-          const image = await observation.evaluate((observer) => observer.image());
+          const image = await activeObservation.evaluate((observer) => observer.image());
           if (!image?.startsWith('data:image/png;base64,')) {
             throw new Error('Missing rendered cable attachment');
           }
@@ -94,13 +102,13 @@ for (const width of [1280, 390]) {
             path: screenshotManager.getScreenshotPath(`spider-rescue-freed-${width}.png`),
           });
         },
-        { evidence: () => observation.evaluate((observer) => observer.evidence()) }
+        { evidence: () => observation?.evaluate((observer) => observer.evidence()) }
       );
     } catch (error) {
       failures.push(error);
     }
     try {
-      const image = await observation.evaluate((observer) => observer.image());
+      const image = await observation?.evaluate((observer) => observer.image());
       if (image?.startsWith('data:image/png;base64,')) {
         writeFileSync(
           screenshotManager.getScreenshotPath(`spider-rescue-tow-${width}.png`),
@@ -111,12 +119,12 @@ for (const width of [1280, 390]) {
       failures.push(error);
     }
     try {
-      await observation.evaluate((observer) => observer.stop());
+      await observation?.evaluate((observer) => observer.stop());
     } catch (error) {
       failures.push(error);
     }
     try {
-      await observation.dispose();
+      await observation?.dispose();
     } catch (error) {
       failures.push(error);
     }

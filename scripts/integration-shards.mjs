@@ -448,17 +448,25 @@ function alive(pid) {
     throw error;
   }
 }
+function inspectionDetails(result) {
+  return JSON.stringify({
+    status: result.status,
+    signal: result.signal,
+    error: result.error?.message.slice(0, 500) ?? null,
+    stderr: result.stderr?.trim().slice(0, 500) ?? '',
+  });
+}
 function startTime(pid) {
   const result = spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8' });
   if (result.status !== 0 || !result.stdout.trim()) {
-    throw new Error(`Cannot inspect PID ${pid}: ${result.stderr}`);
+    throw new Error(`Cannot inspect PID ${pid}: ${inspectionDetails(result)}`);
   }
   return result.stdout.trim();
 }
 function parentPid(pid) {
   const result = spawnSync('ps', ['-p', String(pid), '-o', 'ppid='], { encoding: 'utf8' });
   if (result.status !== 0 || !/^\d+$/u.test(result.stdout.trim())) {
-    throw new Error(`Cannot inspect parent of PID ${pid}`);
+    throw new Error(`Cannot inspect parent of PID ${pid}: ${inspectionDetails(result)}`);
   }
   return Number(result.stdout.trim());
 }
@@ -829,7 +837,10 @@ async function reservePorts(count = 12) {
 }
 function groupMembers(group) {
   const result = spawnSync('ps', ['-axo', 'pid=,pgid=,stat='], { encoding: 'utf8' });
-  required(result.status === 0, `Cannot inspect owned process groups: ${result.stderr}`);
+  required(
+    result.status === 0,
+    `Cannot inspect owned process groups: ${inspectionDetails(result)}`
+  );
   return result.stdout
     .split('\n')
     .map((line) => line.trim().split(/\s+/u))
@@ -840,7 +851,7 @@ export function retainGroup(child) {
   const probe = spawnSync('ps', ['-axo', 'pid=,pgid=,stat=,lstart='], { encoding: 'utf8' });
   required(
     probe.status === 0 && !probe.stderr.trim(),
-    `Cannot inspect group ownership: ${probe.stderr}`
+    `Cannot inspect group ownership: ${inspectionDetails(probe)}`
   );
   const snapshots = probe.stdout
     .split('\n')

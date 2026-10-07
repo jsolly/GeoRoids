@@ -31,7 +31,9 @@ mkdirSync(fixtureHome);
 mkdirSync(fixtureXdg);
 function isolatedEnvironment(input = inheritedEnvironment) {
   const environment = Object.fromEntries(
-    Object.entries(input).filter(([name]) => !name.startsWith('GIT_'))
+    Object.entries(input).filter(
+      ([name]) => !name.startsWith('GIT_') && !name.startsWith('GEOROIDS_VALIDATION_')
+    )
   );
   return {
     ...environment,
@@ -315,6 +317,10 @@ try {
   assert.equal(failure.sessionRemoved, false);
   // Exercise the actual review shell entry with private synthetic stage CLIs.
   copyFileSync(join(root, 'scripts/test-review.sh'), join(repo, 'scripts/test-review.sh'));
+  copyFileSync(
+    join(root, 'scripts/validation-admission.mjs'),
+    join(repo, 'scripts/validation-admission.mjs')
+  );
   const fixture = join(repo, 'scripts/fixture.mjs');
   writeFileSync(
     fixture,

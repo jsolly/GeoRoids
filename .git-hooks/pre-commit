@@ -18,5 +18,6 @@ run_step "bash floor" gate_check_bash_floor 'scripts/process-tree.sh' '.cursor/*
 gate_require_node               # enforce the pinned Node (.nvmrc), not whatever's on PATH
 
 # One complete repo-owned battery; the core never calls this hook.
-run_step "complete gate" node scripts/gate.mjs
+# Keep queue admission and review progress visible while the gate runs.
+node scripts/gate.mjs
 echo "✓ pre-commit gate passed; deployment follows merge."

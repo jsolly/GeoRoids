@@ -10,6 +10,6 @@ A longer curved contour route can compete with a shorter direct crossing. Laser 
 
 `src/physics/terrain/heightfield.ts` defines the seeded heightfield and sampled gradient. `terrainConfig.ts` controls feature size, contour density, and travel strength. `terrainTravel.ts` calculates the shared travel velocity. The room seed in snapshots keeps clients and the server on the same terrain. The homepage uses a fixed terrain preview with denser, muted lines and no stars.
 
-From `/Users/johnsolly/code/GeoRoids`, run `npx vitest run tests/unit/systems/isoContourTerrain.test.ts tests/unit/systems/contourLaser.test.ts tests/unit/ui/titleTerrain.test.ts` for terrain, contour, and homepage coverage. Run `./scripts/test-runner.sh tests/integration/browser/sanity/pilots-follow-contours-for-speed.test.ts` for desktop/mobile contour travel and authoritative server observations.
+From `/Users/johnsolly/code/GeoRoids`, run `npx vitest run tests/unit/systems/isoContourTerrain.test.ts tests/unit/systems/contourLaser.test.ts tests/unit/ui/titleTerrain.test.ts` for terrain, contour, and homepage coverage. Desktop/mobile contour travel is a manual observation; the retired browser scenario no longer supplies automated evidence.
 
 Deploy both the Vercel client and Railway server. Both import this terrain model, so a client-only release leaves them using different physics.

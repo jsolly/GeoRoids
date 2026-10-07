@@ -15,11 +15,7 @@ Local and remote hulls share `Ship`. Combat cases use `describe.each` so both
 kinds stay honest. Server cases drive `GameServerWorld` (fake sockets, manual
 `tick()`).
 
-P0 coverage:
-
-1. Boundary hit → one death, clean respawn, brief invuln
-2. Laser + low health → explode on that frame (local and remote)
-3. Shoot another player → both sockets see the health drop
-4. Death → known cause, cargo discarded, bank preserved, protected respawn
-5. Game clock advances while a ship moves and collides
-6. Classic lasers are short shots, not fat discs; a closed tab leaves the board
+Manual `tick()` advances combat frame counters; it does not advance or freeze the
+real server clock. Control that clock explicitly when a scenario depends on
+reconnect grace, pose age, projectile expiry or saved-flight deadlines. Include
+only the world and actors needed for the asserted event.

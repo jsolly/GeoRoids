@@ -26,9 +26,6 @@ import {
   acceptTestPost,
   areTestHttpEndpointsEnabled,
   buildHealthPayload,
-  handleTestArrangeCrewField,
-  handleTestFixtureState,
-  handleTestPlacePlayer,
   handleTestResetWorld,
 } from './testHttpHandlers';
 import { openWorldPersistence } from './world/openWorldPersistence';
@@ -94,23 +91,8 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       return;
     }
 
-    if (req.url === '/test/fixture-state') {
-      handleTestFixtureState(req, res, NODE_ENV, gameEngine, wss.clients);
-      return;
-    }
-
     if (req.url === '/test/reset-world') {
       handleTestResetWorld(req, res, NODE_ENV, gameEngine);
-      return;
-    }
-
-    if (req.url === '/test/arrange-crew-field') {
-      handleTestArrangeCrewField(req, res, NODE_ENV, gameEngine, wsCore);
-      return;
-    }
-
-    if (req.url === '/test/place-player') {
-      handleTestPlacePlayer(req, res, NODE_ENV, gameEngine, wsCore);
       return;
     }
 

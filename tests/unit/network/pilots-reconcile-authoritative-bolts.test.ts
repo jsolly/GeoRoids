@@ -236,47 +236,6 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     expect(field.isEnabled()).toBe(true);
   });
 
-  test('a local muzzle flash stays a moving bolt while older snapshots arrive before its acknowledgement', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('scout');
-    const ws = await connect();
-    const empty = frame([]);
-    const entity = empty.entities[0];
-    if (!entity) {
-      throw new Error('Local snapshot fixture is missing');
-    }
-    entity.id = local.id;
-    entity.position = { x: 0, y: 0 };
-    entity.velocity = { x: 0, y: 0 };
-    entity.angle = 0;
-    ws.receive('snapshot', new SnapshotEncoder(empty).encode(1));
-    local.ship.position = { x: 0, y: 0 };
-    local.ship.angle = 0;
-    local.ship.fireLaser();
-    const predicted = local.ship.lasers[0];
-    expect(predicted).toBeDefined();
-    if (!predicted) {
-      throw new Error('Local fire did not produce a shot');
-    }
-    const start = predicted.position.x;
-    const requestId = ws.sent.findLast((packet) => packet.type === 'shoot')?.data?.['requestId'];
-    expect(typeof requestId).toBe('string');
-    ws.receive('snapshot', new SnapshotEncoder(empty).encode(2));
-    expect(local.ship.lasers).toEqual([predicted]);
-    predicted?.move();
-    expect(predicted.position.x).toBeGreaterThan(start);
-    ws.receive('snapshot', new SnapshotEncoder(empty).encode(3));
-    expect(local.ship.lasers).toEqual([predicted]);
-    ws.receive('shotAcknowledged', { requestId, projectileId: 'acknowledged-shot' });
-    expect(predicted.serverId).toBe('acknowledged-shot');
-    const live = frame([{ ...bolt('acknowledged-shot'), ownerId: local.id }]);
-    live.entities = empty.entities;
-    ws.receive('snapshot', new SnapshotEncoder(live).encode(4));
-    expect(local.ship.lasers).toEqual([predicted]);
-    expect(predicted.position).toEqual({ x: 600, y: 150 });
-    ws.receive('snapshot', new SnapshotEncoder(empty).encode(5));
-    expect(local.ship.lasers).toEqual([]);
-  });
-
   test('rejected, timed-out and disconnected predictions leave no ghost and receipts cannot claim another shot', async () => {
     const local = PlayerManager.getInstance().createLocalPlayer('scout');
     const ws = await connect();

@@ -1,10 +1,10 @@
-// GeoRoids server release admission; canonical smoke runner owns HTTP/browser receipts.
+// GeoRoids server release admission; canonical smoke runner owns HTTP/WebSocket receipts.
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
 
 const FULL_SHA = /^[a-f0-9]{40}$/iu;
 const RELEASE_SHA = /^[a-f0-9]{40}$/iu;
-// Read-only fetch authentication stays in this module, never Chromium's environment.
+// Read-only fetch authentication stays private to this module's Git fetch.
 const fetchToken = process.env.PRODUCTION_SMOKE_GITHUB_TOKEN;
 delete process.env.PRODUCTION_SMOKE_GITHUB_TOKEN;
 

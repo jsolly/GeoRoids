@@ -125,8 +125,8 @@
       "nursery": {
         "noBaseToString": "error",
         "noBunModules": "error",
-        // HOLD: parameterized desktop/touch browser scenarios wrap
-        // desktop-only expects in `if (!touch)`.
+        // HOLD: fixed parameter rows and protocol event dispatch have deliberate
+        // branch-specific assertions; conditional calls alone do not imply flakiness.
         "noConditionalExpect": "off",
         "noDuplicateFieldDefinitionNames": "error",
         "noDuplicateSelectors": "error",

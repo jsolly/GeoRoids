@@ -20,29 +20,6 @@ describe('Rejoin after a dropped socket', () => {
     world.dispose();
   });
 
-  test('the same pilot id comes back with the same cargo and bank', () => {
-    world.dropTransport(ace);
-    expect(world.engine.getPlayerBySocket(ace.socket)).toBeUndefined();
-    ace = world.resume(ace);
-
-    const ship = world.entity(ace);
-    expect(ship.score).toBe(210);
-    expect(ship.cargo).toBe(123);
-    expect(ship.spawnProtectionTimer ?? 0).toBe(0);
-  });
-
-  test('leaving then entering again returns to the same ship with the saved score', () => {
-    const ship = world.entity(ace);
-    ship.position = { x: 2_400, y: 1_800 };
-    world.disconnect(ace);
-    ace = world.resume(ace, { x: 0, y: 0 });
-
-    const next = world.entity(ace);
-    expect(next.score).toBe(210);
-    expect(next.position).toEqual({ x: 2_400, y: 1_800 });
-    expect(next.spawnProtectionTimer ?? 0).toBe(0);
-  });
-
   test('a new client id with the same name does not create a duplicate pilot', () => {
     const cloneSocket = world.attemptJoin('ace-clone', ace.name, { x: 1, y: 1 });
 

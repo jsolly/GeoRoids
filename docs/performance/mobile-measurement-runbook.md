@@ -29,10 +29,10 @@ DPR and glow candidates are implemented as diagnostic overrides. Normal desktop 
 5. Confirm improvements in landscape and under the normal network profile. Keep
    the degraded network workload as a separate capacity investigation. Fix
    attributable delivery bottlenecks and repeat its constrained test.
-6. Encode regression budgets from stable browser evidence, with short correctness
+6. Encode regression budgets from stable browser evidence, with code correctness
    checks in PR CI and repeatable longer performance comparisons. Keep the
    sustained 60 Hz target separate from a budget calibrated to this host/browser.
-7. Run the full gate and affected browser scenarios. Record raw artifacts, hashes,
+7. Run the full code gate and record affected browser behavior manually. Record raw artifacts, hashes,
    paired effects, failures and remaining uncertainty. Use occasional phone traces
    to validate transfer; do not substitute phone anecdotes for the browser baseline.
 
@@ -133,6 +133,6 @@ Compute frame-threshold rates using the full declared foreground measurement int
 
 Use the proposed budgets in the report only after confirming their suitability for the supported device cohort. Require an improvement beyond baseline variation, readable gameplay, and no new input or synchronization failures. A shorter CPU submission time with unchanged visible stutter is not sufficient.
 
-For an accepted implementation, run focused tests and browser scenarios, update affected Wiki pages, remove abandoned experiment code, and complete `npm run gate` from `/Users/johnsolly/code/GeoRoids`. Integration tests must use `./scripts/test-runner.sh`. Follow `/ship` for remote delivery, then verify the appropriate Vercel and Railway releases and repeat physical-device multiplayer acceptance.
+For an accepted implementation, run focused code tests and record manual browser observations, update affected Wiki pages, remove abandoned experiment code, and complete `npm run gate` from `/Users/johnsolly/code/GeoRoids`. Integration tests must use `./scripts/test-runner.sh`. Follow `/ship` for remote delivery, then verify the appropriate Vercel and Railway releases and repeat physical-device multiplayer acceptance.
 
-The research report is historical evidence. The implementation must be checked with unit, browser, and runner contracts before using its output; successful desktop runs do not certify phone GPU or thermal behavior.
+The research report is historical evidence. The implementation must be checked with unit, integration, and runner contracts before using its output; successful desktop runs do not certify phone GPU or thermal behavior.

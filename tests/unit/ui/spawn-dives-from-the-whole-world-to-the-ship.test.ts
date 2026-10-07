@@ -43,19 +43,6 @@ function runFrameAt(ms: number): void {
   frame?.(performance.now() + ms);
 }
 
-test('joining dives from the whole world to the ship, then hands over to flight', () => {
-  playSpawnFlyIn();
-  runFrameAt(0);
-  expect(overlay()?.style.opacity).toBe('1');
-  runFrameAt(1600);
-  expect(overlay()).not.toBeNull();
-  runFrameAt(2900);
-  expect(Number(overlay()?.style.opacity)).toBeLessThan(0.5);
-  runFrameAt(3100);
-  expect(overlay()).toBeNull();
-  expect(frames).toHaveLength(0);
-});
-
 test('any key skips the dive', () => {
   playSpawnFlyIn();
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));

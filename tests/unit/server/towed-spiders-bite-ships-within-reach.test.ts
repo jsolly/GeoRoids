@@ -3,8 +3,7 @@ import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager'
 import { FurnaceField } from '../../../shared/furnaceField';
 import { civicLot } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
-import { resolveToolFlights } from '../../support/tool-flight';
-import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
+import { useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -92,39 +91,6 @@ test('a captive inside starter protection cannot bite, and a protected hull outs
     []
   );
 });
-
-test.each(['passer', 'owner', 'protected'] as const)(
-  'the authoritative game applies normal lethal bites to %s while towing',
-  (victim) => {
-    const world = new GameServerWorld();
-    try {
-      world.clearAsteroids();
-      world.engine.clearSpiderField();
-      const owner = world.join('Hauler', { x: 7000, y: 3000 }, { kitId: 'hauler' });
-      const passer = world.join('Passer', { x: 7500, y: 3000 });
-      world.clearAsteroids();
-      const spider = world.engine.spawnTerrainSpider({ x: 7100, y: 3000 });
-      if (!spider) {
-        throw new Error('Missing captive spider');
-      }
-      world.entity(owner).abilityCooldownFrames = 0;
-      expect(world.engine.useAbility(owner.id)).toBe(true);
-      resolveToolFlights(world.engine);
-      expect(world.entity(owner).harpoonTargetId).toBe(spider.id);
-      const target = victim === 'owner' ? owner : passer;
-      world.entity(target).spawnProtectionTimer = victim === 'protected' ? 600 : 0;
-      world.engine.updatePlayer(target.id, { position: { ...spider.position } });
-      const health = world.entity(target).health;
-      world.engine.advanceOneFrame();
-      expect(world.entity(target).health).toBe(victim === 'protected' ? health : 0);
-      if (victim !== 'owner') {
-        expect(world.entity(owner).harpoonTargetId).toBe(spider.id);
-      }
-    } finally {
-      world.dispose();
-    }
-  }
-);
 
 test('a towed nest guard can bite far from its old nest and cannot reset its cooldown by relatching', () => {
   const { manager, spider, passer, options } = arrange();

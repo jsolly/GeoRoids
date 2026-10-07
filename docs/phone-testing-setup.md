@@ -70,7 +70,7 @@ platform-tools directory during the investigation. Nothing was installed.
    Connect only to the reserved phone, verify its identity, then inspect Chrome
    through the documented [Android remote-debugging path](https://developer.chrome.com/docs/devtools/remote-debugging).
 5. Test whether the bridge permits a local benchmark connection and Chrome
-   automation. The repository uses Playwright, whose [Android support](https://playwright.dev/docs/api/class-android)
+   automation. The manual benchmark/media tooling uses Playwright, whose [Android support](https://playwright.dev/docs/api/class-android)
    is experimental. ADB availability alone does not prove that the current
    desktop CDP benchmark runs unchanged. Verify simultaneous trusted input,
    in-page evaluation, raw sample extraction and tab cleanup before adapting it.

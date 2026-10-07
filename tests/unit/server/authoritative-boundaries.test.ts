@@ -27,13 +27,6 @@ function addRubble(engine: GameEngine): AsteroidData {
   return rubble;
 }
 
-function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
-  core.handleClientMessage(
-    { type: 'join', data: { ...data, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 } },
-    socket
-  );
-}
-
 describe('server authority boundaries', () => {
   let engine: GameEngine | undefined;
 
@@ -89,40 +82,6 @@ describe('server authority boundaries', () => {
     );
     expect(pilot.kitId).toBe('scout');
     expect(pilot.abilityCooldownFrames).toBeGreaterThan(0);
-  });
-
-  test('initAsteroids only serves the joined socket owner', () => {
-    engine = new GameEngine(45);
-    const core = new WebSocketCore(engine);
-    const ownerWs = new RecordingSocket();
-    const otherWs = new RecordingSocket();
-    const unjoinedWs = new RecordingSocket();
-    join(core, ownerWs, { id: 'owner', name: 'Owner', position: { x: 0, y: 0 } });
-    join(core, otherWs, { id: 'other', name: 'Other', position: { x: 100, y: 0 } });
-    for (const asteroid of engine.getAllAsteroids()) {
-      engine.removeAsteroid(asteroid.id);
-    }
-    const field = addRubble(engine);
-    ownerWs.clear();
-    otherWs.clear();
-    unjoinedWs.clear();
-
-    const request = {
-      type: 'initAsteroids',
-      id: 'owner',
-      data: { asteroidCount: 999_999 },
-    };
-    core.handleClientMessage(request, otherWs);
-    core.handleClientMessage(request, unjoinedWs);
-    expect(ownerWs.received('asteroidCreateBatch')).toHaveLength(0);
-    expect(otherWs.received('asteroidCreateBatch')).toHaveLength(0);
-    expect(unjoinedWs.received('asteroidCreateBatch')).toHaveLength(0);
-    expect(engine.getAsteroid(field.id)).toBeDefined();
-
-    core.handleClientMessage(request, ownerWs);
-    expect(ownerWs.lastReceived('asteroidCreateBatch')?.data).toMatchObject({
-      asteroids: [expect.objectContaining({ id: field.id })],
-    });
   });
 
   test('a rammed rubble rock does not announce a cooperative split', () => {

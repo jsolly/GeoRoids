@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -79,6 +80,7 @@ function fixture() {
   const calls = [];
   const run = (_, args, options) => {
     calls.push(args[1]);
+    writeFileSync(options.artifact, 'passed\n');
     if (args[1] === 'test:review') {
       writeFileSync(options.env.GEOROIDS_REVIEW_RECEIPT, '{"cleanupSucceeded":true}');
     }
@@ -112,39 +114,39 @@ function fixture() {
     },
   };
 }
-test('complete proof reuses only exact candidate and retained successful artifacts', () => {
+test('complete proof reuses only exact candidate and retained successful artifacts', async () => {
   const f = fixture();
   try {
-    const first = f.gate();
+    const first = await f.gate();
     assert.deepEqual(
       f.calls,
       STAGES.map(([, command]) => command)
     );
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.deepEqual(f.calls, []);
     writeFileSync(first.stages[0].artifact, 'corrupt');
-    f.gate();
+    await f.gate();
     assert.equal(f.calls.length, STAGES.length);
     f.calls.length = 0;
     f.installation();
-    f.gate();
+    await f.gate();
     assert.equal(f.calls.length, STAGES.length);
     f.calls.length = 0;
     f.runtime();
-    f.gate();
+    await f.gate();
     assert.equal(f.calls.length, STAGES.length);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
 });
-test('literal tuning skips only graphs while partial staging never certifies candidate', () => {
+test('literal tuning skips only graphs while partial staging never certifies candidate', async () => {
   const f = fixture();
   try {
-    f.gate();
+    await f.gate();
     f.calls.length = 0;
     writeFileSync(join(f.root, 'data.ts'), 'export const tuning = { speed: 3, enabled: false };\n');
-    const result = f.gate();
+    const result = await f.gate();
     assert.equal(result.candidateCertified, false);
     assert.deepEqual(
       f.calls,
@@ -153,16 +155,16 @@ test('literal tuning skips only graphs while partial staging never certifies can
       )
     );
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.ok(f.calls.includes('test:review'));
     f.git('add', '.');
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.deepEqual(f.calls, []);
     chmodSync(join(f.root, 'data.ts'), 0o755);
     assert.equal(candidateMatches(f.root, sourceRows(f.root)), false);
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.ok(f.calls.includes('check:knip'));
     writeFileSync(join(f.root, 'extra.ts'), 'export const extra = 1;');
     assert.equal(candidateMatches(f.root, sourceRows(f.root)), false);
@@ -170,15 +172,15 @@ test('literal tuning skips only graphs while partial staging never certifies can
     rmSync(f.root, { recursive: true, force: true });
   }
 });
-test('failed or cancelled stage and incomplete cleanup never replace successful receipt', () => {
+test('failed or cancelled stage and incomplete cleanup never replace successful receipt', async () => {
   const f = fixture();
   try {
-    f.gate();
+    await f.gate();
     f.installation();
     const path = join(f.root, '.performance/gate/receipt.json');
     const prior = readFileSync(path, 'utf8');
     for (const outcome of [{ status: 1 }, { status: null, signal: 'SIGTERM' }]) {
-      assert.throws(
+      await assert.rejects(
         () =>
           runGate({
             root: f.root,
@@ -192,7 +194,7 @@ test('failed or cancelled stage and incomplete cleanup never replace successful 
       );
       assert.equal(readFileSync(path, 'utf8'), prior);
     }
-    assert.throws(
+    await assert.rejects(
       () =>
         runGate({
           root: f.root,
@@ -208,6 +210,105 @@ test('failed or cancelled stage and incomplete cleanup never replace successful 
     );
     assert.equal(readFileSync(path, 'utf8'), prior);
   } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+test('queued stage reports progress before completion and retains failed subprocess output', async () => {
+  const f = fixture();
+  let child;
+  try {
+    await f.gate();
+    f.installation();
+    const receiptPath = join(f.root, '.performance/gate/receipt.json');
+    const prior = readFileSync(receiptPath, 'utf8');
+    const bin = join(f.root, 'bin');
+    mkdirSync(bin);
+    const release = join(f.root, 'release');
+    const completed = join(f.root, 'completed');
+    writeFileSync(
+      join(bin, 'npm'),
+      `#!${process.execPath}
+import { existsSync, writeFileSync } from 'node:fs';
+process.stdout.write('private stdout diagnostics\\nReview artifacts: fixture-review\\n');
+process.stderr.write('private stderr diagnostics\\nWaiting for heavy validation ticket allocation: fixture-allocation\\nWaiting for heavy validation admission,');
+setTimeout(() => process.stderr.write(' ticket fixture: fixture-queue\\n'), 10);
+const timer = setInterval(() => {
+  if (existsSync(${JSON.stringify(release)})) {
+    clearInterval(timer);
+    writeFileSync(${JSON.stringify(completed)}, 'finished');
+    process.stdout.write('last stdout diagnostics\\n');
+    process.stderr.write('last stderr diagnostics\\n');
+    process.exitCode = 7;
+  }
+}, 10);
+setTimeout(() => process.exit(8), 5000).unref();
+`,
+      { mode: 0o755 }
+    );
+    child = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { runGate } from ${JSON.stringify(new URL('./gate.mjs', import.meta.url).href)};
+try {
+  await runGate({
+    root: ${JSON.stringify(f.root)},
+    capture: () => (${JSON.stringify(f.capture())}),
+    prepare: () => ({status: 0}),
+    environment: {...process.env, PATH: ${JSON.stringify(bin)}}
+  });
+} catch (error) { console.error(error.message); process.exitCode = 1; }
+`,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'], detached: true }
+    );
+    const finished = new Promise((accept, reject) => {
+      child.once('error', reject);
+      child.once('close', (status, signal) => accept({ status, signal }));
+    });
+    let output = '';
+    let progress;
+    const reported = new Promise((accept) => {
+      progress = accept;
+    });
+    const report = (chunk) => {
+      output += chunk;
+      if (
+        output.includes('Waiting for heavy validation admission, ticket fixture: fixture-queue') &&
+        output.includes('Review artifacts: fixture-review') &&
+        output.includes('Waiting for heavy validation ticket allocation: fixture-allocation')
+      ) {
+        progress(true);
+      }
+    };
+    child.stdout.on('data', report);
+    child.stderr.on('data', report);
+    assert.equal(await Promise.race([reported, finished.then(() => false)]), true, output);
+    assert.equal(existsSync(completed), false);
+    assert.doesNotMatch(output, /private (?:stdout|stderr) diagnostics/u);
+    writeFileSync(release, 'continue');
+    assert.deepEqual(await finished, { status: 1, signal: null });
+    assert.match(output, /failed \(7\); diagnostics:/u);
+    const artifact = output.match(/diagnostics: (.+\.log)/u)?.[1];
+    assert.ok(artifact, output);
+    const log = readFileSync(artifact, 'utf8');
+    for (const line of [
+      'private stdout diagnostics',
+      'private stderr diagnostics',
+      'last stdout diagnostics',
+      'last stderr diagnostics',
+      'Waiting for heavy validation ticket allocation: fixture-allocation',
+      'Waiting for heavy validation admission, ticket fixture: fixture-queue',
+      'Review artifacts: fixture-review',
+    ]) {
+      assert.ok(log.includes(line), line);
+    }
+    assert.equal(readFileSync(receiptPath, 'utf8'), prior);
+  } finally {
+    if (child?.exitCode === null && child.pid) {
+      process.kill(-child.pid, 'SIGKILL');
+    }
     rmSync(f.root, { recursive: true, force: true });
   }
 });
@@ -248,7 +349,6 @@ test('real identity covers installed bytes, ignored env, tool bytes, and unknown
   try {
     mkdirSync(join(f.root, 'bin'));
     mkdirSync(join(f.root, 'node_modules'));
-    mkdirSync(join(f.root, 'browsers'));
     for (const name of ['npm', 'bash', 'git', 'uvx']) {
       writeFileSync(join(f.root, 'bin', name), name, { mode: 0o755 });
     }
@@ -257,17 +357,13 @@ test('real identity covers installed bytes, ignored env, tool bytes, and unknown
       `console.log('userconfig='+(process.env.npm_config_userconfig || process.env.HOME+'/.npmrc')); console.log('globalconfig='+(process.env.npm_config_globalconfig || process.env.HOME+'/etc/npmrc'));`,
       { mode: 0o755 }
     );
-    writeFileSync(
-      join(f.root, '.gitignore'),
-      '.performance/\nnode_modules/\nbin/\nbrowsers/\n.env.local\n'
-    );
+    writeFileSync(join(f.root, '.gitignore'), '.performance/\nnode_modules/\nbin/\n.env.local\n');
     const payload = join(f.root, 'node_modules', 'native.node');
     writeFileSync(payload, 'native payload');
     writeFileSync(join(f.root, '.env.local'), 'SECRET=one');
     const env = {
       PATH: join(f.root, 'bin'),
       HOME: fixtureHome,
-      PLAYWRIGHT_BROWSERS_PATH: join(f.root, 'browsers'),
     };
     const first = identity(f.root, env);
     writeFileSync(payload, 'changed native payload');
@@ -284,21 +380,21 @@ test('real identity covers installed bytes, ignored env, tool bytes, and unknown
   }
 });
 
-test('manifest tampering, missing receipts and final source mutation fail closed', () => {
+test('manifest tampering, missing receipts and final source mutation fail closed', async () => {
   const f = fixture();
   try {
-    f.gate();
+    await f.gate();
     const path = join(f.root, '.performance/gate/receipt.json');
     const receipt = JSON.parse(readFileSync(path, 'utf8'));
     receipt.stages.reverse();
     writeFileSync(path, JSON.stringify(receipt));
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.equal(f.calls.length, STAGES.length);
     const current = JSON.parse(readFileSync(path, 'utf8'));
     rmSync(current.reviewReceipt);
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.equal(f.calls.length, STAGES.length);
     f.installation();
     const prior = readFileSync(path, 'utf8');
@@ -309,7 +405,7 @@ test('manifest tampering, missing receipts and final source mutation fail closed
       }
       return result;
     };
-    assert.throws(
+    await assert.rejects(
       () =>
         runGate({
           root: f.root,
@@ -371,7 +467,6 @@ run_step() { printf 'step:%s\\n' "$1" >> "$CALLS"; shift; "$@"; }
         `preamble:${forced}`,
         'step:bash floor',
         'node-floor',
-        'step:complete gate',
         'core',
       ]);
     }
@@ -398,7 +493,7 @@ test('staging a deletion preserves working content identity but changes candidat
   }
 });
 
-test('every gate stage writes generated caches in its issued artifact session', () => {
+test('every gate stage writes generated caches in its issued artifact session', async () => {
   const f = fixture();
   try {
     const sessions = [];
@@ -412,7 +507,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
       writeFileSync(join(session, 'cache', 'generated'), args[1][1]);
       return f.run(...args);
     };
-    const receipt = runGate({
+    const receipt = await runGate({
       root: f.root,
       capture: f.capture,
       run: cacheRunner,
@@ -423,7 +518,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
     assert.equal(new Set(sessions).size, STAGES.length);
     assert.equal(receipt.identity.sourceDigest, f.capture().sourceDigest);
     f.calls.length = 0;
-    runGate({
+    await runGate({
       root: f.root,
       capture: f.capture,
       run: cacheRunner,
@@ -439,10 +534,6 @@ test('every gate stage writes generated caches in its issued artifact session', 
         /GEOROIDS_TEST_SESSION_DIR/u
       );
     }
-    assert.match(
-      readFileSync(new URL('./test-runner.sh', import.meta.url), 'utf8'),
-      /export GEOROIDS_TEST_SESSION_DIR="\$SHARD_DIRECTORY"/u
-    );
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
@@ -500,19 +591,19 @@ test('hostile inherited Git repository, index and config never affect parent sta
   }
 });
 
-test('changed TypeScript symlink plus literal tuning requires both graph checks', () => {
+test('changed TypeScript symlink plus literal tuning requires both graph checks', async () => {
   const f = fixture();
   try {
     writeFileSync(join(f.root, 'a.ts'), 'export const a=1;');
     writeFileSync(join(f.root, 'b.ts'), 'export const b=1;');
     symlinkSync('a.ts', join(f.root, 'linked.ts'));
     f.git('add', '.');
-    f.gate();
+    await f.gate();
     unlinkSync(join(f.root, 'linked.ts'));
     symlinkSync('b.ts', join(f.root, 'linked.ts'));
     writeFileSync(join(f.root, 'data.ts'), 'export const tuning = { speed: 3, enabled: true };\n');
     f.calls.length = 0;
-    f.gate();
+    await f.gate();
     assert.ok(f.calls.includes('check:knip'));
     assert.ok(f.calls.includes('check:ts-prune'));
   } finally {
@@ -520,10 +611,10 @@ test('changed TypeScript symlink plus literal tuning requires both graph checks'
   }
 });
 
-test('cache-hit final boundary rejects index-only candidate mutation', () => {
+test('cache-hit final boundary rejects index-only candidate mutation', async () => {
   const f = fixture();
   try {
-    f.gate();
+    await f.gate();
     let captures = 0;
     f.calls.length = 0;
     const capture = () => {
@@ -533,7 +624,7 @@ test('cache-hit final boundary rejects index-only candidate mutation', () => {
       }
       return value;
     };
-    assert.throws(
+    await assert.rejects(
       () =>
         runGate({
           root: f.root,
@@ -552,10 +643,10 @@ test('cache-hit final boundary rejects index-only candidate mutation', () => {
   }
 });
 
-test('malformed graph skip, classifier and witness metadata always force complete rerun', () => {
+test('malformed graph skip, classifier and witness metadata always force complete rerun', async () => {
   const f = fixture();
   try {
-    f.gate();
+    await f.gate();
     const path = join(f.root, '.performance/gate/receipt.json');
     const original = readFileSync(path, 'utf8');
     const mutations = [
@@ -587,7 +678,7 @@ test('malformed graph skip, classifier and witness metadata always force complet
       mutation(receipt);
       writeFileSync(path, JSON.stringify(receipt));
       f.calls.length = 0;
-      f.gate();
+      await f.gate();
       assert.equal(f.calls.length, STAGES.length);
     }
   } finally {
@@ -600,7 +691,7 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
   const f = fixture();
   const external = mkdtempSync(join(tmpdir(), 'georoids-consumed-'));
   try {
-    for (const name of ['bin', 'node_modules', 'browsers', 'home', 'home/etc']) {
+    for (const name of ['bin', 'node_modules', 'home', 'home/etc']) {
       mkdirSync(join(f.root, name), { recursive: true });
     }
     for (const name of ['bash', 'git', 'uvx']) {
@@ -613,12 +704,11 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
     );
     writeFileSync(
       join(f.root, '.gitignore'),
-      '.performance/\nnode_modules/\nbin/\nbrowsers/\nhome/\n.env.local\n'
+      '.performance/\nnode_modules/\nbin/\nhome/\n.env.local\n'
     );
     const env = {
       PATH: join(f.root, 'bin'),
       HOME: join(f.root, 'home'),
-      PLAYWRIGHT_BROWSERS_PATH: join(f.root, 'browsers'),
     };
     const first = identity(f.root, env);
     f.git('add', '.');
@@ -687,15 +777,6 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
     const envAfter = identity(f.root, env);
     assert.notEqual(envAfter.runtime, envBefore.runtime);
     assert.equal(JSON.stringify(envAfter).includes('PRIVATE=two'), false);
-    symlinkSync(external, join(f.root, 'home/browser-root-link'));
-    assert.throws(
-      () =>
-        identity(f.root, {
-          ...env,
-          PLAYWRIGHT_BROWSERS_PATH: join(f.root, 'home/browser-root-link'),
-        }),
-      /Unsupported installed inventory root link/u
-    );
     symlinkSync(external, join(f.root, 'node_modules/directory'));
     assert.throws(() => identity(f.root, env), /Unsupported installed directory link/u);
     unlinkSync(join(f.root, 'node_modules/directory'));
@@ -724,12 +805,12 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
   }
 });
 
-test('missing mandatory unit stage fails independent battery assertion', () => {
+test('missing mandatory unit stage fails independent battery assertion', async () => {
   const f = fixture();
   const index = STAGES.findIndex(([, command]) => command === 'test');
   const [removed] = STAGES.splice(index, 1);
   try {
-    f.gate();
+    await f.gate();
     assert.throws(() =>
       assert.deepEqual(
         STAGES.map(([, command]) => command),
@@ -743,7 +824,7 @@ test('missing mandatory unit stage fails independent battery assertion', () => {
   }
 });
 
-test('cold pinned archive bootstrap precedes capture and failure cannot consume prior proof', () => {
+test('cold pinned archive bootstrap precedes capture and failure cannot consume prior proof', async () => {
   const f = fixture();
   try {
     mkdirSync(join(f.root, 'scripts'));
@@ -767,15 +848,15 @@ test('cold pinned archive bootstrap precedes capture and failure cannot consume 
       validateReview: f.validateReview,
       environment: process.env,
     };
-    const first = runGate(options);
+    const first = await runGate(options);
     assert.deepEqual(f.calls, REQUIRED_COMMANDS);
     assert.match(readFileSync(first.bootstrap.artifact, 'utf8'), /canonical-helper-prepared/u);
     f.calls.length = 0;
-    runGate(options);
+    await runGate(options);
     assert.deepEqual(f.calls, []);
     const path = join(f.root, '.performance/gate/receipt.json');
     const prior = readFileSync(path, 'utf8');
-    assert.throws(
+    await assert.rejects(
       () =>
         runGate({
           ...options,

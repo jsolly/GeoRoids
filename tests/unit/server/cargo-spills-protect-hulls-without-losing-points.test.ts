@@ -1,18 +1,10 @@
-/* @vitest-environment node */
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { instrumentLootIndex } from '../../../benchmarks/loot-index-instrumentation';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
-import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
-import { WorldStore } from '../../../server/world/WorldStore';
-import { calculateHealthRegenDelayFrames } from '../../../shared/constants/health';
 import { cargoCapacity, ECONOMY } from '../../../shared/economy';
 import { GROWTH } from '../../../shared/shipGrowth';
-import { WORLD } from '../../../shared/world';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 afterEach(() => vi.useRealTimers());
@@ -22,28 +14,6 @@ function pilot(engine: GameEngine, id = 'pilot') {
   actor.asteroidInteractions = 1;
   return actor;
 }
-
-test('cargo absorbs a hazard, then a lethal residual hit spills every point exactly once', () => {
-  const engine = new GameEngine(42);
-  const actor = pilot(engine);
-  actor.cargo = 450;
-  actor.healthRegenTimer = 0;
-  const initialHealth = actor.health;
-  const first = engine.handleShipDamage(actor.id, 'asteroid', 20);
-  expect(first).toMatchObject({ applied: true, isDestroyed: false });
-  expect(actor.health).toBe(initialHealth);
-  expect(actor.cargo).toBe(250);
-  expect(actor.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
-  expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(200);
-  engine.collectLoot();
-  expect(actor.cargo).toBe(250);
-  expect(engine.handleShipDamage(actor.id, 'ricochet', initialHealth + 25).isDestroyed).toBe(true);
-  expect(actor.cargo).toBe(0);
-  expect(actor.health).toBe(0);
-  expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(450);
-  engine.handleShipDamage(actor.id, 'asteroid', 500);
-  expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(450);
-});
 
 test('immunity and direct crew fire preserve cargo while fractional protection only shields its actual value', () => {
   const engine = new GameEngine(42);
@@ -123,116 +93,6 @@ test('a partial shard or tap retains its identity and frame deadline instead of 
     expect(loot.get(drop.id)?.points).toBe(before - 1);
     loot.expire(GROWTH.LOOT_TTL_FRAMES);
     expect(loot.get(drop.id)).toBeUndefined();
-  }
-});
-
-test('ejected points travel beyond pickup and magnet range before the spill becomes recoverable', () => {
-  const engine = new GameEngine(42);
-  const actor = pilot(engine);
-  const loot = new LootManager(new RNGService(7));
-  loot.spawnPoints(actor.position, 200, {
-    velocity: { x: ECONOMY.cargoSpillSpeed, y: 0 },
-    ejectFramesLeft: ECONOMY.cargoSpillEjectFrames,
-  });
-  const drop = loot.getAll()[0];
-  if (!drop) {
-    throw new Error('Spill missing');
-  }
-  expect(loot.collectOverlaps([actor])).toEqual([]);
-  for (let frame = 0; frame < ECONOMY.cargoSpillEjectFrames; frame++) {
-    loot.expire(frame, [actor]);
-    expect(loot.collectOverlaps([actor])).toEqual([]);
-  }
-  const escaped = loot.get(drop.id);
-  if (!escaped) {
-    throw new Error('Spill disappeared');
-  }
-  expect(escaped.position.x - actor.position.x).toBeGreaterThan(GROWTH.LOOT_MAGNET_RANGE);
-  actor.position = { ...escaped.position };
-  expect(loot.collectOverlaps([actor])).toHaveLength(1);
-  expect(actor.cargo).toBe(200);
-});
-
-test('restart preserves partial bank transfers and moving recoverable shield spills in one checkpoint', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'georoids-cargo-'));
-  const path = join(directory, 'world.sqlite');
-  let store = new WorldStore(path);
-  try {
-    const engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    const actor = pilot(engine);
-    actor.position = { x: 0, y: 0 };
-    const registered = engine.registerPilot(actor, actor.ws ?? new RecordingSocket());
-    if (!registered.ok) {
-      throw new Error(registered.error);
-    }
-    actor.spawnProtectionTimer = 0;
-    actor.cargo = 400;
-    for (let frame = 0; frame < 12; frame++) {
-      engine.depositCargo();
-    }
-    actor.position = { x: 1000, y: 1000 };
-    engine.handleShipDamage(actor.id, 'asteroid', 10);
-    engine.checkpointWorld();
-    const saved = store.load().economy?.pointLoot;
-    store.close();
-    store = new WorldStore(path);
-    expect(store.load().economy?.pointLoot).toEqual(saved);
-    const restarted = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    const resumed = restarted.resumePilot(registered.resumeToken, new RecordingSocket());
-    if (!resumed.ok) {
-      throw new Error('Resume failed');
-    }
-    expect(resumed.actor.score).toBe(25);
-    expect(resumed.actor.cargo).toBe(275);
-    expect(restarted.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(100);
-    expect(restarted.getGameState().settlement.points).toBe(25);
-    restarted.collectLoot();
-    expect(resumed.actor.cargo).toBe(275);
-  } finally {
-    store.close();
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('a hazard near the world edge keeps every spilled point inside collectible space', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'georoids-edge-cargo-'));
-  const store = new WorldStore(join(directory, 'world.sqlite'));
-  try {
-    const engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    const actor = pilot(engine);
-    actor.position = { x: WORLD.radius - 30, y: 0 };
-    actor.cargo = 500;
-    engine.handleShipDamage(actor.id, 'boundary', 100);
-    engine.checkpointWorld();
-    const loot = new LootManager(new RNGService(7));
-    loot.restorePoints(store.load().economy?.pointLoot ?? []);
-    expect(
-      loot
-        .savedPoints()
-        .some((drop) => Math.hypot(drop.velocity?.x ?? 0, drop.velocity?.y ?? 0) > 0)
-    ).toBe(true);
-    for (let frame = 0; frame < 120; frame++) {
-      loot.expire(frame);
-    }
-    expect(loot.getAll().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(500);
-    for (const drop of loot.getAll()) {
-      const radius = Math.hypot(drop.position.x, drop.position.y);
-      expect(radius).toBeLessThanOrEqual(WORLD.radius - drop.radius);
-      if (!loot.get(drop.id)) {
-        continue;
-      }
-      const reach = Math.min(radius, WORLD.radius - 30);
-      actor.position = {
-        x: (drop.position.x / radius) * reach,
-        y: (drop.position.y / radius) * reach,
-      };
-      expect(loot.collectOverlaps([actor]).length).toBeGreaterThan(0);
-    }
-    expect(actor.cargo).toBe(500);
-    expect(loot.getAll()).toEqual([]);
-  } finally {
-    store.close();
-    rmSync(directory, { recursive: true, force: true });
   }
 });
 

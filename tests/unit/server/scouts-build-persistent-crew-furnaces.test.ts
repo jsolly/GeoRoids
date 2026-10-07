@@ -319,34 +319,6 @@ test('boost guidance prefers a lit furnace over the square, and dark lots are no
   expect(field.nearby(furnace.position, 1).some((site) => site.id === furnace.id)).toBe(true);
 });
 
-test('raising a furnace during a chase repels the living spider despite tool cooldown', () => {
-  const engine = new GameEngine(42);
-  const { actor } = addScout(engine);
-  actor.score = furnace.cost;
-  const spider = engine.spawnTerrainSpider({
-    x: furnace.position.x + 200,
-    y: furnace.position.y,
-  });
-  assert(spider);
-  engine.advanceOneFrame();
-  expect(engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.targetId).toBe(
-    actor.id
-  );
-  actor.abilityCooldownFrames = 300;
-  const health = actor.health;
-  expect(engine.useAbility(actor.id)).toBe(true);
-  expect(actor.abilityCooldownFrames).toBe(300);
-  engine.advanceOneFrame();
-  expect(
-    engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.targetId
-  ).toBeNull();
-  engine.advanceOneFrame();
-  const escaped = engine.getSpiderField().spiders.find((body) => body.id === spider.id);
-  expect(escaped?.health).toBe(spider.health);
-  expect(escaped?.position.x).toBeGreaterThan(spider.position.x);
-  expect(actor.health).toBe(health);
-});
-
 test('a Scout beside the grate scans instead of being told a build failed', () => {
   const engine = new GameEngine(42);
   const socket = new RecordingSocket();

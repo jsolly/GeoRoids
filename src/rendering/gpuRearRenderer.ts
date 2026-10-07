@@ -12,7 +12,7 @@ import {
 
 type Segment = ContourLevel['segments'][number];
 export type GpuContourLayer = { index: number; segments: readonly Segment[] };
-export type GpuRearScene = {
+type GpuRearScene = {
   position: Position;
   width: number;
   height: number;

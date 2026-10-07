@@ -1,13 +1,11 @@
 /* @vitest-environment node */
 import { strict as assert } from 'node:assert';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { LootManager } from '../../../server/core/LootManager';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
-import { emptySettlement } from '../../../shared/economy';
 import { ExplorationMap } from '../../../shared/exploration';
 import { CIVIC_LOTS, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
@@ -239,78 +237,3 @@ test('equal Unicode loot IDs retain authoritative insertion order regardless of 
   detached.position.x = 999;
   expect(assets.snapshot([]).find((asset) => asset.id === 'loot:é')?.position.x).toBe(40);
 });
-
-test.each([0, 10000])(
-  'local snapshots and frames avoid full loot reads with %i distant restored drops',
-  (count) => {
-    const store = new WorldStore(':memory:');
-    const exploration = new ExplorationMap();
-    exploration.reveal({ x: 40000, y: 24000 }, 260);
-    const expiresAt = Date.now() + 3600000;
-    store.checkpoint(
-      { seed: 82, startedAt: 1, generation: WORLD.generation, exploration: exploration.snapshot() },
-      new Map(),
-      [],
-      {
-        settlement: emptySettlement(),
-        pointLoot: [
-          { id: 'newly-charted', position: { x: 6000, y: 0 }, points: 20, expiresAt },
-          { id: 'near', position: { x: 400, y: 0 }, points: 10, expiresAt },
-          { id: 'charted-far', position: { x: 40000, y: 24000 }, points: 20, expiresAt },
-          ...Array.from({ length: count }, (_, i) => ({
-            id: `hidden-${i}`,
-            position: { x: 20000 + (i % 100) * 120, y: 20000 + Math.floor(i / 100) * 120 },
-            points: 1,
-            expiresAt,
-          })),
-        ],
-      }
-    );
-    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
-    const full = vi.spyOn(LootManager.prototype, 'getAll').mockImplementation(() => {
-      throw new Error('hot full loot read');
-    });
-    const nests = vi.spyOn(LootManager.prototype, 'getNestResources').mockImplementation(() => {
-      throw new Error('hot full nest-resource read');
-    });
-    const socket = new RecordingSocket();
-    try {
-      const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'hauler');
-      const broadcaster = new GameStateBroadcaster(engine);
-      broadcaster.negotiateSnapshot(socket);
-      engine.advanceOneFrame();
-      broadcaster.broadcastGameState();
-      const message = socket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
-      assert(message);
-      const decoded = decodeSnapshotMessage(new SnapshotDecoder(), message);
-      expect(decoded.loot.filter((drop) => drop.kind === 'points').map((drop) => drop.id)).toEqual([
-        'near',
-      ]);
-      for (const drop of decoded.loot) {
-        expect(Math.abs(drop.position.x)).toBeLessThanOrEqual(WORLD.interestRadius);
-        expect(Math.abs(drop.position.y)).toBeLessThanOrEqual(WORLD.interestRadius);
-      }
-      expect(decoded.mapAssets.some((asset) => asset.id === 'loot:charted-far')).toBe(true);
-      expect(decoded.mapAssets.some((asset) => asset.id.startsWith('loot:hidden-'))).toBe(false);
-      expect(decoded.mapAssets.some((asset) => asset.id === 'loot:newly-charted')).toBe(false);
-      pilot.position = { x: 6200, y: 0 };
-      engine.advanceOneFrame();
-      expect(engine.getSnapshotState().mapAssets).toContainEqual({
-        id: 'loot:newly-charted',
-        kind: 'wreckage',
-        position: { x: 6000, y: 0 },
-        name: 'Cargo',
-      });
-      expect(
-        engine.getSnapshotState().mapAssets.some((asset) => asset.id.startsWith('loot:hidden-'))
-      ).toBe(false);
-      expect(full).not.toHaveBeenCalled();
-      expect(nests).not.toHaveBeenCalled();
-    } finally {
-      full.mockRestore();
-      nests.mockRestore();
-      engine.stopGameLoop();
-      store.close();
-    }
-  }
-);

@@ -9,7 +9,6 @@
     "scripts",
     "benchmarks",
     "vitest.config.ts",
-    "vitest.browser.config.ts",
     "vite.config.ts",
     "setup",
     "server",
@@ -17,5 +16,5 @@
     "shared",
     "shared-types.ts"
   ],
-  "files": ["vite.config.ts", "vitest.config.ts", "vitest.browser.config.ts"]
+  "files": ["vite.config.ts", "vitest.config.ts"]
 }

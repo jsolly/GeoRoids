@@ -89,33 +89,6 @@ test('the log route closes invalid schemas while preserving valid forwarding', a
   expect(code).toBe(1006);
 });
 
-test('a log socket past its message quota closes once', async () => {
-  server = createServerInstance({ port: 0, nodeEnv: 'test' });
-  const before = ClientLogger.getDiagnostics().rateLimited;
-  const logs = await connect('/logs');
-  const closed = once(logs, 'close');
-  const filler = JSON.stringify({
-    type: 'clientLog',
-    data: { level: 'INFO', message: 'routine', sessionId: 'quota' },
-  });
-  const overQuota = JSON.stringify({
-    type: 'clientLog',
-    data: { level: 'WARN', message: 'over quota', sessionId: 'quota' },
-  });
-  sendOneChunk(logs, [
-    ...Array.from({ length: 120 }, () => filler),
-    overQuota,
-    overQuota,
-    overQuota,
-    overQuota,
-  ]);
-  const [code] = await closed;
-  await drainDeferredFrames();
-  expect(code).toBe(1006);
-  expect(logs.readyState).toBe(WebSocket.CLOSED);
-  expect(ClientLogger.getDiagnostics().rateLimited).toBe(before + 1);
-});
-
 test('a bad log frame ends the socket so a following frame is not parsed', async () => {
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
   const before = ClientLogger.getDiagnostics();

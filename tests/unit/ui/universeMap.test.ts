@@ -39,7 +39,7 @@ describe('universe map play chrome', () => {
   beforeAll(() => {
     const network = NetworkManager.getInstance();
     PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
-    // jsdom does not implement dialog methods; browser coverage verifies native modality.
+    // jsdom dialog doubles verify wiring; native modality requires manual browser evidence.
     Object.defineProperties(HTMLDialogElement.prototype, {
       showModal: { configurable: true, value: showModal },
       close: {

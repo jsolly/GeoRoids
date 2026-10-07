@@ -38,17 +38,17 @@ Run commands from the repository directory:
 npm run gate
 npm run test
 npm run test:integration:server
-npm run test:integration:browser
+npm run test:integration:entities
 ```
 
-`npm run gate` checks dependencies, lint, configuration, TypeScript, unit tests and the production build. Browser tests need the pinned Playwright browser installation (`npx --no-install playwright install chromium webkit`). Always use `./scripts/test-runner.sh` for individual integration scenarios; it enforces serialized execution.
+`npm run gate` checks dependencies, lint, configuration, TypeScript, runner contracts, all units, the production build and complete server/entity integration. Browser tests are removed. Always use `./scripts/test-runner.sh` for integration scenarios; it owns Vitest, artifacts, cleanup and serialized execution. Socket scenarios own their port-zero loopback servers. Code checks can overlap across worktrees, while the same checkout excludes overlap.
 
 Test-writing conventions are in [tests/AGENTS.ms](tests/AGENTS.ms): focused feature scenarios, controlled setup, and observable outcomes.
 
 TypeScript checks the client, server, shared protocol, scripts, tests and build configuration. `strict` (including `noImplicitAny`) is enforced alongside checked indexed access, exact optional properties, index-signature bracket access and side-effect import checking. Clear absent optional state with `delete`; use `| undefined` only when an API intentionally distinguishes clearing a value from leaving it unchanged.
 
 ```sh
-./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose
+./scripts/test-runner.sh tests/integration/server/server-pause.test.ts --reporter=verbose
 ```
 
 Debug switches and log levels live in `src/constants/index.ts`. Client and server diagnostics share structured records with release, player, session and connection context. The [diagnostics guide](docs/diagnostics.md) explains the incident timeline reader, Railway/Vercel searches, state checkpoints, loss counters and game-loop profiling. See `AGENTS.md` for architecture and commands.
@@ -57,7 +57,7 @@ Repeatable client, server, snapshot codec and loopback transport measurements us
 the [benchmark framework](benchmarks/README.md). It documents clean committed
 harness requirements, revision isolation, paired comparisons and raw artifacts.
 The framework reports fixture timings, work counts and outcome equality; it does
-not claim a generic optimization or supported capacity.
+not claim a generic optimization or supported capacity. Browser benchmarks, frame measurements and Wiki media generation remain manual tools outside the test gate; Playwright is retained for them.
 
 ## Production
 

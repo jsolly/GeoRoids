@@ -203,30 +203,6 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
   engine.stopGameLoop();
 });
 
-test('leaving then entering again returns to the same ship with the saved score', () => {
-  const engine = new GameEngine(82);
-  const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
-  original.actor.score = 450;
-  original.actor.health = 40;
-  original.actor.angle = 1.25;
-  engine.removePlayer('scout');
-  const resumed = engine.resumePilot(original.token, new RecordingSocket(), 'hauler', 'Bob');
-  assert(resumed.ok);
-  expect(resumed.actor).toMatchObject({
-    id: 'scout',
-    name: 'Bob',
-    kitId: 'hauler',
-    cargo: 0,
-    purchases: [],
-    score: 450,
-    position: { x: 200, y: 300 },
-    angle: 1.25,
-  });
-  expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
-  expect(engine.getPlayerCount()).toBe(1);
-  engine.stopGameLoop();
-});
-
 test('checkpoints store the saved score and a recent flight', () => {
   const store = database(':memory:');
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));

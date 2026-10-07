@@ -4,6 +4,13 @@ The benchmark command measures a pinned product revision with one committed copy
 of the benchmark harness. It produces raw artifacts for review. It does not make
 an optimization claim, a frame-rate guarantee, or a supported-capacity claim.
 
+Browser benchmarks and frame measurements are manual tools outside `npm run gate`
+and CI code-test validation. Playwright remains for those tools and Wiki media
+capture. Manual test-runner benchmark modes and frame measurements use the common-Git
+heavyweight queue; code checks can overlap across different worktrees. The same
+checkout excludes overlapping validation. Install Chromium for browser tools with
+`npx --no-install playwright install chromium`.
+
 ## Run a measurement
 
 Run these commands from `/Users/johnsolly/code/GeoRoids` (or a clean linked
@@ -261,9 +268,12 @@ the same checkout/revision, Git-visible files, ignored environment files, build
 environment, lockfile, Node version and every built asset. It starts a fresh
 owned preview/server pair and never attaches to existing services. Changed or
 missing inputs, assets or receipt fail before measurement. Other build commands
-can change `dist/` and invalidate reuse. An impaired-network proxy receives an
-ephemeral port, so reuse is rejected unless its actual WebSocket URL exactly
-matches the successful build; use clean network for frozen renderer cohorts.
+can change `dist/` and invalidate reuse. The first session selects unused Vite,
+server and proxy ports; reuse restores those recorded choices unless explicit
+overrides are supplied. An occupied recorded port fails without attaching to or
+stopping its listener. Changing the actual WebSocket endpoint invalidates reuse.
+Use clean network for frozen renderer cohorts. Older build receipts require a
+fresh build.
 The receipt is local benchmark evidence and does not replace `npm run gate`.
 
 These runs measure the current worktree and real scheduling. They do not use the

@@ -4,13 +4,13 @@ Read root `AGENTS.md` for controls. This guide owns commands, deployment procedu
 
 ## Ship
 
-Run `npm run gate` before publication and again after review fixes. It includes the full unit/integration suites, frame-work validation and constrained-client scenarios. GitHub independently runs parallel static checks and bounded gameplay/touch/reconnect smoke; both must pass `CI / ci`. Read [CI and local review](ci-and-local-review.md).
+Run `npm run gate` before publication and again after review fixes. It includes static checks, runner contracts, the complete unit suite, production build and all server/entity integration tests. Code checks can overlap across worktrees; each checkout excludes overlapping validation. CI requires independent static, runner-contract and complete code-integration lanes to pass `CI / ci`. Browser suites and automatic frame-work/constrained-client gates are retired. Manual measurements remain outside the gate. Read [CI and local review](ci-and-local-review.md).
 
 After merging, verify Vercel's Git deployment is READY for the merged commit at <https://www.georoids.com>. Classify server inputs with the classifier's `--changed` mode with the actual base and merge SHAs from the ship receipt. If the graph requires a server deployment, independently verify Railway's exact release; client success alone is insufficient. Railway auto-deploys main. If deployment is absent or red, inspect the actual trigger and staged platform changes before any exact-commit fallback; never use `railway redeploy` or upload a local tree as proof of the merged release.
 
-Read `/ship`'s installed deploy and smoke references for the canonical follower invocation. Follow the exact release/request through the Production smoke workflow; its receipt uses `releaseSha` and `requestId`. The canonical runner checks HTTP and browser behavior; the GeoRoids scenario separately checks the server's health JSON identity and admitted gameplay connection. Preserve healthy persistent-worker state, zero game-loop stalls, protocol admission, authoritative snapshots, movement and a correlated accepted-shot acknowledgement. Headers alone are not release or gameplay proof.
+Read `/ship`'s installed deploy and smoke references for the canonical follower invocation. Follow the exact release/request through the Production smoke workflow; its receipt uses `releaseSha` and `requestId`. The canonical runner checks client release and module entry identity, declared bundle availability, HTTP health and a genuine current-protocol WebSocket pilot with exact server release admission. It does not launch a browser or certify rendering, keyboard/touch controls, graphics or audio. Preserve healthy persistent-worker state, zero game-loop stalls, protocol admission, authoritative snapshots, movement and a correlated accepted-shot acknowledgement. Headers alone are not release or gameplay proof.
 
-Manual production smoke requires a full `PRODUCTION_SMOKE_RELEASE_SHA` and unique `PRODUCTION_SMOKE_REQUEST_ID`, with the checkout matching that SHA. `PRODUCTION_SMOKE_SERVER_SHA`, when supplied, names the separately deployed server; otherwise the classifier computes the minimum server-affecting commit. Use the workflow dispatch inputs `release_sha`, `request_id` and optional `server_sha`. The production runner starts no local server. After a new Railway deployment, follow a fresh smoke for that exact server release. Skipped, cancelled, missing, failed or timed-out smoke remains unverified. Artifacts retain observations, browser diagnostics, screenshots, trace and server admission evidence.
+Manual production smoke requires a full `PRODUCTION_SMOKE_RELEASE_SHA` and unique `PRODUCTION_SMOKE_REQUEST_ID`, with the checkout matching that SHA. `PRODUCTION_SMOKE_SERVER_SHA`, when supplied, names the separately deployed server; otherwise the classifier computes the minimum server-affecting commit. Use the workflow dispatch inputs `release_sha`, `request_id` and optional `server_sha`. The production runner starts no local server. After a new Railway deployment, follow a fresh smoke for that exact server release. Skipped, cancelled, missing, failed or timed-out smoke remains unverified. Artifacts retain HTTP/release/assets and protocol observations, accepted-shot evidence, persistence health and owned-pilot cleanup.
 
 Open clients check the static same-origin `release.json` for the full build identity, confirm a changed identity twice and retain a per-loaded-build refresh guard. This product refresh behavior is distinct from host deployment proof. The `/wiki` and `/wiki/` rewrite preserves query parameters and remains independently covered.
 
@@ -94,27 +94,26 @@ npm run check:wiki         # flag gameplay changes that need a Wiki review (runs
 npm run gate               # same complete pre-commit battery; exact unchanged receipts may reuse
 
 # Tests
-npm run test               # unit only (tests/unit/)
+npm run test               # complete deterministic unit suite (tests/unit/)
 npm run test:all           # unit, server, and entity integration tests
-npm run test:review        # all integration + frame-work + constrained-client checks (also in gate)
-npm run test:integration:sharded   # complete integration suite, six owned serial shards
-npm run test:integration:browser   # browser tests via test-runner.sh
+npm run test:review        # complete server/entity integration (also in gate)
+npm run test:integration   # complete code integration inventory
 npm run test:integration:server    # server-side integration
 npm run test:integration:entities  # entity integration
-npm run test:coverage      # unit tests with coverage
+npm run test:coverage      # complete unit suite with coverage
 
 # Diagnostics / performance
 npm run --silent logs -- --player <id>   # merged client/server timeline
 npm run benchmark          # see benchmarks/README.md
 
 # Single test file (integration must use the runner script — not raw vitest)
-./scripts/test-runner.sh tests/integration/browser/sanity/<file>.test.ts --reporter=verbose
-npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
+./scripts/test-runner.sh tests/integration/server/server-pause.test.ts --reporter=verbose
+npx vitest run tests/unit/path/to.test.ts        # focused pure unit checks only
 ```
 
-**Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. Full suites use six authenticated shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. Each child retains serial execution. See [isolated shards](integration-shards.md). The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
+**Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns one serialized Vitest worker, per-run artifacts and process cleanup. Socket scenarios create and close their own port-zero loopback servers; the code runner starts no Vite/server pair. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
 
-Use repository-relative or absolute paths for explicit test files; missing files fail before services start. Plain substrings such as `selected-pilot` remain text filters. A file location may have one numeric `:line` suffix. Put selectors directly after the runner command: Vitest ignores a nonempty `--` tail, so the runner refuses that tail instead of silently running a partial selection.
+Use repository-relative or absolute paths for explicit integration test files; missing files fail before services start. Selectors must name literal files or directories within the server/entity inventory. Substrings and `:line` suffixes are rejected. Put selectors directly after the runner command; a nonempty `--` tail is rejected to prevent an unintended selection.
 
 ## Architecture
 
@@ -179,12 +178,15 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 
 ## Local development
 
-- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes.
+- **Validation admission:** different worktrees can run complete unit, runner-contract and integration code checks together. Static checks, types and builds can overlap too. A checkout admits one gate, review or standalone harness at a time because its builds and artifacts share ownership. Failed cleanup retains the barrier.
+- **Manual measurement queue:** browser benchmark runner modes and direct frame measurements use one heavyweight FIFO slot in the common Git directory. Queue waits are visible and cancellable and precede execution deadlines. Failed ownership inspection preserves evidence; never delete a live allocator's lock.
+- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes. There is no full-suite sharding deadline.
+- **Ports:** code integration scenarios own port-zero loopback servers; the code runner does not consume service-port overrides. Manual benchmark harnesses select distinct Vite, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
 - **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
 - **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
-- **Playwright browsers** (browser E2E): `npx --no-install playwright install chromium webkit`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
+- **Playwright browsers** (manual benchmarks and Wiki media only): install the browser required by that tool with `npx --no-install playwright install chromium`. Browser binaries are not needed for code-test validation. Preserve owned media and measurement outputs; these tools remain outside the gate.
 
 ### Services
 
@@ -193,10 +195,10 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 | Vite (client + `/ws` proxy) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
 | Game server (HTTP + WS) | 3001 | `curl http://localhost:3001/health` |
 
-Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for integration tests. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Integration tests start their own pair through `scripts/test-runner.sh`; do not leave another service listening on the configured test ports.
+Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for the interactive session. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Code integration scenarios create their own port-zero loopback servers. Manual benchmark harnesses own separate configured service pairs and refuse occupied ports.
 
 **Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
 
 ### Hello-world smoke
 
-For a manual smoke, open `http://localhost:5173`, click Play, steer (left/right arrow keys) and fire (Space); thrust is automatic. Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose`; the runner starts the required services on unused configured ports and asserts canvas, starting player state, and asteroids.
+For a manual smoke, open `http://localhost:5173`, click Play, steer (left/right arrow keys) and fire (Space); thrust is automatic. This is a manual observation outside automated code-test coverage.

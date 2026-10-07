@@ -15,7 +15,8 @@ fields does not prove either feature.
 
 Extend an existing scenario when an assertion belongs to the same story. Remove
 placeholder and weaker duplicate tests instead of preserving their count.
-Browser input and rendered HUD behavior belong in browser integration tests.
+Native browser input and rendered HUD behavior require manual browser evidence
+and are outside automated coverage.
 
 Run from the repository root:
 

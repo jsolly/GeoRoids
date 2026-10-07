@@ -1,16 +1,16 @@
-// GeoRoids hosts deploy independently: reserve two minutes for client propagation,
-// then retain the canonical runner's browser diagnostics and authoritative gameplay checks.
+// Client and server deploy independently. Preserve the release propagation and
+// behavior budgets while verifying the deployed HTTP and gameplay protocols.
 import process from 'node:process';
-import { runSmoke } from './production-smoke.mjs';
+import { runNetworkSmoke } from './production-smoke-network.mjs';
 import { productionUrl, smoke } from './production-smoke-scenario.mjs';
 
 try {
-  const receipt = await runSmoke({ scenario: { productionUrl, smoke }, behaviorMs: 240000 });
+  const receipt = await runNetworkSmoke({ scenario: { productionUrl, smoke } });
   process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
   if (!receipt.success) {
     process.exitCode = 1;
   }
-} catch (error) {
-  process.stderr.write(`${error}\n`);
+} catch {
+  process.stderr.write('Production verification could not retain its receipt\n');
   process.exitCode = 1;
 }

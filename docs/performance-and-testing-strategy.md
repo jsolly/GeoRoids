@@ -142,7 +142,7 @@ are controlled where the runner owns them; transport scheduling remains native a
 nondeterministic. Record changes in counts as outputs, not necessarily errors, for
 evolving scenarios.
 
-Use desktop Chromium plus WebKit for automated compatibility, and physical Android Chrome plus iPhone Safari for release evidence. Start with the repository's 390×844 and 844×390 touch cases, then add actual device viewport/safe-area dimensions and a large desktop viewport. Device emulation configures properties such as viewport and touch; it does not reproduce a phone's GPU, thermal behavior, or operating system.[^6] Calibrated Chrome CPU throttling helps prioritize candidates, but real devices decide mobile acceptance.[^7]
+Use desktop Chromium plus WebKit for manual compatibility observations, and physical Android Chrome plus iPhone Safari for release evidence. Start with 390×844 and 844×390 touch measurement layouts, then add actual device viewport/safe-area dimensions and a large desktop viewport. Device emulation configures properties such as viewport and touch; it does not reproduce a phone's GPU, thermal behavior, or operating system.[^6] Calibrated Chrome CPU throttling helps prioritize candidates, but real devices decide mobile acceptance.[^7]
 
 Record exact device models and browser versions before accepting the baseline. Test unplugged sustained play with fixed brightness, comparable battery state, and low-power mode both off and on; allow cooldown between comparisons. Keep charging and debugger attachment state consistent because they can alter the experiment. Use device temperature or thermal state where available; otherwise record conditions and frame degradation over time rather than inventing energy measurements.
 
@@ -160,13 +160,9 @@ Add property-based or generated deterministic cases around the highest-risk algo
 
 Use server integration tests for real join/shoot/damage/death/respawn sequences, unsupported-client rejection, resync, rate limits, delayed send callbacks, disconnect cleanup, and restart behavior. A transport benchmark should fail on invalid state, missed acknowledgments, or stalled gameplay even when socket throughput is high. Keep all integration entry points behind `scripts/test-runner.sh` and its repository-scoped ownership lock.
 
-Browser tests should exercise the shipped UI and network lifecycle. Prioritize two-player visibility, simultaneous steer/fire/ability input, pointer cancellation, orientation changes during input, browser chrome resizing, background/resume, death/respawn, and reconnection. For rendering changes, capture deterministic screenshots of dense combat, terrain, HUD, and projectiles on desktop and touch layouts. Pixel checks verify appearance; separate state assertions verify gameplay.
+Manual browser measurements cover the shipped UI and network lifecycle: two-player visibility, sustained steer/fire/ability input, pointer cancellation, orientation and browser chrome changes, background/resume, death/respawn and reconnection. Screenshots document observed appearance; they supply no automated correctness proof.
 
-The repository uses Vitest to drive Playwright's browser API. Playwright Test's auto-retrying assertions require its own runner/assertion integration; do not assume the existing Vitest `expect` waits automatically.[^8] Keep existing bounded waits for observable game state, replace arbitrary sleeps as scenarios are touched, and fail on page errors with diagnostic screenshots and correlated logs. Avoid a wholesale test-runner migration unless measured maintenance cost justifies it.
-
-### CI and coverage
-
-The required `CI / ci` status aggregates parallel static validation and a small serialized smoke covering boot, move/fire, mobile controls, and current-protocol reconnect. Both lanes must succeed before merge. The smoke installs pinned Playwright browsers and OS dependencies and uploads artifacts even on failure. `npm run gate` owns the full local review loop: all unit tests, all integration scenarios, deterministic frame-work checks, and constrained production-client traversal/combat. Run focused regressions after each fix, then repeat the full gate before push. The weekly/manual extended integration workflow remains a backstop. See [CI and local review](ci-and-local-review.md) for commands and the five-minute PR budget.
+The required `CI / ci` status aggregates independent static validation, runner contracts and the complete server/entity code integration suite. All three lanes must succeed. `npm run gate` owns the full local battery of static checks, contracts, unit tests, build and code integration. Browser tests, frame-work gates, constrained-client gates and the extended browser workflow are retired. Keep manual performance measurements separate from correctness validation.
 
 Keep Vitest's one-worker integration settings and process ownership contracts. Unit-test sharding is a separate possible experiment only after proving isolation; increasing integration workers to shorten CI would reintroduce connection bursts and invalid measurements. New failures must fail the run. Any already skipped or quarantined scenario must appear explicitly in the report with a reason and a repair step, never count as a pass.
 
@@ -252,7 +248,7 @@ All phases belong to this plan. Conditional experiments close with a written ado
 | Phase / owner | Concrete change and likely paths | Dependency and completion evidence |
 | --- | --- | --- |
 | 1. Baseline / performance owner | Measurement result schema and fixture manifest in `benchmarks/`; real frame/tick metrics; actual device inventory; documented initial capacity workload. | First. Save reproducible JSON, raw samples, failures, and target-device runs. Calibrate budgets and noise; retain synchronous mode. |
-| 2. Behavioral CI / test owner | Extend `tests/unit`, `tests/integration`, runner utilities, and `ci.yml` with serialized critical scenarios and separate coverage. | Use phase 1 scenarios. Required CI waits for the smoke lane; injected known defects fail; no silent skips. |
+| 2. Behavioral CI / test owner | Extend `tests/unit`, `tests/integration`, runner utilities, and `ci.yml` with serialized critical scenarios and separate coverage. | Use phase 1 scenarios. Required CI waits for static, runner-contract and complete code-integration lanes; injected known defects fail; no silent skips. |
 | 3. Real-time benchmark / client + server owners | Extend the current owned transport sample to a production `dist` path, real WebSocket load driver, network impairment and browser lifecycle cases. | Phases 1–2. Measures update on touch devices, decode/apply, tick deadlines, actual connections, and generator utilization. |
 | 4. Client improvements / rendering owner | Profile-led contour chunks, HUD invalidation, resize deduplication, bounded hot-path allocation, and optional quality tiers. | Phases 1–3. Same fixtures and visual checks pass; target phones meet budgets or show a reviewed quality-tier decision. Retain only measured wins. |
 | 5. Server improvements / simulation owner | Monotonic scheduling/debt policy, collision-index experiment, tick-local views, complete outbound-pressure audit. | Phases 1–3; independent of most phase 4 edits. Clock and collision differential tests pass; capacity/soak evidence shows savings without state divergence. |
@@ -277,17 +273,16 @@ npm run benchmark -- measure transport --revision HEAD --seed 42
 npm run benchmark -- compare client --baseline REV --candidate REV --seed 42 --viewport desktop
 npm run benchmark -- compare server --baseline REV --candidate REV --seed 42
 npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
-./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts
-./scripts/test-runner.sh tests/integration/browser/sanity/mobile-viewport-fits-and-shows-touch-controls.test.ts
+./scripts/test-runner.sh tests/integration/server/
 ```
 
-The full server/entity suite is `npm run test:all`; it does not include browser
-scenarios. Use `npm run test:integration:browser` for those. Run timed benchmarks
+The full unit and server/entity suites run through `npm run test:all`. Run timed benchmarks
 separately from tests, builds, coverage and other benchmarks. Transport accepts a
-single revision because realtime scheduling is nondeterministic. The integration
-runner owns its server processes and ports; use that ownership model for the
-proposed production realtime benchmark instead of attaching to arbitrary local
-servers.
+single revision because realtime scheduling is nondeterministic. The manual
+benchmark runner owns its server processes and ports; retain that ownership model
+for the proposed production realtime benchmark instead of attaching to arbitrary
+local servers. Code integration owns an isolated Vitest worker; its socket
+scenarios create and close port-zero loopback servers.
 
 ## Observability, rollout, and completion
 
@@ -329,7 +324,6 @@ Repository evidence is pinned to `54d8c18d4ce25b3ea6af731582bd615666761a85`, wit
 [^5]: MDN, [JavaScript performance optimization](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Performance/JavaScript), accessed September 8, 2026.
 [^6]: Playwright, [Emulation](https://playwright.dev/docs/emulation), accessed September 8, 2026.
 [^7]: Chrome for Developers, [Throttling](https://developer.chrome.com/docs/devtools/settings/throttling), accessed September 8, 2026.
-[^8]: Playwright, [Assertions](https://playwright.dev/docs/test-assertions), accessed September 8, 2026.
 [^9]: Vitest, [Coverage](https://vitest.dev/guide/coverage.html), accessed September 8, 2026.
 [^10]: MDN, [Optimizing canvas](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas), accessed September 8, 2026.
 [^11]: MDN, [OffscreenCanvas](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas), accessed September 8, 2026.

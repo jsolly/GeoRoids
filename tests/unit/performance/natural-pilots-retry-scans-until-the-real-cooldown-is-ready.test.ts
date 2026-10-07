@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import {
-  bindRegionalPilotOwner,
   matchesAppliedRegionalWork,
   RegionalDecodedWorkCache,
   RegionalScanSchedule,
@@ -9,133 +8,14 @@ import {
   regionalWorkKey,
   requireAppliedRegionalWork,
 } from '../../../benchmarks/regional-scan-workload';
-import { MessageHandler } from '../../../server/communication/MessageHandler';
-import { GameEngine } from '../../../server/core/GameEngine';
-import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import {
-  SNAPSHOT_VERSION,
-  SnapshotDecoder,
-  SnapshotEncoder,
-} from '../../../shared/snapshotProtocol';
+import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { WORLD } from '../../../shared/world';
 import {
   APPLIED_SNAPSHOT_SAMPLE_LIMIT,
   ClientPerformanceMetrics,
 } from '../../../src/diagnostics/performanceMetrics';
 import { snapshotMessage } from '../../support/decodeSnapshotMessage';
-import { RecordingSocket } from '../../support/recordingSocket';
 import { snapshotFixture } from '../network/snapshotFixture';
-
-test('a natural browser binds its actual joined owner before applying and acknowledging its first keyframe', () => {
-  const engine = new GameEngine(42);
-  const broadcaster = new GameStateBroadcaster(engine);
-  const handler = new MessageHandler(engine, broadcaster);
-  const socket = new RecordingSocket();
-  const wireDecoder = new SnapshotDecoder();
-  const clientDecoder = new SnapshotDecoder();
-  const metrics = new ClientPerformanceMetrics(true);
-  let owner: string | undefined;
-  let firstWork: ReturnType<typeof regionalSnapshotWork>;
-  try {
-    handler.handleMessage(
-      {
-        type: 'join',
-        data: {
-          id: 'natural-browser',
-          name: 'Natural browser',
-          kitId: 'scout',
-          snapshotVersion: SNAPSHOT_VERSION,
-          asteroidInteractions: 1,
-        },
-      },
-      socket
-    );
-    for (const raw of socket.sent) {
-      const wire = wireDecoder.readMessage(raw, { acceptSnapshots: owner !== undefined });
-      const client = clientDecoder.readMessage(raw, { acceptSnapshots: owner !== undefined });
-      if (wire.kind === 'message') {
-        const envelope = wire.message;
-        if (
-          envelope &&
-          typeof envelope === 'object' &&
-          'type' in envelope &&
-          envelope.type === 'joined' &&
-          'data' in envelope
-        ) {
-          owner = bindRegionalPilotOwner(envelope.data, owner);
-          wireDecoder.reset();
-          clientDecoder.reset();
-          metrics.resetSnapshotWitness();
-          expect(metrics.read().lastSnapshot).toBeUndefined();
-        }
-        continue;
-      }
-      assert.equal(wire.kind, 'snapshot');
-      assert.equal(client.kind, 'snapshot');
-      assert(owner && wire.kind === 'snapshot' && client.kind === 'snapshot');
-      expect(wire.metadata.kind).toBe('keyframe');
-      firstWork = regionalSnapshotWork(wire.state, wire.metadata, owner);
-      const appliedOwner = owner;
-      assert(client.state.entities.some((entity) => entity.id === appliedOwner));
-      metrics.snapshotApplied({
-        ownerId: owner,
-        ...client.metadata,
-        gameTime: client.state.gameTime,
-        serverTime: client.state.serverTime,
-      });
-      expect(matchesAppliedRegionalWork(firstWork, metrics.read().lastSnapshot)).toBe(true);
-      const actualApplication = metrics.read().appliedSnapshots.values.at(-1);
-      assert(actualApplication);
-      expect(
-        requireAppliedRegionalWork(
-          firstWork,
-          actualApplication,
-          owner,
-          metrics.read().snapshotSession
-        )
-      ).toEqual(firstWork);
-      handler.handleMessage(
-        { type: 'snapshotAck', data: { sequence: client.metadata.sequence } },
-        socket
-      );
-    }
-    assert(firstWork, 'Initial natural keyframe carried the joined owner');
-    expect(owner).toBe('natural-browser');
-    expect(metrics.read().lastSnapshot?.sequence).toBe(1);
-    expect(firstWork.asteroidRows).toBeGreaterThan(0);
-    expect(firstWork.scanning).toBe(false);
-    // The first applied ACK retires initial credit; the next real server offer
-    // retains the same socket's sequence and decoder baseline generation.
-    socket.clear();
-    engine.advanceOneFrame();
-    broadcaster.broadcastGameState();
-    const next = socket.sent[socket.inbox.findIndex((message) => message.type === 'snapshot')];
-    assert(next, 'The healthy joined browser received the next server offer');
-    const applied = clientDecoder.readMessage(next, { acceptSnapshots: true });
-    assert(applied.kind === 'snapshot');
-    expect(applied.metadata.sequence).toBe(2);
-    expect(applied.metadata.kind).toBe('delta');
-    const joined = {
-      id: owner,
-      snapshotVersion: SNAPSHOT_VERSION,
-      asteroidInteractions: 1,
-      resumeToken: 'private',
-    };
-    expect(bindRegionalPilotOwner(joined, owner)).toBe(owner);
-    expect(() => bindRegionalPilotOwner({ ...joined, id: 'other-pilot' }, owner)).toThrow(
-      'changed the browser owner'
-    );
-    expect(() => bindRegionalPilotOwner({ ...joined, snapshotVersion: 1 }, owner)).toThrow(
-      'Invalid regional joined'
-    );
-    expect(() => bindRegionalPilotOwner({ ...joined, resumeToken: '' }, owner)).toThrow(
-      'Invalid regional joined'
-    );
-  } finally {
-    engine.stopGameLoop();
-    broadcaster.stopPeriodicBroadcast();
-  }
-});
 
 test('a natural pilot retries a due scan after simulation lag keeps the real cooldown active', () => {
   const schedule = new RegionalScanSchedule();

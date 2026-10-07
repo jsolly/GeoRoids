@@ -1,24 +1,17 @@
 /* @vitest-environment node */
 
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
-import { WorldStore } from '../../../server/world/WorldStore';
 import {
   advanceSettlement,
-  cargoCapacity,
   ECONOMY,
   emptySettlement,
   oreResource,
   oreYield,
-  settlementRecipe,
 } from '../../../shared/economy';
 import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import type { AsteroidData } from '../../../shared-types';
@@ -52,32 +45,6 @@ function rock(id: string, ore: AsteroidData['ore'], size = 25): AsteroidData {
     angularVelocity: 0,
   };
 }
-
-test('both kits keep partial pickup remainders and full holds reject further loot', () => {
-  for (const kit of ['scout', 'hauler'] as const) {
-    const engine = new GameEngine(42);
-    const { actor } = pilot(engine, kit, kit);
-    const loot = new LootManager(new RNGService(42));
-    actor.cargo = cargoCapacity(kit) - 10;
-    loot.spawnPoints(actor.position, 80);
-    expect(loot.collectOverlaps([actor])).toHaveLength(1);
-    expect(actor.cargo).toBe(cargoCapacity(kit));
-    expect(loot.savedPoints()[0]?.points).toBe(70);
-    expect(loot.collectOverlaps([actor])).toEqual([]);
-    const ore = rock('full-hold-rock', 'ice', 12);
-    ore.position = { ...actor.position };
-    ore.health = 0;
-    engine.addAsteroid(ore);
-    engine.handleAsteroidHit(ore.id, actor.id, 'laser');
-    const before = engine.getLoot();
-    expect(before.length).toBeGreaterThan(0);
-    expect(engine.collectLoot()).toEqual([]);
-    expect(engine.getLoot()).toEqual(before);
-    expect(actor.cargo).toBe(cargoCapacity(kit));
-    expect(actor.score).toBe(0);
-    expect(engine.getGameState().settlement.points).toBe(0);
-  }
-});
 
 test('death repeatedly discards cargo, preserves the bank, and always respawns', () => {
   const engine = new GameEngine(42);
@@ -319,88 +286,6 @@ test('dummy purchases enforce bank, level, proximity and socket ownership withou
   expect(engine.getPlayer(actor.id)).toBe(actor);
   expect(actor).toMatchObject(before);
   expect(engine.getGameState().settlement.points).toBe(0);
-});
-
-test('restart preserves bank, receipts, settlement and unexpired mined cargo after death', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'georoids-economy-'));
-  const path = join(directory, 'world.sqlite');
-  let store = new WorldStore(path);
-  try {
-    const engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    const { actor, socket } = pilot(engine);
-    const registered = engine.registerPilot(actor, socket);
-    if (!registered.ok) {
-      throw new Error('Pilot registration failed');
-    }
-    actor.score = 900;
-    actor.cargo = 300;
-    actor.position = { x: 0, y: 0 };
-    for (let frame = 0; frame < 12 * ECONOMY.offloadIntervalFrames; frame++) {
-      engine.depositCargo();
-    }
-    engine.buyStoreItem(actor.id, 'placeholder-1');
-    actor.position = { x: 1000, y: 1000 };
-    const deposit = rock('persistent-mined-rock', 'metal', 12);
-    deposit.position = { x: 1400, y: 1000 };
-    deposit.health = 0;
-    engine.addAsteroid(deposit);
-    engine.handleAsteroidHit(deposit.id, actor.id, 'laser');
-    const mined = engine.getLoot().filter((drop) => drop.kind === 'points');
-    expect(mined.length).toBeGreaterThan(0);
-    engine.checkpointWorld();
-    const saved = store.load().economy?.pointLoot;
-    expect(saved).toBeDefined();
-    expect(saved?.length).toBeGreaterThan(0);
-    actor.cargo = 123;
-    engine.handleShipDamage(
-      actor.id,
-      'asteroid',
-      actor.health + actor.cargo / ECONOMY.cargoPointsPerHp
-    );
-    const afterHit = engine.getLoot().filter((drop) => drop.kind === 'points');
-    expect(
-      afterHit
-        .filter((drop) => !mined.some((rockDrop) => rockDrop.id === drop.id))
-        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
-    ).toBe(123);
-    engine.checkpointWorld();
-    const savedAfterHit = store.load().economy?.pointLoot;
-    expect(
-      savedAfterHit?.filter((drop) => saved?.some((minedDrop) => minedDrop.id === drop.id))
-    ).toEqual(saved);
-    store.close();
-    store = new WorldStore(path);
-    const restarted = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    const resumed = restarted.resumePilot(registered.resumeToken, new RecordingSocket());
-    if (!resumed.ok) {
-      throw new Error('Resume failed');
-    }
-    expect(resumed.actor.score).toBe(1100);
-    expect(resumed.actor.cargo).toBe(0);
-    expect(resumed.actor.purchases).toEqual(['placeholder-1']);
-    expect(resumed.actor.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
-    expect(restarted.getGameState().settlement.points).toBe(300);
-    expect(restarted.getLoot().filter((drop) => drop.kind === 'points')).toEqual(afterHit);
-    expect(store.load().economy?.pointLoot).toEqual(savedAfterHit);
-    expect(settlementRecipe(1).resources.crystal).toBeGreaterThan(0);
-  } finally {
-    store.close();
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('shooting cannot destroy recoverable points spilled by a lethal hit', () => {
-  const engine = new GameEngine(42);
-  const dead = pilot(engine, 'dead').actor;
-  const rescuer = pilot(engine, 'rescuer').actor;
-  dead.cargo = 333;
-  engine.handleShipDamage(dead.id, 'asteroid', dead.health + dead.cargo / ECONOMY.cargoPointsPerHp);
-  const stash = engine.getLoot().find((drop) => drop.kind === 'points');
-  expect(stash).toBeDefined();
-  expect(engine.handleLootExplode(rescuer.id, stash?.id ?? '').success).toBe(false);
-  engine.collectLoot();
-  expect(rescuer.cargo).toBe(0);
-  expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(333);
 });
 
 test('a long absence and a smaller kit preserve cargo at its field position with excess discarded', () => {

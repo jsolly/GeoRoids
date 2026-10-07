@@ -1,7 +1,16 @@
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+  writeSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
+import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import {
   atomicReceipt,
@@ -15,6 +24,7 @@ import {
 } from './gate-receipt.mjs';
 import { literalOnlyChange } from './literal-only-change.mjs';
 import { validateReviewReceipt } from './review-receipt.mjs';
+import { runAdmitted, verifyChild } from './validation-admission.mjs';
 
 function sourceTexts(root, rows) {
   return Object.fromEntries(
@@ -67,11 +77,39 @@ function prepareTools({ root, environment }) {
     maxBuffer: 64 * 1024 * 1024,
   });
 }
-export function runGate({
+async function runStage(command, args, { artifact, ...options }) {
+  const output = openSync(artifact, 'w', 0o600);
+  try {
+    return await new Promise((accept) => {
+      // Keep stages in the admission supervisor's process group for cancellation.
+      const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      let error;
+      child.once('error', (failure) => {
+        error = failure;
+      });
+      for (const stream of [child.stdout, child.stderr]) {
+        stream.on('data', (chunk) => writeSync(output, chunk));
+        createInterface({ input: stream }).on('line', (line) => {
+          if (
+            /^(Waiting for heavy validation (?:admission,|ticket allocation:)|Heavy validation admitted,|Review artifacts:|Review exit )/u.test(
+              line
+            )
+          ) {
+            process.stderr.write(`${line}\n`);
+          }
+        });
+      }
+      child.once('close', (status, signal) => accept({ status, signal, error }));
+    });
+  } finally {
+    closeSync(output);
+  }
+}
+export async function runGate({
   root,
   environment = process.env,
   capture = identity,
-  run = spawnSync,
+  run = runStage,
   validateReview = validateReviewReceipt,
   prepare = prepareTools,
 }) {
@@ -135,21 +173,22 @@ export function runGate({
       writeFileSync(artifact, `Literal-only graph witness: ${prior.graphWitness}\n`);
     } else {
       process.stdout.write(`Gate: ${name}\n`);
-      // Vite/Vitest honor this cache home; shard children replace it with their
-      // own authenticated session, while serial benchmark children inherit it.
+      // Vite/Vitest honor this cache home; code integration owns its own
+      // isolated artifact session.
       const sessionDirectory = join(directory, `session-${stages.length}`);
       mkdirSync(sessionDirectory);
-      const result = run('npm', ['run', command], {
+      const result = await run('npm', ['run', command], {
+        artifact,
         cwd: root,
         env: {
           ...environment,
           GEOROIDS_REVIEW_RECEIPT: reviewReceipt,
           GEOROIDS_TEST_SESSION_DIR: sessionDirectory,
+          ...(command === 'check:test-runner'
+            ? { GEOROIDS_CONTRACT_EVIDENCE_DIR: join(sessionDirectory, 'contracts') }
+            : {}),
         },
-        encoding: 'utf8',
-        maxBuffer: 64 * 1024 * 1024,
       });
-      writeFileSync(artifact, `${result.stdout ?? ''}${result.stderr ?? ''}`);
       if (result.status !== 0 || result.signal || result.error) {
         throw new Error(
           `Gate ${name} failed (${result.status ?? result.signal ?? result.error}); diagnostics: ${artifact}`
@@ -222,7 +261,17 @@ export function runGate({
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    runGate({ root: fileURLToPath(new URL('../', import.meta.url)) });
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    if (process.argv[2] === '--validation-child') {
+      verifyChild(root, 'checkout');
+      await runGate({ root });
+    } else {
+      process.exitCode = await runAdmitted(
+        'checkout',
+        [process.execPath, fileURLToPath(import.meta.url), '--validation-child'],
+        { root }
+      );
+    }
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

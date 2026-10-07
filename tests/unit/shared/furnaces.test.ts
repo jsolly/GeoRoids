@@ -143,11 +143,10 @@ test('a furnace stays dark until its inward parent lot is lit', () => {
 
 test('scatter keeps index parents even when another inward lot is closer', () => {
   const mismatches: string[] = [];
-  for (const lot of CIVIC_LOTS) {
-    if (lot.ring === 1) {
-      expect(lot.parentId).toBe(TOWN_HEARTH.id);
-      continue;
-    }
+  for (const lot of CIVIC_LOTS.filter((candidate) => candidate.ring === 1)) {
+    expect(lot.parentId).toBe(TOWN_HEARTH.id);
+  }
+  for (const lot of CIVIC_LOTS.filter((candidate) => candidate.ring !== 1)) {
     const candidates =
       lot.ring === 2
         ? CIVIC_LOTS.filter((other) => other.ring === 1)
@@ -190,11 +189,16 @@ test('a furnace pipe turns at right angles through each inward parent lot to Tow
     expect(hop[0]).toEqual(lot.position);
     expect(hop[hop.length - 1]).toEqual(parent);
     axisAligned(hop);
+  }
+  const bentLots = CIVIC_LOTS.filter((lot) => {
+    const parent =
+      lot.parentId === TOWN_HEARTH.id ? TOWN_HEARTH.position : civicLot(lot.parentId)?.position;
     const spanX = Math.abs((parent?.x ?? 0) - lot.position.x);
     const spanY = Math.abs((parent?.y ?? 0) - lot.position.y);
-    if (spanX >= 1 && spanY >= 1) {
-      expect(cornerCount(hop)).toBeGreaterThanOrEqual(3);
-    }
+    return spanX >= 1 && spanY >= 1;
+  });
+  for (const lot of bentLots) {
+    expect(cornerCount(pipeHopToParent(lot.id))).toBeGreaterThanOrEqual(3);
   }
   const toTown = pipeToTownSquare(third.id);
   expect(toTown[0]).toEqual(third.position);

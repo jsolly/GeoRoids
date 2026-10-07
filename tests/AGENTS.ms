@@ -1,191 +1,99 @@
 # Writing GeoRoids tests
 
-Tests explain a game feature and prove its expected behavior. Optimize for a
-small, trustworthy suite that a maintainer can understand. Coverage percentage
-and test count are not goals.
-
-## Start with a scenario
-
-Name the player or system event and its outcome. Good examples:
-
-- An asteroid impact removes health while unbounced crew lasers pass through ships.
-- Both pilots see the same shot, then remove it when it expires.
-- A furnace delivery gives the Scout and Hauler the same points.
-- An asteroid collision costs one life, then the ship respawns inside the arena.
-- A failed connection returns to the menu and a retry joins successfully.
-
-Avoid names such as “collision system works,” “debug regeneration,” or “handles
-messages correctly.” Each test should tell one coherent story. Related outcomes
-of that story belong together; unrelated features need separate setup.
+Tests explain a player or system event and prove its expected behavior. Prefer a
+small, trustworthy suite. Coverage percentage and test count are not goals.
+Browser tests are retired; automated tests execute code without launching a browser.
 
 ## Arrange, act, observe
 
-1. Arrange explicit participants, IDs, roles, positions, health preconditions,
-   protection state, and clocks. Use a fresh world or object graph for each test.
-2. Perform the action through the boundary being tested: input, a socket message,
-   the collision resolver, a lifecycle tick, or a public API.
-3. Observe a result that would fail if that behavior broke. Prefer exact damage,
-   the identified victim/projectile/drop, credited score, the actual death cause,
-   a lifecycle transition, or rendered UI output.
+1. Arrange explicit participants, IDs, positions, health, protection state and
+   clocks. Use a fresh world or object graph for each test.
+2. Act through the boundary being tested: input handler, socket message,
+   collision resolver, lifecycle tick or public API.
+3. Assert a result that fails when the behavior breaks: exact damage, identified
+   victim/projectile/drop, credited score, death cause or lifecycle transition.
 
-Setting a ship's health to 25 can arrange a weakened ship. Setting it to zero and
-then asserting that its health is zero does not test death. A screenshot or an
-entity count cannot prove that a hit, collision, pickup, or respawn happened.
+Name the event and outcome, rather than the implementation function. Setting
+health to zero and asserting zero does not test death. Snapshot mutable
+preconditions by value. Await asynchronous operations, assertions and cleanup.
 
-Snapshot preconditions by value. Do not retain a mutable position object and
-compare it with itself after the action. An asynchronous test must await the
-operation and its assertion; cleanup must also complete.
+## Deterministic setup
 
-## Keep setup deterministic and simple
+- Use fixed seeds and controlled clocks when elapsed time affects the result.
+  Advance explicit ticks rather than starting an unnecessary real-time loop.
+- A manual simulation frame does not necessarily advance the server clock.
+  Inspect shared fixtures and production deadlines, including reconnect grace,
+  projectile expiry, pose age and saved-flight restoration.
+- Reset worlds, singletons, mocks, clocks and configuration between cases.
+- Include only the actors and world needed for the interaction. Identify targets
+  explicitly and disable unrelated motion, contours or hazards when appropriate.
+- Keep helpers small and reuse production geometry rather than implementing a
+  second physics engine.
+- Delete any case without a solid deterministic result. Do not hide failures
+  with retries, skips, broad tolerances, weaker assertions or longer timeouts.
 
-- Use fixed seeds and controlled clocks for simulation rules. Advance explicit
-  ticks instead of starting an unnecessary real-time loop.
-- Reset world, singleton, mock, clock, and configuration state between tests.
-- Use the local test controls to arrange browser scenes and synchronize the
-  authoritative pose. Those controls must not produce the outcome under test.
-- Isolate the chosen interaction from unrelated asteroids, satellite pickups,
-  drops, and previous deaths. Identify targets explicitly; do not pick an
-  arbitrary first entity and hope ambient combat creates the desired result.
-- Keep fixture helpers small. Prefer a controlled starting scene over a browser
-  helper that searches for targets, navigates hazards, and retries combat.
-- Reuse existing geometry or simulation functions when arranging a scene. Do
-  not implement a second physics engine in test helpers.
+Use bounded condition waits for owned I/O. A cleanup/watchdog deadline bounds a
+failed operation; it is not a speed assertion. Fixed sleeps do not prove that an
+action succeeded. Control the clock when passage of time is the rule being tested.
+Observe transient events before triggering them.
 
-Crew arrangement preflights every requested live pilot, OPEN transport and motion
-session before changing the shared field. Await the returned motion epoch with
-`waitForControlledFixture` for controlled scenes; use `placeControlledShipAt`
-for safe placement. Shared-field rendering scenes identify their stationary and
-moving targets and place pilots clear of both; generated drift-mix statistics stay
-in their natural-world rule tests. Bitmap checks distinguish CSS viewport size
-from device-pixel backing dimensions on touch contexts. A newer epoch or dead pilot is a setup failure, never an
-invitation to revive or retry. Keep `placeShipAt` for intentionally lethal
-scenarios that assert the actual death cause and resulting lifecycle.
-
-The reset barrier requires both an empty paused world and departed owned sockets.
-Teardown still attempts reset when page closing fails, and propagates both errors.
-Use `withFixtureEvidence` for lifecycle-sensitive scenes: its retained JSON records
-revision, dirty-tree digest, architecture, Node/Playwright/browser versions, seed,
-stage durations, socket membership, health, pose, motion epoch and transit. HTTP
-fixture failures retain their actual status and response body. Server/client
-capture runs independently so a failed read cannot erase its available counterpart.
-Nested teardown failures and causes are retained within bounded, cycle-safe error
-evidence. Controlled alignment rechecks liveness and the epoch in the same browser
-task as its pose writes. Never serialize
-storage or resume credentials. A dirty-tree run is development evidence, not a
-pinned-release repeatability result.
-
-Browser scenarios use the running game's animation clock. Use
-`waitForAnimationFrames` or wait for the expected state; never call `updateGame`
-alongside the active loop. Hold real keyboard, mouse, or touch input to test
-controls, and release held input in cleanup.
-
-Begin observing transient banners, shots, and events before triggering them.
-Use bounded waits for the actual condition. An immediate destruction event can
-precede the next loot snapshot. A socket receive log can precede validation.
-A fixed sleep is appropriate only when passage of time is itself part of the
-scenario; it is not evidence that an action succeeded.
-
-## Put the proof at the right level
+## Put proof at the right level
 
 | Level | Use it for |
 | --- | --- |
-| Unit | Deterministic game rules, collision geometry, protocol validation, state transitions, and failure boundaries. |
-| Server integration | Real transport negotiation, authoritative shared state, reconnects, and server lifecycle. |
-| Entity integration | Interactions between components/entities through real simulation operations. |
-| Browser | Real input, rendered state, HUD feedback, responsive controls, and multiplayer flows requiring a browser. |
+| Unit | Game rules, geometry, protocol validation, state transitions, executed DOM/canvas calls and failure boundaries. |
+| Server integration | Owned real transport negotiation, authoritative state and server lifecycle. |
+| Entity integration | Interactions between components/entities through real operations. |
 
-Mocks should control external boundaries or failure conditions. A mock should
-not return the exact gameplay outcome the test claims to verify. Model state
-can prove synchronization; it cannot alone prove that a HUD element was drawn.
-Use rendered evidence for a test named after UI behavior.
-Matching tokens in renderer source cannot prove drawing behavior; observe the
-executed canvas calls or rendered output instead.
+Mocks control external boundaries or failures; they must not return the exact
+outcome being claimed. Source-token matches cannot prove game behavior or drawing.
+Observe executed canvas calls or DOM state for those claims. Static contract tests
+may inspect configuration or dependency policy when that is the actual contract.
+Keep independent known positions, counts or ratios when expected geometry uses a
+production helper, so the helper cannot change both sides of the assertion.
 
-When expected rendering uses a production geometry helper, retain independent
-checks on the captured output, such as known positions, vertex counts, or scale
-ratios. Otherwise a helper that ignores a scale argument can change both the
-rendering and its expected result while the test still passes.
+Keep negative cases for invalid ownership, malformed commands, production-disabled
+controls, limits, failed writes and deadlines. Trigger the actual rejection or
+failure. Give concurrent operations distinguishable results. Diagnostics cases
+must trigger the transition or transport/write failure before inspecting the
+correlated record; hand-authored log envelopes do not prove runtime logging.
 
-Keep important negative scenarios: invalid ownership, malformed commands,
-production-disabled controls, resource limits, failed writes, deadlines, and
-reconnect exhaustion. Exercise the observable rejection or failure rather than
-asserting an implementation option. Give concurrent operations distinguishable
-results so the test can detect incorrectly shared completion.
+Shared transport fixtures live in `tests/support/`. `RecordingSocket` models an
+in-process boundary; `WireClient` owns a real loopback connection and bounded
+cleanup. Random private token values are compared only within their owned run.
 
-Diagnostics scenarios must preserve the causal boundary too: trigger an actual
-state transition or write/transport failure, then inspect its correlated record
-and outcome. A hand-authored log envelope cannot prove that the runtime logger
-retains player IDs or event-time values. Control clocks and mutate the source
-after logging when proving that recorded state is a detached observation.
+## Consolidate
 
-Shared transport fixtures used across test levels live in `tests/support/`.
-`RecordingSocket` models an in-process transport boundary; `WireClient` owns a
-real loopback connection and its bounded lifecycle. Keep their use explicit.
+Find the canonical scenario before adding a test. Extend it when the assertion
+belongs to the same story. Delete unconditional passes, placeholders,
+assignment-only assertions and weaker duplicates. Record lost coverage honestly.
 
-## Consolidate instead of accumulating
+## Run and report
 
-Before adding a test, find the canonical scenario for the same feature. Extend
-that scenario when the new assertion belongs to its story. Keep a separate test
-only when it proves a distinct behavior or boundary.
+From the absolute GeoRoids checkout directory, use `npm test` for all units.
+Focused units may use `npx vitest run tests/unit/<scenario>.test.ts`.
+Always use `./scripts/test-runner.sh` for server/entity integration; never raw
+Vitest on `tests/integration/`. The runner owns one isolated Vitest worker and
+per-run artifacts, stops only its process tree and defaults to a 1200-second
+execution deadline. Socket scenarios create and close their own port-zero
+loopback servers; the code runner starts no Vite/server pair. Run the complete literal server/entity inventory
+with `npm run test:integration`; there is no shard or browser lane.
 
-Delete unconditional passes, placeholder tests, assignment-only assertions,
-constructor smoke repeated under feature names, and weaker duplicates. When
-consolidating, carry forward unique meaningful assertions and record where the
-behavior is now proved. Do not retain a test merely to keep coverage numbers up.
-Do not hide a failure with retries, skipped tests, broad tolerances, a weaker
-assertion, or a longer timeout. Diagnose the setup or behavior first.
+Code checks may overlap across different worktrees. Validation in the same
+checkout excludes overlap. Do not attach to an existing developer service.
+Cleanup failures fail the run. Report the commands actually run, skipped checks
+and removed coverage. `npm run gate` remains the complete pre-publication gate.
+All enabled lint findings are errors; do not add suppressions to get green.
 
-## Run and report honestly
+## Manual performance and media tools
 
-From the GeoRoids checkout, use `npm test` for unit tests. A focused unit file may
-run with `npx vitest run tests/unit/<scenario>.test.ts`.
+Keep measurement fixtures under `benchmarks/`; production must not import them.
+Deterministic benchmark contract tests prove workload validation or cleanup, not
+elapsed-time thresholds or native browser comparisons. Browser benchmarks,
+frame measurements and Wiki media generation are manual tools outside the gate.
+Playwright is retained for them. Manual runner/frame measurements enter the
+common-Git heavyweight queue and retain their complete outcome and cleanup evidence.
 
-Always run integration tests through `./scripts/test-runner.sh`; never invoke
-raw Vitest on `tests/integration/`. The runner owns the Vite/server pair and
-serializes each child. Full runs may use its authenticated six-shard coordinator;
-standalone callers cannot select a partial shard. Do not overlap coordinators or
-standalone integration runners or attach to an
-existing developer server. Run unit and integration batches separately when
-they share logging or other process resources.
-
-A failed reset, fixture operation, evidence read, or cleanup must fail the run.
-Report the commands and results actually run, including any skipped or removed
-tests. Screenshots are diagnostics, not a success criterion. The repository's
-full pre-push gate remains `npm run gate`. All lint findings are errors, and
-the CLI also rejects warnings. Fix the code or simplify the scenario; do not
-add suppressions, downgrade rules, or weaken an assertion to pass the gate.
-
-## Performance measurement
-
-Keep measurement fixtures and instrumentation under `benchmarks/`; production
-modules must not import them. Benchmark contract tests belong in
-`tests/unit/performance/` and prove rejected changed workloads, invalid results,
-or cleanup failures. Elapsed-time thresholds stay outside the test gate because machine scheduling
-is not a deterministic correctness assertion. The full local `npm run gate`
-also runs constrained production-client scenarios to validate gameplay and
-measurement correctness; their timing samples are diagnostic, not speed gates.
-
-Compare equivalent scenarios with the same pinned harness. Preserve raw timing
-samples, declared participants, final game state, and exact work counts. A faster
-run that lost a player or skipped work is invalid. Canvas API calls and payload
-bytes are structural counts; elapsed time and frame pacing need calibrated
-repeated measurements. Follow `benchmarks/README.md` for the supported commands.
-
-For controlled reflective shots, arrange canonical identified bumpers on the
-server, await the exact live pilot epoch, and require a non-null shot receipt.
-Count bounces only on that accepted projectile ID. Retain selected authoritative
-rock rows and rejected receipts; a later passing sample does not establish the
-cause of an earlier failure. Capture artifacts before disposing browser handles,
-but attempt every restoration even when capture or the scenario fails.
-
-## Native lifecycle repeatability
-
-Use the [pinned native repeatability runner](../docs/integration-repeatability.md)
-when investigating browser lifecycle flakiness. Retain every attempt and its native
-architecture, versions, seed/order inputs, exit, timing and failure evidence. Read
-native state alongside event-published observations; cached diagnostic state alone
-cannot distinguish a native failure from an observation failure. Capture native
-control calls, settlements and trusted gestures before browser cleanup. Preserve
-browser authorization, existing behavior budgets and real playback assertions.
-A smaller diagnostic sample or an incomplete run never satisfies the approved full
-sample. Do not retry a failed attempt until it disappears from the report.
+Compare equivalent scenarios with a pinned harness and preserve raw samples,
+participants, final state and exact work counts. Timing and frame pacing need
+calibrated repeated measurements. Follow [benchmark guidance](../benchmarks/README.md).

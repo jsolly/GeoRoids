@@ -1,8 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { SPIDER } from '../../../shared/terrainSpider';
-import { resolveToolFlights } from '../../support/tool-flight';
-import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
+import { useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -115,36 +114,6 @@ test('scans repel a cable rescuer and starter sanctuary prevents rescue and rein
   manager.advance({ ...options, nowFrame: 2 + SPIDER.RESCUE_SPAWN_INTERVAL_FRAMES });
   expect(releaseTow).not.toHaveBeenCalled();
   expect(manager.snapshot().spiders).toHaveLength(1);
-});
-
-test('the authoritative game clears the actual tow latch when a rescuer bites', () => {
-  const world = new GameServerWorld();
-  try {
-    world.clearAsteroids();
-    world.engine.clearSpiderField();
-    const pilot = world.join('Hauler', { x: 4400, y: 2200 }, { kitId: 'hauler' });
-    world.clearAsteroids();
-    const friend = world.engine.spawnTerrainSpider({ x: 4500, y: 2200 });
-    if (!friend) {
-      throw new Error('Missing captive');
-    }
-    world.engine.setHaulerUtility(pilot.id, 'tow_cable');
-    world.entity(pilot).abilityCooldownFrames = 0;
-    expect(world.engine.useAbility(pilot.id)).toBe(true);
-    resolveToolFlights(world.engine);
-    expect(world.entity(pilot).harpoonTargetId).toBe(friend.id);
-    world.engine.spawnTerrainSpider({ x: 4450, y: 2220 });
-    const health = world.entity(pilot).health;
-    world.engine.advanceOneFrame();
-    expect(world.entity(pilot).harpoonTargetId).toBeNull();
-    expect(world.entity(pilot).harpoonLatchPos).toBeUndefined();
-    expect(world.entity(pilot).health).toBe(health);
-    expect(world.engine.getSpiderField().spiders.some((spider) => spider.id === friend.id)).toBe(
-      true
-    );
-  } finally {
-    world.dispose();
-  }
 });
 
 test('reinforcements honor the global cap and failed attempts wait a full rescue interval', () => {

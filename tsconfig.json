@@ -30,7 +30,6 @@
     "tests",
     "scripts",
     "vitest.config.ts",
-    "vitest.browser.config.ts",
     "vite.config.ts",
     "setup",
     "server",

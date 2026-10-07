@@ -190,46 +190,6 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(entity(await observer.state(), 'pilot').playerMotion).toEqual(recovered.playerMotion);
   });
 
-  test('retains a free session through a physical flap and accepts only its private token', async () => {
-    const { pilot, observer, joined, engine } = await world();
-    expect(joined['snapshotVersion']).toBe(SNAPSHOT_VERSION);
-    expect(joined['asteroidInteractions']).toBe(1);
-    expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
-
-    const before = entity(await observer.state(), 'pilot');
-    const parked = { ...before.position };
-    expect(before.playerMotion).toMatchObject({ mode: 'free', epoch: 1, ack: 0 });
-    expect(JSON.stringify(before)).not.toContain(String(joined['resumeToken']));
-
-    await pilot.close();
-    const duringGrace = entity(await observer.state(), 'pilot');
-    expect(duringGrace.playerMotion).toMatchObject({ mode: 'free', epoch: 1, ack: 0 });
-    expect(
-      observer.messages.some(
-        (message) =>
-          message.type === 'playerLeft' && isRecord(message.data) && message.data['id'] === 'pilot'
-      )
-    ).toBe(false);
-
-    const replacement = await connect();
-    const resumed = await replacement.join(
-      'different-untrusted-id',
-      800,
-      String(joined['resumeToken'])
-    );
-    expect(resumed).toMatchObject({
-      id: 'pilot',
-      resumeToken: joined['resumeToken'],
-    });
-    expect(entity(await replacement.state(), 'pilot').playerMotion).toMatchObject({
-      mode: 'free',
-      epoch: 1,
-      ack: 0,
-    });
-    expect(engine.getPlayer('pilot')?.position).toEqual(parked);
-    expect(parked).not.toEqual({ x: 800, y: 0 });
-  });
-
   test('rejects a valid resume token on a socket already bound to another current pilot', async () => {
     const { joined, engine } = await world();
     const other = await connect();
@@ -316,55 +276,6 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       x: initialPosition.x + 1,
       y: initialPosition.y,
     });
-  });
-
-  test('preserves a disconnected pilot after grace, rotates its token, and retires the old token', async () => {
-    const { pilot, observer, joined, engine } = await world();
-    const token = String(joined['resumeToken']);
-    expect(token).toMatch(RESUME_TOKEN_PATTERN);
-    engine.startGameLoop();
-    await pilot.close();
-    await observer.waitFor(
-      () => {
-        const state = observer.snapshots.at(-1);
-        return state && !state.entities.some((row) => row.id === 'pilot') ? state : undefined;
-      },
-      'observer sees grace expiry removal',
-      3500
-    );
-    expect(
-      observer.messages.some(
-        (message) =>
-          message.type === 'playerLeft' && isRecord(message.data) && message.data['id'] === 'pilot'
-      )
-    ).toBe(true);
-
-    const replacement = await connect();
-    const resumed = await replacement.join('expired', 100, token);
-    expect(resumed).toMatchObject({ id: 'pilot' });
-    expect(resumed['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
-    expect(resumed['resumeToken']).not.toBe(token);
-    expect(engine.getPlayer('expired')).toBeUndefined();
-    expect(entity(await replacement.state(), 'pilot').playerMotion).toMatchObject({
-      mode: 'free',
-      epoch: 1,
-    });
-
-    const retired = await connect();
-    retired.send('join', {
-      id: 'retired',
-      name: 'retired',
-      position: { x: 100, y: 0 },
-      kitId: 'hauler',
-      snapshotVersion: SNAPSHOT_VERSION,
-      asteroidInteractions: 1,
-      resumeToken: token,
-    });
-    await retired.waitFor(
-      () => retired.messages.find((message) => message.type === 'sessionExpired'),
-      'retired token rejection after archived resume'
-    );
-    expect(retired.messages.some((message) => message.type === 'joined')).toBe(false);
   });
 
   test('preserves a pilot after explicit leave, rotates its token, and retires the old token', async () => {

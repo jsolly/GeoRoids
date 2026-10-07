@@ -1,6 +1,6 @@
 # Knip and ts-prune benchmark
 
-GeoRoids runs **Knip 6.35.1 and ts-prune 0.10.3** as blocking local and CI checks.
+This historical measurement used **Knip 6.35.1 and ts-prune 0.10.3**. Both tools remain blocking local and CI checks with versions pinned in `package.json`.
 Knip checks unused files, dependencies, exports, and types. ts-prune also catches
 unconsumed type export keywords that Knip treats as used through public signatures.
 
@@ -63,7 +63,7 @@ Both tools read that same tree with the installed dependencies. Since the snapsh
 has no `.git` directory, both commands received the actual commit through
 `VERCEL_GIT_COMMIT_SHA` for Vite's required release-identity check.
 
-Knip's entry points include shell-invoked scripts and browser tests. The benchmark
+The measured entry points included shell-invoked scripts and browser tests. Browser test entry points and `vitest.browser.config.ts` are now retired; manual benchmark/media tooling remains live. The benchmark
 restricted its report to exports and types for the symbol comparison; the active
 gate checks all categories and treats configuration and tag hints as errors.
 Its dependency exceptions identify `concurrently`, `markdownlint-cli2`, and

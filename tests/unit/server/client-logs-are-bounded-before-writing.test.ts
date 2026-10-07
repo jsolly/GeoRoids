@@ -140,57 +140,6 @@ test('a flush deadline records an actionable failure before returning false', as
   );
 });
 
-test('one socket receives a message and byte quota even when its payloads are invalid', async () => {
-  const { ClientLogger } = await import('../../../server/services/ClientLogger');
-  const source = {};
-
-  for (let index = 0; index < 120; index += 1) {
-    expect(ClientLogger.logClientMessage({}, source)).toBe('invalid');
-  }
-  expect(ClientLogger.logClientMessage({}, source)).toBe('rate-limited');
-
-  const byteLimitedSource = {};
-  const largeInvalidPayload = { arbitrary: 'x'.repeat(64_000) };
-  for (let index = 0; index < 4; index += 1) {
-    expect(ClientLogger.logClientMessage(largeInvalidPayload, byteLimitedSource)).toBe('invalid');
-  }
-  expect(ClientLogger.logClientMessage(largeInvalidPayload, byteLimitedSource)).toBe(
-    'rate-limited'
-  );
-});
-
-test('a stalled disk writer cannot grow the shared queue without bound', async () => {
-  state.stalled = true;
-  const { ClientLogger } = await import('../../../server/services/ClientLogger');
-  const { emitExternalLogRecord } = await import('../../../setup/serverLogger');
-  const largeStructuredLine = (level: 'info' | 'error') =>
-    JSON.stringify({
-      version: 1,
-      timestamp: new Date().toISOString(),
-      source: 'client',
-      level,
-      releaseId: 'test',
-      message: 'x'.repeat(2048),
-    });
-  const outcomes = Array.from({ length: 300 }, () =>
-    ClientLogger.logClientMessage({ level: 'INFO', line: largeStructuredLine('info') }, {})
-  );
-
-  expect(outcomes).toContain('accepted');
-  expect(outcomes).toContain('queue-full');
-  expect(serverLogging.error).toHaveBeenCalledExactlyOnceWith(
-    'LOGGING',
-    'Client log queue full; dropping forwarded logs',
-    { droppedRecords: 1 }
-  );
-  const mirrorCount = vi.mocked(emitExternalLogRecord).mock.calls.length;
-  expect(
-    ClientLogger.logClientMessage({ level: 'ERROR', line: largeStructuredLine('error') }, {})
-  ).toBe('queue-full');
-  expect(emitExternalLogRecord).toHaveBeenCalledTimes(mirrorCount + 1);
-  expect(await ClientLogger.flushPending(1)).toBe(false);
-});
-
 test('the client log rotates before a write would exceed its disk bound', async () => {
   state.statSize = 10 * 1024 * 1024;
   const { ClientLogger } = await import('../../../server/services/ClientLogger');

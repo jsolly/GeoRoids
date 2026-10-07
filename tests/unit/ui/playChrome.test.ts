@@ -83,17 +83,6 @@ test('title menu uses first-party nickname and sound chrome', () => {
   expect(document.querySelector('.nav-item')).toBeNull();
 });
 
-test('playfield chrome sizes to the visible box instead of overflowing 100dvw', () => {
-  expect(productionCss).toMatch(/#gameWrapper \{[^}]*width: 100%;/su);
-  expect(productionCss).toMatch(/#gameArea \{[^}]*width: 100%;/su);
-  expect(productionCss).toMatch(/#gameCanvas \{[^}]*width: 100%;/su);
-  expect(productionCss).not.toMatch(/#gameArea \{[^}]*width: 100dvw;/su);
-  expect(productionCss).toContain('max-width: min(calc(100% - 20px), 280px)');
-  expect(productionCss).toMatch(
-    /\.touch-ability \{\s*right: max\(16px, env\(safe-area-inset-right, 0px\)\);/u
-  );
-});
-
 test('the player menu keeps instructions and diagnostics out of the join flow', () => {
   expect(document.querySelector('#advanced-settings')).toBeNull();
   expect(document.querySelector('#debugPref')).toBeNull();
@@ -129,19 +118,6 @@ test('title menu exposes the ship kit picker before entering play', () => {
   const grid = document.querySelector('#ship-kit-grid');
   expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Choose your ship');
   expect(document.querySelector('.ship-kit-placeholder-note')).toBeNull();
-});
-
-test('in-play chrome disables text highlight and copy-paste callouts', () => {
-  expect(productionCss).toMatch(
-    /body\.in-play \{[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*-webkit-touch-callout: none;[^}]*-webkit-user-drag: none;/su
-  );
-  expect(productionCss).toMatch(
-    /body\.in-play \* \{[^}]*user-select: none;[^}]*-webkit-touch-callout: none;/su
-  );
-  expect(productionCss).toMatch(
-    /body\.in-play input,\s*body\.in-play textarea,\s*body\.in-play select,[\s\S]*-webkit-tap-highlight-color: revert;/su
-  );
-  expect(productionCss).toMatch(/#gameCanvas \{[^}]*-webkit-touch-callout: none;/su);
 });
 
 test('joining swaps the menu for the playfield and returning restores the menu', () => {

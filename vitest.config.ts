@@ -1,6 +1,5 @@
 import process from 'node:process';
 import { configDefaults, defineConfig } from 'vitest/config';
-import { IntegrationSequencer } from './scripts/integration-sequencer';
 
 export default defineConfig({
   ...(process.env['GEOROIDS_TEST_SESSION_DIR']
@@ -21,7 +20,7 @@ export default defineConfig({
       exclude: ['src/types/**', 'src/wiki/**'],
       reportsDirectory: 'coverage',
     },
-    testTimeout: 120000, // browser E2E scenarios (respawn cycles can exceed 60s under load)
+    testTimeout: 120000, // watchdog for owned code-test I/O; scenario clocks advance explicitly
     hookTimeout: 30000, // 30 seconds for hooks
     env: {
       VITEST: 'true',
@@ -34,7 +33,6 @@ export default defineConfig({
     isolate: true,
     fileParallelism: false,
     sequence: {
-      ...(process.env['GEOROIDS_SHARD_MANIFEST'] ? { sequencer: IntegrationSequencer } : {}),
       concurrent: false,
     },
     maxConcurrency: 1,

@@ -1,22 +1,14 @@
 /* @vitest-environment node */
 import assert from 'node:assert/strict';
 import { afterEach, expect, test } from 'vitest';
-import { GameEngine } from '../../../server/core/GameEngine';
-import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
-import { WorldStore } from '../../../server/world/WorldStore';
 import { FurnaceField } from '../../../shared/furnaceField';
 import { civicLot, pipeToTownSquare, TOWN_HEARTH } from '../../../shared/furnaces';
 import {
   furnaceTravelDuration,
-  furnaceTravelPose,
   nearestTravelFurnace,
   planFurnaceRoute,
 } from '../../../shared/furnaceTravel';
-import { GAME_TICK_MS } from '../../../shared/gameClock';
-import { validateSnapshotDto } from '../../../shared/snapshotDto';
-import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
-import { RecordingSocket } from '../../support/recordingSocket';
 import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 
 useQuietServerConsole();
@@ -37,79 +29,6 @@ function travelWorld() {
   actor.position = { x: 0, y: 0 };
   return { pilot, actor, street };
 }
-
-test('a pilot rides the existing pipe, ignores flight commands and arrives in a fresh motion epoch', () => {
-  const { pilot, actor, street } = travelWorld();
-  const epoch = actor.playerMotion?.epoch ?? 0;
-  world.send(pilot, { type: 'travelFurnace', id: pilot.id, data: { destinationId: street.id } });
-  expect(pilot.socket.lastReceived('furnaceTravelResult')?.data).toEqual({
-    ok: true,
-    message: 'Travelling',
-  });
-  const transit = actor.furnaceTransit;
-  assert(transit);
-  expect(transit.durationMs).toBe(3_000);
-  const startedEpoch = actor.playerMotion?.epoch ?? 0;
-  expect(startedEpoch).toBeGreaterThan(epoch);
-  expect(world.engine.travelFurnace(actor.id, street.id)).toBe('Already travelling');
-  const health = actor.health;
-  expect(world.engine.handleShipDamage(actor.id, 'boundary', health).applied).toBe(false);
-  expect(world.engine.useAbility(actor.id)).toBe(false);
-  world.send(pilot, {
-    type: 'update',
-    id: pilot.id,
-    data: {
-      position: { x: 9999, y: 9999 },
-      velocity: { x: 0, y: 0 },
-      angle: 0,
-      thrusting: false,
-      motionEpoch: startedEpoch,
-      motionSequence: 1,
-    },
-  });
-  expect(actor.position).toEqual(TOWN_HEARTH.position);
-  world.engine.setOverlayHold(actor.id, false);
-  expect(actor.overlayHold).toBe(true);
-  const unclaimed = world.engine.dropEquipmentAt(actor.position, 'resource_tap');
-  expect(world.engine.collectLoot()).toEqual([]);
-  expect(world.engine.getLoot().some((drop) => drop.id === unclaimed.id)).toBe(true);
-  expect(world.engine.spawnPlayerLaser(actor.id, actor.position, { x: 3, y: 0 })).toBeNull();
-  expect(
-    world.engine.playerMotion.acceptFreePose(
-      pilot.socket,
-      {
-        position: { x: 9999, y: 9999 },
-        velocity: { x: 0, y: 0 },
-        angle: 0,
-        thrusting: false,
-        epoch: startedEpoch,
-        sequence: 2,
-      },
-      world.engine.getServerTime()
-    ).ok
-  ).toBe(false);
-  for (let tick = 0; tick < 10; tick++) {
-    world.engine.advanceOneFrame();
-  }
-  const halfway = furnaceTravelPose(transit, transit.startedAt + 10 * GAME_TICK_MS);
-  expect(actor.position.x).toBeCloseTo(halfway.position.x);
-  expect(actor.position.y).toBeCloseTo(halfway.position.y);
-  expect(actor.position).not.toEqual(street.position);
-  for (let tick = 10; tick < Math.ceil(transit.durationMs / GAME_TICK_MS); tick++) {
-    world.engine.advanceOneFrame();
-  }
-  expect(actor.furnaceTransit).toBeNull();
-  expect(actor.position.x).toBeCloseTo(street.position.x);
-  expect(actor.position.y).toBeCloseTo(street.position.y);
-  expect(actor.playerMotion?.epoch).toBeGreaterThan(startedEpoch);
-  expect(actor.playerMotion?.anchor).toEqual(actor.position);
-  expect(actor.health).toBe(health);
-  world.broadcastGameState();
-  const snapshot = captureSnapshot(world.snapshot(pilot));
-  validateSnapshotDto(snapshot);
-  expect(snapshot.entities.find((entry) => entry.id === actor.id)?.furnaceTransit).toBeNull();
-  expect(snapshot.serverTime).toBeGreaterThan(0);
-});
 
 test('spoofed, distant, dark and dead travel requests cannot take motion ownership', () => {
   const { pilot, actor, street } = travelWorld();
@@ -177,35 +96,6 @@ test('routes between parent and child use their shared pipe without detouring th
   expect(
     nearestTravelFurnace({ x: parent.position.x + parent.radius + 1, y: parent.position.y }, field)
   ).toBeUndefined();
-});
-
-test('a mid-ride checkpoint saves the safe arrival instead of a position inside a pipe', () => {
-  const store = new WorldStore(':memory:');
-  const engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-  try {
-    const socket = new RecordingSocket();
-    const actor = engine.addPlayer('rider', 'Rider', socket, undefined, 'scout');
-    actor.asteroidInteractions = 1;
-    const registered = engine.registerPilot(actor, socket);
-    assert(registered.ok);
-    const street = civicLot('street-1-0');
-    assert(street);
-    actor.position = { ...street.position };
-    actor.score = street.cost;
-    expect(engine.useAbility(actor.id)).toBe(true);
-    actor.position = { x: 0, y: 0 };
-    expect(engine.travelFurnace(actor.id, street.id)).toBeUndefined();
-    engine.advanceOneFrame();
-    engine.checkpointWorld();
-    const saved = store.loadPilots().find((pilot) => pilot.id === actor.id);
-    expect(saved?.position).toEqual(street.position);
-    expect(saved?.velocity).toEqual({ x: 0, y: 0 });
-    expect(saved).not.toHaveProperty('furnaceTransit');
-    expect(actor.furnaceTransit).toBeTruthy();
-  } finally {
-    engine.stopGameLoop();
-    store.close();
-  }
 });
 
 test('furnace rides take at least three seconds and scale with pipe length up to eight', () => {

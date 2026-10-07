@@ -255,14 +255,14 @@ the same benchmark code overlay, with dependency and before/after source hashes
 recorded. Transport is a single-revision realtime sample; compare client, server
 or codec with `npm run benchmark -- compare KIND --baseline REV --candidate REV`.
 
-The runtime tests enter through the actual WebSocket `onmessage` callback; they
-verify real entity/loot managers, malformed-frame preservation, asteroid removals,
-harpoon unlatch, unsupported-client rejection, rejoin, EO shot dedupe/death, pickup ownership,
-and asteroid metadata/tag clearing. Run the real socket test through the serialized
+The retained code tests exercise protocol decoding, malformed-frame preservation,
+entity updates, asteroid removals, unsupported-client rejection and pickup ownership.
+Real-clock late-join and reconnect scenarios were retired because snapshot-credit
+expiry could race their assertions. Run the retained server suite through its owned
 integration runner:
 
 ```sh
-./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts --dir tests/integration
+./scripts/test-runner.sh tests/integration/server/
 ```
 
 The current codec measurement uses the original seeded snapshot fixtures and

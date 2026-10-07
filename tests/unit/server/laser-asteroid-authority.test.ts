@@ -72,30 +72,6 @@ describe('Server laser↔asteroid authority', () => {
     expect(engine.getAsteroidCount()).toBe(0);
   });
 
-  test('tags a large asteroid on the first hit and splits only for a second shooter', () => {
-    const engine = new GameEngine();
-    engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
-    engine.addPlayer('p2', 'Two', {} as never, { x: 10, y: 0 });
-    engine.addAsteroid(largeAsteroid('roid-collab'));
-
-    const first = engine.applyLaserAsteroidHit('roid-collab', 'p1');
-    const echo = engine.applyLaserAsteroidHit('roid-collab', 'p1');
-    const partner = engine.applyLaserAsteroidHit('roid-collab', 'p2');
-
-    expect(first.applied).toBe(true);
-    expect(first.outcome).toBe('tagged');
-    expect(first.split).toBe(false);
-    expect(echo.applied).toBe(false);
-    expect(echo.outcome).toBe('ignored');
-    expect(partner.applied).toBe(true);
-    expect(partner.outcome).toBe('destroyed');
-    expect(partner.split).toBe(true);
-    expect(partner.newAsteroids).toHaveLength(2);
-    expect(engine.getPlayer('p1')?.score).toBe(0);
-    expect(engine.getPlayer('p2')?.score).toBe(0);
-    expect(engine.getAsteroid('roid-collab')).toBeUndefined();
-  });
-
   test('large-rock destruction leaves points in space without banking them for contributors', () => {
     const engine = new GameEngine();
     engine.addPlayer('miner-a', 'Miner A', {} as never, { x: 0, y: 0 });

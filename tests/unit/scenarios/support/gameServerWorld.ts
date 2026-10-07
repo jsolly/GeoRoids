@@ -9,7 +9,7 @@ import type {
   ServerGameSnapshot,
   ShipKitId,
 } from '../../../../shared-types';
-import { DAMAGE, GAME, LASER, SHIP } from '../../../../src/constants';
+import { SHIP } from '../../../../src/constants';
 import { RecordingSocket } from '../../../support/recordingSocket';
 
 function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
@@ -29,7 +29,7 @@ function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
   };
 }
 
-/** One server tick is one frame at GAME.FPS. */
+/** Combat lifecycle timers count simulation frames. */
 export const EXPLOSION_FRAMES = SHIP.EXPLODE_DURATION_FRAMES;
 /** GameEngine schedules this at death; the explosion runs in parallel. */
 export const RESPAWN_COUNTDOWN_FRAMES = SHIP.RESPAWN_DELAY_FRAMES;
@@ -168,8 +168,9 @@ class ScenarioSocket extends RecordingSocket {
 }
 
 /**
- * Real `GameEngine` + `WebSocketCore` with no TCP and no wall-clock timers.
- * Scenario tests drive the world with `tick()` / `startClock()`.
+ * Real `GameEngine` + `WebSocketCore` with recording sockets and seeded world RNG.
+ * The engine keeps its real server clock. Control it explicitly for gameplay deadlines.
+ * `tick()` advances combat-frame counters; `startClock()` starts the real loop.
  */
 export class GameServerWorld {
   readonly engine: GameEngine;
@@ -292,54 +293,6 @@ export class GameServerWorld {
     this.core.handleClientMessage(message, pilot.socket);
   }
 
-  shootAsteroid(attacker: Pilot, asteroidId: string, damage: number = DAMAGE.LASER_HIT): void {
-    const asteroid = this.engine.getAsteroid(asteroidId);
-    if (!asteroid) {
-      throw new Error(`No asteroid with id ${asteroidId}`);
-    }
-    const shooter = this.entity(attacker);
-    for (const candidate of this.engine.getAllAsteroids()) {
-      if (candidate.id !== asteroidId) {
-        this.engine.removeAsteroid(candidate.id);
-      }
-    }
-    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
-    for (let i = 0; i < hitCount && asteroid.health > 0; i++) {
-      const healthBefore = asteroid.health;
-      asteroid.position = { x: shooter.position.x + 40, y: shooter.position.y };
-      asteroid.velocity = { x: 0, y: 0 };
-      this.fireAt(attacker, asteroid.position, () => asteroid.health < healthBefore);
-    }
-  }
-
-  private fireAt(attacker: Pilot, target: Position, settled: () => boolean): void {
-    const shooter = this.entity(attacker);
-    const delta = { x: target.x - shooter.position.x, y: target.y - shooter.position.y };
-    const distance = Math.hypot(delta.x, delta.y);
-    const direction =
-      distance > 0 ? { x: delta.x / distance, y: delta.y / distance } : { x: 1, y: 0 };
-    const laserStart = {
-      x: shooter.position.x,
-      y: shooter.position.y,
-    };
-    this.send(attacker, {
-      type: 'shoot',
-      id: attacker.id,
-      data: {
-        laserStart,
-        laserDirection: {
-          x: direction.x * (LASER.SPEED / GAME.FPS),
-          y: direction.y * (LASER.SPEED / GAME.FPS),
-        },
-      },
-    });
-
-    const frames = Math.max(4, Math.ceil(Math.max(1, distance) / (LASER.SPEED / GAME.FPS)) + 4);
-    for (let frame = 0; frame < frames && !settled(); frame++) {
-      this.engine.advanceOneFrame();
-    }
-  }
-
   hitBoundary(pilot: Pilot): void {
     this.send(pilot, {
       type: 'collisionDamage',
@@ -382,7 +335,7 @@ export class GameServerWorld {
   }
 
   /**
-   * Same combat pair the live loop runs each frame, plus the monotonic clock.
+   * Same combat pair the live loop runs each frame; server time is not advanced.
    * Does not move the asteroid belt — use `startClock()` / `advanceOneFrame` for that.
    */
   tick(frames = 1): void {

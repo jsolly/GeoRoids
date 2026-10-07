@@ -8,7 +8,7 @@ export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 /** Missing snapshot / legacy host keeps the existing tow cable. */
 export const UNSET_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 
-export const HAULER_UTILITY_STORAGE_KEY = 'georoids.haulerUtility';
+const HAULER_UTILITY_STORAGE_KEY = 'georoids.haulerUtility';
 
 export const HAULER_UTILITY = {
   boost_coupling: {

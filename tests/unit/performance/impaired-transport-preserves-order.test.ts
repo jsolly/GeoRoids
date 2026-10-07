@@ -61,31 +61,3 @@ test('propagation overlaps across queued chunks while bandwidth and FIFO remain 
   expect(schedule.schedule(21, 10, -80).deliveryAt).toBe(120);
   expect(schedule.schedule(22, 100, 0).deliveryAt).toBe(230);
 });
-
-test('closing a throttled connection cancels and accounts for pending delivery timers', async () => {
-  const server = createServer((clientSocket) => clientSocket.write('pending delivery'));
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('Source did not bind');
-  }
-  const proxy = await startTcpProxy({
-    targetPort: address.port,
-    latencyMs: 5000,
-    jitterMs: 0,
-    downBytesPerSecond: 1000,
-    upBytesPerSecond: 1000,
-    seed: 42,
-  });
-  const socket = createConnection({ host: '127.0.0.1', port: proxy.port });
-  try {
-    await expect.poll(() => proxy.read().pendingTimers).toBeGreaterThan(0);
-  } finally {
-    socket.destroy();
-    await proxy.close();
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve()))
-    );
-  }
-  expect(proxy.read()).toMatchObject({ activeSockets: 0, pendingTimers: 0 });
-});

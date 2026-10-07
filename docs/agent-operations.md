@@ -113,7 +113,7 @@ npx vitest run tests/unit/path/to.test.ts        # focused pure unit checks only
 
 **Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns a fresh Vite/server pair, unused ports, one serialized Vitest worker and cleanup. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
 
-Use repository-relative or absolute paths for explicit test files; missing files fail before services start. Plain substrings such as `selected-pilot` remain text filters. A file location may have one numeric `:line` suffix. Put selectors directly after the runner command: Vitest ignores a nonempty `--` tail, so the runner refuses that tail instead of silently running a partial selection.
+Use repository-relative or absolute paths for explicit integration test files; missing files fail before services start. Selectors must name literal files or directories within the server/entity inventory. Substrings and `:line` suffixes are rejected. Put selectors directly after the runner command; a nonempty `--` tail is rejected to prevent an unintended selection.
 
 ## Architecture
 

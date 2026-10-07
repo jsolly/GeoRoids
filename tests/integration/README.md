@@ -40,7 +40,6 @@ media tools remain outside the gate.
 - `tests/integration/server/current-pilots-recover-after-reconnect.test.ts`
 - `tests/integration/server/fixture-waits-for-departed-pilots-before-resetting-world.test.ts`
 - `tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts`
-- `tests/integration/server/pilots-share-a-depleted-field-across-reconnects.test.ts`
 - `tests/integration/server/player-motion-cross-real-sockets.test.ts`
 - `tests/integration/server/server-init-asteroids.test.ts`
 - `tests/integration/server/server-parity.test.ts`

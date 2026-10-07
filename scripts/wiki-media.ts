@@ -20,6 +20,7 @@ import process from 'node:process';
 import { type CanvasRenderingContext2D, createCanvas } from 'canvas';
 import { AsteroidManager } from '../server/core/AsteroidManager';
 import type { GameEntity } from '../server/core/EntityManager';
+import { GameEngine } from '../server/core/GameEngine';
 import { LootManager } from '../server/core/LootManager';
 import { RNGService } from '../server/core/RNGService';
 import { SatellitePickupManager } from '../server/core/SatellitePickupManager';
@@ -31,8 +32,9 @@ import {
 } from '../shared/asteroidPhenomena';
 import { circlesOverlap } from '../shared/combat';
 import { CONTOUR_LOCK, contourLockDistance, contourLockSpeed } from '../shared/contourLock';
+import { cargoCapacity } from '../shared/economy';
 import { SATELLITE_PROFILES } from '../shared/eoSatellites';
-import { FURNACES, furnaceReward } from '../shared/furnaces';
+import { FURNACES, furnaceReward, TOWN_HEARTH } from '../shared/furnaces';
 import {
   blastPush,
   inBlastRadius,
@@ -78,7 +80,9 @@ import {
 import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient } from '../src/physics/terrain/heightfield';
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
-import { getTerrainField } from '../src/physics/terrain/terrainSession';
+import { getTerrainField, getTerrainSeed } from '../src/physics/terrain/terrainSession';
+import { drawCargoHoldArtwork } from '../src/rendering/cargoHoldRenderer';
+import { drawCargoOffloadArtwork } from '../src/rendering/cargoOffloadRenderer';
 import { drawContourSpeedLines } from '../src/rendering/contourSpeedLines';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
@@ -89,6 +93,7 @@ import {
   thrusterFlameGeometry,
 } from '../src/rendering/vectorJuice';
 import { media } from '../src/wiki/media';
+import { RecordingSocket } from '../tests/support/recordingSocket';
 import { recordSatelliteDemo, type SatelliteDemoPanel } from './wiki-satellite-demo';
 
 type RenderContext = DrawingContext & Pick<CanvasRenderingContext2D, 'clip'>;
@@ -97,6 +102,7 @@ type MediaId =
   | 'hauler'
   | 'movement'
   | 'terrain'
+  | 'cargo'
   | 'loot'
   | 'reflection'
   | 'split'
@@ -109,6 +115,7 @@ const MEDIA_IDS: readonly MediaId[] = [
   'hauler',
   'movement',
   'terrain',
+  'cargo',
   'loot',
   'reflection',
   'split',
@@ -630,6 +637,95 @@ function makeScoutDemo(): Demo {
         325
       );
       drawTag(ctx, 'Scout + teammate see the same marks', 330, 110, PALETTE.REMOTE);
+    },
+  };
+}
+
+function makeCargoDemo(): Demo {
+  const engine = new GameEngine(getTerrainSeed());
+  const pilot = engine.addPlayer(
+    'cargo-demo',
+    'Pilot',
+    new RecordingSocket(),
+    { x: -(TOWN_HEARTH.radius + hullRadiusForKit('scout') - 1), y: 0 },
+    'scout'
+  );
+  pilot.spawnProtectionTimer = 0;
+  pilot.cargo = 400;
+  const shipScreen = { x: 350 + pilot.position.x * (55 / TOWN_HEARTH.radius), y: 210 };
+  let completedAt = Infinity;
+  let acceptedAt = -Infinity;
+  let acceptedPoints = 0;
+  return {
+    id: 'cargo',
+    posterFrame: 12,
+    verify: () => {
+      invariant(pilot.cargo === 0 && pilot.score === 400, 'cargo did not reach the pilot bank');
+      invariant(engine.getGameState().settlement.points === 400, 'cargo settlement credit drifted');
+      invariant(Number.isFinite(completedAt), 'cargo completion never appeared');
+    },
+    render: (ctx, frame) => {
+      const now = (frame * 1000) / FPS;
+      const before = pilot.bankedCargo ?? 0;
+      if (frame > 0) {
+        runSimulationTicks(SIM_TICKS_PER_FRAME, () => engine.depositCargo());
+      }
+      const accepted = (pilot.bankedCargo ?? 0) - before;
+      if (accepted > 0) {
+        acceptedAt = now;
+        acceptedPoints = accepted;
+        if (pilot.cargo === 0) {
+          completedAt = now;
+        }
+      }
+      drawFrameChrome(
+        ctx,
+        'CARGO · FURNACE OFFLOAD',
+        'hover → points stream into the fire → bank credits',
+        frame,
+        PALETTE.LOOT
+      );
+      drawFurnaceArtwork(ctx, 350, 210, 55, now);
+      renderHull(
+        ctx,
+        shipScreen.x,
+        shipScreen.y,
+        hullRadiusForKit('scout'),
+        0,
+        PALETTE.LOCAL,
+        'scout'
+      );
+      drawCargoHoldArtwork(ctx, {
+        position: shipScreen,
+        radius: hullRadiusForKit('scout'),
+        angle: 0,
+        kitId: 'scout',
+        color: PALETTE.LOCAL,
+        fraction: pilot.cargo / cargoCapacity(pilot.kitId),
+        now,
+      });
+      if (pilot.cargo > 0 || now - completedAt < 900) {
+        drawCargoOffloadArtwork(ctx, {
+          ship: shipScreen,
+          furnace: { x: 350, y: 210 },
+          radius: 55,
+          remaining: pilot.cargo,
+          fraction: pilot.cargo / 400,
+          now,
+          pulse: Math.max(0, 1 - (now - acceptedAt) / 300),
+          acceptedPoints,
+          completionAge: now - completedAt,
+          local: true,
+          capacity: cargoCapacity(pilot.kitId),
+        });
+      }
+      drawTag(
+        ctx,
+        `BANK ${pilot.score} · SETTLEMENT ${engine.getGameState().settlement.points}`,
+        320,
+        305,
+        PALETTE.LOOT
+      );
     },
   };
 }
@@ -1921,6 +2017,7 @@ function buildDemos(): Demo[] {
     makeHaulerDemo(),
     makeMovementDemo(),
     makeTerrainDemo(),
+    makeCargoDemo(),
     makeLootDemo(),
     makeReflectionDemo(),
     makeSplitDemo(),

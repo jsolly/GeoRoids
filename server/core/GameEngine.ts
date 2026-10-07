@@ -13,10 +13,12 @@ import {
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
 import { asteroidCrewNeeded, isColossalAsteroid } from '../../shared/asteroidScale';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
+import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { chooseCrewSpawn } from '../../shared/crewSpawn';
 import {
   advanceSettlement,
   cargoCapacity,
+  ECONOMY,
   emptySettlement,
   oreResource,
   oreYield,
@@ -54,7 +56,7 @@ import {
   LOOT_BLAST,
 } from '../../shared/lootBlast';
 import { readReleaseId, releaseField } from '../../shared/releaseId';
-import { GROWTH } from '../../shared/shipGrowth';
+import { canCollectLoot, GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
@@ -1766,6 +1768,7 @@ export class GameEngine {
 
     for (const pickup of loosePickups) {
       const collector = players
+        .filter((entity) => canCollectLoot(entity))
         .map((entity) => ({
           entity,
           distance: Math.hypot(
@@ -1848,8 +1851,19 @@ export class GameEngine {
       return { applied: false, isDestroyed: false };
     }
 
+    if (!Number.isFinite(damage) || damage <= 0) {
+      return { applied: false, isDestroyed: false };
+    }
     const healthBefore = existing.health;
-    const damaged = this.entityManager.damageEntity(targetId, damage);
+    const spilled = Math.min(existing.cargo, Math.ceil(damage * ECONOMY.cargoPointsPerHp));
+    if (spilled > 0) {
+      existing.cargo -= spilled;
+      this.spillCargo(existing, spilled);
+      existing.healthRegenTimer = calculateHealthRegenDelayFrames();
+      this.capturePilot(existing.id);
+    }
+    const hullDamage = Math.max(0, damage - spilled / ECONOMY.cargoPointsPerHp);
+    const damaged = this.entityManager.damageEntity(targetId, hullDamage);
     if (!damaged) {
       return { applied: false, isDestroyed: false };
     }
@@ -2844,6 +2858,7 @@ export class GameEngine {
 
             score: entity.score,
             cargo: entity.cargo,
+            bankedCargo: entity.bankedCargo ?? 0,
             purchases: [...entity.purchases],
             silk: entity.silk ?? 0,
             health: entity.health,
@@ -3629,7 +3644,7 @@ export class GameEngine {
         this.capturePilot(collector.id);
         continue;
       }
-      if (loot.kind === 'points') {
+      if ((loot.points ?? 0) > 0) {
         this.capturePilot(collector.id);
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
         continue;
@@ -3640,12 +3655,6 @@ export class GameEngine {
         this.capturePilot(collector.id);
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
         continue;
-      }
-      if (loot.kind === 'shard') {
-        this.addCargo(collector, GROWTH.SHARD_SCORE);
-      }
-      if (loot.kind === 'tap') {
-        this.addCargo(collector, GROWTH.TAP_LOOT_SCORE);
       }
       collector.lastUpdate = this.getServerTime();
       results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
@@ -3751,9 +3760,30 @@ export class GameEngine {
     return undefined;
   }
 
+  /** Recoverable hit spills launch beyond magnet range before collection resumes. */
+  private spillCargo(entity: GameEntity, points: number): void {
+    const count = Math.min(8, Math.max(1, Math.ceil(points / 100)));
+    const base = Math.floor(points / count);
+    for (let index = 0; index < count; index++) {
+      const angle = entity.angle + (index / count) * Math.PI * 2;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const offset = hullRadiusForKit(entity.kitId) + GROWTH.LOOT_RADIUS + 10;
+      this.lootManager.spawnPoints(
+        { x: entity.position.x + dx * offset, y: entity.position.y + dy * offset },
+        base + (index < points % count ? 1 : 0),
+        {
+          velocity: { x: dx * ECONOMY.cargoSpillSpeed, y: dy * ECONOMY.cargoSpillSpeed },
+          ejectFramesLeft: ECONOMY.cargoSpillEjectFrames,
+        }
+      );
+    }
+  }
+
   private addCargo(entity: GameEntity, points: number): void {
     const accepted = Math.min(points, Math.max(0, cargoCapacity(entity.kitId) - entity.cargo));
     entity.cargo += accepted;
+    this.lootManager.spawnPoints(entity.position, points - accepted);
     this.capturePilot(entity.id);
   }
 
@@ -3763,25 +3793,38 @@ export class GameEngine {
     this.lootManager.spawnPoints(entity.position, excess);
   }
 
+  private readonly cargoOffloadTicks = new WeakMap<
+    GameEntity,
+    { furnaceId: string; frames: number }
+  >();
+
   public depositCargo(): void {
     for (const pilot of this.entityManager.getAllEntities()) {
       if (
         pilot.health <= 0 ||
         pilot.exploding ||
         pilot.respawnTimer !== undefined ||
-        pilot.cargo <= 0
+        pilot.cargo <= 0 ||
+        pilot.furnaceTransit
       ) {
+        this.cargoOffloadTicks.delete(pilot);
         continue;
       }
-      const furnace = this.furnaces.nearest(pilot.position);
-      if (
-        Math.hypot(pilot.position.x - furnace.position.x, pilot.position.y - furnace.position.y) >
-        furnace.radius
-      ) {
+      const furnace = this.furnaces.intakeAt(pilot.position, hullRadiusForKit(pilot.kitId));
+      if (!furnace) {
+        this.cargoOffloadTicks.delete(pilot);
         continue;
       }
-      const points = pilot.cargo;
-      pilot.cargo = 0;
+      const previous = this.cargoOffloadTicks.get(pilot);
+      const frames = previous?.furnaceId === furnace.id ? previous.frames + 1 : 1;
+      if (frames < ECONOMY.offloadIntervalFrames) {
+        this.cargoOffloadTicks.set(pilot, { furnaceId: furnace.id, frames });
+        continue;
+      }
+      this.cargoOffloadTicks.delete(pilot);
+      const points = Math.min(pilot.cargo, ECONOMY.offloadPoints);
+      pilot.cargo -= points;
+      pilot.bankedCargo = (pilot.bankedCargo ?? 0) + points;
       this.awardPilotPoints(pilot.id, points);
     }
   }

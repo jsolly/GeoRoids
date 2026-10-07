@@ -28,6 +28,26 @@ interface TrackedLoot extends LootData {
   nestCache?: true;
 }
 
+/** Recoverable points bounce inside the wall instead of drifting beyond legal ship reach. */
+function containPointLoot(drop: TrackedLoot): void {
+  const radius = Math.hypot(drop.position.x, drop.position.y);
+  const limit = WORLD.radius - drop.radius;
+  if (radius <= limit) {
+    return;
+  }
+  const nx = drop.position.x / radius;
+  const ny = drop.position.y / radius;
+  drop.position.x = nx * limit;
+  drop.position.y = ny * limit;
+  const outward = drop.velocity.x * nx + drop.velocity.y * ny;
+  if (outward > 0) {
+    drop.velocity.x -= 2 * outward * nx;
+    drop.velocity.y -= 2 * outward * ny;
+  }
+}
+
+const POINT_REST_SPEED = 0.01;
+
 interface LootBounds {
   minX: number;
   minY: number;
@@ -208,6 +228,7 @@ export class LootManager {
       mass,
       radius: GROWTH.LOOT_RADIUS,
       kind: 'shard',
+      points: GROWTH.SHARD_SCORE,
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
       velocity: { x: 0, y: 0 },
     };
@@ -216,7 +237,11 @@ export class LootManager {
     return this.toPublic(drop);
   }
 
-  public spawnPoints(position: Position, points: number): void {
+  public spawnPoints(
+    position: Position,
+    points: number,
+    motion?: { velocity: Velocity; ejectFramesLeft: number }
+  ): void {
     if (points <= 0) {
       return;
     }
@@ -228,8 +253,10 @@ export class LootManager {
       radius: GROWTH.LOOT_RADIUS + 2,
       kind: 'points',
       expiresAt: Date.now() + (ECONOMY.deathLootFrames / 60) * 1000,
-      velocity: { x: 0, y: 0 },
+      velocity: motion ? { ...motion.velocity } : { x: 0, y: 0 },
+      ...(motion ? { ejectFramesLeft: motion.ejectFramesLeft } : {}),
     };
+    containPointLoot(drop);
     this.insert(drop);
     this.pointRevision++;
     this.enforceCap();
@@ -243,6 +270,8 @@ export class LootManager {
         position: { ...drop.position },
         points: drop.points ?? 0,
         expiresAt: drop.expiresAt,
+        velocity: { ...drop.velocity },
+        ejectFramesLeft: drop.ejectFramesLeft ?? 0,
       }));
   }
 
@@ -257,7 +286,7 @@ export class LootManager {
         kind: 'points',
         mass: 0,
         radius: GROWTH.LOOT_RADIUS + 2,
-        velocity: { x: 0, y: 0 },
+        velocity: { ...(drop.velocity ?? { x: 0, y: 0 }) },
       });
     }
     this.pointRevision++;
@@ -276,6 +305,7 @@ export class LootManager {
       mass: GROWTH.TAP_LOOT_MASS,
       radius: GROWTH.TAP_LOOT_RADIUS,
       kind: 'tap',
+      points: GROWTH.TAP_LOOT_SCORE,
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
       velocity: { ...velocity },
       ejectFramesLeft: GROWTH.TAP_LOOT_EJECT_FRAMES,
@@ -390,6 +420,10 @@ export class LootManager {
         continue;
       }
       const winner = collectors.find((entity) => {
+        // Prior drops in this same collection pass may have filled this pilot.
+        if (!canCollectLoot(entity)) {
+          return false;
+        }
         if (
           isEquipmentId(drop.kind) &&
           (!canCollectEquipment(entity, drop.kind) ||
@@ -416,12 +450,28 @@ export class LootManager {
         collected.push({ collector: winner, loot: this.toPublic(drop) });
         continue;
       }
-      if (drop.kind === 'points') {
-        winner.cargo = Math.min(cargoCapacity(winner.kitId), winner.cargo + (drop.points ?? 0));
-        this.pointRevision++;
+      const availablePoints = drop.points ?? 0;
+      if (availablePoints > 0) {
+        const accepted = Math.min(availablePoints, cargoCapacity(winner.kitId) - winner.cargo);
+        winner.cargo += accepted;
+        const receipt = { ...this.toPublic(drop), points: accepted };
+        drop.points = availablePoints - accepted;
+        if (drop.kind === 'points') {
+          this.pointRevision++;
+        }
+        if (drop.points === 0) {
+          this.erase(drop);
+        } else {
+          const ordinal = this.membership.get(drop)?.ordinal;
+          if (ordinal !== undefined) {
+            this.catalog?.changed(this.toPublic(drop), ordinal);
+          }
+        }
+        collected.push({ collector: winner, loot: receipt });
+      } else {
+        this.erase(drop);
+        collected.push({ collector: winner, loot: this.toPublic(drop) });
       }
-      this.erase(drop);
-      collected.push({ collector: winner, loot: this.toPublic(drop) });
     }
 
     return collected;
@@ -455,6 +505,9 @@ export class LootManager {
 
     for (const drop of this.inInsertionOrder(candidates)) {
       const previousPosition = { ...drop.position };
+      const previousVx = drop.velocity.x;
+      const previousVy = drop.velocity.y;
+      const previousEjectFrames = drop.ejectFramesLeft ?? 0;
       if ((drop.ejectFramesLeft ?? 0) > 0) {
         drop.ejectFramesLeft = (drop.ejectFramesLeft ?? 0) - 1;
       } else if ((drop.kind === 'tap' || drop.kind === 'silk') && haulerPositions.length > 0) {
@@ -475,8 +528,19 @@ export class LootManager {
       }
       drop.position.x += drop.velocity.x;
       drop.position.y += drop.velocity.y;
+      if (drop.kind === 'points') {
+        containPointLoot(drop);
+      }
       drop.velocity.x *= GROWTH.LOOT_DRAG;
       drop.velocity.y *= GROWTH.LOOT_DRAG;
+      if (
+        drop.kind === 'points' &&
+        (drop.ejectFramesLeft ?? 0) === 0 &&
+        Math.hypot(drop.velocity.x, drop.velocity.y) < POINT_REST_SPEED
+      ) {
+        drop.velocity.x = 0;
+        drop.velocity.y = 0;
+      }
       this.updateMotionMembership(drop);
       this.refile(drop);
       if (drop.position.x !== previousPosition.x || drop.position.y !== previousPosition.y) {
@@ -484,7 +548,12 @@ export class LootManager {
       }
       if (
         drop.kind === 'points' &&
-        (drop.velocity.x !== 0 || drop.velocity.y !== 0 || wallNow >= drop.expiresAt)
+        (drop.position.x !== previousPosition.x ||
+          drop.position.y !== previousPosition.y ||
+          drop.velocity.x !== previousVx ||
+          drop.velocity.y !== previousVy ||
+          (drop.ejectFramesLeft ?? 0) !== previousEjectFrames ||
+          wallNow >= drop.expiresAt)
       ) {
         this.pointRevision++;
       }

@@ -190,6 +190,10 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     for (const article of articles) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
       await expect.poll(() => page.locator('h1').textContent()).toBe(article.title);
+      if (article.id === 'loot-growth') {
+        expect(await page.locator('#content').textContent()).toContain('Cargo protection');
+        await page.screenshot({ path: resolve(output, 'wiki-cargo-desktop.png'), fullPage: true });
+      }
       if (article.id === 'terrain') {
         await page.screenshot({ path: resolve(output, 'wiki-terrain-desktop.png') });
       }
@@ -347,6 +351,10 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page
       .locator('.article-body')
       .screenshot({ path: resolve(output, 'wiki-terrain-mobile.png') });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#loot-growth`);
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Loot and salvage');
+    expect(await page.locator('#content').textContent()).toContain('Cargo protection');
+    await page.screenshot({ path: resolve(output, 'wiki-cargo-mobile.png'), fullPage: true });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect(
       (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')

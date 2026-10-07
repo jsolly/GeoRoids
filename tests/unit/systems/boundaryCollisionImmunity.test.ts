@@ -48,7 +48,7 @@ describe('Boundary collision immunity', () => {
 
   test('sends boundary damage for a vulnerable ship', () => {
     ship.health = 400;
-    collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
+    collisionManager.checkBoundaryCollisions([ship], 'local-player-123', 0);
     expect(mockSendMessage).toHaveBeenCalledWith({
       type: 'collisionDamage',
       data: {
@@ -80,7 +80,7 @@ describe('Boundary collision immunity', () => {
       hull.exploding = false;
     }
 
-    runtimeA.checkBoundaryCollisions([shipA], 'pilot-a');
+    runtimeA.checkBoundaryCollisions([shipA], 'pilot-a', 0);
     expect(sendA).toHaveBeenCalledExactlyOnceWith({
       type: 'collisionDamage',
       data: { targetPlayerId: 'pilot-a', attackerId: 'boundary' },
@@ -91,7 +91,7 @@ describe('Boundary collision immunity', () => {
     expect(shipA.exploding).toBe(true);
     expect(shipB.health).toBe(100);
 
-    runtimeB.checkBoundaryCollisions([shipB], 'pilot-b');
+    runtimeB.checkBoundaryCollisions([shipB], 'pilot-b', 0);
     expect(sendB).toHaveBeenCalledExactlyOnceWith({
       type: 'collisionDamage',
       data: { targetPlayerId: 'pilot-b', attackerId: 'boundary' },
@@ -103,24 +103,37 @@ describe('Boundary collision immunity', () => {
 
   test('does not send boundary damage while blinking', () => {
     ship.blinkCount = 12;
-    collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
+    collisionManager.checkBoundaryCollisions([ship], 'local-player-123', 0);
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   test('does not send boundary damage while a menu holds the ship', () => {
     ship.movementLocked = true;
-    collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
+    collisionManager.checkBoundaryCollisions([ship], 'local-player-123', 0);
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   test('does not send boundary damage while dead or exploding', () => {
     ship.health = 0;
-    collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
+    collisionManager.checkBoundaryCollisions([ship], 'local-player-123', 0);
     expect(mockSendMessage).not.toHaveBeenCalled();
 
     ship.health = 100;
     ship.exploding = true;
-    collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
+    collisionManager.checkBoundaryCollisions([ship], 'local-player-123', 0);
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
+});
+
+test('a cargo-protected wall contact flashes and reports the hit without predicting hull death', () => {
+  const sendMessage = vi.fn();
+  const manager = new CollisionManager({ getLocalPlayerId: () => 'cargo-pilot', sendMessage });
+  const hull = new Ship({ isLocalPlayer: false });
+  hull.health = 100;
+  hull.blinkCount = 0;
+  manager.checkBoundaryCollisions([hull], 'cargo-pilot', 400);
+  expect(sendMessage).toHaveBeenCalledOnce();
+  expect(hull.health).toBe(100);
+  expect(hull.exploding).toBe(false);
+  expect(hull.impactFlashFrames).toBeGreaterThan(0);
 });

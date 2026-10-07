@@ -62,7 +62,7 @@ values become banked points without a reset. Absent cargo and receipts default
 to zero and an empty list. Old owned paint remains readable; lives are no longer
 read or written. Unknown legacy JSON fields are harmless and no data is purged.
 
-Asteroid impacts remove health. Death drops carried points and schedules another respawn; banked points, shared discoveries, deposits, furnaces, and already owned hull paint remain. A UTC month boundary does not clear them. Changing `WORLD.generation` resets sectors, pilots, economy, paint, and banked points on the next start.
+Hazard hits eject recoverable cargo before damaging hull health. Death drops any remaining carried points and schedules another respawn; banked points, shared discoveries, deposits, furnaces, and already owned hull paint remain. A UTC month boundary does not clear them. Changing `WORLD.generation` resets sectors, pilots, economy, paint, and banked points on the next start.
 
 The full-screen universe map shows shared exploration and revealed landmarks across the world. Detailed asteroid geometry stays near each pilot. Furnaces and exploration survive restarts. Point drops persist in the economy checkpoint with their original expiry time. Other loot and satellite pickups remain transient session objects, so their map markers expire when those objects disappear or the server restarts.
 
@@ -121,3 +121,12 @@ committed. Point-drop updates do not resend the explored world. Absolute expiry
 timestamps prevent restarting the server from extending recovery time. Old
 worlds default to settlement level 1 with zero shared points/materials; existing
 banks and furnaces are retained. Whole-database SQLite backups include this row.
+
+Cargo transfers bank in small authoritative pulses while the pilot remains in a lit
+intake. Each checkpoint commits the remaining hold, the credited bank and the
+settlement together. Recoverable hit spills store their velocity and collection
+lockout alongside their original ID, points and absolute expiry, so a restart
+cannot turn a newly ejected spill into an immediate pickup. Old point rows without
+motion resume at rest with no lockout. The live cumulative deposit counter is
+presentation evidence only and restarts with the motion session; it is not bank
+balance and spending cannot erase a completion effect.

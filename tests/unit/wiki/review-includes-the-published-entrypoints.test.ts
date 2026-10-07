@@ -37,6 +37,7 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     cpSync('src', join(fixture, 'src'), { recursive: true });
     cpSync('content', join(fixture, 'content'), { recursive: true });
     cpSync('public/wiki', join(fixture, 'public/wiki'), { recursive: true });
+    cpSync('biome.jsonc', join(fixture, 'biome.jsonc'));
     symlinkSync(resolve(root, 'node_modules'), join(fixture, 'node_modules'));
     for (const path of [...Object.keys(baseline.hashes), 'docs/wiki-source-review.json']) {
       const target = join(fixture, path);
@@ -110,6 +111,39 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
       'wiki/index.html=field-manual'
     );
     expect(JSON.parse(readFileSync(reviewPath, 'utf8')).hashes[otherEntry]).toBe(oldEntryHash);
+    execFileSync(
+      process.execPath,
+      [
+        resolve(root, 'node_modules/@biomejs/biome/bin/biome'),
+        'check',
+        '--vcs-enabled=false',
+        '--error-on-warnings',
+        reviewPath,
+      ],
+      { cwd: fixture, stdio: 'pipe' }
+    );
+    const beforeFormatterFailure = readFileSync(reviewPath, 'utf8');
+    const formatterConfig = join(fixture, 'biome.jsonc');
+    const originalConfig = readFileSync(formatterConfig);
+    try {
+      writeFileSync(formatterConfig, '{ invalid formatter config');
+      expect(() =>
+        check(
+          '--accept',
+          '--source',
+          otherEntry,
+          '--topic',
+          'field-manual',
+          '--owner',
+          `${otherEntry}=field-manual`,
+          '--note',
+          'Reviewed formatter failure'
+        )
+      ).toThrow(/biome/u);
+      expect(readFileSync(reviewPath, 'utf8')).toBe(beforeFormatterFailure);
+    } finally {
+      writeFileSync(formatterConfig, originalConfig);
+    }
     expect(() => check()).toThrow(/index\.html/u);
     check(
       '--accept',

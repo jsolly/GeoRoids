@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { ECONOMY } from '../../../shared/economy';
 import { GROWTH } from '../../../shared/shipGrowth';
 import { SATELLITE_PICKUP } from '../../../src/constants';
 import { orbitRadiusForOwner } from '../../../src/entities/satellitePickup/satellitePickupMath';
@@ -144,6 +145,24 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
   });
 
+  test('a satellite fills the nearest hold and the next satellite goes to another eligible pilot in the same tick', () => {
+    const first = addPilot('first', { x: 1000, y: 1000 });
+    const second = addPilot('second', { x: 1020, y: 1000 });
+    gameEngine.parkSatellitePickups(first.position);
+    first.cargo = ECONOMY.scoutCapacity - SATELLITE_PICKUP.SCORE_BONUS;
+    second.cargo = ECONOMY.scoutCapacity - SATELLITE_PICKUP.SCORE_BONUS;
+    gameEngine.tickSatellitePickups();
+    const pickups = gameEngine.getAllSatellitePickups();
+    const collected = pickups.filter((pickup) => pickup.state === 'stored');
+    expect(
+      collected.map((pickup) => pickup.ownerId).sort((a, b) => (a ?? '').localeCompare(b ?? ''))
+    ).toEqual(['first', 'second']);
+    expect(pickups.filter((pickup) => pickup.state === 'loose')).toHaveLength(4);
+    expect(first.cargo).toBe(ECONOMY.scoutCapacity);
+    expect(second.cargo).toBe(ECONOMY.scoutCapacity);
+    expect(gameEngine.getLoot()).toEqual([]);
+  });
+
   test('collected hardware stays stored and only one owned satellite can be equipped', () => {
     addPilot();
     addPilot('other', { x: 4000, y: 0 });
@@ -283,7 +302,11 @@ describe('Satellite pickups', () => {
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
 
-    gameEngine.handleShipDamage('pilot', 'asteroid', pilot.health);
+    gameEngine.handleShipDamage(
+      'pilot',
+      'asteroid',
+      pilot.health + pilot.cargo / ECONOMY.cargoPointsPerHp
+    );
 
     const released = gameEngine.getSatellitePickup(attached.id);
     expect(released?.state).toBe('loose');

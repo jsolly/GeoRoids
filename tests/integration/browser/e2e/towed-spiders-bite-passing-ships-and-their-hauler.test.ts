@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
+import { SPIDER } from '../../../../shared/terrainSpider';
 import type { SpiderFieldState } from '../../../../shared-types';
 import { HAULER_UTILITY_STORAGE_KEY } from '../../../../src/entities/ship/haulerUtility';
 import { getShipKit } from '../../../../src/entities/ship/shipKits';
@@ -255,6 +256,44 @@ for (const width of [1280, 390]) {
               attached.spiderField.spiders.find((spider) => spider.id === captive.id)?.towedBy
             ).toBe(ownerId);
             await record('protected-latch-confirmed');
+            // Protected contact consumes the normal bite cooldown. Move the owner
+            // out of reach, preserving its real tow, before waiting that clock out.
+            const settling = await getFixtureState();
+            const settlingSpider = settling.spiderField.spiders.find((s) => s.id === captive.id);
+            assert.ok(settlingSpider, 'Captive missing before cooldown separation');
+            const separated = await placePlayer(
+              ownerId,
+              {
+                x: settlingSpider.position.x + 200,
+                y: settlingSpider.position.y,
+              },
+              { expectedTowTargetId: captive.id }
+            );
+            await game.waitForControlledFixture(separated.motionEpoch);
+            const cooldownStart = (await getFixtureState()).world.gameTime;
+            await expect
+              .poll(async () => (await getFixtureState()).world.gameTime, {
+                timeout: TestConfig.GAME_INIT_TIMEOUT,
+              })
+              .toBeGreaterThanOrEqual(cooldownStart + SPIDER.BITE_COOLDOWN_FRAMES);
+            const ready = await getFixtureState();
+            const readySpider = ready.spiderField.spiders.find((s) => s.id === captive.id);
+            assert.ok(readySpider, 'Captive missing after normal cooldown');
+            for (const id of [ownerId, passerId]) {
+              const actor = ready.players.find((pilot) => pilot.id === id);
+              assert.ok(
+                actor &&
+                  actor.spawnProtectionTimer > 0 &&
+                  actor.health === getShipKit(actor.kitId).maxHealth
+              );
+              expect(
+                Math.hypot(
+                  actor.position.x - readySpider.position.x,
+                  actor.position.y - readySpider.position.y
+                )
+              ).toBeGreaterThan(SPIDER.BITE_DISTANCE);
+            }
+            await record('cooldown-ready-outside-reach');
             const target = victim === 'hauler' ? game : other;
             const targetId = victim === 'hauler' ? ownerId : passerId;
             const targetPage = victim === 'hauler' ? page : otherPage;
@@ -271,6 +310,7 @@ for (const width of [1280, 390]) {
             release = await placePlayer(targetId, live.position, {
               clearSpawnProtection: true,
               expectedTowTargetId: captive.id,
+              atTowTarget: true,
             });
             assert.ok(
               release.motionEpoch !== undefined &&
@@ -281,6 +321,7 @@ for (const width of [1280, 390]) {
             expect(release.towOwnerId).toBe(ownerId);
             expect(release.towTargetId).toBe(captive.id);
             expect(release.expectedTowTargetId).toBe(captive.id);
+            expect(release.atTowTarget).toBe(true);
             expect(release.placedActorTowTargetId).toBe(victim === 'hauler' ? captive.id : null);
             // Observe both clients before evidence capture can outlast the death animation.
             const witness = victim === 'hauler' ? otherPage : page;

@@ -27,11 +27,14 @@ import {
   readTouchControlState,
 } from '../../utils/touch-input';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, ownCleanup } = createBrowserScenarioHooks(__dirname);
 
 test('a constrained mobile pilot releases controls, resumes a frozen page, reconnects, and detects injected rendering work', async () => {
   await browserManager.closeAllPages();
-  const native = await createNativeLifecycleBrowser({ width: 390, height: 844, hasTouch: true });
+  const native = await createNativeLifecycleBrowser(
+    { width: 390, height: 844, hasTouch: true },
+    ownCleanup
+  );
   const { page, session } = native;
   let touching = false;
   let freezeConnection: JSHandle<ConnectionManager> | undefined;

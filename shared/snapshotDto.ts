@@ -168,6 +168,7 @@ const entity = shape<ServerEntityData>({
   contourLock: optional(isContourLockState),
   color: string,
   cargo: counter,
+  bankedCargo: optional(counter),
   purchases: array(string),
   score: number,
   health: number,

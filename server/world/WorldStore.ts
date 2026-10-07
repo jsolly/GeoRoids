@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { type BeltSlotState, readBeltState } from '../../shared/asteroidBelt';
-import { emptySettlement, validSettlement } from '../../shared/economy';
+import { ECONOMY, emptySettlement, validSettlement } from '../../shared/economy';
 import { epochField } from '../../shared/epochField';
 import { validEquipment } from '../../shared/equipment';
 import { validExploration } from '../../shared/exploration';
@@ -658,7 +658,12 @@ function readPointLoot(value: object): SavedPointLoot[] {
       !Number.isSafeInteger(row.points) ||
       row.points < 0 ||
       typeof row.expiresAt !== 'number' ||
-      !Number.isFinite(row.expiresAt)
+      !Number.isFinite(row.expiresAt) ||
+      (row.velocity !== undefined && !finiteMotionVector(row.velocity)) ||
+      (row.ejectFramesLeft !== undefined &&
+        (!Number.isSafeInteger(row.ejectFramesLeft) ||
+          row.ejectFramesLeft < 0 ||
+          row.ejectFramesLeft > ECONOMY.cargoSpillEjectFrames))
     ) {
       throw new Error('Invalid saved point loot');
     }
@@ -667,6 +672,8 @@ function readPointLoot(value: object): SavedPointLoot[] {
       position: { ...row.position },
       points: row.points,
       expiresAt: row.expiresAt,
+      ...(row.velocity !== undefined ? { velocity: { ...row.velocity } } : {}),
+      ...(row.ejectFramesLeft !== undefined ? { ejectFramesLeft: row.ejectFramesLeft } : {}),
     });
   }
   return drops;

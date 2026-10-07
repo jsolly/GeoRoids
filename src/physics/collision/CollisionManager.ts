@@ -1,5 +1,9 @@
 import type { Ship } from '../../entities/ship/Ship';
-import { applyShipBoundaryDeath, isShipCollisionImmune } from '../../entities/ship/shipUtils';
+import {
+  applyShipBoundaryDeath,
+  applyShipImpactFlash,
+  isShipCollisionImmune,
+} from '../../entities/ship/shipUtils';
 import { NetworkManager } from '../../network/networkManager';
 import { logger } from '../../utils/Logger';
 import { checkBoundaryCollision } from './collisionDetection';
@@ -20,7 +24,7 @@ export class CollisionManager {
   /**
    * Check boundary collisions for ships
    */
-  checkBoundaryCollisions(ships: Ship[], localPlayerId: string): void {
+  checkBoundaryCollisions(ships: Ship[], localPlayerId: string, cargo: number): void {
     for (const ship of ships) {
       if (ship.contourLocked && checkBoundaryCollision(ship.position, ship.r)) {
         ship.releaseContourLock();
@@ -33,7 +37,7 @@ export class CollisionManager {
       }
 
       if (checkBoundaryCollision(ship.position, ship.r)) {
-        this.handleBoundaryCollision(ship, localPlayerId);
+        this.handleBoundaryCollision(ship, localPlayerId, cargo);
       }
     }
   }
@@ -41,16 +45,19 @@ export class CollisionManager {
   /**
    * Handle ship hitting the boundary
    */
-  private handleBoundaryCollision(ship: Ship, localPlayerId: string): void {
+  private handleBoundaryCollision(ship: Ship, localPlayerId: string, cargo: number): void {
     logger.debug('COLLISION', 'Ship hit boundary', {
       shipPos: ship.position,
       shipId: ship.id,
       localPlayerId,
     });
 
-    // Shared player path: visible wall flash + explode, then the server
-    // confirms the life loss. Waiting for the packet alone looked like a silent reset.
-    applyShipBoundaryDeath(ship);
+    // Show a wall flash immediately; cargo protection and residual damage come from the server.
+    if (cargo > 0) {
+      applyShipImpactFlash(ship);
+    } else {
+      applyShipBoundaryDeath(ship);
+    }
 
     const serverPlayerId = this.networkManager.getLocalPlayerId();
     this.networkManager.sendMessage({

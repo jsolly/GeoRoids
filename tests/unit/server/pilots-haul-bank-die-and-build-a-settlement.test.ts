@@ -14,15 +14,16 @@ import { WorldStore } from '../../../server/world/WorldStore';
 import {
   advanceSettlement,
   cargoCapacity,
+  ECONOMY,
   emptySettlement,
   oreResource,
   oreYield,
   settlementRecipe,
 } from '../../../shared/economy';
-import { isEquipmentId } from '../../../shared/equipment';
-import { TOWN_HEARTH } from '../../../shared/furnaces';
+import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import type { AsteroidData } from '../../../shared-types';
 import { SHIP } from '../../../src/constants';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 afterEach(() => vi.useRealTimers());
@@ -52,28 +53,26 @@ function rock(id: string, ore: AsteroidData['ore'], size = 25): AsteroidData {
   };
 }
 
-test('both kits consume partial and full-hold pickups without exceeding capacity or spawning overflow', () => {
+test('both kits keep partial pickup remainders and full holds reject further loot', () => {
   for (const kit of ['scout', 'hauler'] as const) {
     const engine = new GameEngine(42);
     const { actor } = pilot(engine, kit, kit);
     const loot = new LootManager(new RNGService(42));
     actor.cargo = cargoCapacity(kit) - 10;
-    for (let pickup = 0; pickup < 2; pickup++) {
-      loot.spawnPoints(actor.position, 80);
-      expect(loot.collectOverlaps([actor])).toHaveLength(1);
-      expect(actor.cargo).toBe(cargoCapacity(kit));
-      expect(loot.getAll()).toEqual([]);
-      expect(loot.savedPoints()).toEqual([]);
-    }
+    loot.spawnPoints(actor.position, 80);
+    expect(loot.collectOverlaps([actor])).toHaveLength(1);
+    expect(actor.cargo).toBe(cargoCapacity(kit));
+    expect(loot.savedPoints()[0]?.points).toBe(70);
+    expect(loot.collectOverlaps([actor])).toEqual([]);
     const ore = rock('full-hold-rock', 'ice', 12);
     ore.position = { ...actor.position };
     ore.health = 0;
     engine.addAsteroid(ore);
     engine.handleAsteroidHit(ore.id, actor.id, 'laser');
-    expect(engine.getLoot().length).toBeGreaterThan(0);
-    engine.collectLoot();
-    // Rare equipment drops stay behind for other eligible ships.
-    expect(engine.getLoot().filter((drop) => !isEquipmentId(drop.kind))).toEqual([]);
+    const before = engine.getLoot();
+    expect(before.length).toBeGreaterThan(0);
+    expect(engine.collectLoot()).toEqual([]);
+    expect(engine.getLoot()).toEqual(before);
     expect(actor.cargo).toBe(cargoCapacity(kit));
     expect(actor.score).toBe(0);
     expect(engine.getGameState().settlement.points).toBe(0);
@@ -87,7 +86,11 @@ test('death repeatedly drops cargo, preserves the bank, and always respawns', ()
   for (let death = 0; death < 8; death++) {
     actor.cargo = 90;
     actor.spawnProtectionTimer = 0;
-    engine.handleShipDamage(actor.id, 'boundary', actor.health);
+    engine.handleShipDamage(
+      actor.id,
+      'boundary',
+      actor.health + actor.cargo / ECONOMY.cargoPointsPerHp
+    );
     expect(actor.cargo).toBe(0);
     expect(actor.score).toBe(731);
     expect(actor.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
@@ -100,22 +103,99 @@ test('death repeatedly drops cargo, preserves the bank, and always respawns', ()
   expect(actor).not.toHaveProperty('lives');
 });
 
-test('only a live ship inside a lit furnace banks its cargo once', () => {
+test.each(['scout', 'hauler'] as const)(
+  '%s offloads outside the ring and keeps its remainder when it leaves the furnace',
+  (kitId) => {
+    const engine = new GameEngine(42);
+    const { actor } = pilot(engine, 'pilot', kitId);
+    const rim = TOWN_HEARTH.radius + hullRadiusForKit(kitId);
+    actor.cargo = 400;
+    actor.position = { x: rim + 1, y: 0 };
+    for (let frame = 0; frame < ECONOMY.offloadIntervalFrames; frame++) {
+      engine.depositCargo();
+    }
+    expect(actor.score).toBe(0);
+    actor.position = { x: rim - 1, y: 0 };
+    for (let frame = 0; frame < ECONOMY.offloadIntervalFrames - 1; frame++) {
+      engine.depositCargo();
+    }
+    expect(actor.cargo).toBe(400);
+    engine.depositCargo();
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    expect(actor.cargo).toBe(375);
+    actor.position = { x: 1000, y: 1000 };
+    for (let frame = 0; frame < 60; frame++) {
+      engine.depositCargo();
+    }
+    expect(actor.cargo).toBe(375);
+    actor.position = { ...TOWN_HEARTH.position };
+    for (let frame = 0; frame < 15 * ECONOMY.offloadIntervalFrames; frame++) {
+      engine.depositCargo();
+    }
+    engine.depositCargo();
+    expect(actor.score).toBe(400);
+    expect(actor.cargo).toBe(0);
+    expect(engine.getGameState().settlement.points).toBe(400);
+    actor.cargo = 30;
+    actor.health = 0;
+    for (let frame = 0; frame < 60; frame++) {
+      engine.depositCargo();
+    }
+    expect(actor.cargo).toBe(30);
+  }
+);
+
+test('offload waits for a fresh full pulse after interruption and rejects inactive ships and dark grates', () => {
   const engine = new GameEngine(42);
   const { actor } = pilot(engine);
-  actor.cargo = 400;
-  engine.depositCargo();
-  expect(actor.score).toBe(0);
+  actor.cargo = 28;
   actor.position = { ...TOWN_HEARTH.position };
+  for (let frame = 0; frame < 11; frame++) {
+    engine.depositCargo();
+  }
+  actor.exploding = true;
   engine.depositCargo();
+  actor.exploding = false;
+  for (let frame = 0; frame < 11; frame++) {
+    engine.depositCargo();
+  }
+  expect(actor.cargo).toBe(28);
   engine.depositCargo();
-  expect(actor.score).toBe(400);
+  expect(actor.cargo).toBe(3);
+  actor.respawnTimer = 5;
+  for (let frame = 0; frame < 12; frame++) {
+    engine.depositCargo();
+  }
+  expect(actor.cargo).toBe(3);
+  delete actor.respawnTimer;
+  actor.furnaceTransit = {
+    sourceId: TOWN_HEARTH.id,
+    destinationId: 'street-1-0',
+    startedAt: 0,
+    durationMs: 1000,
+  };
+  for (let frame = 0; frame < 12; frame++) {
+    engine.depositCargo();
+  }
+  expect(actor.cargo).toBe(3);
+  actor.furnaceTransit = null;
+  const dark = civicLot('street-1-0');
+  if (!dark) {
+    throw new Error('Missing dark furnace');
+  }
+  actor.position = { ...dark.position };
+  for (let frame = 0; frame < 12; frame++) {
+    engine.depositCargo();
+  }
+  expect(actor.cargo).toBe(3);
+  actor.position = { ...TOWN_HEARTH.position };
+  for (let frame = 0; frame < 12; frame++) {
+    engine.depositCargo();
+  }
   expect(actor.cargo).toBe(0);
-  expect(engine.getGameState().settlement.points).toBe(400);
-  actor.cargo = 30;
-  actor.health = 0;
-  engine.depositCargo();
-  expect(actor.cargo).toBe(30);
+  expect(actor.bankedCargo).toBe(28);
+  expect(engine.getGameState().settlement.points).toBe(28);
 });
 
 test('points wait for every material and all excess survives multi-tier advancement', () => {
@@ -245,11 +325,17 @@ test('restart preserves bank, cargo, receipts, settlement and unexpired death lo
     actor.score = 900;
     actor.cargo = 300;
     actor.position = { x: 0, y: 0 };
-    engine.depositCargo();
+    for (let frame = 0; frame < 12 * ECONOMY.offloadIntervalFrames; frame++) {
+      engine.depositCargo();
+    }
     engine.buyStoreItem(actor.id, 'placeholder-1');
     actor.position = { x: 1000, y: 1000 };
     actor.cargo = 123;
-    engine.handleShipDamage(actor.id, 'asteroid', actor.health);
+    engine.handleShipDamage(
+      actor.id,
+      'asteroid',
+      actor.health + actor.cargo / ECONOMY.cargoPointsPerHp
+    );
     engine.checkpointWorld();
     store.close();
     store = new WorldStore(path);
@@ -276,18 +362,18 @@ test('restart preserves bank, cargo, receipts, settlement and unexpired death lo
   }
 });
 
-test('shooting cannot destroy the points a dead pilot leaves for recovery', () => {
+test('shooting cannot destroy recoverable points spilled by a lethal hit', () => {
   const engine = new GameEngine(42);
   const dead = pilot(engine, 'dead').actor;
   const rescuer = pilot(engine, 'rescuer').actor;
   dead.cargo = 333;
-  engine.handleShipDamage(dead.id, 'asteroid', dead.health);
+  engine.handleShipDamage(dead.id, 'asteroid', dead.health + dead.cargo / ECONOMY.cargoPointsPerHp);
   const stash = engine.getLoot().find((drop) => drop.kind === 'points');
   expect(stash).toBeDefined();
   expect(engine.handleLootExplode(rescuer.id, stash?.id ?? '').success).toBe(false);
   engine.collectLoot();
-  expect(rescuer.cargo).toBe(333);
-  expect(dead.cargo).toBe(0);
+  expect(rescuer.cargo).toBe(0);
+  expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(333);
 });
 
 test('a long absence and a smaller kit preserve cargo at its field position with excess dropped', () => {

@@ -78,6 +78,9 @@ test(
     const knownLoot = new Set((await collector.getLoot()).map((drop) => drop.id));
     damageMessages.length = 0;
 
+    // Clear incidental launch pickups before arranging an unshielded lethal hit.
+    await arrangeCrewFieldWithEvidence([impactedPilotId, collectorId], 'delivery');
+
     // Start the first pilot at one impact's worth of health, then let the
     // real asteroid collision loop kill it and publish wreckage to both clients.
     const fixture = await arrangeCrewFieldWithEvidence([impactedPilotId, collectorId], 'impact');

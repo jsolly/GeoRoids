@@ -101,6 +101,8 @@ class Ship {
   frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
   /** In-flight menus stop navigation without pausing combat or lifecycle timers. */
   movementLocked = false;
+  /** Automatic cargo stop, released by steering; grants no damage immunity. */
+  cargoHover = false;
   isLocalPlayer: boolean = false; // Track if this is the local player
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID;
   thrust: number = SHIP.THRUST;
@@ -532,6 +534,12 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
+    if (this.cargoHover && !this.movementLocked) {
+      this.releaseContourLock();
+      this.velocity = { x: 0, y: 0 };
+      this.thrusting = false;
+      return;
+    }
     if (this.movementLocked) {
       this.velocity = { x: 0, y: 0 };
       this.angularVelocity = 0;

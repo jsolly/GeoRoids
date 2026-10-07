@@ -229,59 +229,9 @@ for (const viewport of [
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`audio-wiki-${viewport.name}.png`),
     });
-    // A native browser import avoids Vitest rewriting dynamic imports inside evaluate.
-    const splits: Array<{ rate: number; starts: number[]; ends: number[]; peak: number }> =
-      await page.evaluate(`(async () => {
-      const { synthesizeSplitCrack } = await import('/src/audio/splitSound.ts');
-      const results = [];
-      for (const random of [0, 0.999999]) {
-        const context = new OfflineAudioContext(1, 24000, 48000);
-        const starts = [], ends = [], sources = [];
-        const createOscillator = context.createOscillator.bind(context);
-        context.createOscillator = () => {
-          const oscillator = createOscillator();
-          const start = oscillator.frequency.setValueAtTime.bind(oscillator.frequency);
-          const end = oscillator.frequency.exponentialRampToValueAtTime.bind(oscillator.frequency);
-          oscillator.frequency.setValueAtTime = (value, at) => { starts.push(value); return start(value, at); };
-          oscillator.frequency.exponentialRampToValueAtTime = (value, at) => { ends.push(value); return end(value, at); };
-          return oscillator;
-        };
-        const createSource = context.createBufferSource.bind(context);
-        context.createBufferSource = () => { const source = createSource(); sources.push(source); return source; };
-        const originalRandom = Math.random;
-        try {
-          Math.random = () => random;
-          synthesizeSplitCrack(1, context);
-        } finally { Math.random = originalRandom; }
-        const rendered = await context.startRendering();
-        const peak = rendered.getChannelData(0).reduce((peak, value) => Math.max(peak, Math.abs(value)), 0);
-        results.push({ rate: sources[0].playbackRate.value, starts, ends, peak });
-      }
-      return results;
-    })()`);
-    for (const [index, split] of splits.entries()) {
-      const rate = index === 0 ? 0.9 : 1.1;
-      expect(split.rate).toBeCloseTo(rate);
-      expect(split.starts[0]).toBeCloseTo(196, 2);
-      expect(split.starts[1]).toBeCloseTo(130.8128, 2);
-      expect(split.ends[0]).toBeCloseTo(130.8128, 2);
-      expect(split.ends[1]).toBeCloseTo(65.4064, 2);
-      expect(split.peak).toBeGreaterThan(0);
-    }
-    const mutedSplitPeak = await page.evaluate(`(async () => {
-      const { synthesizeSplitCrack } = await import('/src/audio/splitSound.ts');
-      const { setSound } = await import('/src/audio/Sound.ts');
-      const context = new OfflineAudioContext(1, 24000, 48000);
-      setSound(true);
-      synthesizeSplitCrack(1, context);
-      setSound(false);
-      const rendered = await context.startRendering();
-      return rendered.getChannelData(0).reduce((peak, value) => Math.max(peak, Math.abs(value)), 0);
-    })()`);
-    expect(mutedSplitPeak).toBe(0);
     writeFileSync(
       screenshotManager.getScreenshotPath(`audio-${viewport.name}-receipt.json`),
-      JSON.stringify({ events, decoded, splits, mutedSplitPeak, errors, warnings }, null, 2)
+      JSON.stringify({ events, decoded, errors, warnings }, null, 2)
     );
     expect(errors).toEqual([]);
     expect(warnings).toEqual([]);

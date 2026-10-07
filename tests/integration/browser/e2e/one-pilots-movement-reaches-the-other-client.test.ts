@@ -10,14 +10,15 @@ const { browserManager } = createBrowserScenarioHooks(__dirname);
 test(
   'a second pilot cruises without input and the first client receives the changed position',
   async () => {
-    const { game1, game2 } = await bootTwoClientGames(browserManager);
+    const { game1, game2 } = await bootTwoClientGames(browserManager, 'controlled');
 
     const remoteIdsOnClient1 = await game1.getRemotePlayerIds();
     expect(
       remoteIdsOnClient1.length,
       'client 1 should see client 2 as a remote player'
     ).toBeGreaterThan(0);
-    const targetId = remoteIdsOnClient1[0];
+    const targetId = await game2.getLocalPlayerId();
+    expect(remoteIdsOnClient1).toContain(targetId);
     assert.ok(targetId, 'Remote pilot missing');
 
     const startPosOnClient1 = await game1.getNetworkPlayerPosition(targetId);

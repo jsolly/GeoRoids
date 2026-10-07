@@ -259,6 +259,8 @@ export interface TapEjected {
 }
 
 export interface SavedPointLoot {
+  velocity?: Velocity;
+  ejectFramesLeft?: number;
   id: string;
   position: Position;
   points: number;
@@ -412,6 +414,8 @@ export interface ServerEntityData {
   contourLock?: ContourLockState;
   color: string;
   cargo: number;
+  /** Session cumulative accepted cargo deposits; independent of bank spending. */
+  bankedCargo?: number;
   purchases: string[];
   score: number;
   health: number;

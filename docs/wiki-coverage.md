@@ -182,7 +182,7 @@ and the thicker arcade laser core without changing projectile physics.
 
 Furnace travel follows shared pipe geometry between lit destinations. E opens
 the furnace menu inside the hearth’s visible footprint, with Town Square retaining
-level-gated placeholder purchases. Death drops cargo while banks, silk, and equipment
+level-gated placeholder purchases. Hazards spill cargo to protect the hull, full holds reject loot, partial pickups preserve remainders, and furnace hovering banks gradually. Death drops remaining cargo while banks, silk, and equipment
 remain safe.
 Verify server socket/proximity/destination checks, transit action suppression,
 arrival reconciliation, reconnect behavior, and desktop/mobile equipped-hull travel visuals.

@@ -541,7 +541,14 @@
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
     "shared/economy.ts",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+    "src/rendering/cargoHoldRenderer.ts",
+    "src/rendering/cargoOffloadRenderer.ts",
+    "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts",
+    "tests/unit/rendering/a-cargo-deposit-finishes-even-when-the-pilot-spends-their-bank.test.ts",
+    "tests/unit/rendering/ship-cargo-bays-fill-with-crates-as-the-hold-fills.test.ts",
+    "tests/integration/browser/e2e/full-holds-leave-loot-for-crew-to-collect.test.ts",
+    "tests/integration/browser/e2e/crew-banks-cargo-and-unlocks-placeholder-store.test.ts"
   ],
   "teamwork": [
     "shared-types.ts",

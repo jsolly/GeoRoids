@@ -9,6 +9,8 @@ related:
   - content/wiki/satellites.md
   - content/wiki/combat-survival.md
 media:
+  - heading: Furnace offloading
+    demo: cargo
   - heading: Shoot a drop
     demo: loot
 ---
@@ -39,4 +41,14 @@ With Sound Effects on, quick pickups play successive notes of a short melody. Ta
 
 ## Cargo and banks
 
-Both ships collect point loot; the hold sizes are in the reference below. Loot keeps magnetizing and disappears even at capacity; excess points are discarded. When your hold fills, a reminder to bank at a furnace shows for a few seconds, then at most every few minutes while cargo stays full. Fly into a lit furnace intake to offload automatically. The deposit credits your bank and the shared settlement once. Store purchases spend your bank, never carried cargo. Switching to a smaller kit drops the excess as a recoverable point stash at your ship.
+Every ship has an aft cargo bay that fills with gold crates as you collect points; a full bay pulses with a Cargo Full badge. Full ships leave pickups for the crew, and a nearly full hold takes only the points that fit, leaving the same drop and expiry for the remainder. Switching to a smaller kit drops excess cargo as a recoverable stash.
+
+## Furnace offloading
+
+Approach a lit furnace with cargo; both ships lock onto the intake ring when their hull reaches it and stream points into the fire. The countdown and emptying cargo bay show what remains; each pulse credits your bank and the shared settlement, with a flash when the hold empties. Steer to leave early with the rest aboard, or let an empty hold resume flight; hovering grants no protection from hazards.
+
+## Cargo protection
+
+Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills, while a protected hit still delays health regeneration; any cargo left on death drops once.
+
+Store purchases spend your bank, never carried cargo. See [Town Square](/wiki/#controls) for the store and [survival](/wiki/#combat-survival) for damage and respawns.

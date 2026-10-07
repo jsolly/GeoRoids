@@ -311,9 +311,17 @@ export function handleTestPlacePlayer(
       !isRecord(parsed) ||
       Object.keys(parsed).some(
         (key) =>
-          !['playerId', 'position', 'clearSpawnProtection', 'expectedTowTargetId'].includes(key)
+          ![
+            'playerId',
+            'position',
+            'clearSpawnProtection',
+            'expectedTowTargetId',
+            'atTowTarget',
+          ].includes(key)
       ) ||
       ('clearSpawnProtection' in parsed && typeof parsed['clearSpawnProtection'] !== 'boolean') ||
+      ('atTowTarget' in parsed && typeof parsed['atTowTarget'] !== 'boolean') ||
+      (parsed['atTowTarget'] === true && typeof parsed['expectedTowTargetId'] !== 'string') ||
       ('expectedTowTargetId' in parsed &&
         (typeof parsed['expectedTowTargetId'] !== 'string' ||
           parsed['expectedTowTargetId'].length === 0 ||
@@ -396,7 +404,9 @@ export function handleTestPlacePlayer(
       respond(409, { error: 'Validated live terrain tow required' });
       return;
     }
-    const position = { x, y };
+    // Resolve moving-target placement inside the same validated request as release.
+    const position =
+      parsed['atTowTarget'] === true && towTarget ? { ...towTarget.position } : { x, y };
     const placed =
       towOwner?.id === player.id && typeof expectedTowTargetId === 'string'
         ? gameEngine.playerMotion.placeTowedActorForTesting(
@@ -421,6 +431,7 @@ export function handleTestPlacePlayer(
     wsCore.getBroadcaster().broadcastGameState();
     respond(200, {
       expectedTowTargetId: expectedTowTargetId ?? null,
+      atTowTarget: parsed['atTowTarget'] === true,
       towOwnerId: towOwner?.id ?? null,
       towTargetId: towOwner?.harpoonTargetId ?? null,
       placedActorTowTargetId: player.harpoonTargetId ?? null,
@@ -609,6 +620,10 @@ export function handleTestArrangeCrewField(
         : 0;
       if (body['scenario'] === 'impact' && index === 0) {
         player.health = DAMAGE.ASTEROID_COLLISION;
+        player.healthRegenTimer = calculateHealthRegenDelayFrames();
+      }
+      if (body['scenario'] === 'tow') {
+        player.health = player.maxHealth;
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
       if (body['scenario'] !== 'spider-tow-bite') {

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
@@ -302,9 +303,27 @@ if (accepting) {
         },
       ],
     };
+    const formatted = execFileSync(
+      process.execPath,
+      [
+        resolve(root, 'node_modules/@biomejs/biome/bin/biome'),
+        'format',
+        `--config-path=${root}`,
+        '--vcs-enabled=false',
+        '--stdin-file-path=docs/wiki-source-review.json',
+      ],
+      {
+        cwd: root,
+        input: `${JSON.stringify(updated, null, 2)}\n`,
+        encoding: 'utf8',
+        timeout: 10000,
+        maxBuffer: 16 * 1024 * 1024,
+        stdio: 'pipe',
+      }
+    );
     const temporary = `${baselinePath}.${process.pid}.tmp`;
     try {
-      writeFileSync(temporary, `${JSON.stringify(updated, null, 2)}\n`, { flag: 'wx' });
+      writeFileSync(temporary, formatted, { flag: 'wx' });
       renameSync(temporary, baselinePath);
     } finally {
       rmSync(temporary, { force: true });

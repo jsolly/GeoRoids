@@ -46,6 +46,8 @@ export interface GameEntity {
   contourLock: ContourLockState | null;
   color: string;
   cargo: number;
+  /** Session cumulative accepted cargo deposits; independent of bank spending. */
+  bankedCargo?: number;
   purchases: string[];
   score: number;
   health: number;

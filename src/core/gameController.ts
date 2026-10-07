@@ -744,7 +744,11 @@ export class GameController {
     // server-synced copies (which lag at 30 FPS) rather than the predicted
     // local ship, and boundary damage is always attributed to the local
     // player. Remote players self-report.
-    this.collisionManager.checkBoundaryCollisions([currPlayer.ship], currPlayer.id);
+    this.collisionManager.checkBoundaryCollisions(
+      [currPlayer.ship],
+      currPlayer.id,
+      currPlayer.cargo
+    );
   }
 
   // Simple render method - no game logic, just rendering

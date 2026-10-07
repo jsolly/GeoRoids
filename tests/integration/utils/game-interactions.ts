@@ -307,7 +307,15 @@ export class GameInteractions {
   }
 
   async getLoot(): Promise<
-    Array<{ id: string; x: number; y: number; mass: number; radius: number; kind: string }>
+    Array<{
+      id: string;
+      x: number;
+      y: number;
+      mass: number;
+      radius: number;
+      kind: string;
+      points?: number;
+    }>
   > {
     return await this.page.evaluate(() => {
       const gameController = window.gameController;
@@ -322,6 +330,7 @@ export class GameInteractions {
         mass: drop.mass,
         radius: drop.radius,
         kind: drop.kind ?? 'wreckage',
+        ...(drop.points !== undefined ? { points: drop.points } : {}),
       }));
     });
   }
@@ -919,8 +928,11 @@ export class GameInteractions {
 
   /** Arrange one real fatal asteroid impact without unrelated world hazards. */
   async dieFromAsteroidImpact(): Promise<{ x: number; y: number }> {
+    const id = await this.getLocalPlayerId();
+    // A lethal hull-impact scene needs an empty hold now that cargo absorbs hits.
+    await arrangeCrewField([id], 'delivery');
     await this.observeNextDeathCause();
-    await arrangeCrewField([await this.getLocalPlayerId()], 'impact');
+    await arrangeCrewField([id], 'impact');
     await this.requireObservedDeathCause('asteroid');
     return this.page.evaluate(() => {
       const position = (
@@ -1160,28 +1172,19 @@ export class GameInteractions {
     if (!deathPosition) {
       throw new Error('No boundary crossing position available');
     }
-    const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
-      // Finish fixture placement inside the arena, then cross the wall through
-      // the real client collision path.
-      await this.placeShipAt(
-        (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
-        (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
-      );
-      await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
-      // Observe enough collision frames for a ship whose collected mass raised
-      // its health above the base 100, before waiting for the authoritative death event.
-      await this.waitForAnimationFrames(4);
-      await this.page.waitForTimeout(100);
-      if ((await this.getShipHealth()) <= 0) {
-        await this.requireObservedDeathCause('boundary');
-        if (await this.isGameRunning()) {
-          await this.waitForRandomRespawnPlacement(deathPosition, 25000);
-        }
-        return { x: deathPosition.x, y: deathPosition.y };
-      }
+    // Arrange one authoritative wall contact. Leave enough clearance beyond the
+    // edge that a cargo-protected hull cannot drift back inside before the next
+    // hit. The real collision resolver owns damage, death and respawn.
+    const contactPosition = {
+      x: (deathPosition.x * (WORLD.radius + 1000)) / (WORLD.radius + 50),
+      y: (deathPosition.y * (WORLD.radius + 1000)) / (WORLD.radius + 50),
+    };
+    await this.placeShipAt(contactPosition.x, contactPosition.y);
+    await this.requireObservedDeathCause('boundary');
+    if (await this.isGameRunning()) {
+      await this.waitForRandomRespawnPlacement(contactPosition, 25000);
     }
-    throw new Error('boundary crossing should destroy the ship');
+    return contactPosition;
   }
 
   /** Wait until the local ship is alive again (ignores respawn placement). */
@@ -1394,6 +1397,7 @@ export class GameInteractions {
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
     waitForCombatReady?: boolean;
+    field?: 'natural' | 'controlled';
     kitId?: 'scout' | 'hauler';
     haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
@@ -1416,7 +1420,9 @@ export class GameInteractions {
     await this.startGame();
     await this.waitForGameReady();
     await this.waitForServerJoin();
-    await this.waitForNetworkAsteroids(1);
+    if (options?.field !== 'controlled') {
+      await this.waitForNetworkAsteroids(1);
+    }
     if (options?.haulerUtility) {
       await this.page.waitForFunction(
         (utility) => window.gameController?.getCurrPlayer()?.ship.haulerUtility === utility,

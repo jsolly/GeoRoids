@@ -744,7 +744,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     }
   });
 
-  test('moving spiders retain global homes, consumption events and unknown fields across nested patches and field removal', () => {
+  test('moving spiders retain global homes and unknown fields across nested patches and field removal', () => {
     const world = snapshotFixture();
     world.spiderField = {
       spiders: Array.from({ length: 24 }, (_, i) => ({
@@ -761,9 +761,6 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         resourceId: `home-${i}`,
         position: { x: i * 1000, y: 1000 },
       })),
-      consumed: [
-        { id: 'consumed-0', position: { x: 0, y: 0 }, furnaceId: 'town-hearth', frame: 0 },
-      ],
     };
     Object.assign(world.spiderField, { futureSignal: { values: ['星🚀', true] } });
     const first = new SnapshotEncoder(world),
@@ -778,9 +775,6 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     damaged.angle = 0.12345;
     damaged.health = 20;
     changed.spiderField?.nests.pop();
-    const consumed = changed.spiderField?.consumed?.[0];
-    assert.ok(consumed);
-    consumed.frame = 4;
     const next = new SnapshotEncoder(changed),
       frame = next.encode(2, { sequence: 1, state: first.state });
     assert.equal(frame.kind, 'delta');

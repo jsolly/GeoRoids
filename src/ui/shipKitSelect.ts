@@ -47,7 +47,7 @@ export function mountShipKitSelect(): void {
     button.className = 'ship-kit-card';
     button.dataset['kitId'] = kit.id;
     button.setAttribute('aria-pressed', 'false');
-    button.innerHTML = `${kitHullPickerSvg(kit.id)}<span class="ship-kit-name">${kit.name}</span><span class="ship-kit-ability">${kit.abilityName}</span><span class="ship-kit-role">${kit.abilityHint}</span>`;
+    button.innerHTML = `${kitHullPickerSvg(kit.id)}<span class="ship-kit-name">${kit.name}</span><span class="ship-kit-ability">${kit.id === 'scout' ? 'Find minerals. Chart the terrain.' : 'Tow asteroids. Supply the furnaces.'}</span><span class="ship-kit-role">${kit.id === 'scout' ? 'Mineral Scan' : 'Tow Cable'}</span>`;
     attachEventListener(button, 'click', () => {
       activateAudio();
       const changed = getSelectedShipKitId() !== kit.id;

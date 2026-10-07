@@ -48,7 +48,7 @@ A generic connection-failed banner can mean your nickname is in use by an online
 
 ## Diagnostics
 
-Enable Advanced Debug for player and session IDs, a per-browser log level, frame rate, and connection health. Use Copy Diagnostics when reporting trouble, including silent audio.
+Visit `/debug` for player and page session IDs, frame rate, and connection health. Logging defaults to Info; add `?log-level=debug`, `info`, or `warn` to change it for that visit. Use Copy Diagnostics when reporting trouble, including silent audio.
 
 ## Graphics option
 

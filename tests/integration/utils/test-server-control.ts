@@ -319,6 +319,7 @@ export async function arrangeCrewFieldWithEvidence(
     | 'boundary'
     | 'impact'
     | 'mining'
+    | 'hull-recovery'
     | 'cooperative'
     | 'reflection'
     | 'satellite'

@@ -669,11 +669,7 @@ function createObjectPatch(before: Row, after: Row, nested: boolean): ObjectPatc
   for (const name of Object.keys(after)) {
     const previous = before[name],
       current = after[name] as Json;
-    if (
-      (nested && name !== 'spiders' && name !== 'nests' && name !== 'consumed') ||
-      !rows(previous) ||
-      !rows(current)
-    ) {
+    if ((nested && name !== 'spiders' && name !== 'nests') || !rows(previous) || !rows(current)) {
       if (!equal(previous, current)) {
         set[name] = current;
       }
@@ -1101,6 +1097,7 @@ function applyObjectPatch(base: Row, patch: unknown, nested: boolean): Row {
   }
   for (const [name, change] of Object.entries(collections ?? {})) {
     key(name);
+    // Reserved v2 target: deployed older servers still send consumption history.
     if (
       (nested && name !== 'spiders' && name !== 'nests' && name !== 'consumed') ||
       !rows(base[name])

@@ -45,7 +45,7 @@ A towed spider can still bite nearby ships, including your Hauler if you double 
 
 ## Spider rescue
 
-Towing a living spider attracts rescuers that can bite through your cable. Bring a Scout to repel them with Mineral Scan, or reach a lit furnace to burn the captive. Releasing the spider ends its rescue call.
+Towing a living spider attracts rescuers that can bite through your cable. Bring a Scout to repel them with Mineral Scan. Furnaces do not consume spiders. Releasing the spider ends its rescue call.
 
 ## Mining lasers
 

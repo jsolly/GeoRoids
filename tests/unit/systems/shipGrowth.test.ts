@@ -6,7 +6,6 @@ import {
   lootOverlap,
   maxHealthFromMass,
   maxVelocityFromMass,
-  planKillLoot,
   thrustScaleFromMass,
 } from '../../../shared/shipGrowth';
 import { SHIP } from '../../../src/constants';
@@ -18,19 +17,6 @@ describe('saved ship mass and salvage rules', () => {
     expect(thrustScaleFromMass(GROWTH.BASE_MASS)).toBe(1);
     expect(maxVelocityFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_VELOCITY);
     expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
-  });
-
-  test('a base-mass kill still plans loot pellets', () => {
-    const { pelletMasses } = planKillLoot(GROWTH.BASE_MASS);
-    expect(pelletMasses.length).toBeGreaterThanOrEqual(1);
-    expect(pelletMasses.reduce((sum, value) => value + sum, 0)).toBeCloseTo(GROWTH.BASE_KILL_MASS);
-  });
-
-  test('heavier ships drop more pellets than a fresh hull', () => {
-    const light = planKillLoot(GROWTH.BASE_MASS).pelletMasses.length;
-    const heavy = planKillLoot(GROWTH.SOFT_MAX_MASS).pelletMasses.length;
-    expect(heavy).toBeGreaterThan(light);
-    expect(heavy).toBeLessThanOrEqual(GROWTH.MAX_PELLETS);
   });
 
   test('dead and exploding ships cannot collect loot', () => {

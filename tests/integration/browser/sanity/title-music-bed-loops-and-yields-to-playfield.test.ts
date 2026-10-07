@@ -218,7 +218,7 @@ for (const browserType of [chromium, webkit]) {
           await page.screenshot({ path: flightScreenshot });
           const debugScreenshots: string[] = [];
           await page.evaluate(
-            "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
+            "import('/src/ui/debugIdentity.ts').then(({syncDebugMode}) => { history.replaceState(null, '', '/debug'); syncDebugMode(); })"
           );
           for (const debugState of ['expanded', 'collapsed']) {
             const toggle = page.locator('#debug-hud-toggle');
@@ -303,7 +303,7 @@ for (const browserType of [chromium, webkit]) {
           expect(afterInput.lastShotTime).toBe(beforeInput.lastShotTime);
           expect(afterInput.thrusting).toBe(true);
           await page.evaluate(
-            "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(false))"
+            "import('/src/ui/debugIdentity.ts').then(({syncDebugMode}) => { history.replaceState(null, '', '/'); syncDebugMode(); })"
           );
 
           await capture();

@@ -121,7 +121,7 @@ test(
     await game.placeShipAt(0, -500);
 
     await page.evaluate(
-      "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
+      "import('/src/ui/debugIdentity.ts').then(({syncDebugMode}) => { history.replaceState(null, '', '/debug'); syncDebugMode(); })"
     );
     const hudToggle = page.locator('#debug-hud-toggle');
     await hudToggle.waitFor({ state: 'visible' });

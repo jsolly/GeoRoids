@@ -761,7 +761,7 @@ function drawNearbyResources(
     );
   }
   for (const drop of LootField.getInstance().getAll()) {
-    // Wreckage and cores already have persistent landmark entries.
+    // Mined cargo already has persistent landmark entries.
     if (
       (drop.kind !== 'shard' && drop.kind !== 'tap') ||
       !isFiniteMapPosition(drop.position) ||

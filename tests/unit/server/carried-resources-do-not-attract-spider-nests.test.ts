@@ -50,7 +50,7 @@ test('colossal deposits attract larger groups than ordinary ore and loose pickup
   const salvage: LootData = {
     id: 'salvage',
     position: ore.position,
-    kind: 'wreckage',
+    kind: 'shard',
     radius: 10,
     mass: 1,
   };

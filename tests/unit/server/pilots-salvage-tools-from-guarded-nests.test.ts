@@ -198,7 +198,10 @@ test('nest salvage remains for exploration but expires after its thirty-minute l
   const createdAt = 100;
   manager.spawnNestCache({ x: 5000, y: 5000 }, createdAt);
   const count = manager.getCount();
-  expect(count).toBeGreaterThanOrEqual(6);
+  expect(count).toBeGreaterThanOrEqual(5);
+  expect(manager.getAll().filter(({ kind }) => kind === 'shard')).toHaveLength(3);
+  expect(manager.getAll().filter(({ kind }) => kind === 'tap')).toHaveLength(1);
+  expect(manager.getAll().filter(({ kind }) => kind === 'silk')).toHaveLength(1);
   manager.expire(createdAt + GROWTH.LOOT_TTL_FRAMES);
   expect(manager.getCount()).toBe(count);
   manager.expire(createdAt + EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES - 1);

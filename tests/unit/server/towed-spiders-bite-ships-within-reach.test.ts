@@ -146,7 +146,7 @@ test('a towed nest guard can bite far from its old nest and cannot reset its coo
   );
 });
 
-test('a lit street furnace suppresses captive bites and consumes it before combat', () => {
+test('a lit street furnace suppresses captive bites without consuming it', () => {
   const furnaces = new FurnaceField();
   const lot = civicLot('street-1-0');
   if (!lot) {
@@ -161,8 +161,6 @@ test('a lit street furnace suppresses captive bites and consumes it before comba
   spider.velocity = { x: -200, y: 0 };
   owner.position = { ...lot.position };
   expect(manager.advance({ ...options, players: [owner], nowFrame: 2 })).toEqual([]);
-  expect(manager.getBody(spider.id)).toBeUndefined();
-  expect(manager.snapshot().consumed).toEqual([
-    expect.objectContaining({ id: spider.id, furnaceId: lot.id }),
-  ]);
+  expect(manager.getBody(spider.id)).toBe(spider);
+  expect(spider.health).toBeGreaterThan(0);
 });

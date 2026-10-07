@@ -91,7 +91,7 @@ describe('Hauler tools interact with living spiders', () => {
   });
 
   test.each(['landmark', 'built'])(
-    'tow pulls a spider into a %s furnace, consumes it once, and releases its cable',
+    'tow pulls a spider into a %s furnace, keeps it alive, and releases its cable on command',
     (kind) => {
       const lot = civicLot('street-1-0');
       if (!lot) {
@@ -135,17 +135,19 @@ describe('Hauler tools interact with living spiders', () => {
         }
       }
       expect(crossedProtection).toBe(true);
-      expect(world.engine.getSpiderField().spiders.some((body) => body.id === spider.id)).toBe(
-        false
-      );
-      expect(world.engine.getSpiderField().consumed).toEqual([
-        expect.objectContaining({ id: spider.id, furnaceId: furnace.id }),
-      ]);
+      expect(
+        world.engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.health
+      ).toBe(spider.health);
+      expect(world.entity(pilot).harpoonTargetId).toBe(spider.id);
+      expect(world.entity(pilot).exploding).toBe(false);
+      activate();
       expect(world.entity(pilot).harpoonTargetId).toBeNull();
       for (let frame = 0; frame < 10; frame++) {
         world.engine.advanceOneFrame();
       }
-      expect(world.engine.getSpiderField().consumed).toHaveLength(1);
+      expect(world.engine.getSpiderField().spiders.some((body) => body.id === spider.id)).toBe(
+        true
+      );
     }
   );
 

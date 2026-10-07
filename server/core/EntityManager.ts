@@ -349,7 +349,6 @@ export class EntityManager {
   }
 
   public updateHealthRegeneration(): number {
-    const regenPerFrame = calculateHealthRegenPerFrame();
     let healedEntities = 0;
 
     for (const entity of this.entities.values()) {
@@ -367,7 +366,10 @@ export class EntityManager {
         continue;
       }
 
-      const nextHealth = Math.min(entity.maxHealth, entity.health + regenPerFrame);
+      const nextHealth = Math.min(
+        entity.maxHealth,
+        entity.health + calculateHealthRegenPerFrame(entity.maxHealth)
+      );
       if (nextHealth === entity.health) {
         continue;
       }

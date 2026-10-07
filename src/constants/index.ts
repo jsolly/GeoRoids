@@ -67,7 +67,7 @@ export const PALETTE = {
   HUD_MUTED: '#64748B',
   DANGER: '#F43F5E',
   HEALTH: '#4ADE80',
-  /** Locked cream — wreckage/shard pickups. Same hex as Hauler tether. */
+  /** Locked cream — shard pickups. Same hex as Hauler tether. */
   LOOT: '#E8D5A3',
   /** Collectible EO hardware. */
   SATELLITE: '#C4B5FD',
@@ -184,7 +184,7 @@ export const SHIP = {
 
   // Health
   MAX_HEALTH: 100,
-  HEALTH_REGEN_RATE: 1, // per second
+  HEALTH_REGEN_FRACTION_PER_SECOND: 0.02, // fraction of current max health
   HEALTH_REGEN_DELAY: 5, // seconds
 
   // Timing (in frames at 60 FPS)

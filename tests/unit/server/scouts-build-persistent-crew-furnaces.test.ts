@@ -336,6 +336,7 @@ test('raising a furnace during a chase repels the living spider despite tool coo
   const health = actor.health;
   expect(engine.useAbility(actor.id)).toBe(true);
   expect(actor.abilityCooldownFrames).toBe(300);
+  engine.advanceOneFrame();
   expect(
     engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.targetId
   ).toBeNull();
@@ -419,7 +420,7 @@ test('a lit furnace matches Town Square for spider occupancy', () => {
   }
 });
 
-test('a Scout can light a nest-covered foundation and all its guards flee alive', () => {
+test('construction keeps nest guards attached to their home', () => {
   const engine = new GameEngine(42);
   const { actor } = addScout(engine);
   engine.prepareDiagnosticWorld('traversal');
@@ -438,14 +439,26 @@ test('a Scout can light a nest-covered foundation and all its guards flee alive'
   const health = actor.health;
   expect(engine.furnaceBuildIssue(actor.id)).toBeUndefined();
   expect(engine.useAbility(actor.id)).toBe(true);
+  engine.advanceCombatFrame();
+  const manager: TerrainSpiderManager = Reflect.get(engine, 'spiderManager');
+  expect(guards.every(({ id }) => manager.getBody(id)?.territory.kind === 'guard')).toBe(true);
+  expect(engine.getSpiderField().nests).toHaveLength(1);
   const repelled = engine.getSpiderField().spiders;
   expect(repelled.map(({ id }) => id)).toEqual(guards.map(({ id }) => id));
   expect(repelled.every(({ targetId }) => targetId === null)).toBe(true);
   for (let frame = 0; frame < 60; frame++) {
     engine.advanceCombatFrame();
   }
+  actor.position = { x: furnace.position.x + 2000, y: furnace.position.y };
+  manager.suspend();
+  expect(manager.snapshot().spiders).toEqual([]);
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceCombatFrame();
+  }
   const fled = engine.getSpiderField().spiders;
   expect(fled).toHaveLength(10);
+  expect(engine.getSpiderField().nests).toHaveLength(1);
+  expect(guards.every(({ id }) => manager.getBody(id)?.territory.kind === 'guard')).toBe(true);
   expect(actor.health).toBeGreaterThanOrEqual(health);
   for (const before of guards) {
     const after = fled.find(({ id }) => id === before.id);

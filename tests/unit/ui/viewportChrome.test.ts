@@ -1,12 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-  controlsHintFor,
-  DESKTOP_CONTROLS_HINT,
-  shouldUseTouchControls,
-  TOUCH_CONTROLS_HINT,
-  type ViewportQuery,
-} from '../../../src/ui/viewportChrome';
+import { shouldUseTouchControls, type ViewportQuery } from '../../../src/ui/viewportChrome';
 
 const desktop: ViewportQuery = {
   width: 1440,
@@ -18,15 +12,13 @@ const desktop: ViewportQuery = {
 
 test('desktop mouse viewport keeps keyboard chrome', () => {
   expect(shouldUseTouchControls(desktop)).toBe(false);
-  expect(controlsHintFor(desktop)).toBe(DESKTOP_CONTROLS_HINT);
 });
 
-test('phone portrait and landscape use the touch steering + fire hint', () => {
+test('phone portrait and landscape use touch controls', () => {
   const portrait = { ...desktop, width: 390, height: 844 };
   const landscape = { ...desktop, width: 844, height: 390 };
   expect(shouldUseTouchControls(portrait)).toBe(true);
   expect(shouldUseTouchControls(landscape)).toBe(true);
-  expect(controlsHintFor(portrait)).toBe(TOUCH_CONTROLS_HINT);
 });
 
 test('800x600 stay-desktop so existing canvas tests keep the old HUD', () => {

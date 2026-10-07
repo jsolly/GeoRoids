@@ -372,7 +372,7 @@
     "tests/integration/browser/sanity/pilots-toggle-contour-lock-without-charge.test.ts": "sha256:41a7046d7e6adf1e4467dc52cb52c8a53e9849bfd0ce1e6ae17cff6e005c1848",
     "tests/integration/browser/sanity/reflective-asteroids-leave-ordinary-salvage.test.ts": "sha256:92bb9fabf4ecc8124805c39e00ae40289b90b148c7ba2a6a6be7e07d8215fb81",
     "tests/integration/browser/sanity/resource-tap-and-pickups-play-crystal-phrases.test.ts": "sha256:68e8d25fcf62d46b8965ba45da5d5a35b761b264b346c7bfa257f9e19afa8d4f",
-    "tests/integration/browser/sanity/scout-launches-a-shared-moving-probe.test.ts": "sha256:600dca7db5fdd5acd2686c3fe0920bb3ff52b37181ad1f803c08d06838b6318c",
+    "tests/integration/browser/sanity/scout-launches-a-shared-moving-probe.test.ts": "sha256:2660b9632a930673fc0891d38368c69a820040bf6a41efaf14bfff6eca540408",
     "tests/integration/browser/sanity/scout-radar-pulses-cover-the-viewport.test.ts": "sha256:ff2fc244e8e643e4c5bb9e341e860b44b46faf44c168556ffd236771d37426e9",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:f76279f6c010bf3bb720ecc32f896125ee039d06d258c425dc9b7fc1e953cf94",
     "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:7cb9cffa83ea560f133379f279afc1cd4a66b0e9c024e6838ac35f5b2153e0b9",
@@ -1490,6 +1490,15 @@
       "topics": ["field-manual", "hauler", "terrain"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed only the Scout browser fixture: await both living pilots exact arrangement epochs and move the Scout into a safe observation lane after proving real probe attachment and 40 health. Ordinary keyboard/touch launch, outbound miss and disintegration, shared survey, moving host, pulse capture and desktop/mobile Wiki checks retain their original assertions and 30-second budget. The controlled delayed-launch negative demonstrated a host destroyed before the pulse window; the repaired same-delay control and final uninstrumented desktop/mobile case passed, with every attempt retained. Focused Biome and TypeScript passed. Player rules, Wiki prose and demonstration assets are unchanged.",
+      "sources": ["tests/integration/browser/sanity/scout-launches-a-shared-moving-probe.test.ts"],
+      "topics": ["scout"],
+      "media": [],
+      "owners": {
+        "tests/integration/browser/sanity/scout-launches-a-shared-moving-probe.test.ts": "scout"
+      }
     }
   ]
 }

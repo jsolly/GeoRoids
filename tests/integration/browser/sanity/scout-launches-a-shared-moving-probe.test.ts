@@ -29,7 +29,9 @@ for (const viewport of [
     await hauler.bootGame({ kitId: 'hauler', waitForCombatReady: false });
     const playerId = await game.getLocalPlayerId();
     const observerId = await hauler.getLocalPlayerId();
-    await arrangeCrewField([playerId, observerId], 'empty');
+    const emptyEpochs = await arrangeCrewField([playerId, observerId], 'empty');
+    await game.waitForControlledFixture(emptyEpochs.get(playerId));
+    await hauler.waitForControlledFixture(emptyEpochs.get(observerId));
     await page.bringToFront();
     if (viewport.touch) {
       await page.locator('#ship-schematic-toggle').tap();
@@ -105,7 +107,9 @@ for (const viewport of [
       playerId
     );
     await page.bringToFront();
-    await arrangeCrewField([playerId, observerId], 'probe');
+    const probeEpochs = await arrangeCrewField([playerId, observerId], 'probe');
+    await game.waitForControlledFixture(probeEpochs.get(playerId));
+    await hauler.waitForControlledFixture(probeEpochs.get(observerId));
     await page.waitForFunction(() =>
       window.gameController
         ?.getCurrRoidBelt()
@@ -144,6 +148,8 @@ for (const viewport of [
       return { id: rock.probe.id, health: rock.probe.health, x: rock.position.x };
     });
     expect(initial.health).toBe(40);
+    // Keep automatic thrust clear of the host while observing its moving beacon.
+    await game.placeControlledShipAt(target.x - 120, target.y + 160);
     await observer.waitForFunction(
       ({ id, owner }) => {
         const rocks = window.gameController?.getCurrRoidBelt().getRoids();

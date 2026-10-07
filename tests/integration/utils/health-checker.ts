@@ -27,7 +27,7 @@ async function checkWebSocketServer(): Promise<boolean> {
   }
 }
 
-export async function checkViteServer(): Promise<boolean> {
+async function checkViteServer(): Promise<boolean> {
   try {
     const { ok, body } = await httpGet(TestConfig.GAME_URL);
     if (!ok) {
@@ -115,7 +115,7 @@ export async function checkAllServers(): Promise<void> {
         `- WebSocket server (${TestConfig.SERVER_URL}): ${wsHealthy ? '✅' : '❌'}\n` +
         `- Vite dev server (${TestConfig.GAME_URL}): ${viteHealthy ? '✅' : '❌'}\n` +
         `- WebSocket /ws endpoint: ${wsEndpointHealthy ? '✅' : '❌'}\n\n` +
-        `Run this scenario through: ./scripts/test-runner.sh <test-path>\n` +
+        `Start this checkout with: npm run dev\n` +
         `Errors: ${errors.join(', ')}`
     );
   }

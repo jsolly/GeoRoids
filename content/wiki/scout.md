@@ -29,10 +29,6 @@ Aim your nose at a living host without a beacon; powered rocks cannot take a pro
 
 At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. A failed build spends nothing and shows why (not enough banked points, or the inward furnace is unlit), but it uses up that E press, so no Scan or Probe fires.
 
-## Build a refuge
-
-You can build during a chase, even during tool cooldown or on a nest-covered foundation. Lighting the furnace immediately breaks nearby hunts and sends living spiders fleeing. Guards whose home is covered become roamers.
-
 ## Exploration
 
 Scout reveals more of the shared chart as it flies than Hauler. Mineral colors stay with identified rocks: cyan ice, gold metal, orange rubble, and violet crystal; many rocks contain no ore. Use the [map](/wiki/#hud-network) to return to discoveries.

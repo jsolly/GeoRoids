@@ -52,7 +52,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx --no-install playwright install --with-deps chromium
       - run: npm run smoke:scenario-contract
       - run: npm run smoke:production
         env:

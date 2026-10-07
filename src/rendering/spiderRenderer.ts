@@ -4,11 +4,7 @@ import type { Position, TerrainSpider } from '../../shared-types';
 import { updateSpiderScore } from '../audio/spiderScore';
 import { drawSurveyProbe } from '../entities/roid/surveyProbeRenderer';
 import type { ContourLevel } from '../physics/terrain/contours';
-import {
-  getSpiderConsumptionEffects,
-  getSpiderField,
-  spiderDanger,
-} from '../physics/terrain/spiderSession';
+import { getSpiderField, spiderDanger } from '../physics/terrain/spiderSession';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { canvasManager } from './canvasSurface';
 import { createContourQuery } from './contourSpatialIndex';
@@ -221,40 +217,6 @@ export function drawTerrainSpiders(position: Position, playerId: string, alive: 
       drawInfestedContours(ctx, spider, time, scale, levels);
       drawSpider(ctx, spider, time, scale, levels);
     }
-  }
-  for (const effect of getSpiderConsumptionEffects()) {
-    const progress = Math.min(1, time - effect.startedAt);
-    ctx.save();
-    ctx.translate(effect.position.x, effect.position.y - progress * 40);
-    ctx.globalAlpha = 1 - progress;
-    ctx.strokeStyle = '#ffbd69';
-    ctx.fillStyle = '#ef6544';
-    ctx.lineWidth = 2 / scale;
-    const shrink = 1 - progress;
-    for (const side of [-1, 1]) {
-      for (let leg = 0; leg < 4; leg++) {
-        ctx.beginPath();
-        ctx.moveTo((12 - leg * 7) * shrink, 0);
-        ctx.lineTo((20 - leg * 12) * shrink, side * 23 * shrink);
-        ctx.lineTo((25 - leg * 14) * shrink, side * (30 - progress * 24) * shrink);
-        ctx.stroke();
-      }
-    }
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 22 * shrink + 0.1, 12 * shrink + 0.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-    for (let ember = 0; ember < 7; ember++) {
-      ctx.beginPath();
-      ctx.arc(
-        Math.sin(ember * 7) * 26 * progress,
-        -ember * 5 * progress,
-        2 * shrink + 0.1,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-    }
-    ctx.restore();
   }
   ctx.restore();
   for (const spider of field.spiders) {

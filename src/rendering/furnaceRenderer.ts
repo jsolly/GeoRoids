@@ -122,6 +122,16 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
 
 /** Known station artwork; the ring marks a delivery zone and has no physics. */
 export function drawFurnacesRelative(viewerPosition: Position): void {
+  drawKnownFurnaces(viewerPosition, 'artwork');
+}
+
+/** Foreground text stays above ships, loot, lasers, and neighboring fire trails. */
+export function drawFurnaceLabels(viewerPosition: Position): void {
+  drawKnownFurnaces(viewerPosition, 'labels');
+  drawFoundations(viewerPosition, 'labels');
+}
+
+function drawKnownFurnaces(viewerPosition: Position, pass: 'artwork' | 'labels'): void {
   const ctx = canvasManager.getContext();
   const cvs = canvasManager.getCanvas();
   if (!ctx || !cvs) {
@@ -151,18 +161,21 @@ export function drawFurnacesRelative(viewerPosition: Position): void {
     ) {
       continue;
     }
-    if (furnace.id === TOWN_HEARTH.id) {
-      drawDockingStation(ctx, screen.x, screen.y, radius, getSettlement().level);
+    if (pass === 'artwork') {
+      if (furnace.id === TOWN_HEARTH.id) {
+        drawDockingStation(ctx, screen.x, screen.y, radius, getSettlement().level);
+      }
+      drawFurnaceArtwork(ctx, screen.x, screen.y, radius, now);
+    } else {
+      drawFurnaceLabel(
+        ctx,
+        screen.x,
+        screen.y,
+        radius,
+        furnace.name,
+        furnace.id === TOWN_HEARTH.id ? 'STORE' : 'DELIVERY ZONE'
+      );
     }
-    drawFurnaceArtwork(ctx, screen.x, screen.y, radius, now);
-    drawFurnaceLabel(
-      ctx,
-      screen.x,
-      screen.y,
-      radius,
-      furnace.name,
-      furnace.id === TOWN_HEARTH.id ? 'STORE' : 'DELIVERY ZONE'
-    );
   }
 }
 
@@ -377,7 +390,7 @@ function strokeEmbers(
 }
 
 function drawFurnaceLabel(
-  ctx: DrawingContext,
+  ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   radius: number,
@@ -385,14 +398,19 @@ function drawFurnaceLabel(
   subtitle = 'DELIVERY ZONE'
 ): void {
   ctx.save();
+  ctx.strokeStyle = PALETTE.BG;
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
   ctx.fillStyle = hexToRgba(FURNACE_LABEL_COLOR, 0.82);
   ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
+  ctx.strokeText(name, x, y - radius - 7);
   ctx.fillText(name, x, y - radius - 7);
   ctx.fillStyle = hexToRgba(FURNACE_COLOR, 0.72);
   ctx.font = '9px monospace';
   ctx.textBaseline = 'top';
+  ctx.strokeText(subtitle, x, y + radius + 7);
   ctx.fillText(subtitle, x, y + radius + 7);
   ctx.restore();
 }
@@ -648,6 +666,10 @@ export function drawFurnacePipes(viewerPosition: Position, now = performance.now
 
 /** Dark furnace lots. A dashed ring with no flame until a Scout builds it. */
 export function drawFurnaceFoundations(viewerPosition: Position): void {
+  drawFoundations(viewerPosition, 'artwork');
+}
+
+function drawFoundations(viewerPosition: Position, pass: 'artwork' | 'labels'): void {
   const ctx = canvasManager.getContext();
   const cvs = canvasManager.getCanvas();
   if (!ctx || !cvs) {
@@ -674,22 +696,25 @@ export function drawFurnaceFoundations(viewerPosition: Position): void {
     ) {
       continue;
     }
-    ctx.save();
-    ctx.setLineDash([Math.max(4, radius * 0.12), Math.max(3, radius * 0.08)]);
-    ctx.strokeStyle = hexToRgba(FURNACE_COLOR, 0.45);
-    ctx.lineWidth = Math.max(1, radius * 0.02);
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    drawFurnaceLabel(
-      ctx,
-      screen.x,
-      screen.y,
-      radius,
-      lot.name,
-      `SCORE ${lot.cost.toLocaleString('en-US')}`
-    );
+    if (pass === 'artwork') {
+      ctx.save();
+      ctx.setLineDash([Math.max(4, radius * 0.12), Math.max(3, radius * 0.08)]);
+      ctx.strokeStyle = hexToRgba(FURNACE_COLOR, 0.45);
+      ctx.lineWidth = Math.max(1, radius * 0.02);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      drawFurnaceLabel(
+        ctx,
+        screen.x,
+        screen.y,
+        radius,
+        lot.name,
+        `SCORE ${lot.cost.toLocaleString('en-US')}`
+      );
+    }
   }
 }
 

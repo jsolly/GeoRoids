@@ -31,9 +31,9 @@ export class MapAssets implements LootCatalogObserver {
         ordinal: insertionOrdinal,
         asset: {
           id: `loot:${drop.id}`,
-          kind: drop.kind === 'points' ? 'wreckage' : drop.kind,
+          kind: 'wreckage',
           position: { ...drop.position },
-          name: 'Salvage',
+          name: 'Cargo',
         },
       });
     }

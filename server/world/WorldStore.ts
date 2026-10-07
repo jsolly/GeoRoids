@@ -71,6 +71,8 @@ export interface PersistentPilot {
   angle?: number;
   mass?: number;
   health?: number;
+  /** Remaining recovery wait at lastSeenAt, in simulation frames. */
+  healthRegenTimer?: number;
   /** Server release that issued the current token digest. */
   credentialReleaseId?: string;
   /** Client release present when the current token digest was issued. */
@@ -138,6 +140,7 @@ function readOptionalFlight(
   const mass = pilot['mass'];
   const health = pilot['health'];
   const kitId = pilot['kitId'];
+  const healthRegenTimer = pilot['healthRegenTimer'];
   if (
     typeof lastSeenAt !== 'number' ||
     !Number.isFinite(lastSeenAt) ||
@@ -152,7 +155,11 @@ function readOptionalFlight(
     typeof health !== 'number' ||
     !Number.isFinite(health) ||
     health < 0 ||
-    !isShipKitId(kitId)
+    !isShipKitId(kitId) ||
+    (healthRegenTimer !== undefined &&
+      (typeof healthRegenTimer !== 'number' ||
+        !Number.isSafeInteger(healthRegenTimer) ||
+        healthRegenTimer < 0))
   ) {
     return undefined;
   }
@@ -164,6 +171,7 @@ function readOptionalFlight(
     angle,
     mass,
     health,
+    ...(typeof healthRegenTimer === 'number' ? { healthRegenTimer } : {}),
     ...(velocity && finiteMotionVector(velocity) ? { velocity } : {}),
   };
 }

@@ -1,69 +1,48 @@
-# Integration tests
+# Code integration tests
 
-Tests describe a player or system scenario and prove its outcome. A screenshot,
-a connected socket, or a nonzero entity count does not prove a collision, hit,
-kill, or respawn.
+Server and entity scenarios prove executed code results without launching a
+browser. Use fresh fixed state, explicit target identities and controlled clocks
+when elapsed time affects gameplay. Act through the real message, collision,
+input or lifecycle boundary; do not assign the outcome being asserted.
+Owned loopback tests await actual conditions with bounded cleanup rather than
+asserting host speed or relying on fixed sleeps.
 
-## Choose the test level
+## Run
 
-| Level | What belongs here |
-| --- | --- |
-| `tests/unit/` | Deterministic rules, protocol validation, collision geometry, lifecycle boundaries, and failure handling. Use explicit state and controlled clocks. |
-| `tests/integration/server/` | Real socket negotiation, shared authoritative state, reconnects, and server lifecycle. |
-| `tests/integration/entities/` | Interactions between entities and input components. |
-| `tests/integration/browser/` | Real input, rendered state, HUD feedback, and multiplayer behavior that needs a browser to prove it. |
-
-Keep one canonical browser scenario for each behavior. Extend it when another
-assertion belongs to the same player story; do not add another launch-and-shoot
-test under a different implementation-oriented name.
-
-## Write a scenario
-
-1. Arrange known crew participants, positions, and starting state. Use the
-   shared lifecycle hooks to reset the world and close every browser page.
-2. Perform the real action under test. Fixture controls arrange a scene; they
-   must not assign the health, score, death, or other outcome being asserted.
-3. Observe the specific result. Match entity/projectile/loot IDs and assert the
-   appropriate damage, credited score, death cause, or visible UI change.
-4. Wait for an observable condition with a deadline. Start observing transient
-   events before acting. A receive log can precede validation, and a destruction
-   event can precede the next loot snapshot.
-
-Place unrelated actors outside the scenario's interaction area. Do not rely on
-a randomly chosen asteroid to survive, or on
-a fixed sleep to make a shot land. Keep deterministic simulation rules in the
-lower-level tests instead of adding browser aiming and navigation machinery to
-retest them.
-
-Screenshots under `browser/screenshots/` are diagnostic artifacts. Capturing one
-is not an assertion that the scenario succeeded.
-
-## Run tests
-
-Use Node 24.15 or newer within major 24 and run commands from the GeoRoids checkout. Install the
-pinned Chromium and WebKit browsers once with `npx --no-install playwright install chromium webkit`.
+From the absolute GeoRoids checkout directory, use Node 24.15 or newer within
+major 24. Browser binaries are not required.
 
 ```sh
 npm run test:integration
-npm run test:integration:browser
 npm run test:integration:server
 npm run test:integration:entities
-./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose
+./scripts/test-runner.sh tests/integration/server/server-pause.test.ts --reporter=verbose
 ```
 
-Always use `scripts/test-runner.sh` for integration tests. It owns one Vite/server
-pair and one serialized Vitest worker, rejects occupied ports, and cleans up its
-own processes. Do not run raw Vitest integration commands or another suite
-against the same servers. Unit tests run separately with `npm test`.
+Always use `scripts/test-runner.sh` for integration paths. It owns a fresh
+Vite/server pair on automatically selected unused ports, one isolated Vitest
+worker and process cleanup. Explicit `GEOROIDS_TEST_VITE_PORT` and
+`GEOROIDS_TEST_SERVER_PORT` diagnostic overrides remain supported. It refuses to
+attach to existing services. Do not invoke raw Vitest on integration paths.
+The default execution deadline is 1200 seconds; timeouts and cleanup failures fail.
 
-If another checkout owns the default ports, select an unused pair:
+Code checks may overlap across different worktrees; the same checkout excludes
+validation overlap. `npm run test:integration` runs every file below without
+sharding. Browser suites are retired. Native rendering, keyboard/touch delivery
+and audio are outside automated coverage. Manual browser benchmarks and Wiki
+media tools remain outside the gate.
 
-```sh
-GEOROIDS_TEST_VITE_PORT=5174 GEOROIDS_TEST_SERVER_PORT=3002 \
-  ./scripts/test-runner.sh tests/integration/server/
-```
+## Complete inventory
 
-A failed health check, reset, fixture placement, or evidence read must fail the
-test. For a timeout, inspect the missed condition and server/browser evidence
-before changing a deadline. See [browser fixtures](browser/README.md) for setup
-controls and browser-specific guidance.
+- `tests/integration/entities/input/keybindings.test.ts`
+- `tests/integration/entities/input/mouse.test.ts`
+- `tests/integration/server/asteroids-follow-debug-placement-policy.test.ts`
+- `tests/integration/server/current-pilots-recover-after-reconnect.test.ts`
+- `tests/integration/server/fixture-waits-for-departed-pilots-before-resetting-world.test.ts`
+- `tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts`
+- `tests/integration/server/pilots-share-a-depleted-field-across-reconnects.test.ts`
+- `tests/integration/server/player-motion-cross-real-sockets.test.ts`
+- `tests/integration/server/server-init-asteroids.test.ts`
+- `tests/integration/server/server-parity.test.ts`
+- `tests/integration/server/server-pause.test.ts`
+- `tests/integration/server/server-test-reset.test.ts`

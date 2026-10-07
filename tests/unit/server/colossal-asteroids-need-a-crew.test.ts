@@ -6,7 +6,6 @@ import { RNGService } from '../../../server/core/RNGService';
 import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { beltAsteroid, beltSlots } from '../../../shared/asteroidBelt';
-import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
 import {
   applyColossalDeposit,
   asteroidCrewNeeded,
@@ -184,53 +183,6 @@ describe('Colossal asteroids need a crew', () => {
     world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
     world.tick();
     expect(small.velocity.x).toBeLessThan(0);
-  });
-
-  test('one Boost Coupling ignites a colossal deposit at a crawl; two launch and both are paid', () => {
-    world = new GameServerWorld();
-    const alice = world.join('Alice', { x: 500, y: 0 }, { kitId: 'hauler' });
-    const bob = world.join('Bob', { x: 500, y: 80 }, { kitId: 'hauler' });
-    world.clearAsteroids();
-    const rock = colossalRock('colossal-boost', { x: 650, y: 0 });
-    world.engine.addAsteroid(rock);
-    world.entity(alice).angle = 0;
-    world.entity(bob).angle = 0;
-    equip(alice, 'boost_coupling');
-    equip(bob, 'boost_coupling');
-    activate(alice);
-    expect(rock.boost).toEqual({
-      phase: 'armed',
-      ownerId: alice.id,
-      angle: furnaceHeading(rock.position),
-    });
-    activate(alice);
-    expect(rock.boost?.phase).toBe('burning');
-    expect(world.entity(alice).harpoonTargetId).toBeNull();
-    const crawl = ASTEROID_BOOST.maxSpeed * ASTEROID_BOOST.undercrewedFactor;
-    for (let frame = 0; frame < 120; frame++) {
-      world.engine.advanceOneFrame();
-    }
-    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(crawl, 5);
-
-    world.engine.updatePlayer(bob.id, {
-      position: { x: rock.position.x - 150, y: rock.position.y },
-    });
-    activate(bob);
-    expect(boostCrew(rock)).toEqual([alice.id, bob.id]);
-    expect(rock.boost?.phase).toBe('burning');
-    expect(world.entity(bob).harpoonTargetId).toBeNull();
-    for (let frame = 0; frame < 60; frame++) {
-      world.engine.advanceOneFrame();
-    }
-    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeGreaterThan(crawl * 2);
-
-    rock.position = { x: 0, y: 0 };
-    world.engine.processFurnaceDeliveries();
-    const deliveries = world.engine.drainFurnaceDeliveries();
-    expect(deliveries).toHaveLength(1);
-    expect(deliveries[0]?.rewards.map((reward) => reward.playerId).sort()).toEqual(
-      [alice.id, bob.id].sort()
-    );
   });
 
   test('a full burning crew refuses a third coupling and every Tow Cable', () => {

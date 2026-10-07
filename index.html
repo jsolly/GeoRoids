@@ -20,7 +20,7 @@
     <meta property="og:description" content="Survey the unknown, tow asteroids to furnaces, and share discoveries with your crew in this free cooperative space game." />
     <meta property="og:url" content="https://www.georoids.com/" />
     <meta name="twitter:card" content="summary" />
-    <link rel="stylesheet" href="index.css" />
+    <link rel="stylesheet" href="/index.css" />
   </head>
 
   <body>
@@ -28,15 +28,12 @@
     <canvas id="title-terrain" aria-hidden="true"></canvas>
     <main id="gameWrapper">
       <div id="start-screen" class="screen">
-        <p class="terrain-eyebrow">Read the terrain. Explore together.</p>
         <h1>GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click Contour Lock · E ability · V inventory · B furnace menu · M map</p>
-        <p class="manual-entry"><a href="/wiki/">Open field manual →</a></p>
 
         <!-- Join the multiplayer session -->
         <div class="game-modes">
           <div>
-            <label for="playerNameInput" class="nickname-label">Your Nickname</label>
+            <label for="playerNameInput" class="nickname-label">Pilot name</label>
             <input
               type="text"
               id="playerNameInput"
@@ -48,7 +45,7 @@
 
           </div>
           <fieldset class="ship-kit-select">
-            <legend>Ship kit</legend>
+            <legend>Choose your ship</legend>
             <div id="ship-kit-grid" class="ship-kit-grid"></div>
 
           </fieldset>
@@ -89,27 +86,7 @@
               <label class="sound-toggle-label" for="hapticsPref">Haptics</label>
             </div>
           </div>
-          <details id="advanced-settings" class="advanced-settings">
-            <summary>Advanced</summary>
-            <div class="debug-toggle-row">
-              <input
-                class="sound-toggle"
-                type="checkbox"
-                id="debugPref"
-              />
-              <label class="sound-toggle-label" for="debugPref">Debug</label>
-            </div>
-            <div id="debug-identity" class="debug-identity" hidden>
-              <div>
-                <label class="debug-id-label" for="debug-log-level">Log level</label>
-                <select id="debug-log-level" class="debug-id-input" aria-describedby="debug-log-level-hint">
-                  <option value="error">Error</option>
-                  <option value="warn">Warn</option>
-                  <option value="info">Info</option>
-                  <option value="debug">Debug</option>
-                </select>
-                <p id="debug-log-level-hint" class="debug-id-hint">This browser only. Debug is verbose and can stutter play.</p>
-              </div>
+          <section id="debug-identity" class="debug-identity" hidden>
               <div>
                 <label class="debug-id-label" for="debug-player-id">Player ID</label>
                 <div class="debug-id-row">
@@ -132,7 +109,7 @@
                     disabled
                   >Copy</button>
                 </div>
-                <p id="debug-player-id-hint" class="debug-id-hint">Paste this to an agent. Railway filter: @playerId:…</p>
+                <p id="debug-player-id-hint" class="debug-id-hint">Gameplay log ID</p>
               </div>
               <div>
                 <label class="debug-id-label" for="debug-session-id">Page session</label>
@@ -154,13 +131,12 @@
                     aria-label="Copy page session"
                   >Copy</button>
                 </div>
-                <p id="debug-session-id-hint" class="debug-id-hint">Optional client-log filter: @sessionId:…</p>
+                <p id="debug-session-id-hint" class="debug-id-hint">Client log session</p>
               </div>
-            </div>
-          </details>
+          </section>
         </div>
 
-        <p class="game-description">A free multiplayer space game. Survey the unknown, tow valuable asteroids, and build shared progress with your crew.</p>
+        <p class="manual-entry"><a href="/wiki/">Field manual ↗</a></p>
 
 
 
@@ -169,6 +145,10 @@
 
       <div id="gameArea" hidden>
         <div id="debug-play-stack" class="debug-play-stack">
+          <dl class="debug-play-identity">
+            <div><dt>Player</dt><dd id="debug-hud-player-id">—</dd></div>
+            <div><dt>Page</dt><dd id="debug-hud-session-id">—</dd></div>
+          </dl>
           <button id="debug-hud-toggle" type="button" class="debug-copy debug-hud-toggle" aria-controls="debug-hud" aria-expanded="true" hidden>Hide HUD</button>
           <fieldset id="debug-hud" class="debug-hud" hidden>
             <legend>Debug health</legend>

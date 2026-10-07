@@ -7,13 +7,7 @@ import {
   isEquipmentId,
 } from '../../shared/equipment';
 import { cellWorldBounds, explorationCellAt } from '../../shared/exploration';
-import {
-  addLootMagnetPull,
-  canCollectLoot,
-  GROWTH,
-  lootOverlap,
-  planKillLoot,
-} from '../../shared/shipGrowth';
+import { addLootMagnetPull, canCollectLoot, GROWTH, lootOverlap } from '../../shared/shipGrowth';
 import { nearbyWorldRows, WORLD } from '../../shared/world';
 import type { EquipmentId, LootData, Position, SavedPointLoot, Velocity } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
@@ -195,27 +189,6 @@ export class LootManager {
     this.rng = rngService;
   }
 
-  public spawnFromKill(
-    entity: Pick<GameEntity, 'position' | 'mass'>,
-    gameTime: number
-  ): LootData[] {
-    return this.spawnFromPosition(entity.position, entity.mass ?? GROWTH.BASE_MASS, gameTime);
-  }
-
-  public spawnFromPosition(position: Position, mass: number, gameTime: number): LootData[] {
-    const { pelletMasses } = planKillLoot(mass);
-    const spawned: LootData[] = [];
-
-    for (const pelletMass of pelletMasses) {
-      const drop = this.createPellet(position, pelletMass, gameTime);
-      this.insert(drop);
-      spawned.push(this.toPublic(drop));
-    }
-
-    this.enforceCap();
-    return spawned;
-  }
-
   /** One shard at the break site. Collect uses the existing overlap collection path. */
   public spawnShard(
     position: Position,
@@ -252,7 +225,7 @@ export class LootManager {
       mass: 0,
       radius: GROWTH.LOOT_RADIUS + 2,
       kind: 'points',
-      expiresAt: Date.now() + (ECONOMY.deathLootFrames / 60) * 1000,
+      expiresAt: Date.now() + (ECONOMY.pointLootFrames / 60) * 1000,
       velocity: motion ? { ...motion.velocity } : { x: 0, y: 0 },
       ...(motion ? { ejectFramesLeft: motion.ejectFramesLeft } : {}),
     };
@@ -354,7 +327,6 @@ export class LootManager {
       return { x: position.x + Math.cos(angle) * 100, y: position.y + Math.sin(angle) * 100 };
     };
     const cache = [
-      ...this.spawnFromPosition(at(7), GROWTH.BASE_MASS, gameTime),
       this.spawnShard(at(0), gameTime, 0.5),
       this.spawnShard(at(1), gameTime, 0.75),
       this.spawnShard(at(2), gameTime, 0.25),
@@ -589,23 +561,6 @@ export class LootManager {
     this.wallExpiry.clear();
     this.catalog?.cleared();
     this.pointRevision++;
-  }
-
-  private createPellet(origin: Position, mass: number, gameTime: number): TrackedLoot {
-    const angle = this.rng.random() * Math.PI * 2;
-    const dist = GROWTH.SCATTER_MIN + this.rng.random() * (GROWTH.SCATTER_MAX - GROWTH.SCATTER_MIN);
-    return {
-      id: `loot-${this.nextId++}`,
-      position: {
-        x: origin.x + Math.cos(angle) * dist,
-        y: origin.y + Math.sin(angle) * dist,
-      },
-      mass,
-      radius: GROWTH.LOOT_RADIUS,
-      kind: 'wreckage',
-      expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
-      velocity: { x: 0, y: 0 },
-    };
   }
 
   private enforceCap(): void {

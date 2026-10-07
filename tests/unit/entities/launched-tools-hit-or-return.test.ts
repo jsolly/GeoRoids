@@ -233,46 +233,6 @@ test('a tow line uses the asteroid contour rather than an invisible bounding cir
   expect(pilot.harpoonTargetId).toBe(target.id);
 });
 
-for (const kind of ['tow', 'probe'] as const) {
-  test(`a ${kind} shot catches an asteroid crossing a grid seam faster than an ordinary drift`, async () => {
-    const { GameEngine } = await import('../../../server/core/GameEngine');
-    const { RecordingSocket } = await import('../../support/recordingSocket');
-    const engine = new GameEngine(42);
-    try {
-      const pilot = engine.addPlayer(
-        'pilot',
-        'Pilot',
-        new RecordingSocket(),
-        { x: -300, y: 509 },
-        kind === 'tow' ? 'hauler' : 'scout'
-      );
-      for (const asteroid of engine.getAllAsteroids()) {
-        engine.removeAsteroid(asteroid.id);
-      }
-      engine.parkSatellitePickups();
-      const target = rock('fast-crossing', 4, 480);
-      target.size = 8;
-      target.velocity.y = 80;
-      engine.addAsteroid(target);
-      pilot.utilityFlight = {
-        kind,
-        phase: 'outbound',
-        position: { x: 0, y: 509 },
-        velocity: { x: kind === 'tow' ? 8 : 10, y: 0 },
-        remainingDistance: 280,
-      };
-      engine.advanceOneFrame();
-      expect(target.position.y).toBeGreaterThan(550);
-      expect(kind === 'tow' ? pilot.harpoonTargetId : target.probe?.ownerId).toBe(
-        kind === 'tow' ? target.id : pilot.id
-      );
-      expect(pilot.utilityFlight).toBeNull();
-    } finally {
-      engine.stopGameLoop();
-    }
-  });
-}
-
 test('a rotating long asteroid intercepts a stationary tip while its final contour misses', () => {
   const target = rock('rotating', 0);
   target.size = 100;

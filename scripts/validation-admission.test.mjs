@@ -22,7 +22,6 @@ const childScript = `
 const fs = require('node:fs');
 const [started, release, proof] = process.argv.slice(1);
 const start = require('node:child_process').spawnSync('ps', ['-p', String(process.pid), '-o', 'lstart='], {encoding:'utf8'}).stdout.trim();
-fs.writeFileSync(started, JSON.stringify({pid:process.pid, start, at:Date.now(), root:process.cwd(), env:Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('GEOROIDS_VALIDATION_')))}));
 function finish() {
   if (process.env.GEOROIDS_TEST_RUNNER_RECEIPT && proof !== 'missing') {
     fs.writeFileSync(process.env.GEOROIDS_TEST_RUNNER_RECEIPT, JSON.stringify({
@@ -41,6 +40,7 @@ function cancel() {
     return;
   }
   cleaning = true;
+  if (proof === 'held-cleanup') { fs.writeFileSync(started + '.cleaning', ''); return; }
   if (proof === 'repeat-cleanup' || proof === 'first-forward') {
     const cleanup = require('node:child_process').spawn(process.execPath, ['-e',
       "const fs = require('node:fs'); fs.writeFileSync(process.argv[1], ''); if (process.argv[2] === 'first-forward') { setInterval(() => { if (fs.existsSync(process.argv[1] + '-release')) process.exit(0); }, 10); } else setTimeout(() => process.exit(0), 400)",
@@ -59,6 +59,7 @@ process.on('SIGINT', cancel);
 // Observe HUP in this fixture so it can retain the descendant's actual signal.
 // The real runner supports graceful cleanup only for INT/TERM.
 process.on('SIGHUP', cancel);
+fs.writeFileSync(started, JSON.stringify({pid:process.pid, start, at:Date.now(), root:process.cwd(), env:Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('GEOROIDS_VALIDATION_')))}));
 setInterval(() => { if(fs.existsSync(release)) finish(); }, 20);
 `;
 async function until(predicate, description) {
@@ -135,7 +136,15 @@ function fixture(t) {
   }
   function start(
     name,
-    { cwd = root, kind = 'review', proof = 'clean', environment = {}, command, preload } = {}
+    {
+      cwd = root,
+      kind = 'frame',
+      proof = 'clean',
+      environment = {},
+      command,
+      preload,
+      timeoutMs,
+    } = {}
   ) {
     const started = join(directory, `${name}.started`);
     const release = join(directory, `${name}.release`);
@@ -144,10 +153,18 @@ function fixture(t) {
       process.execPath,
       [
         ...(preload ? ['--import', preload] : []),
-        helper,
-        kind,
-        '--',
-        ...(command || [process.execPath, '-e', childScript, started, release, proof]),
+        ...(timeoutMs === undefined
+          ? [
+              helper,
+              kind,
+              '--',
+              ...(command || [process.execPath, '-e', childScript, started, release, proof]),
+            ]
+          : [
+              '--input-type=module',
+              '-e',
+              `const {runAdmitted} = await import(${JSON.stringify(helper)}); process.exitCode = await runAdmitted(${JSON.stringify(kind)}, ${JSON.stringify(command || [process.execPath, '-e', childScript, started, release, proof])}, {timeoutMs:${JSON.stringify(timeoutMs)}});`,
+            ]),
       ],
       { cwd, env: { ...env, ...environment }, stdio: ['ignore', 'pipe', 'pipe'] }
     );
@@ -176,7 +193,7 @@ function fixture(t) {
 
 test('linked checkouts enter heavy validation in ticket order and cancelled waiters leave the queue', async (t) => {
   const f = fixture(t);
-  const a = f.start('a', { kind: 'contracts' });
+  const a = f.start('a', { kind: 'frame' });
   await until(() => existsSync(a.started), 'first admitted contract child');
   const b = f.start('b', { cwd: f.sibling('b'), kind: 'frame' });
   await until(() => b.child.output.includes('Waiting for heavy'), 'second ticket');
@@ -194,6 +211,24 @@ test('linked checkouts enter heavy validation in ticket order and cancelled wait
   assert.equal((await c.child.completed).code, 0, c.child.output);
   assert.deepEqual(f.queue(), []);
 });
+
+for (const kind of ['unit', 'contracts', 'integration', 'review']) {
+  test(`${kind} code checks in linked checkouts overlap an admitted manual workload`, async (t) => {
+    const f = fixture(t);
+    const manual = f.start('manual');
+    await until(() => existsSync(manual.started), 'active manual workload');
+    const code = f.start('code', { cwd: f.sibling('code'), kind });
+    await until(() => existsSync(code.started), 'code validation starts independently');
+    assert.equal(manual.child.exitCode, null);
+    assert.equal(f.queue().length, 1);
+    code.finish();
+    assert.equal((await code.child.completed).code, 0, code.child.output);
+    assert.equal(f.queue().length, 1);
+    manual.finish();
+    assert.equal((await manual.child.completed).code, 0, manual.child.output);
+    assert.deepEqual(f.queue(), []);
+  });
+}
 
 test('same checkout gate and standalone measurements refuse overlap before either can change artifacts', async (t) => {
   const f = fixture(t);
@@ -278,24 +313,6 @@ test('a failed assertion releases capacity when the runner proves owned cleanup'
   assert.equal((await runner.child.completed).code, 1);
   assert.deepEqual(f.queue(), []);
   assert.equal(existsSync(join(f.common, 'georoids-validation-checkout.lock')), false);
-});
-
-test('active cancellation waits for the runner cleanup receipt before allowing the next checkout', async (t) => {
-  const f = fixture(t);
-  const runner = f.start('runner', { kind: 'runner' });
-  await until(() => existsSync(runner.started), 'runner child');
-  const next = f.start('next', { cwd: f.sibling('next') });
-  await until(() => next.child.output.includes('Waiting for heavy'), 'next waiting');
-  runner.child.kill('SIGTERM');
-  await delay(100);
-  assert.equal(existsSync(next.started), false);
-  assert.equal((await runner.child.completed).code, 143, runner.child.output);
-  await until(() => {
-    assert.equal(next.child.exitCode, null, next.child.output);
-    return existsSync(next.started);
-  }, 'next child after cleanup');
-  next.finish();
-  assert.equal((await next.child.completed).code, 0, next.child.output);
 });
 
 test('repeated cancellation leaves runner cleanup helpers alive until their receipt is written', async (t) => {
@@ -821,3 +838,154 @@ syncBuiltinESMExports();
     assertReleased(f, [b]);
   });
 }
+
+// Controlled inspection errors exercise fail-closed ownership without startup races.
+function inspectionFault(f, { target, failure } = {}) {
+  const bin = mkdtempSync(join(f.directory, 'inspection-bin-'));
+  const config = join(bin, 'config.json');
+  const fired = join(bin, 'fired.json');
+  const recovered = join(bin, 'recovered.json');
+  writeFileSync(
+    join(bin, 'ps'),
+    `#!${process.execPath}
+const fs = require('node:fs');
+const cp = require('node:child_process');
+const args = process.argv.slice(2);
+const config = fs.existsSync(${JSON.stringify(config)}) ? JSON.parse(fs.readFileSync(${JSON.stringify(config)}, 'utf8')) : null;
+function real() {
+  const result = cp.spawnSync('/bin/ps', args, {stdio:'inherit'});
+  process.exit(result.status ?? 1);
+}
+const matches = config && (config.target === 'group' ? args[0] === '-axo' :
+  args[0] === '-p' && args[2] === '-o' && args[3] === 'ppid=,stat=,lstart=' &&
+  Number(args[1]) === (config.target === 'self' ? process.ppid : config.target));
+if (!matches) real();
+if (!fs.existsSync(${JSON.stringify(fired)})) {
+  fs.writeFileSync(${JSON.stringify(fired)}, JSON.stringify({pid:process.pid,args,at:Date.now()}));
+  if (config.failure === 'error') { process.stderr.write('inspection-unavailable\\n'); process.exit(2); }
+  if (config.failure === 'permission') { process.stderr.write('Operation not permitted\\n'); process.exit(1); }
+  if (config.failure === 'malformed') { process.stdout.write('invalid process row\\n'); process.exit(0); }
+  throw new Error('Unknown fixture inspection failure');
+} else {
+  fs.writeFileSync(${JSON.stringify(recovered)}, JSON.stringify({pid:process.pid,args,at:Date.now()}));
+  real();
+}
+`,
+    { mode: 0o755 }
+  );
+  const arm = (nextTarget = target) =>
+    writeFileSync(config, JSON.stringify({ target: nextTarget, failure }));
+  if (target !== undefined) {
+    arm();
+  }
+  return {
+    environment: { PATH: `${bin}:${f.env.PATH}` },
+    fired,
+    recovered,
+    arm,
+  };
+}
+function queueOwner(f, run) {
+  const directory = f
+    .queue()
+    .map((name) => join(f.common, 'georoids-validation-queue', name))
+    .find(
+      (path) => JSON.parse(readFileSync(join(path, 'owner.json'), 'utf8')).pid === run.child.pid
+    );
+  assert(directory, `No ticket for supervisor ${run.child.pid}`);
+  return directory;
+}
+
+for (const failure of ['error', 'permission', 'malformed']) {
+  test(`a waiting ${failure} inspection failure still refuses work instead of retrying`, async (t) => {
+    const f = fixture(t);
+    const a = f.start('owner');
+    await until(() => existsSync(a.started), 'active owner');
+    const active = queueOwner(f, a);
+    const fault = inspectionFault(f, { target: a.child.pid, failure });
+    const b = f.start('waiter', { cwd: f.sibling('waiter'), environment: fault.environment });
+    assert.notEqual((await b.child.completed).code, 0);
+    assert.match(
+      b.child.output,
+      failure === 'malformed' ? /Invalid process inspection/u : /Cannot inspect validation PID/u
+    );
+    assert.doesNotMatch(b.child.output, /process inspection timed out/u);
+    assert.equal(existsSync(b.started), false);
+    assert.equal(existsSync(fault.recovered), false);
+    assert.deepEqual(f.queue(), [active.split('/').at(-1)]);
+    assert(existsSync(join(active, 'active')));
+    a.finish();
+    assert.equal((await a.child.completed).code, 0, a.child.output);
+    assertReleased(f, [a]);
+    t.diagnostic(b.child.output);
+  });
+}
+
+for (const operation of ['cancellation']) {
+  test(`code integration ${operation} proves child disappearance before releasing checkout ownership`, async (t) => {
+    const f = fixture(t);
+    const worker = f.start('code', {
+      kind: 'integration',
+    });
+    await until(() => existsSync(worker.started), 'integration child');
+    const identity = JSON.parse(readFileSync(worker.started, 'utf8'));
+    assert.deepEqual(f.queue(), []);
+    worker.child.kill('SIGTERM');
+    assert.equal((await worker.child.completed).code, 143, worker.child.output);
+    assert(existsSync(`${worker.started}.ended`), 'child completed its cancellation handler');
+    const current = spawnSync('ps', ['-p', String(identity.pid), '-o', 'lstart='], {
+      encoding: 'utf8',
+    });
+    assert.notEqual(current.stdout.trim(), identity.start, 'owned command must be absent');
+    assert.equal(existsSync(join(f.common, 'georoids-validation-checkout.lock')), false);
+    assert.deepEqual(f.queue(), []);
+  });
+}
+
+test('a cancelled command that never closes preserves ownership when its controlled grace expires', async (t) => {
+  const f = fixture(t);
+  const armed = join(f.directory, 'grace-armed');
+  const expire = join(f.directory, 'expire-grace');
+  const preload = join(f.directory, 'controlled-grace.mjs');
+  writeFileSync(
+    preload,
+    `
+import {existsSync,writeFileSync} from 'node:fs';
+const realSet=globalThis.setTimeout, realClear=globalThis.clearTimeout;
+const token={}; let grace;
+globalThis.setTimeout=(callback,ms,...args)=>{
+  if(ms!==45000)return realSet(callback,ms,...args);
+  grace=()=>callback(...args); writeFileSync(${JSON.stringify(armed)},''); return token;
+};
+globalThis.clearTimeout=(timer)=>timer===token ? (grace=undefined) : realClear(timer);
+const poll=setInterval(()=>{if(grace&&existsSync(${JSON.stringify(expire)})){const callback=grace;grace=undefined;callback();}},10);
+poll.unref();
+`
+  );
+  const worker = f.start('held', { kind: 'integration', proof: 'held-cleanup', preload });
+  await until(() => existsSync(worker.started), 'ready cancellation handler');
+  worker.child.kill('SIGTERM');
+  await until(
+    () => existsSync(armed) && existsSync(`${worker.started}.cleaning`),
+    'controlled cancellation grace'
+  );
+  writeFileSync(expire, '');
+  assert.equal((await worker.child.exited).code, 1);
+  await until(
+    () =>
+      worker.child.output.includes('did not close within its cancellation grace period') &&
+      worker.child.output.includes('Validation cleanup is unproven'),
+    'failed cleanup diagnostics'
+  );
+  assert.match(worker.child.output, /did not close within its cancellation grace period/u);
+  assert.match(worker.child.output, /Validation cleanup is unproven/u);
+  assert(existsSync(join(f.common, 'georoids-validation-checkout.lock', 'owner.json')));
+  assert.equal(existsSync(`${worker.started}.ended`), false);
+  worker.finish();
+  await until(
+    () => existsSync(`${worker.started}.ended`),
+    'owned command released after failed proof'
+  );
+  await worker.child.completed;
+  assert(existsSync(join(f.common, 'georoids-validation-checkout.lock', 'owner.json')));
+});

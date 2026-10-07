@@ -64,11 +64,7 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     const check = (...args: string[]): string =>
       execFileSync(
         process.execPath,
-        [
-          resolve(root, 'node_modules/tsx/dist/cli.mjs'),
-          join(fixture, 'scripts/wiki-check.ts'),
-          ...args,
-        ],
+        ['--import', 'tsx', join(fixture, 'scripts/wiki-check.ts'), ...args],
         { cwd: fixture, encoding: 'utf8', stdio: 'pipe' }
       );
     expect(check()).toContain('source review passed');

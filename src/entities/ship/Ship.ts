@@ -91,7 +91,6 @@ class Ship {
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
 
-  lastDamageTime: number = 0;
   healthRegenTimer: number = 0;
   impactFlashFrames: number = 0;
   blinkOn: boolean; // Will be set in constructor based on blinkCount
@@ -399,7 +398,6 @@ class Ship {
     }
 
     this.health = calculateHealthAfterDamage(this.health, amount, this.maxHealth);
-    this.lastDamageTime = GAME.FPS;
     this.healthRegenTimer = calculateHealthRegenDelayFrames();
 
     if (this.health <= 0) {
@@ -416,22 +414,23 @@ class Ship {
     this.health = calculateHealthAfterHeal(this.health, amount, this.maxHealth);
   }
 
+  /** Once a server snapshot owns health, only authoritative echoes may heal it. */
+  serverOwnsHealth = false;
+
   updateHealth(): void {
-    // Client-side health regeneration for better responsiveness
-    if (this.exploding) {
+    if (this.serverOwnsHealth) {
       return;
     }
-
-    if (this.lastDamageTime > 0) {
-      this.lastDamageTime--;
+    // Predict the same five-second countdown and proportional rate as the server.
+    if (this.exploding || this.health <= 0) {
+      return;
     }
-
-    if (shouldStartHealthRegeneration(this.lastDamageTime, this.health, this.maxHealth)) {
-      if (this.healthRegenTimer <= 0) {
-        this.heal(calculateHealthRegenPerFrame());
-      } else {
-        this.healthRegenTimer--;
-      }
+    if (this.healthRegenTimer > 0) {
+      this.healthRegenTimer--;
+      return;
+    }
+    if (shouldStartHealthRegeneration(this.healthRegenTimer, this.health, this.maxHealth)) {
+      this.heal(calculateHealthRegenPerFrame(this.maxHealth));
     }
   }
 

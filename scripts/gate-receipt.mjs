@@ -10,7 +10,6 @@ import {
   renameSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, relative as relativePath, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { receiptEnvironment } from './validation-admission.mjs';
@@ -203,7 +202,6 @@ export function identity(root, inputEnvironment = process.env) {
     'LANG',
     'LC_ALL',
     'CI',
-    'PLAYWRIGHT_BROWSERS_PATH',
     'GEOROIDS_SERVER_ENV_FILE',
     'DOTAGENTS_GATE_LIB',
     'FLEET_DOC_FAST',
@@ -229,7 +227,7 @@ export function identity(root, inputEnvironment = process.env) {
     .filter(
       (key) =>
         allowed.has(key) ||
-        /^(?:BIOME_|VITE_|GEOROIDS_|NODE_|NPM_CONFIG_|npm_config_|PLAYWRIGHT_|TSX_|VITEST_|BASH_ENV$|ENV$)/u.test(
+        /^(?:BIOME_|VITE_|GEOROIDS_|NODE_|NPM_CONFIG_|npm_config_|TSX_|VITEST_|BASH_ENV$|ENV$)/u.test(
           key
         )
     )
@@ -246,11 +244,6 @@ export function identity(root, inputEnvironment = process.env) {
       consumedFile(resolve(root, env.GEOROIDS_SERVER_ENV_FILE)),
     ]);
   }
-  const browserHome =
-    env.PLAYWRIGHT_BROWSERS_PATH ||
-    (process.platform === 'darwin'
-      ? join(homedir(), 'Library/Caches/ms-playwright')
-      : join(homedir(), '.cache/ms-playwright'));
   // Ask the actual npm CLI for selected/default configuration homes, rather
   // than guessing a prefix from a separately installed Node executable.
   const npmConfig = spawnSync(
@@ -286,7 +279,6 @@ export function identity(root, inputEnvironment = process.env) {
       .filter(([, record]) => record.mode === '120000')
       .map(([name]) => [name, consumedFile(join(root, name))]),
     npmConfigs,
-    browsers: walk(browserHome),
   });
   return {
     source,

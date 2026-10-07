@@ -68,7 +68,7 @@ afterEach(() => {
   configureRenderQuality('', false);
 });
 
-test('wreckage and shards share locked cream', () => {
+test('shards share the tether’s locked cream', () => {
   expect(PALETTE.LOOT).toBe('#E8D5A3');
   expect(PALETTE.LOOT).toBe(HAULER_TETHER_COLOR);
 });

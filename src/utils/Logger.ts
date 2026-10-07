@@ -1,6 +1,6 @@
 import { createLogRecord, stringifyLogRecord } from '../../shared/logRecords';
 import { LOGGING } from '../constants';
-import { debugIsOn, storedLogLevel } from '../constants/user-preferences';
+import { clientLogLevel } from '../constants/user-preferences';
 import { getClientLogContext } from './clientLogContext';
 import { shouldForwardClientLog } from './logForwardPolicy';
 import { LogLevel, shouldEmitLog } from './logLevel';
@@ -49,13 +49,9 @@ class Logger {
     this.applyConfiguredLogLevel();
   }
 
-  /**
-   * Apply the Advanced ▸ Debug log level while Debug is on; otherwise fall
-   * back to `LOGGING.GLOBAL_LOG_LEVEL`. Lets ops raise verbosity on one
-   * browser without editing constants and shipping a commit.
-   */
+  /** Apply the route-scoped diagnostic verbosity. */
   applyConfiguredLogLevel(): void {
-    const configured = (debugIsOn() ? storedLogLevel() : null) ?? LOGGING.GLOBAL_LOG_LEVEL;
+    const configured = clientLogLevel();
     this.currentLevel =
       configured === 'debug'
         ? LogLevel.DEBUG

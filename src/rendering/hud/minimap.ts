@@ -50,7 +50,6 @@ type RadarMark = {
 };
 
 const LOOT_MARK_KINDS = [
-  'wreckage',
   'shard',
   'tap',
   'silk',

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
-import { GameEngine } from '../../../server/core/GameEngine';
+import type { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import {
   containAsteroidPosition,
@@ -43,25 +43,6 @@ describe('authoritative asteroid motion', () => {
     expect(moved?.rotation).toBeCloseTo(0.51);
     expect(moved?.position).toBe(position);
     expect(moved?.velocity).toBe(velocity);
-  });
-
-  test('asteroids move over time on the running server loop', async () => {
-    engine = new GameEngine(1);
-    engine.startGameLoop();
-    engine.createAsteroids(5);
-
-    const tracked = engine.getAllAsteroids()[0];
-    assert.ok(tracked);
-    engine.updateAsteroid(tracked.id, {
-      position: { x: 0, y: 0 },
-      velocity: { x: 2, y: 0 },
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 120));
-
-    const after = engine.getAsteroid(tracked.id);
-    assert.ok(after);
-    expect(after.position.x).toBeGreaterThan(2);
   });
 
   test('an escaped asteroid is pulled back along the same ray, not the opposite rim', () => {

@@ -173,8 +173,8 @@ export async function runGate({
       writeFileSync(artifact, `Literal-only graph witness: ${prior.graphWitness}\n`);
     } else {
       process.stdout.write(`Gate: ${name}\n`);
-      // Vite/Vitest honor this cache home; shard children replace it with their
-      // own authenticated session, while serial benchmark children inherit it.
+      // Vite/Vitest honor this cache home; code integration owns its own
+      // isolated artifact session.
       const sessionDirectory = join(directory, `session-${stages.length}`);
       mkdirSync(sessionDirectory);
       const result = await run('npm', ['run', command], {

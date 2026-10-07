@@ -35,7 +35,12 @@ import {
 } from './contourLaserRenderer';
 import { drawContourLayers, drawIsoContours, visibleContourLayers } from './contourRenderer';
 import { drawContourTrack } from './contourTrackRenderer';
-import { drawFurnaceFoundations, drawFurnacePipes, drawFurnacesRelative } from './furnaceRenderer';
+import {
+  drawFurnaceFoundations,
+  drawFurnaceLabels,
+  drawFurnacePipes,
+  drawFurnacesRelative,
+} from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
@@ -196,6 +201,8 @@ function drawWorldLayers(
     }
     drawLasers(player.ship, laserColor, currShip.position);
   }
+
+  drawFurnaceLabels(currShip.position);
 
   drawHeadingCue(ctx, viewport, currShip);
 

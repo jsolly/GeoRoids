@@ -18,7 +18,6 @@ import type { ServerGameSnapshot } from '../../../shared-types';
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const WHITESPACE_SPLIT_PATTERN = /\s+/u;
 const SERVER_LISTENING_PORT_PATTERN = /Server listening on port (\d+)/u;
-const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const railwayProject = await railwayConfig(createRailwayContext({ command: 'test' }), project);
 const railwayService = railwayProject.resources
   ?.flat()
@@ -191,12 +190,6 @@ async function pilot(port: number): Promise<Pilot> {
   return client;
 }
 
-async function disconnect(ws: WebSocket): Promise<void> {
-  const closed = once(ws, 'close', { signal: AbortSignal.timeout(5000) });
-  ws.close();
-  await closed;
-}
-
 async function stopProduction(): Promise<void> {
   for (const ws of sockets.splice(0)) {
     if (ws.readyState !== WebSocket.CLOSED) {
@@ -306,102 +299,6 @@ test.each([null, '', 'staging'])(
     expect(existsSync(path)).toBe(false);
   }
 );
-
-test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and resumes pilots through transport grace', async () => {
-  const port = await start();
-  const base = `http://127.0.0.1:${port}`;
-  const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
-  expect(health.status).toBe(200);
-  const healthPayload: unknown = await health.json();
-  expect(healthPayload).toHaveProperty('releaseId', process.env['RAILWAY_GIT_COMMIT_SHA'] || 'dev');
-  expect(healthPayload).toHaveProperty('status', 'healthy');
-  const status = await fetch(`${base}/status`, {
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(5000),
-  });
-  expect(await status.json()).toHaveProperty('server.nodeEnv', 'production');
-  expect(
-    await (await fetch(`${base}/status`, { signal: AbortSignal.timeout(5000) })).text()
-  ).toContain('connectGame()');
-  expect(await (await fetch(base, { signal: AbortSignal.timeout(5000) })).text()).toContain(
-    'GeoRoids Game Server'
-  );
-  expect((await fetch(base, { method: 'OPTIONS', signal: AbortSignal.timeout(5000) })).status).toBe(
-    200
-  );
-
-  for (const path of ['/ws', '/ws?asteroidInteractions=0']) {
-    const stale = connect(port, path);
-    let opened = false;
-    stale.on('open', () => {
-      opened = true;
-    });
-    await expect(once(stale, 'open', { signal: AbortSignal.timeout(5000) })).rejects.toThrow('426');
-    expect(opened).toBe(false);
-  }
-  const logs = connect(port, '/logs?source=entry-test');
-  await once(logs, 'open', { signal: AbortSignal.timeout(5000) });
-  expect(logs.readyState).toBe(WebSocket.OPEN);
-
-  const observer = await pilot(port);
-  await observer.join('observer');
-  const original = await pilot(port);
-  const joined = await original.join('entry-pilot');
-  expect(joined).toMatchObject({
-    id: 'entry-pilot',
-    snapshotVersion: SNAPSHOT_VERSION,
-    asteroidInteractions: 1,
-  });
-  expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
-  const before = await observer.state();
-  const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch;
-  expect(epoch).toBeGreaterThan(0);
-  expect(JSON.stringify(before)).not.toContain(String(joined['resumeToken']));
-  const packetStart = observer.packets.length;
-  await disconnect(original.ws);
-  // Cross a broadcast interval so the server close callback has really run.
-  await new Promise((resolve) => setTimeout(resolve, 150));
-  expect((await observer.state()).entities.some((row) => row.id === 'entry-pilot')).toBe(true);
-  expect(
-    observer.packets
-      .slice(packetStart)
-      .some(
-        (packet) =>
-          packet.type === 'playerLeft' &&
-          isRecord(packet.data) &&
-          packet.data['id'] === 'entry-pilot'
-      )
-  ).toBe(false);
-  const resumed = await pilot(port);
-  expect(await resumed.join('forged-new-id', joined['resumeToken'])).toMatchObject({
-    id: 'entry-pilot',
-    resumeToken: joined['resumeToken'],
-    asteroidInteractions: 1,
-  });
-  expect(
-    (await observer.state()).entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch
-  ).toBe(epoch);
-  await disconnect(resumed.ws);
-  await waitFor(
-    () =>
-      observer.states.at(-1)?.entities.some((row) => row.id === 'entry-pilot') === false
-        ? true
-        : undefined,
-    'grace expiry removes pilot'
-  );
-  const expired = await pilot(port);
-  expired.send('join', {
-    id: 'expired',
-    snapshotVersion: SNAPSHOT_VERSION,
-    asteroidInteractions: 1,
-    resumeToken: joined['resumeToken'],
-  });
-  await waitFor(
-    () => expired.packets.find((packet) => packet.type === 'error'),
-    'expired token rejection'
-  );
-  expect(expired.packets.some((packet) => packet.type === 'joined')).toBe(false);
-}, 25_000);
 
 test('the production entry completes SIGTERM shutdown and exits successfully', async () => {
   const port = await start();

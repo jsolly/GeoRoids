@@ -30,7 +30,7 @@ function universeMapZoomAtLeast(zoom: number, threshold: number): boolean {
   return Math.round(zoom * 100) >= Math.round(threshold * 100);
 }
 
-/** Keep furnaces, satellites, wreckage, and ships on one zoom scale. */
+/** Keep furnaces, satellites, cargo, and ships on one zoom scale. */
 export function universeMapMarkScreenSize(nearSize: number, zoom: number): number {
   if (!(nearSize > 0) || !Number.isFinite(nearSize)) {
     return 0;

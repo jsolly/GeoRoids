@@ -62,7 +62,7 @@ values become banked points without a reset. Absent cargo and receipts default
 to zero and an empty list. Old owned paint remains readable; lives are no longer
 read or written. Unknown legacy JSON fields are harmless and no data is purged.
 
-Hazard hits eject recoverable cargo before damaging hull health. Death drops any remaining carried points and schedules another respawn; banked points, shared discoveries, deposits, furnaces, and already owned hull paint remain. A UTC month boundary does not clear them. Changing `WORLD.generation` resets sectors, pilots, economy, paint, and banked points on the next start.
+Hazard hits eject recoverable cargo before damaging hull health. Death discards any remaining carried points without an extra stash and schedules another respawn; banked points, shared discoveries, deposits, furnaces, and already owned hull paint remain. A UTC month boundary does not clear them. Changing `WORLD.generation` resets sectors, pilots, economy, paint, and banked points on the next start.
 
 The full-screen universe map shows shared exploration and revealed landmarks across the world. Detailed asteroid geometry stays near each pilot. Furnaces and exploration survive restarts. Point drops persist in the economy checkpoint with their original expiry time. Other loot and satellite pickups remain transient session objects, so their map markers expire when those objects disappear or the server restarts.
 
@@ -114,11 +114,11 @@ IDs, so rolling back requires restoring the pre-deploy database backup.
 
 ## Economy persistence
 
-An additive `economy` row stores settlement balances and expiring point stashes.
+An additive `economy` row stores settlement balances and expiring mined cargo pickups.
 It commits atomically with pilots and consumed asteroid sectors in the existing
-worker transaction. Cargo deposits and death drops therefore cannot be half
+worker transaction. Cargo deposits and mined pickups therefore cannot be half
 committed. Point-drop updates do not resend the explored world. Absolute expiry
-timestamps prevent restarting the server from extending recovery time. Old
+timestamps prevent restarting the server from extending pickup lifetime. Old
 worlds default to settlement level 1 with zero shared points/materials; existing
 banks and furnaces are retained. Whole-database SQLite backups include this row.
 

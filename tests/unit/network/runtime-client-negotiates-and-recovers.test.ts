@@ -768,6 +768,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
       'snapshot',
       new SnapshotEncoder(damaged).encode(2, { sequence: 1, state: baseline })
     );
+    player.ship.updateLifecycle(600);
+    expect(player.ship.health).toBe(75);
     expect({
       health: player.ship.health,
       cargo: player.cargo,
@@ -779,7 +781,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const healing = structuredClone(damaged);
     const healingEntity = healing.entities[0];
     assert.ok(healingEntity, 'healing local entity');
-    const regeneratedHealth = 75 + calculateHealthRegenPerFrame();
+    const regeneratedHealth = 75 + calculateHealthRegenPerFrame(player.ship.maxHealth);
     healingEntity.health = regeneratedHealth;
     healing.gameTime += 1;
     ws.receive('snapshot', new SnapshotEncoder(healing).encode(3, { sequence: 2, state: damaged }));

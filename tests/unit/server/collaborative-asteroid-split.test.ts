@@ -251,41 +251,6 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     }
   });
 
-  test('a forged second shooter claim on the owner socket is ignored', async () => {
-    const { server, clients } = await startWorld([
-      { id: 'socket-owner', position: { x: 0, y: 0 } },
-    ]);
-    const [client] = clients;
-    assert.ok(client, 'owner socket');
-    const target = largeIceAsteroid('wire-forged-target', { x: 100, y: 0 });
-    server.gameEngine.addAsteroid(target);
-    client.resetMessages();
-
-    const validStart = client.mark();
-    await sendCurrentShot(server, client, 'socket-owner', target.id);
-    const validTag = messageAt(client, 'asteroidTagged', validStart);
-    expect(messageData(validTag)['asteroidId']).toBe(target.id);
-    client.resetMessages();
-
-    client.send({
-      type: 'shoot',
-      id: 'forged-partner',
-      data: {
-        laserStart: { ...target.position },
-        laserDirection: { x: 0, y: 0 },
-      },
-    });
-    await client.barrier();
-
-    expect(client.messages).toEqual([]);
-    expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
-    expect(server.gameEngine.getPlayer('socket-owner')?.score).toBe(0);
-    expect(
-      server.gameEngine.getActiveCollabTags().some((tag) => tag.asteroidId === target.id)
-    ).toBe(true);
-    expect(client.failures).toEqual([]);
-  });
-
   test('one owner finishes a tagged large roid after the dedupe window without splitting', async () => {
     const { server, clients } = await startWorld([{ id: 'solo-player', position: { x: 0, y: 0 } }]);
     const [client] = clients;

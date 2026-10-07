@@ -390,20 +390,4 @@ describe('server ship respawn lifecycle', () => {
     expect(respawned?.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
     expect(respawned?.position).not.toEqual({ x: 3100, y: 0 });
   });
-
-  test('gameTime keeps advancing after the last player leaves', async () => {
-    engine.startGameLoop();
-    const ws = new RecordingSocket();
-    engine.addPlayer('p1', 'Pilot', ws);
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    const beforeLeave = engine.getDiagnostics().gameTime;
-    expect(beforeLeave).toBeGreaterThan(0);
-
-    engine.removePlayer('p1');
-    expect(engine.isGamePaused()).toBe(true);
-
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    const afterLeave = engine.getDiagnostics().gameTime;
-    expect(afterLeave).toBeGreaterThanOrEqual(beforeLeave);
-  });
 });

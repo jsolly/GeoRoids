@@ -349,7 +349,6 @@ test('real identity covers installed bytes, ignored env, tool bytes, and unknown
   try {
     mkdirSync(join(f.root, 'bin'));
     mkdirSync(join(f.root, 'node_modules'));
-    mkdirSync(join(f.root, 'browsers'));
     for (const name of ['npm', 'bash', 'git', 'uvx']) {
       writeFileSync(join(f.root, 'bin', name), name, { mode: 0o755 });
     }
@@ -358,17 +357,13 @@ test('real identity covers installed bytes, ignored env, tool bytes, and unknown
       `console.log('userconfig='+(process.env.npm_config_userconfig || process.env.HOME+'/.npmrc')); console.log('globalconfig='+(process.env.npm_config_globalconfig || process.env.HOME+'/etc/npmrc'));`,
       { mode: 0o755 }
     );
-    writeFileSync(
-      join(f.root, '.gitignore'),
-      '.performance/\nnode_modules/\nbin/\nbrowsers/\n.env.local\n'
-    );
+    writeFileSync(join(f.root, '.gitignore'), '.performance/\nnode_modules/\nbin/\n.env.local\n');
     const payload = join(f.root, 'node_modules', 'native.node');
     writeFileSync(payload, 'native payload');
     writeFileSync(join(f.root, '.env.local'), 'SECRET=one');
     const env = {
       PATH: join(f.root, 'bin'),
       HOME: fixtureHome,
-      PLAYWRIGHT_BROWSERS_PATH: join(f.root, 'browsers'),
     };
     const first = identity(f.root, env);
     writeFileSync(payload, 'changed native payload');
@@ -539,10 +534,6 @@ test('every gate stage writes generated caches in its issued artifact session', 
         /GEOROIDS_TEST_SESSION_DIR/u
       );
     }
-    assert.match(
-      readFileSync(new URL('./test-runner.sh', import.meta.url), 'utf8'),
-      /export GEOROIDS_TEST_SESSION_DIR="\$SHARD_DIRECTORY"/u
-    );
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
@@ -700,7 +691,7 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
   const f = fixture();
   const external = mkdtempSync(join(tmpdir(), 'georoids-consumed-'));
   try {
-    for (const name of ['bin', 'node_modules', 'browsers', 'home', 'home/etc']) {
+    for (const name of ['bin', 'node_modules', 'home', 'home/etc']) {
       mkdirSync(join(f.root, name), { recursive: true });
     }
     for (const name of ['bash', 'git', 'uvx']) {
@@ -713,12 +704,11 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
     );
     writeFileSync(
       join(f.root, '.gitignore'),
-      '.performance/\nnode_modules/\nbin/\nbrowsers/\nhome/\n.env.local\n'
+      '.performance/\nnode_modules/\nbin/\nhome/\n.env.local\n'
     );
     const env = {
       PATH: join(f.root, 'bin'),
       HOME: join(f.root, 'home'),
-      PLAYWRIGHT_BROWSERS_PATH: join(f.root, 'browsers'),
     };
     const first = identity(f.root, env);
     f.git('add', '.');
@@ -787,15 +777,6 @@ test('actual identity hashes hosted SHAs, npm config and resolved consumed file 
     const envAfter = identity(f.root, env);
     assert.notEqual(envAfter.runtime, envBefore.runtime);
     assert.equal(JSON.stringify(envAfter).includes('PRIVATE=two'), false);
-    symlinkSync(external, join(f.root, 'home/browser-root-link'));
-    assert.throws(
-      () =>
-        identity(f.root, {
-          ...env,
-          PLAYWRIGHT_BROWSERS_PATH: join(f.root, 'home/browser-root-link'),
-        }),
-      /Unsupported installed inventory root link/u
-    );
     symlinkSync(external, join(f.root, 'node_modules/directory'));
     assert.throws(() => identity(f.root, env), /Unsupported installed directory link/u);
     unlinkSync(join(f.root, 'node_modules/directory'));

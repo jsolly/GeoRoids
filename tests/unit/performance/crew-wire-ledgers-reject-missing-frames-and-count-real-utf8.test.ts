@@ -23,7 +23,7 @@ function record(value: unknown): value is Record<string, unknown> {
 function wireScene() {
   const world = snapshotFixture(0);
   world.mapAssets = [
-    { id: 'wreckage-1', kind: 'wreckage', position: { x: 10, y: 20 }, name: '基地 🚀' },
+    { id: 'cargo-1', kind: 'wreckage', position: { x: 10, y: 20 }, name: '基地 🚀' },
   ];
   world.spiderField = {
     spiders: Array.from({ length: 8 }, (_, index) => ({

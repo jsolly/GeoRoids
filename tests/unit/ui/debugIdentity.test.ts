@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { LOGGING } from '../../../src/constants';
-import { debugIsOn, LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
+import { debugIsOn } from '../../../src/constants/user-preferences';
 import {
-  applyDebugPreference,
   mountDebugIdentity,
   resetDebugIdentityForTests,
+  syncDebugMode,
 } from '../../../src/ui/debugIdentity';
 import { setPlayView } from '../../../src/ui/uiUtils';
 import { getClientLogContext } from '../../../src/utils/clientLogContext';
@@ -12,138 +11,77 @@ import { logger } from '../../../src/utils/Logger';
 import { LogLevel } from '../../../src/utils/logLevel';
 import { resetSafeStorage } from '../../../src/utils/safeStorage';
 
-const JOINED_ID = 'client-joined-ship';
-
-function debugCheckbox(): HTMLInputElement {
-  const checkbox = document.querySelector<HTMLInputElement>('#debugPref');
-  if (!checkbox) {
-    throw new Error('expected #debugPref');
-  }
-  return checkbox;
-}
-
-function playerInput(): HTMLInputElement {
-  const input = document.querySelector<HTMLInputElement>('#debug-player-id');
-  if (!input) {
-    throw new Error('expected #debug-player-id');
-  }
-  return input;
-}
-
-function identityPanel(): HTMLElement {
-  const panel = document.querySelector<HTMLElement>('#debug-identity');
-  if (!panel) {
-    throw new Error('expected #debug-identity');
-  }
-  return panel;
+function visit(path: string): void {
+  window.history.replaceState(null, '', path);
+  mountDebugIdentity();
 }
 
 beforeEach(() => {
   resetDebugIdentityForTests();
   resetSafeStorage();
-  localStorage.removeItem(LOCAL_STORAGE_KEYS.debugOn);
-  localStorage.removeItem(LOCAL_STORAGE_KEYS.debugLogLevel);
-  logger.applyConfiguredLogLevel();
-  document.body.classList.remove('debug-on', 'in-play');
   setPlayView(false);
-  debugCheckbox().checked = false;
-  identityPanel().hidden = true;
-  const details = document.querySelector<HTMLDetailsElement>('#advanced-settings');
-  if (details) {
-    details.open = false;
-  }
-  mountDebugIdentity();
-  applyDebugPreference(false);
+  visit('/');
 });
-
 afterEach(() => {
-  resetDebugIdentityForTests();
-  applyDebugPreference(false);
+  visit('/');
   setPlayView(false);
-  document.body.classList.remove('debug-on', 'in-play');
   resetSafeStorage();
-  localStorage.removeItem(LOCAL_STORAGE_KEYS.debugOn);
   vi.unstubAllGlobals();
 });
 
-test('Debug stays off until the pilot opts in, then reveals copyable correlators', () => {
-  expect(debugCheckbox().checked).toBe(false);
-  expect(identityPanel().hidden).toBe(true);
-  expect(playerInput().value).toBe('');
+test('a normal pilot never sees diagnostics even with old saved debug preferences', () => {
+  localStorage.setItem('debugOn', 'true');
+  localStorage.setItem('debugLogLevel', 'debug');
+  visit('/?log-level=debug');
+  expect(debugIsOn()).toBe(false);
+  expect(document.body.classList.contains('debug-on')).toBe(false);
+  expect(document.querySelector<HTMLElement>('#debug-identity')?.hidden).toBe(true);
+  expect(logger.getLogLevel()).toBe(LogLevel.INFO);
+  expect(document.querySelector('#debugPref')).toBeNull();
+  expect(document.querySelector('#debug-log-level')).toBeNull();
+});
 
-  debugCheckbox().checked = true;
-  debugCheckbox().dispatchEvent(new Event('change'));
-
-  expect(debugCheckbox().checked).toBe(true);
-  expect(document.body.classList.contains('debug-on')).toBe(true);
-  expect(document.querySelector<HTMLDetailsElement>('#advanced-settings')?.open).toBe(true);
-  expect(identityPanel().hidden).toBe(false);
+test('a debug pilot sees page identity before joining and stays in debug on refresh', () => {
+  visit('/debug');
+  expect(debugIsOn()).toBe(true);
+  expect(document.querySelector<HTMLElement>('#debug-identity')?.hidden).toBe(false);
   expect(document.querySelector<HTMLInputElement>('#debug-session-id')?.value).toBe(
     getClientLogContext().sessionId
   );
-  expect(playerInput().placeholder).toContain('Enter Game');
   expect(document.querySelector<HTMLButtonElement>('#copy-debug-player-id')?.disabled).toBe(true);
-});
-
-test('the Debug checkbox is remembered across a hard refresh', () => {
-  applyDebugPreference(true);
-  expect(debugIsOn()).toBe(true);
-  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugOn)).toBe('true');
-
-  debugCheckbox().checked = false;
-  document.body.classList.remove('debug-on');
-  identityPanel().hidden = true;
-  const details = document.querySelector<HTMLDetailsElement>('#advanced-settings');
-  if (details) {
-    details.open = false;
-  }
-
-  applyDebugPreference(debugIsOn());
-
-  expect(debugCheckbox().checked).toBe(true);
+  syncDebugMode();
   expect(document.body.classList.contains('debug-on')).toBe(true);
-  expect(identityPanel().hidden).toBe(false);
+  expect(logger.getLogLevel()).toBe(LogLevel.INFO);
+  visit('/debug/');
+  expect(debugIsOn()).toBe(true);
 });
 
-test('a joined playerId is the copyable Debug value agents filter in Railway logs', async () => {
+test('a joined debug pilot can copy the same player ID displayed during play', async () => {
   const writeText = vi.fn(async () => undefined);
   vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
-  applyDebugPreference(true);
-
+  visit('/debug');
   window.dispatchEvent(
-    new CustomEvent('playerIdentityChanged', {
-      detail: { playerId: JOINED_ID },
-    })
+    new CustomEvent('playerIdentityChanged', { detail: { playerId: 'joined-pilot' } })
   );
-
-  expect(playerInput().value).toBe(JOINED_ID);
-  expect(document.querySelector<HTMLButtonElement>('#copy-debug-player-id')?.disabled).toBe(false);
-
+  expect(document.querySelector<HTMLInputElement>('#debug-player-id')?.value).toBe('joined-pilot');
+  expect(document.querySelector('#debug-hud-player-id')?.textContent).toBe('joined-pilot');
+  expect(document.querySelector('#debug-hud-session-id')?.textContent).toBe(
+    getClientLogContext().sessionId
+  );
   document.querySelector<HTMLButtonElement>('#copy-debug-player-id')?.click();
-  await vi.waitFor(() => {
-    expect(writeText).toHaveBeenCalledWith(JOINED_ID);
-  });
+  await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('joined-pilot'));
 });
 
-test('ops raise the client log level from Advanced Debug without a code change', () => {
-  applyDebugPreference(false);
-  const defaultLevel = logger.getLogLevel();
-  applyDebugPreference(true);
-  const select = document.querySelector<HTMLSelectElement>('#debug-log-level');
-  if (!select) {
-    throw new Error('expected #debug-log-level');
-  }
-  expect(select.value).toBe(LOGGING.GLOBAL_LOG_LEVEL);
-
-  select.value = 'debug';
-  select.dispatchEvent(new Event('change'));
-  expect(logger.getLogLevel()).toBe(LogLevel.DEBUG);
-  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugLogLevel)).toBe('debug');
-
-  applyDebugPreference(false);
-  expect(logger.getLogLevel()).toBe(defaultLevel);
-
-  applyDebugPreference(true);
-  expect(select.value).toBe('debug');
-  expect(logger.getLogLevel()).toBe(LogLevel.DEBUG);
+test.each([
+  ['/debug?log-level=debug', LogLevel.DEBUG],
+  ['/debug?log-level=warn', LogLevel.WARN],
+  ['/debug?log-level=info', LogLevel.INFO],
+  ['/debug?log-level=invalid', LogLevel.INFO],
+  ['/debug?log-level=error', LogLevel.INFO],
+  ['/debug-other?log-level=debug', LogLevel.INFO],
+])('a pilot visiting %s receives only the supported route log level', (url, level) => {
+  visit(url);
+  expect(logger.getLogLevel()).toBe(level);
+  visit('/');
+  expect(logger.getLogLevel()).toBe(LogLevel.INFO);
 });

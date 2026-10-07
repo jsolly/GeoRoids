@@ -58,6 +58,14 @@ function inspectionDetails(result) {
     stderr: result.stderr?.trim().slice(0, 500) ?? '',
   });
 }
+class InspectionTimeout extends Error {
+  constructor(pid, result) {
+    super(`Cannot inspect validation PID ${pid}: ${inspectionDetails(result)}`, {
+      cause: result.error,
+    });
+    this.name = 'InspectionTimeout';
+  }
+}
 // A normal absent process is distinct from a failed inspection. Never infer death
 // from an unavailable ps command, diagnostics, or malformed output.
 function inspect(pid) {
@@ -66,6 +74,9 @@ function inspect(pid) {
     encoding: 'utf8',
     timeout: 5000,
   });
+  if (result.error?.code === 'ETIMEDOUT') {
+    throw new InspectionTimeout(pid, result);
+  }
   require(!result.error &&
     !result.signal &&
     !result.stderr.trim(), `Cannot inspect validation PID ${pid}: ${inspectionDetails(result)}`);
@@ -313,39 +324,62 @@ async function acquireHeavy(home, owner, cancelled) {
     for (;;) {
       require(!cancelled(), 'Validation queue wait cancelled');
       let blocked = false;
-      const earlier = readdirSync(queue)
-        .filter((name) => /^\d{12}$/u.test(name) && name < ticket)
-        .sort();
-      for (const name of earlier) {
-        const preceding = join(queue, name);
-        let prior;
-        try {
-          prior = json(join(preceding, 'owner.json'));
-        } catch (error) {
-          if (error.code === 'ENOENT') {
-            const metadata = statSync(preceding, { throwIfNoEntry: false });
-            if (!metadata) {
-              continue;
+      const stale = [];
+      let inspectionTimeout;
+      try {
+        const earlier = readdirSync(queue)
+          .filter((name) => /^\d{12}$/u.test(name) && name < ticket)
+          .sort();
+        for (const name of earlier) {
+          const preceding = join(queue, name);
+          let prior;
+          try {
+            prior = json(join(preceding, 'owner.json'));
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              const metadata = statSync(preceding, { throwIfNoEntry: false });
+              if (!metadata) {
+                continue;
+              }
+              if (Date.now() - metadata.mtimeMs < 5000) {
+                blocked = true;
+                continue;
+              }
             }
-            if (Date.now() - metadata.mtimeMs < 5000) {
-              blocked = true;
-              continue;
-            }
+            throw new Error(`Untrustworthy validation ticket blocks admission: ${preceding}`, {
+              cause: error,
+            });
           }
-          throw new Error(`Untrustworthy validation ticket blocks admission: ${preceding}`, {
-            cause: error,
-          });
+          if (!live(prior)) {
+            require(!existsSync(
+              join(preceding, 'active')
+            ), `Dead validation owner requires cleanup verification: ${preceding}`);
+            stale.push(preceding);
+          } else {
+            blocked = true;
+          }
         }
-        if (!live(prior)) {
-          require(!existsSync(
-            join(preceding, 'active')
-          ), `Dead validation owner requires cleanup verification: ${preceding}`);
+        if (!blocked) {
+          blocked = legacyBusy(home);
+        }
+      } catch (error) {
+        if (!(error instanceof InspectionTimeout)) {
+          throw error;
+        }
+        inspectionTimeout = error;
+        blocked = true;
+        process.stderr.write(
+          `Waiting for heavy validation admission, ticket ${ticket}; process inspection timed out, ownership unchanged: ${error.message}\n`
+        );
+      }
+      // A partial scan cannot reclaim ownership. Retry from the beginning after
+      // the cancellable wait; only conclusive inspections may remove tickets or admit.
+      if (!inspectionTimeout) {
+        for (const preceding of stale) {
           rmSync(preceding, { recursive: true, force: true });
-        } else {
-          blocked = true;
         }
       }
-      if (!blocked && !legacyBusy(home)) {
+      if (!blocked) {
         break;
       }
       if (Date.now() - reported > 10000) {
@@ -389,11 +423,13 @@ function pendingChildren(checkout, ownNonce) {
 export async function runAdmitted(
   kind,
   command,
-  { root = process.cwd(), environment = process.env } = {}
+  { root = process.cwd(), environment = process.env, timeoutMs } = {}
 ) {
-  require(['checkout', 'review', 'runner', 'frame', 'contracts'].includes(kind) &&
-    command.length >
-      0, 'Expected checkout, review, runner, frame or contracts followed by -- command');
+  require(['checkout', 'review', 'runner', 'frame', 'contracts', 'unit', 'integration'].includes(
+    kind
+  ) && command.length > 0, 'Expected a validation kind followed by -- command');
+  require(timeoutMs === undefined ||
+    (Number.isSafeInteger(timeoutMs) && timeoutMs > 0), 'Invalid validation deadline');
   const home = homes(root);
   const env = { ...environment };
   if (tokenKeys.some((key) => env[key] !== undefined)) {
@@ -412,6 +448,9 @@ export async function runAdmitted(
   let interrupted;
   let signalFailure;
   let rejectCommand;
+  let deadlineTimer;
+  let cancellationTimer;
+  let timedOut = false;
   const cancel = (signal) => {
     // The first signal starts owned cleanup. Repeated group signals could kill
     // the short-lived receipt and inspection helpers running during cleanup.
@@ -419,6 +458,11 @@ export async function runAdmitted(
       return;
     }
     interrupted = signal;
+    cancellationTimer = setTimeout(() => {
+      rejectCommand?.(
+        new Error('Validation command did not close within its cancellation grace period')
+      );
+    }, 45000);
     try {
       signalCommand(commandIdentity, signal, kind);
     } catch (error) {
@@ -451,7 +495,7 @@ export async function runAdmitted(
     }
     if (env[ADMISSION] !== undefined) {
       admissionDirectory = admissionOwner(home, env).directory;
-    } else if (kind !== 'checkout') {
+    } else if (kind === 'runner' || kind === 'frame') {
       heavy = await acquireHeavy(home, owner, () => interrupted);
       env[ADMISSION] = heavy.token;
       admissionDirectory = heavy.directory;
@@ -482,6 +526,12 @@ export async function runAdmitted(
         retired: false,
       };
       write(recordPath, { ...owner, command: commandIdentity });
+      if (timeoutMs !== undefined) {
+        deadlineTimer = setTimeout(() => {
+          timedOut = true;
+          cancel('SIGTERM');
+        }, timeoutMs);
+      }
       child.once('error', reject);
       child.once('close', (code, signal) => accept({ code, signal }));
     });
@@ -513,6 +563,9 @@ export async function runAdmitted(
     if (ownCheckout) {
       rmSync(home.checkout, { recursive: true });
     }
+    if (timedOut) {
+      return 124;
+    }
     return interrupted ? (interrupted === 'SIGINT' ? 130 : 143) : (result.code ?? 1);
   } catch (error) {
     // Before starting a command there are no owned child resources to retain.
@@ -537,6 +590,8 @@ export async function runAdmitted(
     error.exitCode = result?.code || 1;
     throw error;
   } finally {
+    clearTimeout(deadlineTimer);
+    clearTimeout(cancellationTimer);
     for (const [signal, handler] of handlers) {
       process.off(signal, handler);
     }

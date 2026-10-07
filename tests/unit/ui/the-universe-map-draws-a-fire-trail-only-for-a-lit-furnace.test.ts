@@ -85,7 +85,7 @@ test('the universe map marks furnace lots before that ground is explored', () =>
   const salvage = {
     id: 'loot:salvage',
     kind: 'wreckage' as const,
-    name: 'Salvage',
+    name: 'Cargo',
     position: { x: 1_000, y: 1_000 },
   };
   setWorldMapAssets([

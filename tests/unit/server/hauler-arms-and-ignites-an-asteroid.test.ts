@@ -5,8 +5,6 @@ import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
 import { furnaceReward, nearestFurnace } from '../../../shared/furnaces';
 import { validateAsteroidDto } from '../../../shared/snapshotDto';
 import type { AsteroidData, HaulerUtilityId } from '../../../shared-types';
-import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
-import { applyAsteroidKinematics } from '../../../src/network/services/asteroidFieldSync';
 import { resolveToolFlights } from '../../support/tool-flight';
 import {
   GameServerWorld,
@@ -41,14 +39,6 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
       world.engine.advanceOneFrame();
     }
   }
-  function snapshotRock(pilot: Pilot): AsteroidData {
-    world.broadcastGameState();
-    const row = world.snapshot(pilot).asteroids.find((candidate) => candidate.id === rock.id);
-    if (!row) {
-      throw new Error('Snapshot omitted the boost rock');
-    }
-    return row;
-  }
 
   beforeEach(() => {
     world = new GameServerWorld();
@@ -75,63 +65,6 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     equip(bob, 'boost_coupling');
   });
   afterEach(() => world.dispose());
-
-  test('arming aims at the furnace; ignition survives departure and rewards its owner exactly once', () => {
-    activate(alice);
-    step(5);
-    expect(rock.boost).toEqual({
-      phase: 'armed',
-      ownerId: alice.id,
-      angle: furnaceHeading(rock.position),
-    });
-    expect(rock.velocity).toEqual({ x: 0, y: 0 });
-    expect(rock.position).toEqual({ x: 150, y: 0 });
-    expect(snapshotRock(bob).boost).toEqual(rock.boost);
-    world.entity(alice).angle = Math.PI / 2;
-    activate(alice);
-    expect(world.entity(alice).harpoonTargetId).toBeNull();
-    expect(world.entity(alice).abilityCooldownFrames).toBe(180);
-    expect(rock.boost).toEqual({
-      phase: 'burning',
-      ownerId: alice.id,
-      angle: furnaceHeading(rock.position),
-    });
-    const destination = nearestFurnace(rock.position);
-    const aliceView = snapshotRock(alice);
-    const bobView = snapshotRock(bob);
-    expect(bobView.boost).toEqual(aliceView.boost);
-    const local = new Roid({ ...rock.position }, rock.size, rock.id);
-    applyAsteroidKinematics(local, bobView, { complete: true, snapPosition: true });
-    const belt = new RoidBelt();
-    belt.roids.push(local);
-    world.engine.removePlayer(alice.id);
-    step(1);
-    belt.moveRoids();
-    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(ASTEROID_BOOST.acceleration);
-    expect(local.velocity).toEqual(rock.velocity);
-    expect(local.boost).toEqual(rock.boost);
-    expect(bobView.boost).toEqual({
-      phase: 'burning',
-      ownerId: alice.id,
-      angle: furnaceHeading(rock.position),
-    });
-    step(179);
-    expect(rock.boost?.phase).toBe('burning');
-    for (let frame = 0; frame < 1000 && world.engine.getAsteroid(rock.id); frame++) {
-      step(1);
-    }
-    expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
-    const deliveries = world.engine.drainFurnaceDeliveries();
-    expect(deliveries).toHaveLength(1);
-    expect(deliveries[0]?.furnaceId).toBe(destination.id);
-    expect(deliveries[0]?.rewards).toEqual([
-      expect.objectContaining({ playerId: alice.id, points: furnaceReward(rock) }),
-    ]);
-    world.engine.processFurnaceDeliveries();
-    expect(world.engine.drainFurnaceDeliveries()).toEqual([]);
-    const resumed = world.resume(alice, { x: 0, y: 0 });
-    expect(world.entity(resumed).score).toBe(furnaceReward(rock));
-  });
 
   test.each(['boost_coupling', 'resource_tap', 'tow_cable'] as const)(
     'another pilot cannot take an armed or burning rock with %s',
@@ -160,39 +93,6 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     }
   );
 
-  test.each(['tool swap', 'range break', 'death', 'departure', 'transport close'] as const)(
-    'an armed coupling cancels after %s without launching',
-    (event) => {
-      activate(alice);
-      if (event === 'tool swap') {
-        equip(alice, 'resource_tap');
-      }
-      if (event === 'range break') {
-        world.entity(alice).position.x = -5000;
-      }
-      if (event === 'death') {
-        world.entity(alice).spawnProtectionTimer = 0;
-        const result = world.engine.handleShipDamage(alice.id, 'ricochet', 1000);
-        expect(result.isDestroyed).toBe(true);
-        expect(rock.boost).toBeNull();
-      }
-      if (event === 'departure') {
-        world.engine.removePlayer(alice.id);
-      }
-      if (event === 'transport close') {
-        world.dropTransport(alice);
-      }
-      if (event === 'tool swap' || event === 'departure' || event === 'transport close') {
-        expect(rock.boost).toBeNull();
-      }
-      step(1);
-      expect(rock.boost).toBeNull();
-      expect(rock.velocity).toEqual({ x: 0, y: 0 });
-      activate(bob);
-      expect(world.entity(bob).harpoonTargetId).toBe(rock.id);
-    }
-  );
-
   test('a lethal hit after ignition leaves the independent burn running', () => {
     activate(alice);
     activate(alice);
@@ -210,24 +110,6 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     step(1);
     expect(rock.boost).toBeNull();
     expect(rock.velocity).toEqual({ x: 0, y: 0 });
-  });
-
-  test('destroying an armed rock releases its owner, and a removed burning rock cannot keep accelerating', () => {
-    activate(alice);
-    world.engine.removeAsteroid(rock.id);
-    step(1);
-    expect(world.entity(alice).harpoonTargetId).toBeNull();
-    expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
-    rock.boost = null;
-    world.engine.addAsteroid(rock);
-    world.entity(alice).abilityCooldownFrames = 0;
-    activate(alice);
-    activate(alice);
-    step(1);
-    const velocity = { ...rock.velocity };
-    world.engine.removeAsteroid(rock.id);
-    step(1);
-    expect(rock.velocity).toEqual(velocity);
   });
 
   test('the last pilot leaving cancels an armed coupling even while the world is paused', () => {

@@ -47,8 +47,7 @@ records the client and server Git identities that issued the token and last
 wrote the bank, plus the server times of those writes. Server-only bank writes
 omit a client identity. Those stamps do not replace the snapshot-v2 join gate.
 A brief reconnect keeps the current pose; carrying cargo preserves that field
-position even after a longer absence. Death drops carried points with a two-minute
-expiry and always schedules a respawn. Banked points survive. Bank balances and
+position even after a longer absence. Death discards carried points and always schedules a respawn. Banked points survive. Bank balances and
 the shared world stay until `WORLD.generation` changes.
 
 ## Updating open clients

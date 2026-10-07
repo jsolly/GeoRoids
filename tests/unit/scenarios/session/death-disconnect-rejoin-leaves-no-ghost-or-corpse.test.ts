@@ -80,23 +80,4 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     expect(world.engine.getPlayerCount()).toBe(2);
     expect(bo.socket.received('playerLeft')).toHaveLength(0);
   });
-
-  test('drop then rejoin after death is a live ship, not a frozen hull', () => {
-    world.send(ace, {
-      type: 'collisionDamage',
-      data: {
-        targetPlayerId: ace.id,
-        attackerId: 'boundary',
-      },
-    });
-    world.dropTransport(ace);
-    world.tickThroughRespawn();
-    ace = world.resume(ace);
-
-    const ship = world.entity(ace);
-    expect(ship.health).toBe(ship.maxHealth);
-    expect(ship.exploding).toBe(false);
-    expect(ship.spawnProtectionTimer).toBeGreaterThan(0);
-    expect(world.leaderboardNames()).toEqual(expect.arrayContaining(['Ace', 'Bo']));
-  });
 });

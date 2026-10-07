@@ -6,9 +6,9 @@ Ship profile: `vercel-static`.
 
 **Integration: branch → PR → merge on green `CI / ci`.** `/ship` merges per `skills/ship/references/git-discipline.md` → Merge a same-repo self PR, read the installed reference. Agents never push to `main`, change rulesets, or admin-merge.
 
-Local gate: `npm run gate`; full unit, integration, frame-work and constrained-client checks are mandatory. CI preserves independent parallel static and gameplay/touch/reconnect lanes; both must pass.
+Local gate: `npm run gate`; static checks, runner contracts, the complete unit suite, build, and all server/entity integration tests are mandatory. CI runs independent static, runner-contract and complete code-integration lanes; all must pass. Browser tests and automatic frame-work/constrained-client gates are retired.
 
-Deploy: Vercel Git at <https://www.georoids.com> plus Railway Git at <https://georoids-production-2403.up.railway.app>. Classify server inputs with `scripts/server-release-inputs.mjs` from the merged checkout; its server/shared/setup/manifest and imported-client graph determines which Railway release needs verification. A successful client deployment cannot prove the server deployed. Follow actual host release evidence and the canonical smoke receipt through genuine join, snapshots, movement, accepted firing and healthy persistence. Skipped, cancelled, failed or missing smoke is unverified.
+Deploy: Vercel Git at <https://www.georoids.com> plus Railway Git at <https://georoids-production-2403.up.railway.app>. Classify server inputs with `scripts/server-release-inputs.mjs` from the merged checkout; its server/shared/setup/manifest and imported-client graph determines which Railway release needs verification. A successful client deployment cannot prove the server deployed. Follow actual host release evidence and the canonical smoke receipt through genuine join, snapshots, movement, accepted firing and healthy persistence. Production smoke uses HTTP/assets and WebSocket protocol evidence; it does not certify browser rendering, keyboard/touch controls, graphics or audio. Skipped, cancelled, failed or missing smoke is unverified.
 
 Before deployment operations, read [agent operations](docs/agent-operations.md). Never apply unrelated staged Railway patches; fallback deploys must name the exact merged SHA. World persistence requires the reviewed production volume and `GEOROIDS_WORLD_PATH=/data/world.sqlite`; apply that configuration before server deployment. The game loop never waits for disk writes. Production configuration and destructive data changes remain human-owned.
 
@@ -33,13 +33,13 @@ Vite static client and authoritative WebSocket server deploy independently from 
 
 ## CI
 
-The dotagents dispatcher runs the tracked pre-commit gate. The tracked pre-commit hook owns lint, unused-code checks, contracts, types, unit tests, build, full integration, frame-work and constrained-client checks. `npm run gate` invokes that same complete battery with the fleet docs exception disabled. Exact receipts may reuse unchanged validation; candidate reuse requires index parity. Canonical actionlint/ShellCheck bytes come from dotagents.
+The dotagents dispatcher runs the tracked pre-commit gate. The tracked pre-commit hook owns lint, unused-code checks, contracts, types, unit tests, build, complete server/entity integration checks. `npm run gate` invokes that same complete battery with the fleet docs exception disabled. Exact receipts may reuse unchanged validation; candidate reuse requires index parity. Canonical actionlint/ShellCheck bytes come from dotagents.
 
 ## Commands
 
-Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns the local Vite/server pair and queues heavy validation across linked worktrees. The runner fault-contract battery shares this admission capacity. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
+Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns a fresh local Vite/server pair, unused ports and cleanup. Code checks, including complete units, runner contracts and integration, can overlap across different worktrees. Each checkout excludes overlapping validation because builds and artifacts belong to it. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences within a run. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
 
-Full suites use six authenticated serial shards with at most three active children, weighted whole-file assignments, and separate services and artifacts. See [isolated shards](docs/integration-shards.md).
+Manual browser benchmarking and frame measurements remain outside the gate and use the common-Git heavyweight queue. Playwright remains for those tools and Wiki media generation.
 
 ## Architecture
 
@@ -47,12 +47,13 @@ Vite serves the client; the Node WebSocket server owns authoritative world state
 
 ## Tests
 
-- `tests/unit/` — pure, fast. Run via `npm run test`.
-- `tests/integration/server/` — vitest against server modules directly.
-- `tests/integration/entities/` — vitest against entity interactions and input behavior.
-- `tests/integration/browser/` — Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`, `e2e/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `ship-respawns-near-furnace-after-asteroid-death.test.ts` (what happens) over `test-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
+- `tests/unit/` — deterministic rules, executed DOM/canvas behavior, protocol and failure boundaries. Run the complete suite via `npm run test`.
+- `tests/integration/server/` — server modules and owned loopback protocol interactions.
+- `tests/integration/entities/` — entity interactions and input behavior.
 
-Integration tests start their own dev servers through `scripts/test-runner.sh` on automatically selected unused ports; explicit diagnostic overrides remain supported. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
+Browser test suites are removed. Tests must prove an executed code result with fixed inputs, seeds and controlled clocks where elapsed time affects gameplay. Delete nondeterministic or placeholder tests; do not preserve their count with retries or weaker assertions. Native browser rendering, real keyboard/touch behavior and audio are outside this automated coverage.
+
+Integration tests start their own services through `scripts/test-runner.sh` on automatically selected unused ports; explicit diagnostic overrides remain supported. Its default execution deadline is 1200 seconds. If a test hangs or fails strangely, inspect the runner output and confirm only its owned processes need cleanup before retrying.
 
 ## Project conventions
 
@@ -77,10 +78,10 @@ Node24 matches `.nvmrc`. Integration runners own their server pair and have a 12
 
 ## Verified-tree CI
 
-PRs run static checks, runner contracts, and the bounded behavioral smoke concurrently.
+PRs run static checks, runner contracts, and the complete server/entity integration suites concurrently.
 The final `ci` job requires all three lanes to succeed; failed, cancelled, or skipped
 lanes fail the aggregate. Each lane has its own exact-tree proof.
-Full unit/integration/performance checks run locally in the review gate. Post-merge CI reuses each successful PR lane only
+Full unit and server/entity integration checks run locally in the review gate. Manual performance measurements remain outside it. Post-merge CI reuses each successful PR lane only
 when its recorded checkout tree exactly matches the landed tree, using
 `scripts/ci-verified-tree.sh` from dotagents. Missing proof runs that CI lane;
 manual runs always validate. The required `ci` name and deployment triggers stay intact.

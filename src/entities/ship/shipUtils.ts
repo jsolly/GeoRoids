@@ -218,12 +218,12 @@ export function calculateHealthAfterHeal(
 }
 
 export function shouldStartHealthRegeneration(
-  lastDamageTime: number,
+  healthRegenTimer: number,
   currentHealth: number,
   maxHealth: number
 ): boolean {
   // Dead ships (health 0) await server respawn — never regen locally from zero.
-  return lastDamageTime <= 0 && currentHealth > 0 && currentHealth < maxHealth;
+  return healthRegenTimer <= 0 && currentHealth > 0 && currentHealth < maxHealth;
 }
 
 export function calculateLaserStartPosition(

@@ -67,7 +67,7 @@ function traceDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, r: nu
   ctx.closePath();
 }
 
-type OrdinaryLootKind = Extract<LootData['kind'], 'wreckage' | 'points' | 'shard' | 'silk'>;
+type OrdinaryLootKind = Extract<LootData['kind'], 'points' | 'shard' | 'silk'>;
 
 interface OrdinaryLootSprite extends RasterSurface {
   origin: number;
@@ -83,7 +83,7 @@ interface OrdinaryLootSprites {
 let ordinaryLootSprites: OrdinaryLootSprites | null = null;
 
 function isOrdinaryLootKind(kind: LootData['kind']): kind is OrdinaryLootKind {
-  return kind === 'wreckage' || kind === 'points' || kind === 'shard' || kind === 'silk';
+  return kind === 'points' || kind === 'shard' || kind === 'silk';
 }
 
 function prepareOrdinaryLootSprites(ctx: CanvasRenderingContext2D): OrdinaryLootSprites {

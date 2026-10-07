@@ -63,7 +63,7 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
       position: { x: i * 50, y: 600 },
       mass: 1,
       radius: 5,
-      kind: i % 2 ? 'wreckage' : 'shard',
+      kind: i % 2 ? 'silk' : 'shard',
       ...(i % 2 ? {} : {}),
     })),
     satellitePickups: SATELLITE_PROFILES.map((profile, i) => ({

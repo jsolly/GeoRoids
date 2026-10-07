@@ -1,134 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import '../src/utils/logLevel';
 
 // Node-environment suites have no browser globals to configure.
 if (typeof window !== 'undefined') {
   // Use the DOM owned by Vitest so events and elements share one window.
-  document.body.innerHTML = `
-    <canvas id="title-terrain"></canvas>
-    <div id="gameWrapper">
-      <div id="start-screen" class="screen">
-        <h1>GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click Contour Lock · E ability · V inventory · B town store · M map</p>
-        <div class="game-modes">
-          <div>
-            <label for="playerNameInput" class="nickname-label">Your Nickname</label>
-            <input
-              type="text"
-              id="playerNameInput"
-              maxlength="20"
-              placeholder="Crimson Falcon"
-              class="nickname-input"
-              autocomplete="nickname"
-            />
-          </div>
-          <fieldset class="ship-kit-select">
-            <legend>Ship kit</legend>
-            <div id="ship-kit-grid" class="ship-kit-grid"></div>
-            <p class="ship-kit-placeholder-note">AD v2 silhouettes</p>
-          </fieldset>
-          <div class="start-actions">
-            <button id="start-game" type="button" class="enter-game">
-              Enter Game
-            </button>
-          </div>
-        </div>
-        <div class="settings">
-          <div class="preference-toggles">
-            <div class="sound-toggle-row">
-              <input
-                class="sound-toggle"
-                type="checkbox"
-                id="soundPref"
-                checked
-              />
-              <label class="sound-toggle-label" for="soundPref">Sound Effects</label>
-            </div>
-            <div class="sound-toggle-row">
-              <input
-                class="sound-toggle"
-                type="checkbox"
-                id="musicPref"
-                checked
-              />
-              <label class="sound-toggle-label" for="musicPref">Music</label>
-            </div>
-            <div id="hapticsRow" class="sound-toggle-row" hidden>
-              <input class="sound-toggle" type="checkbox" id="hapticsPref" />
-              <label class="sound-toggle-label" for="hapticsPref">Haptics</label>
-            </div>
-          </div>
-          <details id="advanced-settings" class="advanced-settings">
-            <summary>Advanced</summary>
-            <div class="debug-toggle-row">
-              <input class="sound-toggle" type="checkbox" id="debugPref" />
-              <label class="sound-toggle-label" for="debugPref">Debug</label>
-            </div>
-            <div id="debug-identity" class="debug-identity" hidden>
-              <label for="debug-log-level">Log level</label>
-              <select id="debug-log-level">
-                <option value="error">Error</option>
-                <option value="warn">Warn</option>
-                <option value="info">Info</option>
-                <option value="debug">Debug</option>
-              </select>
-              <div>
-                <label class="debug-id-label" for="debug-player-id">Player ID</label>
-                <div class="debug-id-row">
-                  <input id="debug-player-id" class="debug-id-input" type="text" readonly />
-                  <button id="copy-debug-player-id" type="button" class="debug-copy" disabled>Copy</button>
-                </div>
-              </div>
-              <div>
-                <label class="debug-id-label" for="debug-session-id">Page session</label>
-                <div class="debug-id-row">
-                  <input id="debug-session-id" class="debug-id-input" type="text" readonly />
-                  <button id="copy-debug-session-id" type="button" class="debug-copy">Copy</button>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-      </div>
-      <div id="gameArea" hidden>
-        <div id="debug-play-stack" class="debug-play-stack">
-          <button id="debug-hud-toggle" type="button" class="debug-copy debug-hud-toggle" aria-controls="debug-hud" aria-expanded="true" hidden>Hide HUD</button>
-          <fieldset id="debug-hud" class="debug-hud" hidden>
-            <legend>Debug health</legend>
-            <dl>
-              <div class="debug-hud-row"><dt>FPS</dt><dd id="debug-hud-fps">—</dd></div>
-              <div class="debug-hud-row"><dt>RTT</dt><dd id="debug-hud-rtt">—</dd></div>
-              <div class="debug-hud-row"><dt>SNAP</dt><dd id="debug-hud-snap">—</dd></div>
-              <div class="debug-hud-row"><dt>MOVE</dt><dd id="debug-hud-move">—</dd></div>
-              <div class="debug-hud-row"><dt>WORLD</dt><dd id="debug-hud-world">—</dd></div>
-              <div class="debug-hud-row"><dt>REL</dt><dd id="debug-hud-rel">—</dd></div>
-            </dl>
-            <button id="copy-debug-diagnostics" type="button" class="debug-copy debug-diagnostics-copy" data-copy-name="diagnostics" data-copy-label="Copy diagnostics" aria-label="Copy diagnostics">Copy diagnostics</button>
-          </fieldset>
-        </div>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <button
-          id="ship-schematic-toggle"
-          type="button"
-          class="ship-schematic-toggle"
-          aria-label="Open inventory and ship schematic (V)"
-          aria-keyshortcuts="V"
-        >Inventory <kbd>V</kbd></button>
-        <button
-          id="universe-map-toggle"
-          type="button"
-          class="universe-map-toggle"
-          aria-label="Open universe map (M)"
-          aria-keyshortcuts="M"
-        >Map <kbd>M</kbd></button>
-        <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
-        </div>
-      </div>
-      <div id="safe-area-probe"></div>
-    </div>
-    <div id="attribution">
-      <span id="buildInfo" class="build-info"></span>
-    </div>
-`;
+  document.body.innerHTML =
+    readFileSync(resolve(__dirname, '../index.html'), 'utf8')
+      .split('<body>')[1]
+      ?.split('</body>')[0] ?? '';
 
   if (typeof window.matchMedia !== 'function') {
     window.matchMedia = (query: string): MediaQueryList =>

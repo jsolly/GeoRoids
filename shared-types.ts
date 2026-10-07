@@ -38,7 +38,6 @@ export interface TerrainSpider {
 }
 
 export interface SpiderFieldState {
-  consumed?: { id: string; position: Position; furnaceId: string; frame: number }[];
   spiders: TerrainSpider[];
   /** Known nest homes whose original stationary resource is still present. */
   nests: { id: string; resourceId: string; position: Position }[];
@@ -239,10 +238,11 @@ export interface AsteroidData {
   probe?: AsteroidProbe | null;
 }
 
-/** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
+/** Shared world pickups. Destroy-drop is shard; Tap extract is tap; mined cargo is points. */
 export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
 
-export type LootKind = 'shard' | 'wreckage' | 'tap' | 'silk' | EquipmentId | 'points';
+/** `wreckage` remains reserved in snapshot v2 for independently deployed clients. */
+export type LootKind = 'shard' | 'tap' | 'silk' | EquipmentId | 'points' | 'wreckage';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -361,6 +361,7 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
+  /** Snapshot v2 calls surviving point-cargo markers `wreckage`. */
   kind: 'furnace' | 'foundation' | 'wreckage' | 'satellite';
   position: Position;
   name: string;

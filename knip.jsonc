@@ -6,7 +6,6 @@
     "server.ts",
     "server/world/worldStoreWorker.ts",
     ".railway/**/*.ts",
-    "vitest.browser.config.ts",
     "scripts/**/*.ts",
     "src/wiki/main.ts",
     "benchmarks/client.html",

@@ -1,28 +1,19 @@
-# Server Integration Tests
+# Server integration tests
 
-This directory contains integration tests that test server-side functionality directly.
+These cases exercise server modules and owned loopback WebSocket interactions:
+protocol admission, authoritative state, current-client recovery and lifecycle.
+Use fixed participants and controlled clocks when the assertion depends on a
+rule deadline. Follow [test conventions](../../AGENTS.md).
 
-## Test Types
+From the absolute checkout path:
 
-- **WebSocket communication tests**: Tests server-client message handling
-- **Game engine tests**: Tests server-side game logic and state management
-- **Server API tests**: Tests server endpoints and responses
-
-## Requirements
-
-These tests run through `scripts/test-runner.sh`, which starts and owns the local WebSocket/Vite services when the configured ports are unused. The runner refuses to attach to preexisting services. They require Node.js, but no browser.
-
-## Running Tests
-
-```bash
-# Run all server integration tests
+```sh
 npm run test:integration:server
-
-# Run specific server test
-npm run test:integration:server -- server-parity.test.ts
+./scripts/test-runner.sh tests/integration/server/server-pause.test.ts
 ```
 
-## Test Files
-
-- `server-parity.test.ts` - WebSocket message handling and server-client communication
-- `server-pause.test.ts` - Server pause/resume functionality
+The repository runner owns fresh local services, automatically selected unused
+ports and process cleanup. It requires Node and no browser. Never attach to a
+developer server or invoke raw Vitest on these paths. The complete literal
+[server/entity inventory](../README.md#complete-inventory) runs in the local gate
+and the CI integration lane.

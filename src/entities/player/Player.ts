@@ -261,6 +261,7 @@ export class Player {
       this.ship.color = color;
     }
     if (data.health !== undefined) {
+      this.ship.serverOwnsHealth = true;
       {
         const wasDead = this.ship.health <= 0;
         const wasExploding = this.ship.exploding;

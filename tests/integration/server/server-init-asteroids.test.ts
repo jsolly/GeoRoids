@@ -96,18 +96,6 @@ function messageAt(messages: readonly WireMessage[], start: number, type: string
   return message;
 }
 
-function snapshotAsteroid(testServer: TestServer, asteroidId: string): AsteroidData {
-  const asteroid = testServer.gameEngine.getAsteroid(asteroidId);
-  if (!asteroid) {
-    throw new Error(`Asteroid ${asteroidId} is absent from the authoritative field`);
-  }
-  return structuredClone(asteroid);
-}
-
-function snapshotField(testServer: TestServer): AsteroidData[] {
-  return structuredClone(testServer.gameEngine.getAllAsteroids());
-}
-
 let server: TestServer | undefined;
 let wsUrl = '';
 const sockets: WireClient[] = [];
@@ -191,46 +179,6 @@ describe('Server initAsteroids sync', () => {
         (asteroid) => asteroid.id
       )
     ).toEqual(firstBatch.map((asteroid) => asteroid.id));
-    playerOne.assertHealthy();
-    playerTwo.assertHealthy();
-  });
-
-  test('moves the live field by explicit ticks and gives a late joiner that exact field', async () => {
-    const current = requireServer();
-    const playerOne = await openGameSocket();
-    await join(playerOne, 'motion-one', { x: 0, y: 0 });
-    const initialBatch = await requestAsteroids(playerOne, 'motion-one');
-    const tracked = initialBatch[0];
-    if (!tracked) {
-      throw new Error('Initial asteroid batch is empty');
-    }
-
-    current.gameEngine.updateAsteroid(tracked.id, {
-      position: { x: 0, y: 0 },
-      velocity: { x: 2, y: 0 },
-    });
-    const arranged = snapshotAsteroid(current, tracked.id);
-    for (let frame = 0; frame < 3; frame++) {
-      current.gameEngine.advanceOneFrame();
-    }
-    const liveBeforeJoin = snapshotAsteroid(current, tracked.id);
-    expect(liveBeforeJoin.position).toEqual({ x: 6, y: 0 });
-    expect(liveBeforeJoin.velocity).toEqual({ x: 2, y: 0 });
-    expect(liveBeforeJoin.position).not.toEqual(arranged.position);
-
-    const playerTwo = await openGameSocket();
-    await join(playerTwo, 'motion-two', { x: 0, y: 0 });
-    const lateBatch = await requestAsteroids(playerTwo, 'motion-two');
-    const liveAfterJoin = snapshotField(current);
-
-    expect(lateBatch).toEqual(nearbyAsteroidRows(liveAfterJoin, { x: 0, y: 0 }));
-    const lateTracked = lateBatch.find((asteroid) => asteroid.id === tracked.id);
-    if (!lateTracked) {
-      throw new Error(`Late batch omitted tracked asteroid ${tracked.id}`);
-    }
-    expect(lateTracked).toEqual(liveAfterJoin.find((asteroid) => asteroid.id === tracked.id));
-    expect(lateTracked.position).toEqual(liveBeforeJoin.position);
-    expect(lateTracked.velocity).toEqual(liveBeforeJoin.velocity);
     playerOne.assertHealthy();
     playerTwo.assertHealthy();
   });

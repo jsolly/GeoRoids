@@ -35,10 +35,11 @@ Run from `/Users/johnsolly/code/GeoRoids` or the absolute feature-worktree path.
    A partial selection or a successful hosted lane cannot replace the local gate.
 
 Different worktrees can run unit, runner-contract and integration code checks
-concurrently. Each checkout excludes overlapping validation because builds,
-services and artifacts belong to it. The integration runner selects unused ports,
-owns its services, defaults to a 1200-second execution deadline and stops only its
-owned processes. Cleanup failures retain the ownership barrier and fail the run.
+concurrently. Each checkout excludes overlapping validation because builds and
+artifacts belong to it. The integration runner owns an isolated Vitest worker and
+per-run artifacts, defaults to a 1200-second execution deadline and stops only its
+owned processes. Individual socket scenarios create and close port-zero loopback
+servers; the code runner starts no Vite/server pair. Cleanup failures retain the ownership barrier and fail the run.
 Manual browser benchmarking and frame measurement still use the common-Git
 heavyweight queue; their measurements are outside the automatic gate.
 

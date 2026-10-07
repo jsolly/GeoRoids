@@ -73,9 +73,10 @@ assignment-only assertions and weaker duplicates. Record lost coverage honestly.
 From the absolute GeoRoids checkout directory, use `npm test` for all units.
 Focused units may use `npx vitest run tests/unit/<scenario>.test.ts`.
 Always use `./scripts/test-runner.sh` for server/entity integration; never raw
-Vitest on `tests/integration/`. The runner owns fresh services and unused ports,
-retains one isolated worker, stops only its process tree and defaults to a
-1200-second execution deadline. Run the complete literal server/entity inventory
+Vitest on `tests/integration/`. The runner owns one isolated Vitest worker and
+per-run artifacts, stops only its process tree and defaults to a 1200-second
+execution deadline. Socket scenarios create and close their own port-zero
+loopback servers; the code runner starts no Vite/server pair. Run the complete literal server/entity inventory
 with `npm run test:integration`; there is no shard or browser lane.
 
 Code checks may overlap across different worktrees. Validation in the same

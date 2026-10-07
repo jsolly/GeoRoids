@@ -41,7 +41,7 @@ npm run test:integration:server
 npm run test:integration:entities
 ```
 
-`npm run gate` checks dependencies, lint, configuration, TypeScript, runner contracts, all units, the production build and complete server/entity integration. Browser tests are removed. Always use `./scripts/test-runner.sh` for integration scenarios; it owns services, unused ports and serialized execution. Code checks can overlap across worktrees, while the same checkout excludes overlap.
+`npm run gate` checks dependencies, lint, configuration, TypeScript, runner contracts, all units, the production build and complete server/entity integration. Browser tests are removed. Always use `./scripts/test-runner.sh` for integration scenarios; it owns Vitest, artifacts, cleanup and serialized execution. Socket scenarios own their port-zero loopback servers. Code checks can overlap across worktrees, while the same checkout excludes overlap.
 
 Test-writing conventions are in [tests/AGENTS.ms](tests/AGENTS.ms): focused feature scenarios, controlled setup, and observable outcomes.
 

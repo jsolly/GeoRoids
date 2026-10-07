@@ -19,11 +19,11 @@ npm run test:integration:entities
 ./scripts/test-runner.sh tests/integration/server/server-pause.test.ts --reporter=verbose
 ```
 
-Always use `scripts/test-runner.sh` for integration paths. It owns a fresh
-Vite/server pair on automatically selected unused ports, one isolated Vitest
-worker and process cleanup. Explicit `GEOROIDS_TEST_VITE_PORT` and
-`GEOROIDS_TEST_SERVER_PORT` diagnostic overrides remain supported. It refuses to
-attach to existing services. Do not invoke raw Vitest on integration paths.
+Always use `scripts/test-runner.sh` for integration paths. It owns one isolated
+Vitest worker, per-run artifacts and process cleanup. Individual socket scenarios
+create and close their own port-zero loopback servers. The code runner starts no
+Vite/server pair and does not consume service-port overrides. Never attach to an
+existing developer service. Do not invoke raw Vitest on integration paths.
 The default execution deadline is 1200 seconds; timeouts and cleanup failures fail.
 
 Code checks may overlap across different worktrees; the same checkout excludes

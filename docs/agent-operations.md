@@ -111,7 +111,7 @@ npm run benchmark          # see benchmarks/README.md
 npx vitest run tests/unit/path/to.test.ts        # focused pure unit checks only
 ```
 
-**Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns a fresh Vite/server pair, unused ports, one serialized Vitest worker and cleanup. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
+**Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns one serialized Vitest worker, per-run artifacts and process cleanup. Socket scenarios create and close their own port-zero loopback servers; the code runner starts no Vite/server pair. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
 
 Use repository-relative or absolute paths for explicit integration test files; missing files fail before services start. Selectors must name literal files or directories within the server/entity inventory. Substrings and `:line` suffixes are rejected. Put selectors directly after the runner command; a nonempty `--` tail is rejected to prevent an unintended selection.
 
@@ -181,7 +181,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - **Validation admission:** different worktrees can run complete unit, runner-contract and integration code checks together. Static checks, types and builds can overlap too. A checkout admits one gate, review or standalone harness at a time because its builds and artifacts share ownership. Failed cleanup retains the barrier.
 - **Manual measurement queue:** browser benchmark runner modes and direct frame measurements use one heavyweight FIFO slot in the common Git directory. Queue waits are visible and cancellable and precede execution deadlines. Failed ownership inspection preserves evidence; never delete a live allocator's lock.
 - **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes. There is no full-suite sharding deadline.
-- **Test ports:** standalone harnesses automatically select distinct Vite, server and benchmark-proxy ports. Use explicit `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` only for diagnostics. Startup checks listener ownership and refuses occupied ports; interactive development retains its defaults.
+- **Ports:** code integration scenarios own port-zero loopback servers; the code runner does not consume service-port overrides. Manual benchmark harnesses select distinct Vite, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
 - **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
 - **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
@@ -195,7 +195,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 | Vite (client + `/ws` proxy) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
 | Game server (HTTP + WS) | 3001 | `curl http://localhost:3001/health` |
 
-Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for integration tests. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Integration tests start their own pair through `scripts/test-runner.sh`; do not leave another service listening on the configured test ports.
+Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for the interactive session. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Code integration scenarios create their own port-zero loopback servers. Manual benchmark harnesses own separate configured service pairs and refuse occupied ports.
 
 **Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
 

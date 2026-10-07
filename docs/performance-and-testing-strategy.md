@@ -278,10 +278,11 @@ npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
 
 The full unit and server/entity suites run through `npm run test:all`. Run timed benchmarks
 separately from tests, builds, coverage and other benchmarks. Transport accepts a
-single revision because realtime scheduling is nondeterministic. The integration
-runner owns its server processes and ports; use that ownership model for the
-proposed production realtime benchmark instead of attaching to arbitrary local
-servers.
+single revision because realtime scheduling is nondeterministic. The manual
+benchmark runner owns its server processes and ports; retain that ownership model
+for the proposed production realtime benchmark instead of attaching to arbitrary
+local servers. Code integration owns an isolated Vitest worker; its socket
+scenarios create and close port-zero loopback servers.
 
 ## Observability, rollout, and completion
 

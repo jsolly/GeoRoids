@@ -37,7 +37,7 @@ The dotagents dispatcher runs the tracked pre-commit gate. The tracked pre-commi
 
 ## Commands
 
-Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns a fresh local Vite/server pair, unused ports and cleanup. Code checks, including complete units, runner contracts and integration, can overlap across different worktrees. Each checkout excludes overlapping validation because builds and artifacts belong to it. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences within a run. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
+Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns an isolated Vitest worker, per-run artifacts and process cleanup. Socket scenarios create their own port-zero loopback servers. Code checks, including complete units, runner contracts and integration, can overlap across different worktrees. Each checkout excludes overlapping validation because builds and artifacts belong to it. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences within a run. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
 
 Manual browser benchmarking and frame measurements remain outside the gate and use the common-Git heavyweight queue. Playwright remains for those tools and Wiki media generation.
 
@@ -53,7 +53,7 @@ Vite serves the client; the Node WebSocket server owns authoritative world state
 
 Browser test suites are removed. Tests must prove an executed code result with fixed inputs, seeds and controlled clocks where elapsed time affects gameplay. Delete nondeterministic or placeholder tests; do not preserve their count with retries or weaker assertions. Native browser rendering, real keyboard/touch behavior and audio are outside this automated coverage.
 
-Integration tests start their own services through `scripts/test-runner.sh` on automatically selected unused ports; explicit diagnostic overrides remain supported. Its default execution deadline is 1200 seconds. If a test hangs or fails strangely, inspect the runner output and confirm only its owned processes need cleanup before retrying.
+Integration socket scenarios start and close their own port-zero loopback servers. `scripts/test-runner.sh` owns the isolated Vitest process and its artifacts; it starts no Vite/server pair. Its default execution deadline is 1200 seconds. If a test hangs or fails strangely, inspect the runner output and confirm only its owned processes need cleanup before retrying.
 
 ## Project conventions
 
@@ -74,7 +74,7 @@ Integration tests start their own services through `scripts/test-runner.sh` on a
 
 ## Local development
 
-Node24 matches `.nvmrc`. Integration runners own their server pair and have a 1200-second default deadline; timeouts fail and stop owned processes. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development).
+Node24 matches `.nvmrc`. The code integration runner owns Vitest and has a 1200-second default deadline; timeouts fail and stop its owned processes. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development).
 
 ## Verified-tree CI
 

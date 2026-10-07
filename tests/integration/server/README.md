@@ -12,8 +12,9 @@ npm run test:integration:server
 ./scripts/test-runner.sh tests/integration/server/server-pause.test.ts
 ```
 
-The repository runner owns fresh local services, automatically selected unused
-ports and process cleanup. It requires Node and no browser. Never attach to a
+The repository runner owns an isolated Vitest worker, per-run artifacts and
+process cleanup. Socket scenarios create and close their own port-zero loopback
+servers. The runner requires Node and no browser. Never attach to a
 developer server or invoke raw Vitest on these paths. The complete literal
 [server/entity inventory](../README.md#complete-inventory) runs in the local gate
 and the CI integration lane.

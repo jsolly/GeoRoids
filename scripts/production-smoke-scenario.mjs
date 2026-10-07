@@ -226,9 +226,7 @@ export async function smoke({
         }
       });
     });
-    await page
-      .getByLabel('Your Nickname', { exact: true })
-      .fill(`Smoke${randomUUID().slice(0, 12)}`);
+    await page.getByLabel('Pilot name', { exact: true }).fill(`Smoke${randomUUID().slice(0, 12)}`);
     await page.getByRole('button', { name: 'Enter Game', exact: true }).click();
     await page.waitForFunction(() =>
       Boolean(window.gameController?.getNetworkManager().getLocalPlayerId())

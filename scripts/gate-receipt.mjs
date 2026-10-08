@@ -14,7 +14,7 @@ import { join, relative as relativePath, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { receiptEnvironment } from './validation-admission.mjs';
 
-export const RECEIPT_VERSION = 1;
+export const RECEIPT_VERSION = 2;
 export const STAGES = [
   ['lint policy', 'check:lint-policy'],
   ['lint', 'check:lint'],
@@ -269,7 +269,6 @@ export function identity(root, inputEnvironment = process.env) {
   const installation = jsonDigest(walk(join(root, 'node_modules')));
   const runtime = jsonDigest({
     runtimes,
-    buildHead: buildHead(root),
     platform: process.platform,
     arch: process.arch,
     version: process.version,
@@ -283,6 +282,7 @@ export function identity(root, inputEnvironment = process.env) {
   return {
     source,
     sourceDigest: jsonDigest(source),
+    buildHead: buildHead(root),
     installation,
     runtime,
     reusable: unknown.length === 0,
@@ -291,18 +291,38 @@ export function identity(root, inputEnvironment = process.env) {
   };
 }
 export function sameIdentity(a, b) {
-  return ['sourceDigest', 'installation', 'runtime', 'manifest'].every((key) => a[key] === b[key]);
+  return ['sourceDigest', 'installation', 'runtime', 'manifest', 'buildHead'].every(
+    (key) => a[key] === b[key]
+  );
 }
-export function readReusable(path, current, candidate, validateReview) {
+export function readReusable(path, current, candidate, validateReview, ancestors = new Set()) {
   try {
+    const location = resolve(path);
+    if (ancestors.has(location)) {
+      return null;
+    }
+    const lineage = new Set([...ancestors, location]);
     const receipt = JSON.parse(readFileSync(path, 'utf8'));
     if (
       receipt.version !== RECEIPT_VERSION ||
       receipt.success !== true ||
       receipt.cleanupSucceeded !== true ||
+      !(
+        receipt.identity?.buildHead === null ||
+        /^[a-f0-9]{40,64}$/u.test(receipt.identity?.buildHead ?? '')
+      ) ||
       !current.reusable ||
       !sameIdentity(receipt.identity, current) ||
       !candidate
+    ) {
+      return null;
+    }
+    const attempt = JSON.parse(readFileSync(receipt.codeAttempt.path, 'utf8'));
+    if (
+      typeof receipt.codeAttempt.id !== 'string' ||
+      attempt.id !== receipt.codeAttempt.id ||
+      attempt.success !== true ||
+      !sameIdentity({ ...attempt.identity, buildHead: current.buildHead }, current)
     ) {
       return null;
     }
@@ -324,12 +344,55 @@ export function readReusable(path, current, candidate, validateReview) {
       receipt.stages.some(
         (stage) =>
           stage.success !== true ||
-          !['ran', 'literal-graph'].includes(stage.kind) ||
+          !['ran', 'literal-graph', 'head-reuse'].includes(stage.kind) ||
           !stage.artifact ||
           digest(readFileSync(stage.artifact)) !== stage.digest
       )
     ) {
       return null;
+    }
+    const donors = new Map();
+    for (const stage of receipt.stages) {
+      if (stage.kind !== 'head-reuse') {
+        if (stage.provenance !== undefined) {
+          return null;
+        }
+        continue;
+      }
+      const proof = stage.provenance;
+      if (
+        stage.command === 'build' ||
+        !proof ||
+        !/^[a-f0-9]{40,64}$/u.test(proof.buildHead) ||
+        typeof proof.receipt !== 'string' ||
+        digest(readFileSync(proof.receipt)) !== proof.digest
+      ) {
+        return null;
+      }
+      let donor = donors.get(proof.receipt);
+      if (!donor) {
+        donor = readReusable(
+          proof.receipt,
+          { ...current, buildHead: proof.buildHead },
+          true,
+          validateReview,
+          lineage
+        );
+        if (donor?.candidateCertified !== true || donor.classifier?.kind !== 'full') {
+          return null;
+        }
+        donors.set(proof.receipt, donor);
+      }
+      const original = donor.stages.find((row) => row.command === stage.command);
+      if (
+        !original ||
+        original.name !== stage.name ||
+        original.kind !== 'ran' ||
+        original.artifact !== stage.artifact ||
+        original.digest !== stage.digest
+      ) {
+        return null;
+      }
     }
     const graphCommands = ['check:knip', 'check:ts-prune'];
     const skipped = receipt.stages.filter((stage) => stage.kind === 'literal-graph');

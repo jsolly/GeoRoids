@@ -108,9 +108,27 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test('charging a reflector destroys it once, leaves ordinary salvage, and preserves normal firing', () => {
     const { engine, pilot, reflector } = arena();
+    const admitted = new Set<string>();
     for (let index = 0; index < 6; index++) {
-      engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+      const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+      assert.ok(shot, `charge shot ${index + 1} was admitted`);
+      expect(admitted.has(shot.id)).toBe(false);
+      admitted.add(shot.id);
       engine.advanceLasersAndResolveHits();
+      const state = snapshot(engine);
+      if (index < 5) {
+        expect(engine.getAsteroid(reflector.id)).toBe(reflector);
+        expect(reflector.health).toBe(75);
+        expect(reflector.phenomenon?.energy).toBe(index + 1);
+        expect(state.asteroids.find((rock) => rock.id === reflector.id)?.phenomenon?.energy).toBe(
+          index + 1
+        );
+        expect(shot.bounces).toBe(1);
+        expect(engine.getLoot()).toHaveLength(0);
+      } else {
+        expect(state.asteroids.some((rock) => rock.id === reflector.id)).toBe(false);
+        expect(shot.hasExploded).toBe(true);
+      }
     }
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
     expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);

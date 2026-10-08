@@ -165,6 +165,20 @@ export function receiptEnvironment(root, environment) {
   }
   return env;
 }
+export function inheritAdmission(root, original, resolved) {
+  // Only the caller's still-authenticated authority may cross setup. The
+  // completed setup command's temporary child token must never be transferred.
+  receiptEnvironment(root, original);
+  const env = { ...resolved };
+  for (const key of tokenKeys) {
+    delete env[key];
+    if (original[key] !== undefined) {
+      env[key] = original[key];
+    }
+  }
+  return env;
+}
+
 export function verifyChild(root, kind, pid = process.pid) {
   const home = homes(root);
   let owner = childOwner(home, process.env);
@@ -423,13 +437,15 @@ function pendingChildren(checkout, ownNonce) {
 export async function runAdmitted(
   kind,
   command,
-  { root = process.cwd(), environment = process.env, timeoutMs } = {}
+  { root = process.cwd(), environment = process.env, timeoutMs, captureOutput = false } = {}
 ) {
   require(['checkout', 'review', 'runner', 'frame', 'contracts', 'unit', 'integration'].includes(
     kind
   ) && command.length > 0, 'Expected a validation kind followed by -- command');
   require(timeoutMs === undefined ||
     (Number.isSafeInteger(timeoutMs) && timeoutMs > 0), 'Invalid validation deadline');
+  require(typeof captureOutput === 'boolean', 'Invalid validation output mode');
+  const captured = { stdout: [], stderr: [], bytes: 0, exceeded: false };
   const home = homes(root);
   const env = { ...environment };
   if (tokenKeys.some((key) => env[key] !== undefined)) {
@@ -516,7 +532,7 @@ export async function runAdmitted(
       child = spawn(command[0], command.slice(1), {
         cwd: root,
         env,
-        stdio: 'inherit',
+        stdio: captureOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
         detached: true,
       });
       commandIdentity = {
@@ -531,6 +547,19 @@ export async function runAdmitted(
           timedOut = true;
           cancel('SIGTERM');
         }, timeoutMs);
+      }
+      if (captureOutput) {
+        for (const name of ['stdout', 'stderr']) {
+          child[name].on('data', (chunk) => {
+            captured.bytes += chunk.length;
+            if (captured.bytes > 4 * 1024 * 1024) {
+              captured.exceeded = true;
+              cancel('SIGTERM');
+            } else {
+              captured[name].push(chunk);
+            }
+          });
+        }
       }
       child.once('error', reject);
       child.once('close', (code, signal) => accept({ code, signal }));
@@ -563,10 +592,23 @@ export async function runAdmitted(
     if (ownCheckout) {
       rmSync(home.checkout, { recursive: true });
     }
-    if (timedOut) {
-      return 124;
-    }
-    return interrupted ? (interrupted === 'SIGINT' ? 130 : 143) : (result.code ?? 1);
+    const exitStatus = timedOut
+      ? 124
+      : captured.exceeded
+        ? 1
+        : interrupted
+          ? interrupted === 'SIGINT'
+            ? 130
+            : 143
+          : (result.code ?? 1);
+    return captureOutput
+      ? {
+          code: exitStatus,
+          stdout: Buffer.concat(captured.stdout).toString('utf8'),
+          stderr: Buffer.concat(captured.stderr).toString('utf8'),
+          outputExceeded: captured.exceeded,
+        }
+      : exitStatus;
   } catch (error) {
     // Before starting a command there are no owned child resources to retain.
     // Once a child existed, missing cleanup evidence keeps both barriers.
@@ -579,8 +621,10 @@ export async function runAdmitted(
       }
     }
     if (child || recordPath) {
-      // Inherited stdio does not need a ref. Keep the durable ownership evidence
-      // while allowing a failed supervisor to exit even if its command survives.
+      // Close captured pipes so a surviving child cannot strand this supervisor.
+      // Keep durable ownership evidence when cleanup remains unproven.
+      child?.stdout?.destroy();
+      child?.stderr?.destroy();
       child?.unref();
       error.message += `\nValidation cleanup is unproven; the owned command may still be running.\nPreserved checkout ownership: ${home.checkout}`;
       if (admissionDirectory) {

@@ -191,6 +191,159 @@ function fixture(t) {
   return { directory, root, common, env, start, sibling, queue, git };
 }
 
+for (const failure of ['existing receipt', 'missing executable']) {
+  test(`${failure} before command startup releases only its own validation ownership`, async (t) => {
+    const f = fixture(t);
+    const siblingRoot = f.sibling('live-sibling');
+    const sibling = f.start('sibling', { cwd: siblingRoot, kind: 'integration' });
+    await until(() => existsSync(sibling.started), 'unrelated live sibling');
+    const siblingLock = join(
+      f.common,
+      'worktrees',
+      'live-sibling',
+      'georoids-validation-checkout.lock'
+    );
+    const siblingOwner = readFileSync(join(siblingLock, 'owner.json'), 'utf8');
+    const receipt = join(f.directory, 'existing-receipt.json');
+    writeFileSync(receipt, 'original receipt evidence\n');
+    const rejected = f.start('rejected', {
+      kind: 'runner',
+      ...(failure === 'existing receipt'
+        ? { environment: { GEOROIDS_TEST_RUNNER_RECEIPT: receipt } }
+        : { command: [join(f.directory, 'no-such-executable')] }),
+    });
+    assert.deepEqual(await rejected.child.completed, { code: 1, signal: null });
+    assert.match(
+      rejected.child.output,
+      failure === 'existing receipt' ? /Runner cleanup receipt already exists/u : /ENOENT/u
+    );
+    assert(!existsSync(rejected.started), 'rejected command never executed');
+    assert.equal(readFileSync(receipt, 'utf8'), 'original receipt evidence\n');
+    assert(
+      !existsSync(join(f.common, 'georoids-validation-checkout.lock')),
+      'no issued command needs the failed checkout barrier'
+    );
+    assert.deepEqual(f.queue(), [], 'only the failed attempt owned a heavy ticket');
+    assert.equal(readFileSync(join(siblingLock, 'owner.json'), 'utf8'), siblingOwner);
+    assert.equal(sibling.child.exitCode, null, 'unrelated sibling remains live');
+    const next = f.start('next', { kind: 'runner' });
+    await until(() => existsSync(next.started), 'next admitted command');
+    next.finish();
+    assert.deepEqual(await next.child.completed, { code: 0, signal: null });
+    sibling.finish();
+    assert.deepEqual(await sibling.child.completed, { code: 0, signal: null });
+  });
+}
+
+test('a parent records a nested command startup failure without requiring nonexistent process cleanup', async (t) => {
+  const f = fixture(t);
+  const evidence = join(f.directory, 'nested-setup.json');
+  const command = [
+    process.execPath,
+    '-e',
+    `
+    const fs = require('node:fs');
+    const result = require('node:child_process').spawnSync(process.execPath,
+      ${JSON.stringify([helper, 'runner', '--', join(f.directory, 'missing-nested-command')])},
+      {env:process.env, encoding:'utf8'});
+    const records = fs.readdirSync(${JSON.stringify(join(f.common, 'georoids-validation-checkout.lock', 'children'))})
+      .map(name => JSON.parse(fs.readFileSync(${JSON.stringify(join(f.common, 'georoids-validation-checkout.lock', 'children'))} + '/' + name, 'utf8')));
+    fs.writeFileSync(${JSON.stringify(evidence)}, JSON.stringify({status:result.status, stderr:result.stderr,
+      failed:records.find(record => record.kind === 'runner')}));
+    process.exit(result.status);
+  `,
+  ];
+  const parent = f.start('parent', { kind: 'review', command });
+  assert.deepEqual(await parent.child.completed, { code: 1, signal: null });
+  const failure = JSON.parse(readFileSync(evidence, 'utf8'));
+  assert.equal(failure.status, 1);
+  assert.match(failure.stderr, /ENOENT/u);
+  assert.equal(failure.failed.finished, true);
+  assert.equal(failure.failed.cleanupSucceeded, true);
+  assert.equal(failure.failed.failure.kind, 'command-not-started');
+  assert.match(failure.failed.failure.message, /ENOENT/u);
+  assert(!existsSync(join(f.common, 'georoids-validation-checkout.lock')));
+  assert.deepEqual(f.queue(), []);
+});
+
+for (const fault of ['birth inspection', 'command publication']) {
+  test(`an issued child retains both barriers when immediate ${fault} fails`, async (t) => {
+    const f = fixture(t);
+    const siblingRoot = f.sibling('unrelated');
+    const sibling = f.start('sibling', { cwd: siblingRoot, kind: 'integration' });
+    await until(() => existsSync(sibling.started), 'unrelated sibling');
+    const siblingLock = join(
+      f.common,
+      'worktrees',
+      'unrelated',
+      'georoids-validation-checkout.lock'
+    );
+    const siblingOwner = readFileSync(join(siblingLock, 'owner.json'), 'utf8');
+    const preload = join(f.directory, 'issued-fault.mjs');
+    writeFileSync(
+      preload,
+      `
+      import cp from 'node:child_process';
+      import fs from 'node:fs';
+      import {syncBuiltinESMExports} from 'node:module';
+      const spawn = cp.spawn;
+      const spawnSync = cp.spawnSync;
+      const renameSync = fs.renameSync;
+      let issuedPid;
+      cp.spawn = (...args) => {
+        const child = spawn(...args);
+        issuedPid = child.pid;
+        return child;
+      };
+      cp.spawnSync = (file, args, options) => {
+        if (${JSON.stringify(fault)} === 'birth inspection' && file === 'ps' &&
+            args[0] === '-p' && Number(args[1]) === issuedPid) {
+          return {status:2, signal:null, stdout:'', stderr:'fixture child birth inspection failed'};
+        }
+        return spawnSync(file, args, options);
+      };
+      fs.renameSync = (from, to) => {
+        if (${JSON.stringify(fault)} === 'command publication' &&
+            String(to).includes('/children/') && JSON.parse(fs.readFileSync(from, 'utf8')).command) {
+          throw new Error('fixture command publication failed');
+        }
+        return renameSync(from, to);
+      };
+      syncBuiltinESMExports();
+    `
+    );
+    const first = f.start('issued', { kind: 'frame', preload });
+    await until(() => existsSync(first.started), 'actually issued child');
+    await until(() => first.child.exitCode !== null, 'failed supervisor exit');
+    assert.equal(first.child.exitCode, 1, first.child.output);
+    assert.match(
+      first.child.output,
+      fault === 'birth inspection'
+        ? /fixture child birth inspection failed/u
+        : /fixture command publication failed/u
+    );
+    assert.match(first.child.output, /Validation cleanup is unproven/u);
+    const owned = JSON.parse(readFileSync(first.started, 'utf8'));
+    const current = spawnSync('ps', ['-p', String(owned.pid), '-o', 'lstart='], {
+      encoding: 'utf8',
+    });
+    assert.equal(current.status, 0);
+    assert.equal(
+      current.stdout.trim(),
+      owned.start,
+      'issued child still lives with its original birth'
+    );
+    assert(existsSync(join(f.common, 'georoids-validation-checkout.lock')));
+    assert.equal(f.queue().length, 1);
+    assert.equal(readFileSync(join(siblingLock, 'owner.json'), 'utf8'), siblingOwner);
+    assert.equal(sibling.child.exitCode, null);
+    first.finish();
+    assert.deepEqual(await first.child.completed, { code: 1, signal: null });
+    sibling.finish();
+    assert.deepEqual(await sibling.child.completed, { code: 0, signal: null });
+  });
+}
+
 test('linked checkouts enter heavy validation in ticket order and cancelled waiters leave the queue', async (t) => {
   const f = fixture(t);
   const a = f.start('a', { kind: 'frame' });

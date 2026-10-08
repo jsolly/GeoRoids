@@ -442,6 +442,7 @@ export async function runAdmitted(
   let heavy;
   let admissionDirectory;
   let child;
+  let commandIssued = false;
   let recordPath;
   let commandIdentity;
   let result;
@@ -519,6 +520,11 @@ export async function runAdmitted(
         stdio: 'inherit',
         detached: true,
       });
+      // Record issuance before inspection/publication can fail. A native spawn
+      // failure has no PID; an issued but unverified process must retain ownership.
+      commandIssued = child.pid !== undefined;
+      child.once('error', reject);
+      child.once('close', (code, signal) => accept({ code, signal }));
       commandIdentity = {
         pid: child.pid,
         group: child.pid,
@@ -532,8 +538,6 @@ export async function runAdmitted(
           cancel('SIGTERM');
         }, timeoutMs);
       }
-      child.once('error', reject);
-      child.once('close', (code, signal) => accept({ code, signal }));
     });
     rejectCommand = undefined;
     await awaitGroup(commandIdentity, () => signalFailure);
@@ -568,17 +572,30 @@ export async function runAdmitted(
     }
     return interrupted ? (interrupted === 'SIGINT' ? 130 : 143) : (result.code ?? 1);
   } catch (error) {
-    // Before starting a command there are no owned child resources to retain.
-    // Once a child existed, missing cleanup evidence keeps both barriers.
-    if (!child && !recordPath) {
-      if (heavy) {
-        rmSync(heavy.directory, { recursive: true });
-      }
-      if (ownCheckout) {
-        rmSync(home.checkout, { recursive: true });
+    // An intent record is not an issued process. Setup failures remain failures,
+    // but cannot require process-cleanup proof for a command that never started.
+    if (!commandIssued) {
+      try {
+        if (recordPath) {
+          write(recordPath, {
+            ...owner,
+            finished: true,
+            cleanupSucceeded: true,
+            failure: { kind: 'command-not-started', message: error.message },
+          });
+        }
+        if (heavy) {
+          rmSync(heavy.directory, { recursive: true });
+        }
+        if (ownCheckout) {
+          rmSync(home.checkout, { recursive: true });
+        }
+        error.message += '\nValidation command never started; owned admission released.';
+      } catch (cleanupError) {
+        error.message += `\nCannot release setup ownership: ${cleanupError.message}\nInspect checkout ownership: ${home.checkout}`;
       }
     }
-    if (child || recordPath) {
+    if (commandIssued) {
       // Inherited stdio does not need a ref. Keep the durable ownership evidence
       // while allowing a failed supervisor to exit even if its command survives.
       child?.unref();

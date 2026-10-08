@@ -133,6 +133,26 @@ for (const job of Object.values(ci.jobs)) {
   }
 }
 const manifest = JSON.parse(read('package.json'));
+// Manual measurements are explicit user entrypoints, never hidden validation.
+const browserMeasurement =
+  /playwright|puppeteer|--benchmark-(?:client|load)|benchmark:(?:realtime|load)|measure-frame-work|wiki:media/u;
+for (const [name, command] of Object.entries(manifest.scripts)) {
+  if (/^(?:test(?::|$)|check:|gate$|fix$)/u.test(name)) {
+    assert.doesNotMatch(command, browserMeasurement, `${name} must remain code-only validation`);
+  }
+}
+for (const file of ['.github/workflows/ci.yml', '.github/workflows/production-smoke.yml']) {
+  const workflow = parse(read(file));
+  for (const job of Object.values(workflow.jobs)) {
+    for (const step of job.steps) {
+      assert.doesNotMatch(
+        step.run ?? '',
+        browserMeasurement,
+        `${file} must not invoke manual measurements`
+      );
+    }
+  }
+}
 assert.equal(manifest.scripts['test:integration'], './scripts/test-runner.sh --reporter=verbose');
 assert.equal(manifest.scripts['test:all'], 'npm run test && npm run test:integration');
 assert.equal(

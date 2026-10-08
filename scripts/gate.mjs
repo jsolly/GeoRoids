@@ -22,6 +22,7 @@ import {
   STAGES,
   sameIdentity,
 } from './gate-receipt.mjs';
+import { canonicalEnvironment, validationLaunch } from './gate-runtime.mjs';
 import { literalOnlyChange } from './literal-only-change.mjs';
 import { validateReviewReceipt } from './review-receipt.mjs';
 import { runAdmitted, verifyChild } from './validation-admission.mjs';
@@ -158,15 +159,73 @@ export async function runGate({
     /* First run, malformed proof, or missing artifact: run graphs. */
   }
   const texts = sourceTexts(root, before.source);
-  const skipGraphs = graphEligible(prior, before, texts);
+  // A commit changes the release stamp, not an already executed code check.
+  // The one donor is a fully validated complete candidate proof, never a partial
+  // or failed attempt. Every other source/install/runtime input must be exact.
+  const buildOnly =
+    prior?.candidateCertified === true &&
+    candidate &&
+    before.reusable &&
+    prior.classifier?.kind === 'full' &&
+    /^[a-f0-9]{40,64}$/u.test(before.buildHead ?? '') &&
+    /^[a-f0-9]{40,64}$/u.test(prior.identity.buildHead ?? '') &&
+    before.buildHead !== prior.identity.buildHead &&
+    sameIdentity({ ...before, buildHead: prior.identity.buildHead }, prior.identity);
+  const skipGraphs =
+    !buildOnly &&
+    before.buildHead === prior?.identity.buildHead &&
+    graphEligible(prior, before, texts);
   const directory = mkdtempSync(join(home, 'run.'));
   writeFileSync(join(directory, 'identity-before.json'), `${JSON.stringify(before, null, 2)}\n`, {
     mode: 0o600,
   });
-  const reviewReceipt = join(directory, 'review.json');
+  // Per-input scope barriers survive interruption and unrelated attempts. A
+  // newer code attempt invalidates older evidence before executing any stage.
+  // Build-only retries retain the code proof and always execute the build.
+  const scopes = join(home, 'code-attempts');
+  mkdirSync(scopes, { recursive: true });
+  const scope = digest(
+    JSON.stringify([before.sourceDigest, before.installation, before.runtime, before.manifest])
+  );
+  const codeAttempt = buildOnly
+    ? prior.codeAttempt
+    : {
+        path: join(scopes, `${scope}.json`),
+        id: directory,
+      };
+  if (!buildOnly) {
+    atomicReceipt(codeAttempt.path, { id: codeAttempt.id, identity: before, success: false });
+  }
+  let reviewReceipt = join(directory, 'review.json');
+  let donorProof;
+  let donorPath;
+  if (buildOnly) {
+    donorPath = join(directory, 'donor-receipt.json');
+    atomicReceipt(donorPath, prior);
+    donorProof = {
+      receipt: donorPath,
+      digest: digest(readFileSync(donorPath)),
+      buildHead: prior.identity.buildHead,
+    };
+  }
   const stages = [];
   process.stdout.write(`Complete gate artifacts: ${directory}\n`);
   for (const [name, command] of STAGES) {
+    if (buildOnly && command !== 'build') {
+      const original = prior.stages.find((row) => row.command === command);
+      stages.push({
+        ...original,
+        kind: 'head-reuse',
+        provenance: original.provenance ?? donorProof,
+      });
+      if (command === 'test:review') {
+        reviewReceipt = prior.reviewReceipt;
+      }
+      process.stdout.write(
+        `Gate: ${name} reused for identical source/install/runtime; build HEAD changed.\n`
+      );
+      continue;
+    }
     const artifact = join(directory, `${stages.length}-${command.replaceAll(':', '-')}.log`);
     const skipped = skipGraphs && ['check:knip', 'check:ts-prune'].includes(command);
     if (skipped) {
@@ -214,6 +273,7 @@ export async function runGate({
     'installation',
     'runtime',
     'manifest',
+    'buildHead',
     'reusable',
   ].filter((key) => before[key] !== after[key]);
   writeFileSync(
@@ -226,8 +286,24 @@ export async function runGate({
       `Gate inputs changed while validating (${changedComponents.join(', ')}); diagnostics: ${directory}`
     );
   }
+  if (buildOnly) {
+    if (!candidateMatches(root, after.source)) {
+      throw new Error('Candidate index changed during new-HEAD validation');
+    }
+    if (
+      !readReusable(
+        donorPath,
+        { ...after, buildHead: prior.identity.buildHead },
+        true,
+        validateReview
+      )
+    ) {
+      throw new Error('Complete donor evidence changed during new-HEAD validation');
+    }
+  }
   const receipt = {
     version: RECEIPT_VERSION,
+    codeAttempt,
     success: true,
     cleanupSucceeded: true,
     bootstrap,
@@ -253,6 +329,9 @@ export async function runGate({
       witness: skipGraphs ? prior.graphWitness : null,
     },
   };
+  if (!buildOnly) {
+    atomicReceipt(codeAttempt.path, { id: codeAttempt.id, identity: after, success: true });
+  }
   atomicReceipt(receiptPath, receipt);
   process.stdout.write(
     `Complete gate passed${receipt.candidateCertified ? '' : '; development proof only (candidate index differs)'}.\n`
@@ -264,13 +343,21 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const root = fileURLToPath(new URL('../', import.meta.url));
     if (process.argv[2] === '--validation-child') {
       verifyChild(root, 'checkout');
+      const env = canonicalEnvironment(root, process.env);
+      process.env.PATH = env.PATH;
+      process.env.FLEET_DOC_FAST = env.FLEET_DOC_FAST;
+      for (const key of Object.keys(process.env)) {
+        if (!Object.hasOwn(env, key)) {
+          delete process.env[key];
+        }
+      }
       await runGate({ root });
     } else {
-      process.exitCode = await runAdmitted(
-        'checkout',
-        [process.execPath, fileURLToPath(import.meta.url), '--validation-child'],
-        { root }
-      );
+      const launch = await validationLaunch(root, process.env, fileURLToPath(import.meta.url));
+      process.exitCode = await runAdmitted('checkout', launch.command, {
+        root,
+        environment: launch.environment,
+      });
     }
   } catch (error) {
     process.stderr.write(`${error.message}\n`);

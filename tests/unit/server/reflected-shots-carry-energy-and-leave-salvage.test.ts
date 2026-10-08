@@ -108,20 +108,46 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test('charging a reflector destroys it once, leaves ordinary salvage, and preserves normal firing', () => {
     const { engine, pilot, reflector } = arena();
+    const admitted = new Set<string>();
+    let destructionOrigin = { ...reflector.position };
     for (let index = 0; index < 6; index++) {
-      engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+      const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+      assert.ok(shot, `charge shot ${index + 1} was admitted`);
+      expect(admitted.has(shot.id)).toBe(false);
+      admitted.add(shot.id);
+      if (index === 5) {
+        destructionOrigin = { ...reflector.position };
+      }
       engine.advanceLasersAndResolveHits();
+      const state = snapshot(engine);
+      if (index < 5) {
+        expect(engine.getAsteroid(reflector.id)).toBe(reflector);
+        expect(reflector.health).toBe(75);
+        expect(reflector.phenomenon?.energy).toBe(index + 1);
+        expect(state.asteroids.find((rock) => rock.id === reflector.id)?.phenomenon?.energy).toBe(
+          index + 1
+        );
+        expect(shot.bounces).toBe(1);
+        expect(engine.getLoot()).toHaveLength(0);
+      } else {
+        expect(state.asteroids.some((rock) => rock.id === reflector.id)).toBe(false);
+        expect(shot.hasExploded).toBe(true);
+      }
     }
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
     expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
     assert.ok(shard, 'ordinary salvage');
     expect(shard.kind).toBe('shard');
+    expect(
+      Math.hypot(shard.position.x - destructionOrigin.x, shard.position.y - destructionOrigin.y)
+    ).toBeLessThan(80);
     const score = pilot.cargo;
     engine.handleAsteroidHit(reflector.id, pilot.id);
     expect(pilot.cargo).toBe(score);
     pilot.position = { ...shard.position };
     engine.collectLoot();
+    expect(engine.getLoot().some((drop) => drop.id === shard.id)).toBe(false);
     const collectedScore = pilot.cargo;
     expect(collectedScore).toBeGreaterThan(score);
     engine.collectLoot();

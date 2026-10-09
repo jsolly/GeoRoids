@@ -1,0 +1,102 @@
+---
+media:
+  input: public/wiki/uploads
+  output: /wiki/uploads
+  extensions: [png, jpg, jpeg, webp]
+  rename: safe
+
+content:
+  - name: wiki
+    label: Field manual
+    type: collection
+    path: content/wiki
+    format: yaml-frontmatter
+    operations:
+      rename: false
+      delete: false
+    view:
+      fields: [title, category, order]
+      primary: title
+      sort: [order, title]
+      search: [title, summary]
+      default:
+        sort: order
+        order: asc
+    fields:
+      - name: title
+        label: Title
+        type: string
+        required: true
+      - name: category
+        label: Category
+        type: select
+        required: true
+        options:
+          values: [Start here, Ships, Systems, Arena, Combat]
+      - name: summary
+        label: Summary
+        type: text
+        required: true
+      - name: order
+        label: Navigation order
+        type: number
+        required: true
+        description: Use a nonnegative whole number.
+        options:
+          min: 0
+      - name: related
+        label: Related articles
+        type: reference
+        description: Select other articles, excluding this article itself.
+        options:
+          collection: wiki
+          multiple: true
+          value: "{path}"
+          label: "{title}"
+      - name: media
+        label: Demonstrations
+        type: object
+        list: true
+        description: Each demo and Heading 2 can appear only once per article.
+        fields:
+          - name: heading
+            label: Section heading
+            type: string
+            required: true
+            description: Must match a Heading 2 in the body exactly.
+          - name: demo
+            label: Demonstration
+            type: select
+            required: true
+            options:
+              values:
+                - scout
+                - hauler
+                - movement
+                - terrain
+                - cargo
+                - loot
+                - reflection
+                - split
+                - satellites
+                - pickups
+                - survival
+      - name: body
+        label: Article
+        type: rich-text
+        required: true
+        description: >-
+          Use Heading 2 or below. Link articles with /wiki/#article-id and
+          add descriptive alternative text to images. Keep each feature brief.
+        options:
+          format: markdown
+
+settings:
+  content:
+    merge: true
+  commit:
+    templates:
+      create: "docs(wiki): create {path}"
+      update: "docs(wiki): update {path}"
+      delete: "docs(wiki): remove {path}"
+      rename: "docs(wiki): rename {oldPath} to {newPath}"

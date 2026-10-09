@@ -4,6 +4,16 @@ The manual is a second Vite entry at `/wiki/`, deployed with the client on the s
 
 ## Content and coverage
 
+Pages CMS reads the root `.pages.yml` on the selected branch. Open
+<https://app.pagescms.org/jsolly/GeoRoids/main> to find the Field manual collection.
+For edits, select a working branch containing that configuration, then save and
+ship through a PR. Saving uses GitHub's branch permissions; the CMS does not bypass
+the required PR and CI on `main`. Article filenames are stable URLs, so renaming
+and deletion are disabled in the editor. New articles still need developer review
+of coverage and source references. Upload PNG, JPEG, or WebP images through the
+media library; the editor writes `/wiki/uploads/` URLs. Generated demonstrations
+and exact gameplay values remain maintained in their owning source files.
+
 Edit `content/wiki/*.md` directly and ship the change through a PR. Each Markdown file contains title, category, summary, navigation order, related article paths, demonstration placements, and a rich-text body. Each placement selects a demonstration and its matching Heading 2, so the illustration stays beside the relevant text. Update the placement heading when renaming a section. Body images go in `public/wiki/uploads/` as PNG, JPEG, or WebP and are referenced as `/wiki/uploads/<name>` with alternative text. Filenames are stable article IDs; title edits do not change URLs. Avoid renaming published articles because their filename is their URL. When a published topic is replaced, migrate every related link and source-reference key to the replacement article and remove the obsolete page; do not leave an alias that keeps the old ID alive. Validation prevents breaking internal links.
 
 `src/wiki/articleSources.json` keeps developer source references separate from editorial content. `src/wiki/gameReference.ts` generates exact values from game definitions in a collapsed reference below the editable body. Keep each feature to two or three short sentences; explain its action, result, and essential limitation. Link to the owning topic instead of repeating its instructions. Use the existing demonstrations where motion explains the rule. Keep imported tuning values out of the narrative so balance changes do not leave stale copies. Some mechanics use private implementation literals, such as the touch flick threshold; those details remain in the editable prose and are checked during gameplay-source review. Do not create duplicate wiki constants for them. New articles need no TypeScript edits; gameplay changes still require developers to maintain coverage and source references. Explain player-visible behavior, including failure conditions and exceptions. Keep strategy separate from confirmed rules and avoid declaring a best tactic without gameplay evidence.

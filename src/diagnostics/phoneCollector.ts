@@ -180,64 +180,54 @@ async function recoverSession(database: IDBDatabase): Promise<Session | undefine
   return session;
 }
 
-/** Explicit user activation leaves automated benchmark drains untouched. */
-export function installPhoneCollector(
-  metrics: ClientPerformanceMetrics,
-  host: HTMLElement = document.body
-): () => void {
+export interface PhoneCollectorView {
+  readonly phase: 'unavailable' | 'ready' | 'starting' | 'recording' | 'stopped' | 'recovering';
+  readonly status: string;
+  readonly device: string;
+  readonly conditions: string;
+  readonly canStart: boolean;
+  readonly canStop: boolean;
+  readonly canRecover: boolean;
+  readonly canDownload: boolean;
+}
+
+export interface PhoneCollectorDownload {
+  readonly blob: Blob;
+  readonly filename: string;
+}
+
+/** Explicit activation leaves automated benchmark drains untouched. No UI is mounted here. */
+export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed: () => void) {
   const scope = new AbortController();
   const { signal } = scope;
   let disposed = false;
-  const downloads = new Map<string, ReturnType<typeof setTimeout>>();
-  const panel = document.createElement('aside');
-  panel.setAttribute('aria-label', 'Performance collection');
-  panel.style.cssText =
-    'position:fixed;left:50%;transform:translateX(-50%);top:8px;z-index:10000;background:#111;color:white;padding:8px;font:14px sans-serif;max-width:calc(100vw - 16px)';
-  const status = document.createElement('span');
-  status.textContent = 'Performance: ready ';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  status.setAttribute('aria-atomic', 'true');
-  status.tabIndex = -1;
-  const retainCollectorFocus = () => {
-    if (panel.contains(document.activeElement)) {
-      status.focus();
+  let phase: PhoneCollectorView['phase'] = 'ready';
+  let status = 'Performance: ready';
+  let device = '';
+  let conditions = '';
+  let downloading = false;
+  if (window.isSecureContext === false || !crypto.subtle || !crypto.randomUUID) {
+    phase = 'unavailable';
+    status = 'Collection requires HTTPS (or localhost) for checksummed downloads.';
+  }
+  const read = (): PhoneCollectorView => {
+    const idle = !disposed && (phase === 'ready' || phase === 'stopped');
+    return Object.freeze({
+      phase,
+      status,
+      device,
+      conditions,
+      canStart: idle,
+      canStop: !disposed && phase === 'recording',
+      canRecover: idle,
+      canDownload: idle && Boolean(active?.stopped) && !downloading,
+    });
+  };
+  const publish = () => {
+    if (!disposed) {
+      changed();
     }
   };
-  const device = document.createElement('input');
-  device.setAttribute('aria-label', 'Device model and OS');
-  device.placeholder = 'Device model and OS';
-  device.maxLength = 256;
-  const conditions = document.createElement('input');
-  conditions.setAttribute('aria-label', 'Test conditions');
-  conditions.placeholder = 'Power, brightness, network, cooldown';
-  conditions.maxLength = 512;
-  const start = document.createElement('button');
-  start.textContent = 'Start';
-  const stop = document.createElement('button');
-  stop.textContent = 'Stop';
-  stop.disabled = true;
-  const download = document.createElement('button');
-  download.textContent = 'Download';
-  download.disabled = true;
-  const recover = document.createElement('button');
-  recover.textContent = 'Recover last session';
-  const details = document.createElement('details');
-  const summary = document.createElement('summary');
-  const note = document.createElement('p');
-  note.textContent =
-    'Model and conditions are required for comparisons. Starting replaces the saved session; download it first.';
-  summary.textContent = 'Device and conditions';
-  details.append(summary, note, device, conditions);
-  panel.append(status, start, stop, download, recover, details);
-  host.append(panel);
-  if (window.isSecureContext === false || !crypto.subtle || !crypto.randomUUID) {
-    status.textContent = 'Collection requires HTTPS (or localhost) for checksummed downloads. ';
-    start.disabled = true;
-    recover.disabled = true;
-    return () => panel.remove();
-  }
-
   let database: IDBDatabase | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
   let active: Session | undefined;
@@ -245,6 +235,13 @@ export function installPhoneCollector(
   let startedAt = 0;
   let previousDrain = 0;
   let writing = Promise.resolve();
+  let ownsDrain = false;
+  const releaseDrain = () => {
+    if (ownsDrain) {
+      ownsDrain = false;
+      metrics.releaseDrain(OWNER);
+    }
+  };
   const finish = (session: Session, reason: string | null) => {
     session.incompleteReason ??= reason;
     session.stopped = true;
@@ -252,28 +249,17 @@ export function installPhoneCollector(
     if (active !== session) {
       return;
     }
-    retainCollectorFocus();
-    if (timer !== undefined) {
-      clearInterval(timer);
-    }
+    clearInterval(timer);
     timer = undefined;
-    metrics.releaseDrain(OWNER);
+    releaseDrain();
     if (disposed) {
       return;
     }
-    start.disabled = false;
-    recover.disabled = false;
-    stop.disabled = true;
-    download.disabled = false;
-    device.disabled = false;
-    conditions.disabled = false;
-    details.hidden = false;
-    start.hidden = false;
-    download.hidden = false;
-    recover.hidden = false;
-    status.textContent = session.incompleteReason
-      ? `Incomplete: ${session.incompleteReason} `
-      : 'Performance: stopped ';
+    phase = 'stopped';
+    status = session.incompleteReason
+      ? `Incomplete: ${session.incompleteReason}`
+      : 'Performance: stopped';
+    publish();
   };
   const save = (session: Session) => {
     const store = database;
@@ -333,125 +319,118 @@ export function installPhoneCollector(
       save(session);
     }
   };
+
   const showError = (error: unknown) => {
     if (disposed) {
       return;
     }
-    status.textContent = `Incomplete: ${error instanceof Error ? error.message : 'Storage unavailable'} `;
-    start.disabled = false;
-    recover.disabled = false;
-    download.disabled = !active?.stopped;
+    phase = active?.stopped ? 'stopped' : 'ready';
+    status = `Incomplete: ${error instanceof Error ? error.message.slice(0, 256) : 'Storage unavailable'}`;
+    publish();
   };
-  start.addEventListener(
-    'click',
-    () => {
-      retainCollectorFocus();
-      const ticket = ++generation;
-      start.disabled = true;
-      recover.disabled = true;
-      download.disabled = true;
-      void openStore()
-        .then(async (store) => {
-          await writing;
-          if (ticket !== generation) {
-            store.close();
-            return;
-          }
-          database?.close();
-          database = store;
-          metrics.claimDrain(OWNER);
-          const session: Session = {
-            id: crypto.randomUUID(),
-            metadata: {
-              startedAt: new Date().toISOString(),
-              userAgent: navigator.userAgent,
-              language: navigator.language,
-              timeOrigin: performance.timeOrigin,
-              device: device.value,
-              conditions: conditions.value,
-            },
-            incompleteReason: null,
-            samples: [],
-            escapedSampleBytes: 0,
-            persistedSamples: 0,
-            stopped: false,
-          };
-          active = session;
-          startedAt = performance.now();
-          previousDrain = startedAt;
-          metrics.read(true, OWNER);
-          stop.disabled = false;
-          device.disabled = true;
-          conditions.disabled = true;
-          details.hidden = true;
-          start.hidden = true;
-          download.hidden = true;
-          recover.hidden = true;
-          status.textContent = 'Performance: recording ';
-          timer = setInterval(() => drain(session), 1000);
-          save(session);
-        })
-        .catch((error: unknown) => {
-          if (ticket === generation) {
-            showError(error);
-          }
-        });
-    },
-    { signal }
-  );
-  recover.addEventListener(
-    'click',
-    () => {
-      retainCollectorFocus();
-      const ticket = ++generation;
-      recover.disabled = true;
-      start.disabled = true;
-      download.disabled = true;
-      void openStore()
-        .then(async (store) => {
-          await writing;
-          let session: Session | undefined;
-          try {
-            session = await recoverSession(store);
-          } finally {
-            store.close();
-          }
-          if (ticket !== generation) {
-            return;
-          }
-          if (!session) {
-            status.textContent = 'No saved performance session. ';
-            start.disabled = false;
-            recover.disabled = false;
-            return;
-          }
-          active = session;
-          device.value = session.metadata.device;
-          conditions.value = session.metadata.conditions;
-          finish(session, null);
-          if (!session.incompleteReason) {
-            status.textContent = 'Performance: recovered ';
-          }
-        })
-        .catch((error: unknown) => {
-          if (ticket === generation) {
-            showError(error);
-          }
-        });
-    },
-    { signal }
-  );
-  stop.addEventListener(
-    'click',
-    () => {
-      if (active) {
-        drain(active);
-        finish(active, null);
-        save(active);
+  const start = async (nextDevice: string, nextConditions: string): Promise<void> => {
+    if (!read().canStart) {
+      return;
+    }
+    const ticket = ++generation;
+    phase = 'starting';
+    device = nextDevice.slice(0, 256);
+    conditions = nextConditions.slice(0, 512);
+    downloading = false;
+    publish();
+    try {
+      const store = await openStore();
+      await writing;
+      if (disposed || ticket !== generation) {
+        store.close();
+        return;
       }
-    },
-    { signal }
-  );
+      database?.close();
+      database = store;
+      const session: Session = {
+        id: crypto.randomUUID(),
+        metadata: {
+          startedAt: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          timeOrigin: performance.timeOrigin,
+          device,
+          conditions,
+        },
+        incompleteReason: null,
+        samples: [],
+        escapedSampleBytes: 0,
+        persistedSamples: 0,
+        stopped: false,
+      };
+      metrics.claimDrain(OWNER);
+      ownsDrain = true;
+      active = session;
+      startedAt = performance.now();
+      previousDrain = startedAt;
+      metrics.read(true, OWNER);
+      phase = 'recording';
+      status = 'Performance: recording';
+      timer = setInterval(() => drain(session), 1000);
+      save(session);
+      publish();
+    } catch (error) {
+      if (ticket === generation) {
+        showError(error);
+      }
+    }
+  };
+  const recover = async (): Promise<void> => {
+    if (!read().canRecover) {
+      return;
+    }
+    const ticket = ++generation;
+    phase = 'recovering';
+    downloading = false;
+    publish();
+    try {
+      const store = await openStore();
+      let session: Session | undefined;
+      try {
+        await writing;
+        if (disposed || ticket !== generation) {
+          return;
+        }
+        session = await recoverSession(store);
+      } finally {
+        store.close();
+      }
+      if (disposed || ticket !== generation) {
+        return;
+      }
+      if (!session) {
+        phase = active?.stopped ? 'stopped' : 'ready';
+        status = 'No saved performance session.';
+        publish();
+        return;
+      }
+      active = session;
+      device = session.metadata.device.slice(0, 256);
+      conditions = session.metadata.conditions.slice(0, 512);
+      finish(session, null);
+      if (!session.incompleteReason) {
+        status = 'Performance: recovered';
+        publish();
+      }
+    } catch (error) {
+      if (ticket === generation) {
+        showError(error);
+      }
+    }
+  };
+  const stop = () => {
+    if (!read().canStop || !active) {
+      return;
+    }
+    drain(active);
+    finish(active, null);
+    save(active);
+  };
   document.addEventListener(
     'visibilitychange',
     () => {
@@ -473,53 +452,46 @@ export function installPhoneCollector(
     },
     { signal }
   );
-  download.addEventListener(
-    'click',
-    () => {
-      const session = active;
-      if (!session?.stopped) {
-        return;
+  const download = async (): Promise<PhoneCollectorDownload | null> => {
+    const session = active;
+    if (!read().canDownload || !session) {
+      return null;
+    }
+    const ticket = generation;
+    downloading = true;
+    publish();
+    try {
+      await writing;
+      if (disposed || ticket !== generation) {
+        return null;
       }
-      const id = session.id;
-      const pendingWrites = writing;
-      void (async () => {
-        await pendingWrites;
-        if (disposed) {
-          return;
-        }
-        const content = `${prefix(session)}${session.samples.join(',')}]}`;
-        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(content));
-        if (disposed) {
-          return;
-        }
-        const checksum = Array.from(new Uint8Array(digest), (byte) =>
-          byte.toString(16).padStart(2, '0')
-        ).join('');
-        const url = URL.createObjectURL(
-          new Blob([JSON.stringify({ checksum, checksumAlgorithm: 'SHA-256', content })], {
-            type: 'application/json',
-          })
-        );
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `georoids-performance-${id}.json`;
-        link.click();
-        downloads.set(
-          url,
-          setTimeout(() => {
-            URL.revokeObjectURL(url);
-            downloads.delete(url);
-          }, 1000)
-        );
-      })().catch((error: unknown) => {
-        if (active === session) {
-          status.textContent = `Download failed: ${error instanceof Error ? error.message : 'unknown error'} `;
-        }
-      });
-    },
-    { signal }
-  );
-  return () => {
+      const content = `${prefix(session)}${session.samples.join(',')}]}`;
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(content));
+      if (disposed || ticket !== generation) {
+        return null;
+      }
+      const checksum = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, '0')
+      ).join('');
+      return {
+        blob: new Blob([JSON.stringify({ checksum, checksumAlgorithm: 'SHA-256', content })], {
+          type: 'application/json',
+        }),
+        filename: `georoids-performance-${session.id}.json`,
+      };
+    } catch (error) {
+      if (!disposed && ticket === generation) {
+        status = `Download failed: ${error instanceof Error ? error.message.slice(0, 256) : 'unknown error'}`;
+      }
+      return null;
+    } finally {
+      if (!disposed && ticket === generation) {
+        downloading = false;
+        publish();
+      }
+    }
+  };
+  const dispose = () => {
     if (disposed) {
       return;
     }
@@ -532,15 +504,10 @@ export function installPhoneCollector(
       save(active);
     }
     clearInterval(timer);
-    metrics.releaseDrain(OWNER);
-    for (const [url, timeout] of downloads) {
-      clearTimeout(timeout);
-      URL.revokeObjectURL(url);
-    }
-    downloads.clear();
+    releaseDrain();
     const store = database;
     database = undefined;
     void writing.finally(() => store?.close());
-    panel.remove();
   };
+  return { read, start, stop, recover, download, dispose };
 }

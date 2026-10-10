@@ -1,4 +1,4 @@
-import { getOpenGameOverlay } from '../runtime/overlayState';
+import { getOpenGameOverlay, subscribeGameOverlay } from '../runtime/overlayState';
 
 let listenerScope: AbortController | null = null;
 
@@ -7,16 +7,40 @@ import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import { rotateVectorInto } from '../rendering/travelCamera';
-import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
 import { reconcilePlayerInput, togglePlayerContourLock } from './keybindings';
 import { pointerHeadingFromCenter } from './pointerSteering';
 import { readAbilityChrome } from './touchAbility';
 
-const ABILITY_ID = 'touch-ability';
-const CONTOUR_LOCK_ID = 'touch-contour-lock';
-const ROOT_ID = 'touch-controls';
+export type TouchInputHost = {
+  canvas: HTMLCanvasElement;
+  readInPlay: () => boolean;
+  readTouchMode: () => boolean;
+  onActionState: () => void;
+};
+
+export type TouchActionElements = {
+  ability: HTMLButtonElement;
+  contourLock: HTMLButtonElement;
+};
+
+export type ActionControlsView = {
+  inPlay: boolean;
+  touchMode: boolean;
+  ability: ReturnType<typeof readAbilityChrome> & { pressed: boolean; disabled: boolean };
+  contourLock: {
+    label: string;
+    name: string;
+    active: boolean;
+    disabled: boolean;
+    pressed: boolean;
+  };
+};
+
+let inputHost: TouchInputHost | null = null;
+let actionScope: AbortController | null = null;
+let unsubscribeOverlay: (() => void) | null = null;
 
 let initialized = false;
 const TAP_MAX_MS = 220;
@@ -31,8 +55,8 @@ let abilityPointerId: number | null = null;
 let contourLockPointerId: number | null = null;
 let abilityButton: HTMLButtonElement | null = null;
 let contourLockButton: HTMLButtonElement | null = null;
-let lastAbilityChromeKey = '';
-let lastContourLockChromeKey = '';
+let abilityPressed = false;
+let contourLockPressed = false;
 const TOUCH_BIND_SLOP_PX = 40;
 let touchListObserved = false;
 const liveTouchPoints = new Map<number, { x: number; y: number }>();
@@ -164,21 +188,13 @@ export function triggerTouchAbility(player: Player): boolean {
 
 function triggerTouchContourLock(player: Player): boolean {
   if (!isInPlay() || isContourLockMenuOpen() || player.ship.health <= 0 || player.ship.exploding) {
-    syncContourLockChrome(player);
     return false;
   }
   const active = togglePlayerContourLock(player);
-  syncContourLockChrome(player);
   return active;
 }
 
 export function tickTouchControls(player: Player): void {
-  if (isInPlay()) {
-    syncContourLockChrome(player);
-    if (isTouchChromeVisible()) {
-      syncAbilityChrome(player);
-    }
-  }
   if (player.ship.health <= 0 || player.ship.exploding) {
     resetTouchInteraction(player);
     return;
@@ -190,142 +206,86 @@ export function tickTouchControls(player: Player): void {
 }
 
 function isTouchChromeVisible(): boolean {
-  return typeof document !== 'undefined' && document.body.classList.contains('touch-play');
+  return isInPlay() && (inputHost?.readTouchMode() ?? false);
 }
 
 function isInPlay(): boolean {
-  return typeof document !== 'undefined' && document.body.classList.contains('in-play');
+  return inputHost?.readInPlay() ?? false;
 }
 
 function isContourLockMenuOpen(): boolean {
   return getOpenGameOverlay() !== null;
 }
 
-export function syncTouchChrome(
-  inPlay = typeof document !== 'undefined' && document.body.classList.contains('in-play')
-): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  const use = inPlay && shouldUseTouchControls();
-  const root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
-  if (root) {
-    root.hidden = !inPlay;
-    root.setAttribute('aria-hidden', inPlay ? 'false' : 'true');
-    root.classList.toggle('is-touch', use);
-    root.classList.toggle('is-desktop', inPlay && !use);
-  }
-  if (!inPlay) {
-    resetTouchInteraction(requireLocalPlayer());
-    lastAbilityChromeKey = '';
-    lastContourLockChromeKey = '';
-    return;
-  }
-
-  if (!use) {
-    // The desktop contourLock button shares this overlay, while touch steering and
-    // firing must release their pointer sources as soon as touch chrome hides.
-    resetTouchInteraction(requireLocalPlayer());
-  }
-
-  const player = requireLocalPlayer();
-  if (player) {
-    reconcilePlayerInput(player);
-    if (use) {
-      syncAbilityChrome(player);
-    }
-    syncContourLockChrome(player);
-  } else {
-    lastAbilityChromeKey = '';
-    lastContourLockChromeKey = '';
-  }
-}
-
-function setAbilityPressed(pressed: boolean): void {
-  document.querySelector(`#${ABILITY_ID}`)?.classList.toggle('is-pressed', pressed);
-}
-
-function setContourLockPressed(pressed: boolean): void {
-  document.querySelector(`#${CONTOUR_LOCK_ID}`)?.classList.toggle('is-pressed', pressed);
-}
-
-function getAbilityButton(): HTMLButtonElement | null {
-  if (!abilityButton?.isConnected) {
-    const next = document.querySelector<HTMLButtonElement>(`#${ABILITY_ID}`);
-    if (next !== abilityButton) {
-      abilityButton = next;
-      lastAbilityChromeKey = '';
-    }
-  }
-  return abilityButton;
-}
-
-function getContourLockButton(): HTMLButtonElement | null {
-  if (!contourLockButton?.isConnected) {
-    const next = document.querySelector<HTMLButtonElement>(`#${CONTOUR_LOCK_ID}`);
-    if (next !== contourLockButton) {
-      contourLockButton = next;
-      lastContourLockChromeKey = '';
-    }
-  }
-  return contourLockButton;
-}
-
-function syncAbilityChrome(player: Player): void {
-  const button = getAbilityButton();
-  if (!button) {
-    return;
-  }
-  const state = readAbilityChrome(player.ship);
-  const key = `${state.label}|${state.ready}|${state.active}|${state.cooling}|${state.unavailable}|${state.cooldownRatio.toFixed(3)}`;
-  if (key === lastAbilityChromeKey) {
-    return;
-  }
-  lastAbilityChromeKey = key;
-  button.textContent = state.label;
-  button.setAttribute('aria-label', state.name);
-  button.title = state.name;
-  button.setAttribute('aria-disabled', state.ready ? 'false' : 'true');
-  button.classList.toggle('is-ready', state.ready);
-  button.classList.toggle('is-cooling', state.cooling && !state.active);
-  button.classList.toggle('is-unavailable', state.unavailable);
-  button.classList.toggle('is-active', state.active);
-  button.style.setProperty('--action-cool', state.cooldownRatio.toFixed(3));
-}
-
-function syncContourLockChrome(player: Player): void {
-  const button = getContourLockButton();
-  if (!button) {
-    return;
-  }
-  const alive = player.ship.health > 0 && !player.ship.exploding;
+/** Read at the presentation cadence, never from the simulation frame. */
+export function readActionControls(player: Player | null): ActionControlsView {
+  const inPlay = isInPlay();
+  const touchMode = inputHost?.readTouchMode() ?? false;
+  const alive = player !== null && player.ship.health > 0 && !player.ship.exploding;
   const menuOpen = isContourLockMenuOpen();
   const active = alive && player.ship.contourLocked;
   const ready = alive && !menuOpen && (active || player.ship.canLockContour());
-  const disabled = !isInPlay() || !ready;
-  const key = `${active}|${disabled}|${alive}|${menuOpen}`;
-  if (key === lastContourLockChromeKey) {
-    return;
+  const ability = player
+    ? readAbilityChrome(player.ship)
+    : {
+        label: 'E',
+        name: 'Ability',
+        ready: false,
+        active: false,
+        cooling: false,
+        unavailable: true,
+        cooldownRatio: 0,
+      };
+  return {
+    inPlay,
+    touchMode,
+    ability: {
+      ...ability,
+      cooldownRatio: Math.round(ability.cooldownRatio * 1000) / 1000,
+      pressed: abilityPressed,
+      disabled: !inPlay || !touchMode || menuOpen || !ability.ready,
+    },
+    contourLock: {
+      label: active ? 'RELEASE LOCK' : 'CONTOUR LOCK',
+      name: active
+        ? 'Release lock'
+        : !alive
+          ? 'Contour Lock unavailable while the ship is destroyed'
+          : menuOpen
+            ? 'Contour Lock unavailable while a menu is open'
+            : !ready
+              ? 'Contour Lock unavailable: approach a contour'
+              : 'Contour Lock: lock onto the nearest contour',
+      active,
+      disabled: !inPlay || !ready,
+      pressed: contourLockPressed,
+    },
+  };
+}
+
+function syncTouchMode(): void {
+  const player = requireLocalPlayer();
+  if (!isTouchChromeVisible()) {
+    resetTouchInteraction(player);
   }
-  lastContourLockChromeKey = key;
-  const label = active
-    ? 'Release lock'
-    : !alive
-      ? 'Contour Lock unavailable while the ship is destroyed'
-      : menuOpen
-        ? 'Contour Lock unavailable while a menu is open'
-        : !ready
-          ? 'Contour Lock unavailable: approach a contour'
-          : 'Contour Lock: lock onto the nearest contour';
-  button.textContent = active ? 'RELEASE LOCK' : 'CONTOUR LOCK';
-  button.setAttribute('aria-label', label);
-  button.setAttribute('aria-pressed', active ? 'true' : 'false');
-  button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-  button.disabled = disabled;
-  button.title = label;
-  button.classList.toggle('is-active', active);
-  button.classList.toggle('is-unavailable', disabled);
+  if (player && isInPlay()) {
+    reconcilePlayerInput(player);
+  }
+  inputHost?.onActionState();
+}
+
+function setAbilityPressed(pressed: boolean): void {
+  if (abilityPressed !== pressed) {
+    abilityPressed = pressed;
+    inputHost?.onActionState();
+  }
+}
+
+function setContourLockPressed(pressed: boolean): void {
+  if (contourLockPressed !== pressed) {
+    contourLockPressed = pressed;
+    inputHost?.onActionState();
+  }
 }
 
 function releasePointerCapture(element: HTMLElement | null, pointerId: number | null): void {
@@ -343,9 +303,9 @@ function clearSteerHoldTimer(): void {
 
 /** Clear every pointer source when the browser takes the gesture away. */
 function resetTouchInteraction(player: Player | null, options?: { forgetTouches?: boolean }): void {
-  const canvas = canvasManager.getCanvas();
-  const ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
-  const contourLock = document.querySelector<HTMLElement>(`#${CONTOUR_LOCK_ID}`);
+  const canvas = inputHost?.canvas ?? null;
+  const ability = abilityButton;
+  const contourLock = contourLockButton;
   const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
@@ -377,62 +337,6 @@ function resetTouchInteraction(player: Player | null, options?: { forgetTouches?
 
 function requireLocalPlayer(): Player | null {
   return PlayerManager.getInstance().getLocalPlayer();
-}
-
-function ensureTouchDom(): {
-  root: HTMLElement;
-  ability: HTMLButtonElement;
-  contourLock: HTMLButtonElement;
-} {
-  let root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
-  if (!root) {
-    root = document.createElement('div');
-    root.id = ROOT_ID;
-    root.className = 'touch-controls';
-    root.hidden = true;
-    root.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(root);
-  }
-
-  let ability = document.querySelector<HTMLButtonElement>(`#${ABILITY_ID}`);
-  if (!ability) {
-    ability = document.createElement('button');
-    ability.id = ABILITY_ID;
-    ability.className = 'touch-ability';
-    ability.setAttribute('type', 'button');
-    ability.setAttribute('aria-label', 'Ability');
-    ability.setAttribute('aria-disabled', 'true');
-    ability.textContent = 'E';
-    root.appendChild(ability);
-  }
-  ability.setAttribute('type', 'button');
-  if (!ability.getAttribute('aria-label')) {
-    ability.setAttribute('aria-label', 'Ability');
-  }
-
-  let contourLock = document.querySelector<HTMLButtonElement>(`#${CONTOUR_LOCK_ID}`);
-  if (!contourLock) {
-    contourLock = document.createElement('button');
-    contourLock.id = CONTOUR_LOCK_ID;
-    contourLock.className = 'touch-contour-lock';
-    contourLock.setAttribute('type', 'button');
-    contourLock.setAttribute('aria-label', 'Contour Lock');
-    contourLock.setAttribute('aria-pressed', 'false');
-    contourLock.setAttribute('aria-disabled', 'true');
-    contourLock.disabled = true;
-    contourLock.textContent = 'CONTOUR LOCK';
-    root.appendChild(contourLock);
-  }
-  contourLock.setAttribute('type', 'button');
-  contourLock.disabled = true;
-  if (!contourLock.getAttribute('aria-disabled')) {
-    contourLock.setAttribute('aria-disabled', 'true');
-  }
-  if (!contourLock.getAttribute('aria-label')) {
-    contourLock.setAttribute('aria-label', 'Contour Lock');
-  }
-
-  return { root, ability, contourLock };
 }
 
 function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): void {
@@ -492,7 +396,7 @@ function reservedSteerHasNoLiveFinger(): boolean {
 }
 
 function onPlayfieldPointerDown(ev: PointerEvent): void {
-  const canvas = canvasManager.getCanvas();
+  const canvas = inputHost?.canvas ?? null;
   if (!canvas || !isTouchChromeVisible() || ev.pointerType !== 'touch' || ev.target !== canvas) {
     return;
   }
@@ -586,7 +490,7 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
   steerTouchId = null;
   clearSteerHoldTimer();
   steerTap = null;
-  releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
+  releasePointerCapture(inputHost?.canvas ?? null, ev.pointerId);
   if (player) {
     setTouchHeading(player, null);
     if (tap) {
@@ -600,7 +504,7 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
 
 function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
   const player = requireLocalPlayer();
-  const canvas = canvasManager.getCanvas();
+  const canvas = inputHost?.canvas ?? null;
   if (!player || !canvas || steerEpoch !== controlSources.steeringEpoch) {
     return;
   }
@@ -634,7 +538,7 @@ function onFirePointerUp(ev: PointerEvent): void {
   }
   ev.preventDefault();
   firePointerId = null;
-  releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
+  releasePointerCapture(inputHost?.canvas ?? null, ev.pointerId);
   const player = requireLocalPlayer();
   if (player) {
     setTouchFire(player, false);
@@ -644,7 +548,7 @@ function onFirePointerUp(ev: PointerEvent): void {
 }
 
 function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
-  if (abilityPointerId !== null) {
+  if (abilityPointerId !== null || !isTouchChromeVisible() || getOpenGameOverlay() !== null) {
     return;
   }
   ev.preventDefault();
@@ -659,7 +563,7 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchAbility(player);
-    syncAbilityChrome(player);
+    inputHost?.onActionState();
   }
 }
 
@@ -677,7 +581,7 @@ function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
 function onAbilityClick(ev: MouseEvent): void {
   // Pointer presses already activate on pointerdown. Their click can arrive
   // later; only keyboard/accessibility/programmatic clicks have no click count.
-  if (ev.detail !== 0) {
+  if (ev.detail !== 0 || !isTouchChromeVisible()) {
     return;
   }
   ev.preventDefault();
@@ -685,12 +589,13 @@ function onAbilityClick(ev: MouseEvent): void {
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchAbility(player);
-    syncAbilityChrome(player);
+    inputHost?.onActionState();
   }
 }
 
 function onContourLockPointerDown(ev: PointerEvent, contourLock: HTMLElement): void {
-  if (contourLockPointerId !== null || contourLock.matches(':disabled')) {
+  const player = requireLocalPlayer();
+  if (contourLockPointerId !== null || readActionControls(player).contourLock.disabled) {
     return;
   }
   ev.preventDefault();
@@ -702,10 +607,9 @@ function onContourLockPointerDown(ev: PointerEvent, contourLock: HTMLElement): v
   contourLockPointerId = ev.pointerId;
   contourLock.setPointerCapture(ev.pointerId);
   setContourLockPressed(true);
-  const player = requireLocalPlayer();
   if (player) {
     triggerTouchContourLock(player);
-    syncContourLockChrome(player);
+    inputHost?.onActionState();
   }
 }
 
@@ -729,7 +633,7 @@ function onContourLockClick(ev: MouseEvent): void {
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchContourLock(player);
-    syncContourLockChrome(player);
+    inputHost?.onActionState();
   }
   ev.stopPropagation();
 }
@@ -740,16 +644,13 @@ function resetIfPageIsInactive(): void {
   }
 }
 
-export function initializeTouchControls(): void {
+export function initializeTouchControls(host: TouchInputHost): void {
   if (initialized || typeof document === 'undefined') {
     return;
   }
+  inputHost = host;
   listenerScope = new AbortController();
   const { signal } = listenerScope;
-
-  const { ability, contourLock } = ensureTouchDom();
-  abilityButton = ability;
-  contourLockButton = contourLock;
 
   document.addEventListener('pointerdown', onPlayfieldPointerDown, {
     passive: false,
@@ -776,6 +677,57 @@ export function initializeTouchControls(): void {
     signal,
   });
 
+  window.addEventListener('playViewOn', syncTouchMode, { signal });
+  window.addEventListener('playViewOff', syncTouchMode, { signal });
+  unsubscribeOverlay = subscribeGameOverlay((overlay) => {
+    if (overlay !== null) {
+      resetTouchInteraction(requireLocalPlayer());
+    }
+    inputHost?.onActionState();
+  });
+  window.addEventListener('resize', () => syncTouchMode(), { signal });
+  window.addEventListener(
+    'orientationchange',
+    () => {
+      resetTouchInteraction(requireLocalPlayer());
+      syncTouchMode();
+    },
+    { signal }
+  );
+  window.addEventListener('blur', () => resetTouchInteraction(requireLocalPlayer()), { signal });
+  window.addEventListener('pagehide', () => resetTouchInteraction(requireLocalPlayer()), {
+    signal,
+  });
+  document.addEventListener('visibilitychange', resetIfPageIsInactive, { signal });
+  window.visualViewport?.addEventListener('resize', () => syncTouchMode(), { signal });
+
+  initialized = true;
+  syncTouchMode();
+  logger.debug('INPUT', 'Touch controls initialized', {
+    visible: isTouchChromeVisible(),
+  });
+}
+
+export function disposeTouchControls(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  initialized = false;
+  resetTouchInteraction(requireLocalPlayer(), { forgetTouches: true });
+  unsubscribeOverlay?.();
+  unsubscribeOverlay = null;
+  inputHost = null;
+}
+
+/** Bind only the mounted Svelte action elements; TypeScript owns gesture capture. */
+export function mountTouchActionControls(elements: TouchActionElements): () => void {
+  actionScope?.abort();
+  resetTouchInteraction(requireLocalPlayer());
+  const scope = new AbortController();
+  actionScope = scope;
+  const { signal } = scope;
+  const { ability, contourLock } = elements;
+  abilityButton = ability;
+  contourLockButton = contourLock;
   ability.addEventListener('pointerdown', (ev) => onAbilityPointerDown(ev, ability), { signal });
   ability.addEventListener('pointerup', (ev) => onAbilityPointerUp(ev, ability), { signal });
   ability.addEventListener('pointercancel', (ev) => onAbilityPointerUp(ev, ability), { signal });
@@ -810,82 +762,14 @@ export function initializeTouchControls(): void {
     { signal }
   );
 
-  window.addEventListener('playViewOn', () => syncTouchChrome(true), { signal });
-  window.addEventListener('playViewOff', () => syncTouchChrome(false), { signal });
-  // A modal universe map can cover the playfield while the game keeps cruising.
-  // Drop any active touch gesture before the dialog takes pointer ownership.
-  window.addEventListener(
-    'gameMapOpen',
-    () => {
-      resetTouchInteraction(requireLocalPlayer());
-      const player = requireLocalPlayer();
-      if (player) {
-        syncContourLockChrome(player);
-      }
-    },
-    { signal }
-  );
-  window.addEventListener(
-    'gameMapClose',
-    () => {
-      const player = requireLocalPlayer();
-      if (player) {
-        syncContourLockChrome(player);
-      }
-    },
-    { signal }
-  );
-  window.addEventListener(
-    'gameSchematicOpen',
-    () => {
-      resetTouchInteraction(requireLocalPlayer());
-      const player = requireLocalPlayer();
-      if (player) {
-        syncContourLockChrome(player);
-      }
-    },
-    { signal }
-  );
-  window.addEventListener(
-    'gameSchematicClose',
-    () => {
-      const player = requireLocalPlayer();
-      if (player) {
-        syncContourLockChrome(player);
-      }
-    },
-    { signal }
-  );
-  window.addEventListener('resize', () => syncTouchChrome(), { signal });
-  window.addEventListener(
-    'orientationchange',
-    () => {
-      resetTouchInteraction(requireLocalPlayer());
-      syncTouchChrome();
-    },
-    { signal }
-  );
-  window.addEventListener('blur', () => resetTouchInteraction(requireLocalPlayer()), { signal });
-  window.addEventListener('pagehide', () => resetTouchInteraction(requireLocalPlayer()), {
-    signal,
-  });
-  document.addEventListener('visibilitychange', resetIfPageIsInactive, { signal });
-  window.visualViewport?.addEventListener('resize', () => syncTouchChrome(), { signal });
-
-  initialized = true;
-  syncTouchChrome();
-  logger.debug('INPUT', 'Touch controls initialized', {
-    visible: isTouchChromeVisible(),
-  });
-}
-
-export function disposeTouchControls(): void {
-  listenerScope?.abort();
-  listenerScope = null;
-  initialized = false;
-  resetTouchInteraction(requireLocalPlayer(), { forgetTouches: true });
-  abilityButton = null;
-  contourLockButton = null;
-  lastAbilityChromeKey = '';
-  lastContourLockChromeKey = '';
+  return () => {
+    scope.abort();
+    if (actionScope !== scope) {
+      return;
+    }
+    resetTouchInteraction(requireLocalPlayer());
+    abilityButton = null;
+    contourLockButton = null;
+    actionScope = null;
+  };
 }

@@ -1,9 +1,12 @@
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { NetworkManager } from '../../../src/network/networkManager';
-import { playSpawnFlyIn } from '../../../src/ui/spawnFlyIn';
+import { mountSpawnFlyIn, playSpawnFlyIn } from '../../../src/ui/spawnFlyIn';
 
 let gameArea: HTMLElement;
+let canvas: HTMLCanvasElement;
+let visible: boolean;
+let dispose: () => void;
 let frames: FrameRequestCallback[];
 let localShip: { position: { x: number; y: number } } | null;
 
@@ -18,6 +21,12 @@ beforeEach(() => {
   gameArea = document.createElement('div');
   gameArea.id = 'gameArea';
   document.body.append(gameArea);
+  canvas = document.createElement('canvas');
+  canvas.id = 'spawn-fly-in';
+  gameArea.append(canvas);
+  dispose = mountSpawnFlyIn(canvas, (next) => {
+    visible = next;
+  });
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
     frames.push(callback);
     return frames.length;
@@ -29,14 +38,10 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
-  document.querySelector('#spawn-fly-in')?.remove();
+  dispose();
   gameArea.remove();
   vi.restoreAllMocks();
 });
-
-function overlay(): HTMLCanvasElement | null {
-  return document.querySelector<HTMLCanvasElement>('#spawn-fly-in');
-}
 
 function runFrameAt(ms: number): void {
   const frame = frames.shift();
@@ -46,30 +51,49 @@ function runFrameAt(ms: number): void {
 test('any key skips the dive', () => {
   playSpawnFlyIn();
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
-  expect(overlay()).toBeNull();
+  expect(visible).toBe(false);
+  expect(canvas.isConnected).toBe(true);
 });
 
 test('a tap skips the dive', () => {
   playSpawnFlyIn();
   window.dispatchEvent(new Event('pointerdown'));
-  expect(overlay()).toBeNull();
+  expect(visible).toBe(false);
+  expect(canvas.isConnected).toBe(true);
 });
 
 test('the dive ends immediately if the pilot has no ship yet', () => {
   localShip = null;
   playSpawnFlyIn();
   runFrameAt(0);
-  expect(overlay()).toBeNull();
+  expect(visible).toBe(false);
+  expect(canvas.isConnected).toBe(true);
 });
 
-test('a second join replaces the first dive with a single overlay', () => {
+test('a second join cancels the first dive and reuses the shell canvas', () => {
   playSpawnFlyIn();
   playSpawnFlyIn();
   expect(document.querySelectorAll('#spawn-fly-in')).toHaveLength(1);
+  expect(window.cancelAnimationFrame).toHaveBeenCalledTimes(1);
+  expect(visible).toBe(true);
 });
 
 test('pilots who prefer reduced motion land directly in flight', () => {
   vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
   playSpawnFlyIn();
-  expect(overlay()).toBeNull();
+  expect(visible).toBe(false);
+  expect(canvas.isConnected).toBe(true);
+});
+
+test('unmount cancels the owned frame and detached input cannot restart the painter', () => {
+  playSpawnFlyIn();
+  dispose();
+  expect(window.cancelAnimationFrame).toHaveBeenCalledTimes(1);
+  expect(visible).toBe(false);
+  const scheduled = frames.length;
+  frames[0]?.(performance.now());
+  playSpawnFlyIn();
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
+  expect(frames).toHaveLength(scheduled);
+  expect(canvas.isConnected).toBe(true);
 });

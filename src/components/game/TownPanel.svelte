@@ -1,21 +1,24 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type { TownStoreView, TownView } from '../../runtime/townStore';
+  import type { FurnaceTravelView } from '../../ui/furnaceTravelMap';
   import Button from '../ui/button/button.svelte';
-  import LegacyFurnaceTravel from './LegacyFurnaceTravel.svelte';
+  import FurnaceTravelMap from './FurnaceTravelMap.svelte';
 
   let {
     view,
     onmode,
     onpurchase,
     onclose,
-    mountTravel,
+    travel,
+    ontravel,
   }: {
     view: TownStoreView;
     onmode: (mode: TownView) => void;
     onpurchase: (id: string) => void;
     onclose: () => void;
-    mountTravel: (host: HTMLElement) => () => void;
+    travel: FurnaceTravelView | null;
+    ontravel: (id: string) => void;
   } = $props();
 
   let returnButton = $state<HTMLButtonElement | null>(null);
@@ -88,7 +91,11 @@
       <p class="text-sm leading-relaxed text-muted-foreground">
         Ride your ship along the pipes to any lit furnace. Travel is free.
       </p>
-      <LegacyFurnaceTravel {mountTravel} />
+      {#if travel}
+        {#key travel.source.id}
+          <FurnaceTravelMap view={travel} {ontravel} />
+        {/key}
+      {/if}
     </section>
   {/if}
 

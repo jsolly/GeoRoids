@@ -6,7 +6,10 @@ import { controlSources, resetControlSources } from '../../../src/input/controlS
 import { togglePlayerContourLock } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
+  disposeTouchControls,
   initializeTouchControls,
+  mountTouchActionControls,
+  readActionControls,
   readTouchControlDiagnostics,
   setTouchHeading,
   tickTouchControls,
@@ -15,11 +18,18 @@ import { NetworkManager } from '../../../src/network/networkManager';
 import { sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { getTerrainField } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import {
+  closeGameOverlay,
+  getOpenGameOverlay,
+  openGameOverlay,
+} from '../../../src/runtime/overlayState';
 import * as townStore from '../../../src/runtime/townStore';
-import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 
 let player: Player;
 let canvas: HTMLCanvasElement;
+let actions: { ability: HTMLButtonElement; contourLock: HTMLButtonElement };
+let disposeActions: () => void;
+let touchMode = true;
 
 beforeAll(() => {
   const network = NetworkManager.getInstance();
@@ -44,14 +54,34 @@ beforeEach(() => {
   vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 390, height: 844 });
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 390, 844));
   vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-  initializeTouchControls();
+  touchMode = true;
+  initializeTouchControls({
+    canvas,
+    readInPlay: () => true,
+    readTouchMode: () => touchMode,
+    onActionState: () => {},
+  });
+  actions = {
+    ability: document.createElement('button'),
+    contourLock: document.createElement('button'),
+  };
+  document.body.append(actions.ability, actions.contourLock);
+  disposeActions = mountTouchActionControls(actions);
   document.body.classList.add('in-play', 'touch-play');
   tickTouchControls(player);
 });
 
 afterEach(() => {
+  const overlay = getOpenGameOverlay();
+  if (overlay) {
+    closeGameOverlay(overlay);
+  }
   window.dispatchEvent(new Event('blur'));
   document.body.classList.remove('in-play', 'touch-play');
+  disposeActions();
+  disposeTouchControls();
+  actions.ability.remove();
+  actions.contourLock.remove();
   canvas.remove();
   vi.restoreAllMocks();
 });
@@ -171,7 +201,7 @@ test('an interrupted tap never fires, and losing focus clears both held fingers'
 
 test('ability buttons do not create playfield shots or change steering', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
-  const ability = document.querySelector('#touch-ability');
+  const ability = actions.ability;
   expect(ability).toBeTruthy();
   if (!ability) {
     throw new Error('Missing ability button');
@@ -193,7 +223,7 @@ test('Contour Lock tap starts a stronger cruise and a second tap returns to crui
     return player.ship.contourLocked;
   });
   tickTouchControls(player);
-  const contourLock = document.querySelector('#touch-contour-lock');
+  const contourLock = actions.contourLock;
   expect(contourLock).toBeTruthy();
   if (!contourLock) {
     throw new Error('Missing contourLock button');
@@ -204,18 +234,18 @@ test('Contour Lock tap starts a stronger cruise and a second tap returns to crui
   pointer('pointerdown', 1, 0, 195, 780, contourLock);
   pointer('pointerup', 1, 80, 195, 780, contourLock);
   expect(player.ship.contourLocked).toBe(true);
-  expect(contourLock.getAttribute('aria-pressed')).toBe('true');
+  expect(readActionControls(player).contourLock.active).toBe(true);
   pointer('pointerdown', 2, 200, 195, 780, contourLock);
   pointer('pointerup', 2, 280, 195, 780, contourLock);
   expect(player.ship.contourLocked).toBe(false);
-  expect(contourLock.getAttribute('aria-pressed')).toBe('false');
+  expect(readActionControls(player).contourLock.active).toBe(false);
 });
 
 test('a delayed pointer click cannot repeat an ability, while a following semantic click still works', () => {
   vi.useFakeTimers();
   try {
     const activate = vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
-    const ability = document.querySelector<HTMLButtonElement>('#touch-ability');
+    const ability = actions.ability;
     if (!ability) {
       throw new Error('Missing ability button');
     }
@@ -257,7 +287,7 @@ test('holding a finger starts steering, and release cancels its target without s
 });
 
 test('an action tap during a pending hold still lets a second canvas finger start steering and fire', () => {
-  const ability = document.querySelector('#touch-ability');
+  const ability = actions.ability;
   if (!ability) {
     throw new Error('Missing ability button');
   }
@@ -492,7 +522,7 @@ test('releasing a tow while entering furnace range does not turn the same touch 
     return true;
   });
   const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
-  const ability = document.querySelector<HTMLElement>('#touch-ability');
+  const ability = actions.ability;
   if (!ability) {
     throw new Error('Ability button missing');
   }
@@ -504,23 +534,6 @@ test('releasing a tow while entering furnace range does not turn the same touch 
   touchChange('touchend', []);
   ability.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
   expect(openStore).not.toHaveBeenCalled();
-});
-
-test('furnace prompt entry waits for the completed click and survives touch-end cleanup', () => {
-  player.ship.position = { x: 0, y: 0 };
-  vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
-  const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
-  syncFurnaceTravelPrompt();
-  const prompt = document.querySelector<HTMLElement>('#furnace-travel-prompt button');
-  if (!prompt) {
-    throw new Error('Furnace prompt missing');
-  }
-  pointer('pointerdown', 82, 0, 195, 500, prompt);
-  pointer('pointerup', 82, 10, 195, 500, prompt);
-  touchChange('touchend', []);
-  expect(openStore).not.toHaveBeenCalled();
-  prompt.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-  expect(openStore).toHaveBeenCalledTimes(1);
 });
 
 test('touch steering stays ignored until the pilot explicitly releases the rail', () => {
@@ -621,7 +634,7 @@ test('a flick toward a displayed contour follows the camera rotation into world 
 
 test('using the ability with a second finger cancels a pending contour flick', () => {
   settleOnHopFixture();
-  const ability = document.querySelector('#touch-ability');
+  const ability = actions.ability;
   if (!ability) {
     throw new Error('Missing ability button');
   }
@@ -671,7 +684,7 @@ test('holding Contour Lock with one finger prevents a second finger from flickin
   player.ship.releaseContourLock();
   tickTouchControls(player);
   const cue = vi.spyOn(feedback, 'playFeedback').mockImplementation(() => {});
-  const button = document.querySelector<HTMLElement>('#touch-contour-lock');
+  const button = actions.contourLock;
   if (!button) {
     throw new Error('Missing Contour Lock button');
   }
@@ -687,4 +700,106 @@ test('holding Contour Lock with one finger prevents a second finger from flickin
   expect(player.ship.contourLock).toEqual(lock);
   expect(cue).not.toHaveBeenCalled();
   pointer('pointerup', 130, 100, 320, 700, button);
+});
+
+test.each(['blur', 'pagehide', 'hidden', 'overlay', 'death', 'desktop', 'detach', 'dispose'])(
+  '%s releases actual action captures and cancels a pending tap without firing',
+  (reason) => {
+    const capture = new Set<number>();
+    actions.ability.setPointerCapture = (id) => {
+      capture.add(id);
+    };
+    actions.ability.hasPointerCapture = (id) => capture.has(id);
+    actions.ability.releasePointerCapture = vi.fn((id) => {
+      capture.delete(id);
+    });
+    vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
+    const shoot = vi.spyOn(player.ship, 'shoot');
+    pointer('pointerdown', 301, 0);
+    pointer('pointerdown', 302, 10, 320, 780, actions.ability);
+    expect(capture.has(302)).toBe(true);
+    expect(readActionControls(player).ability.pressed).toBe(true);
+    if (reason === 'hidden') {
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+    } else if (reason === 'overlay') {
+      openGameOverlay('inventory');
+    } else if (reason === 'death') {
+      player.ship.health = 0;
+      tickTouchControls(player);
+    } else if (reason === 'desktop') {
+      touchMode = false;
+      window.dispatchEvent(new Event('resize'));
+    } else if (reason === 'detach') {
+      actions.ability.remove();
+      disposeActions();
+    } else if (reason === 'dispose') {
+      disposeTouchControls();
+    } else {
+      window.dispatchEvent(new Event(reason));
+    }
+    expect(actions.ability.releasePointerCapture).toHaveBeenCalledExactlyOnceWith(302);
+    expect(capture.size).toBe(0);
+    expect(readActionControls(player).ability.pressed).toBe(false);
+    pointer('pointerup', 301, 50);
+    expect(shoot).not.toHaveBeenCalled();
+    expect(controlSources.pointerHeading).toBeNull();
+    expect(controlSources.touchFire).toBe(false);
+  }
+);
+
+test('replacing action refs releases the old capture and stale cleanup cannot detach the replacement', () => {
+  const old = actions;
+  const capture = new Set<number>();
+  old.ability.setPointerCapture = (id) => {
+    capture.add(id);
+  };
+  old.ability.hasPointerCapture = (id) => capture.has(id);
+  old.ability.releasePointerCapture = vi.fn((id) => {
+    capture.delete(id);
+  });
+  const activate = vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
+  pointer('pointerdown', 401, 0, 320, 780, old.ability);
+  const next = {
+    ability: document.createElement('button'),
+    contourLock: document.createElement('button'),
+  };
+  document.body.append(next.ability, next.contourLock);
+  const disposeNext = mountTouchActionControls(next);
+  expect(old.ability.releasePointerCapture).toHaveBeenCalledExactlyOnceWith(401);
+  disposeActions();
+  old.ability.click();
+  expect(activate).toHaveBeenCalledTimes(1);
+  next.ability.click();
+  expect(activate).toHaveBeenCalledTimes(2);
+  disposeNext();
+  next.ability.click();
+  expect(activate).toHaveBeenCalledTimes(2);
+  next.ability.remove();
+  next.contourLock.remove();
+});
+
+test('opening a menu releases held fire and a detached Contour Lock capture on its original button', () => {
+  vi.spyOn(player.ship, 'canLockContour').mockReturnValue(true);
+  vi.spyOn(player.ship, 'toggleContourLock').mockReturnValue(false);
+  const captured = new Set<number>();
+  actions.contourLock.setPointerCapture = (id) => {
+    captured.add(id);
+  };
+  actions.contourLock.hasPointerCapture = (id) => captured.has(id);
+  actions.contourLock.releasePointerCapture = vi.fn((id) => {
+    captured.delete(id);
+  });
+  pointer('pointerdown', 501, 0);
+  pointer('pointerdown', 502, 10, 320, 400);
+  pointer('pointerdown', 503, 20, 200, 780, actions.contourLock);
+  expect(controlSources.touchFire).toBe(true);
+  expect(readActionControls(player).contourLock.pressed).toBe(true);
+  actions.contourLock.remove();
+  openGameOverlay('universe-map');
+  expect(actions.contourLock.releasePointerCapture).toHaveBeenCalledExactlyOnceWith(503);
+  expect(captured.size).toBe(0);
+  expect(controlSources.touchFire).toBe(false);
+  expect(controlSources.pointerHeading).toBeNull();
+  expect(readActionControls(player).contourLock).toMatchObject({ pressed: false, disabled: true });
 });

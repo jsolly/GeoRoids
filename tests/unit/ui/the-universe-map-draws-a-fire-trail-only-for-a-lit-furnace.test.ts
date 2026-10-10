@@ -10,13 +10,22 @@ import {
 } from '../../../src/network/worldExploration';
 import { setSpiderField } from '../../../src/physics/terrain/spiderSession';
 import {
-  closeUniverseMap,
-  initializeUniverseMap,
-  UNIVERSE_MAP_IDS,
+  mountUniverseMap as mountMap,
+  type UniverseMapChrome,
+  type UniverseMapController,
 } from '../../../src/ui/universeMap';
 
+let controller: UniverseMapController | undefined;
+let chrome: UniverseMapChrome | undefined;
+let clock = 0;
+
+function closeMap() {
+  controller?.dispose();
+  controller = undefined;
+}
+
 afterEach(() => {
-  closeUniverseMap();
+  closeMap();
   setSpiderField(undefined);
   worldFurnaces.replaceLit([]);
   setWorldMapAssets([]);
@@ -26,44 +35,52 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function mountUniverseMap(): { toggle: HTMLButtonElement; ctx: CanvasRenderingContext2D } {
+function mountUniverseMap() {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
-  Object.defineProperties(HTMLDialogElement.prototype, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.removeAttribute('open');
-      },
-    },
-  });
+  vi.spyOn(performance, 'now').mockImplementation(() => clock);
   const network = NetworkManager.getInstance();
   PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
   vi.spyOn(network, 'getAllPlayers').mockReturnValue([]);
-  document.body.classList.add('in-play');
-  initializeUniverseMap();
-  const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
-  const canvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement;
+  const canvas = document.createElement('canvas');
+  document.body.append(canvas);
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     throw new Error('Expected a map canvas');
   }
-  return { toggle, ctx };
+  const open = () => {
+    closeMap();
+    controller = mountMap(canvas, (next) => {
+      chrome = next;
+    });
+  };
+  const allLocations = () => {
+    if (!chrome || !controller) {
+      throw new Error('Expected map chrome');
+    }
+    const rows: string[] = [];
+    const pages = chrome.locationPages;
+    for (let page = 0; page < pages; page++) {
+      controller.setLocationPage(page);
+      clock += 100;
+      window.dispatchEvent(new Event('resize'));
+      rows.push(...chrome.locations);
+      expect(chrome.locations.length).toBeLessThanOrEqual(24);
+    }
+    return rows.join(' ');
+  };
+  return { open, canvas, ctx, allLocations };
 }
 
 test('a pilot pinches the universe chart, keeps dragging after lifting one finger, and locates home', () => {
-  const { toggle, ctx } = mountUniverseMap();
-  const canvas = document.querySelector<HTMLCanvasElement>(`#${UNIVERSE_MAP_IDS.canvas}`);
-  const locate = document.querySelector<HTMLButtonElement>(`#${UNIVERSE_MAP_IDS.center}`);
-  if (!canvas || !locate) {
-    throw new Error('Missing chart controls');
-  }
+  const { open, canvas, ctx } = mountUniverseMap();
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 400));
   setWorldMapAssets([
     { id: 'foundation:a', kind: 'foundation', name: 'A', position: { x: 0, y: 0 } },
@@ -96,7 +113,7 @@ test('a pilot pinches the universe chart, keeps dragging after lifting one finge
     Object.defineProperty(event, 'pointerId', { value: id });
     canvas.dispatchEvent(event);
   };
-  toggle.click();
+  open();
   const initial = draw();
   const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   pointer('pointerdown', 1, 150, 200);
@@ -115,11 +132,11 @@ test('a pilot pinches the universe chart, keeps dragging after lifting one finge
   pointer('pointercancel', 1, 170, 210);
   pointer('pointermove', 1, 300, 300);
   expect(draw()).toEqual(dragged);
-  locate.click();
+  controller?.center();
   expect(draw()).toEqual(initial);
   pointer('pointerdown', 3, 150, 200);
-  closeUniverseMap();
-  toggle.click();
+  closeMap();
+  open();
   pointer('pointermove', 3, 300, 300);
   expect(draw()).toEqual(initial);
 });
@@ -129,7 +146,7 @@ test('the universe map draws a fire trail only for a lit furnace', () => {
   if (!furnace) {
     throw new Error('Missing furnace lot');
   }
-  const { toggle, ctx } = mountUniverseMap();
+  const { open, ctx } = mountUniverseMap();
   const fireTrail = () => {
     let count = 0;
     const spy = vi.spyOn(ctx, 'stroke').mockImplementation(function stroke(
@@ -139,9 +156,9 @@ test('the universe map draws a fire trail only for a lit furnace', () => {
         count += 1;
       }
     });
-    toggle.click();
+    open();
     spy.mockRestore();
-    closeUniverseMap();
+    closeMap();
     return count;
   };
   expect(fireTrail()).toBe(0);
@@ -150,7 +167,7 @@ test('the universe map draws a fire trail only for a lit furnace', () => {
 });
 
 test('the universe map marks furnace lots before that ground is explored', () => {
-  const { toggle, ctx } = mountUniverseMap();
+  const { open, ctx, allLocations } = mountUniverseMap();
   const salvage = {
     id: 'loot:salvage',
     kind: 'wreckage' as const,
@@ -172,7 +189,6 @@ test('the universe map marks furnace lots before that ground is explored', () =>
     })),
     salvage,
   ]);
-  const locations = document.querySelector(`#${UNIVERSE_MAP_IDS.locations}`);
   const draw = (): { rings: number; text: string } => {
     let rings = 0;
     const arc = ctx.arc.bind(ctx);
@@ -185,10 +201,10 @@ test('the universe map marks furnace lots before that ground is explored', () =>
       }
       arc(...args);
     });
-    toggle.click();
-    const text = locations?.textContent ?? '';
+    open();
     spy.mockRestore();
-    closeUniverseMap();
+    const text = allLocations();
+    closeMap();
     return { rings, text };
   };
   const hidden = draw();
@@ -207,7 +223,7 @@ test('the universe map marks furnace lots before that ground is explored', () =>
 });
 
 test('the shared chart turns a discovered nest dark gray after its last guard dies', () => {
-  const { toggle, ctx } = mountUniverseMap();
+  const { open, ctx } = mountUniverseMap();
   const position = { x: 500, y: 500 };
   const explored = new ExplorationMap();
   explored.reveal(position, 400);
@@ -219,8 +235,8 @@ test('the shared chart turns a discovered nest dark gray after its last guard di
   for (const cleared of [false, true]) {
     setSpiderField({ spiders: [], nests: [{ id: '0,0', resourceId: 'ore', position, cleared }] });
     colors.length = 0;
-    toggle.click();
+    open();
     expect(colors).toContain(cleared ? '#444444' : '#f43f5e');
-    closeUniverseMap();
+    closeMap();
   }
 });

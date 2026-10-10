@@ -7,12 +7,7 @@ import { hexToRgba } from '../utils/colorUtils';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 
 /** A fixed terrain preview, independent of the live room's terrain cache. */
-export function initTitleTerrain(
-  canvas: Element | null = document.querySelector('#title-terrain')
-): () => void {
-  if (!(canvas instanceof HTMLCanvasElement)) {
-    return () => {};
-  }
+export function initTitleTerrain(canvas: HTMLCanvasElement): () => void {
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     return () => {};

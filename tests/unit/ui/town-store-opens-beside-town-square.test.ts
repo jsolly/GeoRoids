@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
+import { CIVIC_LOTS, civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -16,10 +16,12 @@ import {
   openTownStore,
   purchaseTownOffer,
   readTownStoreView,
+  readTownTravelMap,
+  requestFurnaceTravel,
   selectTownView,
 } from '../../../src/runtime/townStore';
-import { mountTownTravelHost } from '../../../src/runtime/townTravelHost';
 import { SCOUT_ONLY_BUILD_HINT } from '../../../src/ui/constants';
+import { activateFieldHint, hideFieldHints, readFieldHints } from '../../../src/ui/fieldHint';
 import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import { setWindowViewport } from '../../support/viewport';
 
@@ -27,20 +29,6 @@ let stopStore: () => void;
 beforeAll(() => {
   const network = NetworkManager.getInstance();
   PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
-  Object.defineProperties(HTMLDialogElement.prototype, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.removeAttribute('open');
-      },
-    },
-  });
   document.body.classList.add('in-play');
   PlayerManager.getInstance().createLocalPlayer('hauler');
   vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([]);
@@ -55,8 +43,7 @@ afterAll(() => {
   closeTownStore();
   vi.restoreAllMocks();
   document.body.classList.remove('in-play');
-  Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-  Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+  hideFieldHints();
 });
 
 test('the store opens at Town Square via E and buys a placeholder without an upgrade', () => {
@@ -168,14 +155,21 @@ test('a lit street offers free travel to Town Square and other lit streets but n
   player.ship.position = { ...street.position };
   expect(openTownStore()).toBe(true);
   expect(readTownStoreView().mode).toBe('travel');
-  const travelHost = document.createElement('div');
-  document.body.append(travelHost);
-  const map = mountTownTravelHost(travelHost);
-  expect(document.querySelector(`[data-furnace-id="${street.id}"]`)).toBeNull();
-  expect(document.querySelector('[data-furnace-id="street-1-1"]')).not.toBeNull();
-  expect(document.querySelector('[data-furnace-id="street-1-2"]')).toBeNull();
+  const travel = readTownTravelMap();
+  expect(travel.source).toMatchObject({ id: street.id, position: street.position });
+  expect(travel.destinations.map((destination) => destination.id)).toContain(TOWN_HEARTH.id);
+  expect(travel.destinations.map((destination) => destination.id)).toContain('street-1-1');
+  expect(travel.destinations.map((destination) => destination.id)).not.toContain(street.id);
+  expect(travel.destinations.map((destination) => destination.id)).not.toContain('street-1-2');
+  expect(travel.destinations.length).toBeLessThanOrEqual(CIVIC_LOTS.length + 1);
+  expect(new Set(travel.destinations.map((destination) => destination.id)).size).toBe(
+    travel.destinations.length
+  );
   const send = vi.spyOn(NetworkManager.getInstance(), 'sendMessage').mockReturnValue(true);
-  document.querySelector<HTMLButtonElement>(`[data-furnace-id="${TOWN_HEARTH.id}"]`)?.click();
+  requestFurnaceTravel(street.id);
+  requestFurnaceTravel('street-1-2');
+  expect(send).not.toHaveBeenCalled();
+  requestFurnaceTravel(TOWN_HEARTH.id);
   expect(send).toHaveBeenCalledWith({
     type: 'travelFurnace',
     id: player.id,
@@ -184,12 +178,10 @@ test('a lit street offers free travel to Town Square and other lit streets but n
   window.dispatchEvent(new CustomEvent('furnaceTravelResult', { detail: { ok: true } }));
   expect(isGameOverlayOpen('town-store')).toBe(false);
   send.mockRestore();
-  map.dispose();
-  travelHost.remove();
   worldFurnaces.replaceLit([]);
 });
 
-test('a touch boarding gesture opens the map only after its click completes', () => {
+test('a boarding command rechecks the current footprint before opening a furnace menu', () => {
   closeTownStore();
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
@@ -199,28 +191,26 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   player.ship.health = 100;
   player.ship.exploding = false;
   player.ship.furnaceTransit = null;
-  const width = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
-  syncFurnaceTravelPrompt();
-  const ability = document.querySelector<HTMLButtonElement>('#furnace-travel-prompt button');
-  if (!ability) {
-    throw new Error('Missing furnace prompt');
+  const restoreViewport = setWindowViewport(390, 844);
+  try {
+    syncFurnaceTravelPrompt();
+    expect(readFieldHints().find((hint) => hint.id === 'furnace-travel-prompt')).toMatchObject({
+      text: '',
+      actionLabel: 'Enter',
+    });
+    expect(isGameOverlayOpen('town-store')).toBe(false);
+    // A stored hint cannot board after the ship leaves the offered footprint.
+    player.ship.position = { x: 800, y: 0 };
+    activateFieldHint('furnace-travel-prompt');
+    expect(isGameOverlayOpen('town-store')).toBe(false);
+    player.ship.position = { x: 0, y: 0 };
+    activateFieldHint('furnace-travel-prompt');
+    expect(isGameOverlayOpen('town-store')).toBe(true);
+    expect(readFieldHints().find((hint) => hint.id === 'furnace-travel-prompt')).toBeUndefined();
+    closeTownStore();
+  } finally {
+    restoreViewport();
   }
-  expect(ability.textContent).toBe('Enter');
-  ability.setPointerCapture = vi.fn();
-  ability.hasPointerCapture = vi.fn().mockReturnValue(true);
-  ability.releasePointerCapture = vi.fn();
-  ability.dispatchEvent(
-    new PointerEvent('pointerdown', { pointerId: 7, pointerType: 'touch', bubbles: true })
-  );
-  expect(isGameOverlayOpen('town-store')).toBe(false);
-  ability.dispatchEvent(
-    new PointerEvent('pointerup', { pointerId: 7, pointerType: 'touch', bubbles: true })
-  );
-  expect(isGameOverlayOpen('town-store')).toBe(false);
-  ability.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true }));
-  expect(isGameOverlayOpen('town-store')).toBe(true);
-  closeTownStore();
-  width.mockRestore();
 });
 
 test('boarding hints query the current touch mode only while a live pilot can board', () => {
@@ -248,10 +238,8 @@ test('boarding hints query the current touch mode only while a live pilot can bo
       removeListener() {},
     })
   );
-  const hint = () => document.querySelector('#furnace-travel-prompt');
-  const button = () => hint()?.querySelector('button');
-  const line = () => hint()?.querySelector('span');
-  const shown = () => hint()?.classList.contains('is-visible') ?? false;
+  const hint = () => readFieldHints().find((item) => item.id === 'furnace-travel-prompt');
+  const shown = () => hint() !== undefined;
   try {
     worldFurnaces.replaceLit([{ id: street.id, builderName: 'Pilot' }]);
     player.ship.position = { x: 800, y: 0 };
@@ -268,8 +256,8 @@ test('boarding hints query the current touch mode only while a live pilot can bo
     player.ship.position = { ...TOWN_HEARTH.position };
     syncFurnaceTravelPrompt();
     expect(shown()).toBe(true);
-    expect(line()?.textContent).toBe('Press E to enter');
-    expect(button()?.hidden).toBe(true);
+    expect(hint()?.text).toBe('Press E to enter');
+    expect(hint()?.actionLabel).toBeNull();
     expect(media.mock.calls).toEqual([['(pointer: coarse)'], ['(hover: none)']]);
 
     media.mockClear();
@@ -281,19 +269,19 @@ test('boarding hints query the current touch mode only while a live pilot can bo
     player.ship.health = 100;
     syncFurnaceTravelPrompt();
     expect(shown()).toBe(true);
-    expect(button()?.hidden).toBe(false);
-    expect(button()?.textContent).toBe('Enter');
-    expect(line()?.hidden).toBe(true);
+    expect(hint()?.actionLabel).not.toBeNull();
+    expect(hint()?.actionLabel).toBe('Enter');
+    expect(hint()?.text).toBe('');
     expect(media).toHaveBeenCalledTimes(2);
 
     media.mockClear();
     player.ship.position = { ...street.position };
     syncFurnaceTravelPrompt();
-    expect(button()?.textContent).toBe('Tap to travel');
+    expect(hint()?.actionLabel).toBe('Tap to travel');
     coarse = false;
     syncFurnaceTravelPrompt();
-    expect(line()?.textContent).toBe('Press E to travel');
-    expect(button()?.hidden).toBe(true);
+    expect(hint()?.text).toBe('Press E to travel');
+    expect(hint()?.actionLabel).toBeNull();
     expect(media).toHaveBeenCalledTimes(4);
 
     media.mockClear();
@@ -305,8 +293,8 @@ test('boarding hints query the current touch mode only while a live pilot can bo
     coarse = true;
     syncFurnaceTravelPrompt();
     expect(shown()).toBe(true);
-    expect(button()?.textContent).toBe('Tap to travel');
-    expect(button()?.hidden).toBe(false);
+    expect(hint()?.actionLabel).toBe('Tap to travel');
+    expect(hint()?.actionLabel).not.toBeNull();
     expect(media).toHaveBeenCalledTimes(2);
   } finally {
     media.mockRestore();
@@ -330,13 +318,13 @@ test('a Hauler on an unbuilt furnace footprint is told only Scouts can build it'
   }
   worldFurnaces.replaceLit([]);
   closeTownStore();
-  const hint = () => document.querySelector('#furnace-build-hint');
-  const shown = () => hint()?.classList.contains('is-visible') ?? false;
+  const hint = () => readFieldHints().find((item) => item.id === 'furnace-build-hint');
+  const shown = () => hint() !== undefined;
   player.ship.position = { x: lot.position.x + lot.radius - 5, y: lot.position.y };
   syncFurnaceTravelPrompt();
   expect(shown()).toBe(true);
-  expect(hint()?.textContent).toBe(SCOUT_ONLY_BUILD_HINT);
-  expect(hint()?.querySelector('button')?.hidden).toBe(true);
+  expect(hint()?.text).toBe(SCOUT_ONLY_BUILD_HINT);
+  expect(hint()?.actionLabel).toBeNull();
 
   // Beside the grate but off it: the same footprint rule as Scout Build.
   player.ship.position = { x: lot.position.x + lot.radius + 40, y: lot.position.y };
@@ -349,10 +337,10 @@ test('a Hauler on an unbuilt furnace footprint is told only Scouts can build it'
   player.score = lot.cost - 25;
   syncFurnaceTravelPrompt();
   expect(shown()).toBe(true);
-  expect(hint()?.textContent).toBe('You need 25 more points to build this furnace');
+  expect(hint()?.text).toBe('You need 25 more points to build this furnace');
   player.score = lot.cost - 1;
   syncFurnaceTravelPrompt();
-  expect(hint()?.textContent).toBe('You need 1 more point to build this furnace');
+  expect(hint()?.text).toBe('You need 1 more point to build this furnace');
   player.score = lot.cost;
   syncFurnaceTravelPrompt();
   expect(shown()).toBe(false);

@@ -1,8 +1,20 @@
 import { flushSync, mount, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CIVIC_LOTS, TOWN_HEARTH } from '../../../shared/furnaces';
 import TownPanel from '../../../src/components/game/TownPanel.svelte';
 import type { TownStoreView, TownView } from '../../../src/runtime/townStore';
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
 
 const initialView: TownStoreView = {
   mode: 'entry',
@@ -74,18 +86,7 @@ async function start(initial = initialView) {
   const onmode = vi.fn((mode: TownView) => view.update((previous) => ({ ...previous, mode })));
   const onpurchase = vi.fn();
   const onclose = vi.fn();
-  const disposeTravel = vi.fn();
-  const mountTravel = vi.fn((host: HTMLElement) => {
-    expect(host.id).toBe('legacy-furnace-travel');
-    expect(host.childNodes).toHaveLength(0);
-    const marker = document.createElement('span');
-    marker.textContent = 'Imperative travel map';
-    host.append(marker);
-    return () => {
-      marker.remove();
-      disposeTravel();
-    };
-  });
+  const ontravel = vi.fn();
   panel = mount(TownPanel, {
     target: document.body,
     props: {
@@ -95,17 +96,19 @@ async function start(initial = initialView) {
       onmode,
       onpurchase,
       onclose,
-      mountTravel,
+      travel: { source: TOWN_HEARTH, destinations: CIVIC_LOTS.slice(0, 1), rotation: 0 },
+      ontravel,
     },
   });
   await settle();
-  return { view, onmode, onpurchase, onclose, mountTravel, disposeTravel };
+  return { view, onmode, onpurchase, onclose, ontravel };
 }
 afterEach(async () => {
   if (panel) {
     await unmount(panel);
   }
   panel = undefined;
+  vi.unstubAllGlobals();
 });
 
 test('Town Square offers exact purchase commands while owned, locked and unaffordable offers stay disabled', async () => {
@@ -141,22 +144,25 @@ test('Town Square offers exact purchase commands while owned, locked and unaffor
   expect(onclose).toHaveBeenCalledTimes(1);
 });
 
-test('travel mode mounts one isolated map host and navigation disposes it before returning to Store', async () => {
-  const { onmode, mountTravel, disposeTravel } = await start();
+test('travel mode renders furnace destinations and navigation removes them before returning to Store', async () => {
+  const { onmode, ontravel } = await start();
   button('Fast Travel').click();
   expect(onmode).toHaveBeenCalledExactlyOnceWith('travel');
   await settle();
-  expect(mountTravel).toHaveBeenCalledTimes(1);
-  expect(document.querySelector('#legacy-furnace-travel')?.textContent).toBe(
-    'Imperative travel map'
-  );
+  const marker = document.querySelector<HTMLButtonElement>('[data-furnace-id]');
+  if (!marker || !CIVIC_LOTS[0]) {
+    throw new Error('Missing furnace destination');
+  }
+  marker.click();
+  expect(ontravel).toHaveBeenCalledExactlyOnceWith(CIVIC_LOTS[0].id);
   button('Back to Town Square').click();
   await settle();
-  expect(disposeTravel).toHaveBeenCalledTimes(1);
-  expect(document.querySelector('#legacy-furnace-travel')).toBeNull();
+  expect(document.querySelector('.furnace-travel-viewport')).toBeNull();
+  marker.click();
+  expect(ontravel).toHaveBeenCalledTimes(1);
   button('Store').click();
   await settle();
-  expect(mountTravel).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('.furnace-travel-viewport')).toBeNull();
 });
 
 test('keyed offers retain focus across bank ticks and transfer focus when buying becomes unavailable', async () => {
@@ -193,7 +199,7 @@ test('keyed offers retain focus across bank ticks and transfer focus when buying
 });
 
 test('a remote furnace exposes travel without a Town Square back action and unmount disposes the map', async () => {
-  const { disposeTravel } = await start({
+  await start({
     ...initialView,
     mode: 'travel',
     atTown: false,
@@ -209,5 +215,5 @@ test('a remote furnace exposes travel without a Town Square back action and unmo
   }
   await unmount(panel);
   panel = undefined;
-  expect(disposeTravel).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('.furnace-travel-viewport')).toBeNull();
 });

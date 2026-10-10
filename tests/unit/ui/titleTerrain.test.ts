@@ -2,10 +2,13 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { initTitleTerrain } from '../../../src/rendering/titleTerrain';
 
+let stop: (() => void) | undefined;
 const originalViewport = { width: window.innerWidth, height: window.innerHeight };
 const canvasHtml = '<canvas id="title-terrain" aria-hidden="true"></canvas>';
 
 afterEach(() => {
+  stop?.();
+  stop = undefined;
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
     value: originalViewport.width,
@@ -42,7 +45,10 @@ test.each([
     const moves = vi.spyOn(context, 'moveTo');
     const labels = vi.spyOn(context, 'fillText');
     const arc = vi.spyOn(context, 'arc');
-    initTitleTerrain();
+    if (!canvas) {
+      throw new Error('Title canvas missing');
+    }
+    stop = initTitleTerrain(canvas);
     expect(stroke.mock.calls.length).toBeGreaterThan(10);
     expect(labels).not.toHaveBeenCalled();
     expect(arc).not.toHaveBeenCalled();

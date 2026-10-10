@@ -34,7 +34,7 @@ function pilot() {
     getNetworkManager: () => ({ isConnected: true, sendMessage: resync }),
   } satisfies EventLoopLifecycle;
   const resync = vi.fn(() => true);
-  const paintDebugHud = vi.fn((now: number) => {
+  const present = vi.fn((now: number) => {
     hud.textContent = `Frame ${now}`;
   });
   const removedStart = vi.spyOn(events, 'removeEventListener');
@@ -57,7 +57,8 @@ function pilot() {
     cancelAnimationFrame: (id: number) => {
       frames.delete(id);
     },
-    paintDebugHud,
+    present,
+    reportFailure: vi.fn(),
   } satisfies EventLoopHost;
   const mount = () => {
     const loop = new EventLoop(lifecycle, host);
@@ -81,7 +82,7 @@ function pilot() {
     frames,
     lifecycle,
     hud,
-    paintDebugHud,
+    present,
     removedStart,
     removedVisibility,
     resync,
@@ -91,7 +92,7 @@ function pilot() {
   };
 }
 
-test('two mounted pilots paint their own HUD and a disposed pilot cannot restart or steal frames', () => {
+test('two mounted pilots publish their own presentation and a disposed pilot cannot restart or steal frames', () => {
   const a = pilot();
   const b = pilot();
   const loopA = a.mount();
@@ -102,12 +103,12 @@ test('two mounted pilots paint their own HUD and a disposed pilot cannot restart
   expect(a.frames.size).toBe(1);
   expect(b.frames.size).toBe(1);
   a.tick(116);
-  expect(a.paintDebugHud).toHaveBeenCalledWith(116);
-  expect(b.paintDebugHud).not.toHaveBeenCalled();
+  expect(a.present).toHaveBeenCalledWith(116);
+  expect(b.present).not.toHaveBeenCalled();
   expect(a.hud.textContent).toBe('Frame 116');
   expect(b.hud.textContent).toBe('');
   b.tick(120);
-  expect(b.paintDebugHud).toHaveBeenCalledWith(120);
+  expect(b.present).toHaveBeenCalledWith(120);
   expect(b.hud.textContent).toBe('Frame 120');
   expect(a.hud.textContent).toBe('Frame 116');
   const captured = a.frames.values().next().value;

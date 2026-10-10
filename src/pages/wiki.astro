@@ -1,0 +1,28 @@
+---
+import { getCollection } from 'astro:content';
+import WikiShell from '../components/wiki/WikiShell.svelte';
+import '../styles/theme.css';
+
+const articles = (await getCollection('wiki'))
+  .map((entry) => entry.data)
+  .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Field manual | GeoRoids</title>
+    <meta
+      name="description"
+      content="The GeoRoids field manual. Meet every ship, learn its abilities, and explore combat, asteroids, pickups, and flight with animated demonstrations."
+    />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="canonical" href="https://www.georoids.com/wiki/" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <WikiShell {articles} client:load />
+  </body>
+</html>

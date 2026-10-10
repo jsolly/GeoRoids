@@ -15,7 +15,7 @@ import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { expect, test } from 'vitest';
 
-const WIKI_INDEX_ENTRYPOINT_PATTERN = /wiki\/index\.html/u;
+const WIKI_INDEX_ENTRYPOINT_PATTERN = /src\/pages\/wiki\.astro/u;
 const NEW_GAME_RULE_PATH_PATTERN = /src\/entities\/new-game-rule\.ts/u;
 
 test('a changed wiki entrypoint or newly added game rule requires a new documentation review', () => {
@@ -81,13 +81,13 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
       `${readFileSync(prose, 'utf8')}\n![A pilot practicing thrust](/wiki/uploads/editor.png)\n`
     );
     expect(check()).toContain('source review passed');
-    const entry = join(fixture, 'wiki/index.html');
+    const entry = join(fixture, 'src/pages/wiki.astro');
     const original = readFileSync(entry);
     writeFileSync(entry, `${original.toString()}\n<!-- changed entrypoint -->\n`);
     expect(check).toThrow(WIKI_INDEX_ENTRYPOINT_PATTERN);
     writeFileSync(entry, original);
     expect(check()).toContain('source review passed');
-    const otherEntry = 'index.html';
+    const otherEntry = 'src/pages/index.astro';
     const otherOriginal = readFileSync(join(fixture, otherEntry));
     writeFileSync(entry, `${original.toString()}\n<!-- first source review -->\n`);
     writeFileSync(
@@ -100,11 +100,11 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
       '--note',
       'Reviewed first entry',
       '--source',
-      'wiki/index.html',
+      'src/pages/wiki.astro',
       '--topic',
       'field-manual',
       '--owner',
-      'wiki/index.html=field-manual'
+      'src/pages/wiki.astro=field-manual'
     );
     expect(JSON.parse(readFileSync(reviewPath, 'utf8')).hashes[otherEntry]).toBe(oldEntryHash);
     execFileSync(
@@ -140,7 +140,7 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     } finally {
       writeFileSync(formatterConfig, originalConfig);
     }
-    expect(() => check()).toThrow(/index\.html/u);
+    expect(() => check()).toThrow(/index\.astro/u);
     check(
       '--accept',
       '--note',
@@ -219,6 +219,35 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     accept('--source', added, '--topic', 'controls', '--owner', `${added}=controls`);
     expect(JSON.parse(readFileSync(reviewPath, 'utf8')).hashes[added]).toBeUndefined();
     expect(check()).toContain('source review passed');
+    // Every new frontend language must invalidate on addition, edit and deletion.
+    for (const path of [
+      'src/components/wiki/ReviewFixture.svelte',
+      'src/pages/review-fixture.astro',
+      'src/styles/review-fixture.css',
+      'astro.config.ts',
+      'scripts/client-build.ts',
+    ]) {
+      const target = join(fixture, path);
+      mkdirSync(dirname(target), { recursive: true });
+      const originalSource = existsSync(target) ? readFileSync(target) : undefined;
+      writeFileSync(target, '/* first reviewed source */\n');
+      expect(check).toThrow(path);
+      accept('--source', path, '--topic', 'field-manual', '--owner', `${path}=field-manual`);
+      writeFileSync(target, '/* second reviewed source */\n');
+      expect(check).toThrow(path);
+      accept('--source', path, '--topic', 'field-manual', '--owner', `${path}=field-manual`);
+      rmSync(target);
+      expect(check).toThrow(path);
+      expect(() => accept('--source', path, '--topic', 'field-manual')).toThrow(
+        /requires --owner/u
+      );
+      accept('--source', path, '--topic', 'field-manual', '--owner', `${path}=field-manual`);
+      if (originalSource !== undefined) {
+        writeFileSync(target, originalSource);
+        accept('--source', path, '--topic', 'field-manual', '--owner', `${path}=field-manual`);
+      }
+      expect(check()).toContain('source review passed');
+    }
     const mapped = 'src/input/keybindings.ts';
     writeFileSync(
       join(fixture, mapped),

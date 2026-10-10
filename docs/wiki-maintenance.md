@@ -1,6 +1,27 @@
 # Maintaining the field manual
 
-The manual is a second Vite entry at `/wiki/`, deployed with the client on the same domain. It never boots the game or opens a gameplay WebSocket. Articles use fragment links such as `/wiki/#hauler`; Vite emits `dist/wiki/index.html`. The existing Vercel middleware rewrites both `/wiki` and `/wiki/` to that entry while preserving query parameters; a Vite plugin applies the same mapping in development and build previews. Search covers titles, summaries, headings, and rule text. No separate service or database is required. Vite commands use its `runner` config loader so the build-time content compiler can import the existing TypeScript game definitions without requiring native Node import syntax across gameplay modules.
+Astro prerenders the manual at `/wiki/` alongside the game and debug pages. The
+static output is `dist/wiki/index.html`; `/wiki` and `/wiki/` preserve query
+parameters and article fragments such as `/wiki/#hauler`. Ordinary document
+navigation needs no routing middleware, client router or prefetch. The manual
+never starts gameplay or opens a game WebSocket.
+
+`src/content.config.ts` registers the custom loader in
+`src/wiki/contentLoader.ts`. It calls the same validated compiler,
+`scripts/wiki-content.ts`, used by the maintenance check. Astro does not apply a
+second Markdown renderer, and the collection does not use MDX. Development
+refreshes article additions, edits and deletions; changes to generated reference
+inputs rebuild Astro's content module graph.
+
+The static document contains the overview and every article with unique anchors.
+Without JavaScript, readers can follow links, read generated values and view
+illustration posters. `src/components/wiki/WikiShell.svelte` enhances that document
+with shadcn-svelte search controls and navigation, showing one overview, article,
+search or not-found panel. Search covers titles, summaries, headings and rules
+without changing the hash. Clearing search restores the route; following its
+current hash clears search and returns to the route's beginning. Unknown or
+malformed hashes show the manual's not-found panel. Charts and animated media
+mount only for active articles and are disposed on navigation or teardown.
 
 ## Content and coverage
 
@@ -26,7 +47,7 @@ Back and Forward return to the scroll position of that visit, including after a 
 
 Each ship page pairs an Apache ECharts SVG radar with seven base-stat ratings and exact values. `src/wiki/shipScorecard.ts` derives both displays from the current ship definitions. Each stat maps linearly from the fleet minimum to maximum onto 1–5 bubbles, rounded to a whole bubble. Size, shot interval, and ability cooldown reverse the scale so smaller or shorter scores higher. Equal fleet-wide values score 3. These compare base stats, not ability effectiveness or an overall ship ranking.
 
-The Wiki imports only the radar chart and SVG renderer; gameplay does not load ECharts. Navigation disposes the chart and its resize observer. The HTML values and accessible bubble labels remain the readable counterpart to the visual radar.
+The Wiki imports only the radar chart and SVG renderer; the build-generated gameplay module graph rejects ECharts in gameplay bundles. Static rendering does not initialize charts. Navigation disposes the chart and its resize observer. The HTML values and accessible bubble labels remain the readable counterpart to the visual radar.
 
 ## Demonstrations
 
@@ -51,7 +72,7 @@ Use the pinned Node dependency installation and the same Pillow version for rege
 
 Run commands from `/Users/johnsolly/code/GeoRoids` or the root of its checkout.
 
-`npm run check:wiki` validates frontmatter, stable article IDs, related and body links, image alternative text and local upload paths, source paths, demonstrations, and the accepted source digest. Markdown renders with HTML disabled; executable HTML is never inserted into the page. Gameplay source additions, removals, and changes invalidate the review, including files not cited in an existing article. Changes to rendering, generated demonstrations, and generation scripts also invalidate it. Editorial Markdown and uploaded screenshots are validated on every build but do not invalidate the gameplay review. They cannot change the generated facts or accepted source digest. The build runs this check so stale documentation cannot quietly pass the normal release path.
+`npm run check:wiki` validates frontmatter, stable article IDs, related and body links, image alternative text and local upload paths, source paths, demonstrations, and the accepted source digest. Markdown renders with HTML disabled; executable HTML is never inserted into the page. Gameplay source additions, removals, and changes invalidate the review, including files not cited in an existing article. The inventory also tracks Astro pages, Svelte components, styles, the content loader and frontend configuration, so adding or deleting an interface cannot bypass review. Changes to rendering, generated demonstrations, and generation scripts also invalidate it. Editorial Markdown and uploaded screenshots are validated on every build but do not invalidate the gameplay review. They cannot change the generated facts or accepted source digest. The build runs this check so stale documentation cannot quietly pass the normal release path.
 
 When a check fails:
 
@@ -70,3 +91,13 @@ For a change confined to the Wiki checker, a review command from `/Users/johnsol
 ```sh
 npm run wiki:review -- --source scripts/wiki-check.ts --topic field-manual --owner scripts/wiki-check.ts=field-manual --note "Reviewed scoped maintenance checks; player rules and demonstrations are unchanged."
 ```
+
+## Live CMS acceptance
+
+Fixture checks prove collection validation and rendering, but do not verify an
+editor session. Select the feature branch in Pages CMS, save an editorial change and upload
+an image there. An agent may perform this check when John authorizes browser
+editing. Validate the resulting Git change,
+inspect the rendered article and image, then publish through `/ship` and verify
+the exact deployed release. Record that acceptance as unverified until the live
+editor save and published result have both been observed.

@@ -588,7 +588,7 @@ function failingInspection(f) {
     `#!${process.execPath}
 const args = process.argv.slice(2);
 if (require('node:fs').existsSync(${JSON.stringify(fail)}) &&
-    args[0] === ${JSON.stringify('-axo')}) {
+    (args[0] === '-axo' || args[0] === '-g')) {
   process.stderr.write('inspection-unavailable\\n');
   process.exit(2);
 }
@@ -960,7 +960,7 @@ function real() {
   const result = cp.spawnSync('/bin/ps', args, {stdio:'inherit'});
   process.exit(result.status ?? 1);
 }
-const matches = config && (config.target === 'group' ? args[0] === '-axo' :
+const matches = config && (config.target === 'group' ? (args[0] === '-axo' || args[0] === '-g') :
   args[0] === '-p' && args[2] === '-o' && args[3] === 'ppid=,stat=,lstart=' &&
   Number(args[1]) === (config.target === 'self' ? process.ppid : config.target));
 if (!matches) real();
@@ -1093,3 +1093,169 @@ poll.unref();
   await worker.child.completed;
   assert(existsSync(join(f.common, 'georoids-validation-checkout.lock', 'owner.json')));
 });
+
+test('group cleanup waits for a surviving descendant and leaves a foreign group running', async (t) => {
+  const f = fixture(t);
+  const census = join(f.directory, 'group-census.jsonl');
+  const leaderIdentity = join(f.directory, 'leader.json');
+  const preload = join(f.directory, 'record-group-inspection.mjs');
+  writeFileSync(
+    preload,
+    `
+import cp from 'node:child_process';
+import fs from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
+const real = cp.spawnSync;
+cp.spawnSync = (file,args,options) => {
+  const result = real(file,args,options);
+  if(file === 'ps' && (args[0] === '-g' || args[0] === '-axo')) {
+    fs.appendFileSync(${JSON.stringify(census)},JSON.stringify({args,status:result.status,stdout:result.stdout,stderr:result.stderr,error:result.error?.message,signal:result.signal})+'\\n');
+  }
+  return result;
+};
+syncBuiltinESMExports();
+`
+  );
+  const foreign = f.start('foreign', { cwd: f.sibling('foreign'), kind: 'integration' });
+  await until(() => existsSync(foreign.started), 'foreign command');
+  const foreignIdentity = JSON.parse(readFileSync(foreign.started, 'utf8'));
+  const own = f.start('own', {
+    kind: 'integration',
+    preload,
+    command: [
+      process.execPath,
+      '-e',
+      `
+const fs = require('node:fs');
+fs.writeFileSync(${JSON.stringify(leaderIdentity)},JSON.stringify({pid:process.pid}));
+const child = require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(childScript)},${JSON.stringify(join(f.directory, 'own.started'))},${JSON.stringify(join(f.directory, 'own.release'))},'clean'],{stdio:'ignore'});
+child.unref();
+const poll = setInterval(()=>{if(fs.existsSync(${JSON.stringify(join(f.directory, 'own.started'))})){clearInterval(poll);process.exit(0);}},10);
+`,
+    ],
+  });
+  const records = () =>
+    existsSync(census)
+      ? readFileSync(census, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line))
+      : [];
+  await until(
+    () => existsSync(own.started) && records().length > 0,
+    'orphaned owned descendant inspection'
+  );
+  const leader = JSON.parse(readFileSync(leaderIdentity, 'utf8')).pid;
+  const descendant = JSON.parse(readFileSync(own.started, 'utf8')).pid;
+  const observed = records().find((record) =>
+    record.stdout.split('\n').some((line) => {
+      const [pid, group] = line.trim().split(/\s+/u);
+      return Number(pid) === descendant && Number(group) === leader;
+    })
+  );
+  assert(observed, 'the real inspector sees the descendant after its leader exited');
+  assert.equal(own.child.exitCode, null);
+  assert(existsSync(join(f.common, 'georoids-validation-checkout.lock')));
+  if (process.platform === 'darwin') {
+    assert.deepEqual(observed.args, ['-g', String(leader), '-o', 'pid=,pgid=,stat=']);
+    assert(
+      observed.stdout
+        .split('\n')
+        .filter(Boolean)
+        .every((line) => Number(line.trim().split(/\s+/u)[1]) === leader)
+    );
+    assert(
+      !observed.stdout
+        .split('\n')
+        .some((line) => Number(line.trim().split(/\s+/u)[0]) === foreignIdentity.pid)
+    );
+  }
+  own.finish();
+  assert.equal((await own.child.completed).code, 0, own.child.output);
+  assert.equal(
+    foreign.child.exitCode,
+    null,
+    'cleanup does not wait for or signal the foreign group'
+  );
+  const descendantFinished = records().at(-1);
+  const ownedRows = descendantFinished.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.trim().split(/\s+/u))
+    .filter(([, group]) => Number(group) === leader);
+  assert(
+    ownedRows.every(([, , state]) => state.includes('Z')),
+    'no live owned descendants remain'
+  );
+  // A directly reaped command has no remaining group members, including zombies.
+  const empty = f.start('empty', { kind: 'integration', preload });
+  await until(() => existsSync(empty.started), 'ordinary owned command');
+  empty.finish();
+  assert.equal((await empty.child.completed).code, 0, empty.child.output);
+  const final = records().at(-1);
+  if (process.platform === 'darwin') {
+    assert.equal(final.status, 1);
+    assert.equal(final.stdout, '');
+    assert.equal(final.stderr, '');
+    assert.equal(final.signal, null);
+    assert.equal(final.error, undefined);
+  }
+  foreign.finish();
+  assert.equal((await foreign.child.completed).code, 0, foreign.child.output);
+});
+
+for (const failure of [
+  'permission',
+  'absent-row',
+  'absent-whitespace',
+  'absent-stderr-whitespace',
+  'malformed',
+  'wrong-group',
+  'signal',
+  'timeout',
+]) {
+  test(`a ${failure} group inspection cannot release ownership`, async (t) => {
+    const f = fixture(t);
+    const armed = join(f.directory, 'fault-armed');
+    const preload = join(f.directory, 'fail-group-inspection.mjs');
+    writeFileSync(
+      preload,
+      `
+import cp from 'node:child_process';
+import fs from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
+const real = cp.spawnSync;
+cp.spawnSync = (file,args,options) => {
+  if(file !== 'ps' || !fs.existsSync(${JSON.stringify(armed)}) || !['-g','-axo'].includes(args[0])) return real(file,args,options);
+  const failure = ${JSON.stringify(failure)};
+  if(failure === 'wrong-group' && process.platform !== 'darwin') return {status:1,signal:null,stdout:'1 1 S\\n',stderr:''};
+  if(failure === 'wrong-group') return {status:0,signal:null,stdout:'1 '+(Number(args[1])+1)+' S\\n',stderr:''};
+  if(failure === 'permission') return {status:1,signal:null,stdout:'',stderr:'Operation not permitted'};
+  if(failure === 'absent-row') return {status:1,signal:null,stdout:'1 1 S\\n',stderr:''};
+  if(failure === 'absent-whitespace') return {status:1,signal:null,stdout:' ',stderr:''};
+  if(failure === 'absent-stderr-whitespace') return {status:1,signal:null,stdout:'',stderr:' '};
+  if(failure === 'malformed') return {status:0,signal:null,stdout:'invalid row',stderr:''};
+  if(failure === 'signal') return {status:1,signal:'SIGTERM',stdout:'',stderr:''};
+  return {status:1,signal:null,error:Object.assign(new Error('fixture inspection timeout'),{code:'ETIMEDOUT'}),stdout:'',stderr:''};
+};
+syncBuiltinESMExports();
+`
+    );
+    const owned = f.start('fault', { kind: 'integration', preload });
+    await until(() => existsSync(owned.started), 'owned command before inspector failure');
+    writeFileSync(armed, '');
+    owned.finish();
+    assert.equal((await owned.child.completed).code, 1, owned.child.output);
+    assert.match(
+      owned.child.output,
+      failure === 'wrong-group' && process.platform === 'darwin'
+        ? /Unexpected validation process group inspection/u
+        : failure === 'malformed'
+          ? /Malformed validation process group inspection/u
+          : /Cannot inspect validation process group/u
+    );
+    assert(existsSync(join(f.common, 'georoids-validation-checkout.lock', 'owner.json')));
+    assert.match(owned.child.output, /Validation cleanup is unproven/u);
+  });
+}

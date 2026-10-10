@@ -6,7 +6,7 @@ import '../src/utils/logLevel';
 if (typeof window !== 'undefined') {
   // Use the DOM owned by Vitest so events and elements share one window.
   document.body.innerHTML =
-    readFileSync(resolve(__dirname, '../index.html'), 'utf8')
+    readFileSync(resolve(__dirname, '../src/components/LegacyGameDocument.astro'), 'utf8')
       .split('<body>')[1]
       ?.split('</body>')[0] ?? '';
 

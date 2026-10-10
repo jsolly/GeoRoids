@@ -8,11 +8,11 @@ Run `npm run gate` before publication and again after review fixes. It includes 
 
 After merging, verify Vercel's Git deployment is READY for the merged commit at <https://www.georoids.com>. Classify server inputs with the classifier's `--changed` mode with the actual base and merge SHAs from the ship receipt. If the graph requires a server deployment, independently verify Railway's exact release; client success alone is insufficient. Railway auto-deploys main. If deployment is absent or red, inspect the actual trigger and staged platform changes before any exact-commit fallback; never use `railway redeploy` or upload a local tree as proof of the merged release.
 
-Read `/ship`'s installed deploy and smoke references for the canonical follower invocation. Follow the exact release/request through the Production smoke workflow; its receipt uses `releaseSha` and `requestId`. The canonical runner checks client release and module entry identity, declared bundle availability, HTTP health and a genuine current-protocol WebSocket pilot with exact server release admission. It does not launch a browser or certify rendering, keyboard/touch controls, graphics or audio. Preserve healthy persistent-worker state, zero game-loop stalls, protocol admission, authoritative snapshots, movement and a correlated accepted-shot acknowledgement. Headers alone are not release or gameplay proof.
+Read `/ship`'s installed deploy and smoke references for the canonical follower invocation. Follow the exact release/request through the Production smoke workflow; its receipt uses `releaseSha` and `requestId`. The canonical runner checks the full client release SHA and build-generated `client-assets.json` module graph, gameplay entry reachability, declared asset availability, HTTP health and a genuine current-protocol WebSocket pilot with exact server release admission. It does not launch a browser or certify rendering, keyboard/touch controls, graphics or audio. Preserve healthy persistent-worker state, zero game-loop stalls, protocol admission, authoritative snapshots, movement and a correlated accepted-shot acknowledgement. Headers alone are not release or gameplay proof.
 
 Manual production smoke requires a full `PRODUCTION_SMOKE_RELEASE_SHA` and unique `PRODUCTION_SMOKE_REQUEST_ID`, with the checkout matching that SHA. `PRODUCTION_SMOKE_SERVER_SHA`, when supplied, names the separately deployed server; otherwise the classifier computes the minimum server-affecting commit. Use the workflow dispatch inputs `release_sha`, `request_id` and optional `server_sha`. The production runner starts no local server. After a new Railway deployment, follow a fresh smoke for that exact server release. Skipped, cancelled, missing, failed or timed-out smoke remains unverified. Artifacts retain HTTP/release/assets and protocol observations, accepted-shot evidence, persistence health and owned-pilot cleanup.
 
-Open clients check the static same-origin `release.json` for the full build identity, confirm a changed identity twice and retain a per-loaded-build refresh guard. This product refresh behavior is distinct from host deployment proof. The `/wiki` and `/wiki/` rewrite preserves query parameters and remains independently covered.
+Open clients check the static same-origin `release.json` for the full build identity, confirm a changed identity twice and retain a per-loaded-build refresh guard. This product refresh behavior is distinct from host deployment proof. `release.json` is served with `Cache-Control: no-store`. Astro emits static documents at `dist/index.html`, `dist/debug/index.html` and `dist/wiki/index.html`; `/debug` and `/wiki` also accept trailing slashes and retain query parameters. No route-rewrite middleware or client router is required.
 
 ## Deploy
 
@@ -24,7 +24,7 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | **Project** | `georoids` (`jsollys-projects`) |
 | **Production URLs** | **Canonical:** <https://www.georoids.com>; **apex:** <https://georoids.com> (redirects to www); **Vercel default:** `https://georoids-jsollys-projects.vercel.app` |
-| **Build** | `npm run build` → `dist/` (Vite; framework auto-detected) |
+| **Build** | `npm run build` → `dist/` (Astro static output; Vite is managed by Astro) |
 | **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration. Branch pushes do **not** create Preview deployments (`vercel.json` `git.deploymentEnabled`); GeoRoids has no Preview path. |
 | **Local deploy** | None — no `npm run deploy` or CLI deploy step from `/ship` |
 
@@ -34,9 +34,9 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://georoids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
 
-`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit is the first valid 40-character SHA from `VERCEL_GIT_COMMIT_SHA`, then `RAILWAY_GIT_COMMIT_SHA`, then local Git. Empty hosted values do not block the later fallbacks. A missing or invalid commit stops the build because automatic client refresh needs that identity.
+`VITE_BUILD_TIME`, short `VITE_COMMIT_HASH` and full `VITE_COMMIT_SHA` are injected by `scripts/client-build.ts` through `astro.config.ts` at build time — do not set them on Vercel. Only those metadata values and the required `VITE_WEBSOCKET_URL` are exposed to client code. The commit is the first valid 40-character SHA from `VERCEL_GIT_COMMIT_SHA`, then `RAILWAY_GIT_COMMIT_SHA`, then local Git. Empty hosted values do not block the later fallbacks. A missing or invalid commit stops the build because automatic client refresh needs that identity.
 
-Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManager` uses same-origin `/ws`. Vite proxies `/ws` and `/logs` to the configured local game-server port. This also supports phones using a public HTTPS tunnel to the Vite port. Direct Vite runs can override the endpoint in `.env.local` (see `.env.example`).
+Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManager` uses same-origin `/ws`. Astro's Vite configuration proxies `/ws` and `/logs` to the configured local game-server port. This also supports phones using a public HTTPS tunnel to the Astro port. Direct `astro dev` runs can override the endpoint in `.env.local` (see `.env.example`).
 
 ### Railway (game server)
 
@@ -50,7 +50,7 @@ Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManage
 Railpack installs dependencies and runs `npm run build` during the build. The
 tracked [`.railway/railway.ts`](../.railway/railway.ts) keeps the explicit
 `startCommand` on Node with the installed `tsx` loader so the server owns
-shutdown signals; restarts do not install packages or start the Vite client.
+shutdown signals; restarts do not install packages or start the Astro development client.
 The IaC package is a development-only dependency and the CLI must be at least
 5.42.1.
 
@@ -72,15 +72,19 @@ The former `geoasteroids-production-2403.up.railway.app` hostname returns a Rail
 
 ## Commands
 
+Use `npm run dev` for live rebuilding. The former `npm run watch` build command is retired because Astro does not support watched static builds.
+
 ```shell
-# Dev (Vite on :5173 + ws server on :3001 via concurrently)
+# Dev (Astro on :5173 + ws server on :3001 via concurrently)
 npm run dev                # ./scripts/dev-server.sh
 npm run dev:check          # status of dev servers
 npm run dev:kill           # stop only this checkout's owned dev session
 
 # Build / typecheck / lint
-npm run build              # wiki checks + tsc -p tsconfig.build.json + vite build
-npm run check:ts           # tsc --noEmit
+npm run build              # Wiki checks + strict tsc + Astro build + built route/release/asset checks
+npm run check:ts           # strict client/server/shared TypeScript
+npm run check:frontend     # Astro and Svelte diagnostics; warnings fail
+npm run check:format       # pinned Prettier checks Astro/Svelte formats
 npm run check:lint         # biome check --error-on-warnings .
 npm run check:lint-policy  # reject inherited warn/info Biome severities
 npm run check:knip         # fail on unused files/exports/dependencies and config hints
@@ -111,7 +115,7 @@ npm run benchmark          # see benchmarks/README.md
 npx vitest run tests/unit/path/to.test.ts        # focused pure unit checks only
 ```
 
-**Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns one serialized Vitest worker, per-run artifacts and process cleanup. Socket scenarios create and close their own port-zero loopback servers; the code runner starts no Vite/server pair. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
+**Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns one serialized Vitest worker, per-run artifacts and process cleanup. Socket scenarios create and close their own port-zero loopback servers; the code runner starts no Astro/server pair. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
 
 Use repository-relative or absolute paths for explicit integration test files; missing files fail before services start. Selectors must name literal files or directories within the server/entity inventory. Substrings and `:line` suffixes are rejected. Put selectors directly after the runner command; a nonempty `--` tail is rejected to prevent an unintended selection.
 
@@ -119,11 +123,11 @@ Use repository-relative or absolute paths for explicit integration test files; m
 
 ### Two processes, one game
 
-- **Client** (`src/`, served by Vite): rendering, input, prediction, HUD. Entry is `index.html` → `src/core/main.ts`, which composes an injected `EventLoop` and bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
+- **Client** (`src/`, served and built by Astro with Vite): rendering, input, prediction, HUD. Static game and debug routes temporarily share `src/components/LegacyGameDocument.astro` → `src/core/main.ts`, which composes an injected `EventLoop` and bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
 - **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
 - **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
 
-Vite dev proxies `/ws` to `ws://localhost:3001` so the client always connects via the Vite origin.
+Astro's Vite development server proxies `/ws` and `/logs` to the owned local game-server port, normally `3001`, so the client connects through the Astro origin. The Wiki route is a separate Svelte-enhanced static manual and does not initialize the game; see [Wiki maintenance](wiki-maintenance.md).
 
 Gameplay requires snapshot v3 and asteroid interactions. The client adds
 `snapshotVersion=3` and `asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
@@ -181,7 +185,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - **Validation admission:** different worktrees can run complete unit, runner-contract and integration code checks together. Static checks, types and builds can overlap too. A checkout admits one gate, review or standalone harness at a time because its builds and artifacts share ownership. Failed cleanup retains the barrier.
 - **Manual measurement queue:** browser benchmark runner modes and direct frame measurements use one heavyweight FIFO slot in the common Git directory. Queue waits are visible and cancellable and precede execution deadlines. Failed ownership inspection preserves evidence; never delete a live allocator's lock.
 - **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes. There is no full-suite sharding deadline.
-- **Ports:** code integration scenarios own port-zero loopback servers; the code runner does not consume service-port overrides. Manual benchmark harnesses select distinct Vite, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
+- **Ports:** code integration scenarios own port-zero loopback servers; the code runner does not consume service-port overrides. Manual benchmark harnesses select distinct Astro client, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
 - **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
 - **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
@@ -205,10 +209,10 @@ retain their scenario-owned fixtures.
 
 | Service | Port | Health / URL |
 | --- | --- | --- |
-| Vite (client + `/ws` proxy) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
+| Astro (client + `/ws` and `/logs` proxies) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
 | Game server (HTTP + WS) | 3001 | `curl http://localhost:3001/health` |
 
-Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for the interactive session. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Code integration scenarios create their own port-zero loopback servers. Manual benchmark harnesses own separate configured service pairs and refuse occupied ports.
+Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for the interactive session. The launcher keeps `astro dev --ignore-lock` in the foreground under its recorded process tree and owns both services, including content-triggered Astro restarts. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Code integration scenarios create their own port-zero loopback servers. Manual benchmark harnesses own separate configured service pairs and refuse occupied ports.
 
 **Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
 

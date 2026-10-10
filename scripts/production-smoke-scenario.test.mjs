@@ -79,11 +79,21 @@ function clientHttp({
   assetType = 'application/javascript',
   html,
   redirect,
+  assetsManifest,
 } = {}) {
   return (url) => {
     let result;
     if (url.endsWith('/release.json')) {
       result = response(url, { releaseSha: manifest });
+    } else if (url.endsWith('/client-assets.json')) {
+      result = response(
+        url,
+        assetsManifest ?? {
+          releaseSha: manifest,
+          gameplay: ['assets/game-coded.js'],
+          modules: { 'assets/game-coded.js': [] },
+        }
+      );
     } else if (url.endsWith('/health')) {
       result = response(url, world);
     } else if (url.endsWith('.js')) {
@@ -353,6 +363,21 @@ for (const world of [
 }
 for (const options of [
   { manifest: oldRelease },
+  { assetsManifest: { releaseSha: release, gameplay: [], modules: {} } },
+  {
+    assetsManifest: {
+      releaseSha: release,
+      gameplay: ['assets/unreachable.js'],
+      modules: { 'assets/game-coded.js': [], 'assets/unreachable.js': [] },
+    },
+  },
+  {
+    assetsManifest: {
+      releaseSha: release,
+      gameplay: ['assets/game-coded.js'],
+      modules: { 'assets/game-coded.js': ['https://cdn.example/game.js'] },
+    },
+  },
   { bundle: oldRelease },
   { bundleSource: `const env = { VITE_COMMIT_SHA: \`${oldRelease}\` };` },
   { bundleSource: `const env = { VITE_COMMIT_SHA: "${release}' };` },
@@ -378,6 +403,32 @@ for (const options of [
     assert.equal(clock.now(), 100);
   });
 }
+
+test('Astro entry reaches a dynamically imported gameplay chunk and binds its release', async () => {
+  const requests = [];
+  const assetsManifest = {
+    releaseSha: release,
+    gameplay: ['_astro/engine.hash.js'],
+    modules: { '_astro/page.hash.js': ['_astro/engine.hash.js'], '_astro/engine.hash.js': [] },
+  };
+  const http = clientHttp({
+    assetsManifest,
+    html: '<html><canvas id="gameCanvas"></canvas><script type="module" src="/_astro/page.hash.js"></script></html>',
+  });
+  const observed = await waitForClientRelease({
+    expectedSha: release,
+    verifyHttp: (url) => {
+      requests.push(url);
+      return url.endsWith('/page.hash.js')
+        ? response(url, 'import("./engine.hash.js");', 'application/javascript')
+        : http(url);
+    },
+    clock: controlledClock(),
+    readinessMs: 100,
+  });
+  assert.deepEqual(observed, { releaseSha: release, assetCount: 2 });
+  assert.ok(requests.some((url) => url.endsWith('/engine.hash.js')));
+});
 
 for (const quote of ['"', "'", '`']) {
   test(`client release accepts the deployed identity in a ${quote} JavaScript literal`, async () => {

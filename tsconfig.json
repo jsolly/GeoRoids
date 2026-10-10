@@ -25,16 +25,16 @@
   },
   "include": [
     ".railway",
-    "middleware.ts",
     "src",
     "tests",
     "scripts",
     "vitest.config.ts",
-    "vite.config.ts",
+    "astro.config.ts",
     "setup",
     "server",
     "server.ts",
     "shared",
-    "shared-types.ts"
+    "shared-types.ts",
+    ".astro/types.d.ts"
   ]
 }

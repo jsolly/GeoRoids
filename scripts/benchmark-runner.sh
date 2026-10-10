@@ -460,7 +460,7 @@ start_dev_servers() {
     if [ "$RUN_MODE" = benchmark-client ]; then
         local proxy_port="${GEOROIDS_TEST_PROXY_PORT:-$((10#$TEST_SERVER_PORT + 1))}"
         if ! valid_port "$proxy_port" || [ "$proxy_port" -eq "$TEST_SERVER_PORT" ] || [ "$proxy_port" -eq "$TEST_VITE_PORT" ]; then
-            echo "❌ GEOROIDS_TEST_PROXY_PORT must be a valid TCP port distinct from the owned server and Vite ports" >&2
+            echo "❌ GEOROIDS_TEST_PROXY_PORT must be a valid TCP port distinct from the owned server and Astro ports" >&2
             return 64
         fi
         REGISTERING_CHILD=true
@@ -482,7 +482,7 @@ start_dev_servers() {
         [ "$gameplay_port" -eq "$proxy_port" ] || return 1
     fi
     export GEOROIDS_BENCHMARK_WS_URL="ws://localhost:$gameplay_port/ws"
-    local client_command="vite --configLoader runner --port $TEST_VITE_PORT --strictPort"
+    local client_command="astro dev --ignore-lock --port $TEST_VITE_PORT"
     local server_entry=benchmarks/realtime-server.ts
     local server_env=.env.local
     if [ "$BUILD_MODE" = production ]; then
@@ -499,13 +499,13 @@ start_dev_servers() {
                 node scripts/benchmark-build-receipt.mjs record "$REPO_ROOT" "$GEOROIDS_BENCHMARK_WS_URL" "$BENCHMARK_SESSION/build-inputs.json" || return 1
             fi
         fi
-        client_command="vite preview --configLoader runner --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
+        client_command="astro preview --ignore-lock --host 127.0.0.1 --port $TEST_VITE_PORT"
     fi
     echo "🚀 Starting servers owned by this runner..."
     REGISTERING_CHILD=true
     (
         export NODE_ENV="$BUILD_MODE"
-        export VITEST=false
+        export VITEST=""
         export PORT="$TEST_SERVER_PORT"
         export GEOROIDS_PERFORMANCE=1
         export VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws"
@@ -513,7 +513,7 @@ start_dev_servers() {
             --kill-others \
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
-            --names "vite,network" \
+            --names "astro,network" \
             "$client_command" \
             "node --env-file=$server_env --import tsx $server_entry"
     ) &

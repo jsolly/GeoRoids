@@ -22,7 +22,10 @@ import {
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
 
-const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
+const productionHtml = readFileSync(
+  resolve(__dirname, '../../../src/components/LegacyGameDocument.astro'),
+  'utf8'
+);
 
 describe('universe map play chrome', () => {
   const releaseInput = vi.fn();

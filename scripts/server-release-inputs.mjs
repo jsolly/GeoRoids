@@ -15,6 +15,8 @@ const deploymentFiles = new Set([
   '.npmrc',
   'tsconfig.json',
   'tsconfig.build.json',
+  'astro.config.ts',
+  'astro.config.mjs',
   'vite.config.ts',
   'Procfile',
   'Dockerfile',

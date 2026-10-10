@@ -57,14 +57,20 @@ test('repeated owned sessions reuse only the exact successfully built client', (
     mkdirSync(join(root, 'benchmarks'));
     mkdirSync(join(root, 'public/wiki'), { recursive: true });
     mkdirSync(join(root, 'dist/assets'), { recursive: true });
+    const releaseSha = git('rev-parse', 'HEAD').toString().trim();
     const files = {
       'src/game.ts': 'product',
       'benchmarks/scene.ts': 'harness',
       'public/wiki/index.html': 'wiki',
       'package-lock.json': 'lock',
       '.env.production.local': 'VITE_OTHER=value',
-      'dist/index.html': '<script src="/assets/game.js"></script>',
-      'dist/release.json': '{"releaseSha":"fixture"}',
+      'dist/index.html': '<script type="module" src="/assets/game.js"></script>',
+      'dist/release.json': JSON.stringify({ releaseSha }),
+      'dist/client-assets.json': JSON.stringify({
+        releaseSha,
+        gameplay: ['assets/game.js'],
+        modules: { 'assets/game.js': [] },
+      }),
       'dist/assets/game.js': 'built client',
     };
     writeFileSync(join(root, '.gitignore'), '.env.*.local\ndist/\n.performance/\n');
@@ -118,11 +124,16 @@ test('repeated owned sessions reuse only the exact successfully built client', (
     }
     for (const path of ['dist/assets/game.js', 'dist/index.html']) {
       writeFileSync(join(root, path), 'changed');
-      rejects(run('verify'), /Reusable production assets differ/u);
+      rejects(
+        run('verify'),
+        path.endsWith('index.html')
+          ? /Client module entry is missing/u
+          : /Reusable production assets differ/u
+      );
       writeFileSync(join(root, path), files[path]);
     }
     rmSync(join(root, 'dist/assets/game.js'));
-    rejects(run('verify'), /Reusable production assets differ/u);
+    rejects(run('verify'), /Attributed gameplay asset is missing/u);
     writeFileSync(join(root, 'dist/assets/game.js'), files['dist/assets/game.js']);
     writeFileSync(join(root, 'dist/extra.js'), 'unexpected asset');
     rejects(run('verify'), /Reusable production assets differ/u);

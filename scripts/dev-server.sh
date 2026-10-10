@@ -2,7 +2,7 @@
 # Start, inspect, or stop the GeoRoids development session for this checkout.
 #
 # The session record is keyed by the absolute repository path. We never search
-# for or signal arbitrary `vite`, `tsx`, or port-owning processes: a developer
+# for or signal arbitrary `astro`, `tsx`, or port-owning processes: a developer
 # may have another checkout or application running at the same time.
 ((BASH_VERSINFO[0] >= 5)) || { echo "✗ $0 requires Bash >= 5, not $BASH_VERSION. Fix: brew install bash; rerun bash ~/code/dotagents/setup/install-local-agent-runtime.sh; open a new shell." >&2; exit 1; }
 set -Eeuo pipefail
@@ -284,7 +284,7 @@ status() {
     pid="$(read_state_pid)"
     if state_is_owned "$pid"; then
         echo "✅ GeoRoids development session is running (PID $pid)"
-        echo "   Vite:    http://localhost:$DEV_VITE_PORT"
+        echo "   Astro:   http://localhost:$DEV_VITE_PORT"
         echo "   Server:  http://localhost:$DEV_SERVER_PORT"
         return 0
     else
@@ -359,7 +359,7 @@ start() {
     (
         export NODE_ENV=development
         export GEOROIDS_LOCAL_PLAYGROUND="${GEOROIDS_LOCAL_PLAYGROUND:-1}"
-        export VITEST=false
+        export VITEST=""
         export PORT="$DEV_SERVER_PORT"
         # Keep gameplay on the page origin so LAN clients and HTTPS tunnels work.
         export VITE_WEBSOCKET_URL=""
@@ -368,8 +368,8 @@ start() {
             --kill-others \
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
-            --names "vite,network" \
-            "vite --configLoader runner --port $DEV_VITE_PORT --strictPort" \
+            --names "astro,network" \
+            "astro dev --ignore-lock --port $DEV_VITE_PORT" \
             "tsx --env-file=.env.local server.ts"
     ) &
     DEV_PID=$!

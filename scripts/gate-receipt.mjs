@@ -26,6 +26,8 @@ export const STAGES = [
   ['test runner contract', 'check:test-runner'],
   ['dev server contract', 'check:dev-server'],
   ['tsc', 'check:ts'],
+  ['Astro and Svelte', 'check:frontend'],
+  ['frontend formatting', 'check:format'],
   ['benchmark tsc', 'check:benchmarks'],
   ['vitest', 'test'],
   ['build', 'build'],

@@ -3,18 +3,17 @@
   // These modules export configuration consumed by their tool, not by imports.
   "include": [
     ".railway",
-    "middleware.ts",
     "src",
     "tests",
     "scripts",
     "benchmarks",
     "vitest.config.ts",
-    "vite.config.ts",
+    "astro.config.ts",
     "setup",
     "server",
     "server.ts",
     "shared",
     "shared-types.ts"
   ],
-  "files": ["vite.config.ts", "vitest.config.ts"]
+  "files": ["astro.config.ts", "vitest.config.ts"]
 }

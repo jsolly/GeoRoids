@@ -18,6 +18,7 @@ export class WikiScrollMemory {
   private pushed = false;
   private ticket = 0;
   private rememberTimer: ReturnType<typeof setTimeout> | undefined;
+  private ignoreTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingY = 0;
   private pendingRemember = false;
 
@@ -157,6 +158,15 @@ export class WikiScrollMemory {
     this.ignoreScroll = false;
   }
 
+  /** Cancel owned timers when the manual unmounts or hot reloads. */
+  dispose(): void {
+    this.ticket += 1;
+    this.cancelRemember();
+    if (this.ignoreTimer !== undefined) {
+      clearTimeout(this.ignoreTimer);
+    }
+  }
+
   private queueRemember(y: number): void {
     this.pendingY = y;
     this.pendingRemember = true;
@@ -192,7 +202,11 @@ export class WikiScrollMemory {
   private armIgnore(): void {
     this.ignoreScroll = true;
     const ticket = ++this.ticket;
-    setTimeout(() => {
+    if (this.ignoreTimer !== undefined) {
+      clearTimeout(this.ignoreTimer);
+    }
+    this.ignoreTimer = setTimeout(() => {
+      this.ignoreTimer = undefined;
       if (this.ticket !== ticket) {
         return;
       }

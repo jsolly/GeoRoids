@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import WebSocket from 'ws';
+import { clientAssetGraph } from './client-asset-graph.mjs';
 import { requireEvidence, SmokeFailure, smokeClock } from './production-smoke-network.mjs';
 import { verifyAncestry as verifyServerAncestry } from './production-smoke-release.mjs';
 import { minimumServerRelease } from './server-release-inputs.mjs';
@@ -46,7 +47,7 @@ function documentAssets(html) {
       url.origin === new URL(productionUrl).origin &&
         !url.search &&
         !url.hash &&
-        /^\/assets\/[a-zA-Z0-9_.-]+\.(?:js|css)$/u.test(url.pathname),
+        /^\/(?:assets|_astro)\/[a-zA-Z0-9_.-]+\.(?:js|css)$/u.test(url.pathname),
       'Client bundle asset is not first-party'
     );
     return url.href;
@@ -82,7 +83,21 @@ export async function waitForClientRelease({
         /^text\/html\b/iu.test(document.headers.get('content-type') ?? ''),
         'Client document content type is invalid'
       );
-      const { modules, assets } = documentAssets(await document.text());
+      const { modules, assets: documentFiles } = documentAssets(await document.text());
+      const attributed = await (
+        await verifyHttp(new URL('/client-assets.json', productionUrl).href)
+      ).json();
+      const reachable = clientAssetGraph(
+        attributed,
+        expectedSha,
+        modules.map((url) => new URL(url).pathname.slice(1))
+      );
+      const assets = [
+        ...new Set([
+          ...documentFiles,
+          ...reachable.map((path) => new URL(path, productionUrl).href),
+        ]),
+      ];
       let embeddedRelease = false;
       for (const url of assets) {
         const response = await verifyHttp(url);
@@ -97,7 +112,7 @@ export async function waitForClientRelease({
         );
         const body = await response.text();
         requireEvidence(body.length > 0, 'Client bundle asset is empty');
-        if (modules.includes(url) && new RegExp(`(["'\`])${expectedSha}\\1`, 'u').test(body)) {
+        if (javascript && new RegExp(`(["'\`])${expectedSha}\\1`, 'u').test(body)) {
           embeddedRelease = true;
         }
       }

@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "astro/client", "svelte"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "src/**/*.astro", ".astro/types.d.ts"]
+}

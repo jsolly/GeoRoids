@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { SatellitePickupData } from '../../../shared-types';
+import * as audioRuntime from '../../../src/audio/audioRuntime';
 import { GameController } from '../../../src/core/gameController';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
+import { controlSources } from '../../../src/input/controlSources';
 import { keys } from '../../../src/input/keybindings';
+import * as playfieldSelection from '../../../src/input/playfieldSelection';
 import * as touchControls from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
@@ -13,6 +16,7 @@ import {
   type GameRuntime,
   type GameRuntimeHosts,
 } from '../../../src/runtime/gameRuntime';
+import { getOpenGameOverlay } from '../../../src/runtime/overlayState';
 import type { GamePresentation } from '../../../src/runtime/uiTypes';
 import { logger } from '../../../src/utils/Logger';
 import { snapshotFixture } from '../network/snapshotFixture';
@@ -50,8 +54,15 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', (id: number) => {
     frames.delete(id);
   });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   document.body.innerHTML =
-    '<main id="gameWrapper"><div id="gameArea"><canvas id="gameCanvas"></canvas><div id="legacy-play"></div></div><canvas id="title-terrain"></canvas><div id="legacy-menu"></div><div id="legacy-overlay"></div><div id="collector"></div><div id="start-screen"></div></main>';
+    '<main id="gameWrapper"><div id="gameArea"><canvas id="gameCanvas"></canvas><canvas id="spawn-fly-in"></canvas></div><canvas id="title-terrain"></canvas></main>';
   const element = <T extends HTMLElement>(id: string): T => {
     const node = document.querySelector<T>(`#${id}`);
     if (!node) {
@@ -62,14 +73,33 @@ beforeEach(() => {
   hosts = {
     canvas: element<HTMLCanvasElement>('gameCanvas'),
     titleCanvas: element<HTMLCanvasElement>('title-terrain'),
-    collector: element('collector'),
-    legacyMenu: element('legacy-menu'),
-    legacyPlay: element('legacy-play'),
-    legacyOverlay: element('legacy-overlay'),
+    spawnCanvas: element<HTMLCanvasElement>('spawn-fly-in'),
     placeChrome: vi.fn(),
   };
   scope = new AbortController();
 });
+
+/** A headless consumer performs the body-mode projection that GameShell owns. */
+function mountRuntime(signal: AbortSignal): GameRuntime {
+  const runtime = createGameRuntime(hosts, signal);
+  runtime.subscribe((view) => document.body.classList.toggle('in-play', view.inPlay));
+  return runtime;
+}
+
+function keyboard(code: string, target: EventTarget = document, repeat = false): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true, repeat });
+  target.dispatchEvent(event);
+  return event;
+}
+
+async function joinWithAcceptedWorld(): Promise<void> {
+  vi.spyOn(NetworkManager.getInstance(), 'connect').mockResolvedValue();
+  vi.spyOn(NetworkManager.getInstance(), 'joinAndWaitForWorld').mockResolvedValue(true);
+  current = mountRuntime(scope.signal);
+  current.commands.join('Map Pilot');
+  await settle();
+  expect(GameController.getInstance().getIsGameRunning()).toBe(true);
+}
 
 afterEach(() => {
   current?.dispose();
@@ -81,21 +111,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('a failed canvas initialization unwinds its hosts and permits a fresh runtime', () => {
+test('a failed canvas initialization retires its work and permits a fresh runtime on the same supplied canvases', () => {
   const context = vi.spyOn(hosts.canvas, 'getContext').mockReturnValue(null);
   expect(() => createGameRuntime(hosts, scope.signal)).toThrow('rendering context');
-  expect(hosts.legacyMenu.childNodes).toHaveLength(0);
-  expect(hosts.legacyPlay.childNodes).toHaveLength(0);
-  expect(hosts.legacyOverlay.childNodes).toHaveLength(0);
+  expect(document.querySelectorAll('canvas')).toHaveLength(3);
+  expect(hosts.spawnCanvas.isConnected).toBe(true);
+  expect(frames.size).toBe(0);
   expect(canvasManager.getCanvas()).toBeNull();
   expect(vi.getTimerCount()).toBe(0);
   context.mockRestore();
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   expect(canvasManager.getCanvas()).toBe(hosts.canvas);
 });
 
 test('one runtime lease owns pagehide and abort releases it without retaining the callback', () => {
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   expect(() => createGameRuntime(hosts, new AbortController().signal)).toThrow('already mounted');
   const disconnect = vi.spyOn(ConnectionManager.getInstance(), 'disconnect');
   window.dispatchEvent(new Event('pagehide'));
@@ -107,7 +137,7 @@ test('one runtime lease owns pagehide and abort releases it without retaining th
   expect(window.gameController).toBeUndefined();
   current.dispose();
   expect(disconnect).toHaveBeenCalledTimes(2);
-  current = createGameRuntime(hosts, new AbortController().signal);
+  current = mountRuntime(new AbortController().signal);
   window.dispatchEvent(new Event('pagehide'));
   expect(disconnect).toHaveBeenCalledTimes(3);
 });
@@ -120,11 +150,13 @@ test('unmounting during a pending connection prevents a late join, input or anim
         accept = resolve;
       })
   );
+  const activateAudio = vi.spyOn(audioRuntime, 'activateAudio');
   const joinWorld = vi.spyOn(NetworkManager.getInstance(), 'joinAndWaitForWorld');
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   current.commands.join('Waiting Pilot');
   current.commands.join('Duplicate Pilot');
   expect(connect).toHaveBeenCalledTimes(1);
+  expect(activateAudio).toHaveBeenCalledTimes(1);
   current.dispose();
   accept?.();
   await settle();
@@ -139,11 +171,11 @@ test('a failed child input initializer retires partial handlers before the pilot
   vi.spyOn(NetworkManager.getInstance(), 'connect').mockResolvedValue();
   vi.spyOn(NetworkManager.getInstance(), 'joinAndWaitForWorld').mockResolvedValue(true);
   const initialize = vi
-    .spyOn(touchControls, 'initializeTouchControls')
+    .spyOn(playfieldSelection, 'initializePlayfieldSelection')
     .mockImplementationOnce(() => {
-      throw new Error('Touch host failed');
+      throw new Error('Selection host failed');
     });
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   current.commands.join('Retry Pilot');
   await settle();
   expect(GameController.getInstance().getIsGameRunning()).toBe(false);
@@ -223,7 +255,7 @@ async function joinThroughTransport(name: string): Promise<RecordingTransport> {
 test('disposing a connecting runtime retires its socket and ignores a late open', async () => {
   RecordingTransport.created = [];
   vi.stubGlobal('WebSocket', RecordingTransport);
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   current.commands.join('Waiting Transport Pilot');
   const socket = RecordingTransport.created[0];
   expect(socket).toBeDefined();
@@ -241,7 +273,7 @@ test('disposing a connecting runtime retires its socket and ignores a late open'
 test('a real transport join can retire and rejoin with one input and network owner', async () => {
   RecordingTransport.created = [];
   vi.stubGlobal('WebSocket', RecordingTransport);
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   const first = await joinThroughTransport('First Pilot');
   current.dispose();
   expect(first.close).toHaveBeenCalledOnce();
@@ -249,7 +281,7 @@ test('a real transport join can retire and rejoin with one input and network own
   expect(first.onopen).toBeNull();
   expect(vi.getTimerCount()).toBe(0);
   expect(frames.size).toBe(0);
-  current = createGameRuntime(hosts, new AbortController().signal);
+  current = mountRuntime(new AbortController().signal);
   const second = await joinThroughTransport('Second Pilot');
   expect(second).not.toBe(first);
   expect(RecordingTransport.created).toHaveLength(2);
@@ -274,7 +306,7 @@ test('a real transport join can retire and rejoin with one input and network own
 test('foreign pickup churn does not flush sampled local inventory values between presentation ticks', async () => {
   vi.spyOn(NetworkManager.getInstance(), 'connect').mockResolvedValue();
   vi.spyOn(NetworkManager.getInstance(), 'joinAndWaitForWorld').mockResolvedValue(true);
-  current = createGameRuntime(hosts, scope.signal);
+  current = mountRuntime(scope.signal);
   current.commands.join('Inventory Pilot');
   await settle();
   const player = GameController.getInstance().getCurrPlayer();
@@ -315,4 +347,206 @@ test('foreign pickup churn does not flush sampled local inventory values between
   expect(views.at(-1)?.inventory?.items[0]?.id).toBe('local-satellite');
   expect(views.at(-1)?.inventory?.silk).toBe(11);
   unsubscribe();
+});
+
+test('a failed touch mount removes its partial playfield listeners before a new runtime mounts', async () => {
+  const original = touchControls.initializeTouchControls;
+  const initialize = vi
+    .spyOn(touchControls, 'initializeTouchControls')
+    .mockImplementationOnce((host) => {
+      original(host);
+      throw new Error('Touch host failed');
+    });
+  expect(() => mountRuntime(scope.signal)).toThrow('Touch host failed');
+  expect(canvasManager.getCanvas()).toBeNull();
+  expect(frames.size).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
+  await joinWithAcceptedWorld();
+  expect(initialize).toHaveBeenCalledTimes(2);
+  expect(
+    touchControls.readActionControls(GameController.getInstance().getCurrPlayer() ?? null).inPlay
+  ).toBe(true);
+  keyboard('Space');
+  expect(GameController.getInstance().getCurrPlayer()?.ship.lasers).toHaveLength(1);
+  current?.dispose();
+  expect(frames.size).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test('M opens the shared overlay once, releases held controls, ignores repeats and closes through the command port', async () => {
+  await joinWithAcceptedWorld();
+  if (!current) {
+    throw new Error('Missing runtime');
+  }
+  const opened = vi.fn();
+  const closed = vi.fn();
+  window.addEventListener('gameMapOpen', opened, { signal: scope.signal });
+  window.addEventListener('gameMapClose', closed, { signal: scope.signal });
+  const views: GamePresentation[] = [];
+  current.subscribe((view) => views.push(view));
+  const player = GameController.getInstance().getCurrPlayer();
+  if (!player) {
+    throw new Error('Missing local pilot');
+  }
+  keys.Space = true;
+  keys.ArrowRight = true;
+  controlSources.pointerHeading = 1;
+  controlSources.touchFire = true;
+  player.ship.canShoot = false;
+  expect(keyboard('KeyM').defaultPrevented).toBe(true);
+  expect(views.at(-1)?.overlay).toBe('universe-map');
+  expect(opened).toHaveBeenCalledOnce();
+  expect(keys.Space).toBe(false);
+  expect(keys.ArrowRight).toBe(false);
+  expect(controlSources.pointerHeading).toBeNull();
+  expect(controlSources.touchFire).toBe(false);
+  expect(player.ship.canShoot).toBe(true);
+  expect(player.ship.movementLocked).toBe(true);
+  expect(keyboard('KeyM', document, true).defaultPrevented).toBe(true);
+  expect(views.at(-1)?.overlay).toBe('universe-map');
+  expect(opened).toHaveBeenCalledOnce();
+  keyboard('Space');
+  expect(player.ship.lasers).toHaveLength(0);
+  keyboard('KeyM');
+  expect(views.at(-1)?.overlay).toBeNull();
+  expect(player.ship.movementLocked).toBe(false);
+  expect(closed).toHaveBeenCalledOnce();
+  current.commands.openUniverseMap();
+  expect(opened).toHaveBeenCalledTimes(2);
+  current.commands.closeUniverseMap();
+  expect(closed).toHaveBeenCalledTimes(2);
+  current.commands.closeUniverseMap();
+  expect(closed).toHaveBeenCalledTimes(2);
+});
+
+test('map shortcuts leave menu name entry and editable play controls alone and never open outside play', async () => {
+  current = mountRuntime(scope.signal);
+  const name = document.createElement('input');
+  const editor = document.createElement('div');
+  editor.setAttribute('contenteditable', 'true');
+  document.body.append(name, editor);
+  current.commands.openUniverseMap();
+  expect(getOpenGameOverlay()).toBeNull();
+  expect(keyboard('KeyM').defaultPrevented).toBe(false);
+  expect(keyboard('KeyM', name).defaultPrevented).toBe(false);
+  vi.spyOn(NetworkManager.getInstance(), 'connect').mockResolvedValue();
+  vi.spyOn(NetworkManager.getInstance(), 'joinAndWaitForWorld').mockResolvedValue(true);
+  current.commands.join('Typing Pilot');
+  await settle();
+  for (const target of [name, editor]) {
+    expect(keyboard('KeyM', target).defaultPrevented).toBe(false);
+    expect(getOpenGameOverlay()).toBeNull();
+  }
+  keyboard('KeyM');
+  expect(getOpenGameOverlay()).toBe('universe-map');
+  expect(keyboard('KeyM', name).defaultPrevented).toBe(false);
+  expect(getOpenGameOverlay()).toBe('universe-map');
+  window.dispatchEvent(new Event('playViewOff'));
+  expect(getOpenGameOverlay()).toBeNull();
+  expect(keyboard('KeyM').defaultPrevented).toBe(false);
+  current.dispose();
+  window.dispatchEvent(new Event('playViewOn'));
+  expect(keyboard('KeyM').defaultPrevented).toBe(false);
+  expect(getOpenGameOverlay()).toBeNull();
+});
+
+test('map-to-inventory handoff cancels captured canvas work immediately and runtime abort retires a reopened map', async () => {
+  await joinWithAcceptedWorld();
+  if (!current) {
+    throw new Error('Missing runtime');
+  }
+  const mapCanvas = document.createElement('canvas');
+  document.body.append(mapCanvas);
+  const captured = new Set<number>();
+  mapCanvas.setPointerCapture = (id) => {
+    captured.add(id);
+  };
+  mapCanvas.hasPointerCapture = (id) => captured.has(id);
+  const release = vi.fn((id: number) => {
+    captured.delete(id);
+  });
+  mapCanvas.releasePointerCapture = release;
+  const views: GamePresentation[] = [];
+  current.subscribe((view) => views.push(view));
+  current.commands.openUniverseMap();
+  const baseline = frames.size;
+  const chrome = vi.fn();
+  const mounted = current.commands.mountUniverseMap(mapCanvas, chrome);
+  expect(chrome).toHaveBeenCalledOnce();
+  expect(frames.size).toBe(baseline + 1);
+  for (const pointerId of [8, 9]) {
+    const event = new Event('pointerdown', { cancelable: true });
+    Object.assign(event, {
+      pointerId,
+      pointerType: 'touch',
+      button: 0,
+      clientX: pointerId * 20,
+      clientY: 100,
+    });
+    mapCanvas.dispatchEvent(event);
+  }
+  expect([...captured]).toEqual([8, 9]);
+  current.commands.openInventory();
+  expect(views.at(-1)?.overlay).toBe('inventory');
+  expect(release.mock.calls).toEqual([[8], [9]]);
+  // Pointerdown skips the spawn animation independently of map disposal.
+  expect(frames.size).toBe(1);
+  current.commands.closeUniverseMap();
+  expect(getOpenGameOverlay()).toBe('inventory');
+  mounted.zoomBy(2);
+  expect(frames.size).toBe(1);
+  current.commands.openUniverseMap();
+  current.commands.mountUniverseMap(mapCanvas, chrome);
+  expect(frames.size).toBe(2);
+  scope.abort();
+  expect(views.at(-1)?.overlay).toBeNull();
+  expect(frames.size).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
+  expect(getOpenGameOverlay()).toBeNull();
+  mounted.dispose();
+  current.dispose();
+});
+
+test('Space activates interactive chrome without firing while canvas Space still fires once', async () => {
+  await joinWithAcceptedWorld();
+  const button = document.createElement('button');
+  const link = document.createElement('a');
+  link.href = '/wiki/';
+  document.body.append(button, link);
+  for (const target of [button, link]) {
+    keyboard('Space', target);
+    expect(GameController.getInstance().getCurrPlayer()?.ship.lasers).toHaveLength(0);
+    expect(keys.Space).toBe(false);
+  }
+  keyboard('Space', hosts.canvas);
+  expect(GameController.getInstance().getCurrPlayer()?.ship.lasers).toHaveLength(1);
+});
+
+test('a failed rendered frame closes an open map and publishes a restart notice without leaving a loop running', async () => {
+  await joinWithAcceptedWorld();
+  if (!current) {
+    throw new Error('Missing runtime');
+  }
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  keyboard('KeyM');
+  const views: GamePresentation[] = [];
+  current.subscribe((view) => views.push(view));
+  vi.spyOn(GameController.getInstance(), 'renderGame').mockImplementationOnce(() => {
+    throw new Error('Renderer failed');
+  });
+  const frame = [...frames.entries()].at(-1);
+  if (!frame) {
+    throw new Error('Missing game frame');
+  }
+  frames.delete(frame[0]);
+  frame[1](performance.now() + 16);
+  expect(GameController.getInstance().getIsGameRunning()).toBe(false);
+  expect(views.at(-1)?.inPlay).toBe(false);
+  expect(views.at(-1)?.overlay).toBeNull();
+  expect(views.at(-1)?.failureNotice).toBe(
+    'An unexpected error occurred. Enter the game again to restart.'
+  );
+  expect(frames.size).toBe(0);
+  current.dispose();
+  expect(vi.getTimerCount()).toBe(0);
 });

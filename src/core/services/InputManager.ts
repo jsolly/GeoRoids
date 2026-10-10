@@ -18,14 +18,12 @@ import {
   disposePlayfieldSelection,
   initializePlayfieldSelection,
 } from '../../input/playfieldSelection';
-import { disposeTouchControls, initializeTouchControls } from '../../input/touchControls';
 import {
   closeGameOverlay,
   getOpenGameOverlay,
   subscribeGameOverlay,
 } from '../../runtime/overlayState';
 import { initializeSchematicEquipHint } from '../../ui/schematicEquipHint';
-import { disposeUniverseMap, initializeUniverseMap } from '../../ui/universeMap';
 import { logger } from '../../utils/Logger';
 import { GameStateManager } from './GameStateManager';
 
@@ -73,13 +71,14 @@ export class InputManager {
       (ev) => {
         if (
           ev.target instanceof Element &&
-          ev.target.closest('input, textarea, select, [contenteditable]')
+          ev.target.closest(
+            'input, textarea, select, button, summary, a[href], [role=button], [contenteditable]'
+          )
         ) {
           return;
         }
-        // The universe map owns its keyboard controls while open. This guard is
-        // intentionally duplicated with the map's capture listener so a future
-        // input source cannot make firing or steering leak through the dialog.
+        // Shared overlay state gates gameplay synchronously before Svelte mounts
+        // the dialog and its map keyboard controller.
         if (getOpenGameOverlay() !== null) {
           return;
         }
@@ -191,8 +190,6 @@ export class InputManager {
       { signal }
     );
     initializePlayfieldSelection();
-    initializeTouchControls();
-    initializeUniverseMap({ onOpen: releaseInput });
     initializeSchematicEquipHint();
     this.unsubscribeOverlay = subscribeGameOverlay(() => this.releaseHeldInput());
   }
@@ -222,8 +219,6 @@ export class InputManager {
     this.listenerScope?.abort();
     this.listenerScope = null;
     this.listenersInitialized = false;
-    disposeTouchControls();
-    disposeUniverseMap();
     disposePlayfieldSelection();
   }
 

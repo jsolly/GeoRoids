@@ -51,7 +51,9 @@ test('hiding a pilot with held movement releases the controls and resumes withou
     requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
     cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
     now: () => performance.now(),
-    paintDebugHud: () => undefined,
+    reportFailure: (error) => {
+      throw error;
+    },
   });
   window.dispatchEvent(new Event('gameStart'));
   const initial = performance.now();

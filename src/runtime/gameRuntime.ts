@@ -6,27 +6,43 @@ import { setSound } from '../audio/Sound';
 import { musicIsOn, soundIsOn } from '../constants/user-preferences';
 import { EventLoop } from '../core/eventLoop';
 import { GameController } from '../core/gameController';
+import { InputManager } from '../core/services/InputManager';
 import { clientPerformance, mountPerformanceMetrics } from '../diagnostics/performanceMetrics';
+import { createPhoneCollector } from '../diagnostics/phoneCollector';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { hapticsApiAvailable, hapticsPreferenceOn, setHaptics } from '../fx/haptics';
+import {
+  disposeTouchControls,
+  initializeTouchControls,
+  mountTouchActionControls,
+  readActionControls,
+} from '../input/touchControls';
 import { readStoredResumeName } from '../network/services/resumeCredential';
 import { mountClientRelease } from '../release/clientReleaseEntry';
 import { canvasManager, type PlayfieldGeometry } from '../rendering/canvasSurface';
 import { mountShipSchematicCanvases } from '../rendering/shipSchematicCanvas';
 import { initTitleTerrain } from '../rendering/titleTerrain';
-import { disposeDebugHud, mountDebugHud, paintDebugHud } from '../ui/debugHud';
-import { disposeDebugIdentity, mountDebugIdentity } from '../ui/debugIdentity';
-import { mountFieldHints } from '../ui/fieldHint';
-import { disposeNetworkStatusUI, initNetworkStatusUI } from '../ui/networkStatus';
+import { resetCargoFullHint } from '../ui/cargoFullHint';
+import {
+  activateFieldHint,
+  hideFieldHints,
+  readFieldHints,
+  subscribeFieldHints,
+} from '../ui/fieldHint';
+import type { FurnaceSite, FurnaceTravelView } from '../ui/furnaceTravelMap';
+import { mountNetworkStatus, readNetworkStatus, subscribeNetworkStatus } from '../ui/networkStatus';
 import { disposeSchematicEquipHint, initializeSchematicEquipHint } from '../ui/schematicEquipHint';
 import { mountSpawnFlyIn, stopSpawnFlyIn } from '../ui/spawnFlyIn';
+import { mountUniverseMap, type UniverseMapController } from '../ui/universeMap';
+import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { getBuildInfoString } from '../utils/buildInfo';
 import { applyLockedPaletteCss } from '../utils/colorUtils';
 import { disposeGlobalErrorLogging, installGlobalErrorLogging } from '../utils/globalErrorLogging';
 import { logger } from '../utils/Logger';
 import { generatePilotNickname } from '../utils/pilotNickname';
 import { sanitizePlayerName } from '../utils/playerName';
+import { createDebugPresentation } from './debugPresentation';
 import {
   equipInventorySatellite,
   equipInventoryUtility,
@@ -34,11 +50,11 @@ import {
   readSchematicSelection,
 } from './inventory';
 import { mountInventoryShortcuts, openInventory } from './inventoryOverlay';
-import { type LegacyHosts, mountLegacyHosts } from './legacyHosts';
 import {
   closeGameOverlay,
   getOpenGameOverlay,
   isGameOverlayOpen,
+  openGameOverlay,
   subscribeGameOverlay,
 } from './overlayState';
 import { createPresentation, type PresentationSubscription } from './presentation';
@@ -49,10 +65,11 @@ import {
   openTownStore,
   purchaseTownOffer,
   readTownStoreView,
+  readTownTravelMap,
+  requestFurnaceTravel,
   selectTownView,
   subscribeTownStore,
 } from './townStore';
-import { mountTownTravelHost } from './townTravelHost';
 import type { GameCommands, GamePresentation } from './uiTypes';
 
 export interface GameRuntime extends PresentationSubscription<GamePresentation> {
@@ -60,10 +77,10 @@ export interface GameRuntime extends PresentationSubscription<GamePresentation> 
   dispose(): void;
 }
 
-export interface GameRuntimeHosts extends LegacyHosts {
+export interface GameRuntimeHosts {
   readonly canvas: HTMLCanvasElement;
   readonly titleCanvas: HTMLCanvasElement;
-  readonly collector: HTMLElement;
+  readonly spawnCanvas: HTMLCanvasElement;
   readonly placeChrome: (geometry: PlayfieldGeometry) => void;
 }
 
@@ -78,23 +95,36 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
   let disposed = false;
   const cleanup: (() => void)[] = [];
   const painters = new Set<() => void>();
-  const travelHosts = new Set<ReturnType<typeof mountTownTravelHost>>();
+  const mapControllers = new Set<UniverseMapController>();
+  const actionBindings = new Set<() => void>();
+  let spawnActive = false;
+  let notifyPresentation = () => {};
   cleanup.push(() => {
     for (const stop of painters) {
       stop();
     }
     painters.clear();
-    for (const host of travelHosts) {
-      host.dispose();
+    for (const map of mapControllers) {
+      map.dispose();
     }
-    travelHosts.clear();
+    mapControllers.clear();
+    for (const stop of actionBindings) {
+      stop();
+    }
+    actionBindings.clear();
   });
   const dispose = (): void => {
     if (disposed) {
       return;
     }
     disposed = true;
-    for (const stop of cleanup.reverse()) {
+    const closeOverlay = () => {
+      const overlay = getOpenGameOverlay();
+      if (overlay !== null) {
+        closeGameOverlay(overlay);
+      }
+    };
+    for (const stop of [closeOverlay, ...cleanup.reverse()]) {
       try {
         stop();
       } catch (error) {
@@ -117,25 +147,23 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
     cleanup.push(() => logger.detachRuntime());
     logger.attachRuntime();
     cleanup.push(mountClientRelease());
-    cleanup.push(mountLegacyHosts(hosts));
-    cleanup.push(mountFieldHints(hosts.legacyOverlay));
-    const spawnHost = hosts.legacyPlay.querySelector<HTMLElement>('#spawn-fly-in-host');
-    if (!spawnHost) {
-      throw new Error('The spawn canvas host is missing.');
-    }
-    cleanup.push(mountSpawnFlyIn(spawnHost));
+    cleanup.push(hideFieldHints, resetCargoFullHint);
+    cleanup.push(
+      mountSpawnFlyIn(hosts.spawnCanvas, (visible) => {
+        spawnActive = visible;
+        if (!disposed) {
+          notifyPresentation();
+        }
+      })
+    );
     cleanup.push(disposeGlobalErrorLogging);
     installGlobalErrorLogging();
     cleanup.push(disposeAudioRuntime, disposeMusicBeds);
     mountMusicBeds();
-    cleanup.push(mountPerformanceMetrics(hosts.collector));
+    cleanup.push(mountPerformanceMetrics());
     cleanup.push(disposeSchematicEquipHint);
     initializeSchematicEquipHint();
-    cleanup.push(disposeNetworkStatusUI);
-    initNetworkStatusUI(hosts.legacyOverlay);
-    cleanup.push(disposeDebugIdentity, disposeDebugHud);
-    mountDebugIdentity();
-    mountDebugHud();
+    cleanup.push(mountNetworkStatus());
     applyLockedPaletteCss();
     cleanup.push(initTitleTerrain(hosts.titleCanvas));
     cleanup.push(() => canvasManager.destroy());
@@ -151,8 +179,36 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
     let failureNotice: string | null = null;
     let inPlay = false;
     let inventoryPage = 0;
-    const project = (): GamePresentation =>
+    const debug = createDebugPresentation(() => notifyPresentation());
+    cleanup.push(() => debug.dispose());
+    const phone =
+      clientPerformance.enabled &&
+      new URLSearchParams(window.location.search).get('performance') === 'collect'
+        ? createPhoneCollector(clientPerformance, () => notifyPresentation())
+        : null;
+    cleanup.push(() => phone?.dispose());
+    const freezeSite = (site: FurnaceSite): FurnaceSite =>
       Object.freeze({
+        id: site.id,
+        name: site.name,
+        position: Object.freeze({ x: site.position.x, y: site.position.y }),
+      });
+    const projectTravel = (): FurnaceTravelView | null => {
+      const travel = readTownTravelMap();
+      if (!travel.source) {
+        return null;
+      }
+      // This list is bounded by the world's fixed civic-lot catalog.
+      return Object.freeze({
+        source: freezeSite(travel.source),
+        destinations: Object.freeze(travel.destinations.map(freezeSite)),
+        rotation: travel.rotation,
+      });
+    };
+    const project = (): GamePresentation => {
+      const townStore = isGameOverlayOpen('town-store') ? readTownStoreView() : null;
+      const controls = readActionControls(PlayerManager.getInstance().getLocalPlayer());
+      return Object.freeze({
         menu: Object.freeze({
           initialName,
           fallbackName,
@@ -171,15 +227,49 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
         failureNotice,
         overlay: getOpenGameOverlay(),
         inventory: isGameOverlayOpen('inventory') ? readInventoryView(inventoryPage) : null,
-        townStore: isGameOverlayOpen('town-store') ? readTownStoreView() : null,
+        townStore,
+        townTravel: townStore?.mode === 'travel' ? projectTravel() : null,
+        debug: debug.read(inPlay),
+        network: readNetworkStatus(),
+        hints: inPlay ? readFieldHints() : Object.freeze([]),
+        controls: Object.freeze({
+          ...controls,
+          ability: Object.freeze(controls.ability),
+          contourLock: Object.freeze(controls.contourLock),
+        }),
+        spawnActive,
+        phone: phone?.read() ?? null,
       });
+    };
     const presentation = createPresentation(
       project,
       (previous, next) => JSON.stringify(previous) === JSON.stringify(next)
     );
+    notifyPresentation = () => {
+      if (!disposed) {
+        presentation.transition();
+      }
+    };
     cleanup.push(() => presentation.dispose());
     cleanup.push(
+      subscribeNetworkStatus(notifyPresentation),
+      subscribeFieldHints(notifyPresentation)
+    );
+    cleanup.push(
       subscribeGameOverlay((next, previous) => {
+        if (previous === 'universe-map' && next !== 'universe-map') {
+          for (const map of mapControllers) {
+            map.dispose();
+          }
+          mapControllers.clear();
+          window.dispatchEvent(new CustomEvent('gameMapClose'));
+          playFeedback('interface');
+        }
+        if (next === 'universe-map' && previous !== 'universe-map') {
+          InputManager.getInstance().releaseHeldInput();
+          window.dispatchEvent(new CustomEvent('gameMapOpen'));
+          playFeedback('interface');
+        }
         if (next === 'inventory' && previous !== 'inventory') {
           inventoryPage = 0;
         }
@@ -197,7 +287,6 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
     cleanup.push(mountInventoryShortcuts(() => inPlay));
     cleanup.push(subscribeTownStore(() => presentation.transition()));
     cleanup.push(mountTownStore());
-    let nextTravelRefresh = 0;
     const events = new AbortController();
     cleanup.push(() => events.abort());
     window.addEventListener(
@@ -220,24 +309,51 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
       },
       { signal: events.signal }
     );
+    cleanup.push(disposeTouchControls);
+    initializeTouchControls({
+      canvas: hosts.canvas,
+      readInPlay: () => inPlay,
+      readTouchMode: shouldUseTouchControls,
+      onActionState: notifyPresentation,
+    });
+    const openMap = () => {
+      if (!disposed && inPlay) {
+        openGameOverlay('universe-map');
+      }
+    };
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (
+          event.code !== 'KeyM' ||
+          !inPlay ||
+          (event.target instanceof Element &&
+            event.target.closest('input, textarea, select, [contenteditable]'))
+        ) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.repeat) {
+          return;
+        }
+        if (isGameOverlayOpen('universe-map')) {
+          closeGameOverlay('universe-map');
+        } else {
+          openMap();
+        }
+      },
+      { capture: true, signal: events.signal }
+    );
     const eventLoop = new EventLoop(controller, {
       window,
       document,
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
       cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
       now: () => performance.now(),
-      paintDebugHud,
       observeRenderer: () =>
         clientPerformance.recordRendererFrame(canvasManager.getRendererBackend()),
-      present: (now) => {
-        presentation.sample(now);
-        if (now >= nextTravelRefresh) {
-          nextTravelRefresh = now + 100;
-          for (const host of travelHosts) {
-            host.refresh();
-          }
-        }
-      },
+      present: (now) => presentation.sample(now),
       reportFailure(error) {
         logger.error(
           'STATE',
@@ -276,16 +392,84 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
           purchaseTownOffer(id);
         }
       },
-      mountTownTravel(host) {
-        if (disposed || !isGameOverlayOpen('town-store')) {
+      requestFurnaceTravel(id) {
+        if (!disposed && inPlay) {
+          requestFurnaceTravel(id);
+        }
+      },
+      openUniverseMap: openMap,
+      closeUniverseMap() {
+        if (!disposed) {
+          closeGameOverlay('universe-map');
+        }
+      },
+      mountUniverseMap(canvas, onChrome) {
+        if (disposed || !isGameOverlayOpen('universe-map')) {
+          return {
+            center() {},
+            zoomBy() {},
+            keydown() {},
+            setLocationPage() {},
+            setOcclusions() {},
+            dispose() {},
+          };
+        }
+        const map = mountUniverseMap(canvas, onChrome);
+        mapControllers.add(map);
+        return {
+          center: map.center,
+          zoomBy: map.zoomBy,
+          keydown: map.keydown,
+          setLocationPage: map.setLocationPage,
+          setOcclusions: map.setOcclusions,
+          dispose() {
+            map.dispose();
+            mapControllers.delete(map);
+          },
+        };
+      },
+      mountTouchActions(elements) {
+        if (disposed) {
           return () => {};
         }
-        const mounted = mountTownTravelHost(host);
-        travelHosts.add(mounted);
-        return () => {
-          mounted.dispose();
-          travelHosts.delete(mounted);
+        const stop = mountTouchActionControls(elements);
+        const retire = () => {
+          stop();
+          actionBindings.delete(retire);
         };
+        actionBindings.add(retire);
+        return retire;
+      },
+      activateHint(id) {
+        if (!disposed && inPlay && getOpenGameOverlay() === null) {
+          activateFieldHint(id);
+        }
+      },
+      toggleDebugHud() {
+        if (!disposed) {
+          debug.toggleHud();
+        }
+      },
+      readDiagnostics() {
+        return disposed ? '' : debug.diagnostics();
+      },
+      startPhoneCollection(device, conditions) {
+        if (!disposed) {
+          void phone?.start(device, conditions);
+        }
+      },
+      stopPhoneCollection() {
+        if (!disposed) {
+          phone?.stop();
+        }
+      },
+      recoverPhoneCollection() {
+        if (!disposed) {
+          void phone?.recover();
+        }
+      },
+      downloadPhoneCollection() {
+        return disposed || !phone ? Promise.resolve(null) : phone.download();
       },
       openInventory() {
         if (!disposed) {

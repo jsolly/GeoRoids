@@ -1,6 +1,5 @@
 import type { GpuFrameStats } from '../rendering/gpuRearRenderer';
 import { logger } from '../utils/Logger';
-import { installPhoneCollector } from './phoneCollector';
 
 const SAMPLE_LIMIT = 4096;
 export const APPLIED_SNAPSHOT_SAMPLE_LIMIT = SAMPLE_LIMIT;
@@ -477,7 +476,7 @@ export const clientPerformance = new ClientPerformanceMetrics(
 );
 
 /** Opt-in diagnostics have the same lifetime as the mounted game. */
-export function mountPerformanceMetrics(collectorHost: HTMLElement = document.body): () => void {
+export function mountPerformanceMetrics(): () => void {
   if (!clientPerformance.enabled) {
     return () => {};
   }
@@ -534,13 +533,8 @@ export function mountPerformanceMetrics(collectorHost: HTMLElement = document.bo
     },
     { signal }
   );
-  const stopCollector =
-    new URLSearchParams(window.location.search).get('performance') === 'collect'
-      ? installPhoneCollector(clientPerformance, collectorHost)
-      : () => {};
   return () => {
     scope.abort();
-    stopCollector();
     if (window.georoidsPerformance === clientPerformance) {
       delete window.georoidsPerformance;
     }

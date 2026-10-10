@@ -1,6 +1,49 @@
-import { expect, test, vi } from 'vitest';
+import { flushSync, mount, unmount } from 'svelte';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { CIVIC_LOTS, TOWN_HEARTH } from '../../../shared/furnaces';
-import { renderFurnaceTravelMap } from '../../../src/ui/furnaceTravelMap';
+import FurnaceTravelMap from '../../../src/components/game/FurnaceTravelMap.svelte';
+import type { FurnaceSite } from '../../../src/ui/furnaceTravelMap';
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+const mounted = new Set<ReturnType<typeof mount>>();
+afterEach(async () => {
+  for (const component of mounted) {
+    await unmount(component);
+  }
+  mounted.clear();
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+});
+function mountMap(
+  container: HTMLElement,
+  source: FurnaceSite,
+  destinations: readonly FurnaceSite[],
+  ontravel: (id: string) => void,
+  rotation = 0
+) {
+  document.body.append(container);
+  const component = mount(FurnaceTravelMap, {
+    target: container,
+    props: { view: { source, destinations, rotation }, ontravel },
+  });
+  mounted.add(component);
+  flushSync();
+  return async () => {
+    if (mounted.delete(component)) {
+      await unmount(component);
+    }
+  };
+}
 
 test('the destination map preserves bearings, shows pipes, and sends only chosen destinations', () => {
   const container = document.createElement('div');
@@ -9,7 +52,7 @@ test('the destination map preserves bearings, shows pipes, and sends only chosen
   if (!east) {
     throw new Error('Missing east street');
   }
-  renderFurnaceTravelMap(container, TOWN_HEARTH, [east], travel);
+  mountMap(container, TOWN_HEARTH, [east], travel);
   const current = container.querySelector<HTMLButtonElement>('[aria-current="location"]');
   const destination = container.querySelector<HTMLButtonElement>(`[data-furnace-id="${east.id}"]`);
   expect(current?.disabled).toBe(true);
@@ -27,7 +70,8 @@ test('the destination map preserves bearings, shows pipes, and sends only chosen
   expect(container.querySelector('polyline')?.getAttribute('points')).toBeTruthy();
   current?.click();
   expect(travel).not.toHaveBeenCalled();
-  destination?.dispatchEvent(new Event('pointerdown'));
+  destination?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+  flushSync();
   expect(container.querySelector('.furnace-travel-caption')?.textContent).toBe(
     `Travel to ${east.name}`
   );
@@ -37,7 +81,7 @@ test('the destination map preserves bearings, shows pipes, and sends only chosen
 
 test('all lit furnaces retain separate touch targets on a dense map', () => {
   const container = document.createElement('div');
-  renderFurnaceTravelMap(container, TOWN_HEARTH, CIVIC_LOTS, vi.fn());
+  mountMap(container, TOWN_HEARTH, CIVIC_LOTS, vi.fn());
   const markers = [...container.querySelectorAll<HTMLButtonElement>('.furnace-travel-marker')];
   expect(markers).toHaveLength(CIVIC_LOTS.length + 1);
   for (let a = 0; a < markers.length; a++) {
@@ -62,7 +106,7 @@ test('all lit furnaces retain separate touch targets on a dense map', () => {
 
 test('an isolated source remains visible with an explanation instead of an empty map', () => {
   const container = document.createElement('div');
-  renderFurnaceTravelMap(container, TOWN_HEARTH, [], vi.fn());
+  mountMap(container, TOWN_HEARTH, [], vi.fn());
   expect(container.querySelector('[aria-current="location"]')).not.toBeNull();
   expect(container.textContent).toContain('No other furnaces are lit yet');
   expect(container.querySelector('[data-furnace-id]')).toBeNull();
@@ -78,7 +122,7 @@ test('pilots see a destination along their course above them with pipes attached
     -(east.position.y - TOWN_HEARTH.position.y),
     east.position.x - TOWN_HEARTH.position.x
   );
-  renderFurnaceTravelMap(container, TOWN_HEARTH, [east], vi.fn(), course - Math.PI / 2);
+  mountMap(container, TOWN_HEARTH, [east], vi.fn(), course - Math.PI / 2);
   const current = container.querySelector<HTMLElement>('[aria-current="location"]');
   const destination = container.querySelector<HTMLElement>('[data-furnace-id="street-1-0"]');
   if (!current || !destination) {

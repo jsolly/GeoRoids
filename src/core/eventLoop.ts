@@ -1,6 +1,5 @@
 import { noteDebugFrame } from '../diagnostics/debugHudMetrics';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
-import { reportRenderError } from '../rendering/renderError';
 
 export interface EventLoopLifecycle {
   getIsGameRunning(): boolean;
@@ -21,10 +20,9 @@ export interface EventLoopHost {
   requestAnimationFrame(callback: FrameRequestCallback): number;
   cancelAnimationFrame(id: number): void;
   now(): number;
-  paintDebugHud(now: number): void;
   observeRenderer?(): void;
   present?(now: number): void;
-  reportFailure?(error: unknown): void;
+  reportFailure(error: unknown): void;
 }
 
 export class EventLoop {
@@ -140,9 +138,6 @@ export class EventLoop {
       if (this.disposed) {
         return;
       }
-      if (debugHudOn) {
-        this.host.paintDebugHud(now);
-      }
       if (observing) {
         const rendered = this.host.now();
         clientPerformance.record('updateMs', updated - started);
@@ -158,11 +153,7 @@ export class EventLoop {
       this.gameLoopScheduled = false;
       clientPerformance.count('frameFailures');
       this.lifecycle.stopAfterFrameFailure();
-      if (this.host.reportFailure) {
-        this.host.reportFailure(error);
-      } else {
-        reportRenderError(error);
-      }
+      this.host.reportFailure(error);
     }
   };
 }

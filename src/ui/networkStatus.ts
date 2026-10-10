@@ -12,38 +12,32 @@ import { logger } from '../utils/Logger';
  * on (re)connect) so players know when they've been disconnected.
  */
 
-const BANNER_ID = 'network-status-banner';
+export interface NetworkStatusView {
+  readonly message: string;
+  readonly tone: 'error' | 'reconnect';
+}
 let initialized = false;
 let lossAnnounced = false;
-let bannerHost: HTMLElement | undefined;
+let current: NetworkStatusView | null = null;
+const subscribers = new Set<() => void>();
 
-function getOrCreateBanner(): HTMLElement | null {
-  if (typeof document === 'undefined') {
-    return null;
+export function readNetworkStatus(): NetworkStatusView | null {
+  return current;
+}
+
+export function subscribeNetworkStatus(listener: () => void): () => void {
+  subscribers.add(listener);
+  return () => subscribers.delete(listener);
+}
+
+function publish(next: NetworkStatusView | null): void {
+  if (current?.message === next?.message && current?.tone === next?.tone) {
+    return;
   }
-  let el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
-  if (!el) {
-    el = document.createElement('div');
-    el.id = BANNER_ID;
-    el.setAttribute('role', 'alert');
-    Object.assign(el.style, {
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      right: '0',
-      zIndex: '10000',
-      padding: 'calc(10px + env(safe-area-inset-top, 0px)) 16px 10px',
-      textAlign: 'center',
-      background: 'rgba(180, 0, 0, 0.92)',
-      color: '#ffffff',
-      font: '600 15px/1.4 Arial, sans-serif',
-      letterSpacing: '0.3px',
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
-      display: 'none',
-    });
-    (bannerHost ?? document.body ?? document.documentElement).appendChild(el);
+  current = next ? Object.freeze(next) : null;
+  for (const listener of subscribers) {
+    listener();
   }
-  return el;
 }
 
 export const DISCONNECT_BANNER_TEXT =
@@ -51,45 +45,25 @@ export const DISCONNECT_BANNER_TEXT =
 export const RECONNECTING_BANNER_TEXT = 'Reconnecting to game server…';
 
 export function showNetworkBanner(message: string, tone: 'error' | 'reconnect' = 'error'): void {
-  const el = getOrCreateBanner();
-  if (!el) {
-    return;
-  }
-  el.textContent = message;
-  el.style.background = tone === 'reconnect' ? 'rgba(180, 110, 0, 0.92)' : 'rgba(180, 0, 0, 0.92)';
-  el.style.display = 'block';
+  publish({ message: message.slice(0, 500), tone });
 }
 
 export function hideNetworkBanner(): void {
   lossAnnounced = false;
-  if (typeof document === 'undefined') {
-    return;
-  }
-  const el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
-  if (el) {
-    el.style.display = 'none';
-  }
-}
-
-export function isNetworkBannerVisible(): boolean {
-  if (typeof document === 'undefined') {
-    return false;
-  }
-  const el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
-  return el !== null && el.style.display !== 'none';
+  publish(null);
 }
 
 /**
  * Wire the banner to the network lifecycle events dispatched by
  * ConnectionManager. Idempotent — safe to call more than once.
  */
-export function initNetworkStatusUI(host: HTMLElement = document.body): void {
+export function mountNetworkStatus(): () => void {
   if (initialized || typeof window === 'undefined') {
-    return;
+    return () => {};
   }
-  bannerHost = host;
-  listenerScope = new AbortController();
-  const { signal } = listenerScope;
+  const scope = new AbortController();
+  listenerScope = scope;
+  const { signal } = scope;
   initialized = true;
 
   window.addEventListener('networkConnected', () => hideNetworkBanner(), { signal });
@@ -123,13 +97,13 @@ export function initNetworkStatusUI(host: HTMLElement = document.body): void {
     },
     { signal }
   );
-}
-
-export function disposeNetworkStatusUI(): void {
-  listenerScope?.abort();
-  listenerScope = null;
-  initialized = false;
-  hideNetworkBanner();
-  bannerHost?.querySelector(`#${BANNER_ID}`)?.remove();
-  bannerHost = undefined;
+  return () => {
+    if (listenerScope !== scope) {
+      return;
+    }
+    scope.abort();
+    listenerScope = null;
+    initialized = false;
+    hideNetworkBanner();
+  };
 }

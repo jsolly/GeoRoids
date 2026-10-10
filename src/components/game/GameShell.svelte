@@ -6,10 +6,15 @@
   import { mountRuntime, type RuntimeMountState } from '../../runtime/runtimeMount';
   import type { GamePreference, GamePresentation } from '../../runtime/uiTypes';
   import Button from '../ui/button/button.svelte';
+  import ActionControls from './ActionControls.svelte';
+  import DebugPanel from './DebugPanel.svelte';
+  import FieldHints from './FieldHints.svelte';
   import GameOverlay from './GameOverlay.svelte';
   import InventoryPanel from './InventoryPanel.svelte';
+  import PhoneCollector from './PhoneCollector.svelte';
   import StartScreen from './StartScreen.svelte';
   import TownPanel from './TownPanel.svelte';
+  import UniverseMap from './UniverseMap.svelte';
 
   let view = $state.raw<GamePresentation>({
     menu: {
@@ -26,6 +31,34 @@
     overlay: null,
     inventory: null,
     townStore: null,
+    townTravel: null,
+    debug: null,
+    network: null,
+    hints: [],
+    phone: null,
+    spawnActive: false,
+    controls: {
+      inPlay: false,
+      touchMode: false,
+      ability: {
+        label: 'E',
+        name: 'Ability',
+        ready: false,
+        active: false,
+        cooling: false,
+        unavailable: true,
+        cooldownRatio: 0,
+        pressed: false,
+        disabled: true,
+      },
+      contourLock: {
+        label: 'CONTOUR LOCK',
+        name: 'Contour Lock',
+        active: false,
+        disabled: true,
+        pressed: false,
+      },
+    },
   });
   let startup = $state.raw<RuntimeMountState<GameRuntime>>({ kind: 'loading' });
   let playerName = $state('');
@@ -35,10 +68,7 @@
   let titleCanvas: HTMLCanvasElement;
   let wrapper: HTMLElement;
   let gameArea: HTMLDivElement;
-  let collector: HTMLDivElement;
-  let legacyMenu: HTMLDivElement;
-  let legacyPlay: HTMLDivElement;
-  let legacyOverlay: HTMLDivElement;
+  let spawnCanvas: HTMLCanvasElement;
   let retry = () => {};
 
   function join(name: string) {
@@ -81,8 +111,10 @@
     let unsubscribe: (() => void) | undefined;
     const wasInPlay = document.body.classList.contains('in-play');
     const wasTouchPlay = document.body.classList.contains('touch-play');
+    const wasDebug = document.body.classList.contains('debug-on');
     const syncBody = () => {
       document.body.classList.toggle('in-play', view.inPlay);
+      document.body.classList.toggle('debug-on', view.debug !== null);
       document.body.classList.toggle('touch-play', view.inPlay && touchControls);
     };
     syncBody();
@@ -94,10 +126,7 @@
           {
             canvas,
             titleCanvas,
-            collector,
-            legacyMenu,
-            legacyPlay,
-            legacyOverlay,
+            spawnCanvas,
             placeChrome(geometry: PlayfieldGeometry) {
               if (!live) {
                 return;
@@ -146,6 +175,7 @@
       lifetime.dispose();
       document.body.classList.toggle('in-play', wasInPlay);
       document.body.classList.toggle('touch-play', wasTouchPlay);
+      document.body.classList.toggle('debug-on', wasDebug);
     };
   });
 </script>
@@ -166,7 +196,14 @@
       onselectship={selectShip}
       onpreference={setPreference}
     >
-      <div bind:this={legacyMenu}></div>
+      {#if view.debug && startup.kind === 'ready'}
+        <DebugPanel
+          view={view.debug}
+          inPlay={false}
+          ontoggle={startup.runtime.commands.toggleDebugHud}
+          diagnostics={startup.runtime.commands.readDiagnostics}
+        />
+      {/if}
     </StartScreen>
   </div>
   <div id="gameArea" bind:this={gameArea} hidden={!view.inPlay}>
@@ -187,7 +224,30 @@
       >Inventory {#if !touchControls}<kbd class="ml-2 text-xs text-muted-foreground">V</kbd
         >{/if}</Button
     >
-    <div bind:this={legacyPlay}></div>
+    <canvas id="spawn-fly-in" bind:this={spawnCanvas} hidden={!view.spawnActive} aria-hidden="true"
+    ></canvas>
+    {#if startup.kind === 'ready'}
+      <ActionControls
+        view={view.controls}
+        mountActions={startup.runtime.commands.mountTouchActions}
+      />
+      <Button
+        id="universe-map-toggle"
+        variant="outline"
+        class={touchControls ? 'map-toggle touch-toggle min-h-11' : 'map-toggle min-h-11'}
+        aria-label={touchControls ? 'Open universe map' : 'Open universe map (M)'}
+        aria-keyshortcuts={touchControls ? undefined : 'M'}
+        aria-expanded={view.overlay === 'universe-map'}
+        onclick={startup.runtime.commands.openUniverseMap}
+        >Map {#if !touchControls}<kbd class="ml-2 text-xs">M</kbd>{/if}</Button
+      >
+      {#if view.debug}<DebugPanel
+          view={view.debug}
+          inPlay={true}
+          ontoggle={startup.runtime.commands.toggleDebugHud}
+          diagnostics={startup.runtime.commands.readDiagnostics}
+        />{/if}
+    {/if}
   </div>
   <GameOverlay
     open={view.overlay === 'inventory'}
@@ -223,16 +283,85 @@
         view={view.townStore}
         onmode={startup.runtime.commands.selectTownView}
         onpurchase={startup.runtime.commands.purchaseTownOffer}
-        mountTravel={startup.runtime.commands.mountTownTravel}
+        travel={view.townTravel}
+        ontravel={startup.runtime.commands.requestFurnaceTravel}
         onclose={() => closeTownStore(true)}
       />
     {/if}
   </GameOverlay>
-  <div bind:this={legacyOverlay}></div>
-  <div bind:this={collector}></div>
+  {#if startup.kind === 'ready'}
+    <UniverseMap
+      open={view.overlay === 'universe-map'}
+      touch={touchControls}
+      mountMap={startup.runtime.commands.mountUniverseMap}
+      onclose={startup.runtime.commands.closeUniverseMap}
+      fallbackFocusTarget={() => (view.inPlay ? canvas : null)}
+      restoreFocus={view.overlay === null && view.inPlay}
+    />
+    <FieldHints hints={view.hints} onactivate={startup.runtime.commands.activateHint} />
+    {#if view.phone}<div hidden={view.overlay !== null}>
+        <PhoneCollector
+          view={view.phone}
+          inPlay={view.inPlay}
+          onstart={startup.runtime.commands.startPhoneCollection}
+          onstop={startup.runtime.commands.stopPhoneCollection}
+          onrecover={startup.runtime.commands.recoverPhoneCollection}
+          ondownload={startup.runtime.commands.downloadPhoneCollection}
+        />
+      </div>{/if}
+  {/if}
+  {#if view.network}<div
+      id="network-status-banner"
+      role="alert"
+      class="network-banner rounded-lg border border-border bg-card px-4 py-3 text-foreground"
+    >
+      {view.network.message}
+    </div>{/if}
 </main>
 
 <style>
+  main {
+    --mobile-diagnostic-max-height: calc(
+      (
+          100dvh - var(--mobile-controls-top, 80px) - 56px -
+            max(100px, calc(env(safe-area-inset-bottom) + 88px)) - 12px
+        ) /
+        2
+    );
+  }
+  #spawn-fly-in {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #spawn-fly-in[hidden] {
+    display: none;
+  }
+  :global(.map-toggle) {
+    position: fixed;
+    z-index: 25;
+    left: var(--map-toggle-x);
+    top: var(--map-toggle-y);
+    transform: translateX(-50%);
+  }
+  :global(.map-toggle.touch-toggle) {
+    top: var(--mobile-controls-top);
+    left: calc(var(--action-left) + var(--action-width) + 6px);
+    width: var(--action-width);
+    transform: none;
+  }
+  .network-banner {
+    position: fixed;
+    z-index: 100;
+    top: max(12px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: min(32rem, 90vw);
+  }
+
   :global(.inventory-toggle) {
     position: fixed;
     z-index: 25;

@@ -32,6 +32,34 @@ const initialView: GamePresentation = {
   overlay: null,
   inventory: null,
   townStore: null,
+  townTravel: null,
+  debug: null,
+  network: null,
+  hints: [],
+  phone: null,
+  spawnActive: false,
+  controls: {
+    inPlay: false,
+    touchMode: false,
+    ability: {
+      label: 'E',
+      name: 'Ability',
+      ready: false,
+      active: false,
+      cooling: false,
+      unavailable: true,
+      cooldownRatio: 0,
+      pressed: false,
+      disabled: true,
+    },
+    contourLock: {
+      label: 'CONTOUR LOCK',
+      name: 'Contour Lock',
+      active: false,
+      disabled: true,
+      pressed: false,
+    },
+  },
 };
 let svelte: typeof import('svelte');
 let shell: ReturnType<typeof svelte.mount> | undefined;
@@ -84,7 +112,18 @@ beforeEach(async () => {
       closeTownStore: vi.fn(),
       selectTownView: vi.fn(),
       purchaseTownOffer: vi.fn(),
-      mountTownTravel: vi.fn(() => () => {}),
+      requestFurnaceTravel: vi.fn(),
+      openUniverseMap: vi.fn(),
+      closeUniverseMap: vi.fn(),
+      mountUniverseMap: vi.fn(),
+      mountTouchActions: vi.fn(() => () => {}),
+      activateHint: vi.fn(),
+      toggleDebugHud: vi.fn(),
+      readDiagnostics: vi.fn(() => ''),
+      startPhoneCollection: vi.fn(),
+      stopPhoneCollection: vi.fn(),
+      recoverPhoneCollection: vi.fn(),
+      downloadPhoneCollection: vi.fn(async () => null),
     },
     subscribe: vi.fn((listener) => {
       publish = listener;
@@ -200,7 +239,7 @@ test('unmount after runtime creation disposes it before a ready subscription can
   expect(document.body.className).toBe('existing');
 });
 
-test('play and geometry update body classes synchronously and preserve isolated hosts through menu transitions', async () => {
+test('play and geometry update body classes synchronously and preserve shell canvases through menu transitions', async () => {
   document.body.classList.add('touch-play');
   await start();
   await vi.dynamicImportSettled();
@@ -208,12 +247,9 @@ test('play and geometry update body classes synchronously and preserve isolated 
   if (!hosts) {
     throw new Error('Missing runtime hosts');
   }
-  const menuHost = hosts.legacyMenu;
-  const playHost = hosts.legacyPlay;
-  const overlayHost = hosts.legacyOverlay;
-  const marker = document.createElement('span');
-  marker.textContent = 'Runtime-owned menu';
-  menuHost.append(marker);
+  const gameCanvas = hosts.canvas;
+  const spawnCanvas = hosts.spawnCanvas;
+  expect(spawnCanvas).toBe(element('#spawn-fly-in', HTMLCanvasElement));
   hosts.placeChrome({
     width: 390,
     height: 760,
@@ -245,8 +281,8 @@ test('play and geometry update body classes synchronously and preserve isolated 
   expect(document.body.classList.contains('touch-play')).toBe(false);
   await settle();
   expect(document.body.textContent).toContain('Restart your flight.');
-  expect(menuHost.contains(marker)).toBe(true);
-  expect(playHost.isConnected && overlayHost.isConnected).toBe(true);
+  expect(gameCanvas.isConnected && spawnCanvas.isConnected).toBe(true);
+  expect(element('#gameCanvas', HTMLCanvasElement)).toBe(gameCanvas);
   if (!shell) {
     throw new Error('Missing shell');
   }

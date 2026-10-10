@@ -22,7 +22,7 @@ Inside a lit furnace's visible footprint, the prompt offers travel; at Town Squa
 
 ## Radar and universe map
 
-The minimap shows nearby space; M or Map opens the full shared chart. Both keep north at the top, matching the viewport and furnace destination map. Your ship marker turns to show its heading. Pinch the full chart to zoom and drag to pan; desktop also supports the mouse wheel and +/− keys. The north arrow and legend sit inside the chart, and Locate restores the nearby ship view. The minimap shows furnaces once explored and pins off-radar crew to its rim, while the full chart always shows every lit furnace and foundation; their names appear on the chart only after you zoom in close, and only lit furnaces show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
+The minimap shows nearby space; M or Map opens the full shared chart. Both keep north at the top, matching the viewport and furnace destination map. Your ship marker turns to show its heading. Pinch the full chart to zoom and drag to pan; desktop also supports the mouse wheel and +/− keys. The north arrow and legend sit inside the chart, and Center on you restores the nearby ship view. The minimap shows furnaces once explored and pins off-radar crew to its rim, while the full chart always shows every lit furnace and foundation; their names appear on the chart only after you zoom in close, and only lit furnaces show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
 
 ## Ricochet Court
 

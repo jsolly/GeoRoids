@@ -14,7 +14,6 @@
     --map-toggle-x: 0px;
     --map-toggle-y: 0px;
     --schematic-toggle-y: 0px;
-    --action-cool: 0;
   }
 
   /* Global styles */
@@ -105,134 +104,6 @@
     display: none;
   }
 
-  /* Playfield chrome above the local radar: Map and Inventory on every device. */
-  .universe-map-toggle {
-    position: absolute;
-    left: var(--map-toggle-x);
-    top: var(--map-toggle-y);
-    z-index: 25;
-    min-width: 74px;
-    height: 44px;
-    padding: 0.3rem 0.65rem;
-    border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 75%, transparent);
-    border-radius: 6px;
-    color: var(--palette-accent, #a78bfa);
-    background: color-mix(in srgb, var(--palette-bg, #000011) 82%, transparent);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--palette-accent, #a78bfa) 25%, transparent);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    touch-action: manipulation;
-  }
-
-  .furnace-destinations button {
-    min-height: 36px;
-    padding: 0.3rem 0.7rem;
-    font: 700 0.7rem / 1 var(--font-mono, monospace);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .furnace-destinations {
-    display: grid;
-    gap: 8px;
-    min-height: 0;
-  }
-
-  .furnace-travel-viewport {
-    touch-action: none;
-    user-select: none;
-    height: min(42dvh, 340px);
-    overflow: auto;
-    overscroll-behavior: contain;
-    border: 1px solid #334155;
-    background: #07131d;
-    scrollbar-width: thin;
-  }
-
-  .furnace-travel-map {
-    contain: size;
-    position: relative;
-    background-image:
-      linear-gradient(#14232e 1px, transparent 1px),
-      linear-gradient(90deg, #14232e 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-
-  .furnace-travel-pipes {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    fill: none;
-    stroke: #b89558;
-    stroke-width: 2;
-    opacity: 0.65;
-    pointer-events: none;
-  }
-
-  .furnace-destinations .furnace-travel-marker {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    width: 64px;
-    height: 64px;
-    padding: 4px;
-    transform: translate(-50%, -50%);
-    border-radius: 8px;
-    background: #10202c;
-    color: #fde68a;
-    border-color: #b89558;
-    text-align: center;
-    letter-spacing: normal;
-    text-transform: none;
-    cursor: pointer;
-  }
-
-  .furnace-travel-marker:hover,
-  .furnace-travel-marker:focus-visible {
-    z-index: 1;
-    outline: 3px solid #5eead4;
-    outline-offset: 2px;
-  }
-
-  .furnace-destinations .furnace-travel-marker[aria-current] {
-    pointer-events: none;
-    color: #5eead4;
-    border-color: #5eead4;
-    opacity: 1;
-    cursor: default;
-  }
-
-  .furnace-travel-symbol {
-    font-size: 23px;
-    line-height: 1;
-  }
-
-  .furnace-travel-label {
-    width: 100%;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow-wrap: anywhere;
-    font-size: 10px;
-    line-height: 1.3;
-  }
-
-  .universe-map-toggle:hover,
-  .universe-map-toggle:focus-visible {
-    color: var(--palette-hud, #e2e8f0);
-    border-color: var(--palette-hud, #e2e8f0);
-    box-shadow: 0 0 16px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
-  }
-
-  .universe-map-toggle kbd,
   .universe-map-dialog kbd {
     padding: 0.08rem 0.25rem;
     border: 1px solid currentColor;
@@ -244,22 +115,16 @@
   }
 
   @media (pointer: coarse), (hover: none) {
-    .universe-map-toggle kbd,
     .universe-map-dialog kbd {
       display: none;
     }
   }
 
-  .universe-map-toggle.universe-map-touch {
-    min-width: 52px;
-  }
-
-  .universe-map-toggle.universe-map-touch kbd,
   .universe-map-dialog.universe-map-touch kbd {
     display: none;
   }
 
-  /* Full-screen native dialog used for the shared universe map. */
+  /* Shared universe-map layout and domain legend, rendered by UniverseMap.svelte. */
   .universe-map-dialog {
     flex-direction: column;
     width: 100dvw;
@@ -270,25 +135,15 @@
     padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
       max(14px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
     border: 0;
-    color: var(--palette-hud, #e2e8f0);
-    background:
-      radial-gradient(circle at 50% 42%, rgba(23, 46, 70, 0.35), transparent 52%),
-      var(--palette-bg, #000011);
+    color: var(--foreground);
+    background: var(--background);
+    font-family: system-ui, sans-serif;
     overflow: hidden;
-  }
-
-  .universe-map-dialog[open] {
-    display: flex;
   }
 
   .universe-map-dialog,
   .universe-map-dialog * {
     box-sizing: border-box;
-  }
-
-  .universe-map-dialog::backdrop {
-    background: rgba(0, 0, 17, 0.93);
-    backdrop-filter: blur(5px);
   }
 
   .universe-map-header {
@@ -302,31 +157,33 @@
     justify-content: space-between;
     gap: 1rem;
     min-height: 70px;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px
+      max(16px, env(safe-area-inset-left));
   }
 
   .universe-map-eyebrow {
     margin: 0 0 0.25rem;
-    color: var(--palette-accent, #a78bfa);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.55rem;
+    color: var(--muted-foreground);
+    font-family: system-ui, sans-serif;
+    font-size: 0.75rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
   }
 
   .universe-map-header h2 {
     margin: 0;
-    color: var(--palette-hud, #e2e8f0);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: clamp(1rem, 2.2vw, 1.6rem);
+    color: var(--foreground);
+    font-family: system-ui, sans-serif;
+    font-size: clamp(1.25rem, 2.2vw, 1.6rem);
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
   .universe-map-subtitle {
     margin: 0.3rem 0 0;
-    color: var(--palette-hud-muted, #64748b);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.56rem;
+    color: var(--muted-foreground);
+    font-family: system-ui, sans-serif;
+    font-size: 0.875rem;
     letter-spacing: 0.05em;
   }
 
@@ -338,25 +195,11 @@
     flex-wrap: wrap;
   }
 
-  .universe-map-actions button {
-    min-height: 32px;
-    padding: 0.25rem 0.55rem;
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 70%, transparent);
-    border-radius: 4px;
-    color: var(--palette-hud, #e2e8f0);
-    background: color-mix(in srgb, var(--palette-bg, #000011) 76%, transparent);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    cursor: pointer;
+  .universe-map-dialog button {
+    min-width: 44px;
+    min-height: 44px;
+    font-family: system-ui, sans-serif;
     touch-action: manipulation;
-  }
-
-  .universe-map-actions button:hover,
-  .universe-map-actions button:focus-visible {
-    border-color: var(--palette-accent, #a78bfa);
-    color: var(--palette-accent, #a78bfa);
   }
 
   .universe-map-stage {
@@ -379,16 +222,6 @@
     cursor: grabbing;
   }
 
-  .universe-map-accessible {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   .universe-map-compass {
     position: absolute;
     top: 10px;
@@ -399,7 +232,7 @@
     gap: 3px;
     transform-origin: center;
     color: var(--palette-hud, #e2e8f0);
-    font-family: "Courier New", ui-monospace, monospace;
+    font-family: system-ui, sans-serif;
     font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -425,11 +258,11 @@
     height: 44px;
     padding: 0;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--palette-local, #5eead4) 70%, transparent);
+    border: 1px solid var(--border);
     border-radius: 50%;
-    color: var(--palette-local, #5eead4);
-    background: color-mix(in srgb, var(--palette-bg, #000011) 82%, transparent);
-    box-shadow: 0 0 14px color-mix(in srgb, var(--palette-local, #5eead4) 28%, transparent);
+    color: var(--foreground);
+    background: var(--card);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
     cursor: pointer;
     touch-action: manipulation;
   }
@@ -442,13 +275,13 @@
   }
 
   .universe-map-locate-dot {
-    fill: var(--palette-local, #5eead4);
+    fill: currentColor;
   }
 
   .universe-map-locate-ring,
   .universe-map-locate-cross {
     fill: none;
-    stroke: var(--palette-local, #5eead4);
+    stroke: currentColor;
     stroke-width: 1.75;
   }
 
@@ -458,13 +291,14 @@
 
   .universe-map-locate:hover,
   .universe-map-locate:focus-visible {
-    border-color: var(--palette-local, #5eead4);
-    box-shadow: 0 0 18px color-mix(in srgb, var(--palette-local, #5eead4) 48%, transparent);
+    border-color: var(--foreground);
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 
   .universe-map-locate[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--palette-local, #5eead4) 22%, var(--palette-bg, #000011));
-    box-shadow: 0 0 18px color-mix(in srgb, var(--palette-local, #5eead4) 55%, transparent);
+    background: var(--accent);
+    color: var(--accent-foreground);
   }
 
   .universe-map-legend {
@@ -479,7 +313,7 @@
     gap: 0.8rem;
     flex-wrap: wrap;
     color: var(--palette-hud, #e2e8f0);
-    font-family: "Courier New", ui-monospace, monospace;
+    font-family: system-ui, sans-serif;
     font-size: 0.57rem;
     letter-spacing: 0.04em;
   }
@@ -564,217 +398,6 @@
     height: 36px;
   }
 
-  .debug-identity {
-    text-align: left;
-    padding-top: 12px;
-    border-top: 1px solid #34464f;
-    display: grid;
-    gap: 0.7rem;
-  }
-
-  .debug-identity[hidden] {
-    display: none;
-  }
-
-  .debug-id-label {
-    display: block;
-    margin: 0 0 0.22rem;
-    color: var(--palette-hud-muted, #64748b);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.55rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .debug-id-row {
-    display: flex;
-    align-items: stretch;
-    gap: 0.4rem;
-  }
-
-  .debug-id-input {
-    flex: 1;
-    min-width: 0;
-    padding: 0.35rem 0.45rem;
-    color: var(--palette-local, #5eead4);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.68rem;
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--palette-local, #5eead4) 32%, transparent);
-    border-radius: 4px;
-  }
-
-  select.debug-id-input,
-  select.debug-id-input option {
-    color-scheme: dark;
-    background: var(--palette-bg, #000011);
-  }
-
-  .debug-id-input:focus {
-    outline: none;
-    border-color: var(--palette-local, #5eead4);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-local, #5eead4) 22%, transparent);
-  }
-
-  .debug-id-hint {
-    margin: 0.28rem 0 0;
-    color: color-mix(in srgb, var(--palette-hud, #e2e8f0) 35%, var(--palette-hud-muted, #64748b));
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.58rem;
-    line-height: 1.35;
-  }
-
-  .debug-copy {
-    flex-shrink: 0;
-    padding: 0.28rem 0.5rem;
-    color: var(--palette-accent, #a78bfa);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent);
-    border-radius: 4px;
-  }
-
-  .debug-copy:hover,
-  .debug-copy:focus-visible {
-    color: var(--palette-hud, #e2e8f0);
-    border-color: var(--palette-hud, #e2e8f0);
-    outline: none;
-  }
-
-  .debug-copy:disabled {
-    opacity: 0.38;
-    cursor: default;
-  }
-
-  .debug-play-identity {
-    display: none;
-    margin: 0;
-    padding: 8px;
-    background: #081219e8;
-    border: 1px solid #34464f;
-    border-radius: 4px;
-    max-width: 100%;
-  }
-
-  body.debug-on .debug-play-identity {
-    display: block;
-  }
-
-  .debug-play-identity dt,
-  .debug-play-identity dd {
-    margin: 0;
-    font: 10px / 1.4 var(--font-mono);
-    overflow-wrap: anywhere;
-  }
-
-  .debug-play-identity dt {
-    color: #a9bbb8;
-  }
-
-  .debug-play-identity dd {
-    color: #7ad6bb;
-    user-select: text;
-  }
-
-  .debug-play-stack {
-    position: absolute;
-    left: max(10px, env(safe-area-inset-left, 0px));
-    bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 76px);
-    z-index: 22;
-    display: none;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
-    box-sizing: border-box;
-    max-width: min(calc(100% - 20px), 280px);
-    min-width: 0;
-    pointer-events: none;
-  }
-
-  body.in-play .debug-play-stack {
-    display: flex;
-  }
-
-  .debug-diagnostics-copy,
-  .debug-hud-toggle {
-    pointer-events: auto;
-    min-height: 36px;
-    background: var(--palette-bg, #000011);
-  }
-
-  .debug-hud {
-    display: none;
-    margin: 0;
-    padding: 0.35rem 0.5rem 0.4rem;
-    box-sizing: border-box;
-    max-width: 100%;
-    min-inline-size: 0;
-    min-width: 0;
-    pointer-events: none;
-    background: color-mix(in srgb, var(--palette-bg, #000011) 78%, transparent);
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 50%, transparent);
-    border-radius: 4px;
-  }
-
-  .debug-hud legend {
-    padding: 0 0.2rem;
-    color: var(--palette-hud-muted, #64748b);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.48rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .debug-hud[hidden] {
-    display: none;
-  }
-
-  body.in-play.debug-on .debug-hud:not([hidden]) {
-    display: block;
-  }
-
-  .debug-hud dl {
-    display: grid;
-    gap: 0.14rem 0.55rem;
-    margin: 0;
-    grid-template-columns: auto 1fr;
-  }
-
-  .debug-hud-row {
-    display: contents;
-  }
-
-  .debug-hud dt {
-    margin: 0;
-    color: var(--palette-hud-muted, #64748b);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.5rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .debug-hud dd {
-    overflow-wrap: anywhere;
-    margin: 0;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--palette-local, #5eead4);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.62rem;
-    text-align: right;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .debug-diagnostics-copy {
-    margin-top: 0.5rem;
-  }
-
   #start-game.active-mode {
     background-color: color-mix(in srgb, var(--palette-accent, #a78bfa) 16%, transparent);
     border-color: var(--palette-accent, #a78bfa);
@@ -801,26 +424,7 @@
     opacity: 1;
   }
 
-  /* Touch steering + fire + kit actions. Contour Lock remains available on desktop. */
-  .touch-controls {
-    display: none;
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    pointer-events: none;
-  }
-
-  .touch-controls[hidden] {
-    display: none;
-  }
-
-  .touch-controls:not([hidden]) {
-    display: block;
-  }
-
-  body.touch-play #gameCanvas,
-  .touch-ability,
-  .touch-contour-lock {
+  body.touch-play #gameCanvas {
     pointer-events: auto;
     touch-action: none;
     user-select: none;
@@ -830,171 +434,11 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .touch-ability,
-  .touch-contour-lock {
-    --action-cool: 0;
-    position: absolute;
-    box-sizing: border-box;
-    bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 8px);
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    padding: 0;
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.56rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--palette-hud, #e2e8f0);
-    background: color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent);
-    border: 1.5px solid var(--palette-hud, #e2e8f0);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-hud, #e2e8f0) 28%, transparent);
-    text-shadow: 0 0 8px color-mix(in srgb, var(--palette-hud, #e2e8f0) 35%, transparent);
-  }
-
-  .touch-ability {
-    right: max(16px, env(safe-area-inset-right, 0px));
-    z-index: 2;
-  }
-
-  .touch-contour-lock {
-    left: 50%;
-    transform: translateX(-50%);
-    width: 152px;
-    border-radius: 9px;
-    position: absolute;
-    overflow: hidden;
-    isolation: isolate;
-    --contour-lock-color: #22d3ee;
-    border-color: color-mix(in srgb, var(--contour-lock-color) 78%, var(--palette-hud, #e2e8f0));
-    color: color-mix(in srgb, var(--contour-lock-color) 78%, var(--palette-hud, #e2e8f0));
-    font-size: 0.62rem;
-    z-index: 1;
-  }
-
-  .touch-contour-lock.is-active {
-    --contour-lock-color: #fbbf24;
-  }
-
-  .touch-contour-lock:disabled {
-    cursor: not-allowed;
-  }
-
-  .touch-ability.is-pressed,
-  .touch-ability.is-active,
-  .touch-contour-lock.is-pressed,
-  .touch-contour-lock.is-active {
-    background: color-mix(in srgb, currentColor 16%, transparent);
-    box-shadow: 0 0 14px color-mix(in srgb, currentColor 45%, transparent);
-  }
-
-  .touch-ability.is-cooling {
-    opacity: 0.58;
-    background: conic-gradient(
-      color-mix(in srgb, currentColor 45%, transparent) calc(var(--action-cool) * 360deg),
-      color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent) 0
-    );
-  }
-
-  .touch-ability.is-unavailable,
-  .touch-contour-lock.is-unavailable {
-    opacity: 0.42;
-  }
-
-  .touch-ability:focus-visible,
-  .touch-contour-lock:focus-visible {
-    outline: 2px solid var(--palette-laser, #fde68a);
-    outline-offset: 3px;
-  }
-
-  @media (orientation: landscape) and (max-height: 500px) {
-    .touch-ability,
-    .touch-contour-lock {
-      width: 140px;
-      height: 48px;
-      bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 8px);
-      font-size: 0.5rem;
-    }
-
-    .touch-ability {
-      width: 48px;
-      right: max(20px, env(safe-area-inset-right, 0px));
-    }
-  }
-
   /* Compact action row above the steering area; Contour Lock stays at bottom center. */
   body.touch-play #gameArea {
     --action-left: max(12px, env(safe-area-inset-left));
     --action-right: max(12px, env(safe-area-inset-right));
     --action-width: calc((100vw - var(--action-left) - var(--action-right) - 18px) / 4);
-  }
-
-  body.touch-play .universe-map-toggle,
-  body.touch-play .touch-ability,
-  body.touch-play .debug-hud-toggle {
-    box-sizing: border-box;
-    height: 44px;
-    min-width: 0;
-    padding: 0 3px;
-    font-size: 10px;
-    letter-spacing: 0.02em;
-    border-radius: 6px;
-  }
-
-  body.touch-play .universe-map-toggle,
-  body.touch-play .touch-ability {
-    top: var(--mobile-controls-top);
-    bottom: auto;
-    right: auto;
-    width: var(--action-width);
-  }
-
-  body.touch-play .universe-map-toggle {
-    left: calc(var(--action-left) + var(--action-width) + 6px);
-  }
-
-  body.in-play.touch-play .debug-play-stack {
-    top: var(--mobile-controls-top);
-    left: var(--action-left);
-    right: var(--action-right);
-    bottom: auto;
-    max-width: none;
-    align-items: flex-end;
-    z-index: 26;
-  }
-
-  body.touch-play .debug-hud-toggle {
-    width: var(--action-width);
-    margin-right: calc(var(--action-width) + 6px);
-  }
-
-  body.touch-play .debug-play-identity {
-    position: absolute;
-    left: 0;
-    top: 60px;
-    max-width: min(210px, calc(100vw - 96px));
-  }
-
-  body.touch-play .debug-hud {
-    position: absolute;
-    top: 150px;
-    right: 0;
-    width: min(240px, calc(100% - 128px));
-    max-width: calc(100vw - 24px);
-  }
-
-  body.touch-play .touch-ability {
-    left: calc(var(--action-left) + (var(--action-width) + 6px) * 3);
-  }
-
-  @media (orientation: landscape) and (max-height: 500px) {
-    body.touch-play .debug-play-identity,
-    body.touch-play .debug-hud {
-      top: 52px;
-    }
-  }
-
-  .touch-controls.is-desktop .touch-ability {
-    display: none;
   }
 
   /* Companion reference, reachable before joining a game. */

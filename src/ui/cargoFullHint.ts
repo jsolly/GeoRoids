@@ -20,6 +20,6 @@ export function syncCargoFullHint(now: number = performance.now()): void {
   });
 }
 
-export function resetCargoFullHintForTests(): void {
+export function resetCargoFullHint(): void {
   shownAt = Number.NEGATIVE_INFINITY;
 }

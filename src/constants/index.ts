@@ -4,8 +4,6 @@ import { WORLD } from '../../shared/world';
  * Organized by domain for better maintainability
  */
 
-import { getStoredItem } from '../utils/safeStorage';
-
 // ============================================================================
 // GAME CONFIGURATION
 // ============================================================================
@@ -414,15 +412,6 @@ export const DEBUG = {
 } as const;
 
 // ============================================================================
-// USER PREFERENCES
-// ============================================================================
-const PREFERENCES = {
-  LOCAL_STORAGE_KEYS: {
-    SOUND_ON: 'soundOn',
-  } as const,
-} as const;
-
-// ============================================================================
 // LOGGING CONFIGURATION
 // ============================================================================
 export const LOG_LEVEL_NAMES = ['error', 'warn', 'info', 'debug'] as const;
@@ -440,28 +429,3 @@ export const LOGGING = {
   // Whether to write logs to browser console
   WRITE_TO_CONSOLE: true,
 } as const;
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-const isSoundEnabled = (): boolean =>
-  getStoredItem(PREFERENCES.LOCAL_STORAGE_KEYS.SOUND_ON) === 'true';
-
-// Initialize sound preference checkbox after DOM is ready
-function initializeSoundPreference() {
-  const soundCheckbox = document.querySelector('#soundPref') as HTMLInputElement;
-  if (soundCheckbox) {
-    soundCheckbox.checked = isSoundEnabled();
-  }
-}
-
-// Run initialization when DOM is ready
-if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    // DOM not yet ready, wait for DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', initializeSoundPreference);
-  } else {
-    // DOM already ready, initialize immediately
-    initializeSoundPreference();
-  }
-}

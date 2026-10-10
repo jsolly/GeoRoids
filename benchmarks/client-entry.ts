@@ -1,4 +1,3 @@
-import { mountLegacyHosts } from '../src/runtime/legacyHosts';
 import '../index.css';
 import { CLIENT_ID_STORAGE_KEY } from '../src/network/services/clientIdentity';
 import {
@@ -30,21 +29,9 @@ export interface ClientOptions {
 const FRAME_MS = 1000 / 60;
 const EPOCH_MS = 1_700_000_000_000;
 
-// The measurement harness owns hosts without mounting the product runtime.
+// Rendering measurements own a minimal canvas fixture, without product UI or sockets.
 document.body.innerHTML =
-  '<div id="safe-area-probe"></div><main id="gameWrapper"><div id="gameArea"><canvas id="gameCanvas"></canvas><div id="fixture-play"></div></div><div id="fixture-menu"></div><div id="fixture-overlay"></div></main>';
-function fixtureHost(id: string): HTMLElement {
-  const host = document.querySelector<HTMLElement>(`#${id}`);
-  if (!host) {
-    throw new Error(`Missing benchmark host ${id}`);
-  }
-  return host;
-}
-mountLegacyHosts({
-  legacyMenu: fixtureHost('fixture-menu'),
-  legacyPlay: fixtureHost('fixture-play'),
-  legacyOverlay: fixtureHost('fixture-overlay'),
-});
+  '<div id="safe-area-probe"></div><main id="gameWrapper"><div id="gameArea"><canvas id="gameCanvas"></canvas></div></main>';
 
 async function runClientFixture(options: ClientOptions & { observe: boolean }) {
   const scene = options.scene ?? 'stationary';
@@ -112,7 +99,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         '../src/physics/terrain/terrainSession'
       );
       const { setPlayView } = await import('../src/ui/uiUtils');
-      const { syncTouchChrome } = await import('../src/input/touchControls');
       const game = GameController.getInstance();
       const state = GameStateManager.getInstance();
       const network = NetworkManager.getInstance();
@@ -211,7 +197,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       ensureTerrain(options.seed);
       document.body.classList.add('in-play');
       setPlayView(true);
-      syncTouchChrome(true);
+      document.body.classList.add('in-play');
       document.body.classList.toggle('touch-play', options.viewport !== 'desktop');
       const probe = document.querySelector('#safe-area-probe');
       if (!(probe instanceof HTMLElement)) {

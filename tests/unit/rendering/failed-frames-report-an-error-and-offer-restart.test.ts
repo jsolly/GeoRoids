@@ -6,7 +6,6 @@ import { PlayerNetwork } from '../../../src/entities/player/playerNetwork';
 import * as shipRenderer from '../../../src/entities/ship/shipRenderer';
 import { NetworkManager } from '../../../src/network/networkManager';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import { logger } from '../../../src/utils/Logger';
 
 import { TestPath2D } from '../../support/TestPath2D';
 
@@ -27,7 +26,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test('an actual game-loop frame failure stops work and offers one restart notice', () => {
+test('an actual game-loop frame failure stops work and reports once to its runtime', () => {
   vi.useFakeTimers();
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const scheduled: FrameRequestCallback[] = [];
@@ -59,7 +58,7 @@ test('an actual game-loop frame failure stops work and offers one restart notice
   const stopNetwork = vi
     .spyOn(PlayerNetwork.getInstance(), 'stopNetworkUpdates')
     .mockImplementation(() => undefined);
-  const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  const reportFailure = vi.fn();
 
   eventLoop = new EventLoop(controller, {
     window,
@@ -67,7 +66,7 @@ test('an actual game-loop frame failure stops work and offers one restart notice
     requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
     cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
     now: () => performance.now(),
-    paintDebugHud: () => undefined,
+    reportFailure,
   });
   window.dispatchEvent(new CustomEvent('gameStart'));
   expect(scheduled).toHaveLength(1);
@@ -77,17 +76,6 @@ test('an actual game-loop frame failure stops work and offers one restart notice
   expect(stop).toHaveBeenCalledOnce();
   expect(stopNetwork).toHaveBeenCalledOnce();
   expect(controller.getIsGameRunning()).toBe(false);
-  expect(log).toHaveBeenCalledWith(
-    'STATE',
-    'game_loop_failed',
-    expect.objectContaining({
-      name: 'Error',
-      message: 'Canvas clear failed',
-    }),
-    {
-      observedAt: expect.any(Number),
-    }
-  );
-  expect(document.querySelector('[role="alert"]')?.textContent).toContain('restart the game');
+  expect(reportFailure).toHaveBeenCalledExactlyOnceWith(failure);
   expect(scheduled).toHaveLength(0);
 });

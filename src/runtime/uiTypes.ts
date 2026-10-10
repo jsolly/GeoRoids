@@ -1,4 +1,11 @@
 import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
+import type { PhoneCollectorDownload, PhoneCollectorView } from '../diagnostics/phoneCollector';
+import type { ActionControlsView, TouchActionElements } from '../input/touchControls';
+import type { FieldHintId, FieldHintView } from '../ui/fieldHint';
+import type { FurnaceTravelView } from '../ui/furnaceTravelMap';
+import type { NetworkStatusView } from '../ui/networkStatus';
+import type { UniverseMapChrome, UniverseMapController } from '../ui/universeMap';
+import type { DebugView } from './debugPresentation';
 import type { GameOverlayId } from './overlayState';
 import type { TownStoreView, TownView } from './townStore';
 
@@ -26,6 +33,13 @@ export interface GamePresentation {
   readonly overlay: GameOverlayId | null;
   readonly inventory: InventoryView | null;
   readonly townStore: TownStoreView | null;
+  readonly townTravel: FurnaceTravelView | null;
+  readonly debug: DebugView | null;
+  readonly network: NetworkStatusView | null;
+  readonly hints: readonly FieldHintView[];
+  readonly controls: ActionControlsView;
+  readonly spawnActive: boolean;
+  readonly phone: PhoneCollectorView | null;
 }
 
 export interface GameCommands {
@@ -36,7 +50,21 @@ export interface GameCommands {
   closeTownStore(): void;
   selectTownView(mode: TownView): void;
   purchaseTownOffer(id: string): void;
-  mountTownTravel(host: HTMLElement): () => void;
+  requestFurnaceTravel(id: string): void;
+  openUniverseMap(): void;
+  closeUniverseMap(): void;
+  mountUniverseMap(
+    canvas: HTMLCanvasElement,
+    onChrome: (chrome: UniverseMapChrome) => void
+  ): UniverseMapController;
+  mountTouchActions(elements: TouchActionElements): () => void;
+  activateHint(id: FieldHintId): void;
+  toggleDebugHud(): void;
+  readDiagnostics(): string;
+  startPhoneCollection(device: string, conditions: string): void;
+  stopPhoneCollection(): void;
+  recoverPhoneCollection(): void;
+  downloadPhoneCollection(): Promise<PhoneCollectorDownload | null>;
   openInventory(): void;
   closeInventory(): void;
   inventoryPage(page: number): void;

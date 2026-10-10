@@ -19,14 +19,26 @@ const RETICLE_TICKS: ReadonlyArray<readonly [number, number]> = [
 ];
 
 let frameRequest: number | null = null;
+let generation = 0;
 let overlay: HTMLCanvasElement | null = null;
-let overlayHost: HTMLElement | undefined;
+let visibilityChanged: ((visible: boolean) => void) | undefined;
 
-export function mountSpawnFlyIn(host: HTMLElement): () => void {
-  overlayHost = host;
+/** The shell owns the canvas element; this painter owns its pixels and RAF. */
+export function mountSpawnFlyIn(
+  canvas: HTMLCanvasElement,
+  onVisibility: (visible: boolean) => void
+): () => void {
+  stopSpawnFlyIn();
+  overlay = canvas;
+  visibilityChanged = onVisibility;
+  onVisibility(false);
   return () => {
+    if (overlay !== canvas) {
+      return;
+    }
     stopSpawnFlyIn();
-    overlayHost = undefined;
+    overlay = null;
+    visibilityChanged = undefined;
   };
 }
 
@@ -34,36 +46,13 @@ function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
-function ensureOverlay(): HTMLCanvasElement | null {
-  if (overlay) {
-    return overlay;
-  }
-  const gameArea = overlayHost ?? document.querySelector('#gameArea');
-  if (!gameArea) {
-    return null;
-  }
-  overlay = document.createElement('canvas');
-  overlay.id = 'spawn-fly-in';
-  overlay.setAttribute('aria-hidden', 'true');
-  Object.assign(overlay.style, {
-    position: 'absolute',
-    inset: '0',
-    width: '100%',
-    height: '100%',
-    pointerEvents: 'none',
-    zIndex: '5',
-  });
-  gameArea.appendChild(overlay);
-  return overlay;
-}
-
 export function stopSpawnFlyIn(): void {
+  generation++;
   if (frameRequest !== null) {
     window.cancelAnimationFrame(frameRequest);
     frameRequest = null;
   }
-  overlay?.remove();
-  overlay = null;
+  visibilityChanged?.(false);
   window.removeEventListener('keydown', stopSpawnFlyIn, true);
   window.removeEventListener('pointerdown', stopSpawnFlyIn, true);
 }
@@ -74,16 +63,22 @@ export function playSpawnFlyIn(): void {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
     return;
   }
-  const canvas = ensureOverlay();
+  const canvas = overlay;
   const context = canvas?.getContext('2d');
   if (!canvas || !context) {
     return;
   }
+  visibilityChanged?.(true);
   window.addEventListener('keydown', stopSpawnFlyIn, true);
   window.addEventListener('pointerdown', stopSpawnFlyIn, true);
   const started = performance.now();
+  const ticket = generation;
 
   const render = (now: number): void => {
+    if (generation !== ticket || overlay !== canvas) {
+      return;
+    }
+    frameRequest = null;
     const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
     const elapsed = now - started;
     if (!ship || elapsed >= HOLD_MS + DIVE_MS + FADE_MS) {
@@ -106,6 +101,8 @@ export function playSpawnFlyIn(): void {
     const fade = Math.min(1, Math.max(0, (elapsed - HOLD_MS - DIVE_MS + FADE_MS) / FADE_MS));
 
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.clearRect(0, 0, width, height);
+    context.globalAlpha = 1 - fade;
     context.fillStyle = PALETTE.BG;
     context.fillRect(0, 0, width, height);
     drawSpawnChart(context, width, height, center, scale);
@@ -125,7 +122,7 @@ export function playSpawnFlyIn(): void {
     }
     context.stroke();
 
-    canvas.style.opacity = String(1 - fade);
+    context.globalAlpha = 1;
     frameRequest = window.requestAnimationFrame(render);
   };
   frameRequest = window.requestAnimationFrame(render);

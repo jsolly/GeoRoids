@@ -1,10 +1,4 @@
-import type {
-  AsteroidDestroyEvent,
-  AsteroidTaggedEvent,
-  Position,
-  SatellitePickupCollected,
-  ShockwaveEvent,
-} from '../../shared-types';
+import type { AsteroidDestroyEvent, Position, SatellitePickupCollected } from '../../shared-types';
 import type { PlayerIdentityChangedDetail } from '../network/services/playerIdentityEvents';
 
 declare global {
@@ -22,9 +16,7 @@ declare global {
       position?: Position;
       cause?: string;
     }>;
-    serverAsteroidTagged: CustomEvent<AsteroidTaggedEvent>;
     serverAsteroidDestroyed: CustomEvent<AsteroidDestroyEvent>;
-    serverShockwave: CustomEvent<ShockwaveEvent>;
     satellitePickupCollected: CustomEvent<SatellitePickupCollected>;
   }
 }

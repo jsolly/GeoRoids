@@ -8,7 +8,7 @@ import {
 } from './snapshotMotion';
 import { quantizeSnapshotKinematics, SNAPSHOT_KINEMATIC_FACTOR } from './snapshotPrecision';
 
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 // A late join includes the entire explored atlas plus nearby asteroid geometry.
 // Keep that keyframe admissible while bounding each socket's projected queue.
 export const SNAPSHOT_BACKPRESSURE_BYTES = 1024 * 1024;
@@ -52,9 +52,9 @@ interface SnapshotPatch extends ObjectPatch {
   objects?: { spiderField: ObjectPatch };
 }
 export type SnapshotFrame =
-  | { version: 2; sequence: number; kind: 'keyframe'; state: SnapshotState }
+  | { version: 3; sequence: number; kind: 'keyframe'; state: SnapshotState }
   | {
-      version: 2;
+      version: 3;
       sequence: number;
       kind: 'delta';
       baseline: number;
@@ -183,7 +183,6 @@ const BROADCAST_ROW_COLLECTIONS = new Set([
   'loot',
   'satellitePickups',
   'playerProjectiles',
-  'collabTags',
   'mapAssets',
 ]);
 const BROADCAST_COMMON_BRANCHES = new Set([
@@ -1097,7 +1096,7 @@ function applyObjectPatch(base: Row, patch: unknown, nested: boolean): Row {
   }
   for (const [name, change] of Object.entries(collections ?? {})) {
     key(name);
-    // Reserved v2 target: deployed older servers still send consumption history.
+    // The consumed collection remains a reserved nested snapshot target.
     if (
       (nested && name !== 'spiders' && name !== 'nests' && name !== 'consumed') ||
       !rows(base[name])

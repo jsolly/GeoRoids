@@ -14,7 +14,6 @@ import { snapshotFixture } from './snapshotFixture';
 const NON_JSON_ERROR_PATTERN = /Non-JSON/u;
 const BASELINE_ERROR_PATTERN = /baseline/u;
 const DTO_ERROR_PATTERN = /DTO/u;
-const REFERENCES_ERROR_PATTERN = /references/u;
 const STALE_SNAPSHOT_ERROR_PATTERN = /Stale/u;
 const UNSAFE_SNAPSHOT_ERROR_PATTERN = /Unsafe/u;
 const JOIN_ACK_ORDER_ERROR_PATTERN = /before.*join ack/u;
@@ -263,7 +262,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         JSON.stringify({
           type: 'snapshot',
           data: {
-            version: 2,
+            version: 3,
             sequence: 2,
             kind: 'delta',
             baseline: 1,
@@ -282,16 +281,6 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         })
       )
     ).toThrow(DTO_ERROR_PATTERN);
-    const invalidReference = captureSnapshot(snapshotFixture(2));
-    const collabTag = invalidReference.collabTags[0];
-    assert.ok(collabTag, 'collab tag');
-    collabTag.asteroidId = 'missing-asteroid';
-    expect(() =>
-      decodeSnapshotMessage(
-        decoder,
-        snapshotMessage({ version: 2, sequence: 2, kind: 'keyframe', state: invalidReference })
-      )
-    ).toThrow(REFERENCES_ERROR_PATTERN);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(delta))).toEqual(nextEncoder.state);
     expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(
       STALE_SNAPSHOT_ERROR_PATTERN
@@ -299,7 +288,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     expect(() =>
       decodeSnapshotMessage(
         decoder,
-        '{"type":"snapshot","data":{"version":2,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}}'
+        '{"type":"snapshot","data":{"version":3,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}}'
       )
     ).toThrow(UNSAFE_SNAPSHOT_ERROR_PATTERN);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(50)))).toEqual(first.state);
@@ -329,7 +318,6 @@ describe('pilots reconstruct complete authoritative worlds', () => {
           loot: [],
           satellitePickups: [],
           playerProjectiles: [],
-          collabTags: [],
           settlement: emptySettlement(),
           exploration: [],
           mapAssets: [],
@@ -340,10 +328,10 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         };
         for (const shorterBaseline of [9, 99]) {
           const sequence = shorterBaseline + 2;
-          const full = { version: 2, sequence, kind: 'keyframe', state: world };
+          const full = { version: 3, sequence, kind: 'keyframe', state: world };
           const clear: string[] = [retiredPrefix];
           const delta = {
-            version: 2,
+            version: 3,
             sequence,
             kind: 'delta',
             baseline: shorterBaseline + 1,
@@ -723,11 +711,11 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         [0, 9, 1, 2, 3],
       ]) {
         const decoder = new SnapshotDecoder();
-        const keyframe = { version: 2, sequence: 1, kind: 'keyframe', state: baseline } as const;
+        const keyframe = { version: 3, sequence: 1, kind: 'keyframe', state: baseline } as const;
         const app = decodeSnapshotMessage(decoder, snapshotMessage(keyframe));
         const original = structuredClone(app);
         const corrupt = {
-          version: 2,
+          version: 3,
           sequence: 2,
           kind: 'delta',
           baseline: 1,
@@ -885,7 +873,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       const rejected = decoder.readMessage(
         JSON.stringify({
           type: 'snapshot',
-          data: { version: 2, sequence: 2, kind: 'delta', baseline: 1, patch },
+          data: { version: 3, sequence: 2, kind: 'delta', baseline: 1, patch },
         }),
         { acceptSnapshots: true }
       );
@@ -896,7 +884,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     expect(
       decoder.readMessage(
-        '{"type":"snapshot","data":{"version":2,"sequence":2,"kind":"delta","baseline":1,"patch":{"collections":{"asteroids":{"update":[[0,1,1e999,2]]}}}}}',
+        '{"type":"snapshot","data":{"version":3,"sequence":2,"kind":"delta","baseline":1,"patch":{"collections":{"asteroids":{"update":[[0,1,1e999,2]]}}}}}',
         { acceptSnapshots: true }
       ).kind
     ).toBe('snapshot-rejected');

@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { AsteroidManager } from '../../../server/core/AsteroidManager';
-import { RNGService } from '../../../server/core/RNGService';
 import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
 import { furnaceReward, nearestFurnace } from '../../../shared/furnaces';
 import { validateAsteroidDto } from '../../../shared/snapshotDto';
@@ -158,16 +156,11 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     expect(world.engine.getAsteroid(rock.id)).toBe(rock);
   });
 
-  test('weapons, direct mining, shockwaves, and new scans cannot affect ignited cargo', () => {
+  test('weapons and new scans cannot affect ignited cargo', () => {
     activate(alice);
     activate(alice);
-    rock.isCollabTarget = true;
     const original = structuredClone(rock);
     expect(world.engine.applyLaserAsteroidHit(rock.id, bob.id).outcome).toBe('ignored');
-    expect(world.engine.handleAsteroidDamage(rock.id, bob.id).destroyed).toBe(false);
-    const manager = new AsteroidManager(new RNGService(42));
-    manager.addAsteroid(rock);
-    expect(manager.applyRadialImpulse({ x: 140, y: 0 }, 300, 10)).toBe(0);
     const scout = world.join('Scout', { x: 150, y: 0 });
     world.engine.useAbility(scout.id);
     expect(rock).toEqual(original);
@@ -179,21 +172,6 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     expect(laser?.hasExploded).toBe(false);
     expect(laser?.position.x).toBeGreaterThan(rock.position.x + rock.size);
     expect(rock).toEqual(original);
-  });
-
-  test('a mining tag from before ignition cannot destroy self-guided cargo when it expires', () => {
-    rock.material = 'ice';
-    rock.size = 50;
-    const hitAt = world.engine.getServerTime();
-    expect(world.engine.applyLaserAsteroidHit(rock.id, bob.id, 'laser', hitAt).outcome).toBe(
-      'tagged'
-    );
-    activate(alice);
-    activate(alice);
-    expect(rock.boost?.phase).toBe('burning');
-    world.engine.flushExpiredCollabHits(hitAt + 10000);
-    expect(world.engine.getAsteroid(rock.id)).toBe(rock);
-    expect(world.engine.getLoot()).toEqual([]);
   });
 
   test('delivery still pays its original launcher after the launcher dies', () => {

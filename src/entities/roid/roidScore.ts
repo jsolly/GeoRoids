@@ -1,11 +1,6 @@
 import { isColossalAsteroid } from '../../../shared/asteroidScale';
 import { ROID } from '../../constants';
 
-/** Large / collab-split class. Shared by client scoring and the server window. */
-export function isBiggestAsteroid(size: number): boolean {
-  return size >= ROID.COLLAB_SPLIT_MIN_SIZE;
-}
-
 export function pointsForRoidSize(
   size: number
 ):
@@ -16,7 +11,7 @@ export function pointsForRoidSize(
   if (isColossalAsteroid(size)) {
     return ROID.POINTS_COLOSSAL;
   }
-  if (isBiggestAsteroid(size)) {
+  if (size >= ROID.LARGE_MIN_SIZE) {
     return ROID.POINTS_LARGE;
   }
   if (size >= 20) {

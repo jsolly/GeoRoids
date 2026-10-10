@@ -24,7 +24,6 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 | Ship and orbital shots | Short G4 and C4 pulses, without pitch randomization |
 | Hits | Rounded low impact with a soft C4 overtone |
 | Asteroid destruction | Low body, quiet G3/E4 tail, low-pass dust |
-| Asteroid split | Existing destruction layer plus quiet sine body and low-pass dust |
 | Satellite and loot destruction | Shorter, lighter relatives of the asteroid impact |
 | Ship destruction | Deeper and longer C/G body, without sharp noise |
 | Local hull damage | Short low knock, only on a surviving damage event |
@@ -37,7 +36,7 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 
 ## Coverage decisions
 
-The audit traced firing, damage/death/respawn, asteroid destruction/splits,
+The audit traced firing, damage/death/respawn, asteroid destruction,
 resource extraction/collection, tools, asteroid ignition, satellite inventory, furnace
 rewards, and in-flight menus. Missing asteroid ignition, surviving hull damage,
 coupling ignition, satellite equip and menu feedback now have cues.
@@ -66,8 +65,7 @@ danger loop while gameplay holds `pushMusicThreat()`. Pair every push with
 decode still keeps Playfield Drift slightly louder and faster. Music off
 silences every bed, including danger, without muting cues.
 Leaving the playfield zeros the threat count. All beds stay quieter than
-cues. Satellite break, respawn, scan, latch/release and
-shockwave already had cues and now use the new family.
+cues. Satellite break, respawn, scan and latch/release use the same family.
 
 ## Terrain spiders
 
@@ -113,9 +111,7 @@ not advance the melody. No sound delays simulation, input, or collection.
 ## Playback
 
 Samples retain their authored tuning. Resource notes use exact semitone ratios;
-playback rate also shortens higher notes' tails. Only the split's quiet noise
-texture varies in rate; its body tones stay tuned. The split uses sine tones
-and low-pass noise instead of a sawtooth and high-pass crack.
+playback rate also shortens higher notes' tails.
 
 World cues retain viewport culling and distance attenuation. Sound Effects off
 stops active cues and prevents new ones. Music off stops looping beds without
@@ -155,8 +151,8 @@ backend loads and decodes samples once for reuse; firing does not fetch or decod
 another copy. Cues that occur before an asset is ready are skipped, not replayed
 later in a burst. Audio failures must not block simulation or networking.
 
-One realtime audio context serves sample effects, the orbit chime, looping
-beds, and the synthesized split cue.
+One realtime audio context serves sample effects, the orbit chime and looping
+beds.
 Muting sound effects stops active cue sources; hiding the tab or turning both
 Sound Effects and Music off suspends audio work. Delayed loads or resumes
 cannot undo a mute.

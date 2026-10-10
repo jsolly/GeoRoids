@@ -113,7 +113,7 @@ export interface PlayerUpdate {
 
 export interface PlayerJoin {
   /** Required current-protocol acknowledgement. */
-  snapshotVersion: 2;
+  snapshotVersion: 3;
   asteroidInteractions: 1;
   /** The server accepts correlated shoot requests and emits per-shot acknowledgements. */
   shotAcknowledgements?: boolean;
@@ -231,8 +231,6 @@ export interface AsteroidData {
   surveyedBy?: string[];
   /** Pilots who have mined this deposit; persisted until the deposit is destroyed. */
   miningContributors?: string[];
-  /** High-HP rock that stacks hits from every pilot (voluntary coop). */
-  isCollabTarget?: boolean;
   phenomenon?: AsteroidPhenomenon;
   boost?: AsteroidBoost | null;
   /** Explicit null clears a previously rendered probe from client state. */
@@ -242,7 +240,7 @@ export interface AsteroidData {
 /** Shared world pickups. Destroy-drop is shard; Tap extract is tap; mined cargo is points. */
 export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
 
-/** `wreckage` remains reserved in snapshot v2 for independently deployed clients. */
+/** `wreckage` remains a reserved loot kind; current mining produces point cargo. */
 export type LootKind = 'shard' | 'tap' | 'silk' | EquipmentId | 'points' | 'wreckage';
 
 /** One accepted collection, emitted before the next world snapshot. */
@@ -308,25 +306,12 @@ export interface SatellitePickupCollected {
   scoreBonus: number;
 }
 
-/** Server-owned collab tag. Clients must not destroy the roid until asteroidDestroy. */
-export interface AsteroidTaggedEvent {
-  asteroidId: string;
-  shooterId: string;
-  expiresAt: number;
-}
-
-/** Authoritative destroy. `origin` + `collabSplit` are the #447 shockwave hook. */
+/** Authoritative destruction and its world position. */
 export interface AsteroidDestroyEvent {
   asteroidId: string;
-  collabSplit?: boolean;
   origin?: Position;
   /** Furnace intake; clients shatter the outline in danger-red with a smoke poof. */
   consumedBy?: 'furnace';
-}
-
-export interface ShockwaveEvent {
-  origin: Position;
-  asteroidId?: string;
 }
 
 /** A furnace a Scout lit with their own score. */
@@ -362,27 +347,14 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  /** Snapshot v2 calls surviving point-cargo markers `wreckage`. */
+  /** Snapshots call surviving point-cargo markers `wreckage`. */
   kind: 'furnace' | 'foundation' | 'wreckage' | 'satellite';
   position: Position;
   name: string;
 }
 
-/** Complete collaborative hit window; omitted windows are no longer active. */
-export interface ActiveCollabTag {
-  asteroidId: string;
-  hits: Array<{ shooterId: string; at: number; points: number }>;
-  expiresAt: number;
-}
-
-export interface SnapshotCollabTag extends ActiveCollabTag {
-  /** Identical to asteroidId; enables explicit tag removals. */
-  id: string;
-}
-
 /** Complete authoritative snapshot, including recovery state. */
 export interface ServerGameSnapshot extends ServerGameState {
-  collabTags: SnapshotCollabTag[];
   playerProjectiles: PlayerProjectileState[];
 }
 

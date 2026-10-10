@@ -528,7 +528,7 @@ Material, health, shape, rotation, and reflective-pocket offsets remain intact;
 every initial asteroid clears the hulls and Town Square hearth. The hashed
 fixture manifest records the layout and complete starting asteroid state.
 
-After arrangement, ordinary physics, firing, damage, splitting, towing and
+After arrangement, ordinary physics, firing, damage, fragmentation, towing and
 impulses run unchanged. Rocks are never topped up or reset during the run; a
 peer rejoin fails this scenario instead of reseeding its field. Warmup can
 consume asteroids, and a finite field can still deplete. Review per-second visible
@@ -584,11 +584,10 @@ Ordinary damage, death, respawn, pickups, map discovery, spiders and loot remain
 actual populations and existing combat witnesses remain in the report. Shorter
 runs report whether a scan was observed and cannot claim scan workload coverage.
 
-`combatWitness` records actual `playerDamaged`, `asteroidTagged`,
-`asteroidDestroy`, and `shockwave` messages. Player damage preserves the target,
+`combatWitness` records actual `playerDamaged` and `asteroidDestroy` messages. Player damage preserves the target,
 attacker, damage, remaining health, and destruction flag. An `asteroid` attacker
 identifies a ship/asteroid collision; `ricochet`, `spider`, and `boundary` identify
-other hazards. Asteroid tags retain the asteroid and shooter IDs and tag expiry.
+other hazards.
 Supplemental health decreases come from successive measured snapshots. The
 report retains receipt times, event origins or the last known target position, and
 whether that position lies inside the last sampled browser viewport with the

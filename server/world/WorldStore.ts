@@ -363,6 +363,11 @@ export class WorldStore {
           candidate = { ...saved, boost: null };
         }
       }
+      // Retire the saved cooperative marker without undoing prior migrations.
+      if (typeof candidate === 'object' && candidate !== null && 'isCollabTarget' in candidate) {
+        const { isCollabTarget: _retiredMarker, ...normalized } = candidate;
+        candidate = normalized;
+      }
       try {
         validateAsteroidDto(candidate);
       } catch (error) {

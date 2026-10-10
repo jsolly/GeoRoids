@@ -14,7 +14,6 @@ import type {
   AbilityUsedEvent,
   AsteroidData,
   AsteroidDestroyEvent,
-  AsteroidTaggedEvent,
   FurnaceDelivery,
   LootCollected,
   LootKind,
@@ -25,7 +24,6 @@ import type {
   Position,
   SatellitePickupCollected,
   ServerGameSnapshot,
-  ShockwaveEvent,
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
 import { playFeedback } from '../../audio/feedbackSounds';
@@ -84,7 +82,6 @@ import {
   createAsteroidFieldSyncScratch,
   notifyAsteroidCreated,
   notifyAsteroidDestroyed,
-  notifyAsteroidTagged,
   notifyAsteroidUpdated,
   partitionAsteroidSnapshot,
   shouldPreserveSeenAsteroidsOnJoin,
@@ -205,7 +202,6 @@ export class ConnectionManager {
   private hasInitializedAsteroidsForConnection: boolean = false;
   private readonly playerListCache = new PlayerListCache<Player>();
   private readonly snapshotEntityIds = new Set<string>();
-  private readonly taggedAsteroidIds = new Set<string>();
   private readonly playedLootCollectionIds = new Set<string>();
   private readonly playedTapEjectionIds = new Set<string>();
   private readonly playedLootExplosionIds = new Set<string>();
@@ -575,7 +571,6 @@ export class ConnectionManager {
     this.state.isConnected = false;
     this.state.socket = null;
     this.allPlayers.clear();
-    this.taggedAsteroidIds.clear();
     this.playerListCache.invalidate();
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
@@ -1060,12 +1055,6 @@ export class ConnectionManager {
       case 'asteroidDestroy':
         this.handleAsteroidDestroyed(data as AsteroidDestroyEvent);
         break;
-      case 'asteroidTagged':
-        this.handleAsteroidTagged(data as AsteroidTaggedEvent);
-        break;
-      case 'shockwave':
-        this.handleShockwave(data as ShockwaveEvent);
-        break;
       case 'satellitePickupCollected':
         this.handleSatellitePickupCollected(data as SatellitePickupCollected);
         break;
@@ -1514,21 +1503,6 @@ export class ConnectionManager {
     for (const player of this.allPlayers.values()) {
       projectileField.reconcileShip(player.ship, player.id);
     }
-    const activeTags = new Set(data.collabTags.map((tag) => tag.asteroidId));
-    for (const id of this.taggedAsteroidIds) {
-      if (!activeTags.has(id)) {
-        notifyAsteroidTagged({ asteroidId: id, shooterId: '', expiresAt: 0 });
-      }
-    }
-    this.taggedAsteroidIds.clear();
-    for (const tag of data.collabTags) {
-      this.taggedAsteroidIds.add(tag.asteroidId);
-      notifyAsteroidTagged({
-        asteroidId: tag.asteroidId,
-        shooterId: tag.hits[0]?.shooterId ?? '',
-        expiresAt: tag.expiresAt,
-      });
-    }
   }
 
   private handleLootExploded(data: {
@@ -1769,32 +1743,9 @@ export class ConnectionManager {
   private handleAsteroidDestroyed(data: AsteroidDestroyEvent): void {
     notifyAsteroidDestroyed({
       asteroidId: data.asteroidId,
-      collabSplit: data.collabSplit === true,
       ...(data.origin !== undefined ? { origin: data.origin } : {}),
       ...(data.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
     });
-  }
-
-  private handleAsteroidTagged(data: AsteroidTaggedEvent): void {
-    if (!data?.asteroidId) {
-      return;
-    }
-    this.taggedAsteroidIds.add(data.asteroidId);
-    notifyAsteroidTagged(data);
-  }
-
-  private handleShockwave(data: ShockwaveEvent): void {
-    if (!data?.origin) {
-      return;
-    }
-    window.dispatchEvent(
-      new CustomEvent('serverShockwave', {
-        detail: {
-          origin: { x: data.origin.x, y: data.origin.y },
-          asteroidId: data.asteroidId,
-        },
-      })
-    );
   }
 
   private handleSatellitePickupCollected(data: SatellitePickupCollected): void {

@@ -101,7 +101,7 @@ export function previewChargedReflections(
 
 /** Decorate stable field slots once; never reseed a consumed cluster mid-belt. */
 export function seedAsteroidPhenomena(rocks: AsteroidData[]): void {
-  const candidates = rocks.filter((rock) => !rock.isCollabTarget && !rock.phenomenon);
+  const candidates = rocks.filter((rock) => !rock.phenomenon);
   for (let cluster = 0; cluster < ASTEROID_INTERACTIONS.clusterCount; cluster++) {
     const group = candidates.slice(
       cluster * ASTEROID_INTERACTIONS.rocksPerCluster,

@@ -191,7 +191,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       ws
     );
 
-  test('current offers receive a joined acknowledgment before snapshot-v2 frames', () => {
+  test('current offers receive a joined acknowledgment before snapshot-v3 frames', () => {
     const pilot = socket();
     joinPilot(handler, pilot.ws, 'pilot');
     applySnapshots(pilot, handler);
@@ -211,7 +211,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     });
     expect(pilot.messages[0]?.type).toBe('joined');
     const snapshot = applySnapshots(pilot, handler)[0];
-    assert.ok(snapshot, 'snapshot-v2 state');
+    assert.ok(snapshot, 'snapshot-v3 state');
     expect(snapshot).toMatchObject({
       entities: expect.any(Array),
       playerProjectiles: expect.any(Array),
@@ -266,10 +266,6 @@ describe('current pilots share the production handler and broadcaster', () => {
         loot: nearby(state.loot),
         satellitePickups: nearby(state.satellitePickups),
         playerProjectiles: nearby(engine.getPlayerProjectiles()),
-        collabTags: engine
-          .getActiveCollabTags()
-          .filter((tag) => asteroids.some((rock) => rock.id === tag.asteroidId))
-          .map((tag) => ({ id: tag.asteroidId, ...tag })),
       }).state;
     };
     const a = socket();

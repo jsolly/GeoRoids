@@ -5,8 +5,6 @@ import type { WebSocket } from 'ws';
 import { GameEngine, PLAYER_LASER_MAX_LIFETIME_MS } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import type { AsteroidData } from '../../../shared-types';
-import { ROID } from '../../../src/constants';
 
 describe('server motion clock', () => {
   let engine: GameEngine;
@@ -73,35 +71,6 @@ describe('server motion clock', () => {
     vi.setSystemTime(9_999);
     expect(engine.advanceLasersAndResolveHits()).toEqual([]);
     expect(engine.getServerLasers()).toHaveLength(0);
-  });
-
-  test('collaborative asteroid expiry follows elapsed time after a wall rollback', () => {
-    const socket = {} as WebSocket;
-    const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
-    const target: AsteroidData = {
-      id: 'clock-collab-target',
-      position: { x: 400, y: 300 },
-      velocity: { x: 0, y: 0 },
-      size: 50,
-      jaggedness: 0.5,
-      rotation: 0,
-      angularVelocity: 0,
-      health: 50,
-      maxHealth: 50,
-      vertices: 8,
-      offsets: [1, 1, 1, 1, 1, 1, 1, 1],
-      material: 'ice',
-    };
-    engine.addAsteroid(target);
-
-    const firstHit = engine.applyLaserAsteroidHit(target.id, pilot.id);
-    expect(firstHit.outcome).toBe('tagged');
-    expect(engine.getActiveCollabTags()).toHaveLength(1);
-
-    advanceElapsed(ROID.COLLAB_SPLIT_WINDOW_MS + 1);
-    vi.setSystemTime(9_999);
-    expect(engine.flushExpiredCollabHits()).toHaveLength(1);
-    expect(engine.getAsteroid(target.id)).toBeUndefined();
   });
 
   test('explicit simulation times reject invalid or backwards values while allowing repeats', () => {

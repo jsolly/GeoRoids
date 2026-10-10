@@ -1009,9 +1009,7 @@ try {
       healthDecreaseCounts: { entities: 0, asteroids: 0 },
       authoritativeEventCounts: {
         asteroidDestroy: 0,
-        shockwave: 0,
         playerDamaged: 0,
-        asteroidTagged: 0,
       },
       healthDecreases,
       authoritativeEvents,
@@ -1221,10 +1219,7 @@ try {
             if (
               measuring &&
               !arranging &&
-              (envelope.type === 'asteroidDestroy' ||
-                envelope.type === 'shockwave' ||
-                envelope.type === 'playerDamaged' ||
-                envelope.type === 'asteroidTagged')
+              (envelope.type === 'asteroidDestroy' || envelope.type === 'playerDamaged')
             ) {
               const data = envelope.data;
               assert(data && typeof data === 'object', 'Invalid authoritative combat event');
@@ -1258,17 +1253,6 @@ try {
                   remainingHealth: data.remainingHealth,
                   isDestroyed: data.isDestroyed,
                 };
-              } else if (envelope.type === 'asteroidTagged') {
-                assert(
-                  asteroidId &&
-                    'shooterId' in data &&
-                    typeof data.shooterId === 'string' &&
-                    'expiresAt' in data &&
-                    typeof data.expiresAt === 'number' &&
-                    Number.isFinite(data.expiresAt),
-                  'Invalid authoritative asteroid tag'
-                );
-                hitDetails = { shooterId: data.shooterId, expiresAt: data.expiresAt };
               }
               let eventOrigin: Position | undefined;
               if ('origin' in data && data.origin !== undefined) {
@@ -1287,7 +1271,6 @@ try {
                 eventOrigin = { x: value.x, y: value.y };
               }
               assert(envelope.type !== 'asteroidDestroy' || asteroidId, 'Destroy event lacks id');
-              assert(envelope.type !== 'shockwave' || eventOrigin, 'Shockwave event lacks origin');
               combatWitness.authoritativeEventCounts[envelope.type]++;
               if (authoritativeEvents.length < combatWitness.retainedLimitPerSeries) {
                 const observedAtMs = performance.now();
@@ -1316,7 +1299,6 @@ try {
                       ? 'latest-snapshot'
                       : 'unknown',
                   viewport: viewportWitness(position, observedAtMs),
-                  collabSplit: 'collabSplit' in data && data.collabSplit === true,
                   consumedBy:
                     'consumedBy' in data && data.consumedBy === 'furnace' ? 'furnace' : null,
                 });

@@ -15,11 +15,9 @@ import { snapshotFixture } from './snapshotFixture';
 
 function selected(state: ServerGameSnapshot, center: { x: number; y: number }, scanning = false) {
   const asteroids = nearbyAsteroidRows(state.asteroids, center, scanning);
-  const ids = new Set(asteroids.map((rock) => rock.id));
   return {
     ...state,
     asteroids,
-    collabTags: state.collabTags.filter((tag) => ids.has(tag.asteroidId)),
   };
 }
 
@@ -195,24 +193,17 @@ test('source changes affect the next broadcast while published baselines and sam
   expect(next.state.asteroids[0]).not.toBe(first.state.asteroids[0]);
 });
 
-test('failed recipient validation cannot publish stale captures or bypass selected-row references', () => {
+test('failed recipient validation cannot publish stale row captures', () => {
   const world = snapshotFixture();
   const context = new SnapshotBroadcastCapture();
   const rock = world.asteroids[0];
   assert(rock);
-  const invalid = {
-    ...world,
-    collabTags: [{ id: 'missing', asteroidId: 'missing', expiresAt: 1000, hits: [] }],
-  };
-  expect(() => new SnapshotEncoder(invalid, context)).toThrow('references');
+  const validHealth = rock.health;
+  rock.health = Number.NaN;
+  expect(() => new SnapshotEncoder(world, context)).toThrow();
+  rock.health = validHealth - 1;
   rock.position.x += 10;
-  rock.health -= 1;
-  const valid = new SnapshotEncoder(world, context);
-  expect(valid.state).toEqual(new SnapshotEncoder(world).state);
-  // Cached valid tags/rows do not replace per-recipient relationship validation.
-  expect(
-    () => new SnapshotEncoder({ ...world, asteroids: world.asteroids.slice(1) }, context)
-  ).toThrow('references');
+  expect(new SnapshotEncoder(world, context).state).toEqual(new SnapshotEncoder(world).state);
 });
 
 test('shared capture preserves nesting limits, unsafe-key checks and non-JSON rejection on cold and warm recipients', () => {

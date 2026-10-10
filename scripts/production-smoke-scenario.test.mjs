@@ -120,7 +120,7 @@ function codedSocket(outcome = 'accepted') {
   const createSocket = (url, options) => {
     assert.equal(
       url,
-      'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=2&asteroidInteractions=1'
+      'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=3&asteroidInteractions=1'
     );
     assert.equal(options.origin, new URL(productionUrl).origin);
     assert.equal(options.handshakeTimeout, 15000);
@@ -150,7 +150,7 @@ function codedSocket(outcome = 'accepted') {
       sent.push(message);
       if (message.type === 'join') {
         id = message.id;
-        assert.equal(message.data.snapshotVersion, 2);
+        assert.equal(message.data.snapshotVersion, 3);
         assert.equal(message.data.asteroidInteractions, 1);
         assert.equal(message.data.clientReleaseId, release);
         assert.equal(message.data.resumeToken, undefined);
@@ -168,7 +168,7 @@ function codedSocket(outcome = 'accepted') {
         }
         receive('joined', {
           id: outcome === 'wrong-player' ? 'other' : id,
-          snapshotVersion: outcome === 'old-protocol' ? 1 : 2,
+          snapshotVersion: outcome === 'old-protocol' ? 2 : 3,
           asteroidInteractions: 1,
           shotAcknowledgements: true,
           resumeToken: 'private-resume-token',
@@ -281,7 +281,7 @@ test('the deployed HTTP release and genuine current-protocol gameplay produce a 
     assert.equal(transport.sent().at(-1).type, 'leave');
     const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
     assert.equal(evidence.acceptedSnapshots, 3);
-    assert.equal(evidence.admission.snapshotVersion, 2);
+    assert.equal(evidence.admission.snapshotVersion, 3);
     assert.match(evidence.admission.playerId, /^smoke-/u);
     assert.equal(evidence.movement.acknowledged, 1);
     assert.equal(evidence.movement.displacement, 6);

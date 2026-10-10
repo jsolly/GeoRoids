@@ -6,7 +6,6 @@ import type {
   AsteroidDestroyEvent,
   FurnaceDelivery,
   LootData,
-  Position,
   SatellitePickupCollected,
   ShipKitId,
 } from '../../shared-types';
@@ -14,7 +13,6 @@ import { playDestructionSound } from '../audio/destructionSounds';
 import { playFeedback } from '../audio/feedbackSounds';
 import { playRespawn } from '../audio/interactionSounds';
 import { bindGameAudio } from '../audio/spatialAudio';
-import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { entityFactory } from '../entities/EntityFactory';
@@ -34,7 +32,6 @@ import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/ha
 import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
 import { noteFurnacePipePulse, resetFurnacePipePulses } from '../fx/furnacePipePulse';
 import { playLocalHaptic } from '../fx/haptics';
-import { shockwaveManager } from '../fx/ShockwaveManager';
 import { tickTouchControls } from '../input/touchControls';
 import { NetworkManager } from '../network/networkManager';
 import {
@@ -44,7 +41,6 @@ import {
   unbindAsteroidFieldApply,
 } from '../network/services/asteroidFieldSync';
 import { CollisionManager } from '../physics/collision/CollisionManager';
-import { applyShockwaveToBody, type ShockwaveWaveSpec } from '../physics/shockwave';
 import { contourSegmentCount } from '../physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../physics/terrain/heightfield';
 import { getSpiderField } from '../physics/terrain/spiderSession';
@@ -92,7 +88,6 @@ export class GameController {
   private collisionManager: CollisionManager;
 
   private currRoidBelt: RoidBelt;
-  private recentShockwaveKeys = new Set<string>();
   private readonly localFirstPlayers: Player[] = [];
   private simulationAccumulatorMs = 0;
 
@@ -120,10 +115,6 @@ export class GameController {
           rotation: canvasManager.getCameraRotation(),
         };
       },
-    });
-
-    shockwaveManager.setWaveFireHandler((origin, wave) => {
-      this.applyLocalShockwaveKick(origin, wave);
     });
 
     // Initialize with empty asteroid belt - will be populated by server
@@ -183,7 +174,6 @@ export class GameController {
       // Empty belt + listeners must be ready before join so the first
       // asteroidCreateBatch / snapshot cannot land on a static local set.
       this.currRoidBelt = entityFactory.createEmptyRoidBelt();
-      shockwaveManager.clear();
       this.setupServerAsteroidListeners();
       const joined = await this.networkManager.joinAndWaitForWorld();
       if (!joined) {
@@ -288,10 +278,9 @@ export class GameController {
     event: AsteroidDestroyEvent,
     showDestructionVfx: boolean
   ): void => {
-    const { asteroidId, collabSplit, origin } = event;
+    const { asteroidId } = event;
     logger.debug('GAME', 'Removing server asteroid from local belt', {
       asteroidId,
-      collabSplit,
       showDestructionVfx,
     });
 
@@ -304,18 +293,13 @@ export class GameController {
       return;
     }
     if (showDestructionVfx) {
-      if (collabSplit) {
-        this.spawnCollabShockwave(origin ?? roid.position, asteroidId);
-      } else {
-        playDestructionSound('asteroid', roid.position);
-      }
+      playDestructionSound('asteroid', roid.position);
       recordAsteroidShatter(
         roid,
         performance.now(),
         event.consumedBy === 'furnace' ? 'furnace' : 'break'
       );
     }
-    delete roid.taggedUntil;
     this.currRoidBelt.roids.splice(index, 1);
   };
 
@@ -325,64 +309,6 @@ export class GameController {
 
   private applyServerAsteroidReconciled = (asteroidId: string): void => {
     this.removeServerAsteroid({ asteroidId }, false);
-  };
-
-  private handleServerShockwave = (event: Event): void => {
-    const customEvent = event as CustomEvent<{ origin: Position; asteroidId?: string }>;
-    const { origin, asteroidId } = customEvent.detail;
-    if (!origin) {
-      return;
-    }
-    this.spawnCollabShockwave(origin, asteroidId);
-  };
-
-  private spawnCollabShockwave(origin: Position, asteroidId?: string): void {
-    const key = asteroidId ?? `${Math.round(origin.x)}:${Math.round(origin.y)}`;
-    if (this.recentShockwaveKeys.has(key)) {
-      return;
-    }
-    this.recentShockwaveKeys.add(key);
-    window.setTimeout(() => this.recentShockwaveKeys.delete(key), 1000);
-    playSplitSound(origin);
-    shockwaveManager.spawn(origin);
-  }
-
-  private applyLocalShockwaveKick(origin: Position, wave: ShockwaveWaveSpec): void {
-    const ship = this.playerManager.getLocalShip();
-    if (ship && !ship.exploding) {
-      const next = applyShockwaveToBody(
-        { position: ship.position, velocity: ship.velocity, size: ship.r },
-        origin,
-        wave
-      );
-      if (next) {
-        ship.velocity = next;
-      }
-    }
-
-    for (const roid of this.currRoidBelt.roids) {
-      if (roid.boost?.phase === 'burning') {
-        continue;
-      }
-      const next = applyShockwaveToBody(
-        { position: roid.position, velocity: roid.velocity, size: roid.r },
-        origin,
-        wave
-      );
-      if (next) {
-        roid.velocity = next;
-      }
-    }
-  }
-
-  private applyServerAsteroidTagged = (event: { asteroidId: string; expiresAt: number }): void => {
-    const { asteroidId, expiresAt } = event;
-    const roid = this.currRoidBelt.roids.find((r) => r.id === asteroidId);
-    if (!roid) {
-      return;
-    }
-    roid.taggedUntil = expiresAt;
-    logger.debug('GAME', 'Server tagged asteroid for collab window', { asteroidId, expiresAt });
   };
 
   private handleSatellitePickupCollected = (event: Event): void => {
@@ -420,16 +346,13 @@ export class GameController {
       onUpdated: this.applyServerAsteroidUpdated,
       onDestroyed: this.applyServerAsteroidDestroyed,
       onReconciled: this.applyServerAsteroidReconciled,
-      onTagged: this.applyServerAsteroidTagged,
     });
-    window.addEventListener('serverShockwave', this.handleServerShockwave);
     window.addEventListener('satellitePickupCollected', this.handleSatellitePickupCollected);
     window.addEventListener('furnaceDelivery', this.handleFurnaceDelivery);
   }
 
   private cleanupServerAsteroidListeners(): void {
     unbindAsteroidFieldApply();
-    window.removeEventListener('serverShockwave', this.handleServerShockwave);
     window.removeEventListener('satellitePickupCollected', this.handleSatellitePickupCollected);
     window.removeEventListener('furnaceDelivery', this.handleFurnaceDelivery);
   }
@@ -702,7 +625,6 @@ export class GameController {
     syncCargoFullHint();
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
-    shockwaveManager.update();
 
     // Remote pose remains server-driven; their projectiles and lifecycle
     // advance on the same simulation clock as the local ship.

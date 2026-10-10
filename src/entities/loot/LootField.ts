@@ -14,7 +14,7 @@ export class LootField {
   }
 
   applySnapshot(loot: LootData[]): void {
-    // Older servers can send the retired v2 tag during a staggered release.
+    // Reserved wreckage rows are not collectible world loot.
     this.loot = loot
       .filter((drop) => drop.kind !== 'wreckage')
       .map((drop) => ({

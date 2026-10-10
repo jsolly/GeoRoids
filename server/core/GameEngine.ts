@@ -70,7 +70,6 @@ import {
 import { advanceUtilityFlight } from '../../shared/utilityFlight';
 import { WORLD } from '../../shared/world';
 import type {
-  ActiveCollabTag,
   AsteroidData,
   CivicModule,
   ExplorationTile,
@@ -116,7 +115,6 @@ import {
 } from '../../src/entities/ship/shipKits';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
-import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/physics/shockwave';
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../src/physics/terrain/terrainSession';
 import { getVelocityMagnitude } from '../../src/utils/mathUtils';
@@ -139,7 +137,6 @@ import {
   type AsteroidHitCause,
   type AsteroidHitOutcome,
   AsteroidManager,
-  type ExpiredCollabHit,
 } from './AsteroidManager.ts';
 import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
@@ -206,8 +203,6 @@ export interface AppliedAsteroidHit {
   playerId: string;
   points: number;
   newAsteroids: AsteroidData[];
-  split: boolean;
-  expiresAt?: number;
   origin?: Position;
 }
 
@@ -222,7 +217,6 @@ export interface CombatBroadcast {
   destroyedAsteroidId?: string;
   newAsteroids?: AsteroidData[];
   asteroidScore?: { playerId: string; score: number };
-  collabSplit?: boolean;
   origin?: { x: number; y: number };
 }
 
@@ -270,13 +264,6 @@ interface FlushedWorldRow {
   startedAt: number;
 }
 
-type PendingShockwave = {
-  origin: Position;
-  radius: number;
-  impulse: number;
-  fireAt: number;
-};
-
 export class GameEngine {
   private settlement = emptySettlement();
   private lastSavedEconomy: { settlement: SettlementState; pointRevision: number } | undefined;
@@ -314,7 +301,6 @@ export class GameEngine {
   private lastFlushedWorldRow: FlushedWorldRow | undefined;
   private flushWaitingForIdle = false;
   private lastSimulationAtMs: number | undefined;
-  private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
   private laserSeq = 0;
   private readonly laserNonce = randomUUID();
@@ -332,7 +318,6 @@ export class GameEngine {
   private onAsteroidHits?: (hits: AppliedAsteroidHit[]) => void;
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private persistenceFailure: Error | undefined;
-  private pendingShockwaves: PendingShockwave[] = [];
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
   private pendingLootCollections: LootCollected[] = [];
   private pendingTapEjections: TapEjected[] = [];
@@ -657,8 +642,6 @@ export class GameEngine {
       this.seedAsteroidInteractions();
     }
     this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
-    this.flushDueShockwaves(serverNow);
-    this.flushExpiredCollabHits(serverNow);
     this.resolveAuthoritativeCombat();
     this.depositCargo();
     // Activate newly reached sectors and regrow harvested slots out of sight.
@@ -803,10 +786,8 @@ export class GameEngine {
 
   // Clear ambient entities and pending combat without replacing player sessions.
   private clearWorldObjects(): void {
-    // Clear all asteroids and pending collab resolutions
+    // Clear the asteroid field
     this.asteroidManager.clearAsteroids();
-    this.resolvedCollabHits = [];
-    this.pendingShockwaves = [];
     this.lootManager.clear();
     this.lasers = [];
     this.surveyProbeManager.clear();
@@ -1707,11 +1688,6 @@ export class GameEngine {
     return this.asteroidManager.createAsteroids(count, bounds, playerPositions);
   }
 
-  /** Snapshot source for the server-owned collaborative hit window. */
-  public getActiveCollabTags(now = this.getServerTime()): ActiveCollabTag[] {
-    return this.asteroidManager.getActiveCollabTags(now);
-  }
-
   public getSatellitePickup(pickupId: string): SatellitePickupData | undefined {
     return this.satellitePickupManager.getAllPickups().find((pickup) => pickup.id === pickupId);
   }
@@ -1962,7 +1938,7 @@ export class GameEngine {
   /**
    * Server-owned ship and asteroid resolution. Asteroid motion already ran in
    * the game loop (`updateMotion`); this only applies health. Ram uses the tip
-   * collision destroy path so laser collab stays intact.
+   * collision destroy path independently of mining damage.
    */
   public resolveAuthoritativeCombat(): CombatBroadcast[] {
     if (this.isPaused) {
@@ -2012,10 +1988,6 @@ export class GameEngine {
           destroyedAsteroids.add(hit.asteroidId);
           result.destroyedAsteroidId = hit.asteroidId;
           result.newAsteroids = destruction.newAsteroids;
-          // Rubble has its own ordinary three-fragment break. Keep the
-          // cooperative shockwave reserved for the collaborative split path,
-          // even if a future collision destroyer starts returning fragments.
-          result.collabSplit = destruction.split && destruction.destroyed?.material !== 'rubble';
           if (destruction.destroyed) {
             result.origin = destruction.destroyed.position;
           }
@@ -2185,13 +2157,12 @@ export class GameEngine {
     asteroidId: string,
     playerId: string,
     cause: AsteroidHitCause = 'laser',
-    now = this.getServerTime(),
     miningDamage = this.miningDamage(playerId)
   ): AsteroidHitOutcome {
     const result =
       cause === 'collision'
         ? this.asteroidManager.destroyFromCollision(asteroidId)
-        : this.asteroidManager.registerLaserHit(asteroidId, playerId, now, miningDamage);
+        : this.asteroidManager.registerLaserHit(asteroidId, playerId, miningDamage);
 
     if (result.outcome === 'destroyed' && result.destroyed) {
       this.releaseTowsAttachedTo(asteroidId);
@@ -2214,7 +2185,6 @@ export class GameEngine {
     asteroidId: string,
     playerId: string,
     cause: AsteroidHitCause = 'laser',
-    now = this.getServerTime(),
     miningDamage = this.miningDamage(playerId)
   ): AppliedAsteroidHit {
     const empty: AppliedAsteroidHit = {
@@ -2224,7 +2194,6 @@ export class GameEngine {
       playerId,
       points: 0,
       newAsteroids: [],
-      split: false,
     };
 
     const asteroid = this.asteroidManager.getAsteroid(asteroidId);
@@ -2232,7 +2201,7 @@ export class GameEngine {
       return empty;
     }
 
-    const result = this.handleAsteroidHit(asteroidId, playerId, cause, now, miningDamage);
+    const result = this.handleAsteroidHit(asteroidId, playerId, cause, miningDamage);
     if (result.outcome === 'missing' || result.outcome === 'ignored') {
       return { ...empty, outcome: result.outcome };
     }
@@ -2246,29 +2215,8 @@ export class GameEngine {
       playerId,
       points: result.destroyed ? pointsForRoidSize(result.destroyed.size) : 0,
       newAsteroids: result.newAsteroids,
-      // The wire flag activates the cooperative shockwave. Ordinary mineral
-      // fragments still broadcast through newAsteroids without that reward.
-      split: result.split && asteroid.material !== 'rubble' && !isColossalAsteroid(asteroid.size),
-      ...(result.expiresAt !== undefined ? { expiresAt: result.expiresAt } : {}),
       origin,
     };
-  }
-
-  public flushExpiredCollabHits(now = this.getServerTime()): ExpiredCollabHit[] {
-    const expired = this.asteroidManager.expireStaleHits(now);
-    for (const item of expired) {
-      this.releaseTowsAttachedTo(item.destroyed.id);
-      this.lootManager.spawnPoints(item.destroyed.position, item.points);
-      this.dropShardAt(item.destroyed.position, asteroidShardMass(item.destroyed.material));
-    }
-    this.resolvedCollabHits.push(...expired);
-    return expired;
-  }
-
-  public drainResolvedCollabHits(): ExpiredCollabHit[] {
-    const items = this.resolvedCollabHits;
-    this.resolvedCollabHits = [];
-    return items;
   }
 
   public setOnAsteroidHits(listener: (hits: AppliedAsteroidHit[]) => void): void {
@@ -2462,7 +2410,7 @@ export class GameEngine {
 
       // Powered cargo ignores ordinary laser traffic; fragments join the shared
       // index as they split, before the next shot resolves.
-      const hit = this.resolveEnhancedLaser(laser, now, (rock) => rock.boost?.phase !== 'burning');
+      const hit = this.resolveEnhancedLaser(laser, (rock) => rock.boost?.phase !== 'burning');
       if (hit) {
         hits.push(hit);
       }
@@ -2476,16 +2424,13 @@ export class GameEngine {
 
   /** Resolve only the new muzzle overlap, never replay an older shot's swept
    * path. After a reflection, its start/end chord is not its traveled path. */
-  public resolveSpawnedLaserHits(
-    laserId: string,
-    now = this.getServerTime()
-  ): AppliedAsteroidHit[] {
+  public resolveSpawnedLaserHits(laserId: string): AppliedAsteroidHit[] {
     const index = this.lasers.findIndex((candidateLaser) => candidateLaser.id === laserId);
     const laser = this.lasers[index];
     if (!laser || laser.hasExploded || laser.age !== 0) {
       return [];
     }
-    const hit = this.resolveEnhancedLaser(laser, now);
+    const hit = this.resolveEnhancedLaser(laser);
     if (laser.hasExploded) {
       this.lasers.splice(index, 1);
     }
@@ -2505,7 +2450,6 @@ export class GameEngine {
   /** Resolve mining shots against nearby world objects; unbounced shots ignore hulls. */
   private resolveEnhancedLaser(
     laser: ServerLaser,
-    now: number,
     include: (rock: AsteroidData) => boolean = () => true
   ): AppliedAsteroidHit | null {
     const index = this.asteroidManager.spatialIndex();
@@ -2717,7 +2661,6 @@ export class GameEngine {
             playerId: laser.ownerId,
             points: pointsForRoidSize(rock.size),
             newAsteroids: result.newAsteroids,
-            split: false,
             origin: { ...rock.position },
           };
         }
@@ -2739,42 +2682,11 @@ export class GameEngine {
       }
       laser.hasExploded = true;
       const healthBefore = rock.health;
-      if (rock.isCollabTarget) {
-        const result = this.handleAsteroidDamage(rock.id, laser.ownerId, laser.miningDamage);
-        if (this.fixtureCombat?.watches(laser.ownerId)) {
-          this.observeFixtureTerminal(
-            laser,
-            'asteroid',
-            rock.id,
-            { health: healthBefore },
-            { health: this.getAsteroid(rock.id)?.health ?? null }
-          );
-        }
-        if (!result.destroyed) {
-          return null;
-        }
-        return {
-          applied: true,
-          outcome: 'destroyed',
-          asteroidId: rock.id,
-          playerId: laser.ownerId,
-          points: pointsForRoidSize(rock.size),
-          newAsteroids: result.newAsteroids,
-          split: false,
-          origin: { ...rock.position },
-        };
-      }
       // Energized ricochets double one physical shot's metal chip; each logical shot
       // is still consumed once and terminal drops/score happen only once.
-      let hit = this.applyLaserAsteroidHit(
-        rock.id,
-        laser.ownerId,
-        'laser',
-        now,
-        laser.miningDamage
-      );
+      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', laser.miningDamage);
       if (laser.energy >= 2 && rock.material === 'metal' && this.getAsteroid(rock.id)) {
-        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now, laser.miningDamage);
+        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', laser.miningDamage);
       }
       if (this.fixtureCombat?.watches(laser.ownerId)) {
         this.observeFixtureTerminal(
@@ -2802,49 +2714,6 @@ export class GameEngine {
       return;
     }
     this.pendingAsteroidHits.push(...applied);
-  }
-
-  public queueCollabShockwave(origin: Position, now = this.getServerTime()): void {
-    const source = { x: origin.x, y: origin.y };
-    for (const wave of SHOCKWAVE_WAVES) {
-      if (wave.delayFrames <= 0) {
-        this.applyShockwaveWave(source, wave);
-      } else {
-        this.pendingShockwaves.push({
-          origin: source,
-          radius: wave.radius,
-          impulse: wave.impulse,
-          fireAt: now + framesToMs(wave.delayFrames),
-        });
-      }
-    }
-  }
-
-  public flushDueShockwaves(now = this.getServerTime()): number {
-    let applied = 0;
-    const remaining: PendingShockwave[] = [];
-    for (const pending of this.pendingShockwaves) {
-      if (now >= pending.fireAt) {
-        this.applyShockwaveWave(pending.origin, pending);
-        applied += 1;
-      } else {
-        remaining.push(pending);
-      }
-    }
-    this.pendingShockwaves = remaining;
-    return applied;
-  }
-
-  public getPendingShockwaveCount(): number {
-    return this.pendingShockwaves.length;
-  }
-
-  private applyShockwaveWave(
-    origin: Position,
-    wave: Pick<ShockwaveWaveSpec, 'radius' | 'impulse'>
-  ): void {
-    this.asteroidManager.applyRadialImpulse(origin, wave.radius, wave.impulse);
-    this.entityManager.applyRadialImpulse(origin, wave.radius, wave.impulse);
   }
 
   // Game state
@@ -3609,41 +3478,6 @@ export class GameEngine {
 
   public drainFurnaceDeliveries(): FurnaceDelivery[] {
     return this.pendingFurnaceDeliveries.splice(0);
-  }
-
-  public handleAsteroidDamage(
-    asteroidId: string,
-    playerId: string,
-    miningDamage = this.miningDamage(playerId)
-  ): { destroyed: boolean; asteroid: AsteroidData | null; newAsteroids: AsteroidData[] } {
-    const current = this.asteroidManager.getAsteroid(asteroidId);
-    if (!current?.isCollabTarget || current.boost?.phase === 'burning') {
-      return { destroyed: false, asteroid: null, newAsteroids: [] };
-    }
-
-    // Mining strength comes from the authoritative kit. Client-supplied
-    // damage and points are never authoritative.
-    this.asteroidManager.recordMiningHit(asteroidId, playerId);
-    const asteroid = this.asteroidManager.damageAsteroid(asteroidId, miningDamage);
-    if (!asteroid) {
-      return { destroyed: false, asteroid: null, newAsteroids: [] };
-    }
-    if (asteroid.health > 0) {
-      return { destroyed: false, asteroid, newAsteroids: [] };
-    }
-    // Chip-to-zero is kits coop HP, not the 1s split window.
-    const result = this.asteroidManager.destroyFromCollision(asteroidId);
-    if (result.destroyed) {
-      this.releaseTowsAttachedTo(asteroidId);
-      const points = pointsForRoidSize(result.destroyed.size);
-      this.lootManager.spawnPoints(result.destroyed.position, points);
-      this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
-    }
-    return {
-      destroyed: result.outcome === 'destroyed',
-      asteroid,
-      newAsteroids: result.newAsteroids,
-    };
   }
 
   public dropEquipmentAt(

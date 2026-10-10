@@ -47,7 +47,6 @@ import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawMiniMap } from './hud/minimap';
 import { drawRicochetCourt } from './ricochetCourtRenderer';
-import { drawShockwaves } from './shockwaveRenderer';
 import { drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield, visibleStarTiles } from './starfield';
 
@@ -190,8 +189,6 @@ function drawWorldLayers(
 
   drawCargoHolds(allPlayers, currShip.position);
   drawCargoOffloads(allPlayers, currShip.position);
-
-  drawShockwaves(currShip.position);
 
   drawLasers(currShip, laserColor);
 

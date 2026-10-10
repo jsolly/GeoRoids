@@ -71,6 +71,7 @@ test('the server rejects stale gameplay clients before open and accepts a refres
     '/ws',
     '/ws?asteroidInteractions=1',
     '/ws?snapshotVersion=1&asteroidInteractions=1',
+    '/ws?snapshotVersion=2&asteroidInteractions=1',
     '/other?snapshotVersion=1&asteroidInteractions=1',
     `/ws?snapshotVersion=${SNAPSHOT_VERSION + 1}&asteroidInteractions=1`,
     `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=2`,
@@ -115,7 +116,7 @@ test('the server rejects stale gameplay clients before open and accepts a refres
 test('a current gameplay socket rejects missing, retired and future snapshot join offers', async () => {
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
   const port = await server.listening;
-  for (const offer of [undefined, 1, SNAPSHOT_VERSION + 1, String(SNAPSHOT_VERSION)]) {
+  for (const offer of [undefined, 1, 2, SNAPSHOT_VERSION + 1, String(SNAPSHOT_VERSION)]) {
     const socket = connect(port, `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`);
     await once(socket, 'open');
     expect(socket.readyState).toBe(WebSocket.OPEN);

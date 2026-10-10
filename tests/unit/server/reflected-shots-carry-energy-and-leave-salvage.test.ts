@@ -42,7 +42,6 @@ function snapshot(engine: GameEngine) {
   return captureSnapshot({
     ...engine.getGameState(),
     playerProjectiles: engine.getPlayerProjectiles(),
-    collabTags: [],
   });
 }
 

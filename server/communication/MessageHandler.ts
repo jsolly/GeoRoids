@@ -625,15 +625,6 @@ export class MessageHandler {
         continue;
       }
 
-      if (hit.outcome === 'tagged' && hit.expiresAt) {
-        this.broadcaster.broadcastAsteroidTagged({
-          asteroidId: hit.asteroidId,
-          shooterId: hit.playerId,
-          expiresAt: hit.expiresAt,
-        });
-        continue;
-      }
-
       if (hit.outcome !== 'destroyed') {
         continue;
       }
@@ -645,18 +636,8 @@ export class MessageHandler {
 
       this.broadcaster.broadcastAsteroidDestruction(
         hit.asteroidId,
-        hit.origin !== undefined
-          ? { collabSplit: hit.split, origin: hit.origin }
-          : { collabSplit: hit.split }
+        hit.origin !== undefined ? { origin: hit.origin } : undefined
       );
-
-      if (hit.split && hit.origin) {
-        this.gameEngine.queueCollabShockwave(hit.origin);
-        this.broadcaster.broadcastShockwave({
-          origin: hit.origin,
-          asteroidId: hit.asteroidId,
-        });
-      }
 
       if (hit.newAsteroids.length > 0) {
         this.broadcaster.broadcastAsteroidCreation(hit.newAsteroids);

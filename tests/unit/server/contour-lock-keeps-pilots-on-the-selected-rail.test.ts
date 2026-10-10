@@ -460,7 +460,6 @@ test.each(['constructor', '__proto__', 'unexpected'])(
       () =>
         new SnapshotEncoder({
           ...world.engine.getGameState(),
-          collabTags: [],
           playerProjectiles: [],
         })
     ).not.toThrow();

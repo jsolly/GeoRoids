@@ -49,4 +49,4 @@ Towing a living spider attracts rescuers that can bite through your cable. Bring
 
 ## Mining lasers
 
-Hauler hits metal and large deposits harder, but cooperative splits still require different pilots. Direct shots are safe for crew hulls; [ricochets](/wiki/#combat-survival) are dangerous.
+Hauler hits metal and colossal deposits harder. Direct shots are safe for crew hulls; [ricochets](/wiki/#combat-survival) are dangerous.

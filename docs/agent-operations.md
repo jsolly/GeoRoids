@@ -129,12 +129,12 @@ Use repository-relative or absolute paths for explicit integration test files; m
 
 Astro's Vite development server proxies `/ws` and `/logs` to the owned local game-server port, normally `3001`, so the client connects through the Astro origin. The Wiki route is a separate Svelte-enhanced static manual and does not initialize the game; see [Wiki maintenance](wiki-maintenance.md).
 
-Gameplay requires snapshot v2 and asteroid interactions. The client adds
-`snapshotVersion=2` and `asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
+Gameplay requires snapshot v3 and asteroid interactions. The client adds
+`snapshotVersion=3` and `asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
 Unsupported clients receive HTTP 426 or an explicit join error; there are no
-protocol opt-out flags or version-1 bridge. Client and server deploy independently;
+protocol opt-out flags or older-version bridge. Client and server deploy independently;
 joining can be unavailable until both hosts publish matching versions. Reconnects
-use a private resume token. See [snapshot deployment](protocol/snapshot-v2.md#deployment).
+use a private resume token. See [snapshot deployment](protocol/snapshot-v3.md#deployment).
 
 ### Server-authoritative model
 

@@ -153,7 +153,7 @@ test('a Scout builds only the furnace foundation they are standing in and pays w
   expect(engine.useAbility(scout.actor.id)).toBe(true);
   expect(scout.actor.abilityActiveFrames).toBeGreaterThan(0);
   expect(scout.actor.score).toBe(0);
-  validateSnapshotDto({ ...engine.getGameState(), collabTags: [], playerProjectiles: [] });
+  validateSnapshotDto({ ...engine.getGameState(), playerProjectiles: [] });
 });
 
 test('a dead ship and the wrong kit spend neither score nor a furnace', () => {

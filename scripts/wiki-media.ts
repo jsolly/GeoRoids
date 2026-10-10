@@ -18,7 +18,6 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { type CanvasRenderingContext2D, createCanvas } from 'canvas';
-import { AsteroidManager } from '../server/core/AsteroidManager';
 import type { GameEntity } from '../server/core/EntityManager';
 import { GameEngine } from '../server/core/GameEngine';
 import { LootManager } from '../server/core/LootManager';
@@ -70,13 +69,6 @@ import {
 import { applyShipImpactFlash, tickShipImpactFlash } from '../src/entities/ship/shipUtils';
 import { steeringTurn } from '../src/input/pointerSteering';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
-import {
-  applyShockwaveToBody,
-  easedRingRadius,
-  ringAlpha,
-  SHOCKWAVE_WAVES,
-  waveVisualProgress,
-} from '../src/physics/shockwave';
 import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient } from '../src/physics/terrain/heightfield';
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
@@ -105,7 +97,6 @@ type MediaId =
   | 'cargo'
   | 'loot'
   | 'reflection'
-  | 'split'
   | 'satellites'
   | 'pickups'
   | 'survival';
@@ -118,7 +109,6 @@ const MEDIA_IDS: readonly MediaId[] = [
   'cargo',
   'loot',
   'reflection',
-  'split',
   'satellites',
   'pickups',
   'survival',
@@ -1552,137 +1542,6 @@ function makeReflectionDemo(): Demo {
   };
 }
 
-function makeSplitDemo(): Demo {
-  const manager = new AsteroidManager(new RNGService(0x1234abcd));
-  const original = makeAsteroid('split-target', { x: 0, y: 0 }, 60, 'ice');
-  original.isCollabTarget = true;
-  manager.addAsteroid(original);
-  const first = manager.registerLaserHit(original.id, 'pilot-a', 0);
-  invariant(
-    first.outcome === 'tagged' && !first.split,
-    'first cooperative hit did not tag the rock'
-  );
-  const second = manager.registerLaserHit(original.id, 'pilot-b', 500);
-  invariant(
-    second.split && second.newAsteroids.length === 2,
-    'two pilots did not split the biggest rock'
-  );
-  const fragments = second.newAsteroids;
-  const splitBodies = fragments.map((fragment) => ({
-    ...fragment,
-    position: { ...fragment.position },
-    velocity: { ...fragment.velocity },
-  }));
-  const splitFrame = 7;
-  let fastWaveApplied = false;
-  let heavyWaveApplied = false;
-  return {
-    id: 'split',
-    posterFrame: 12,
-    verify: () => {
-      invariant(
-        splitBodies.every((fragment) => fragment.size < original.size),
-        'split fragments were not smaller'
-      );
-      invariant(fastWaveApplied && heavyWaveApplied, 'split shockwave waves did not run');
-    },
-    render: (ctx, frame) => {
-      drawFrameChrome(
-        ctx,
-        'COOPERATIVE SPLIT',
-        'two pilots → two smaller rocks',
-        frame,
-        PALETTE.LASER_LOCAL
-      );
-      if (frame < splitFrame) {
-        drawRoid(ctx, original);
-        drawLaser(ctx, { x: -150 + frame * 16, y: 0 }, { x: 5, y: 0 });
-        drawLaser(ctx, { x: 150 - frame * 16, y: 0 }, { x: -5, y: 0 }, PALETTE.LASER_LOCAL);
-        drawTag(ctx, frame < 4 ? 'pilot A hits' : 'pilot B hits', 365, 112, PALETTE.LASER_LOCAL);
-      } else {
-        if (!fastWaveApplied) {
-          const wave = SHOCKWAVE_WAVES.find((candidate) => candidate.id === 'fast');
-          if (wave !== undefined) {
-            for (const fragment of splitBodies) {
-              const nextVelocity = applyShockwaveToBody(fragment, { x: 0, y: 0 }, wave);
-              if (nextVelocity !== null) {
-                fragment.velocity = nextVelocity;
-              }
-            }
-          }
-          fastWaveApplied = true;
-        }
-        if (frame > splitFrame) {
-          runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-            const ageTicks = (frame - splitFrame - 1) * SIM_TICKS_PER_FRAME + 1;
-            if (!heavyWaveApplied && ageTicks >= 7) {
-              const wave = SHOCKWAVE_WAVES.find((candidate) => candidate.id === 'heavy');
-              if (wave !== undefined) {
-                for (const fragment of splitBodies) {
-                  const nextVelocity = applyShockwaveToBody(fragment, { x: 0, y: 0 }, wave);
-                  if (nextVelocity !== null) {
-                    fragment.velocity = nextVelocity;
-                  }
-                }
-              }
-              heavyWaveApplied = true;
-            }
-            for (const fragment of splitBodies) {
-              const next = stepAsteroidMotion(fragment.position, fragment.velocity);
-              fragment.position = next.position;
-              fragment.velocity = next.velocity;
-            }
-          });
-        }
-        const minX = Math.min(...splitBodies.map((fragment) => fragment.position.x));
-        const maxX = Math.max(...splitBodies.map((fragment) => fragment.position.x));
-        const minY = Math.min(...splitBodies.map((fragment) => fragment.position.y));
-        const maxY = Math.max(...splitBodies.map((fragment) => fragment.position.y));
-        const center = {
-          x: (minX + maxX) / 2,
-          y: (minY + maxY) / 2,
-        };
-        const maxSize = Math.max(...splitBodies.map((fragment) => fragment.size));
-        const displayScale = Math.min(
-          1,
-          440 / (maxX - minX + 2 * maxSize + 40),
-          130 / (maxY - minY + 2 * maxSize + 40)
-        );
-        for (const fragment of splitBodies) {
-          drawRoid(
-            ctx,
-            {
-              ...fragment,
-              position: {
-                x: fragment.position.x - center.x,
-                y: fragment.position.y - center.y,
-              },
-            },
-            displayScale
-          );
-        }
-        const ageMs = ((frame - splitFrame) * SIM_TICKS_PER_FRAME * 1000) / GAME.FPS;
-        for (const wave of SHOCKWAVE_WAVES) {
-          const progress = waveVisualProgress(ageMs, wave);
-          if (progress === null) {
-            continue;
-          }
-          const color = wave.id === 'fast' ? PALETTE.LASER_LOCAL : PALETTE.LOCAL;
-          drawRing(
-            ctx,
-            { x: -center.x, y: -center.y },
-            easedRingRadius(progress, wave.radius) * displayScale,
-            color,
-            ringAlpha(progress, wave.id === 'fast' ? 0.82 : 1)
-          );
-        }
-        drawTag(ctx, 'two smaller rocks', 355, 112, PALETTE.LASER_LOCAL);
-      }
-      drawTag(ctx, 'two hits → two rocks', 380, 286, PALETTE.HUD_MUTED);
-    },
-  };
-}
-
 function makeSatellitesDemo(): Demo {
   const recording = recordSatelliteDemo(FRAME_COUNT, SIM_TICKS_PER_FRAME);
   invariant(recording.length === FRAME_COUNT, 'satellite recording length changed');
@@ -2020,7 +1879,6 @@ function buildDemos(): Demo[] {
     makeCargoDemo(),
     makeLootDemo(),
     makeReflectionDemo(),
-    makeSplitDemo(),
     makeSatellitesDemo(),
     makePickupsDemo(),
     makeSurvivalDemo(),

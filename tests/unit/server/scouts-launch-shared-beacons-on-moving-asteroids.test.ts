@@ -324,7 +324,8 @@ describe('authoritative Scout probes', () => {
       y: 100,
     });
     const host = asteroidAt('split-host', { x: 200, y: 0 });
-    host.size = 100;
+    host.size = 50;
+    host.material = 'rubble';
     host.probe = {
       id: 'split-probe',
       ownerId: scout.id,
@@ -337,15 +338,7 @@ describe('authoritative Scout probes', () => {
     };
     engine.addAsteroid(host);
 
-    expect(engine.applyLaserAsteroidHit(host.id, scout.id, 'laser', now.value).outcome).toBe(
-      'tagged'
-    );
-    const destroyed = engine.applyLaserAsteroidHit(
-      host.id,
-      secondShooter.id,
-      'laser',
-      now.value + 1
-    );
+    const destroyed = engine.applyLaserAsteroidHit(host.id, secondShooter.id, 'laser');
     expect(destroyed.outcome).toBe('destroyed');
     expect(destroyed.newAsteroids.length).toBeGreaterThan(0);
     expect(destroyed.newAsteroids.every((fragment) => fragment.probe === undefined)).toBe(true);

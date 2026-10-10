@@ -163,7 +163,7 @@ test('scans retain map discoveries after expiry without crediting distant Scouts
   assert(cell !== null);
   expect(isCellExplored(engine.getGameState().exploration, cell)).toBe(true);
   const state = engine.getGameState();
-  const snapshot = captureSnapshot({ ...state, collabTags: [], playerProjectiles: [] });
+  const snapshot = captureSnapshot({ ...state, playerProjectiles: [] });
   expect(snapshot.asteroids.find((item) => item.id === rock.id)?.surveyedBy).toEqual(['scout']);
   expect(snapshot.exploration).toEqual(state.exploration);
 });

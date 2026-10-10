@@ -349,7 +349,6 @@ describe('server-authoritative combat', () => {
 
     const serverOwnedAsteroid = testAsteroid({
       id: 'server-owned-roid',
-      isCollabTarget: true,
     });
     const expectedServerOwnedHealth = serverOwnedAsteroid.health;
     const expectedServerOwnedPosition = { ...serverOwnedAsteroid.position };

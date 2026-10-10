@@ -2,15 +2,13 @@
 title: Asteroids
 category: Arena
 summary: Asteroid material, size, contributor history, and reflection state
-  determine damage, splits, rewards, and projectile behavior.
+  determine damage, fragmentation, rewards, and projectile behavior.
 order: 90
 related:
   - content/wiki/loot-growth.md
   - content/wiki/teamwork.md
   - content/wiki/combat-survival.md
 media:
-  - heading: Cooperative splits and score
-    demo: split
   - heading: Reflection and charge
     demo: reflection
 ---
@@ -19,13 +17,13 @@ media:
 
 Rocks gather in rich fields separated by quiet voids, and they come in every size, speed, and spin. Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Harvested deposits slowly regrow out of sight, so a mined field fills back in.
 
-## Cooperative splits and score
+## Mining and score
 
-Two different pilots hitting a large ice or crystal rock in quick succession split it and leave collectible point loot. A repeat hit by one pilot or an expired collaboration window breaks it without that split; metal and rubble follow their own rules. Each field also has one tougher marked rock that takes several hits and breaks without splitting. Split shockwaves push nearby ships and rocks without direct damage, and mining leaves points to pick up and haul home; delivery contributors share banked furnace rewards.
+Ordinary ice and crystal rocks break on the first laser hit, whatever their size; metal takes repeated hits, larger rubble fragments, and colossal deposits need sustained mining. Mining leaves collectible points and salvage to haul home. Delivery contributors share banked furnace rewards.
 
 ## Colossal deposits
 
-These rare, stationary landmarks resist rams and need many laser hits to split. Move one with two Tow Cables, or launch it with a Boost Coupling: alone it crawls, and a second coupling brings it to full speed. Both Haulers earn delivery credit.
+These rare, stationary landmarks resist rams and need many laser hits to fragment. Move one with two Tow Cables, or launch it with a Boost Coupling: alone it crawls, and a second coupling brings it to full speed. Both Haulers earn delivery credit.
 
 ## Reflection and charge
 
@@ -49,4 +47,4 @@ Crawlers cannot be tapped, probed, towed directly, or repelled by Mineral Scan. 
 
 ## Ore and refining
 
-Many asteroids are barren. Scouts and equipped satellites reveal ore on the crew radar: ice, metal, rubble, or crystal. Bring ore-bearing rocks to a furnace using a tow cable or Boost Coupling to refine them into shared materials and banked rewards for delivery contributors; barren rocks still pay a token reward but add no material. Probes also reveal ore. Mining produces point loot to haul home. Splitting a rock reduces its total recoverable ore.
+Many asteroids are barren. Scouts and equipped satellites reveal ore on the crew radar: ice, metal, rubble, or crystal. Bring ore-bearing rocks to a furnace using a tow cable or Boost Coupling to refine them into shared materials and banked rewards for delivery contributors; barren rocks still pay a token reward but add no material. Probes also reveal ore. Mining produces point loot to haul home. Fragmenting a rock reduces its total recoverable ore.

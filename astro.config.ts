@@ -7,6 +7,7 @@ const vite = clientViteConfig();
 export default defineConfig({
   site: 'https://www.georoids.com',
   output: 'static',
+  cacheDir: './.performance/astro',
   trailingSlash: 'ignore',
   build: { format: 'directory' },
   server: { host: '127.0.0.1', port: vite.server.port },

@@ -129,6 +129,7 @@ const sourcePaths = new Set([
   'package.json',
   'scripts/wiki-check.ts',
   'scripts/client-build.ts',
+  'scripts/client-release-sha.ts',
   'scripts/wiki-content.ts',
   'scripts/wiki-satellite-demo.ts',
   'shared-types.ts',

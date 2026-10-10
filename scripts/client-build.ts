@@ -1,21 +1,9 @@
-import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import type { Plugin } from 'vite';
+import { clientReleaseSha } from './client-release-sha';
 
 const HAULER_TETHER_HEXES = ['#E8D5A3', '#FDE68A'] as const;
-const GIT_COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
-
-/** Hosted platforms may set an empty SHA; `??` does not fall through that. */
-function firstHostedCommitSha(): string | undefined {
-  const candidates = [process.env['VERCEL_GIT_COMMIT_SHA'], process.env['RAILWAY_GIT_COMMIT_SHA']];
-  for (const value of candidates) {
-    if (typeof value === 'string' && GIT_COMMIT_SHA_PATTERN.test(value)) {
-      return value;
-    }
-  }
-  return undefined;
-}
 
 /** Attribute gameplay by source modules, independent of output filenames. */
 function clientAssets(releaseSha: string): Plugin {
@@ -142,15 +130,7 @@ export function clientViteConfig() {
   define['import.meta.env.VITE_BUILD_TIME'] = JSON.stringify(new Date().toISOString());
 
   // Hosted builds may omit .git; release polling still needs the deployed identity.
-  const commitHash =
-    firstHostedCommitSha() ??
-    execFileSync('git', ['rev-parse', 'HEAD'], {
-      encoding: 'utf8',
-      timeout: 5000,
-    }).trim();
-  if (!GIT_COMMIT_SHA_PATTERN.test(commitHash)) {
-    throw new Error('Cannot build client without a valid Git commit SHA');
-  }
+  const commitHash = clientReleaseSha();
   define['import.meta.env.VITE_COMMIT_HASH'] = JSON.stringify(commitHash.slice(0, 7));
   define['import.meta.env.VITE_COMMIT_SHA'] = JSON.stringify(commitHash.toLowerCase());
 

@@ -37,7 +37,7 @@ test('the production logger keeps reconnect chatter off the log socket', async (
     'transport_closed',
     'transport_connected',
     'player_joined',
-    'snapshot_applied',
+    'snapshot_resync_requested',
     'damage_applied',
   ]) {
     logger.info('STATE', message);

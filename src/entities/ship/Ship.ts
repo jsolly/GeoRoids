@@ -5,9 +5,7 @@ import {
 } from '../../../shared/constants/health';
 import {
   acceleratedContourVelocity,
-  type ContourReleaseReason,
   canReachContour,
-  contourLockGeometry,
   contourLockVelocity,
 } from '../../../shared/contourLock';
 import { onDarkFurnaceFootprint } from '../../../shared/furnaceField';
@@ -95,23 +93,6 @@ class Ship {
   }
 
   set contourLock(state: ContourLockState | null) {
-    this.setContourLock(state, 'authoritative');
-  }
-
-  private setContourLock(state: ContourLockState | null, reason: ContourReleaseReason): void {
-    const previous = this.contourLockState;
-    if (this.isLocalPlayer && previous && !state) {
-      logger.info('STATE', 'contour_lock_released', {
-        shipId: this.id,
-        reason,
-        motionEpoch: this.playerMotion?.epoch,
-        motionAck: this.playerMotion?.ack,
-        position: { ...this.position },
-        velocity: { ...this.velocity },
-        lock: { ...previous },
-        ...contourLockGeometry(this.position, previous),
-      });
-    }
     const wasLocked = this.contourLockState !== null;
     this.contourLockState = state;
     // Predicted input and authoritative reconciliation share this transition.
@@ -233,7 +214,7 @@ class Ship {
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
-    this.releaseContourLock('death');
+    this.releaseContourLock();
     this.angularVelocity = 0;
     playExplosionSound(this.position);
     playLocalHaptic(this.isLocalPlayer, 'boom');
@@ -269,17 +250,9 @@ class Ship {
     if (this.furnaceTransit) {
       return;
     }
-    logger.debug('SHIP', 'Shoot method called', {
-      canShoot: this.canShoot,
-      laserCount: this.lasers.length,
-    });
+
     if (this.canShootAgain()) {
       this.fireLaser();
-    } else {
-      logger.debug('SHIP', 'Cannot shoot - cooldown or max lasers reached', {
-        canShoot: this.canShoot,
-        laserCount: this.lasers.length,
-      });
     }
   }
 
@@ -300,11 +273,11 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  releaseContourLock(reason: ContourReleaseReason = 'manual'): void {
+  releaseContourLock(): void {
     if (this.contourLock === null) {
       return;
     }
-    this.setContourLock(null, reason);
+    this.contourLock = null;
     this.contourLockInputVersion++;
     const speed = cruiseSpeed(this.mass, this.maxVelocity);
     if (this.knockbackVelocityLimit <= speed) {
@@ -327,7 +300,7 @@ class Ship {
 
   toggleContourLock(): boolean {
     if (this.contourLocked) {
-      this.releaseContourLock('manual');
+      this.releaseContourLock();
       return false;
     }
     if (!this.canLockContour()) {
@@ -444,18 +417,12 @@ class Ship {
   private sendShootEvent(laser: Laser): void {
     const network = this.combatNetwork;
     if (network?.isConnected) {
-      logger.debug('SHIP', 'Sending shoot event', {
-        position: laser.position,
-        velocity: laser.velocity,
-      });
       network.sendShoot(laser);
-    } else {
-      logger.debug('SHIP', 'Network not connected, cannot send shoot event');
     }
   }
 
   takeDamage(amount: number, cause?: string): void {
-    this.releaseContourLock('damage');
+    this.releaseContourLock();
     if (this.exploding || this.movementLocked) {
       return;
     }
@@ -512,16 +479,6 @@ class Ship {
         this.blinkCount--;
         this.spawnProtectionTimer = SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES;
         this.setBlinkOn();
-
-        // Debug logging for blinking updates
-        if (this.isLocalPlayer) {
-          logger.debug('BLINK_UPDATE', 'Blinking state changed', {
-            shipId: this.id,
-            blinkCount: this.blinkCount,
-            blinkOn: this.blinkOn,
-            spawnProtectionTimer: this.spawnProtectionTimer,
-          });
-        }
       }
     } else if (this.isLocalPlayer) {
       // Debug logging when spawn protection is complete
@@ -565,7 +522,7 @@ class Ship {
   /** Advance one 60 Hz simulation step, including movement and combat timers. */
   update(): void {
     if (this.furnaceTransit) {
-      this.releaseContourLock('furnace');
+      this.releaseContourLock();
       const pose = furnaceTravelPose(this.furnaceTransit, Date.now() + this.furnaceClockOffsetMs);
       this.position = { ...pose.position };
       this.angle = pose.angle;
@@ -580,7 +537,7 @@ class Ship {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
     }
     if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
-      this.releaseContourLock(this.exploding || this.health <= 0 ? 'death' : 'movement-lock');
+      this.releaseContourLock();
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
@@ -597,7 +554,7 @@ class Ship {
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
     if (this.cargoHover && !this.movementLocked) {
-      this.releaseContourLock('cargo-hover');
+      this.releaseContourLock();
       this.velocity = { x: 0, y: 0 };
       this.thrusting = false;
       return;
@@ -612,7 +569,7 @@ class Ship {
     this.angle += this.angularVelocity;
     const speed = cruiseSpeed(this.mass, this.maxVelocity);
     if (this.knockbackVelocityLimit > speed) {
-      this.releaseContourLock('knockback');
+      this.releaseContourLock();
     }
     if (this.contourLock) {
       const target = acceleratedContourVelocity(
@@ -628,7 +585,7 @@ class Ship {
         this.position = addPositionAndVelocity(this.position, this.velocity);
         return;
       }
-      this.releaseContourLock('guidance-unavailable');
+      this.releaseContourLock();
     }
     const velocityLimit = Math.max(
       terrainSpeedLimit(this.position, speed),

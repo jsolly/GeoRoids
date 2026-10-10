@@ -37,7 +37,6 @@ import { mountSpawnFlyIn, stopSpawnFlyIn } from '../ui/spawnFlyIn';
 import { mountUniverseMap, type UniverseMapController } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { getBuildInfoString } from '../utils/buildInfo';
-import { applyLockedPaletteCss } from '../utils/colorUtils';
 import { disposeGlobalErrorLogging, installGlobalErrorLogging } from '../utils/globalErrorLogging';
 import { logger } from '../utils/Logger';
 import { generatePilotNickname } from '../utils/pilotNickname';
@@ -164,7 +163,6 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
     cleanup.push(disposeSchematicEquipHint);
     initializeSchematicEquipHint();
     cleanup.push(mountNetworkStatus());
-    applyLockedPaletteCss();
     cleanup.push(initTitleTerrain(hosts.titleCanvas));
     cleanup.push(() => canvasManager.destroy());
     canvasManager.initialize(hosts.canvas, hosts.placeChrome);

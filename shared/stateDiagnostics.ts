@@ -1,6 +1,5 @@
 import type { Position, Velocity } from '../shared-types';
 
-const STATE_SNAPSHOT_SAMPLE_INTERVAL = 450;
 const MAX_ERROR_TEXT = 2048;
 
 interface DiagnosticActorState {
@@ -34,10 +33,6 @@ export function captureDiagnosticActorState(source: ActorStateSource): Diagnosti
       ? { spawnProtectionTimer: source.spawnProtectionTimer }
       : {}),
   };
-}
-
-export function shouldSampleSnapshot(sequence: number): boolean {
-  return sequence === 1 || sequence % STATE_SNAPSHOT_SAMPLE_INTERVAL === 0;
 }
 
 function boundedText(value: string, max = MAX_ERROR_TEXT): string {

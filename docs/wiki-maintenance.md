@@ -9,7 +9,8 @@ never starts gameplay or opens a game WebSocket.
 `src/content.config.ts` registers the custom loader in
 `src/wiki/contentLoader.ts`. It calls the same validated compiler,
 `scripts/wiki-content.ts`, used by the maintenance check. Astro does not apply a
-second Markdown renderer, and the collection does not use MDX. Development
+second Markdown renderer, and the collection does not use MDX. The former virtual
+Wiki module is removed; this loader is the build-time content entrypoint. Development
 refreshes article additions, edits and deletions; changes to generated reference
 inputs rebuild Astro's content module graph.
 

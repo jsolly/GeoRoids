@@ -2,7 +2,6 @@ import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import {
   CONTOUR_LOCK,
-  type ContourReleaseReason,
   canHopContour,
   contourLockDistance,
   contourLockGeometry,
@@ -19,7 +18,6 @@ import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
 import { terrainSpeedLimit } from '../../src/physics/terrain/terrainTravel';
-import { releaseActorContourLock } from './contourLockDiagnostics';
 import type { GameEntity } from './EntityManager';
 
 /** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
@@ -306,7 +304,7 @@ export class PlayerMotionService {
     if (old) {
       this.sockets.delete(old);
     }
-    releaseActorContourLock(session.actor, 'resume', now);
+    session.actor.contourLock = null;
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
       this.legalSpeed(session.actor, now)
@@ -339,7 +337,7 @@ export class PlayerMotionService {
     delete session.actor.ws;
     session.disconnectedUntil = now + PLAYER_MOTION.reconnectGraceMs;
     session.actor.thrusting = false;
-    releaseActorContourLock(session.actor, 'transport-closed', now);
+    session.actor.contourLock = null;
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
       this.legalSpeed(session.actor, now)
@@ -354,13 +352,8 @@ export class PlayerMotionService {
     delete actor.harpoonLatchPos;
   }
 
-  private handoff(
-    session: Session,
-    now: number,
-    reason: ContourReleaseReason,
-    poseCredit?: number
-  ): void {
-    releaseActorContourLock(session.actor, reason, now);
+  private handoff(session: Session, now: number, poseCredit?: number): void {
+    session.actor.contourLock = null;
     const speed = this.legalSpeed(session.actor, now);
     session.actor.velocity = capMotionVelocity(session.actor.velocity, speed);
     session.epoch += 1;
@@ -394,7 +387,7 @@ export class PlayerMotionService {
       this.legalSpeed(session.actor, now)
     );
     this.clearHarpoon(session.actor);
-    this.handoff(session, now, 'lifecycle');
+    this.handoff(session, now);
   }
 
   public quit(socket: WebSocket): string | undefined {
@@ -406,8 +399,8 @@ export class PlayerMotionService {
     return session.actor.id;
   }
 
-  private removeSession(session: Session, now?: number): void {
-    releaseActorContourLock(session.actor, 'removed', now);
+  private removeSession(session: Session): void {
+    session.actor.contourLock = null;
     if (session.socket) {
       this.sockets.delete(session.socket);
     }
@@ -417,10 +410,10 @@ export class PlayerMotionService {
   }
 
   /** Terminal authoritative removal, including an owner currently in socket grace. */
-  public forgetActor(actorId: string, now?: number): void {
+  public forgetActor(actorId: string): void {
     const session = this.sessions.get(actorId);
     if (session) {
-      this.removeSession(session, now);
+      this.removeSession(session);
     }
   }
 
@@ -506,7 +499,7 @@ export class PlayerMotionService {
       ? this.contourPoseRejection(session, pose, candidate, acquiredAt, now)
       : null;
     if (contour) {
-      this.handoff(session, now, contour.reason, session.poseCredit);
+      this.handoff(session, now, session.poseCredit);
       return { ok: false, error: 'Movement left its authoritative contour rail', contour };
     }
     // The client samples terrain before its final movement step. Include that
@@ -578,12 +571,7 @@ export class PlayerMotionService {
       // A fresh epoch makes the client adopt the last accepted pose. Preserve
       // the earned budget so rejected commands cannot mint more movement credit.
       const mode = session.mode;
-      this.handoff(
-        session,
-        now,
-        failed === 'rail' ? 'rail-route' : failed,
-        Math.min(travelSpeed * PLAYER_MOTION.poseLeadFrames, credit)
-      );
+      this.handoff(session, now, Math.min(travelSpeed * PLAYER_MOTION.poseLeadFrames, credit));
       return {
         ok: false,
         error: 'Enhanced movement exceeds its server-time envelope',
@@ -625,9 +613,6 @@ export class PlayerMotionService {
     session.actor.velocity = { x: pose.velocity.x, y: pose.velocity.y };
     session.actor.angle = pose.angle;
     session.actor.thrusting = pose.thrusting;
-    if (!candidate) {
-      releaseActorContourLock(session.actor, 'client-release', now);
-    }
     session.actor.contourLock = candidate
       ? { height: candidate.height, direction: candidate.direction }
       : null;
@@ -644,7 +629,7 @@ export class PlayerMotionService {
     if (!session || !this.alive(session.actor)) {
       return;
     }
-    releaseActorContourLock(session.actor, 'knockback', now);
+    session.actor.contourLock = null;
     const speed = Math.hypot(session.actor.velocity.x, session.actor.velocity.y);
     session.knockback = { speed, at: now };
     session.epoch += 1;
@@ -665,7 +650,7 @@ export class PlayerMotionService {
     const session = this.sessions.get(actorId);
     if (session) {
       delete session.knockback;
-      this.handoff(session, now, 'furnace', 0);
+      this.handoff(session, now, 0);
     }
   }
 
@@ -694,7 +679,7 @@ export class PlayerMotionService {
     session.poseCredit = this.maximumTravelSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
     session.burstCredit = 0;
     session.burstAt = now;
-    releaseActorContourLock(session.actor, 'fixture', now);
+    session.actor.contourLock = null;
     session.actor.position = { ...position };
     session.actor.velocity = { x: 0, y: 0 };
     session.actor.thrusting = false;
@@ -704,14 +689,10 @@ export class PlayerMotionService {
   }
 
   /** Release at a physical contact even when protection prevents health loss. */
-  public releaseContourLock(
-    actorId: string,
-    now: number,
-    reason: 'damage' | 'collision' = 'damage'
-  ): void {
+  public releaseContourLock(actorId: string, now: number): void {
     const session = this.sessions.get(actorId);
     if (session?.actor.contourLock) {
-      this.handoff(session, now, reason, session.poseCredit);
+      this.handoff(session, now, session.poseCredit);
     }
   }
 
@@ -895,20 +876,20 @@ export class PlayerMotionService {
     for (const session of this.sessions.values()) {
       if (session.disconnectedUntil !== undefined && now >= session.disconnectedUntil) {
         expired.push(session.actor.id);
-        this.removeSession(session, now);
+        this.removeSession(session);
         continue;
       }
       const alive = this.alive(session.actor);
       if (alive !== session.wasAlive) {
         session.wasAlive = alive;
-        this.handoff(session, now, 'lifecycle');
+        this.handoff(session, now);
       }
       if (
         !session.actor.furnaceTransit &&
         session.mode === 'handoff' &&
         now - session.anchorAt >= PLAYER_MOTION.handoffTimeoutMs
       ) {
-        this.handoff(session, now, 'handoff-timeout');
+        this.handoff(session, now);
       }
       this.publish(session);
     }

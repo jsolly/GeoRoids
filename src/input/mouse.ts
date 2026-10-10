@@ -1,7 +1,6 @@
 import type { Player } from '../entities/player/Player';
 import { canvasManager } from '../rendering/canvasSurface';
 import { getOpenGameOverlay } from '../runtime/overlayState';
-import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { reconcilePlayerInput, togglePlayerContourLock } from './keybindings';
 import { pointerHeadingFromCenter } from './pointerSteering';
@@ -41,19 +40,13 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
   if (isSyntheticTouchMouse(ev)) {
     return;
   }
-  logger.debug('MOUSE', 'Mouse down event', {
-    button: ev.button,
-    playerId: player.id,
-    exploding: player.ship.exploding,
-  });
+
   if (getOpenGameOverlay() !== null || player.ship.health <= 0 || player.ship.exploding) {
-    logger.debug('MOUSE', 'Mouse down ignored - player dead or exploding', { playerId: player.id });
     return;
   }
 
   // Left mouse fires; right mouse toggles Contour Lock like Shift.
   if (ev.button === 0) {
-    logger.debug('MOUSE', 'Left mouse click - shooting', { playerId: player.id });
     player.ship.shoot();
   } else if (ev.button === 2) {
     togglePlayerContourLock(player);

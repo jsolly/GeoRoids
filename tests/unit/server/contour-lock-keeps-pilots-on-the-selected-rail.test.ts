@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { decodeClientCommand } from '../../../server/communication/clientCommandDecoder';
-import { logger } from '../../../setup/serverLogger';
 import {
   CONTOUR_LOCK,
   contourLockDistance,
@@ -637,10 +636,10 @@ test.each([
 );
 
 test.each(['distance', 'heading', 'route'] as const)(
-  'a rejected contour %s records its release reason once',
+  'a rejected contour %s releases the lock and leaves the pilot unlocked',
   (failure) => {
     const { actor, state, cruise, pose, now } = railPilot();
-    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
     expect(pose(0).ok).toBe(true);
     const forward = contourLockVelocity(actor.position, state, cruise);
     if (!forward) {
@@ -671,26 +670,20 @@ test.each(['distance', 'heading', 'route'] as const)(
       });
       expect(rejected.contour?.gradientMagnitude).toBeGreaterThan(0);
     }
+    expect(actor.contourLock).toBeNull();
     world.engine.playerMotion.releaseContourLock(actor.id, now + 1000);
-    const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
-    expect(releases).toHaveLength(1);
-    expect(releases[0]?.[2]).toMatchObject({
-      playerId: actor.id,
-      reason: `rail-${failure}`,
-      lock: state,
-    });
+
     expect(actor.contourLock).toBeNull();
   }
 );
 
-test('a departing locked pilot records one terminal release before ownership is removed', () => {
-  const { pilot, actor, pose, state } = railPilot();
+test('a departing locked pilot releases its contour before ownership is removed', () => {
+  const { pilot, actor, pose } = railPilot();
   expect(pose(0).ok).toBe(true);
-  const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
   world.core.handleClientMessage({ type: 'leave', id: actor.id }, pilot.socket);
   world.engine.playerMotion.transportClosed(pilot.socket, world.engine.getServerTime());
-  const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
-  expect(releases).toHaveLength(1);
-  expect(releases[0]?.[2]).toMatchObject({ playerId: actor.id, reason: 'removed', lock: state });
+
+  expect(actor.contourLock).toBeNull();
   expect(world.engine.getPlayer(actor.id)).toBeUndefined();
 });

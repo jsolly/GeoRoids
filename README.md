@@ -2,7 +2,7 @@
 
 A cooperative open-world spaceship game with surveying, asteroid towing, and shared mineral deliveries. Play at [www.georoids.com](https://www.georoids.com).
 
-The Vite + TypeScript client renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, NPCs and rewards.
+Astro produces the static pages, and Svelte 5 with shadcn-svelte owns the interfaces. The TypeScript canvas engine renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, NPCs and rewards.
 
 ## Local development
 
@@ -16,13 +16,17 @@ touch .env
 npm run dev
 ```
 
-Vite serves the client at `http://localhost:5173`; the game server listens on port 3001. `npm run dev` routes `/ws` and `/logs` through the Vite origin to the local server, including custom dev ports. A public HTTPS tunnel to Vite therefore also carries the game WebSocket, so phones never connect to their own `localhost`. Direct Vite and production endpoint configuration is documented in `.env.example`.
+Astro serves the client at `http://localhost:5173`; the game server listens on port 3001. `npm run dev` routes `/ws` and `/logs` through Astro's Vite proxy to the local server, including custom dev ports. A public HTTPS tunnel to Astro therefore also carries the game WebSocket, so phones never connect to their own `localhost`. Direct Astro and production endpoint configuration is documented in `.env.example`.
 
 Choose a ship, enter the game, steer with the mouse or left/right arrow keys while thrust stays on, Space to fire, E to scan as Scout or attach/release cargo as Hauler. Mobile players use the on-screen controls. The minimap follows your ship through the 120,000-unit-wide world. Shared fog records discoveries; Scouts reveal more terrain, and discovered furnaces remain marked.
 
 Every player belongs to the crew. Direct crew lasers pass through ships; a bounced shot becomes a ricochet that can hurt you or another pilot. Tow a scanned asteroid into a furnace to give both the Hauler and its Scouts the full reward, including Scouts who are offline.
 
 Reflective asteroid clusters can bounce lasers and release ordinary salvage. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, ricochet energy and the shared snapshot behavior.
+
+## Frontend ownership
+
+The Svelte shell imports the browser runtime after mounting and sends commands through its UI port. Read-only, bounded presentation values update at most ten times per second; semantic transitions publish immediately. The engine retains canvas dimensions, pixels and world state. Unmount and HMR dispose the runtime and its owned work. See [architecture](docs/agent-operations.md#architecture).
 
 ## Field manual
 
@@ -32,24 +36,13 @@ See [manual maintenance](docs/wiki-maintenance.md) for content, reproducible med
 
 ## Verification
 
-Run commands from the repository directory:
-
-```sh
-npm run gate
-npm run test
-npm run test:integration:server
-npm run test:integration:entities
-```
-
-`npm run gate` checks dependencies, lint, configuration, TypeScript, runner contracts, all units, the production build and complete server/entity integration. Browser tests are removed. Always use `./scripts/test-runner.sh` for integration scenarios; it owns Vitest, artifacts, cleanup and serialized execution. Socket scenarios own their port-zero loopback servers. Code checks can overlap across worktrees, while the same checkout excludes overlap.
-
-Test-writing conventions are in [tests/AGENTS.ms](tests/AGENTS.ms): focused feature scenarios, controlled setup, and observable outcomes.
+`npm run gate` checks dependencies, lint, configuration, strict TypeScript,
+Astro/Svelte diagnostics, frontend formatting, runner contracts, all units, the
+production build and complete server/entity integration. Testing instructions,
+commands and basic manual browser smoke policy live in
+[tests/AGENTS.md](tests/AGENTS.md).
 
 TypeScript checks the client, server, shared protocol, scripts, tests and build configuration. `strict` (including `noImplicitAny`) is enforced alongside checked indexed access, exact optional properties, index-signature bracket access and side-effect import checking. Clear absent optional state with `delete`; use `| undefined` only when an API intentionally distinguishes clearing a value from leaving it unchanged.
-
-```sh
-./scripts/test-runner.sh tests/integration/server/server-pause.test.ts --reporter=verbose
-```
 
 Debug switches and log levels live in `src/constants/index.ts`. Client and server diagnostics share structured records with release, player, session and connection context. The [diagnostics guide](docs/diagnostics.md) explains the incident timeline reader, Railway/Vercel searches, state checkpoints, loss counters and game-loop profiling. See `AGENTS.md` for architecture and commands.
 

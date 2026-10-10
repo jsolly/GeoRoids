@@ -268,7 +268,7 @@ the same checkout/revision, Git-visible files, ignored environment files, build
 environment, lockfile, Node version and every built asset. It starts a fresh
 owned preview/server pair and never attaches to existing services. Changed or
 missing inputs, assets or receipt fail before measurement. Other build commands
-can change `dist/` and invalidate reuse. The first session selects unused Vite,
+can change `dist/` and invalidate reuse. The first session selects unused Astro/Vite,
 server and proxy ports; reuse restores those recorded choices unless explicit
 overrides are supplied. An occupied recorded port fails without attaching to or
 stopping its listener. Changing the actual WebSocket endpoint invalidates reuse.

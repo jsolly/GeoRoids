@@ -1,5 +1,5 @@
 import { laserDamagesShips } from '../../shared/combat';
-import { PALETTE, TITLE } from '../constants';
+import { PALETTE } from '../constants';
 
 type PlayerColorType = 'local' | 'remote';
 
@@ -59,18 +59,4 @@ export function hexToRgba(hex: string, alpha: number): string {
   const value = `rgba(${r}, ${g}, ${b}, ${bucket})`;
   byAlpha.set(bucket, value);
   return value;
-}
-
-/** Mirror locked hexes into CSS custom properties for the title/menu shell. */
-export function applyLockedPaletteCss(
-  root: CSSStyleDeclaration = document.documentElement.style
-): void {
-  root.setProperty('--palette-bg', PALETTE.BG);
-  root.setProperty('--palette-stars', PALETTE.STARS);
-  root.setProperty('--palette-accent', TITLE.ACCENT);
-  root.setProperty('--palette-local', PALETTE.LOCAL);
-  root.setProperty('--palette-hud', PALETTE.HUD);
-  root.setProperty('--palette-hud-muted', PALETTE.HUD_MUTED);
-  root.setProperty('--palette-danger', PALETTE.DANGER);
-  root.setProperty('--palette-laser', PALETTE.LASER_LOCAL);
 }

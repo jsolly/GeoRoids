@@ -97,37 +97,24 @@ npm run fix                # biome write + tsc + unit tests
 npm run check:wiki         # flag gameplay changes that need a Wiki review (runs in build)
 npm run gate               # same complete pre-commit battery; exact unchanged receipts may reuse
 
-# Tests
-npm run test               # complete deterministic unit suite (tests/unit/)
-npm run test:all           # unit, server, and entity integration tests
-npm run test:review        # complete server/entity integration (also in gate)
-npm run test:integration   # complete code integration inventory
-npm run test:integration:server    # server-side integration
-npm run test:integration:entities  # entity integration
-npm run test:coverage      # complete unit suite with coverage
-
 # Diagnostics / performance
 npm run --silent logs -- --player <id>   # merged client/server timeline
 npm run benchmark          # see benchmarks/README.md
 
-# Single test file (integration must use the runner script — not raw vitest)
-./scripts/test-runner.sh tests/integration/server/server-pause.test.ts --reporter=verbose
-npx vitest run tests/unit/path/to.test.ts        # focused pure unit checks only
 ```
 
-**Use `./scripts/test-runner.sh` for server/entity integration tests.** It owns one serialized Vitest worker, per-run artifacts and process cleanup. Socket scenarios create and close their own port-zero loopback servers; the code runner starts no Astro/server pair. Code checks in different worktrees can overlap; the same checkout excludes overlap. There are no browser or sharded test lanes. `vitest.config.ts` retains `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false` and `maxConcurrency: 1`.
-
-Use repository-relative or absolute paths for explicit integration test files; missing files fail before services start. Selectors must name literal files or directories within the server/entity inventory. Substrings and `:line` suffixes are rejected. Put selectors directly after the runner command; a nonempty `--` tail is rejected to prevent an unintended selection.
+Testing instructions, code-test commands, runner ownership and basic manual
+browser smoke policy live in [tests/AGENTS.md](../tests/AGENTS.md).
 
 ## Architecture
 
 ### Two processes, one game
 
-- **Client** (`src/`, served and built by Astro with Vite): rendering, input, prediction, HUD. Static game and debug routes share `src/components/GameDocument.astro` → `src/runtime/gameRuntime.ts`, which composes an injected `EventLoop` and bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
+- **Client** (`src/`, served and built by Astro with Vite): rendering, input, prediction, HUD. Static game and debug routes share `src/components/GameDocument.astro` → `src/components/game/GameShell.svelte` → `src/runtime/gameRuntime.ts`, which composes an injected `EventLoop` and bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
 - **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
 - **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
 
-The Svelte shell owns the start screen, preferences, inventory, store, furnace travel, map controls, touch actions, field hints, network banners and diagnostics, including their responsive dialogs. It imports the browser-only runtime after mounting; initialization failure offers Retry and never queues Enter Game. The command port delegates to gameplay operations, while frozen presentation values update at most ten times per second and semantic transitions publish immediately. Canvas dimensions and pixels remain engine-owned; a separate geometry callback places shell controls. TypeScript painters receive explicit canvas elements from Svelte; the shell owns DOM state and styles. Map and touch adapters own their scoped gestures, while bounded presentation snapshots carry only visible controls and diagnostic values. Teardown retires the runtime, subscriptions, listeners, timers, painters, and owned connections.
+The Svelte shell owns the start screen, preferences, inventory, store, furnace travel, map controls, touch actions, field hints, network banners and diagnostics, including their responsive dialogs. It imports the browser-only runtime after mounting; initialization failure offers Retry and never queues Enter Game. The command port delegates to gameplay operations, while frozen presentation values update at most ten times per second and semantic transitions publish immediately. Canvas dimensions and pixels remain engine-owned; a separate geometry callback places shell controls. TypeScript painters receive explicit canvas elements from Svelte; the shell owns DOM state and styles. Map and touch adapters own their scoped gestures, while bounded presentation snapshots carry only visible controls and diagnostic values. Teardown retires the runtime, subscriptions, listeners, timers, painters, and owned connections. No legacy migration hosts remain. Renderer unit suites share only a canvas and safe-area probe; DOM scenarios mount the real Svelte components.
 
 Astro's Vite development server proxies `/ws` and `/logs` to the owned local game-server port, normally `3001`, so the client connects through the Astro origin. The Wiki route is a separate Svelte-enhanced static manual and does not initialize the game; see [Wiki maintenance](wiki-maintenance.md).
 
@@ -180,15 +167,13 @@ Notable flags under `DEBUG.*`: `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_LOCAL_PLA
 - `logs/client.log` — client-side (forwarded over WS)
 - `logs/server.log` — server-side
 
-Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge a player's client/server timeline. Browser warnings, errors and sampled `STATE` checkpoints also reach Railway's searchable logs. See [docs/diagnostics.md](diagnostics.md) for correlation, filtering, loss counters and profiling the actual game loop.
+Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge a player's client/server timeline. Browser warnings, errors and correlated lifecycle `STATE` records also reach Railway's searchable logs. See [docs/diagnostics.md](diagnostics.md) for correlation, filtering, loss counters and profiling the actual game loop.
 
 ## Local development
 
-- **Validation admission:** different worktrees can run complete unit, runner-contract and integration code checks together. Static checks, types and builds can overlap too. A checkout admits one gate, review or standalone harness at a time because its builds and artifacts share ownership. Failed cleanup retains the barrier.
+- **Validation admission:** testing concurrency, ownership and cleanup rules live in [tests/AGENTS.md](../tests/AGENTS.md#run-and-report).
 - **Manual measurement queue:** browser benchmark runner modes and direct frame measurements use one heavyweight FIFO slot in the common Git directory. Queue waits are visible and cancellable and precede execution deadlines. Failed ownership inspection preserves evidence; never delete a live allocator's lock.
-- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes. There is no full-suite sharding deadline.
-- **Ports:** code integration scenarios own port-zero loopback servers; the code runner does not consume service-port overrides. Manual benchmark harnesses select distinct Astro client, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
-- **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
+- **Ports:** manual benchmark harnesses select distinct Astro client, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
 - **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
@@ -220,4 +205,4 @@ Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive develo
 
 ### Hello-world smoke
 
-For a manual smoke, open `http://localhost:5173`, click Play, steer (left/right arrow keys) and fire (Space); thrust is automatic. This is a manual observation outside automated code-test coverage.
+For basic manual browser smoke instructions, read [tests/AGENTS.md](../tests/AGENTS.md#basic-manual-browser-smoke).

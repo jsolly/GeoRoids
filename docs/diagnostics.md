@@ -42,22 +42,11 @@ ignored rather than presented as successful structured evidence.
 ## Follow a state transition
 
 Start with connection, join, resume, resynchronization, motion rejection,
-damage, death or respawn events. Match player and release IDs, then inspect the
-surrounding snapshot checkpoints. Snapshot sequence numbers belong to a
-connection; `gameTime` is the authoritative simulation tick counter.
-
-Snapshots are sampled at sequence 1 and then every 450 sequences. At the normal
-30 Hz broadcast rate, ongoing samples are about 15 seconds apart. Sampling
-happens before copying state. The server checkpoint captures the state passed
-to a successful socket send callback; that callback does not prove the browser
-received or applied the packet.
-
-The corresponding client checkpoint records the accepted packet metadata and
-three observations: `clientBeforeApply`, `authoritativeRow`, and
-`clientAfterApply`. Compare health, cargo, position, velocity, motion epoch and
-acknowledged input where available. Position differences can be normal during
-prediction and reconciliation; do not diagnose desynchronization from a single
-unequal coordinate. Rejected snapshots record the baseline/sequence problem
+damage, death or respawn events. Match player and release IDs. Routine snapshot
+state dumps, contour-release traces, and per-action firing/input/asteroid logs
+are removed. Use the debug HUD and explicitly copied diagnostics when current
+state is needed. Snapshot sequence numbers belong to a connection; `gameTime`
+is the authoritative simulation tick counter. Rejected snapshots record the baseline/sequence problem
 while preserving the last accepted state and requesting resynchronization.
 
 Copied playfield diagnostics include an `input` object: `pointerHeading`,

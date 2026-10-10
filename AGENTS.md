@@ -14,22 +14,22 @@ Before deployment operations, read [agent operations](docs/agent-operations.md).
 
 ## Project
 
-GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Vite + TypeScript client (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
+GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Astro static pages with Svelte 5 and shadcn-svelte interfaces plus a TypeScript canvas engine (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
 
 `AGENTS.md` (plus `tests/AGENTS.md`) is the only agent instruction file. Claude Code 2.1.277+ reads it natively; do not add a `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md`, because any of them makes Claude Code ignore `AGENTS.md`.
 
 ## Frontend stack
 
-Svelte + shadcn-svelte is the fleet default for product interfaces. GeoRoids is a
-user-authorized exception: keep its TypeScript canvas game, existing HUD, Wiki
-and performance tooling on the current rendering stack. Do not add unused Svelte
-or shadcn dependencies to satisfy an installation check. New standalone product
-interfaces follow the fleet default; expanding this exception or migrating the
-game needs user direction. Canon: dotagents `rules/frontend-stack.md`.
+Astro owns static `/`, `/debug` and `/wiki` documents and manages Vite. Svelte 5
+and committed shadcn-svelte primitives own page and DOM interfaces. TypeScript
+owns canvas painting, geometry, simulation and multiplayer. This completes the
+user-directed migration from the former rendering-stack exception; no exception
+remains for product DOM interfaces. Keep ordinary document navigation, relative
+imports and imports from defining modules. Canon: dotagents `rules/frontend-stack.md`.
 
 ## Deploy
 
-Vite static client and authoritative WebSocket server deploy independently from `main`. Before configuration or release work, read [deployment operations](docs/agent-operations.md#deploy) and [world operations](docs/persistent-world.md). Never use the retired geoasteroids hostnames. No automatic Vercel Preview deployments.
+Astro static client and authoritative WebSocket server deploy independently from `main`. Before configuration or release work, read [deployment operations](docs/agent-operations.md#deploy) and [world operations](docs/persistent-world.md). Never use the retired geoasteroids hostnames. No automatic Vercel Preview deployments.
 
 ## CI
 
@@ -37,23 +37,15 @@ The dotagents dispatcher runs the tracked pre-commit gate. The tracked pre-commi
 
 ## Commands
 
-Run `npm run gate` before publication. Integration tests always use `./scripts/test-runner.sh`, never raw Vitest: it owns an isolated Vitest worker, per-run artifacts and process cleanup. Socket scenarios create their own port-zero loopback servers. Code checks, including complete units, runner contracts and integration, can overlap across different worktrees. Each checkout excludes overlapping validation because builds and artifacts belong to it. Keep forks, one worker, isolation, no file parallelism and no concurrent test sequences within a run. Read [commands](docs/agent-operations.md#commands) before operating local services or tests.
-
-Manual browser benchmarking and frame measurements remain outside the gate and use the common-Git heavyweight queue. Playwright remains for those tools and Wiki media generation.
+Run `npm run gate` before publication. Testing instructions, suite ownership, runner isolation and manual browser smoke policy live in [tests/AGENTS.md](tests/AGENTS.md). Read [commands](docs/agent-operations.md#commands) before operating local services.
 
 ## Architecture
 
-Vite serves the client; the Node WebSocket server owns authoritative world state. Shared gameplay rules live once under `shared/`; import them on both sides. Gameplay requires snapshot v3 and asteroid interactions; unsupported clients must reject, with no protocol opt-outs. Reconnects use private resume tokens. Read [architecture and diagnostics](docs/agent-operations.md#architecture) for module ownership and debugging.
+Astro serves and builds the static client with Vite; the Node WebSocket server owns authoritative world state. Shared gameplay rules live once under `shared/`; import them on both sides. Gameplay requires snapshot v3 and asteroid interactions; unsupported clients must reject, with no protocol opt-outs. Reconnects use private resume tokens. Read [architecture and diagnostics](docs/agent-operations.md#architecture) for module ownership and debugging.
 
 ## Tests
 
-- `tests/unit/` — deterministic rules, executed DOM/canvas behavior, protocol and failure boundaries. Run the complete suite via `npm run test`.
-- `tests/integration/server/` — server modules and owned loopback protocol interactions.
-- `tests/integration/entities/` — entity interactions and input behavior.
-
-Browser test suites are removed. Tests must prove an executed code result with fixed inputs, seeds and controlled clocks where elapsed time affects gameplay. Delete nondeterministic or placeholder tests; do not preserve their count with retries or weaker assertions. Native browser rendering, real keyboard/touch behavior and audio are outside this automated coverage.
-
-Integration socket scenarios start and close their own port-zero loopback servers. `scripts/test-runner.sh` owns the isolated Vitest process and its artifacts; it starts no Vite/server pair. Its default execution deadline is 1200 seconds. If a test hangs or fails strangely, inspect the runner output and confirm only its owned processes need cleanup before retrying.
+Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
 
 ## Project conventions
 
@@ -65,16 +57,15 @@ Integration socket scenarios start and close their own port-zero loopback server
 - **Relative paths only** — no `@`-style aliases.
 - **No CDN for app assets** — never load runtime CSS or JS from CDNs. Prefer npm, local files, or same-origin Vite/Railway builds.
 - **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`biome.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. ESLint is gone. Knip and ts-prune check unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
-- **Production managers use `getInstance()`** (`GameController`, `PlayerManager`, `CollisionManager`, etc.). `GameController` supplies PlayerManager's complete network capabilities at creation; later access cannot rebind them. Isolated runtime tests may construct PlayerManager and CollisionManager with explicit capabilities. `main.ts` owns production EventLoop wiring and disposal.
+- **Production managers use `getInstance()`** (`GameController`, `PlayerManager`, `CollisionManager`, etc.). `GameController` supplies PlayerManager's complete network capabilities at creation; later access cannot rebind them. Isolated runtime tests may construct PlayerManager and CollisionManager with explicit capabilities. `src/runtime/gameRuntime.ts` owns production EventLoop wiring and disposal. The Svelte shell owns its mount lifetime.
 - **The 60 Hz game loop never touches the disk or does O(world) work.** The saved world is read once at startup and lives in memory; changes leave the loop once a second as a batch through `WorldPersistence` (`server/world/`); unchanged-membership asteroid sectors persist drift every `WORLD.driftFlushCheckpoints` checkpoints. Do not add SQLite calls, `fs` calls, or per-saved-sector scans to `advanceOneFrame` or the message handlers; `tests/unit/server/explored-world-keeps-the-simulation-frame-off-the-database.test.ts` and `world-writes-leave-the-game-loop-once-a-second.test.ts` fail if that regresses.
 - **Snapshots and terrain work stay local.** Snapshots send each player only nearby world entities (loot, projectiles, and other players' pickups within `WORLD.interestRadius`; asteroids within the smaller `WORLD.asteroidInterestRadius` radar circle, widened to the interest square while that pilot's Mineral Scan zooms the camera out; a player's own pickups always ship) (`shared/world.ts`; applied in `server/services/GameStateBroadcaster.ts`, with sectors waking at `WORLD.interestRadius` in `server/world/RegionalAsteroidField.ts`), and the client builds contours in local patches (`src/physics/terrain/terrainSession.ts`). Never broadcast or rebuild the whole world. `tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts` guards regional asteroid queries and per-player asteroid row filtering, and `tests/unit/rendering/contours-follow-the-camera-without-dropping-lines.test.ts` guards contour patches; per-player filtering of non-asteroid rows has no dedicated guard test.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.
 - **Conventional Commits** (`feat`, `fix`, `chore`, `refactor`, `test`, `perf`, `docs`) with a scope (e.g. `feat(network): ...`).
-- **Scenario-style test names** — describe a real user/system event, not the function under test.
 
 ## Local development
 
-Node24 matches `.nvmrc`. The code integration runner owns Vitest and has a 1200-second default deadline; timeouts fail and stop its owned processes. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development).
+Node24 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development).
 
 ## Verified-tree CI
 

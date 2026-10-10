@@ -6,7 +6,6 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { serverPerformanceMetrics } from '../../../server/performanceMetrics';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { logger } from '../../../setup/serverLogger';
 import {
   SNAPSHOT_BACKPRESSURE_BYTES,
   SNAPSHOT_VERSION,
@@ -216,34 +215,6 @@ describe('current pilots share the production handler and broadcaster', () => {
       entities: expect.any(Array),
       playerProjectiles: expect.any(Array),
     });
-  });
-
-  test('a sampled snapshot is logged only after its transport callback succeeds', () => {
-    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    const pilot = socket();
-    pilot.fake.defer = true;
-    joinPilot(handler, pilot.ws, 'sampled-pilot');
-    expect(
-      info.mock.calls.some(
-        ([category, event]) => category === 'STATE' && event === 'snapshot_sent_to_transport'
-      )
-    ).toBe(false);
-
-    pilot.pending.shift()?.();
-    applySnapshots(pilot, handler);
-
-    expect(info).toHaveBeenCalledWith(
-      'STATE',
-      'snapshot_sent_to_transport',
-      expect.objectContaining({
-        playerId: 'sampled-pilot',
-        snapshotSequence: 1,
-        snapshotKind: 'keyframe',
-        authoritativeRow: expect.objectContaining({
-          position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-        }),
-      })
-    );
   });
 
   test('late joins, exclusions, backpressure, rejoin and reconnect have independent baselines', () => {

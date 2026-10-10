@@ -1,8 +1,7 @@
-import { describe, expect, it as test, vi } from 'vitest';
+import { describe, expect, it as test } from 'vitest';
 import type { ServerEntityData } from '../../../shared-types';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
-import { logger } from '../../../src/utils/Logger';
 import { snapshotFixture } from './snapshotFixture';
 
 const OMITTED_MOTION_PATTERN = /omitted/u;
@@ -219,31 +218,21 @@ test('a new authoritative epoch and an omitted rail clear local prediction', () 
   expect(prediction.buildHandoffPose(ship)?.contourLock).toBeNull();
 });
 
-test('an authoritative contour correction logs the released transform before rebasing', () => {
+test('an authoritative contour correction releases the lock and rebases the ship', () => {
   const ship = new Ship({ kitId: 'scout', isLocalPlayer: true });
   const prediction = new PlayerMotionReconciliation();
   prediction.rebase(row(), ship, 0);
   ship.position = { x: 2250, y: 100 };
   ship.velocity = { x: 2, y: 1 };
   ship.contourLock = { height: 0.08, direction: 1 };
-  const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-  try {
-    const correction = row({
-      position: { x: 2200, y: 80 },
-      velocity: { x: 0, y: 0 },
-      playerMotion: { epoch: 3, mode: 'handoff', ack: 0, anchor: { x: 2200, y: 80 } },
-    });
-    prediction.rebase(correction, ship, 17);
-    prediction.rebase(correction, ship, 34);
-    const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
-    expect(releases).toHaveLength(1);
-    expect(releases[0]?.[2]).toMatchObject({
-      reason: 'authoritative',
-      position: { x: 2250, y: 100 },
-      velocity: { x: 2, y: 1 },
-    });
-    expect(ship.position).toEqual(correction.position);
-  } finally {
-    info.mockRestore();
-  }
+  const correction = row({
+    position: { x: 2200, y: 80 },
+    velocity: { x: 0, y: 0 },
+    playerMotion: { epoch: 3, mode: 'handoff', ack: 0, anchor: { x: 2200, y: 80 } },
+  });
+  prediction.rebase(correction, ship, 17);
+  prediction.rebase(correction, ship, 34);
+
+  expect(ship.contourLock).toBeNull();
+  expect(ship.position).toEqual(correction.position);
 });

@@ -86,10 +86,7 @@ export class InputManager {
         if (!localPlayer) {
           return;
         }
-        logger.debug('INPUT', 'Key down event', {
-          key: ev.code,
-          gameRunning: this.gameStateManager.getIsGameRunning(),
-        });
+
         if (this.gameStateManager.getIsGameRunning()) {
           keyDown(ev, localPlayer);
         } else {
@@ -109,10 +106,7 @@ export class InputManager {
         if (!localPlayer) {
           return;
         }
-        logger.debug('INPUT', 'Key up event', {
-          key: ev.code,
-          gameRunning: this.gameStateManager.getIsGameRunning(),
-        });
+
         // Always handle keyup events regardless of game state to prevent stuck keys
         keyUp(ev, localPlayer);
       },

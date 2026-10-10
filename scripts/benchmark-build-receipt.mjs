@@ -110,24 +110,13 @@ function inputs(root, websocketUrl) {
 
 function build(root) {
   assert(existsSync(join(root, 'dist/index.html')), 'Missing production dist/index.html');
-  assert(existsSync(join(root, 'dist/release.json')), 'Missing production dist/release.json');
-  const release = readJson(join(root, 'dist/release.json'));
-  assert.equal(
-    release.releaseSha,
-    git(root, ['rev-parse', 'HEAD']).trim(),
-    'Benchmark build release is stale'
-  );
   const html = readFileSync(join(root, 'dist/index.html'), 'utf8');
   const entries = [...html.matchAll(/<script\b[^>]*>/giu)]
     .map(([tag]) =>
       /\btype=["']module["']/iu.test(tag) ? /\bsrc=["']\/([^"']+)["']/iu.exec(tag)?.[1] : undefined
     )
     .filter(Boolean);
-  const modules = clientAssetGraph(
-    readJson(join(root, 'dist/client-assets.json')),
-    release.releaseSha,
-    entries
-  );
+  const modules = clientAssetGraph(readJson(join(root, 'dist/client-assets.json')), entries);
   for (const path of modules) {
     assert(existsSync(join(root, 'dist', path)), 'Attributed gameplay asset is missing');
     assert(readFileSync(join(root, 'dist', path)).length > 0, 'Attributed gameplay asset is empty');

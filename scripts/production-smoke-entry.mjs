@@ -1,4 +1,4 @@
-// Client and server deploy independently. Preserve the release propagation and
+// Client and server deploy independently. Preserve the HTTP readiness and
 // behavior budgets while verifying the deployed HTTP and gameplay protocols.
 import process from 'node:process';
 import { runNetworkSmoke } from './production-smoke-network.mjs';

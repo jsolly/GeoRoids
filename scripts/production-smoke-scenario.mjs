@@ -5,8 +5,6 @@ import { tsImport } from 'tsx/esm/api';
 import WebSocket from 'ws';
 import { clientAssetGraph } from './client-asset-graph.mjs';
 import { requireEvidence, SmokeFailure, smokeClock } from './production-smoke-network.mjs';
-import { verifyAncestry as verifyServerAncestry } from './production-smoke-release.mjs';
-import { minimumServerRelease } from './server-release-inputs.mjs';
 
 export const productionUrl = 'https://www.georoids.com/';
 const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
@@ -18,13 +16,6 @@ const { SNAPSHOT_VERSION, SnapshotDecoder } = await tsImport(
 );
 const { GAME, LASER } = await tsImport('../src/constants/index.ts', import.meta.url);
 
-function sha(value) {
-  requireEvidence(
-    typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value),
-    'Full release SHA is required'
-  );
-  return value;
-}
 function attribute(tag, name) {
   return new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'iu').exec(tag)?.[1];
 }
@@ -55,29 +46,17 @@ function documentAssets(html) {
   return { modules: modules.map((path) => new URL(path, productionUrl).href), assets };
 }
 
-export async function waitForClientRelease({
-  expectedSha,
+export async function waitForClientAssets({
   verifyHttp,
   clock = smokeClock,
   signal,
   readinessMs = 120000,
   pollMs = 5000,
 }) {
-  sha(expectedSha);
   const deadline = clock.now() + readinessMs;
   for (;;) {
     try {
       signal?.throwIfAborted();
-      const manifest = await (
-        await verifyHttp(new URL('/release.json', productionUrl).href)
-      ).json();
-      requireEvidence(
-        manifest &&
-          typeof manifest === 'object' &&
-          !Array.isArray(manifest) &&
-          manifest.releaseSha === expectedSha,
-        'Published client manifest is malformed or stale'
-      );
       const document = await verifyHttp(productionUrl);
       requireEvidence(
         /^text\/html\b/iu.test(document.headers.get('content-type') ?? ''),
@@ -89,7 +68,6 @@ export async function waitForClientRelease({
       ).json();
       const reachable = clientAssetGraph(
         attributed,
-        expectedSha,
         modules.map((url) => new URL(url).pathname.slice(1))
       );
       const assets = [
@@ -98,7 +76,6 @@ export async function waitForClientRelease({
           ...reachable.map((path) => new URL(path, productionUrl).href),
         ]),
       ];
-      let embeddedRelease = false;
       for (const url of assets) {
         const response = await verifyHttp(url);
         const javascript = url.endsWith('.js');
@@ -112,19 +89,15 @@ export async function waitForClientRelease({
         );
         const body = await response.text();
         requireEvidence(body.length > 0, 'Client bundle asset is empty');
-        if (javascript && new RegExp(`(["'\`])${expectedSha}\\1`, 'u').test(body)) {
-          embeddedRelease = true;
-        }
       }
-      requireEvidence(embeddedRelease, 'Published client bundle is stale');
-      return { releaseSha: expectedSha, assetCount: assets.length };
+      return { assetCount: assets.length };
     } catch (error) {
       signal?.throwIfAborted();
       if (clock.now() >= deadline) {
         throw new SmokeFailure(
           error instanceof SmokeFailure
-            ? `Client release readiness deadline: ${error.message}`
-            : 'Client release readiness deadline',
+            ? `Client asset readiness deadline: ${error.message}`
+            : 'Client asset readiness deadline',
           { cause: error }
         );
       }
@@ -144,30 +117,24 @@ async function waitForEvidence(predicate, description, { clock, signal }) {
 
 export async function smoke({
   expectedSha,
-  expectedServerSha,
   verifyHttp,
   artifacts,
   observations = [],
-  verifyAncestry = verifyServerAncestry,
-  resolveServerMinimum = minimumServerRelease,
   createSocket = (url, options) => new WebSocket(url, options),
   clock = smokeClock,
   signal,
   clientReadinessMs = 120000,
   clientPollMs = 5000,
 }) {
-  const client = await waitForClientRelease({
-    expectedSha,
+  const client = await waitForClientAssets({
     verifyHttp,
     clock,
     signal,
     readinessMs: clientReadinessMs,
     pollMs: clientPollMs,
   });
-  observations.push({ source: 'client-release', ...client });
-  const minimum = sha(expectedServerSha || resolveServerMinimum(expectedSha));
+  observations.push({ source: 'client-assets', ...client });
   const evidence = {
-    minimumServerRelease: minimum,
     serverReleaseId: null,
     acceptedSnapshots: 0,
     admission: null,
@@ -190,26 +157,8 @@ export async function smoke({
     shotRequestId = randomUUID();
   const decoder = new SnapshotDecoder();
   let movementSequence, movementEpoch;
-  const checkRelease = (observed) => {
-    sha(observed);
-    if (expectedServerSha) {
-      requireEvidence(observed === minimum, 'Production server release is stale');
-    } else {
-      try {
-        verifyAncestry(minimum, observed);
-      } catch (error) {
-        throw new SmokeFailure('Production server release ancestry failed', { cause: error });
-      }
-    }
-    requireEvidence(
-      evidence.serverReleaseId === null || evidence.serverReleaseId === observed,
-      'Production server changed during gameplay verification'
-    );
-    evidence.serverReleaseId = observed;
-  };
   const checkHealth = async () => {
     const health = await (await verifyHttp(healthUrl)).json();
-    checkRelease(health?.releaseId);
     requireEvidence(
       health.world?.persistence?.mode === 'worker',
       'Persistent world worker is required'
@@ -308,7 +257,7 @@ export async function smoke({
               message.data.resumeToken.length > 0,
             'Gameplay join admission is incomplete or mismatched'
           );
-          checkRelease(message.data.serverReleaseId);
+          evidence.serverReleaseId = message.data.serverReleaseId ?? null;
           admitted = true;
           evidence.admission = {
             playerId: pilotId,

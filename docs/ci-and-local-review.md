@@ -51,12 +51,14 @@ and the manual Coverage report workflow, without a percentage merge threshold.
 ## Production verification
 
 Production smoke uses HTTP and a genuine current-protocol WebSocket pilot. It
-checks the client release manifest, module entry identity and declared bundle
-availability, exact server release admission, current snapshots, acknowledged
+checks gameplay module reachability and declared bundle availability, current
+protocol admission and snapshots, acknowledged
 movement, an accepted shot and healthy world persistence. It does not launch a
 browser or certify rendering, keyboard/touch controls, graphics or audio.
 The local smoke scenario contracts use controlled clocks and transports with the
-production protocol encoder/decoder. Follow the exact release/request receipt;
+production protocol encoder/decoder. Host deployment status establishes the
+release; descriptive metadata and bundle text do not gate verification. Follow
+the scenario checkout/request receipt;
 a skipped, failed, missing or timed-out smoke remains unverified.
 
 This test-tooling removal changes no gameplay behavior, controls, assets or Wiki

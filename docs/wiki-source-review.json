@@ -58,7 +58,7 @@
     "public/wiki/media/survival.png": "sha256:b3c28da426ca94ff585cf653aee10287028e1ff3166c0b84ddb7e02c905e96a5",
     "public/wiki/media/terrain.gif": "sha256:dcaebe9bf2bf9e9c1ef6d5fd5555dc1f06b3f15d3344a8520c8da7ad2796a663",
     "public/wiki/media/terrain.png": "sha256:96426cda4ad69680b231e1b9b653c51d695fa709cdcd79bf7b2048728745a107",
-    "scripts/client-build.ts": "sha256:0ef4ba4edcf23601829eefcf11533c48fd89b04e1b624f75fb0cc8c274b99317",
+    "scripts/client-build.ts": "sha256:17d1b94a35b19ec6445ab1d5156554fc6636dd919cc2001d43678ce2822707b5",
     "scripts/generate-sounds.ts": "sha256:ebbc3a23666b38c0d405f61049fda9c651b3def1381eba9e22cf3095f42b8dd4",
     "scripts/wiki-check.ts": "sha256:68db3ec943a37d99fb2827f372e6ad21b37f2c0682e728a105f7b00aee1bbfae",
     "scripts/wiki-content.ts": "sha256:d7006a811d3fee2b623e6b3fdbc921ef3142d968e58bd5aaed89c21b8f40ee1d",
@@ -313,7 +313,7 @@
     "src/ui/universeMapLabels.ts": "sha256:95c53001bf510ca6e7da44162eb386e7d3d6d64043fe2eb454cb4d0411bc1024",
     "src/ui/viewportChrome.ts": "sha256:582159cb92905d7ea0b7e2d83da2d8dbfa0a17735272321adf11e43bd9f79284",
     "src/utils/Logger.ts": "sha256:dd9d0370c4c0342dc9306044c110c5b88781deaebe5b1766420a8aea2bc37a59",
-    "src/utils/buildInfo.ts": "sha256:b26206e67fd4fa2cb2068dcd70bd1ff4711e15cf3c68989f49a00006fade0bb3",
+    "src/utils/buildInfo.ts": "sha256:799a50bb976587767415d83de7e7edca5f1f295b4aaba3c31dda279daa4f7318",
     "src/utils/clientLogContext.ts": "sha256:608f0b74cd094a966456f806a435797ba27171d1d9eed737f0fbbb91c59320f5",
     "src/utils/colorUtils.ts": "sha256:04668d18326a2b0338401d95b9079a1fa6da98ab9605d9965effc5c5e4da17ff",
     "src/utils/deathCause.ts": "sha256:615a2f8d1fc0e9dea17e0b2e7c5bde0501dacac3cc787ff14d64d9cfb8d54f9a",
@@ -457,7 +457,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:c521a028c2a0abf0c029f44825524fd71cbdc65ca0cb7b0cad345297a129fae5",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "tsconfig.frontend.json": "sha256:591ebcd86d1208910f385d8291a712740f14b10a2e06f3a56c06c324e12a2101",
-    "scripts/client-release-sha.ts": "sha256:a9089670f66f99085189284f775f374ef76c7d3f171cf9ad1a6f40f9877ac246",
+    "scripts/client-release-sha.ts": "sha256:e4d51752d83d1324cd254fbc9720a8f10970e323ad245b3541226a3463aee9ba",
     "public/sounds/contour-flick-blocked.m4a": "sha256:2aa9b534ae23d19f9df1470b46b54d410831bf41b1e43cc98f5e04df70925a0d",
     "public/sounds/contour-flick-success.m4a": "sha256:74a49bfd234ba15162410e88afa41ee0be0b9d01fcc0f65cdc602daa2ef1393a",
     "public/sounds/contour-lock-acquired.m4a": "sha256:928afee6bf5a0bff7da80205e8a473dd811b1a16ff7e56f67a18897e4cff6c6e",
@@ -485,7 +485,7 @@
       "owners": {}
     },
     {
-      "note": "Reviewed merged package manifest: preserve PR6 complete gate commands and main\u2019s landed Knip 6.38.0 update. No gameplay controls, Wiki prose, demonstrations or runtime dependency behavior changed.",
+      "note": "Reviewed merged package manifest: preserve PR6 complete gate commands and main’s landed Knip 6.38.0 update. No gameplay controls, Wiki prose, demonstrations or runtime dependency behavior changed.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],
@@ -2453,7 +2453,7 @@
       }
     },
     {
-      "note": "Removed cooperative mining targets, timers, tags, split audio/shockwaves and the split demonstration. Reviewed first-hit ordinary mining, retained durable metal/colossal/rubble behavior and data, protocol3 negotiation and storage migration; updated asteroid/Hauler/controls guidance and references. Baseline76 passed; migrated focused gameplay/network/persistence checks passed after fixture corrections. Types, Biome, Knip and Markdown checks passed. All10 surviving demos reproduced byte-for-byte with Pillow12.3.0. Two simultaneous local Chromium clients at1280x900 and390x844 fired competing shots: one destruction/drop set, ordinary shatter and audio starts, metal health75\u219250 on both. Game and asteroid Wiki screenshots inspected at both widths; no console warnings/errors. No physical-phone or human listening claim. Full gate follows this scoped acceptance. Integrated cleared-nest main changes; preserved their independent review and current snapshot rows.",
+      "note": "Removed cooperative mining targets, timers, tags, split audio/shockwaves and the split demonstration. Reviewed first-hit ordinary mining, retained durable metal/colossal/rubble behavior and data, protocol3 negotiation and storage migration; updated asteroid/Hauler/controls guidance and references. Baseline76 passed; migrated focused gameplay/network/persistence checks passed after fixture corrections. Types, Biome, Knip and Markdown checks passed. All10 surviving demos reproduced byte-for-byte with Pillow12.3.0. Two simultaneous local Chromium clients at1280x900 and390x844 fired competing shots: one destruction/drop set, ordinary shatter and audio starts, metal health75→50 on both. Game and asteroid Wiki screenshots inspected at both widths; no console warnings/errors. No physical-phone or human listening claim. Full gate follows this scoped acceptance. Integrated cleared-nest main changes; preserved their independent review and current snapshot rows.",
       "sources": [
         "docs/protocol/snapshot-v2.md",
         "docs/protocol/snapshot-v3.md",
@@ -2774,6 +2774,21 @@
       "owners": {
         "server/core/EntityManager.ts": "controls",
         "src/wiki/gameReference.ts": "controls"
+      }
+    },
+    {
+      "note": "User-directed removal of release identity gates keeps version metadata and client refresh. Builds without valid host/Git metadata share one opaque build token with release.json; game controls and manual copy are unchanged. Asset reachability and protocol, movement, accepted firing, persistence and cleanup checks remain. No editorial or media changes are required.",
+      "sources": [
+        "scripts/client-build.ts",
+        "scripts/client-release-sha.ts",
+        "src/utils/buildInfo.ts"
+      ],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "scripts/client-build.ts": "field-manual",
+        "scripts/client-release-sha.ts": "field-manual",
+        "src/utils/buildInfo.ts": "field-manual"
       }
     }
   ]

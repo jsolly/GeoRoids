@@ -5,23 +5,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 
 const roots: string[] = [];
 const sha = 'a'.repeat(40);
 const checker = fileURLToPath(new URL('../../../scripts/check-built-client.mjs', import.meta.url));
 
-function checkArchive(root: string) {
+function checkArchive(root: string, metadata: Record<string, string>) {
   return spawnSync(process.execPath, [checker], {
     cwd: root,
-    env: process.env,
+    env: { ...process.env, ...metadata },
     encoding: 'utf8',
     timeout: 10_000,
   });
 }
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   for (const root of roots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
   }
@@ -60,24 +59,18 @@ function archive() {
   return root;
 }
 
-test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA'])(
-  'a hosted archive passes output checks using %s without a Git checkout',
-  (variable) => {
-    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
-    vi.stubEnv('RAILWAY_GIT_COMMIT_SHA', '');
-    vi.stubEnv(variable, sha.toUpperCase());
-    const result = checkArchive(archive());
+test.each([
+  { VERCEL_GIT_COMMIT_SHA: '', RAILWAY_GIT_COMMIT_SHA: '' },
+  { VERCEL_GIT_COMMIT_SHA: 'not-a-sha', RAILWAY_GIT_COMMIT_SHA: '' },
+  { VERCEL_GIT_COMMIT_SHA: '', RAILWAY_GIT_COMMIT_SHA: 'b'.repeat(40) },
+])(
+  'an archive without Git passes route and asset checks independently of host metadata %j',
+  (metadata) => {
+    const root = archive();
+    writeFileSync(join(root, 'dist/_astro/game.js'), 'console.log("gameplay");');
+    const result = checkArchive(root, metadata);
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain(`3 static routes, 1 modules, ${sha}`);
+    expect(result.stdout).toContain('3 static routes, 1 modules');
   }
 );
-
-test('a hosted archive rejects output built for another release', () => {
-  vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
-  vi.stubEnv('RAILWAY_GIT_COMMIT_SHA', 'b'.repeat(40));
-  const result = checkArchive(archive());
-  expect(result.error).toBeUndefined();
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain('Built release identity differs');
-});

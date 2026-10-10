@@ -6,7 +6,7 @@ import { clientReleaseSha } from './client-release-sha';
 const HAULER_TETHER_HEXES = ['#E8D5A3', '#FDE68A'] as const;
 
 /** Attribute gameplay by source modules, independent of output filenames. */
-function clientAssets(releaseSha: string): Plugin {
+function clientAssets(): Plugin {
   return {
     name: 'client-assets',
     generateBundle(
@@ -66,7 +66,6 @@ function clientAssets(releaseSha: string): Plugin {
         type: 'asset',
         fileName: 'client-assets.json',
         source: JSON.stringify({
-          releaseSha,
           gameplay: [...reachable].sort(),
           modules,
         }),
@@ -142,11 +141,7 @@ export function clientViteConfig() {
       ? { cacheDir: `${process.env['GEOROIDS_TEST_SESSION_DIR']}/cache/vite` }
       : {}),
     envPrefix: ['PUBLIC_', 'VITE_WEBSOCKET_URL'],
-    plugins: [
-      refreshWikiFacts(),
-      publishClientRelease(commitHash.toLowerCase()),
-      clientAssets(commitHash.toLowerCase()),
-    ],
+    plugins: [refreshWikiFacts(), publishClientRelease(commitHash.toLowerCase()), clientAssets()],
     preview: { strictPort: true },
     server: {
       port: testVitePort,

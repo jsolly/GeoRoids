@@ -161,8 +161,8 @@ The current benchmark assumes local client and health ports and an owned
 WebSocket endpoint. A cloud phone cannot reach the Mac's `127.0.0.1`. For AWS,
 prepare a dedicated HTTPS/WSS fixture with pinned client/server artifacts and
 explicit endpoint configuration. Keep fixture controls private to the benchmark
-controller. Verify release identity and actual WebSocket traffic from the phone,
-as well as controller health checks. Hosting cost is separate from device time.
+controller. Record build metadata and verify actual WebSocket traffic from the
+phone, as well as controller health checks. Hosting cost is separate from device time.
 
 For Samsung's ADB path, first test whether the bridge supports routing to the
 owned local fixture. If it does not, use the same dedicated remote fixture.

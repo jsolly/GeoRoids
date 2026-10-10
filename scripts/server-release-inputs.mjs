@@ -83,15 +83,6 @@ export function serverReleaseInputs(cwd = process.cwd()) {
   return inputs.sort();
 }
 
-export function minimumServerRelease(targetSha, cwd = process.cwd()) {
-  requireSha(targetSha);
-  if (git(cwd, ['rev-parse', 'HEAD']) !== targetSha) {
-    throw new Error('Compute server release inputs from the target commit checkout');
-  }
-  const sha = git(cwd, ['log', '-1', '--format=%H', targetSha, '--', ...serverReleaseInputs(cwd)]);
-  return requireSha(sha);
-}
-
 export function requiresServerDeployment(baseSha, targetSha, cwd = process.cwd()) {
   requireSha(baseSha);
   requireSha(targetSha);
@@ -111,13 +102,11 @@ export function requiresServerDeployment(baseSha, targetSha, cwd = process.cwd()
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const [mode, first, second] = process.argv.slice(2);
-  if (mode === '--minimum' && first) {
-    process.stdout.write(`${minimumServerRelease(first)}\n`);
-  } else if (mode === '--changed' && first && second) {
+  if (mode === '--changed' && first && second) {
     process.stdout.write(`${requiresServerDeployment(first, second)}\n`);
   } else if (mode === '--list') {
     process.stdout.write(`${serverReleaseInputs().join('\n')}\n`);
   } else {
-    throw new Error('Usage: server-release-inputs.mjs --list | --minimum SHA | --changed BASE SHA');
+    throw new Error('Usage: server-release-inputs.mjs --list | --changed BASE SHA');
   }
 }

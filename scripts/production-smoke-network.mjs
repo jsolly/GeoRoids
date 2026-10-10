@@ -24,7 +24,6 @@ export async function runNetworkSmoke({
   fetcher = fetch,
   clock = smokeClock,
   createSocket,
-  verifyAncestry,
   artifacts = resolve('production-smoke-artifacts'),
   readinessMs = 120000,
   pollMs = 10000,
@@ -125,14 +124,12 @@ export async function runNetworkSmoke({
     }
     behavior = scenario.smoke({
       expectedSha: receipt.releaseSha,
-      expectedServerSha: env.PRODUCTION_SMOKE_SERVER_SHA,
       verifyHttp,
       artifacts,
       observations: receipt.observations,
       clock,
       signal,
       createSocket,
-      verifyAncestry,
     });
     await Promise.race([
       behavior,

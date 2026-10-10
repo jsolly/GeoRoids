@@ -66,6 +66,7 @@ export const PALETTE = {
   HUD: '#E2E8F0',
   HUD_MUTED: '#64748B',
   DANGER: '#F43F5E',
+  CLEARED_NEST: '#444444',
   HEALTH: '#4ADE80',
   /** Locked cream — shard pickups. Same hex as Hauler tether. */
   LOOT: '#E8D5A3',

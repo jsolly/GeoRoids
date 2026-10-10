@@ -88,7 +88,7 @@
     "server/core/SatellitePickupManager.ts": "sha256:4f0389abc624ef72fa45cd48e70c94ebf956ac3c908f7ff4a3095912cf190c03",
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
     "server/core/SurveyProbeManager.ts": "sha256:592b8c86660f02ea405639841c832efa5fd2050e0db2280c0394ef00806ed8be",
-    "server/core/TerrainSpiderManager.ts": "sha256:702281dfb166f646a9876da4f39eb08a54d0f5e5a41056934b970c0a9b7f54aa",
+    "server/core/TerrainSpiderManager.ts": "sha256:b3946c53930bcb4e5e1e38356d7265f4d5deabeaa382ef44abb03890a7878658",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
     "server/services/ClientLogger.ts": "sha256:6700ef35cffb3ad28b14ff8939e9812d4a96560a2ddbe66dec2dfbe897c19f32",
@@ -105,7 +105,7 @@
     "server/world/worldPersistence.ts": "sha256:c0b69372e9e7c588d9e53091f3ead314bf6dc479377ba3d4116819868778d8f5",
     "server/world/worldStoreWorker.ts": "sha256:ab144e0908be8341c729f03a88ce1c67750e881b29839212e7b1b8f8f1dde2ea",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:1dce91c104ad10ea5e905477bfdc875557c58e2785535ac4bce0b5f28b4e8d61",
-    "shared-types.ts": "sha256:92cdc1416bb953069d129c1a55de5bebc43d7eb85904368df5b97d59b81398e5",
+    "shared-types.ts": "sha256:8f29406a2bf3e706a36bc1fedf7424d5eaa351a67f61606943172fcd98c1419b",
     "shared/asteroidBelt.ts": "sha256:94d55e4288a9d968066ac05f666ae0cfe757739166a00ff1dd7a368339378b49",
     "shared/asteroidBoost.ts": "sha256:98594cb2fc30bac61c5a7ce16e9015c9aeb2c5517caa9bbe05711991dbae5b9c",
     "shared/asteroidMaterials.ts": "sha256:fcdc8ed77c790da388f773cb55f54bf890562df76acc44d9bb2b5c2e41cab84b",
@@ -134,7 +134,7 @@
     "shared/ricochetCourt.ts": "sha256:37d79178d40c2a15f9e96ce8d86f48cfd316031d9840758d5ed87e75f74223f5",
     "shared/shipFlight.ts": "sha256:4e375f43ff14a704fcdf6b07698b72eac5f23c85e1dce8af4fa7b3abca25c1c7",
     "shared/shipGrowth.ts": "sha256:c1a6580ad34915573e38feb49b5d52471dfe3f5a89aa8d922d23969489e33b0b",
-    "shared/snapshotDto.ts": "sha256:b1bf5dafb539f59471b28dda3f916c3733c720ce14e0e7fca4b69d7940a5b2e5",
+    "shared/snapshotDto.ts": "sha256:b14bdbcd52bc937a40f8df56e69cd523245a57b7c207ec9d1307b2908091fa89",
     "shared/snapshotMotion.ts": "sha256:63f28afaca42cb4a80215c6b88258309ced4241656c41c8186371a78518caee1",
     "shared/snapshotPrecision.ts": "sha256:d3a31e0a2de8d67ca1375008f6493218e9718fc0cfb2b0535518d78a640609f1",
     "shared/snapshotProtocol.ts": "sha256:6d367f5e4e3c39196cdec3245a23ca81837419a325f1d9cbd3a9698e9bb109ad",
@@ -162,7 +162,7 @@
     "src/audio/spatialAudio.ts": "sha256:c17456ea24859eccb7bf20054cd2841612f17f2d638676507265f44a36e2039e",
     "src/audio/spiderScore.ts": "sha256:7b0129c4605d2e5fcbbbde425d22f4962c81f842aced04c48e318d18df3f7a40",
     "src/audio/splitSound.ts": "sha256:f1ba4b8785204096b8e10a4e90d75b04ce31b983c87f7242dc3819e4d37806c0",
-    "src/constants/index.ts": "sha256:3e1dd47fc1e5a6f06226a948ec388c6f255746a71dcbdd25146fc93d435a36b7",
+    "src/constants/index.ts": "sha256:b4d8fef9446efae023167d5b2676f4dd5dc5d69266e311eca39466dfbe97d892",
     "src/constants/user-preferences.ts": "sha256:d19e2f2890273f568bf992a7d3c341b699d3661785e6985e3819f766ac92d2ca",
     "src/core/eventLoop.ts": "sha256:8ba0ddb4ddaabf629bf01d2670def2daa7dcdc3fdb6ee800499c749df0d0e0a0",
     "src/core/gameController.ts": "sha256:f94f07b389e05a37e76a94c1863119f09fea1d5b0c5b74a0695a0c1ddcaa233c",
@@ -272,7 +272,7 @@
     "src/rendering/hud/gameInfo.ts": "sha256:4d3feb217dbe1c4f5f3f457f9cb9a4a172a10ded3957780c63be70d6bac32345",
     "src/rendering/hud/hudLayout.ts": "sha256:e98e09597703121948682dce52612199b879957548ab79cae61797a909c98576",
     "src/rendering/hud/leaderboard.ts": "sha256:9b11db76cc6635998907bccc4a9f388aa458beb8d3d7c07bb51ff39bfa9e1b47",
-    "src/rendering/hud/minimap.ts": "sha256:c11f569aabc74251e280ab26b7f79338ccffa72772e1a78125952a5e5390e018",
+    "src/rendering/hud/minimap.ts": "sha256:6fea4a9a93792ef8c5e3bd2f0844a69ee07318c637e73801fd3bf6b8d14f1634",
     "src/rendering/hud/resourceMapMark.ts": "sha256:570f6ec5d5b6d51f48795520ebc3de933083429c35ff45dd9227904c48e939c1",
     "src/rendering/nativeStarPainter.ts": "sha256:99ceed7fc237a7ad8bea8689cc5f0e8560256942f6912b586546ab4d6e9ce2ba",
     "src/rendering/playfieldCamera.ts": "sha256:828e45713adb9f3c902ee396b4fde932f1cc78fe6268a5be2857cc7989a80fb9",
@@ -305,7 +305,7 @@
     "src/ui/townStore.ts": "sha256:962caaa91b7fdd7583da1aa5d57067a6750ff192a5b076cc7e1f941dafa5d2a6",
     "src/ui/townStoreState.ts": "sha256:98ced1c612ca84284d02cadd5594db413f3dec736a1beaeca56519ee242d4cd2",
     "src/ui/uiUtils.ts": "sha256:a755a8190ad786bf53c8f7fbecce84606652d342d5376689760502aaa9ab6ff0",
-    "src/ui/universeMap.ts": "sha256:9d7e3c1c384a5e881be100fadd695b1bcccf0155918d2956d3df124135f0ceed",
+    "src/ui/universeMap.ts": "sha256:114920ff106a87e0eb2f2c604dc45b2f5b1f09166c7f9d8a72027f0111036a4f",
     "src/ui/universeMapLabels.ts": "sha256:95c53001bf510ca6e7da44162eb386e7d3d6d64043fe2eb454cb4d0411bc1024",
     "src/ui/viewportChrome.ts": "sha256:582159cb92905d7ea0b7e2d83da2d8dbfa0a17735272321adf11e43bd9f79284",
     "src/utils/Logger.ts": "sha256:dd9d0370c4c0342dc9306044c110c5b88781deaebe5b1766420a8aea2bc37a59",
@@ -374,7 +374,7 @@
     "tests/unit/network/failed-connections-settle-and-recover.test.ts": "sha256:4c239078502aede0b99ab512d1631995fe34f6620bc2f4612cf70092915332eb",
     "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts": "sha256:d404192a63694562ee3bde6d447816123ad24236d06a1500ff48482d162f7254",
     "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts": "sha256:52996f3c79b14553eb4934f741485ecc5f493066928331b145029a214a4d60a9",
-    "tests/unit/network/pilots-recover-complete-snapshots.test.ts": "sha256:273f5f8abd201b001b9e2117d2cdbffde39f91b99a308e670723fda07a0e1481",
+    "tests/unit/network/pilots-recover-complete-snapshots.test.ts": "sha256:e4b53b5a1a6984756c58bf9dc5bf37513aa1ad9b650eb33d1e2bbe36481b3848",
     "tests/unit/network/resume-credential-stores-release-provenance.test.ts": "sha256:6ad859a57905a6db1119e110a3d35409da4639f49a74bafbaa133676654df9c7",
     "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts": "sha256:7b5add8d4d85cb66b5f86931a3690f969f49d8b3e5fa1c29d0d1c7d597ec2cce",
     "tests/unit/physics/lasers-bounce-on-asteroid-faces.test.ts": "sha256:1132b077afd027a1d5d98edcf646311182d43487e579619dece9ef805dd145e4",
@@ -383,7 +383,7 @@
     "tests/unit/rendering/delivery-lights-the-pipe-back-to-town-square.test.ts": "sha256:d058187e52a6aa2741cfa38695ee2bb6ed94e2f10211e51a4ff715ff208a353f",
     "tests/unit/rendering/furnace-hearth-roars-inside-the-delivery-zone.test.ts": "sha256:5979472c5154535b34b86055af509a45e41bffe5d15c8277e59dab61305e01f4",
     "tests/unit/rendering/hudLayout.test.ts": "sha256:1bf7056cdca591b35d10fd580796ab1ec02bff54680f414cc32677277aa68296",
-    "tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts": "sha256:1a7af63eab933c85bd62b5522fd3db45edd55d5b6d4c656d621baac4f61ee9fb",
+    "tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts": "sha256:a86aa41aebc7120efdda8e482260cd621df53087333d0e89fecd05d2fa3425b3",
     "tests/unit/rendering/radar-marks-a-discovered-furnace-as-fire.test.ts": "sha256:04d41ef533d651d95705d74482b1d124b755c6b97b9f0b506d2ab66ba9f3572e",
     "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-furnace-is-lit.test.ts": "sha256:11bbb8a1ec7495a3ef75c7f4068d01bd3c068872e519d712ff12911592f0d118",
     "tests/unit/rendering/ship-cargo-bays-fill-with-crates-as-the-hold-fills.test.ts": "sha256:ab3359ddbebd806099024d287673660ef78e45e0880168513ecb4b5905ee3b76",
@@ -418,7 +418,7 @@
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:b140f0461b86f29b958ba5fd0390497d2c5c7b0f00bf5b6f4f5191c15d17d75a",
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:a8b2a10ee999e4761c72d64b28d60a025bb9f72fd1182693ea70d87f0f7977f7",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1b81bd9b23ec35804328671ee7323a555c1077a7ae0b0c82641881ed15d614f7",
-    "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:d5f74f7562f9d4651d28c50e0eccc2af124340a59d213793e28b2e3d703664a2",
+    "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:bed909714f43c38c009d038737638034f0f2c4b3aa1212efc895870f3c813bc0",
     "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:067c03ac316c14309c409f771b835505521671040820f2a733fbba6dfd714694",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:857cf91f07fe8838ea889dede1f0727da9b9606cf183573ad2bab7c381899d20",
     "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:a5a026560a9e4faf2ea83d824a01dd547ee1b5a6e1bd1422eebe212bfb3f4a2f",
@@ -436,7 +436,7 @@
     "tests/unit/shared/scouts-reveal-more-shared-map-than-haulers.test.ts": "sha256:111a4fe017dbb546172ac87c8eb436030f890af7dc532ef446c4be9bbf479ae0",
     "tests/unit/systems/contour-cuts-preserve-the-shared-world-shape.test.ts": "sha256:805a157d71bf09573d09841ebc4360d1837672e9dd9cc80b9c42b5728b6aa497",
     "tests/unit/systems/contourLaser.test.ts": "sha256:f8f685f404df8c05e8951004ceb69f8c6b075d871191a0c347f317cb2b5939b3",
-    "tests/unit/systems/hudReadability.test.ts": "sha256:8d823f9c0b0c30944712ce46d68b076922ca229163508a30ccfb248a83367abf",
+    "tests/unit/systems/hudReadability.test.ts": "sha256:957d9c5f8b97b0fda51cd2cf437e0e9c52dd557e984e79aaef81a2cb04439183",
     "tests/unit/systems/isoContourTerrain.test.ts": "sha256:80e8a6a99db5a892f9b617a977dc5c93b46e41333484c92b6d7cb98430ce2e6a",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts": "sha256:ee8dc109344bdd51f01e99fa733b0e2af2c492060fb5fc213bb389cbed43392c",
     "tests/unit/systems/lootBlast.test.ts": "sha256:7d1342d66c5dbe1380e19fe6092bbf9069ad6cf6c8c6115841d166d3ade0e089",
@@ -447,7 +447,7 @@
     "tests/unit/ui/furnace-names-stay-hidden-until-the-chart-is-zoomed-in.test.ts": "sha256:9b3c8cffc8bf62d8bc7ece3d0319911a78f0a0929eef1581b6d9beac404b8541",
     "tests/unit/ui/schematicEquipHint.test.ts": "sha256:5dc4e83beedf2ef05307a9aecffd85b84975854e42c798baa25c39c008de367b",
     "tests/unit/ui/shipSchematic.test.ts": "sha256:6a7d248b9f9e6081db21492a3b04d3e2b35672a9928e5ab4f9b1e28961c86a97",
-    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "sha256:3906ba9a9860b19fd5f077cd485afd599212e65c348784692fa2808004af62e2",
+    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "sha256:0d7b405b892c84bdfba5e7b20daa3b74891bbcf48aabc0f08f2995737e56f831",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:6e31a432d033bd4f34ef8f95bfabf84520befcabcb7208f42b02a3c31948f457",
     "tests/unit/ui/universeMap.test.ts": "sha256:935737dc15d4ec497e9ffdddee7d8aaea9d67b9d031a137bcf7511bf5b915338",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
@@ -2228,6 +2228,96 @@
       "media": [],
       "owners": {
         "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "controls"
+      }
+    },
+    {
+      "note": "Reviewed cleared nest status and snapshot fixtures; updated HUD field guide. Focused server, snapshot and executed canvas tests pass. Existing demonstration generators contain no cleared nest markers; other palette entries and illustrated behavior are unchanged.",
+      "sources": [
+        "server/core/TerrainSpiderManager.ts",
+        "shared-types.ts",
+        "shared/snapshotDto.ts",
+        "src/constants/index.ts",
+        "src/rendering/hud/minimap.ts",
+        "src/ui/universeMap.ts",
+        "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
+        "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
+        "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["movement", "pickups", "scout", "split", "survival"],
+      "owners": {
+        "shared/snapshotDto.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Added executed radar stroke checks for red living nests and dark gray cleared nests at desktop and mobile widths; all four radar cases pass.",
+      "sources": ["tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Cleared status derives from retained guard membership during the existing once-per-second resource refresh. Spider death does not scan markers. Sleeping guards remain alive; old snapshots stay unchanged. Server lifecycle scenario verifies the transition at refresh.",
+      "sources": [
+        "server/core/TerrainSpiderManager.ts",
+        "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Extended the exact palette contract with the requested dark gray cleared-nest ink; all pre-existing palette entries remain fixed.",
+      "sources": ["tests/unit/systems/hudReadability.test.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed independent client/server rollout: previous-server snapshots may omit cleared status and keep red nest marks; new servers always send the authoritative boolean. Added and passed executed codec compatibility scenario.",
+      "sources": ["shared-types.ts", "shared/snapshotDto.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [],
+      "owners": {
+        "shared/snapshotDto.ts": "hud-network"
       }
     }
   ]

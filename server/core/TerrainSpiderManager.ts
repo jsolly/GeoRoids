@@ -536,7 +536,12 @@ export class TerrainSpiderManager {
           nest.guards.push(guard);
         }
       }
-      onNestCreated?.({ id, resourceId: resource.id, position: copyPosition(home) });
+      onNestCreated?.({
+        id,
+        resourceId: resource.id,
+        position: copyPosition(home),
+        cleared: false,
+      });
     }
     const markers: SpiderFieldState['nests'] = [];
     // At most one nest per 5,000-unit cell (576 cells across this world).
@@ -544,7 +549,12 @@ export class TerrainSpiderManager {
     for (const [id, nest] of this.nests) {
       const resource = observedResources.get(id);
       if (resource && distanceBetween(nest.home, resource.position) <= POSITION_EPSILON) {
-        markers.push({ id, resourceId: nest.resourceId, position: copyPosition(nest.home) });
+        markers.push({
+          id,
+          resourceId: nest.resourceId,
+          position: copyPosition(nest.home),
+          cleared: nest.guards.length === 0,
+        });
       }
     }
     this.nestMarkers = markers.sort((a, b) => a.id.localeCompare(b.id));

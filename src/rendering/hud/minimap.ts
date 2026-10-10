@@ -797,7 +797,7 @@ export function drawMiniMap(
           geometry.projection.x,
           geometry.projection.y,
           8,
-          PALETTE.DANGER
+          nest.cleared ? PALETTE.CLEARED_NEST : PALETTE.DANGER
         );
       }
     }

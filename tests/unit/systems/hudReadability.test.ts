@@ -712,6 +712,7 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
     HUD: '#E2E8F0',
     HUD_MUTED: '#64748B',
     DANGER: '#F43F5E',
+    CLEARED_NEST: '#444444',
     HEALTH: '#4ADE80',
     LOOT: '#E8D5A3',
     SATELLITE: '#C4B5FD',

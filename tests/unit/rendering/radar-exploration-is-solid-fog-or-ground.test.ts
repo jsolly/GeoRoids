@@ -1,14 +1,19 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { cellWorldBounds, ExplorationMap, explorationCellAt } from '../../../shared/exploration';
 import { WORLD } from '../../../shared/world';
 import { PALETTE } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { resetWorldExploration, setWorldExploration } from '../../../src/network/worldExploration';
+import { setSpiderField } from '../../../src/physics/terrain/spiderSession';
 import { computeHudLayout } from '../../../src/rendering/hud/hudLayout';
 import { drawMiniMap } from '../../../src/rendering/hud/minimap';
 
-afterEach(resetWorldExploration);
+afterEach(() => {
+  resetWorldExploration();
+  setSpiderField(undefined);
+  vi.restoreAllMocks();
+});
 
 function radarPixel(
   ctx: CanvasRenderingContext2D,
@@ -80,5 +85,40 @@ test.each([1280, 390])(
     expect(fog.slice(0, 3)).toEqual([0, 0, 17]);
     expect(fog.slice(0, 3)).not.toEqual(ground.slice(0, 3));
     expect(PALETTE.BG.toLowerCase()).toBe('#000011');
+  }
+);
+
+test.each([1280, 390])(
+  'radar at width %i distinguishes cleared nests from living guards',
+  (width) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = 900;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Expected real canvas');
+    }
+    const player = new Player({
+      id: 'scout',
+      name: 'Scout',
+      type: 'local',
+      input: new MockPlayerInput(),
+    });
+    player.ship.position = { x: 10000, y: 10000 };
+    const position = { x: 10400, y: 10000 };
+    const exploration = new ExplorationMap();
+    exploration.reveal(position, 500);
+    setWorldExploration(exploration.snapshot());
+    const layout = computeHudLayout(canvas, { touchControls: width < 500 });
+    const colors: string[] = [];
+    vi.spyOn(ctx, 'stroke').mockImplementation(function (this: CanvasRenderingContext2D) {
+      colors.push(String(this.strokeStyle));
+    });
+    for (const cleared of [false, true]) {
+      setSpiderField({ spiders: [], nests: [{ id: '2,2', resourceId: 'ore', position, cleared }] });
+      colors.length = 0;
+      drawMiniMap(ctx, layout, player.ship, [], [], [], []);
+      expect(colors).toContain(cleared ? '#444444' : '#f43f5e');
+    }
   }
 );

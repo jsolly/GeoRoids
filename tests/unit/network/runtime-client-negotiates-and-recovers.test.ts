@@ -832,7 +832,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       '../../../src/physics/terrain/spiderSession'
     );
     setSpiderField({
-      nests: [{ id: '0,0', resourceId: 'ore', position: { x: 5000, y: 5000 } }],
+      nests: [{ id: '0,0', resourceId: 'ore', cleared: false, position: { x: 5000, y: 5000 } }],
       spiders: [
         {
           id: 'expired-spider',

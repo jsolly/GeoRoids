@@ -26,6 +26,8 @@ The minimap shows nearby space; M or Map opens the full shared chart. Both keep 
 
 ## Ricochet Court
 
+Discovered spider nests are red while any guard survives and turn dark gray when the last guard dies. A cleared marker stays until its original resource moves or disappears.
+
 The cyan open-corner marker northeast of Town Square is always visible on both maps. See [bank-shot duels](/wiki/#combat-survival) before entering.
 
 ## Probe beacons

@@ -39,8 +39,9 @@ export interface TerrainSpider {
 
 export interface SpiderFieldState {
   spiders: TerrainSpider[];
-  /** Known nest homes whose original stationary resource is still present. */
-  nests: { id: string; resourceId: string; position: Position }[];
+  /** Known nest homes whose original stationary resource is still present.
+   * Missing cleared status from a previous server release means still guarded. */
+  nests: { id: string; resourceId: string; position: Position; cleared?: boolean }[];
 }
 
 // Common position and velocity types used throughout the system

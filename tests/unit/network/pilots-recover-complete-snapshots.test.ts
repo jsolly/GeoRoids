@@ -759,6 +759,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       nests: Array.from({ length: 8 }, (_, i) => ({
         id: `${i},0`,
         resourceId: `home-${i}`,
+        cleared: false,
         position: { x: i * 1000, y: 1000 },
       })),
     };

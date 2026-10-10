@@ -21,12 +21,7 @@ import type {
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
-import {
-  applyShipKitStats,
-  DEFAULT_SHIP_KIT_ID,
-  hullRadiusForKit,
-} from '../../src/entities/ship/shipKits';
-import { applyShockwaveToBody } from '../../src/physics/shockwave';
+import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../src/entities/ship/shipKits';
 import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */
@@ -115,35 +110,6 @@ export class EntityManager {
       }
     }
     return undefined;
-  }
-
-  /** Kick living ships away from a collab-split origin. Smaller ships move more. */
-  public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
-    let affected = 0;
-    for (const entity of this.entities.values()) {
-      if (
-        entity.exploding ||
-        entity.health <= 0 ||
-        entity.respawnTimer !== undefined ||
-        entity.overlayHold === true
-      ) {
-        continue;
-      }
-      const next = applyShockwaveToBody(
-        {
-          position: entity.position,
-          velocity: entity.velocity,
-          size: hullRadiusForKit(entity.kitId),
-        },
-        origin,
-        { radius, impulse }
-      );
-      if (next) {
-        entity.velocity = next;
-        affected += 1;
-      }
-    }
-    return affected;
   }
 
   public updateEntity(entityId: string, updates: Partial<GameEntity>): GameEntity | undefined {

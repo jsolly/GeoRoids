@@ -82,8 +82,7 @@ describe('Server laser↔asteroid authority', () => {
     assert.ok(target);
     target.surveyedBy = ['scout', 'miner-a', 'scout'];
 
-    engine.applyLaserAsteroidHit(target.id, 'miner-a', 'laser', 0);
-    const result = engine.applyLaserAsteroidHit(target.id, 'miner-b', 'laser', 100);
+    const result = engine.applyLaserAsteroidHit(target.id, 'miner-b', 'laser');
 
     expect(result.outcome).toBe('destroyed');
     expect(engine.getPlayer('miner-a')?.score).toBe(0);
@@ -109,7 +108,7 @@ describe('Server laser↔asteroid authority', () => {
     expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 
-  test('server laser tick tags a large asteroid without finishing the collab window', () => {
+  test('server laser tick destroys a large asteroid immediately', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     isolateAsteroid(engine, largeAsteroid('roid-tag', { x: 100, y: 100 }));
@@ -118,10 +117,27 @@ describe('Server laser↔asteroid authority', () => {
     const hits = engine.advanceLasersAndResolveHits();
 
     expect(hits).toHaveLength(1);
-    expect(hits[0]?.outcome).toBe('tagged');
-    expect(engine.getAsteroid('roid-tag')).toBeDefined();
+    expect(hits[0]?.outcome).toBe('destroyed');
+    expect(engine.getAsteroid('roid-tag')).toBeUndefined();
     expect(engine.getPlayer('p1')?.score).toBe(0);
     expect(engine.getServerLasers()).toHaveLength(0);
+  });
+
+  test('competing pilot lasers destroy a large mineral once and create one reward', () => {
+    const engine = new GameEngine(42);
+    engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
+    engine.addPlayer('p2', 'Two', {} as never, { x: 0, y: 20 });
+    isolateAsteroid(
+      engine,
+      asteroidAt('competing-target', 50, { x: 100, y: 100 }, { material: 'crystal' })
+    );
+    expect(engine.spawnLaser('p1', { x: 40, y: 100 }, { x: 80, y: 0 })).not.toBeNull();
+    expect(engine.spawnLaser('p2', { x: 160, y: 100 }, { x: -80, y: 0 })).not.toBeNull();
+    const hits = engine.advanceLasersAndResolveHits();
+    expect(hits.filter((hit) => hit.outcome === 'destroyed')).toHaveLength(1);
+    expect(engine.getAsteroid('competing-target')).toBeUndefined();
+    expect(engine.getLoot().filter((drop) => drop.kind === 'points')).toHaveLength(1);
+    expect(engine.getLoot().find((drop) => drop.kind === 'points')?.points).toBe(ROID.POINTS_LARGE);
   });
 
   test('two players share the same apply-once helper', () => {
@@ -158,7 +174,7 @@ describe('Asteroid destruction over real sockets', () => {
 
   test.each([
     { size: 'medium', radius: 20, points: ROID.POINTS_MEDIUM, shots: 1 },
-    { size: 'large', radius: 40, points: ROID.POINTS_LARGE, shots: 2 },
+    { size: 'large', radius: 40, points: ROID.POINTS_LARGE, shots: 1 },
   ])(
     'one pilot shoots a $size ice rock and receives its removal without fragments',
     async ({ radius, points, shots }) => {
@@ -241,7 +257,7 @@ describe('Asteroid destruction over real sockets', () => {
       states.length = 0;
       try {
         for (let shot = 0; shot < shots; shot++) {
-          clock.mockReturnValue(now + shot * (ROID.COLLAB_HIT_DEDUPE_MS + 1));
+          clock.mockReturnValue(now + shot * 200);
           ws.send(
             JSON.stringify({
               type: 'shoot',
@@ -257,20 +273,6 @@ describe('Asteroid destruction over real sockets', () => {
           const hits = server.gameEngine.advanceLasersAndResolveHits();
           server.wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
           await barrier();
-          if (shot + 1 < shots) {
-            expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
-            expect(pilot.score).toBe(scoreBefore);
-            expect(received.filter((message) => message.type === 'asteroidTagged')).toEqual([
-              {
-                type: 'asteroidTagged',
-                data: {
-                  asteroidId: target.id,
-                  shooterId: pilot.id,
-                  expiresAt: now + ROID.COLLAB_SPLIT_WINDOW_MS,
-                },
-              },
-            ]);
-          }
         }
         server.wsCore.getBroadcaster().broadcastGameState();
         await barrier();
@@ -278,7 +280,7 @@ describe('Asteroid destruction over real sockets', () => {
         expect(received.filter((message) => message.type === 'asteroidDestroy')).toEqual([
           {
             type: 'asteroidDestroy',
-            data: { asteroidId: target.id, collabSplit: false, origin: targetPosition },
+            data: { asteroidId: target.id, origin: targetPosition },
           },
         ]);
         expect(received.filter((message) => message.type === 'asteroidCreateBatch')).toEqual([]);

@@ -10,7 +10,7 @@ import { minimumServerRelease } from './server-release-inputs.mjs';
 export const productionUrl = 'https://www.georoids.com/';
 const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
 const socketUrl =
-  'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=2&asteroidInteractions=1';
+  'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=3&asteroidInteractions=1';
 const { SNAPSHOT_VERSION, SnapshotDecoder } = await tsImport(
   '../shared/snapshotProtocol.ts',
   import.meta.url

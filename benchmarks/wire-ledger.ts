@@ -250,7 +250,6 @@ function recipientSnapshotOracle(engine: GameEngine, id: string): ServerGameSnap
     player.position,
     isActiveScanner(player)
   );
-  const ids = new Set(asteroids.map((rock) => rock.id));
   const source = {
     ...common,
     asteroids,
@@ -267,10 +266,6 @@ function recipientSnapshotOracle(engine: GameEngine, id: string): ServerGameSnap
       ),
     ],
     playerProjectiles: nearbyWorldRows(engine.getPlayerProjectiles(), player.position),
-    collabTags: engine
-      .getActiveCollabTags()
-      .filter((tag) => ids.has(tag.asteroidId))
-      .map((tag) => ({ id: tag.asteroidId, ...tag })),
   } satisfies ServerGameSnapshot;
   // Independent JSON ownership copy preserves undefined omission and negative-zero wire semantics.
   const owned: unknown = JSON.parse(JSON.stringify(source));

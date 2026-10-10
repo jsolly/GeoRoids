@@ -54,7 +54,6 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
         maxHealth: 50,
         vertices: 12,
         offsets: [1, 0.9, 0.8, 1.1, 0.9, 1.2, 1, 0.8, 1.1, 0.95, 0.9, 1],
-        isCollabTarget: i === 0,
         material,
       };
     }),
@@ -82,17 +81,6 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
       maxHealth: 50,
     })),
     playerProjectiles: [],
-    collabTags:
-      tick < 40
-        ? [
-            {
-              id: 'asteroid-0',
-              asteroidId: 'asteroid-0',
-              hits: [{ shooterId: 'pilot-0', at: 1000 + tick * 33, points: 20 }],
-              expiresAt: 5000,
-            },
-          ]
-        : [],
     gameTime: tick / 30,
     isPaused: false,
     terrainSeed: 2345,

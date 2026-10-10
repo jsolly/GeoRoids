@@ -99,7 +99,7 @@ either candidate for responsive slow-link play. See
 No push, PR, deployment, production configuration or data change was performed.
 The protocol migration requires matching independently verified client and
 server releases plus a refresh window; see
-[the release contract](../protocol/snapshot-v2.md).
+[the release contract](../protocol/snapshot-v3.md).
 
 Performance qualification can resume on a quiet host. Start with one short
 matched Canvas/GPU diagnostic to investigate a repeated common stall; success

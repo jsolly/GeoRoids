@@ -15,7 +15,6 @@ const FULL_FIXTURE_FIELDS = {
   asteroids: true,
   beltRecovery: false,
   civicModules: false,
-  collabTags: true,
   entities: true,
   exploration: true,
   gameTime: true,

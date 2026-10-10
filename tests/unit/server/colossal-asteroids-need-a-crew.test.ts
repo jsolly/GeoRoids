@@ -122,7 +122,6 @@ describe('Colossal asteroids need a crew', () => {
     expect(colossal[0]?.size).toBe(ROID.COLOSSAL_SIZE);
     expect(colossal[0]?.health).toBe(colossalMiningHealth());
     expect(colossal[0]?.velocity).toEqual({ x: 0, y: 0 });
-    expect(colossal[0]?.isCollabTarget).toBeUndefined();
     expect(colossal[0]?.phenomenon).toBeUndefined();
     expect(sectorHostsColossal(0, 0, seed)).toBe(false);
   });
@@ -245,15 +244,13 @@ describe('Colossal asteroids need a crew', () => {
     engine.addAsteroid(rock);
     const hits = ROID.COLOSSAL_LASER_HITS;
     for (let shot = 0; shot < hits - 1; shot++) {
-      const tagged = engine.applyLaserAsteroidHit(rock.id, 'p1');
-      expect(tagged.outcome).toBe('tagged');
+      const damaged = engine.applyLaserAsteroidHit(rock.id, 'p1');
+      expect(damaged.outcome).toBe('damaged');
       expect(engine.getAsteroid(rock.id)).toBeDefined();
     }
-    engine.flushExpiredCollabHits(Date.now() + ROID.COLLAB_SPLIT_WINDOW_MS + 1);
     expect(engine.getAsteroid(rock.id)).toBeDefined();
     const last = engine.applyLaserAsteroidHit(rock.id, 'p1');
     expect(last.outcome).toBe('destroyed');
-    expect(last.split).toBe(false);
     expect(last.newAsteroids).toHaveLength(2);
     expect(last.newAsteroids.every((fragment) => !isColossalAsteroid(fragment.size))).toBe(true);
     expect(last.newAsteroids[0]?.size).toBe(ROID.COLOSSAL_SIZE * 0.5);
@@ -271,7 +268,7 @@ describe('Colossal asteroids need a crew', () => {
     engine.addAsteroid(rock);
     const hits = ROID.COLOSSAL_LASER_HITS / SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER;
     for (let shot = 0; shot < hits - 1; shot++) {
-      expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('tagged');
+      expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('damaged');
     }
     expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('destroyed');
   });

@@ -6,15 +6,13 @@ import { isColossalAsteroid } from '../../shared/asteroidScale';
 import { oreResource } from '../../shared/economy';
 import { FurnaceField } from '../../shared/furnaceField';
 import { WORLD } from '../../shared/world';
-import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
+import type { AsteroidData, Position } from '../../shared-types';
 import { DAMAGE, DEBUG, GAME, ROID } from '../../src/constants';
-import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import {
   containAsteroidPosition,
   getAsteroidFieldRadius,
   stepAsteroidMotionInto,
 } from '../../src/physics/asteroidMotion';
-import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import { isDebugMode } from '../../src/utils/debugUtils';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { RNGService } from './RNGService';
@@ -22,33 +20,13 @@ import type { RNGService } from './RNGService';
 export type AsteroidHitCause = 'laser' | 'collision';
 
 export type AsteroidHitOutcome = {
-  outcome: 'missing' | 'tagged' | 'ignored' | 'destroyed';
+  outcome: 'missing' | 'damaged' | 'ignored' | 'destroyed';
   destroyed?: AsteroidData;
   newAsteroids: AsteroidData[];
-  split: boolean;
-  expiresAt?: number;
-  /** Laser miners and Scouts credited for this destruction. */
-  contributors?: string[];
-};
-
-export type ExpiredCollabHit = {
-  playerId: string;
-  /** Every laser miner and Scout credited for the destroyed deposit. */
-  contributors: string[];
-  points: number;
-  destroyed: AsteroidData;
-  newAsteroids: AsteroidData[];
-};
-
-type LaserHitRecord = {
-  shooterId: string;
-  at: number;
-  points: number;
 };
 
 export class AsteroidManager {
   private asteroids = new Map<string, AsteroidData>();
-  private laserHits = new Map<string, LaserHitRecord[]>();
   private readonly index = new AsteroidSpatialIndex([]);
   private rng: RNGService;
   /** Per-manager identity prevents delayed reports surviving a server restart. */
@@ -58,7 +36,6 @@ export class AsteroidManager {
 
   // Asteroid splitting constants - can be overridden by DEBUG settings
   private readonly MIN_ASTEROID_SIZE = 10;
-  private readonly SPLIT_SIZE_RATIO = 0.6; // New asteroids are 60% of original size
   private readonly COLOSSAL_SPLIT_SIZE_RATIO = 0.5;
 
   constructor(
@@ -74,10 +51,6 @@ export class AsteroidManager {
     return this.MIN_ASTEROID_SIZE;
   }
 
-  private get splitSizeRatio(): number {
-    return this.SPLIT_SIZE_RATIO;
-  }
-
   public addAsteroid(asteroid: AsteroidData): void {
     this.asteroids.set(asteroid.id, asteroid);
     this.index.add(asteroid);
@@ -87,7 +60,6 @@ export class AsteroidManager {
     const asteroid = this.asteroids.get(asteroidId);
     if (asteroid) {
       this.asteroids.delete(asteroidId);
-      this.laserHits.delete(asteroidId);
       this.index.remove(asteroidId);
     }
     return asteroid;
@@ -138,33 +110,10 @@ export class AsteroidManager {
     return this.asteroids.size;
   }
 
-  /** Return live collab tags without mutating the server's expiry clock. */
-  public getActiveCollabTags(now = Date.now()): ActiveCollabTag[] {
-    const active: ActiveCollabTag[] = [];
-    for (const [asteroidId, hits] of this.laserHits) {
-      const asteroid = this.asteroids.get(asteroidId);
-      if (!asteroid) {
-        continue;
-      }
-      const windowHits = hits.filter((hit) => now - hit.at <= ROID.COLLAB_SPLIT_WINDOW_MS);
-      const first = windowHits[0];
-      if (!first) {
-        continue;
-      }
-      active.push({
-        asteroidId,
-        hits: windowHits.map((hit) => ({ ...hit })),
-        expiresAt: first.at + ROID.COLLAB_SPLIT_WINDOW_MS,
-      });
-    }
-    return active;
-  }
-
   public clearAsteroids(): void {
     for (const id of [...this.asteroids.keys()]) {
       this.removeAsteroid(id);
     }
-    this.laserHits.clear();
     this.index.clear();
   }
 
@@ -194,26 +143,6 @@ export class AsteroidManager {
       asteroid.rotation += asteroid.angularVelocity;
       this.index.move(asteroid, previous);
     }
-  }
-
-  /** Radial kick from a collab-split shockwave. Smaller roids move more. */
-  public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
-    let affected = 0;
-    for (const asteroid of this.asteroids.values()) {
-      if (asteroid.boost?.phase === 'burning') {
-        continue;
-      }
-      const next = applyShockwaveToBody(
-        { position: asteroid.position, velocity: asteroid.velocity, size: asteroid.size },
-        origin,
-        { radius, impulse }
-      );
-      if (next) {
-        asteroid.velocity = next;
-        affected += 1;
-      }
-    }
-    return affected;
   }
 
   public createAsteroids(
@@ -295,8 +224,7 @@ export class AsteroidManager {
       if (DEBUG.ENABLED && DEBUG.ROIDS.ALL_LARGE && !localTestMode) {
         size = 50; // Large size
       } else if (localTestMode) {
-        // In test mode, create medium asteroids (size 20-30). Only the biggest
-        // class (>= COLLAB_SPLIT_MIN_SIZE) can split, and only via collab hits.
+        // In test mode, create medium asteroids (size 20-30).
         size = this.rng.random() * 10 + 20;
       } else {
         // Mixed sizes make mineral silhouettes and rubble fragments readable.
@@ -319,14 +247,6 @@ export class AsteroidManager {
         material,
       };
 
-      // One voluntary coop rock in live fields. Test placement (on-player) stays one-shot.
-      if (i === 0 && !DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER) {
-        asteroid.size = Math.max(asteroid.size, ROID.COLLAB_SPLIT_MIN_SIZE);
-        asteroid.isCollabTarget = true;
-        asteroid.health = 100;
-        asteroid.maxHealth = 100;
-      }
-
       this.addAsteroid(asteroid);
       newAsteroids.push(asteroid);
     }
@@ -334,96 +254,31 @@ export class AsteroidManager {
     return newAsteroids;
   }
 
-  public damageAsteroid(asteroidId: string, damage: number): AsteroidData | null {
-    const asteroid = this.asteroids.get(asteroidId);
-    if (!asteroid || asteroid.boost?.phase === 'burning') {
-      return null;
-    }
-
-    asteroid.health = Math.max(0, asteroid.health - damage);
-    return asteroid;
-  }
-
-  /**
-   * Record a laser hit from a crew ship. Biggest asteroids only
-   * split when two distinct shooters land within COLLAB_SPLIT_WINDOW_MS.
-   * A second hit from the same shooter destroys without splitting.
-   * Same-shooter echoes inside COLLAB_HIT_DEDUPE_MS are ignored.
-   */
+  /** Apply one accepted mining shot; only durable deposits require more hits. */
   public registerLaserHit(
     asteroidId: string,
     shooterId: string,
-    now = Date.now(),
     miningDamage: number = DAMAGE.LASER_HIT
   ): AsteroidHitOutcome {
     const asteroid = this.asteroids.get(asteroidId);
     if (!asteroid) {
-      return { outcome: 'missing', newAsteroids: [], split: false };
+      return { outcome: 'missing', newAsteroids: [] };
     }
-
     if (asteroid.boost?.phase === 'burning') {
-      return { outcome: 'ignored', newAsteroids: [], split: false };
+      return { outcome: 'ignored', newAsteroids: [] };
     }
     this.recordMiningHit(asteroidId, shooterId);
-
-    // Crew-scale rocks chip like metal: many hits, no collab window, no expire-break.
-    if (isColossalAsteroid(asteroid.size)) {
+    if (isColossalAsteroid(asteroid.size) || asteroid.material === 'metal') {
       asteroid.health = Math.max(0, asteroid.health - miningDamage);
       if (asteroid.health > 0) {
-        return { outcome: 'tagged', newAsteroids: [], split: false, expiresAt: now + 150 };
+        return { outcome: 'damaged', newAsteroids: [] };
       }
-      return this.finishDestroy(asteroidId, true);
+      return this.finishDestroy(asteroidId, isColossalAsteroid(asteroid.size));
     }
-
-    // Metal chips remain present until their mining HP is exhausted. This
-    // does not enter the cooperative tag-expiry table: waiting never kills it.
-    if (asteroid.material === 'metal') {
-      asteroid.health = Math.max(0, asteroid.health - miningDamage);
-      if (asteroid.health > 0) {
-        return { outcome: 'tagged', newAsteroids: [], split: false, expiresAt: now + 150 };
-      }
-      return this.finishDestroy(asteroidId, false);
-    }
-
-    if (asteroid.material === 'rubble') {
-      return this.finishDestroy(asteroidId, asteroid.size > this.minAsteroidSize * 2);
-    }
-
-    if (!isBiggestAsteroid(asteroid.size)) {
-      return this.finishDestroy(asteroidId, false);
-    }
-
-    const existing = this.laserHits.get(asteroidId) ?? [];
-    const windowHits = existing.filter((hit) => now - hit.at <= ROID.COLLAB_SPLIT_WINDOW_MS);
-    const lastFromShooter = [...windowHits].reverse().find((hit) => hit.shooterId === shooterId);
-    if (lastFromShooter && now - lastFromShooter.at <= ROID.COLLAB_HIT_DEDUPE_MS) {
-      return {
-        outcome: 'ignored',
-        newAsteroids: [],
-        split: false,
-        expiresAt: lastFromShooter.at + ROID.COLLAB_SPLIT_WINDOW_MS,
-      };
-    }
-
-    const recorded = this.recordHit(asteroidId, shooterId, pointsForRoidSize(asteroid.size), now);
-    const distinctShooters = new Set(recorded.map((hit) => hit.shooterId));
-
-    if (distinctShooters.size >= 2) {
-      return this.finishDestroy(asteroidId, true);
-    }
-
-    const shotsByThisShooter = recorded.filter((hit) => hit.shooterId === shooterId);
-    if (shotsByThisShooter.length >= 2) {
-      return this.finishDestroy(asteroidId, false);
-    }
-
-    const first = recorded[0];
-    return {
-      outcome: 'tagged',
-      newAsteroids: [],
-      split: false,
-      expiresAt: (first?.at ?? now) + ROID.COLLAB_SPLIT_WINDOW_MS,
-    };
+    return this.finishDestroy(
+      asteroidId,
+      asteroid.material === 'rubble' && asteroid.size > this.minAsteroidSize * 2
+    );
   }
 
   /** Ship-ram / non-laser destroy: never splits. Colossal rocks survive the bump. */
@@ -431,14 +286,14 @@ export class AsteroidManager {
     const asteroid = this.asteroids.get(asteroidId);
     if (asteroid && isColossalAsteroid(asteroid.size) && asteroid.health > 0) {
       if (asteroid.boost?.phase === 'burning') {
-        return { outcome: 'ignored', newAsteroids: [], split: false };
+        return { outcome: 'ignored', newAsteroids: [] };
       }
-      return { outcome: 'tagged', newAsteroids: [], split: false };
+      return { outcome: 'damaged', newAsteroids: [] };
     }
     return this.finishDestroy(asteroidId, false);
   }
 
-  /** Record a non-collab mining path (for example a high-HP target) uniformly. */
+  /** Retain the mining history of durable deposits. */
   public recordMiningHit(asteroidId: string, minerId: string): void {
     const asteroid = this.asteroids.get(asteroidId);
     if (!asteroid || asteroid.boost?.phase === 'burning') {
@@ -451,94 +306,22 @@ export class AsteroidManager {
     }
   }
 
-  /**
-   * After the collab window closes with only one shooter, the tagged biggest
-   * asteroid is destroyed without splitting.
-   */
-  public expireStaleHits(now = Date.now()): ExpiredCollabHit[] {
-    const expired: ExpiredCollabHit[] = [];
-    const staleIds: string[] = [];
-
-    for (const [asteroidId, hits] of this.laserHits) {
-      const windowHits = hits.filter((hit) => now - hit.at <= ROID.COLLAB_SPLIT_WINDOW_MS);
-      if (windowHits.length > 0) {
-        this.laserHits.set(asteroidId, windowHits);
-      } else {
-        staleIds.push(asteroidId);
-      }
-    }
-
-    for (const asteroidId of staleIds) {
-      const asteroid = this.asteroids.get(asteroidId);
-      if (asteroid && isColossalAsteroid(asteroid.size)) {
-        this.laserHits.delete(asteroidId);
-        continue;
-      }
-      const hits = this.laserHits.get(asteroidId);
-      const lastHit = hits?.[hits.length - 1];
-      const result = this.finishDestroy(asteroidId, false);
-      if (result.destroyed && lastHit) {
-        expired.push({
-          playerId: lastHit.shooterId,
-          contributors: [
-            ...new Set([...(result.contributors ?? []), ...(result.destroyed.surveyedBy ?? [])]),
-          ],
-          points: pointsForRoidSize(result.destroyed.size),
-          destroyed: result.destroyed,
-          newAsteroids: result.newAsteroids,
-        });
-      }
-    }
-
-    return expired;
-  }
-
-  private recordHit(
-    asteroidId: string,
-    shooterId: string,
-    points: number,
-    now: number
-  ): LaserHitRecord[] {
-    const existing = this.laserHits.get(asteroidId) ?? [];
-    const windowHits = existing.filter((hit) => now - hit.at <= ROID.COLLAB_SPLIT_WINDOW_MS);
-    windowHits.push({ shooterId, at: now, points });
-    this.laserHits.set(asteroidId, windowHits);
-    return windowHits;
-  }
-
   private finishDestroy(asteroidId: string, split: boolean): AsteroidHitOutcome {
     const destroyed = this.asteroids.get(asteroidId);
     if (!destroyed) {
-      this.laserHits.delete(asteroidId);
-      return { outcome: 'missing', newAsteroids: [], split: false };
+      return { outcome: 'missing', newAsteroids: [] };
     }
 
     if (destroyed.boost?.phase === 'burning') {
-      this.laserHits.delete(asteroidId);
-      return { outcome: 'ignored', newAsteroids: [], split: false };
+      return { outcome: 'ignored', newAsteroids: [] };
     }
 
-    // Capture the hit and survey identities before removeAsteroid clears the
-    // collab window. The GameEngine awards these pilots after the
-    // authoritative destruction and persists the score with the field change.
-    const contributors = [
-      ...new Set([
-        ...(destroyed.miningContributors ?? []),
-        ...(this.laserHits.get(asteroidId) ?? []).map((hit) => hit.shooterId),
-        ...(destroyed.surveyedBy ?? []),
-      ]),
-    ];
     this.removeAsteroid(asteroidId);
 
-    const fragmentCount = isColossalAsteroid(destroyed.size)
-      ? 2
-      : destroyed.material === 'rubble'
-        ? 3
-        : 2;
+    const colossal = isColossalAsteroid(destroyed.size);
+    const fragmentCount = colossal ? 2 : 3;
     const canSplit =
-      destroyed.material === 'rubble' && !isColossalAsteroid(destroyed.size)
-        ? destroyed.size > this.minAsteroidSize * 2
-        : isBiggestAsteroid(destroyed.size);
+      colossal || (destroyed.material === 'rubble' && destroyed.size > this.minAsteroidSize * 2);
     const nearbyCount = this.spatialIndex()
       .query({
         minX: destroyed.position.x - WORLD.sectorSize,
@@ -567,23 +350,17 @@ export class AsteroidManager {
       outcome: 'destroyed',
       destroyed,
       newAsteroids,
-      split: newAsteroids.length > 0,
-      ...(contributors.length > 0 ? { contributors } : {}),
     };
   }
 
   private createSplitFragments(destroyed: AsteroidData): AsteroidData[] {
     const newAsteroids: AsteroidData[] = [];
 
-    const rubble = destroyed.material === 'rubble' && !isColossalAsteroid(destroyed.size);
     const colossal = isColossalAsteroid(destroyed.size);
+    const rubble = !colossal;
     const fragmentCount = rubble ? 3 : 2;
     for (let i = 0; i < fragmentCount; i++) {
-      const ratio = colossal
-        ? this.COLOSSAL_SPLIT_SIZE_RATIO
-        : rubble
-          ? 0.3 + i * 0.07
-          : this.splitSizeRatio;
+      const ratio = colossal ? this.COLOSSAL_SPLIT_SIZE_RATIO : 0.3 + i * 0.07;
       const newSize = Math.max(this.minAsteroidSize, destroyed.size * ratio);
       const offsetDistance = rubble ? newSize * 1.4 : newSize * 0.3;
       const angle = (i * Math.PI * 2) / fragmentCount + (rubble ? this.rng.random() * 0.5 : 0);

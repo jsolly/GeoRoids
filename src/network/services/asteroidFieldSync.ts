@@ -1,10 +1,5 @@
 import { isAsteroidMaterial } from '../../../shared/asteroidMaterials';
-import type {
-  AsteroidData,
-  AsteroidDestroyEvent,
-  AsteroidMaterial,
-  AsteroidTaggedEvent,
-} from '../../../shared-types';
+import type { AsteroidData, AsteroidDestroyEvent, AsteroidMaterial } from '../../../shared-types';
 import { containAsteroidPositionInto, isPoseInAsteroidField } from '../../physics/asteroidMotion';
 import { logger } from '../../utils/Logger';
 
@@ -144,7 +139,6 @@ export function writeAsteroidKinematicUpdates(
   writeOptionalField(into, 'health', asteroid.health);
   writeOptionalField(into, 'maxHealth', asteroid.maxHealth);
   writeOptionalField(into, 'size', asteroid.size);
-  writeOptionalField(into, 'isCollabTarget', asteroid.isCollabTarget);
   writeOptionalField(into, 'miningContributors', asteroid.miningContributors);
   writeOptionalField(into, 'phenomenon', asteroid.phenomenon);
   writeOptionalField(into, 'boost', asteroid.boost);
@@ -204,7 +198,6 @@ export interface AsteroidKinematicTarget {
   health: number;
   maxHealth: number;
   r: number;
-  isCollabTarget?: boolean;
   material?: AsteroidMaterial;
   ore?: AsteroidMaterial | null;
   offsets?: number[];
@@ -247,7 +240,6 @@ export function applyAsteroidKinematics(
     } else {
       delete roid.material;
     }
-    roid.isCollabTarget = updates.isCollabTarget ?? false;
     if (updates.ore !== undefined) {
       roid.ore = updates.ore;
     } else {
@@ -302,9 +294,6 @@ export function applyAsteroidKinematics(
   if (updates.maxHealth !== undefined) {
     roid.maxHealth = updates.maxHealth;
   }
-  if (updates.isCollabTarget !== undefined) {
-    roid.isCollabTarget = updates.isCollabTarget;
-  }
   if ('miningContributors' in updates) {
     if (updates.miningContributors) {
       roid.miningContributors = [...updates.miningContributors];
@@ -328,7 +317,6 @@ type AsteroidFieldApplyHandlers = {
   onDestroyed: (event: AsteroidDestroyEvent) => void;
   /** Snapshot reconciliation removes stale local rows without destruction VFX. */
   onReconciled: (asteroidId: string) => void;
-  onTagged?: (event: AsteroidTaggedEvent) => void;
 };
 
 let applyHandlers: AsteroidFieldApplyHandlers | null = null;
@@ -367,10 +355,6 @@ export function notifyAsteroidDestroyed(event: string | AsteroidDestroyEvent): v
 
 function notifyAsteroidReconciled(asteroidId: string): void {
   applyHandlers?.onReconciled(asteroidId);
-}
-
-export function notifyAsteroidTagged(event: AsteroidTaggedEvent): void {
-  applyHandlers?.onTagged?.(event);
 }
 
 /** Fan a partition out to the bound belt handlers. Snapshot removals are reconciliation, not destroys. */

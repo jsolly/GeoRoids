@@ -39,7 +39,7 @@ Follow the gray lines for extra speed in either direction; crossing them keeps n
 
 ## Inventory and menus
 
-V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-growth) and equip [satellites](/wiki/#satellites). Map, Inventory, and the furnace menu hold your ship safely while the world keeps moving; satellite health still drains and you cannot collect pickups. Your ship stops dead, drops Contour Lock, and shockwaves cannot push it. Close with Escape or the close control to resume flight with brief blink protection. Your equipped tool is remembered in this browser.
+V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-growth) and equip [satellites](/wiki/#satellites). Map, Inventory, and the furnace menu hold your ship safely while the world keeps moving; satellite health still drains and you cannot collect pickups. Your ship stops dead and drops Contour Lock. Close with Escape or the close control to resume flight with brief blink protection. Your equipped tool is remembered in this browser.
 
 ## Furnace travel and store
 

@@ -123,7 +123,6 @@ export class GameStateBroadcaster {
 
     // Periodic game state broadcast (30 FPS)
     this.broadcastInterval = setInterval(() => {
-      this.flushExpiredCollabHits();
       if (this.gameEngine.getPlayerCount() > 0) {
         this.broadcastGameState();
       }
@@ -191,9 +190,6 @@ export class GameStateBroadcaster {
     }
     const players = this.gameEngine.getAllPlayers();
     let playerProjectiles: ReturnType<GameEngine['getPlayerProjectiles']> | undefined;
-    let collabTags:
-      | Array<ReturnType<GameEngine['getActiveCollabTags']>[number] & { id: string }>
-      | undefined;
     for (const player of players) {
       const ws = player.ws;
       if (!ws || (excludeId && player.id === excludeId)) {
@@ -219,9 +215,6 @@ export class GameStateBroadcaster {
         capture ??= new SnapshotBroadcastCapture();
         gameState ??= this.gameEngine.getSnapshotState();
         playerProjectiles ??= this.gameEngine.getPlayerProjectiles();
-        collabTags ??= this.gameEngine
-          .getActiveCollabTags()
-          .map((tag) => ({ id: tag.asteroidId, ...tag }));
         const scanning = isActiveScanner(player);
         const reach = asteroidReach(scanning);
         const asteroids = nearbyAsteroidRows(
@@ -234,7 +227,6 @@ export class GameStateBroadcaster {
           player.position,
           scanning
         );
-        const asteroidIds = new Set(asteroids.map((rock) => rock.id));
         const canonical = new SnapshotEncoder(
           {
             ...gameState,
@@ -261,7 +253,6 @@ export class GameStateBroadcaster {
               ),
             ],
             playerProjectiles: nearbyWorldRows(playerProjectiles, player.position),
-            collabTags: collabTags.filter((tag) => asteroidIds.has(tag.asteroidId)),
           },
           capture
         );
@@ -496,7 +487,7 @@ export class GameStateBroadcaster {
     }
   }
 
-  /** Register the current snapshot-v2 recipient before the join acknowledgment. */
+  /** Register the current snapshot-v3 recipient before the join acknowledgment. */
   public negotiateSnapshot(ws: WebSocket): typeof SNAPSHOT_VERSION {
     const existing = this.snapshotRecipients.get(ws);
     if (existing) {
@@ -586,9 +577,7 @@ export class GameStateBroadcaster {
     if (result.destroyedAsteroidId) {
       this.broadcastAsteroidDestruction(
         result.destroyedAsteroidId,
-        result.origin !== undefined
-          ? { collabSplit: result.collabSplit === true, origin: result.origin }
-          : { collabSplit: result.collabSplit === true }
+        result.origin !== undefined ? { origin: result.origin } : undefined
       );
       if (result.newAsteroids && result.newAsteroids.length > 0) {
         this.broadcastAsteroidCreation(result.newAsteroids);
@@ -683,13 +672,12 @@ export class GameStateBroadcaster {
 
   public broadcastAsteroidDestruction(
     asteroidId: string,
-    extras?: { collabSplit?: boolean; origin?: { x: number; y: number }; consumedBy?: 'furnace' }
+    extras?: { origin?: { x: number; y: number }; consumedBy?: 'furnace' }
   ): void {
     const message = {
       type: 'asteroidDestroy',
       data: {
         asteroidId,
-        collabSplit: extras?.collabSplit === true,
         ...(extras?.origin !== undefined ? { origin: extras.origin } : {}),
         ...(extras?.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
       },
@@ -697,55 +685,6 @@ export class GameStateBroadcaster {
     };
 
     this.broadcastToAll(message);
-  }
-
-  public broadcastShockwave(event: {
-    origin: { x: number; y: number };
-    asteroidId?: string;
-  }): void {
-    const message = {
-      type: 'shockwave',
-      data: {
-        origin: { x: event.origin.x, y: event.origin.y },
-        ...(event.asteroidId !== undefined ? { asteroidId: event.asteroidId } : {}),
-      },
-      timestamp: Date.now(),
-    };
-
-    this.broadcastToAll(message);
-  }
-
-  public broadcastAsteroidTagged(event: {
-    asteroidId: string;
-    shooterId: string;
-    expiresAt: number;
-  }): void {
-    const message = {
-      type: 'asteroidTagged',
-      data: {
-        asteroidId: event.asteroidId,
-        shooterId: event.shooterId,
-        expiresAt: event.expiresAt,
-      },
-      timestamp: Date.now(),
-    };
-
-    this.broadcastToAll(message);
-  }
-
-  private flushExpiredCollabHits(): void {
-    this.gameEngine.flushExpiredCollabHits();
-    const expired = this.gameEngine.drainResolvedCollabHits();
-    for (const item of expired) {
-      const player = this.gameEngine.getPlayer(item.playerId);
-      if (player) {
-        this.broadcastScoreUpdate(item.playerId, player.score);
-      }
-      this.broadcastAsteroidDestruction(item.destroyed.id, {
-        collabSplit: false,
-        origin: item.destroyed.position,
-      });
-    }
   }
 
   public broadcastAsteroidUpdate(asteroidId: string, updates: AsteroidUpdateData): void {

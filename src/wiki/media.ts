@@ -110,19 +110,6 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/roid/materialArt.ts',
     ],
   },
-  split: {
-    title: 'Cooperative asteroid split',
-    alt: 'Two laser hits from different pilots break a large asteroid into two smaller fragments.',
-    caption:
-      'Controlled demonstration: two pilots hit one large rock within the collaboration window. It splits and sends out two shockwaves.',
-    sources: [
-      'server/core/AsteroidManager.ts',
-      'shared/asteroidPhenomena.ts',
-      'src/physics/shockwave.ts',
-      'src/constants/index.ts',
-      'src/entities/roid/materialArt.ts',
-    ],
-  },
   satellites: {
     title: 'EO satellite pickups',
     alt: 'Six separate satellite views show the Earth-observation hulls glowing as stationary collectible pickups.',

@@ -47,7 +47,7 @@ The authoritative simulation runs at 60 Hz; periodic snapshots target 30 Hz. The
 
 The broadcaster has a 1 MiB projected outbound limit and tracks pending sends. The [pending-send follow-up](performance/pending-snapshot-results.md) now preserves a successful baseline after an unsent pending offer; pressure skips and failed delivery still request a keyframe. Periodic keyframes use a 90-delta interval, approximately three seconds at an uninterrupted 30 Hz cadence. Recovery and skipped sends can alter that interval. These controls already exist and should be measured before changing them.[^3]
 
-Current snapshot v2 removes that forced interval while retaining full initial,
+Current snapshot v3 removes that forced interval while retaining full initial,
 rejoin and explicit recovery frames. Other frames use the encoder's actual
 UTF-8 byte comparison; ACK credit and recovery timeouts remain unchanged. The
 90-delta statement above describes the research revision, not the current draft,
@@ -254,7 +254,7 @@ Do not apply every row. Each conditional candidate has an evidence gate; rejecti
 
 The first implementation change should connect DPR, CPU throttling, and ordered network impairment to the existing production-client runner and prove that each constraint actually applies. Add missing attribution counters and the controlled rendering-scale comparison next. Follow with the smallest successful rendering change. Add a production quality policy only after fixed settings prove useful on real phones. Remove temporary switches and unused experiment paths once decisions are made.
 
-Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve [current snapshot recovery](protocol/snapshot-v2.md) and authoritative asteroid and projectile behavior. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
+Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve [current snapshot recovery](protocol/snapshot-v3.md) and authoritative asteroid and projectile behavior. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
 
 Run the focused canvas/input/protocol tests appropriate to each implementation, then the repository gate. Integration and browser scenarios must use the repository runner. Include simultaneous steering/fire, scan/tow feedback, rotation, death/respawn, background recovery, and two-player reconnect. Visual checks must cover low-quality rendering as well as the normal tier.
 

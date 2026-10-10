@@ -260,27 +260,20 @@ export const ROID = {
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged
 
   // Scoring
+  LARGE_MIN_SIZE: 40,
   POINTS_COLOSSAL: 200,
   POINTS_LARGE: 20,
   POINTS_MEDIUM: 50,
   POINTS_SMALL: 100,
 
   // Rare crew-scale rocks: too heavy for one tow or one coupling, and they
-  // ignore the one-second collab window until many laser hits land.
+  // take many laser hits to mine.
   COLOSSAL_MIN_SIZE: 90,
   COLOSSAL_SIZE: 120,
   COLOSSAL_LASER_HITS: 16,
   COLOSSAL_CREW: 2,
   COLOSSAL_SECTOR_PERIOD: 5,
   COLOSSAL_CORE_EXCLUSION: 2,
-
-  // Collaborative split: only the biggest asteroids, and only when two
-  // distinct ships land laser hits within this window.
-  // The server owns the clock, shooter identity, and resolve/expire.
-  COLLAB_SPLIT_WINDOW_MS: 1000,
-  COLLAB_SPLIT_MIN_SIZE: 40,
-  // Same-shooter reports inside this gap are one shot (multi-client echo).
-  COLLAB_HIT_DEDUPE_MS: 100,
 
   // Spawning (can be overridden by DEBUG.ROIDS.INITIAL_COUNT when in debug mode)
   // Production density; DEBUG.ROIDS.INITIAL_COUNT may override this only
@@ -357,41 +350,9 @@ export const SATELLITE_PICKUP = {
 } as const;
 
 // ============================================================================
-// COLLAB SPLIT SHOCKWAVE
-// ============================================================================
-// Double phosphor ring + radial impulse when a biggest asteroid splits.
-// First wave is small/fast; second is large/impactful. Size scale is inverse
-// so crumbs and ships get shoved harder than remaining big rocks.
-export const SHOCKWAVE = {
-  REFERENCE_SIZE: 25,
-  MIN_SIZE: 8,
-  MIN_SIZE_SCALE: 0.28,
-  MAX_SIZE_SCALE: 2.6,
-  SIZE_EXPONENT: 1.2,
-  FAST: {
-    delayFrames: 0,
-    durationFrames: 8,
-    radius: 150,
-    impulse: 3.2 * GAME.MOTION_SCALE,
-    strokeWidth: 1.25,
-  },
-  HEAVY: {
-    delayFrames: 7,
-    durationFrames: 36,
-    radius: 400,
-    impulse: 7.0 * GAME.MOTION_SCALE,
-    strokeWidth: 2.25,
-  },
-} as const;
-
-// ============================================================================
-
-// ============================================================================
 // AUDIO CONFIGURATION
 // ============================================================================
 export const AUDIO = {
-  MIN_PLAYBACK_RATE: 0.9,
-  MAX_PLAYBACK_RATE: 1.1,
   HARPOON_LAUNCH: ['/sounds/harpoon-launch.m4a', 4, 0.04],
   HARPOON_LATCH: ['/sounds/harpoon-latch.m4a', 4, 0.045],
   HARPOON_RELEASE: ['/sounds/harpoon-release.m4a', 3, 0.035],

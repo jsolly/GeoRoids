@@ -18,7 +18,6 @@ import type {
   ServerGameSnapshot,
   ServerGameState,
   ShipKitId,
-  SnapshotCollabTag,
   SpiderFieldState,
   TerrainSpider,
   UtilityFlight,
@@ -235,7 +234,6 @@ const asteroidShape = shape<AsteroidData>({
   maxHealth: number,
   vertices: number,
   offsets: array(number),
-  isCollabTarget: optional(boolean),
   material: optional(material),
   ore: optional((value) => value === null || material(value)),
   surveyedBy: optional(array(string)),
@@ -303,14 +301,6 @@ const playerProjectile = shape<PlayerProjectileState>({
   energy,
   bounces: counter,
   age: counter,
-});
-const collabTag = shape<SnapshotCollabTag>({
-  id: string,
-  asteroidId: string,
-  expiresAt: number,
-  hits: array(
-    shape<SnapshotCollabTag['hits'][number]>({ shooterId: string, at: number, points: number })
-  ),
 });
 const mapAsset = shape<MapAsset>({
   id: string,
@@ -404,7 +394,6 @@ const worldRules = {
 } satisfies Shape<ServerGameState>;
 const world = shape<ServerGameSnapshot>({
   ...worldRules,
-  collabTags: array(collabTag),
   playerProjectiles: array(playerProjectile),
 });
 /** Validate one persisted asteroid with the same metadata rules used on the wire. */
@@ -417,14 +406,5 @@ export function validateAsteroidDto(value: unknown): asserts value is AsteroidDa
 export function validateSnapshotDto(value: unknown): asserts value is ServerGameSnapshot {
   if (!world(value)) {
     throw new Error('Incomplete or invalid public snapshot DTO');
-  }
-  const snapshot = value as ServerGameSnapshot;
-  const asteroidIds = new Set(snapshot.asteroids.map((item) => item.id));
-  if (
-    snapshot.collabTags.some(
-      (item) => item.id !== item.asteroidId || !asteroidIds.has(item.asteroidId)
-    )
-  ) {
-    throw new Error('Snapshot references a missing or invalid entity');
   }
 }

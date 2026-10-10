@@ -1,7 +1,7 @@
 import type { AsteroidData } from '../shared-types';
 import { DAMAGE, ROID } from '../src/constants';
 
-/** Crew-scale rocks sit well above the ordinary large/collab class. */
+/** Crew-scale rocks sit well above the ordinary large class. */
 export function isColossalAsteroid(size: number): boolean {
   return size >= ROID.COLOSSAL_MIN_SIZE;
 }

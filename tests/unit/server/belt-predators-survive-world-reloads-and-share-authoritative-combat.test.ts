@@ -38,7 +38,6 @@ test('a natural belt shares valid snapshots with roaming spiders and retains cra
     expect(() =>
       captureSnapshot({
         ...engine.getGameState(),
-        collabTags: [],
         playerProjectiles: engine.getPlayerProjectiles(),
       })
     ).not.toThrow();
@@ -222,9 +221,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     engine.advanceCombatFrame();
     const before = engine.getSpiderField().spiders.find((body) => body.crawler?.hostId === rock.id);
     assert(before);
-    expect(engine.handleAsteroidHit(rock.id, player.id, 'laser', undefined, 25).outcome).toBe(
-      'destroyed'
-    );
+    expect(engine.handleAsteroidHit(rock.id, player.id, 'laser', 25).outcome).toBe('destroyed');
     expect(engine.getSpiderField().spiders.find((body) => body.id === before.id)).toMatchObject({
       health: BELT_CRAWLER.MAX_HEALTH,
       crawler: { phase: 'escaping', hostId: destination.id },
@@ -244,7 +241,6 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     );
     const snapshot = {
       ...restarted.getGameState(),
-      collabTags: [],
       playerProjectiles: restarted.getPlayerProjectiles(),
     };
     expect(() => captureSnapshot(snapshot)).not.toThrow();

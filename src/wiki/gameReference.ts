@@ -27,16 +27,7 @@ import { SPIDER } from '../../shared/terrainSpider';
 import { STORE_OFFERS, TOWN_STORE_RADIUS } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
-import {
-  DAMAGE,
-  DEPOSIT_FIELD,
-  GAME,
-  LASER,
-  ROID,
-  SATELLITE_PICKUP,
-  SHIP,
-  SHOCKWAVE,
-} from '../constants';
+import { DAMAGE, DEPOSIT_FIELD, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
 import { CONNECTION_STALE_TIMEOUT_MS } from '../network/services/connectionHealth';
 import { RECONNECT_DELAYS_MS } from '../network/services/connectionReconnect';
@@ -126,7 +117,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Tow and mining values',
       paragraphs: [
-        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids, cooperative large rocks, and colossal deposits. The ability has no ship-targeting mode.`,
+        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids and colossal deposits. The ability has no ship-targeting mode.`,
         `Resource Tap and Boost Coupling attach within a ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Tow Cable shoots forward from the nose for ${SHIP_ABILITY.HARPOON_RANGE} units and attaches on contact; a miss reels back. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; launching starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown even on a miss; E again recalls an outgoing line or releases attached cargo. Ordinary towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable. A colossal deposit needs ${ROID.COLOSSAL_CREW} Tow Cables before it will haul, and ${ROID.COLOSSAL_CREW} Boost Couplings for full burn speed (fewer crawl at ${ASTEROID_BOOST.undercrewedFactor * 100}% speed); ramming it or dragging it into another rock does not shatter it.`,
         `Furnace intakes are ${TOWN_HEARTH.radius} units, and a towed rock delivers only while its Hauler is within ${TOWN_HEARTH.radius + SHIP_ABILITY.HARPOON_RANGE * SHIP_ABILITY.HARPOON_SLACK} units of the furnace centre. At size 25, delivery rewards are ice ${furnaceReward({ id: 'reference', ore: 'ice', material: 'ice', size: 25 })}, metal ${furnaceReward({ id: 'reference', ore: 'metal', material: 'metal', size: 25 })}, rubble ${furnaceReward({ id: 'reference', ore: 'rubble', material: 'rubble', size: 25 })}, and crystal ${furnaceReward({ id: 'reference', ore: 'crystal', material: 'crystal', size: 25 })} points for each launcher and every recorded scanner (Scout scan, Survey Probe, or deployed satellite); a barren rock pays only a token amount. A lit furnace shows a right-angle fire trail from its grate through each inward lot on its parent chain to ${TOWN_HEARTH.name}. A delivery sends a brighter head along that trail at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
       ],
@@ -165,10 +156,9 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       ],
     },
     {
-      heading: 'Split and score values',
+      heading: 'Mining and score values',
       paragraphs: [
-        `The fast collaboration shockwave reaches ${SHOCKWAVE.FAST.radius} units with impulse ${SHOCKWAVE.FAST.impulse}; the heavy wave reaches ${SHOCKWAVE.HEAVY.radius} units with impulse ${SHOCKWAVE.HEAVY.impulse}.`,
-        `Large-rock collaboration starts at size ${ROID.COLLAB_SPLIT_MIN_SIZE}; the collaboration window is ${ROID.COLLAB_SPLIT_WINDOW_MS} milliseconds and same-shooter deduplication lasts ${ROID.COLLAB_HIT_DEDUPE_MS} milliseconds. Colossal deposits begin at size ${ROID.COLOSSAL_MIN_SIZE}, need ${ROID.COLOSSAL_CREW} Tow Cables to haul or Boost Couplings for full burn speed, take ${ROID.COLOSSAL_LASER_HITS} Scout laser hits, and appear in 1 of every ${ROID.COLOSSAL_SECTOR_PERIOD} sectors outside the ${ROID.COLOSSAL_CORE_EXCLUSION * 2 - 1}×${ROID.COLOSSAL_CORE_EXCLUSION * 2 - 1} launch neighborhood. Asteroid point drops are colossal ${ROID.POINTS_COLOSSAL}, large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, and small ${ROID.POINTS_SMALL}.`,
+        `Ordinary ice and crystal rocks break on one laser hit. Large scoring starts at size ${ROID.LARGE_MIN_SIZE}. Colossal deposits begin at size ${ROID.COLOSSAL_MIN_SIZE}, need ${ROID.COLOSSAL_CREW} Tow Cables to haul or Boost Couplings for full burn speed, take ${ROID.COLOSSAL_LASER_HITS} Scout laser hits, and appear in 1 of every ${ROID.COLOSSAL_SECTOR_PERIOD} sectors outside the ${ROID.COLOSSAL_CORE_EXCLUSION * 2 - 1}×${ROID.COLOSSAL_CORE_EXCLUSION * 2 - 1} launch neighborhood. Asteroid point drops are colossal ${ROID.POINTS_COLOSSAL}, large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, and small ${ROID.POINTS_SMALL}.`,
       ],
     },
     {

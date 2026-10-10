@@ -43,11 +43,11 @@ test('Hauler breaks metal in two shots while Scout needs three and teammate lase
   );
   engine.addAsteroid(metal('heavy-mining'));
   engine.addAsteroid(metal('light-mining'));
-  expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('damaged');
   expect(engine.getAsteroid('heavy-mining')?.health).toBe(25);
   expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('destroyed');
-  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('tagged');
-  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('damaged');
+  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('damaged');
   expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('destroyed');
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
@@ -76,35 +76,20 @@ test('a Hauler laser retains mining strength after its owner leaves', () => {
   expect(engine.getAsteroid('in-flight-metal')?.health).toBe(25);
 });
 
-test('Hauler improves collaborative HP mining while ordinary one-hit rocks stay one-hit', () => {
-  engine.addPlayer('miner', 'Miner', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
-  engine.addAsteroid({ ...metal('collab-hp'), isCollabTarget: true, health: 100, maxHealth: 100 });
-  expect(engine.handleAsteroidDamage('collab-hp', 'miner').asteroid?.health).toBe(50);
-  expect(engine.handleAsteroidDamage('collab-hp', 'miner').destroyed).toBe(true);
-  for (const material of ['ice', 'rubble'] as const) {
-    engine.addAsteroid({ ...metal(material), material, size: 25 });
-    expect(engine.handleAsteroidHit(material, 'miner').outcome).toBe('destroyed');
+test.each(['scout', 'hauler'] as const)(
+  '%s destroys large ordinary minerals on the first hit',
+  (kit) => {
+    engine.addPlayer('miner', 'Miner', new RecordingSocket(), { x: 0, y: 0 }, kit);
+    for (const material of ['ice', 'crystal'] as const) {
+      engine.addAsteroid({
+        ...metal(material),
+        material,
+        size: ROID.LARGE_MIN_SIZE,
+        health: 100,
+        maxHealth: 100,
+      });
+      expect(engine.handleAsteroidHit(material, 'miner').outcome).toBe('destroyed');
+      expect(engine.getAsteroid(material)).toBeUndefined();
+    }
   }
-});
-
-test('Hauler mining still requires different pilots to split the largest ice', () => {
-  engine.addPlayer('miner', 'Miner', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
-  engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 100, y: 0 }, 'scout');
-  for (const id of ['solo-ice', 'shared-ice']) {
-    engine.addAsteroid({ ...metal(id), material: 'ice', size: ROID.COLLAB_SPLIT_MIN_SIZE });
-  }
-  expect(engine.handleAsteroidHit('solo-ice', 'miner', 'laser', 1000).outcome).toBe('tagged');
-  const solo = engine.handleAsteroidHit(
-    'solo-ice',
-    'miner',
-    'laser',
-    1000 + ROID.COLLAB_HIT_DEDUPE_MS + 1
-  );
-  expect(solo.outcome).toBe('destroyed');
-  expect(solo.split).toBe(false);
-  expect(engine.handleAsteroidHit('shared-ice', 'miner', 'laser', 2000).outcome).toBe('tagged');
-  const shared = engine.handleAsteroidHit('shared-ice', 'scout', 'laser', 2001);
-  expect(shared.outcome).toBe('destroyed');
-  expect(shared.split).toBe(true);
-  expect(shared.newAsteroids.length).toBeGreaterThan(0);
-});
+);

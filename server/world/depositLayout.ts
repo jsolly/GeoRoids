@@ -133,16 +133,14 @@ function placeReflectiveClusters(rocks: AsteroidData[], x: number, y: number): v
   }
 }
 
-/** Resize one ordinary slot; keep collab rocks and pinball clusters intact. */
+/** Resize one ordinary slot; keep pinball clusters intact. */
 function placeColossalDeposit(rocks: AsteroidData[], x: number, y: number, seed: number): void {
   if (!sectorHostsColossal(x, y, seed)) {
     return;
   }
   const slot =
-    rocks.find(
-      (rock) =>
-        !rock.isCollabTarget && !rock.phenomenon && rock.velocity.x === 0 && rock.velocity.y === 0
-    ) ?? rocks.find((rock) => !rock.isCollabTarget && !rock.phenomenon);
+    rocks.find((rock) => !rock.phenomenon && rock.velocity.x === 0 && rock.velocity.y === 0) ??
+    rocks.find((rock) => !rock.phenomenon);
   if (slot) {
     applyColossalDeposit(slot);
   }
@@ -250,13 +248,6 @@ export function sectorDeposits(seed: number, x: number, y: number): AsteroidData
       vertices: offsets.length,
       offsets,
     });
-  }
-  const collab = rocks[0];
-  if (collab) {
-    collab.size = Math.max(collab.size, ROID.COLLAB_SPLIT_MIN_SIZE);
-    collab.isCollabTarget = true;
-    collab.health = 100;
-    collab.maxHealth = 100;
   }
   seedAsteroidPhenomena(rocks);
   placeReflectiveClusters(rocks, x, y);

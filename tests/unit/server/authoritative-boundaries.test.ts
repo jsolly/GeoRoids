@@ -97,7 +97,6 @@ describe('server authority boundaries', () => {
     const result = results.find((entry) => entry.destroyedAsteroidId === rubble.id);
     assert.ok(result, 'rubble collision result');
 
-    expect(result.collabSplit).toBe(false);
     expect(result.newAsteroids).toEqual([]);
   });
 });

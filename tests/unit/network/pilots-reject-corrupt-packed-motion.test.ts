@@ -118,7 +118,7 @@ test('pilots reject noncanonical or truncated packed numbers without losing the 
       JSON.stringify({
         type: 'snapshot',
         data: {
-          version: 2,
+          version: 3,
           sequence: 2,
           baseline: 1,
           kind: 'delta',
@@ -180,7 +180,7 @@ test('pilots reject overlapping operations and invalid relative baselines after 
         JSON.stringify({
           type: 'snapshot',
           data: {
-            version: 2,
+            version: 3,
             sequence: 2,
             baseline: 1,
             kind: 'delta',
@@ -202,6 +202,7 @@ test('packed asteroid drift coexists with unknown fields, clear operations, chur
   const source = snapshotFixture();
   const retained = source.asteroids[2];
   assert(retained);
+  retained.surveyedBy = ['survey-pilot'];
   Object.assign(retained, { futureField: ['星🚀', 1.23456789] });
   const first = new SnapshotEncoder(source);
   const changed = structuredClone(source);
@@ -216,7 +217,7 @@ test('packed asteroid drift coexists with unknown fields, clear operations, chur
   for (const rock of changed.asteroids.slice(4, 9)) {
     rock.position.x += 0.0001;
   }
-  delete generic.isCollabTarget;
+  delete generic.surveyedBy;
   generic.position.x += 0.0001;
   changed.asteroids.splice(1, 1);
   changed.asteroids.push({ ...structuredClone(addition), id: 'packed-new-rock' });
@@ -226,7 +227,7 @@ test('packed asteroid drift coexists with unknown fields, clear operations, chur
   assert.equal(frame.kind, 'delta');
   const patch = frame.patch.collections?.['asteroids'];
   expect(patch?.motion).toBeTypeOf('string');
-  expect(patch?.update?.find((tuple) => tuple[0] === 2)?.[2]).toEqual(['isCollabTarget']);
+  expect(patch?.update?.find((tuple) => tuple[0] === 2)?.[2]).toEqual(['surveyedBy']);
   expect(patch?.remove).toEqual([1]);
   expect(patch?.order?.[0]).toBe(80);
   const decoder = new SnapshotDecoder();
@@ -321,7 +322,7 @@ test('prediction rejects invalid elapsed ticks, spider targets, unsafe projectio
         JSON.stringify({
           type: 'snapshot',
           data: {
-            version: 2,
+            version: 3,
             sequence: 2,
             baseline: 1,
             kind: 'delta',
@@ -388,7 +389,7 @@ test('unsafe and unknown velocity references retain ordinary motion while large 
         JSON.stringify({
           type: 'snapshot',
           data: {
-            version: 2,
+            version: 3,
             sequence: 3,
             baseline: 2,
             kind: 'delta',

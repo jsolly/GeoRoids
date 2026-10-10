@@ -8,24 +8,21 @@ import { launchUtilityFlight } from '../../../shared/utilityFlight';
 import { WORLD } from '../../../shared/world';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('a broadcast with only pressured recipients prepares no common projectile or tag rows', () => {
+test('a broadcast with only pressured recipients prepares no common projectile rows', () => {
   const engine = new GameEngine(82);
   const socket = new RecordingSocket();
   const broadcaster = new GameStateBroadcaster(engine);
   const projectiles = vi.spyOn(engine, 'getPlayerProjectiles');
-  const tags = vi.spyOn(engine, 'getActiveCollabTags');
   try {
     engine.addPlayer('waiting', 'Waiting', socket, { x: 0, y: 0 });
     broadcaster.negotiateSnapshot(socket);
     socket.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
     broadcaster.broadcastGameState();
     expect(projectiles).not.toHaveBeenCalled();
-    expect(tags).not.toHaveBeenCalled();
     expect(socket.received('snapshot')).toEqual([]);
     expect(socket.readyState).toBe(socket.OPEN);
   } finally {
     projectiles.mockRestore();
-    tags.mockRestore();
     engine.stopGameLoop();
   }
 });

@@ -581,7 +581,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
       });
       state.entities = [local];
       state.playerProjectiles = [];
-      state.collabTags = [];
       state.satellitePickups = [];
       state.loot = [];
       ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
@@ -701,7 +700,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     first.asteroids = [];
     first.loot = [];
     first.satellitePickups = [];
-    first.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     ws.receive(
       'snapshot',
@@ -748,8 +746,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     baseline.asteroids = [];
     baseline.loot = [];
     baseline.satellitePickups = [];
-    baseline.collabTags = [];
-
     ws.receive('snapshot', new SnapshotEncoder(baseline).encode(1));
     expect({
       health: player.ship.health,
@@ -825,7 +821,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     state.asteroids = [];
     state.loot = [];
     state.satellitePickups = [];
-    state.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     expect(manager.getAllPlayers()).toEqual([player]);
     const { getSpiderField, setSpiderField } = await import(
@@ -968,7 +963,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ]);
     const next = captureSnapshot(snapshotFixture(1));
     next.asteroids = [];
-    next.collabTags = [];
     next.loot = [];
     next.entities.pop();
     const nextPilot = next.entities[1];
@@ -1029,7 +1023,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     const next = captureSnapshot(snapshotFixture(1));
     next.asteroids = [];
-    next.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(next).encode(2, { sequence: 1, state: first }));
     expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([
       { type: 'snapshotAck', data: { sequence: 1 } },
@@ -1043,7 +1036,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
   });
 
-  test('pickup ownership, tag expiry and asteroid metadata reconcile in real managers', async () => {
+  test('pickup ownership and asteroid metadata reconcile in real managers', async () => {
     const ws = await connect();
     acknowledge(ws);
     const belt = new Map<string, Roid>();
@@ -1068,19 +1061,12 @@ describe('actual ConnectionManager WebSocket message path', () => {
       onReconciled: (id) => {
         belt.delete(id);
       },
-      onTagged: (event) => {
-        const roid = belt.get(event.asteroidId);
-        if (roid) {
-          roid.taggedUntil = event.expiresAt;
-        }
-      },
     });
     const first = captureSnapshot(snapshotFixture());
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     const pickups = SatellitePickupManager.getInstance();
     expect(pickups.getAll()).toHaveLength(6);
     expect(pickups.get('pickup-0')?.ownerId).toBe('pilot-0');
-    expect(belt.get('asteroid-0')?.taggedUntil).toBe(5000);
     const next = captureSnapshot(snapshotFixture(70));
     const damagedPickup = next.satellitePickups[0];
     assert.ok(damagedPickup, 'damaged pickup');
@@ -1091,7 +1077,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     nextAsteroid.vertices = 3;
     nextAsteroid.offsets = [0.7, 1.2, 0.8];
     nextAsteroid.jaggedness = 0.9;
-    delete nextAsteroid.isCollabTarget;
     ws.receive('snapshot', new SnapshotEncoder(next).encode(2, { sequence: 1, state: first }));
     expect(pickups.get('pickup-0')?.ownerId).toBeNull();
     expect(pickups.get('pickup-0')?.health).toBe(25);
@@ -1100,8 +1085,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
       offsets: [0.7, 1.2, 0.8],
       vertices: 3,
       jaggedness: 0.9,
-      isCollabTarget: false,
-      taggedUntil: 0,
     });
     // A rejoin starts a new sequence and reconstructs ownership even after local caches were lost.
     manager.initializeAsteroidSync();
@@ -1231,7 +1214,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager.sendMessage({ type: 'useAbility', data: { abilityId: 'harpoon' } });
     const emptyBelt = captureSnapshot(zero);
     emptyBelt.asteroids = [];
-    emptyBelt.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(emptyBelt).encode(2));
     expect(player.ship.harpoonTargetId).toBe('asteroid-1');
     expect(player.ship.harpoonLatchPos).toEqual({ x: 1, y: 2 });
@@ -1341,10 +1323,38 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(ws.close).not.toHaveBeenCalled();
   });
 
+  test('an existing pilot retries after a previous-version server rejects negotiation without losing its credential', async () => {
+    let ws = await connect();
+    acknowledge(ws);
+    const id = manager.getClientId();
+    manager.disconnect();
+    ws = await connect();
+    expect(ws.sent.find((message) => message.type === 'join')?.data).toMatchObject({
+      resumeToken: 'a'.repeat(64),
+    });
+    ws.receive('joined', {
+      id,
+      name: 'Runtime pilot',
+      position: { x: 0, y: 0 },
+      snapshotVersion: 2,
+      asteroidInteractions: 1,
+      resumeToken: 'b'.repeat(64),
+    });
+    expect(ws.close).toHaveBeenCalled();
+    expect(manager.getClientId()).toBe(id);
+    ws = await connect();
+    expect(ws.sent.find((message) => message.type === 'join')?.data).toMatchObject({
+      resumeToken: 'a'.repeat(64),
+    });
+    acknowledge(ws);
+    expect(manager.isConnected()).toBe(true);
+    expect(manager.getClientId()).toBe(id);
+  });
+
   test.each([
     {
-      label: 'retired snapshot version',
-      snapshotVersion: 1,
+      label: 'previous snapshot version',
+      snapshotVersion: 2,
       asteroidInteractions: 1,
       resumeToken: 'a'.repeat(64),
     },

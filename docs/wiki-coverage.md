@@ -24,7 +24,7 @@ while the surviving deterministic cases define the automated proof.
 | scout | Ships | Stats scorecard, shared cruise, Contour Lock, passive exploration reveal, one-pulse shared radar mineral scan with a longer recharge and a camera that widens to fit the scan range, scan spider repulsion, persistent named furnaces paid with personal score, scattered furnace lots, right-angle fire trails only after a furnace is lit, escape construction and living spider retreat, moving probe beacons, and delivery tags |
 | hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, Contour Lock, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the furnace is lit, and double metal mining damage |
 | loot-growth | Systems | Cargo, silk, and equipment pickups without ship-stat changes, Tap canister extract, shoot-a-drop blast |
-| asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
+| asteroids | Arena | Materials, health, score, rubble fragments, first-hit ice/crystal mining, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Broad gentle plains, neutral gray contours, bidirectional contour speed bonus, guided Contour Lock with ignored steering and physical contact release during protection, with lasers passing through invulnerable hulls, normal-speed crossings, no terrain drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and one-shot spider kills |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, cargo loss, unlimited respawn, brief-disconnect return, and score |
@@ -46,7 +46,7 @@ while the surviving deterministic cases define the automated proof.
 | How do shards and mined cargo work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Where is the rich belt, how do crawlers attack, and when do mined deposits return? | asteroids, terrain | shared/asteroidBelt.ts, shared/beltCrawler.ts, RegionalAsteroidField.ts, BeltCrawlerManager.ts, belt scenario tests |
-| Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
+| Why did an asteroid break, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, mining/reflection tests |
 | Why won't this huge rock tow, ignite, or break from a ram? | asteroids, hauler, teamwork | shared/asteroidScale.ts, GameEngine.ts, colossal crew tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | src/entities/ship/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |
 | How do I arm, ignite, and cancel an asteroid thruster? | hauler, controls, asteroids, teamwork | shared/asteroidBoost.ts, shipAbilities.ts, GameEngine.ts, boost lifecycle and persistence tests |
@@ -80,7 +80,7 @@ while the surviving deterministic cases define the automated proof.
   demonstration beside the section that explains its mechanic. The Markdown
   compiler derives the aggregate list used by coverage checks from each
   article's media placements. Requested demonstrations
-  include ship abilities, movement, reflection, cooperative splits,
+  include ship abilities, movement, reflection, mining,
   Hauler tow cable and furnace delivery, shared scans, reflective asteroids,
   satellites, pickups, contour travel, and
   loot collection or blast, and surviving an environmental asteroid impact.
@@ -128,10 +128,11 @@ while the surviving deterministic cases define the automated proof.
   Furnaces and dark foundations stay marked on the overview before that
   ground is explored. A fire trail appears only after that furnace is lit.
   Uncharted asteroid and loot positions remain hidden.
-- Hauler mining damage is doubled for metal asteroids, cooperative large rocks,
-  and colossal deposits;
-  normal asteroid mining damage remains configured per material. Large ice or crystal
-  collaboration requires distinct pilot IDs; mining a rock leaves collectible point drops (two minutes) plus a shard, not a direct bank payment. Delivery credit goes to launchers and recorded scanners; partial-rock scan history survives saved-region reloads
+- Hauler mining damage is doubled for metal asteroids and colossal deposits.
+  Ordinary ice and crystal break on the first laser hit, regardless of size;
+  larger rubble fragments. Mining leaves collectible point drops (two minutes)
+  plus salvage, not a direct bank payment. Delivery credit goes to launchers
+  and recorded scanners; partial-rock scan history survives saved-region reloads
   and server restarts, and offline pilots retain their credit.
 - Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
   never damage crew hulls. After a bounce off the arena wall or a reflective
@@ -169,9 +170,6 @@ while the surviving deterministic cases define the automated proof.
 - Pickups preserve ship mass, health capacity, current health, hull size, and flight
   tuning. Cargo, silk, equipment, and satellite collection keep their existing rewards
   and do not release Contour Lock.
-- Cooperative splits automatically expire without a second qualifying hit.
-  Their fast and heavy shockwaves push ships and asteroids without direct
-  damage; metal and rubble follow their own break rules.
 
 ## Spider utility interactions
 
@@ -234,7 +232,7 @@ Exact tuning belongs in the article's expandable reference. Media names refer to
 | Fire: combat-survival / Firing while moving | Space or second touch holds repeated fire; mouse click or quick touch fires once. Shots inherit ship motion. | Shots are authoritative and temporary; death/transit blocks firing. | `src/input/touchControls.ts`, `src/input/PlayerInput.ts`, `GameEngine.spawnPlayerLaser`; touch-input scenarios | movement, reflection. |
 | Contour speed: terrain / Contour travel | Along contours gains speed in either direction; crossings/void keep cruise, no ordinary terrain damage or drift. | Personal movement; pickups preserve tuning. | `src/physics/terrain/terrainTravel.ts`, `shared/shipFlight.ts`; browser scenario retired (source review remains) | terrain. |
 | Contour Lock: controls / Contour Lock | Shift, right click or button catches nearby rail; ignores steering, no charge/cooldown. Explicit release, damage, impulse, wall/rock contact even protected, menus, death and travel end lock. | Temporary personal guidance; cannot capture during knockback/hold. | `shared/contourLock.ts`, `src/physics/terrain/contourCapture.ts`; `tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts` | terrain. |
-| Menu hold: controls / Inventory and menus | Map, schematic or furnace/store menu freezes/protects ship; cannot scoop pickups; world continues, satellite drains. Escape/close resumes with blink. | Personal temporary hold, no shockwave movement; releases lock. | `src/core/services/InputManager.ts`, `shared/combat.ts`, `GameEngine`; authoritative combat tests | Text: explicit pause boundary. |
+| Menu hold: controls / Inventory and menus | Map, schematic or furnace/store menu freezes/protects ship; cannot scoop pickups; world continues, satellite drains. Escape/close resumes with blink. | Personal temporary hold; releases lock. | `src/core/services/InputManager.ts`, `shared/combat.ts`, `GameEngine`; authoritative combat tests | Text: explicit pause boundary. |
 | Tool inventory: controls / Inventory and menus | V/button shows compatible owned utilities; salvage unlocks cards; swapping cancels latch or scan pulse but preserves cooldown. | Ownership persists through death/restart; selected tool remembered by browser. | `shared/equipment.ts`, `src/ui/shipSchematic.ts`, `src/entities/ship/shipAbilities.ts`; `tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts` | Text: inventory labels explain choices. |
 | Universe chart controls: controls / Map | M/button opens; drag/arrows pan; pinch, wheel or +/− keys zoom; Home/Locate resets zoom and centers. Compass and legend sit inside the chart; zoom buttons and status/help footer are removed. | Shared exploration, personal view; map holds hull. | `src/ui/universeMap.ts`; executed DOM/canvas gesture and keyboard scenarios | Text: controls and keyboard alternatives. |
 | Accessibility: controls / Keyboard access and motion | Tab and native button activation; focus chart for pan/zoom; landmark text list. Reduced motion skips dive, steadies loot/flame and shows Wiki posters. | Device/browser preference; does not stop gameplay. | `src/input/touchControls.ts`, `src/ui/universeMap.ts`, `src/ui/furnaceTravelMap.ts`, `src/wiki/mediaPlayback.ts` | Posters for every GIF; text explains controls. |
@@ -277,8 +275,7 @@ Exact tuning belongs in the article's expandable reference. Media names refer to
 | Spider pursuit/bite: terrain / Guard patrols, Survive a hunt | Nearest eligible pilot, guard leash/time vs longer roamer chase; edge/terrain warning; single hit kills spider, bite kills vulnerable hull. | Shared actors; no cargo preference on baseline, no permanent queen clearance. | `shared/terrainSpider.ts`, `TerrainSpiderManager.findHuntTarget`; spider field scenarios | Text: warning, range and refuge advice. |
 | Spider refuge: scout / Build a furnace; terrain / Survive a hunt | Scan pulse repels briefly; Town Square/lit furnace exclude hunts; building over a nest repels living guards without clearing the nest or changing their role. | Shared permanent furnace, temporary scan; dark lots/probes offer no safety. | `TerrainSpiderManager.canOccupy`, `repelProtectedSpiders`; browser scenario retired (source review remains) | scout for pulse; text for refuge. |
 | Spider tow/rescue: hauler / Spider bites, Spider rescue | Live captive bites by proximity, cable safe; rescuers attracted and can sever tow; release ends the rescue call, and furnaces do not consume captives. | Temporary shared rescue, finite silk retained per living spider; no cargo-based reinforcements. | `TerrainSpiderManager`, `server/core/spiderRescueTarget.ts`; `tests/unit/server/hauler-extracts-silk-and-tows-living-spiders.test.ts` | Text: captive proximity and rescue warning. |
-| Material/ore: asteroids / Field and materials, Ore and refining | Hull material governs damage, ore independent and often barren; scan reveals; intact refining gives more than fragments. | Shared persistent rock, mining drops cargo rather than bank. | `shared/asteroidMaterials.ts`, `shared/economy.ts`, `AsteroidManager`; asteroid material tests | scout, split. |
-| Cooperative splits: asteroids / Cooperative splits and score | Distinct pilots within window split large ice/crystal; repeat/expired hits ordinary break; tougher marked rock chips without split. | Shared short contributor window; shockwaves push without damage; fragments reduce ore. | `AsteroidManager`, `shared/asteroidPhenomena.ts`; split/reflection scenarios | split. |
+| Material/ore: asteroids / Field and materials, Ore and refining | Hull material governs damage, ore independent and often barren; scan reveals; intact refining gives more than fragments. | Shared persistent rock, mining drops cargo rather than bank. | `shared/asteroidMaterials.ts`, `shared/economy.ts`, `AsteroidManager`; asteroid material tests | scout. |
 | Reflection/charge: asteroids / Reflection and charge | Reflective metal multiplies energy up to cap; absorbed charge can break rock and release ordinary salvage. | Shared temporary charge/projectiles; bounded chains and ricochet hazards. | `shared/asteroidReflection.ts`, `shared/asteroidPhenomena.ts`; reflection scenarios | reflection. |
 | Ordinary regrowth: teamwork / Persistent world | Missing deposits slowly refill outside nearby pilot/probe visibility; sleeping sector catches up, restart not refill. | Shared saved field and reveal; mined ground remains flyable. | `server/world/RegionalAsteroidField.ts`, `server/world/depositLayout.ts`; `tests/unit/server/harvested-ground-stays-flyable.test.ts` | Text: return condition in reference. |
 | Eastern belt: asteroids / Asteroid belt | Fixed metal rows/lane gaps; remove/move deposit starts timer, warning then replacement even occupied; damage alone no reset/heal. | Shared timer survives sleeping sectors and restart; carried host remains separate from new home deposit. | `shared/asteroidBelt.ts`, `RegionalAsteroidField`; `tests/unit/server/miners-return-to-a-recovering-asteroid-belt.test.ts` | Text: location and amber warning. |

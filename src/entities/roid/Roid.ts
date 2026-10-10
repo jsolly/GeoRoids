@@ -30,8 +30,6 @@ class Roid {
   boost?: AsteroidBoost | null;
   probe?: AsteroidProbe | null;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
-  isCollabTarget: boolean = false;
-  taggedUntil?: number; // Server-owned collab window; do not destroy locally while set
   private _jaggedness: number = ROID.JAGGEDNESS; // Store jaggedness value
 
   playHitSound(): void {

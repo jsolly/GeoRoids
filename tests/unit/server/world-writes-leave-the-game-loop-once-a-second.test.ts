@@ -73,7 +73,7 @@ test('a mining break and its score reach the database on the next one-second flu
   expect(store.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(true);
   commits.mockClear();
 
-  expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('damaged');
   expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('destroyed');
   expect(miner.score).toBe(0);
   // The break is a terminal, score-bearing event, yet nothing touches storage yet.
@@ -169,7 +169,7 @@ test('a commit still in flight defers the next flush, which then carries everyth
   // The worker is still committing: this second's cadence passes without a
   // new batch, even though a deposit breaks and a score changes meanwhile.
   persistence.pendingBatches = 1;
-  expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('damaged');
   expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('destroyed');
   expect(miner.score).toBeGreaterThanOrEqual(0);
   for (let tick = 0; tick < GAME.FPS; tick++) {
@@ -213,7 +213,7 @@ test('the last pilot leaving behind a busy writer still writes deferred chip dam
   // Chipping leaves the sector's rock set unchanged, so a periodic flush
   // would defer it; the writer is still busy when the last pilot leaves.
   persistence.pendingBatches = 1;
-  expect(engine.handleAsteroidHit(chipped.id, miner.id, 'laser').outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit(chipped.id, miner.id, 'laser').outcome).toBe('damaged');
   const health = chipped.health;
   expect(health).toBeLessThan(75);
   engine.removePlayer(miner.id);
@@ -242,7 +242,7 @@ test('shutdown flushes the final state once the writer is idle and then releases
   }
   miner.score = 77;
   // A chip without a rock-set change must not wait for the next drift flush.
-  expect(engine.handleAsteroidHit(chipped.id, miner.id, 'laser').outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit(chipped.id, miner.id, 'laser').outcome).toBe('damaged');
   await engine.shutdownPersistence();
   expect(persistence.shutdownCalls).toBe(1);
   const last = persistence.batches.at(-1);

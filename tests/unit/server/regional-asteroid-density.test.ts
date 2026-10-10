@@ -50,7 +50,6 @@ function hiddenSlots(manager: AsteroidManager, observer: Position): AsteroidData
       (rock) =>
         rock.id.startsWith(`deposit-${SEED}-0-0-`) &&
         !rock.phenomenon &&
-        !rock.isCollabTarget &&
         Math.max(Math.abs(rock.position.x - observer.x), Math.abs(rock.position.y - observer.y)) >
           DEPOSIT_FIELD.REGROWTH_HIDDEN_DISTANCE + 50
     );
@@ -145,9 +144,7 @@ test('the eastern belt keeps clear lanes inside the surrounding rich field', () 
 test('deposits vary in size, drift, spin and outline instead of repeating one rock', () => {
   const rocks = sectorSample(SEED)
     .flat()
-    .filter(
-      (rock) => !rock.phenomenon && !rock.isCollabTarget && rock.size < ROID.COLOSSAL_MIN_SIZE
-    );
+    .filter((rock) => !rock.phenomenon && rock.size < ROID.COLOSSAL_MIN_SIZE);
   const sizes = rocks.map((rock) => rock.size);
   expect(Math.min(...sizes)).toBeLessThan(ROID.DEPOSIT_SIZE_MIN + 2);
   expect(Math.max(...sizes)).toBeGreaterThan(ROID.DEPOSIT_SIZE_MAX - 6);
@@ -276,7 +273,7 @@ test('a sector that slept catches up on the regrowth it missed', () => {
 
 test('a world saved under an older layout keeps its rocks and refills over a few minutes', () => {
   const layout = sectorDeposits(SEED, 0, 0);
-  const kept = layout.find((rock) => !rock.phenomenon && !rock.isCollabTarget);
+  const kept = layout.find((rock) => !rock.phenomenon);
   if (!kept) {
     throw new Error('Sector 0,0 needs an ordinary slot');
   }

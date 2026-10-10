@@ -50,7 +50,6 @@ test('furnace intake tells every client the rock was consumed so they play the r
     world.broadcastGameState();
     expect(hauler.socket.lastReceived('asteroidDestroy')?.data).toEqual({
       asteroidId: rock.id,
-      collabSplit: false,
       consumedBy: 'furnace',
     });
     expect(hauler.socket.lastReceived('furnaceDelivery')?.data).toMatchObject({

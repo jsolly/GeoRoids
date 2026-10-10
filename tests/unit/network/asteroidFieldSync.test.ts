@@ -257,13 +257,13 @@ test('snapshot reconciliation removes stale rows without looking like an explici
 
   try {
     applyAsteroidFieldPartition({ created: [], updated: [], removed: ['replaced-row'] });
-    notifyAsteroidDestroyed({ asteroidId: 'authoritative-destroy', collabSplit: true });
+    notifyAsteroidDestroyed({ asteroidId: 'authoritative-destroy' });
   } finally {
     unbindAsteroidFieldApply();
   }
 
   expect(reconciled).toEqual(['replaced-row']);
-  expect(destroyed).toEqual([{ asteroidId: 'authoritative-destroy', collabSplit: true }]);
+  expect(destroyed).toEqual([{ asteroidId: 'authoritative-destroy' }]);
 });
 
 test('kinematic updates omit undefined fields so a lean row cannot wipe pose', () => {
@@ -277,12 +277,6 @@ test('writeAsteroidKinematicUpdates reuses the caller envelope and drops stale k
   const same = writeAsteroidKinematicUpdates({ position: { x: 3, y: 4 } }, into);
   expect(same).toBe(into);
   expect(into).toEqual({ position: { x: 3, y: 4 } });
-});
-
-test('collab flag copies onto the local rock so both pilots can chip it', () => {
-  const local = { ...localRoid(1, 2), isCollabTarget: false };
-  applyAsteroidKinematics(local, { ...roid('server-asteroid-0', 10, 10), isCollabTarget: true });
-  expect(local.isCollabTarget).toBe(true);
 });
 
 test('reflection and spin metadata reaches the local rock for live cues and previews', () => {

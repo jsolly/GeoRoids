@@ -1,7 +1,7 @@
-# Snapshots v2
+# Snapshots v3
 
-Gameplay uses snapshot v2 with reflective asteroid support. Every join must offer
-`snapshotVersion:2` and `asteroidInteractions:1`; the server acknowledges both
+Gameplay uses snapshot v3 with reflective asteroid support. Every join must offer
+`snapshotVersion:3` and `asteroidInteractions:1`; the server acknowledges both
 and provides a private resume token before the client starts play. Missing or
 unsupported capabilities fail explicitly. There is no full-state `gameState`
 transport, disabled-offer build, or legacy-client mode.
@@ -9,19 +9,22 @@ transport, disabled-offer build, or legacy-client mode.
 ## Deployment
 
 Merge through the CI-gated PR flow. Vercel publishes the client through Git and
-Railway publishes the server independently. Version 2 is a clean break: no
-version-1 decoder, negotiation bridge, rollout flag or protocol rollback mode
-remains. World persistence, diagnostic log envelopes and player-motion epochs
+Railway publishes the server independently. Version 3 removes cooperative tags
+and split effects with a clean break: no version-2 decoder, negotiation bridge,
+rollout flag or protocol rollback mode remains. World persistence, diagnostic log envelopes and player-motion epochs
 keep their existing schemas.
 
 Publish the matching client and server revisions close together. Either deployment
-order has a temporary mismatch window: a version-1 tab cannot join a version-2
-server, and a version-2 client cannot join a version-1 server. Refreshing obtains
-the current client; it cannot finish a pending server deployment. Existing tabs
-must refresh when requested. A version mismatch fails explicitly rather than
-starting gameplay with incomplete or incompatible state.
+order has a temporary mismatch window: a version-2 tab cannot join a version-3
+server, and a version-3 client cannot join a version-2 server. Refreshing obtains
+the current client; it cannot finish a pending server deployment. The release
+watcher reloads stale tabs after observing a changed client manifest.
+A matching new client that met an older server may need Enter Game again once
+both deployments finish. Pilot resume credentials are retained. A version
+mismatch fails explicitly rather than starting gameplay with incomplete or
+incompatible state.
 
-Gameplay WebSocket URLs must include `snapshotVersion=2` and
+Gameplay WebSocket URLs must include `snapshotVersion=3` and
 `asteroidInteractions=1`. Missing or unsupported offers receive HTTP 426 before
 upgrade. The join message is validated again, so URL parameters alone do not
 grant access. The client rejects an unsupported server acknowledgment. The log
@@ -40,7 +43,7 @@ Omission means unlocked. Lock state is transient and is not persisted.
 ## Wire contract
 
 The envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
-`version:2`, positive integer `sequence`, and either:
+`version:3`, positive integer `sequence`, and either:
 
 - `kind:"keyframe", state:<complete ServerGameSnapshot>`.
 - `kind:"delta", baseline:<previous sequence>, patch:{set?,clear?,collections?,objects?}`.
@@ -154,12 +157,11 @@ credits resources once per rock and personal rewards once per distinct contribut
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
-make additions to the shared world/entity/asteroid/loot/EO/pickup/projectile/tag DTOs
+make additions to the shared world/entity/asteroid/loot/EO/pickup/projectile DTOs
 require corresponding validation. `ServerGameSnapshot` extends the core
-`ServerGameState` with `playerProjectiles` and `collabTags`. Projectile IDs equal their stable `shotId`,
+`ServerGameState` with `playerProjectiles`. Projectile IDs equal their stable `shotId`,
 so an event and subsequent keyframe repair one shot instead of creating two.
-Tags include asteroid ID, shooter hit records and expiry. Keyframes restore active
-shots and cooperative windows after reconnect without replaying old events.
+Keyframes restore active shots after reconnect without replaying old events.
 All six EO pickup types, asteroid
 shape/material/health, kits, E cooldowns, cable targets, survey contributors and
 shared exploration tiles use the shared DTO contract. Public state must be finite JSON;
@@ -343,7 +345,7 @@ recreate this archived table.
 
 ## Reflective asteroid capability
 
-The required `asteroidInteractions:1` join capability requires snapshot v2 and an
+The required `asteroidInteractions:1` join capability requires snapshot v3 and an
 explicit matching acknowledgment. The joined socket alone receives its private resume token.
 A physical gameplay socket close gives the live session a two-second neutral-input
 grace. A same-socket rejoin is idempotent, and a valid token can atomically

@@ -142,7 +142,6 @@ function asteroid(id: string, position: { x: number; y: number }): AsteroidData 
     offsets: [1, 1, 1, 1],
     material: 'metal',
     surveyedBy: ['scout'],
-    isCollabTarget: false,
     phenomenon: {
       kind: 'reflective',
       clusterId: id,
@@ -621,7 +620,7 @@ test('a restart loads a recent flight only when lastSeenAt is present', () => {
   }
 });
 
-test('a legacy saved finite burn loads as coasting cargo without losing the deposit', () => {
+test('a legacy marked deposit and ownerless finite burn normalize together without losing mining history', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-legacy-boost-'));
   const path = join(directory, 'world.sqlite');
   try {
@@ -630,6 +629,12 @@ test('a legacy saved finite burn loads as coasting cargo without losing the depo
     const db = new DatabaseSync(path);
     const legacy = {
       ...asteroid('legacy-cargo', { x: 20, y: 20 }),
+      isCollabTarget: true,
+      material: 'ice' as const,
+      health: 100,
+      maxHealth: 100,
+      miningContributors: ['offline-miner'],
+      surveyedBy: ['scout'],
       velocity: { x: 1, y: 2 },
       boost: { phase: 'burning', angle: 0.3, remainingFrames: 120 },
     };
@@ -637,7 +642,23 @@ test('a legacy saved finite burn loads as coasting cargo without losing the depo
     db.close();
     const restored = new WorldStore(path);
     try {
-      expect(restored.loadSector('0,0')?.[0]).toEqual({ ...legacy, boost: null });
+      const { isCollabTarget: _retiredFlag, ...retained } = legacy;
+      const expected = { ...retained, boost: null };
+      expect(restored.loadSector('0,0')?.[0]).toEqual(expected);
+      restored.checkpoint(undefined, new Map([['0,0', [expected]]]), []);
+      const saved = new DatabaseSync(path);
+      try {
+        expect(
+          JSON.parse(
+            String(saved.prepare('SELECT json FROM sectors WHERE id = ?').get('0,0')?.['json'])
+          )
+        ).toEqual([expected]);
+      } finally {
+        saved.close();
+      }
+      const manager = new AsteroidManager(new RNGService(42));
+      manager.addAsteroid(expected);
+      expect(manager.registerLaserHit(expected.id, 'new-miner').outcome).toBe('destroyed');
     } finally {
       restored.close();
     }

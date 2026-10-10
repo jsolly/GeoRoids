@@ -6,7 +6,7 @@ import { LootField } from '../../../src/entities/loot/LootField';
 import { decodeSnapshotMessage, snapshotMessage } from '../../support/decodeSnapshotMessage';
 import { snapshotFixture } from './snapshotFixture';
 
-test('a client accepts snapshot v2 cargo markers and ignores retired debris from an older server', () => {
+test('a snapshot v3 client displays cargo markers and ignores reserved debris rows', () => {
   const field = new LootField();
   const cargo: LootData = {
     id: 'cargo',
@@ -24,7 +24,7 @@ test('a client accepts snapshot v2 cargo markers and ignores retired debris from
   expect(field.getAll()).toEqual([cargo]);
 });
 
-test('a new client applies reserved consumption-history deltas from an older v2 server', () => {
+test('a snapshot v3 client applies deltas to reserved consumption history', () => {
   const world = snapshotFixture();
   world.spiderField = Object.assign(world.spiderField ?? { spiders: [], nests: [] }, {
     consumed: [{ id: 'old-spider', position: { x: 2, y: 3 }, furnaceId: 'hearth', frame: 4 }],
@@ -35,7 +35,7 @@ test('a new client applies reserved consumption-history deltas from an older v2 
   const result = decodeSnapshotMessage(
     decoder,
     snapshotMessage({
-      version: 2,
+      version: 3,
       sequence: 2,
       kind: 'delta',
       baseline: 1,

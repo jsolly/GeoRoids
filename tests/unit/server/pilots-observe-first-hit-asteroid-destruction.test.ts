@@ -1,7 +1,7 @@
 /* @vitest-environment node */
 
 import { strict as assert } from 'node:assert';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
@@ -164,49 +164,35 @@ afterEach(async () => {
   }
 });
 
-describe('Scenario: two players hit a big roid within 1s → split', () => {
-  test('one owner finishes a tagged large roid after the dedupe window without splitting', async () => {
-    const { server, clients } = await startWorld([{ id: 'solo-player', position: { x: 0, y: 0 } }]);
-    const [client] = clients;
-    assert.ok(client, 'solo socket');
-    const target = largeIceAsteroid('wire-solo-target', { x: 100, y: 0 });
+describe('Pilots observe first-hit asteroid destruction', () => {
+  test('two pilots receive one removal and one reward from a large ice shot', async () => {
+    const { server, clients } = await startWorld([
+      { id: 'first', position: { x: 0, y: 0 } },
+      { id: 'second', position: { x: 0, y: 20 } },
+    ]);
+    const [first, second] = clients;
+    assert.ok(first && second);
+    const target = largeIceAsteroid('wire-first-hit', { x: 100, y: 0 });
     server.gameEngine.addAsteroid(target);
-    client.resetMessages();
-
-    const now = Date.now();
-    const clock = vi.spyOn(server.gameEngine, 'getServerTime').mockReturnValue(now);
-    try {
-      const firstStart = client.mark();
-      await sendCurrentShot(server, client, 'solo-player', target.id);
-      const tag = messageAt(client, 'asteroidTagged', firstStart);
-      expect(tag.data).toEqual({
-        asteroidId: target.id,
-        shooterId: 'solo-player',
-        expiresAt: now + ROID.COLLAB_SPLIT_WINDOW_MS,
-      });
-      expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
+    for (const client of clients) {
       client.resetMessages();
-      clock.mockReturnValue(now + ROID.COLLAB_HIT_DEDUPE_MS + 1);
-
-      const secondStart = client.mark();
-      await sendCurrentShot(server, client, 'solo-player', target.id);
-      const destroy = messageAt(client, 'asteroidDestroy', secondStart);
-      const score = messageAt(client, 'scoreUpdate', secondStart);
-      expect(destroy.data).toEqual({
+    }
+    await sendCurrentShot(server, first, 'first', target.id);
+    await Promise.all(clients.map((client) => client.barrier()));
+    for (const client of clients) {
+      expect(messageAt(client, 'asteroidDestroy').data).toEqual({
         asteroidId: target.id,
-        collabSplit: false,
         origin: target.position,
       });
-      expect(score.data).toEqual({ playerId: 'solo-player', score: 0 });
-      expect(countType(client, 'shockwave')).toBe(0);
-      expect(countType(client, 'asteroidCreateBatch')).toBe(0);
       expect(countType(client, 'asteroidDestroy')).toBe(1);
-      expect(countType(client, 'scoreUpdate')).toBe(1);
-      expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
-      expect(server.gameEngine.getPlayer('solo-player')?.score).toBe(0);
-      expect(client.failures).toEqual([]);
-    } finally {
-      clock.mockRestore();
+      expect(countType(client, 'asteroidCreateBatch')).toBe(0);
+      expect(countType(client, 'asteroidTagged')).toBe(0);
+      expect(countType(client, 'shockwave')).toBe(0);
     }
+    expect(server.gameEngine.applyLaserAsteroidHit(target.id, 'second').outcome).toBe('missing');
+    expect(server.gameEngine.getLoot().filter((drop) => drop.kind === 'points')).toHaveLength(1);
+    expect(server.gameEngine.getLoot().find((drop) => drop.kind === 'points')?.points).toBe(
+      ROID.POINTS_LARGE
+    );
   });
 });

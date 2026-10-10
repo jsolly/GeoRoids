@@ -39,9 +39,6 @@ describe('mineral asteroids break with distinct rewards', () => {
     );
     expect(new Set(rocks.map((rock) => rock.size)).size).toBeGreaterThan(1);
     expect(rocks.every((rock) => rock.size >= 18 && rock.size <= 48)).toBe(true);
-    expect(rocks.find((rock) => rock.isCollabTarget)?.size).toBeGreaterThanOrEqual(
-      ROID.COLLAB_SPLIT_MIN_SIZE
-    );
     for (const rock of rocks) {
       const local = new Roid({ x: 0, y: 0 }, 1, rock.id);
       applyAsteroidKinematics(local, rock);
@@ -53,16 +50,15 @@ describe('mineral asteroids break with distinct rewards', () => {
     }
   });
 
-  test('metal takes three hits, survives waiting, and drops three times the ice shard mass', () => {
+  test('metal takes three hits and drops three times the ice shard mass', () => {
     const engine = new GameEngine(42);
     engine.addAsteroid(mineral('ice'));
     engine.addAsteroid(mineral('metal'));
-    engine.handleAsteroidHit('ice', 'pilot', 'laser', 0);
-    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser', 100).outcome).toBe('tagged');
-    engine.flushExpiredCollabHits(10000);
+    engine.handleAsteroidHit('ice', 'pilot', 'laser');
+    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser').outcome).toBe('damaged');
     expect(engine.getAsteroid('metal')?.health).toBe(DAMAGE.LASER_HIT * 2);
-    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser', 10100).outcome).toBe('tagged');
-    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser', 10300).outcome).toBe('destroyed');
+    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser').outcome).toBe('damaged');
+    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser').outcome).toBe('destroyed');
     const masses = engine
       .getLoot()
       .filter((drop) => drop.kind === 'shard')
@@ -102,13 +98,12 @@ describe('mineral asteroids break with distinct rewards', () => {
     expect(manager.destroyFromCollision('rubble').newAsteroids).toHaveLength(0);
   });
 
-  test('one pilot breaking rubble creates fragments without a cooperative shockwave', () => {
+  test('one pilot breaking rubble creates three fragments', () => {
     const engine = new GameEngine(42);
     engine.addAsteroid(mineral('rubble'));
     const result = engine.applyLaserAsteroidHit('rubble', 'pilot');
     expect(result.applied).toBe(true);
     expect(result.newAsteroids).toHaveLength(3);
-    expect(result.split).toBe(false);
   });
 
   test('mineral SVG assets match the contours and facets used by the Canvas renderer', () => {

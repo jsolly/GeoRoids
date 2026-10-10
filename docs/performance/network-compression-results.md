@@ -9,7 +9,7 @@ retain their original workload and limitations.
 
 Performance alternatives are not exhausted. Compression remains an isolated
 experiment. These archived runs used uncompressed snapshot v1; the current
-[snapshot contract](../protocol/snapshot-v2.md) requires version 2. Renderer libraries,
+[snapshot contract](../protocol/snapshot-v3.md) requires version 3. Renderer libraries,
 WebGL, workers, binary protocols, runtime/language changes and the client-server
 loop remain open where current measurements justify an experiment.
 

@@ -63,7 +63,6 @@ function frame(projectiles: PlayerProjectileState[]): ServerGameSnapshot {
   state.asteroids = [];
   state.loot = [];
   state.satellitePickups = [];
-  state.collabTags = [];
   state.playerProjectiles = projectiles;
   return state;
 }

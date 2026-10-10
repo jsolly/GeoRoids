@@ -3,10 +3,13 @@
 Implementation progress and outstanding acceptance evidence are tracked in
 [`performance/implementation-status.md`](performance/implementation-status.md).
 Historical architecture observations below remain pinned to their stated revision.
+Current testing instructions live in [tests/AGENTS.md](../tests/AGENTS.md).
+Detailed browser/device experiments below are optional performance research, not
+correctness acceptance requirements or browser test suites.
 
 ## Recommendation
 
-Use the repeatable benchmark framework in [`benchmarks/README.md`](../benchmarks/README.md) to establish evidence, protect gameplay with behavioral tests, then optimize the work that dominates on real phones. Keep the current Vite client, Canvas2D renderer, Node server, and negotiated WebSocket protocol while establishing evidence. A renderer rewrite, binary protocol, or multiple Railway replicas should require a demonstrated bottleneck and a passing compatibility experiment.
+Use the repeatable benchmark framework in [`benchmarks/README.md`](../benchmarks/README.md) to establish evidence, protect gameplay with behavioral tests, then optimize the work that dominates on real phones. Keep Astro-managed Vite, the Svelte interfaces, Canvas2D renderer, Node server, and current WebSocket protocol while establishing evidence. A renderer rewrite, binary protocol, or multiple Railway replicas should require a demonstrated bottleneck and a passing compatibility experiment.
 
 The current framework produces separate client, server, codec and transport measurements with workload counts and outcome witnesses. The broader plan still calls for an automated report connecting frame pacing, client update/render/decode time, server tick deadlines, and transport pressure to the same workload and release. Follow it with small changes to terrain traversal, HUD work, clock recovery, and collision candidate selection where traces show material cost. Every optimization must preserve authoritative combat, touch controls, readable projectiles, and reconnect behavior.
 
@@ -28,7 +31,7 @@ The historical repository baseline is [`54d8c18d4ce25b3ea6af731582bd615666761a85
 | Collision | [CollisionAuthority.ts](../server/core/CollisionAuthority.ts) maps entities into collision rows; [combat.ts](../shared/combat.ts) checks ship/asteroid combinations and ship pairs with nested loops. | Candidate growth and temporary allocations are plausible scaling costs, not measured bottlenecks yet. |
 | Mobile interaction | [touchControls.ts](../src/input/touchControls.ts) supports steering, firing, and ability input with stateful pointer handling and cached button state. | Test sustained multitouch and lifecycle transitions, beyond button visibility. |
 | Test enforcement | [ci.yml](../.github/workflows/ci.yml) runs static checks, runner contracts, unit tests, and build. It does not run gameplay browser or server integration suites. | Add bounded behavioral integration coverage to CI without weakening the existing gate. |
-| Diagnostics | [diagnostics.md](diagnostics.md) describes correlated bounded logs, release IDs, queue loss, and sampled state checkpoints. | Reuse these mechanisms; add aggregate timing metrics rather than per-frame logs. |
+| Diagnostics | [diagnostics.md](diagnostics.md) describes correlated bounded logs, release IDs, queue loss, and explicitly copied state. | Reuse these mechanisms; add aggregate timing metrics rather than per-frame logs. |
 
 ### What existing numbers establish
 
@@ -152,23 +155,14 @@ Use a controlled TCP proxy or OS network shaping for WebSocket tests and verify 
 
 ## Testing strategy for safe refactoring
 
-### Behavioral layers
+Test design, deterministic algorithm comparisons, mutation checks, coverage,
+runner settings and basic manual smoke instructions live in
+[tests/AGENTS.md](../tests/AGENTS.md). Performance experiment guidance remains here.
 
-Keep unit tests fast and focused on shared rules: fixed-step clock behavior, movement and terrain forces, collision geometry, input arbitration, resource consumption, and snapshot invariants. Prefer observable outcomes over singleton internals or private method call counts. Existing tests already cover many of these areas; inventory scenarios and extend missing cases instead of duplicating test names.
-
-Add property-based or generated deterministic cases around the highest-risk algorithms. For snapshots, compare decoded output with canonical public state across add/update/remove/order/clear transitions, keyframes, invalid baselines, and capability mixtures. For collision acceleration, compare against the current brute-force implementation for seeded worlds, edge overlaps, large objects, and swept projectiles. For clocks, compare equal elapsed durations at 30/60/120/144 Hz and inject pauses or backward wall-clock changes.
-
-Use server integration tests for real join/shoot/damage/death/respawn sequences, unsupported-client rejection, resync, rate limits, delayed send callbacks, disconnect cleanup, and restart behavior. A transport benchmark should fail on invalid state, missed acknowledgments, or stalled gameplay even when socket throughput is high. Keep all integration entry points behind `scripts/test-runner.sh` and its repository-scoped ownership lock.
-
-Manual browser measurements cover the shipped UI and network lifecycle: two-player visibility, sustained steer/fire/ability input, pointer cancellation, orientation and browser chrome changes, background/resume, death/respawn and reconnection. Screenshots document observed appearance; they supply no automated correctness proof.
-
-The required `CI / ci` status aggregates independent static validation, runner contracts and the complete server/entity code integration suite. All three lanes must succeed. `npm run gate` owns the full local battery of static checks, contracts, unit tests, build and code integration. Browser tests, frame-work gates, constrained-client gates and the extended browser workflow are retired. Keep manual performance measurements separate from correctness validation.
-
-Keep Vitest's one-worker integration settings and process ownership contracts. Unit-test sharding is a separate possible experiment only after proving isolation; increasing integration workers to shorten CI would reintroduce connection bursts and invalid measurements. New failures must fail the run. Any already skipped or quarantined scenario must appear explicitly in the report with a reason and a repair step, never count as a pass.
-
-Collect coverage separately from benchmarks with the installed `@vitest/coverage-v8` provider via `npm run test:coverage` or the manual Coverage report workflow.[^9] Coverage no longer repeats the full unit suite on every PR. Start with branch coverage reporting for `shared/`, protocol validation, clocks, and authoritative combat. Protect changed high-risk branches and known scenarios before setting a repository-wide percentage. A high line percentage does not prove reconnect semantics or collision ordering.
-
-For each algorithm refactor, include one deliberate mutation or controlled defect that the new regression test rejects, such as ignoring a snapshot clear or missing a cell-edge collision. Remove the defect before committing. This validates the test's ability to catch the failure it claims to protect.
+The required `CI / ci` status aggregates independent static validation, runner
+contracts and complete server/entity code integration. All three lanes must
+succeed. `npm run gate` owns static checks, contracts, units, build and integration.
+Manual performance measurements remain separate from correctness validation.
 
 ## Client optimization opportunities
 
@@ -273,16 +267,14 @@ npm run benchmark -- measure transport --revision HEAD --seed 42
 npm run benchmark -- compare client --baseline REV --candidate REV --seed 42 --viewport desktop
 npm run benchmark -- compare server --baseline REV --candidate REV --seed 42
 npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
-./scripts/test-runner.sh tests/integration/server/
 ```
 
-The full unit and server/entity suites run through `npm run test:all`. Run timed benchmarks
+Code-test commands and runner instructions live in [tests/AGENTS.md](../tests/AGENTS.md). Run timed benchmarks
 separately from tests, builds, coverage and other benchmarks. Transport accepts a
 single revision because realtime scheduling is nondeterministic. The manual
 benchmark runner owns its server processes and ports; retain that ownership model
 for the proposed production realtime benchmark instead of attaching to arbitrary
-local servers. Code integration owns an isolated Vitest worker; its socket
-scenarios create and close port-zero loopback servers.
+local servers.
 
 ## Observability, rollout, and completion
 
@@ -324,7 +316,6 @@ Repository evidence is pinned to `54d8c18d4ce25b3ea6af731582bd615666761a85`, wit
 [^5]: MDN, [JavaScript performance optimization](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Performance/JavaScript), accessed September 8, 2026.
 [^6]: Playwright, [Emulation](https://playwright.dev/docs/emulation), accessed September 8, 2026.
 [^7]: Chrome for Developers, [Throttling](https://developer.chrome.com/docs/devtools/settings/throttling), accessed September 8, 2026.
-[^9]: Vitest, [Coverage](https://vitest.dev/guide/coverage.html), accessed September 8, 2026.
 [^10]: MDN, [Optimizing canvas](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas), accessed September 8, 2026.
 [^11]: MDN, [OffscreenCanvas](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas), accessed September 8, 2026.
 [^12]: Node.js, [Node 24 performance measurement APIs](https://nodejs.org/docs/latest-v24.x/api/perf_hooks.html), accessed September 8, 2026.

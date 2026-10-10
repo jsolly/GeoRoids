@@ -1,7 +1,13 @@
 # Backlog reconciliation
 
 Reviewed against `origin/main` at `b6526529` on 2026-09-30. This records the
-decisions for the backlog's first PR; it does not close the remaining work.
+decisions for the backlog's first PR; it does not close the remaining gameplay work.
+
+Current frontend guidance supersedes the former stack exception: Astro manages
+Vite and static documents; Svelte 5 and shadcn-svelte own DOM interfaces. Canvas2D
+and shared TypeScript gameplay remain. Browser suites and their harness repair
+requirements are retired; the commands and receipts below are historical evidence,
+not instructions to restore them. See [agent operations](agent-operations.md).
 
 ## Keep the current module and rendering conventions
 
@@ -35,8 +41,8 @@ shared nearby survey state, not a promise that every remote rock is broadcast.
 Snapshots retain the documented world-interest limits.
 
 Railway hosting and correlated client/server logs are already shipped repository
-capabilities. [Deployment instructions](../AGENTS.md#railway-game-server) require
-release-specific Railway verification independently of Vercel.
+capabilities. [Deployment instructions](agent-operations.md#railway-game-server) require
+successful Railway deployment verification independently of Vercel.
 [Diagnostics](diagnostics.md) describes JSONL logs, browser forwarding, Railway
 output and the player/session timeline reader. This reconciliation did not run a
 fresh production deployment or inspect production logs.
@@ -56,5 +62,5 @@ the commands above passed. Touch emulation is not physical-phone evidence. The
 full gate and release verification belong to the shipping step.
 
 No player behavior or Wiki semantics changed, so no Wiki article update is
-needed. The `tests/AGENTS.md` link to `tests/AGENTS.ms` was checked; the target
-exists and contains the test-writing instructions.
+needed. The test-writing instructions are now consolidated in
+`tests/AGENTS.md`, including the prohibition on browser tests.

@@ -250,8 +250,6 @@ export class GameController {
 
   // Event handler methods for server asteroid synchronization
   private applyServerAsteroidCreated = (asteroid: AsteroidData): void => {
-    logger.debug('GAME', 'Adding server asteroid to local belt', { asteroidId: asteroid.id });
-
     // Duplicate create (late join / rejoined snapshot) must still take the
     // live pose — skipping here left a private static copy on prod.
     const existingRoid = this.currRoidBelt.roids.find((r) => r.id === asteroid.id);
@@ -284,10 +282,6 @@ export class GameController {
     }
 
     this.currRoidBelt.roids.push(roid);
-    logger.debug(
-      'GAME',
-      `Added asteroid ${asteroid.id} to belt. Total asteroids: ${this.currRoidBelt.roids.length}`
-    );
   };
 
   private applyServerAsteroidUpdated = (
@@ -295,8 +289,6 @@ export class GameController {
     updates: Partial<AsteroidData>,
     complete = false
   ): void => {
-    logger.debug('GAME', 'Updating server asteroid in local belt', { asteroidId });
-
     if (!updates) {
       return;
     }
@@ -314,10 +306,6 @@ export class GameController {
     showDestructionVfx: boolean
   ): void => {
     const { asteroidId } = event;
-    logger.debug('GAME', 'Removing server asteroid from local belt', {
-      asteroidId,
-      showDestructionVfx,
-    });
 
     const index = this.currRoidBelt.roids.findIndex((r) => r.id === asteroidId);
     if (index === -1) {

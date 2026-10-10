@@ -5,12 +5,7 @@ import { getRoidStrokeWidth } from '../../../src/entities/roid/roidRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import {
-  applyLockedPaletteCss,
-  getLaserColor,
-  hexToRgba,
-  laserBoltColor,
-} from '../../../src/utils/colorUtils';
+import { getLaserColor, hexToRgba, laserBoltColor } from '../../../src/utils/colorUtils';
 import { isDebugMode } from '../../../src/utils/debugUtils';
 
 test('locked palette hexes match the art-direction swatch', () => {
@@ -131,21 +126,4 @@ test('HUD score stays readable in the compact cluster and name labels stay faded
   expect(VISUAL.HUD_BALANCE_HEIGHT).toBeLessThan(SHIP.SIZE / 2);
   expect(VISUAL.NAME_LABEL_ALPHA).toBeLessThanOrEqual(0.45);
   expect(VISUAL.NAME_LABEL_ALPHA).toBeGreaterThan(0);
-});
-
-test('applyLockedPaletteCss writes title/menu custom properties', () => {
-  const props = new Map<string, string>();
-  applyLockedPaletteCss({
-    setProperty(name: string, value: string) {
-      props.set(name, value);
-    },
-  } as CSSStyleDeclaration);
-  expect(props.get('--palette-bg')).toBe(PALETTE.BG);
-  expect(props.get('--palette-stars')).toBe(PALETTE.STARS);
-  expect(props.get('--palette-accent')).toBe(TITLE.ACCENT);
-  expect(props.get('--palette-local')).toBe(PALETTE.LOCAL);
-  expect(props.get('--palette-hud')).toBe(PALETTE.HUD);
-  expect(props.get('--palette-hud-muted')).toBe(PALETTE.HUD_MUTED);
-  expect(props.get('--palette-danger')).toBe(PALETTE.DANGER);
-  expect(props.get('--palette-laser')).toBe(PALETTE.LASER_LOCAL);
 });

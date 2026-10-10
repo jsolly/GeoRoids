@@ -1,15 +1,8 @@
 @layer georoids {
   :root {
     --palette-bg: #000011;
-    --palette-stars: #8ba3c7;
     --palette-accent: #a78bfa;
-    --palette-local: #5eead4;
-    --palette-remote: #7dd3fc;
     --palette-hud: #e2e8f0;
-    --palette-hud-muted: #64748b;
-    --palette-danger: #f43f5e;
-    --palette-laser: #fde68a;
-    --font-mono: "Courier New", ui-monospace, monospace;
     --mobile-controls-top: 132px;
     --map-toggle-x: 0px;
     --map-toggle-y: 0px;
@@ -353,33 +346,11 @@
     }
   }
 
-  /* Attribution positioning */
-  #attribution {
-    position: fixed;
-    bottom: 8px;
-    left: 8px;
-    font-size: 0.35em;
-    z-index: 1000;
-    opacity: 0.3;
-    transition: opacity 0.3s ease;
-  }
-
-  #attribution:hover {
-    opacity: 0.6;
-  }
-
   a {
     text-decoration: none;
   }
 
-  /* Custom scrollbar styling */
-
-  /* Enhanced title with better contrast */
-
-  /* Title/menu only — phosphor control legend. Hidden in live play via body.in-play. */
-
-  body.in-play #title-terrain,
-  body.in-play #attribution {
+  body.in-play #title-terrain {
     display: none;
   }
 
@@ -390,38 +361,6 @@
     -webkit-touch-callout: none;
     -webkit-user-drag: none;
     -webkit-tap-highlight-color: transparent;
-  }
-
-  .ship-kit-silhouette {
-    display: block;
-    width: 48px;
-    height: 36px;
-  }
-
-  #start-game.active-mode {
-    background-color: color-mix(in srgb, var(--palette-accent, #a78bfa) 16%, transparent);
-    border-color: var(--palette-accent, #a78bfa);
-    color: var(--palette-accent, #a78bfa);
-    box-shadow: 0 0 18px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
-  }
-
-  /* Responsive adjustments */
-
-  /* Additional visual enhancements */
-
-  /* Build info styling */
-  .build-info {
-    display: inline-block;
-    margin-left: 1em;
-    font-size: 0.75em;
-    color: rgba(255, 255, 255, 0.4);
-    font-family: "Courier New", monospace;
-    opacity: 0.6;
-    transition: opacity 0.3s ease;
-  }
-
-  .build-info:hover {
-    opacity: 1;
   }
 
   body.touch-play #gameCanvas {
@@ -439,21 +378,6 @@
     --action-left: max(12px, env(safe-area-inset-left));
     --action-right: max(12px, env(safe-area-inset-right));
     --action-width: calc((100vw - var(--action-left) - var(--action-right) - 18px) / 4);
-  }
-
-  /* Companion reference, reachable before joining a game. */
-  .manual-entry {
-    margin: 8px 0 0;
-  }
-  .manual-entry a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    font-size: 0.8rem;
-    line-height: 1.5;
-    color: #5eead4;
-    text-decoration: underline;
-    text-underline-offset: 4px;
   }
 
   /* After other * rules so in-play selection suppression stays last in the layer. */

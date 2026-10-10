@@ -102,10 +102,8 @@ test('setPlayView announces play chrome so the overlay can appear', () => {
   window.addEventListener('playViewOff', off);
   setPlayView(true);
   expect(on).toHaveBeenCalledTimes(1);
-  expect(document.body.classList.contains('in-play')).toBe(true);
   setPlayView(false);
   expect(off).toHaveBeenCalledTimes(1);
-  expect(document.body.classList.contains('touch-play')).toBe(false);
   window.removeEventListener('playViewOn', on);
   window.removeEventListener('playViewOff', off);
 });

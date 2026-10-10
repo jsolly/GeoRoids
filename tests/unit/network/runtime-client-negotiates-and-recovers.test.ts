@@ -31,7 +31,6 @@ import {
 } from '../../../src/network/services/asteroidFieldSync';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 import { setSelectedShipKitId } from '../../../src/runtime/shipSelection';
-import { logger } from '../../../src/utils/Logger';
 import { snapshotFixture } from './snapshotFixture';
 
 const LASER_SOUND_PATH_PATTERN = /sounds\/laser\.m4a$/u;
@@ -740,68 +739,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(player.ship.angularVelocity).toBe(0);
   });
 
-  test('sampled snapshots correlate predicted and authoritative local state', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'scout');
-    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-    const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    const ws = await connect();
-    ws.receive('joined', {
-      id: manager.getClientId(),
-      name: 'Runtime pilot',
-      position: player.ship.position,
-      color: '#fff',
-      snapshotVersion: SNAPSHOT_VERSION,
-      asteroidInteractions: 1,
-      resumeToken: 'a'.repeat(64),
-      serverReleaseId: 'server-release',
-    });
-    const first = captureSnapshot(snapshotFixture());
-    const firstEntity = first.entities[0];
-    if (!firstEntity) {
-      throw new Error('Expected the snapshot fixture to contain a local entity');
-    }
-    first.entities = [
-      {
-        ...firstEntity,
-        id: manager.getClientId(),
-        position: { x: 500, y: 100 },
-        playerMotion: { epoch: 3, mode: 'free', ack: 4 },
-      },
-    ];
-    first.asteroids = [];
-    first.loot = [];
-    first.satellitePickups = [];
-    ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
-    ws.receive(
-      'snapshot',
-      new SnapshotEncoder({ ...first, gameTime: first.gameTime + 1 }).encode(2)
-    );
-    const checkpoint = captureSnapshot(first);
-    checkpoint.gameTime += 450;
-    const checkpointEntity = checkpoint.entities[0];
-    if (!checkpointEntity) {
-      throw new Error('Expected the checkpoint to retain the local entity');
-    }
-    checkpointEntity.position = { x: 540, y: 120 };
-    ws.receive('snapshot', new SnapshotEncoder(checkpoint).encode(450));
-
-    const samples = log.mock.calls.filter(
-      ([category, event]) => category === 'STATE' && event === 'snapshot_applied'
-    );
-    expect(samples).toHaveLength(2);
-    expect(samples[0]?.[2]).toMatchObject({
-      serverReleaseId: 'server-release',
-      snapshotSequence: 1,
-      snapshotKind: 'keyframe',
-      motionEpoch: 3,
-      motionAck: 4,
-      clientBeforeApply: { position: { x: 900, y: 700 } },
-      authoritativeRow: { position: { x: 500, y: 100 } },
-      clientAfterApply: { position: expect.objectContaining({ x: expect.any(Number) }) },
-    });
-    expect(samples[1]?.[2]).toMatchObject({ snapshotSequence: 450 });
-  });
-
   test('applies authoritative local health damage and partial regeneration snapshots', async () => {
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
@@ -1290,18 +1227,19 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(player.ship.harpoonLatchPos).toEqual({ x: 1, y: 2 });
   });
 
-  test('socket closure records a contour release once and resume does not repeat it', async () => {
+  test('socket closure releases the contour and resume stays unlocked', async () => {
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
     let ws = await connect();
     acknowledge(ws);
     player.ship.contourLock = { height: 0.08, direction: 1 };
-    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
     ws.close();
     expect(player.ship.contourLock).toBeNull();
     ws = await connect();
     acknowledge(ws);
+    expect(player.ship.contourLock).toBeNull();
     const snapshot = captureSnapshot(snapshotFixture());
     const entity = snapshot.entities[0];
     assert.ok(entity);
@@ -1309,9 +1247,10 @@ describe('actual ConnectionManager WebSocket message path', () => {
     delete entity.contourLock;
     entity.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
     ws.receive('snapshot', new SnapshotEncoder(snapshot).encode(1));
-    const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
-    expect(releases).toHaveLength(1);
-    expect(releases[0]?.[2]).toMatchObject({ reason: 'transport-closed' });
+    expect(player.ship.contourLock).toBeNull();
+    expect(ws.sent.filter((message) => message.type === 'snapshotAck')).toEqual([
+      { type: 'snapshotAck', data: { sequence: 1 } },
+    ]);
   });
 
   test('socket-flap Hauler visuals clear on an authoritative release', async () => {
@@ -1484,3 +1423,5 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.isConnected()).toBe(false);
   });
 });
+
+import { logger } from '../../../src/utils/Logger';

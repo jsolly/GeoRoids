@@ -248,6 +248,7 @@ test('play and geometry update body classes synchronously and preserve shell can
     throw new Error('Missing runtime hosts');
   }
   const gameCanvas = hosts.canvas;
+  expect(hosts.titleCanvas).toBe(element('#title-terrain', HTMLCanvasElement));
   const spawnCanvas = hosts.spawnCanvas;
   expect(spawnCanvas).toBe(element('#spawn-fly-in', HTMLCanvasElement));
   hosts.placeChrome({

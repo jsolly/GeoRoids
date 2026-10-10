@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
 import {
   CONTOUR_LOCK,
   contourLockDistance,
@@ -12,7 +12,6 @@ import { findContourCapture } from '../../../src/physics/terrain/contourCapture'
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 import { terrainSpeedLimit } from '../../../src/physics/terrain/terrainTravel';
-import { logger } from '../../../src/utils/Logger';
 
 beforeEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius }));
 
@@ -134,27 +133,20 @@ test('a diagonal flick takes the reachable reverse route around an adjacent bend
 });
 
 test.each(['manual', 'damage', 'authoritative'] as const)(
-  'a local pilot records a %s contour release once',
+  'a local pilot releases its contour through %s and repeated release stays unlocked',
   (reason) => {
     const ship = pilot();
     expect(ship.toggleContourLock()).toBe(true);
-    const lock = ship.contourLock;
-    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    try {
-      if (reason === 'manual') {
-        ship.toggleContourLock();
-      } else if (reason === 'damage') {
-        ship.takeDamage(1);
-      } else {
-        ship.contourLock = null;
-      }
-      ship.releaseContourLock();
-      const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
-      expect(releases).toHaveLength(1);
-      expect(releases[0]?.[2]).toMatchObject({ reason, lock, position: ship.position });
-      expect(ship.contourLock).toBeNull();
-    } finally {
-      info.mockRestore();
+    if (reason === 'manual') {
+      ship.toggleContourLock();
+    } else if (reason === 'damage') {
+      ship.takeDamage(1);
+    } else {
+      ship.contourLock = null;
     }
+    expect(ship.contourLock).toBeNull();
+    ship.releaseContourLock();
+
+    expect(ship.contourLock).toBeNull();
   }
 );

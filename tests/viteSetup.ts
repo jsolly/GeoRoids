@@ -5,34 +5,8 @@ import '../src/utils/logLevel';
 // Node-environment suites have no browser globals to configure.
 if (typeof window !== 'undefined') {
   // Use the DOM owned by Vitest so events and elements share one window.
-  document.body.innerHTML =
-    readFileSync(resolve(__dirname, './support/legacy-game.html'), 'utf8')
-      .split('<body>')[1]
-      ?.split('</body>')[0] ?? '';
-
-  // Temporary owner for retained imperative driver fixtures. Component suites
-  // mount their own shell and do not consume this fixture's chrome.
-  const showFixture = (inPlay: boolean) => {
-    if (!document.querySelector('#ship-kit-grid')) {
-      return;
-    }
-    document.body.classList.toggle('in-play', inPlay);
-    if (!inPlay) {
-      document.body.classList.remove('touch-play');
-    }
-    for (const [id, visible] of [
-      ['gameArea', inPlay],
-      ['start-screen', !inPlay],
-    ] as const) {
-      const node = document.querySelector<HTMLElement>(`#${id}`);
-      if (node) {
-        node.hidden = !visible;
-        node.style.display = visible ? 'block' : 'none';
-      }
-    }
-  };
-  window.addEventListener('playViewOn', () => showFixture(true));
-  window.addEventListener('playViewOff', () => showFixture(false));
+  // Renderer suites share only engine surfaces. Component suites mount real UI.
+  document.body.innerHTML = readFileSync(resolve(__dirname, './support/canvas.html'), 'utf8');
 
   if (typeof window.matchMedia !== 'function') {
     window.matchMedia = (query: string): MediaQueryList =>

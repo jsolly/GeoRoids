@@ -6,10 +6,7 @@ import {
   SnapshotDecoder,
   type SnapshotMetadata,
 } from '../../../shared/snapshotProtocol';
-import {
-  captureDiagnosticActorState,
-  shouldSampleSnapshot,
-} from '../../../shared/stateDiagnostics';
+import { captureDiagnosticActorState } from '../../../shared/stateDiagnostics';
 import type {
   AbilityUsedEvent,
   AsteroidData,
@@ -475,7 +472,7 @@ export class ConnectionManager {
     this.motionReconciliation.transportClosed();
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
-      localShip.releaseContourLock('transport-closed');
+      localShip.releaseContourLock();
       localShip.serverOwnsMotion = true;
     }
     this.resetSnapshotSession();
@@ -830,7 +827,6 @@ export class ConnectionManager {
       this.state.socket.readyState !== WebSocket.OPEN ||
       !this.joinAcknowledged
     ) {
-      logger.debug('NETWORK', 'Cannot send shoot event - current join is not acknowledged');
       return;
     }
 
@@ -863,7 +859,6 @@ export class ConnectionManager {
       },
     };
 
-    logger.debug('NETWORK', 'Sending shoot message to server', { playerId: message.id });
     if (!this.sendPayload(message) && requestId) {
       field.acknowledgeShot({ requestId, projectileId: null });
     }
@@ -967,9 +962,7 @@ export class ConnectionManager {
     if (!this.sendPayload(message)) {
       return false;
     }
-    logger.debug('NETWORK', 'Sent message', {
-      messageType: typeof message['type'] === 'string' ? message['type'] : 'unknown',
-    });
+
     return true;
   }
 
@@ -1201,9 +1194,6 @@ export class ConnectionManager {
     receivedAt: number
   ): void {
     const appliedSocket = this.state.socket;
-    const sampled = shouldSampleSnapshot(metadata.sequence);
-    const localBefore = sampled ? PlayerManager.getInstance().getLocalPlayer() : undefined;
-    const clientBeforeApply = localBefore ? captureClientPlayerState(localBefore) : undefined;
     try {
       this.snapshotResyncPending = false;
       if (this.lastAcceptedSnapshotSequence === 0) {
@@ -1228,32 +1218,6 @@ export class ConnectionManager {
         gameTime: state.gameTime,
         serverTime: state.serverTime,
       });
-      if (sampled) {
-        const authoritative = state.entities.find(
-          (entity) => entity.id === (this.localPlayerId || this.clientId)
-        );
-        const localAfter = PlayerManager.getInstance().getLocalPlayer();
-        logger.info('STATE', 'snapshot_applied', {
-          receivedAt,
-          gameTime: state.gameTime,
-          snapshotSequence: metadata.sequence,
-          snapshotKind: metadata.kind,
-          ...(metadata.baseline !== undefined ? { snapshotBaseline: metadata.baseline } : {}),
-          ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
-          ...(authoritative?.playerMotion
-            ? {
-                motionEpoch: authoritative.playerMotion.epoch,
-                motionAck: authoritative.playerMotion.ack,
-                motionMode: authoritative.playerMotion.mode,
-              }
-            : {}),
-          ...(clientBeforeApply ? { clientBeforeApply } : {}),
-          ...(authoritative
-            ? { authoritativeRow: captureDiagnosticActorState(authoritative) }
-            : {}),
-          ...(localAfter ? { clientAfterApply: captureClientPlayerState(localAfter) } : {}),
-        });
-      }
     } catch (error) {
       this.requestSnapshotResync(error, metadata, receivedAt);
     }

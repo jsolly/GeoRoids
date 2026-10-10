@@ -4,35 +4,7 @@ import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
 
-export type ContourReleaseReason =
-  | 'manual'
-  | 'authoritative'
-  | 'death'
-  | 'damage'
-  | 'furnace'
-  | 'overlay'
-  | 'movement-lock'
-  | 'cargo-hover'
-  | 'knockback'
-  | 'guidance-unavailable'
-  | 'collision'
-  | 'boundary'
-  | 'inactive'
-  | 'transport-closed'
-  | 'resume'
-  | 'lifecycle'
-  | 'handoff-timeout'
-  | 'removed'
-  | 'fixture'
-  | 'client-release'
-  | 'rail-distance'
-  | 'rail-heading'
-  | 'rail-route'
-  | 'velocity'
-  | 'displacement'
-  | 'anchor';
-
-/** Release-only diagnostics; unavailable geometry is explicit JSON null, never Infinity. */
+/** Geometry for server rail validation; unavailable distance is explicit null. */
 export function contourLockGeometry(position: Position, state: ContourLockState) {
   const field = getTerrainField();
   const gradient = sampleGradient(field, position.x, position.y, 0.25);

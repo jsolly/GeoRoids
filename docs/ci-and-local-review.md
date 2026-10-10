@@ -23,30 +23,10 @@ Dependabot keeps its explicit manual-drain invocation gate.
 
 ## Local review
 
-Run from `/Users/johnsolly/code/GeoRoids` or the absolute feature-worktree path.
-
-1. Run affected deterministic unit scenarios or code integration through
-   `scripts/test-runner.sh`, and independently review the change and evidence.
-2. Fix findings and repeat affected checks. Keep one isolated Vitest worker with
-   no file parallelism or concurrent test sequences within each run.
-3. Run `npm run gate` after final edits and before publication through `/ship`.
-   It owns static checks, runner contracts, all units, build and `test:review`.
-4. `npm run test:review` runs the complete server/entity integration inventory.
-   A partial selection or a successful hosted lane cannot replace the local gate.
-
-Different worktrees can run unit, runner-contract and integration code checks
-concurrently. Each checkout excludes overlapping validation because builds and
-artifacts belong to it. The integration runner owns an isolated Vitest worker and
-per-run artifacts, defaults to a 1200-second execution deadline and stops only its
-owned processes. Individual socket scenarios create and close port-zero loopback
-servers; the code runner starts no Vite/server pair. Cleanup failures retain the ownership barrier and fail the run.
-Manual browser benchmarking and frame measurement still use the common-Git
-heavyweight queue; their measurements are outside the automatic gate.
-
-Retain the printed review/session artifact directories and actual exit results.
-Do not commit generated logs or reports. Report removed coverage and any unrun or
-skipped checks explicitly. Coverage is available through `npm run test:coverage`
-and the manual Coverage report workflow, without a percentage merge threshold.
+Testing commands, deterministic setup, runner ownership, cleanup and evidence
+reporting live in [tests/AGENTS.md](../tests/AGENTS.md). Publication through `/ship`
+requires the complete `npm run gate`; a partial selection or hosted lane cannot
+replace it. Coverage reporting has no percentage merge threshold.
 
 ## Production verification
 

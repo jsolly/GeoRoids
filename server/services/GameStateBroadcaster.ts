@@ -8,7 +8,6 @@ import {
   SnapshotBroadcastCapture,
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
-import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
 import {
   asteroidReach,
   isWithinWorldInterest,
@@ -19,7 +18,6 @@ import type { AsteroidData, SatellitePickupCollected } from '../../shared-types'
 import { isActiveScanner } from '../../src/entities/ship/surveyScan';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
-import { SERVER_RELEASE_ID } from '../release';
 
 interface SnapshotFlight {
   sequence: number;
@@ -265,7 +263,6 @@ export class GameStateBroadcaster {
           recipient.needsKeyframe ? undefined : recipient.baseline,
           timestamp
         );
-        const { frame } = encoded;
         const bytes = Buffer.byteLength(encoded.text, 'utf8') + OUTBOUND_FRAME_HEADER_RESERVE_BYTES;
         const recovery = recipient.resyncRequested;
         if (!this.canAdmitSnapshot(recipient, bytes, recovery)) {
@@ -288,7 +285,6 @@ export class GameStateBroadcaster {
         }
         recipient.needsKeyframe = false;
         const deliveredState = canonical.state;
-        const recipientPlayerId = player.id;
         const result = this.sendSerialized(ws, encoded.text, 'snapshot', (error) => {
           // One physical socket owns its sequence frontier even across rejoin.
           if (this.snapshotRecipients.get(ws) !== recipient || recipient.pending !== submission) {
@@ -325,30 +321,6 @@ export class GameStateBroadcaster {
           }
           if (submission.applied) {
             this.applySnapshotCredit(recipient, sequence);
-          }
-          if (shouldSampleSnapshot(sequence)) {
-            const authoritative = deliveredState.entities.find(
-              (entity) => entity.id === recipientPlayerId
-            );
-            logger.info('STATE', 'snapshot_sent_to_transport', {
-              releaseId: SERVER_RELEASE_ID,
-              playerId: recipientPlayerId,
-              sentAt: timestamp,
-              gameTime: deliveredState.gameTime,
-              snapshotSequence: sequence,
-              snapshotKind: frame.kind,
-              ...(frame.kind === 'delta' ? { snapshotBaseline: frame.baseline } : {}),
-              ...(authoritative?.playerMotion
-                ? {
-                    motionEpoch: authoritative.playerMotion.epoch,
-                    motionAck: authoritative.playerMotion.ack,
-                    motionMode: authoritative.playerMotion.mode,
-                  }
-                : {}),
-              ...(authoritative
-                ? { authoritativeRow: captureDiagnosticActorState(authoritative) }
-                : {}),
-            });
           }
         });
         if (result !== 'sent') {

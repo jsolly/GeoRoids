@@ -2,7 +2,6 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { logger } from '../../../src/utils/Logger';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -48,7 +47,7 @@ test('a furnace rocket follows server time despite clock skew and accepts its ar
 });
 
 test.each(['snapshot', 'tick'] as const)(
-  'boarding through a %s logs the contour release before adopting the furnace transform',
+  'boarding through a %s releases the contour before adopting the furnace transform',
   (path) => {
     const player = new Player({
       id: 'boarding-pilot',
@@ -65,7 +64,7 @@ test.each(['snapshot', 'tick'] as const)(
       startedAt: 1000,
       durationMs: 3000,
     };
-    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
     vi.spyOn(Date, 'now').mockReturnValue(2500);
     if (path === 'snapshot') {
       player.updateFromServer({
@@ -77,13 +76,7 @@ test.each(['snapshot', 'tick'] as const)(
       player.ship.furnaceTransit = transit;
     }
     player.ship.update();
-    const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
-    expect(releases).toHaveLength(1);
-    expect(releases[0]?.[2]).toMatchObject({
-      reason: 'furnace',
-      position: { x: 2250, y: 100 },
-      velocity: { x: 2, y: 1 },
-    });
+
     expect(player.ship.contourLock).toBeNull();
     expect(player.ship.position).toEqual(furnaceTravelPose(transit, 2500).position);
   }

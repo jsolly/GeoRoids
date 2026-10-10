@@ -155,7 +155,7 @@ export class Player {
     const wasInTransit = this.ship.furnaceTransit !== null;
     if (data.furnaceTransit !== undefined) {
       if (data.furnaceTransit) {
-        this.ship.releaseContourLock('furnace');
+        this.ship.releaseContourLock();
       }
       this.ship.furnaceTransit = data.furnaceTransit;
     }

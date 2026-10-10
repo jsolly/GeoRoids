@@ -3,7 +3,6 @@ import type { Player } from '../entities/player/Player';
 import { worldFurnaces } from '../network/worldExploration';
 import { canvasManager } from '../rendering/canvasSurface';
 import { getOpenGameOverlay } from '../runtime/overlayState';
-import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { steeringTurn } from './pointerSteering';
 
@@ -83,7 +82,7 @@ function updateCruise(player: Player): void {
   }
   player.ship.thrusting = alive && !player.ship.movementLocked && !player.ship.cargoHover;
   if (!alive) {
-    player.ship.releaseContourLock('inactive');
+    player.ship.releaseContourLock();
   }
 }
 
@@ -137,10 +136,6 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
   if (getOpenGameOverlay() !== null) {
     return;
   }
-  logger.debug('KEYBINDINGS', 'KeyDown called', {
-    key: ev.code,
-    shipExploding: player.ship.exploding,
-  });
 
   if (
     TURN_KEYS.has(ev.code) &&
@@ -177,7 +172,7 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
       case 'ArrowRight':
       case 'KeyD':
         controlSources.pointerHeading = null;
-        logger.debug('KEYBINDINGS', 'Updating rotation', { key: ev.code });
+
         reconcilePlayerInput(player);
         break;
       default:
@@ -187,11 +182,6 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
 }
 
 export function keyUp(ev: KeyboardEvent, player: Player): void {
-  logger.debug('KEYBINDINGS', 'KeyUp called', {
-    key: ev.code,
-    shipExploding: player.ship.exploding,
-  });
-
   // Always update keys state first
   if (ev.code in keys) {
     keys[ev.code] = false;
@@ -199,11 +189,6 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
 
   // Update per-player pressed keys set
   getPressedKeysForPlayer(player).delete(ev.code);
-
-  logger.debug('KEYBINDINGS', 'After key removal', {
-    remainingKeys: Array.from(getPressedKeysForPlayer(player)),
-    globalKeys: { ...keys },
-  });
 
   // Space is the fire key; on release simply re-arm the next shot (mirrors the
   // left-mouse behavior). Handled regardless of alive state so it never sticks.

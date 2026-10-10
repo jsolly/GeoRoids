@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 bin="node_modules/.bin/markdownlint-cli2"
 if [[ -x "$bin" ]]; then
-  exec "$bin" "$@" "**/*.md" "**/AGENTS.ms"
+  exec "$bin" "$@" "**/*.md"
 fi
 echo "lint-md: $bin not found — run 'npm ci' in the repository, then retry." >&2
 exit 1

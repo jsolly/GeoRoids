@@ -18,6 +18,12 @@ import * as viewportChrome from '../../../src/ui/viewportChrome';
 const HAULER_RADIUS = hullRadiusForKit('hauler');
 const OVERSIZED_HULL_RADIUS = STEERING.ARROW_DISTANCE_PX + 20;
 
+// The mounted Svelte shell owns this class; these canvas tests supply its state.
+function setFlightState(inPlay: boolean): void {
+  document.body.classList.toggle('in-play', inPlay);
+  setPlayView(inPlay);
+}
+
 function mockContext(): DrawingContext & { fillText: ReturnType<typeof vi.fn> } {
   return {
     save: vi.fn(),
@@ -36,7 +42,7 @@ describe('equip reminder after a pickup', () => {
   });
 
   afterEach(() => {
-    setPlayView(false);
+    setFlightState(false);
     vi.restoreAllMocks();
   });
 
@@ -44,7 +50,7 @@ describe('equip reminder after a pickup', () => {
     vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(true);
     let now = 1_000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
-    setPlayView(true);
+    setFlightState(true);
 
     expect(schematicEquipHintAlpha(now)).toBe(0);
     const ctx = mockContext();
@@ -88,24 +94,24 @@ describe('equip reminder after a pickup', () => {
   test('a pickup before flight does not arm the reminder', () => {
     vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(true);
     showSchematicEquipHint();
-    setPlayView(true);
+    setFlightState(true);
     expect(schematicEquipHintAlpha()).toBe(0);
   });
 
   test('leaving the flight clears the reminder', () => {
     vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(true);
-    setPlayView(true);
+    setFlightState(true);
     showSchematicEquipHint();
     expect(schematicEquipHintAlpha()).toBe(1);
-    setPlayView(false);
+    setFlightState(false);
     expect(schematicEquipHintAlpha()).toBe(0);
-    setPlayView(true);
+    setFlightState(true);
     expect(schematicEquipHintAlpha()).toBe(0);
   });
 
   test('opening the schematic clears the pickup reminder', () => {
     vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(true);
-    setPlayView(true);
+    setFlightState(true);
     showSchematicEquipHint();
     expect(schematicEquipHintAlpha()).toBe(1);
     window.dispatchEvent(new CustomEvent('gameSchematicOpen'));

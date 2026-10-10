@@ -420,7 +420,6 @@ export class MessageHandler {
 
   private handlePlayerShoot(ws: WebSocket, command: CommandOf<'shoot'>): void {
     const { id, laserStart, laserDirection, requestId } = command;
-    logger.debug('DEBUG: Server received shoot message', { id, laserStart, laserDirection });
 
     const shooter = this.gameEngine.getPlayerBySocket(ws);
     if (!shooter || shooter.id !== id) {

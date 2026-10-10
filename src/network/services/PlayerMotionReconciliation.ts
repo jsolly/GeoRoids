@@ -124,7 +124,7 @@ export class PlayerMotionReconciliation {
       this.acknowledgedContourLockVersion = ship.contourLockInputVersion;
       this.pendingContourLock = undefined;
       if (ship.movementLocked || ship.exploding || ship.health <= 0) {
-        ship.releaseContourLock('movement-lock');
+        ship.releaseContourLock();
       }
       return;
     }

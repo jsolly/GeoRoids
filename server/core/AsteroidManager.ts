@@ -200,10 +200,8 @@ export class AsteroidManager {
             y: playerPos.y,
           };
         }
-        logger.debug('Placing asteroid on player', { index: i, position });
       } else {
         position = this.rng.randomPosition(bounds);
-        logger.debug('Placing asteroid randomly', { index: i, position });
       }
 
       const velocity = this.rng.randomVelocity(ROID.SERVER_VELOCITY_MAX);

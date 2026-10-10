@@ -4,13 +4,28 @@ The approved sequence contains 16 feature groups. PR 7 is split into runtime
 capability injection and a separate measured loot-index repair PR. Status describes implementation progress,
 not Todoist completion. Each PR starts from fresh `origin/main`, ships through
 `/ship` semantic review and the full local gate, and merges by squash when CI is
-green. Verify exact Vercel and Railway releases as applicable, then complete the
+green. Verify successful Vercel and Railway deployments as applicable, then complete the
 matching production smoke. Never infer deployment success from CI alone.
 
 Gameplay acceptance covers desktop and touch with two clients, authoritative
 rules, prediction, snapshots, reconnect, restart, locality and affected Wiki
 content. Preserve existing shared state and the existing world. Mark completion
 only after fresh evidence covers the PR's acceptance criteria.
+
+## Current scope after frontend alignment
+
+Astro, Svelte 5 and shadcn-svelte replace the former product DOM stack. The
+TypeScript canvas engine and shared gameplay remain. Browser test suites,
+automatic frame-work/constrained-client gates and release identity gates are
+retired. Historical browser repetition, shard-count and architecture-sampling
+requirements below do not reopen those suites. Retain the old receipts as
+provenance; current validation is the full gate and manual UI checks described in
+[agent operations](agent-operations.md). Version metadata and client refresh remain.
+
+The historical sequence below records the original constraints backlog, separate
+from the completed frontend migration. Its unrelated planned gameplay features
+are not declared complete by this migration. This document does not change
+Todoist task status.
 
 ## Sequence and acceptance
 

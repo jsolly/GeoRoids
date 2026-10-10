@@ -140,7 +140,6 @@ import {
 } from './AsteroidManager.ts';
 import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
-import { releaseActorContourLock } from './contourLockDiagnostics';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { LootManager } from './LootManager';
@@ -878,7 +877,7 @@ export class GameEngine {
       this.finishFurnaceTravel(traveler, this.getServerTime());
     }
     this.capturePilot(id);
-    this.playerMotion.forgetActor(id, this.getServerTime());
+    this.playerMotion.forgetActor(id);
     const departing = this.getPlayer(id);
     if (departing) {
       this.cancelArmedBoost(departing.id, departing.harpoonTargetId);
@@ -1533,7 +1532,7 @@ export class GameEngine {
     }
     const wasHeld = entity.overlayHold === true;
     if (held) {
-      releaseActorContourLock(entity, 'overlay', this.getServerTime());
+      entity.contourLock = null;
       entity.overlayHold = true;
       entity.velocity = { x: 0, y: 0 };
       entity.knockbackVelocityLimit = 0;
@@ -1975,7 +1974,7 @@ export class GameEngine {
     const destroyedAsteroids = new Set<string>();
     const bumperKeys = this.resolveTowedAsteroidImpacts(entities, destroyedAsteroids);
     for (const hit of ramHits) {
-      this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime(), 'collision');
+      this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime());
       if (bumperKeys.has(`${hit.shipId}:${hit.asteroidId}`)) {
         continue;
       }
@@ -2981,7 +2980,7 @@ export class GameEngine {
     this.cancelArmedBoost(actor.id, actor.harpoonTargetId);
     clearHaulerLatch(actor);
     actor.abilityActiveFrames = 0;
-    releaseActorContourLock(actor, 'furnace', now);
+    actor.contourLock = null;
     actor.velocity = { x: 0, y: 0 };
     actor.thrusting = false;
     actor.overlayHold = true;

@@ -604,8 +604,9 @@ test('touch input targets the game canvas while the title terrain stays passive'
     add.call(this, type, listener, options);
     listeners.push(() => this.removeEventListener(type, listener, options));
   });
-  const touchControls = document.querySelector('#touch-controls');
-  const oldTouchContent = touchControls?.innerHTML;
+  const titleTerrain = document.createElement('canvas');
+  titleTerrain.id = 'title-terrain';
+  document.body.appendChild(titleTerrain);
   const bodyClass = document.body.className;
   try {
     const { NetworkManager } = await import('../../../src/network/networkManager');
@@ -614,8 +615,7 @@ test('touch input targets the game canvas while the title terrain stays passive'
     PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
     InputManager.getInstance().initializeListeners();
     const gameCanvas = document.querySelector('#gameCanvas');
-    const titleTerrain = document.querySelector('#title-terrain');
-    if (!gameCanvas || !titleTerrain) {
+    if (!gameCanvas) {
       throw new Error('expected both canvases in the play shell');
     }
     expect(gameCanvas.tagName).toBe('CANVAS');
@@ -630,9 +630,7 @@ test('touch input targets the game canvas while the title terrain stays passive'
     for (const remove of listeners) {
       remove();
     }
-    if (touchControls && oldTouchContent !== undefined) {
-      touchControls.innerHTML = oldTouchContent;
-    }
+    titleTerrain.remove();
     document.body.className = bodyClass;
     vi.resetModules();
   }

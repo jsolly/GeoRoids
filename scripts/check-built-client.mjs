@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { clientAssetGraph } from './client-asset-graph.mjs';
+import { clientReleaseSha } from './client-release-sha.ts';
 
 export function checkBuiltClient(root = process.cwd(), expectedSha) {
-  const sha =
-    expectedSha ??
-    execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const sha = expectedSha ?? clientReleaseSha(root);
   const read = (path) => readFileSync(join(root, 'dist', path), 'utf8');
   const release = JSON.parse(read('release.json'));
   assert.equal(release.releaseSha, sha, 'Built release identity differs from the checkout');

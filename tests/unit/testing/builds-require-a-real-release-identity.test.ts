@@ -1,5 +1,6 @@
 /* @vitest-environment node */
 import { execFileSync } from 'node:child_process';
+import process from 'node:process';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { clientViteConfig } from '../../../scripts/client-build';
 
@@ -46,6 +47,7 @@ test('local builds embed their Git identity and bound the lookup', () => {
   );
   expect(built.define?.['import.meta.env.VITE_COMMIT_SHA']).toBe(JSON.stringify(release));
   expect(execFileSync).toHaveBeenCalledWith('git', ['rev-parse', 'HEAD'], {
+    cwd: process.cwd(),
     encoding: 'utf8',
     timeout: 5000,
   });

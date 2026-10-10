@@ -58,9 +58,9 @@
     "public/wiki/media/survival.png": "sha256:b3c28da426ca94ff585cf653aee10287028e1ff3166c0b84ddb7e02c905e96a5",
     "public/wiki/media/terrain.gif": "sha256:dcaebe9bf2bf9e9c1ef6d5fd5555dc1f06b3f15d3344a8520c8da7ad2796a663",
     "public/wiki/media/terrain.png": "sha256:96426cda4ad69680b231e1b9b653c51d695fa709cdcd79bf7b2048728745a107",
-    "scripts/client-build.ts": "sha256:9ed253c7073f20856ed061fd98f9f98d90a545e4cc37a798722813f7c5f68966",
+    "scripts/client-build.ts": "sha256:0ef4ba4edcf23601829eefcf11533c48fd89b04e1b624f75fb0cc8c274b99317",
     "scripts/generate-sounds.ts": "sha256:7aa65b0caa7873259dd249990054a74c503faf98839bf2196096ffd5425ec7d0",
-    "scripts/wiki-check.ts": "sha256:01964f7b4e71d48a06196a941e3c0336aa9387efec746280b57c3a2ad1632006",
+    "scripts/wiki-check.ts": "sha256:68db3ec943a37d99fb2827f372e6ad21b37f2c0682e728a105f7b00aee1bbfae",
     "scripts/wiki-content.ts": "sha256:d7006a811d3fee2b623e6b3fdbc921ef3142d968e58bd5aaed89c21b8f40ee1d",
     "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
@@ -456,7 +456,8 @@
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:6e31a432d033bd4f34ef8f95bfabf84520befcabcb7208f42b02a3c31948f457",
     "tests/unit/ui/universeMap.test.ts": "sha256:c521a028c2a0abf0c029f44825524fd71cbdc65ca0cb7b0cad345297a129fae5",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
-    "tsconfig.frontend.json": "sha256:591ebcd86d1208910f385d8291a712740f14b10a2e06f3a56c06c324e12a2101"
+    "tsconfig.frontend.json": "sha256:591ebcd86d1208910f385d8291a712740f14b10a2e06f3a56c06c324e12a2101",
+    "scripts/client-release-sha.ts": "sha256:a9089670f66f99085189284f775f374ef76c7d3f171cf9ad1a6f40f9877ac246"
   },
   "reviews": [
     {
@@ -2582,6 +2583,38 @@
       "media": [],
       "owners": {
         "astro.config.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Shared release identity resolution now covers build emission and output validation in hosted archives without Git metadata. Existing refresh behavior and Wiki guidance are unchanged; hosted success and mismatched-release rejection are exercised with real archive fixtures.",
+      "sources": [
+        "scripts/client-build.ts",
+        "scripts/client-release-sha.mjs",
+        "scripts/wiki-check.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "scripts/client-build.ts": "hud-network",
+        "scripts/client-release-sha.mjs": "hud-network",
+        "scripts/wiki-check.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Release resolution uses one typed defining module. The Node 24 output checker imports it directly; archive regression scenarios execute that real CLI. Refresh behavior and Wiki copy remain unchanged.",
+      "sources": [
+        "scripts/client-build.ts",
+        "scripts/client-release-sha.mjs",
+        "scripts/client-release-sha.ts",
+        "scripts/wiki-check.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "scripts/client-release-sha.mjs": "hud-network",
+        "scripts/client-release-sha.ts": "hud-network",
+        "scripts/client-build.ts": "hud-network",
+        "scripts/wiki-check.ts": "hud-network"
       }
     }
   ]

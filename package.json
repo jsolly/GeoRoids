@@ -65,7 +65,7 @@
   "dependencies": {
     "@astrojs/svelte": "9.0.1",
     "@tailwindcss/vite": "4.3.3",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.4",
     "@types/ws": "^8.18.1",
     "astro": "7.3.8",
     "echarts": "^6.1.0",

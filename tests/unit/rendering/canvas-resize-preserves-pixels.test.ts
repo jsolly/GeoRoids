@@ -30,7 +30,7 @@ test('repeated viewport notifications keep the current picture until dimensions 
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
   document.body.append(canvas);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const context = canvasManager.requireContext();
   context.fillStyle = '#ff0000';
   context.fillRect(0, 0, 10, 10);

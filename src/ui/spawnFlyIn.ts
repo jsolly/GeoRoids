@@ -20,6 +20,15 @@ const RETICLE_TICKS: ReadonlyArray<readonly [number, number]> = [
 
 let frameRequest: number | null = null;
 let overlay: HTMLCanvasElement | null = null;
+let overlayHost: HTMLElement | undefined;
+
+export function mountSpawnFlyIn(host: HTMLElement): () => void {
+  overlayHost = host;
+  return () => {
+    stopSpawnFlyIn();
+    overlayHost = undefined;
+  };
+}
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
@@ -29,7 +38,7 @@ function ensureOverlay(): HTMLCanvasElement | null {
   if (overlay) {
     return overlay;
   }
-  const gameArea = document.querySelector('#gameArea');
+  const gameArea = overlayHost ?? document.querySelector('#gameArea');
   if (!gameArea) {
     return null;
   }
@@ -48,20 +57,20 @@ function ensureOverlay(): HTMLCanvasElement | null {
   return overlay;
 }
 
-function stop(): void {
+export function stopSpawnFlyIn(): void {
   if (frameRequest !== null) {
     window.cancelAnimationFrame(frameRequest);
     frameRequest = null;
   }
   overlay?.remove();
   overlay = null;
-  window.removeEventListener('keydown', stop, true);
-  window.removeEventListener('pointerdown', stop, true);
+  window.removeEventListener('keydown', stopSpawnFlyIn, true);
+  window.removeEventListener('pointerdown', stopSpawnFlyIn, true);
 }
 
 /** Isonzo-style deploy camera: whole world → local ship. Any key or tap skips it. */
 export function playSpawnFlyIn(): void {
-  stop();
+  stopSpawnFlyIn();
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
     return;
   }
@@ -70,15 +79,15 @@ export function playSpawnFlyIn(): void {
   if (!canvas || !context) {
     return;
   }
-  window.addEventListener('keydown', stop, true);
-  window.addEventListener('pointerdown', stop, true);
+  window.addEventListener('keydown', stopSpawnFlyIn, true);
+  window.addEventListener('pointerdown', stopSpawnFlyIn, true);
   const started = performance.now();
 
   const render = (now: number): void => {
     const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
     const elapsed = now - started;
     if (!ship || elapsed >= HOLD_MS + DIVE_MS + FADE_MS) {
-      stop();
+      stopSpawnFlyIn();
       return;
     }
     const dpr = window.devicePixelRatio || 1;

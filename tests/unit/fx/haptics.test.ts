@@ -8,7 +8,6 @@ import {
   playLocalHaptic,
   resetHapticsForTests,
   setHaptics,
-  syncHapticsControl,
 } from '../../../src/fx/haptics';
 import { resetSafeStorage } from '../../../src/utils/safeStorage';
 
@@ -41,14 +40,6 @@ function installVibrate(impl: ((pattern: VibratePattern) => boolean) | undefined
 
 function resetHapticsPreferenceUi(): void {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.hapticsOn);
-  const checkbox = document.querySelector<HTMLInputElement>('#hapticsPref');
-  if (checkbox) {
-    checkbox.checked = false;
-  }
-  const row = document.querySelector<HTMLElement>('#hapticsRow');
-  if (row) {
-    row.hidden = true;
-  }
 }
 
 beforeEach(() => {
@@ -85,28 +76,22 @@ test('enabling haptics stores the preference and plays a preview pulse', () => {
   expect(localStorage.getItem(LOCAL_STORAGE_KEYS.hapticsOn)).toBe('true');
   expect(hapticsIsEnabled()).toBe(true);
   expect(vibrate).toHaveBeenCalledWith(24);
-  expect(document.querySelector<HTMLElement>('#hapticsRow')?.hidden).toBe(false);
-  expect(document.querySelector<HTMLInputElement>('#hapticsPref')?.checked).toBe(true);
 });
 
-test('a browser without vibration hides the Haptics toggle and stores nothing', () => {
+test('a browser without vibration cannot enable haptics or store a preference', () => {
   installVibrate(undefined);
   setHaptics(true);
-  syncHapticsControl();
   expect(hapticsApiAvailable()).toBe(false);
   expect(localStorage.getItem(LOCAL_STORAGE_KEYS.hapticsOn)).toBeNull();
-  expect(document.querySelector<HTMLElement>('#hapticsRow')?.hidden).toBe(true);
 });
 
-test('a desktop browser that exposes vibrate without a touch screen hides Haptics', () => {
+test('a desktop browser without touch cannot enable haptics', () => {
   installVibrate(vi.fn(() => true));
   installPointer(false);
-  syncHapticsControl();
   expect(hapticsApiAvailable()).toBe(false);
-  expect(document.querySelector<HTMLElement>('#hapticsRow')?.hidden).toBe(true);
 });
 
-test('turning haptics off cancels vibration and unchecks the control', () => {
+test('turning haptics off cancels vibration and future cues', () => {
   const vibrate = vi.fn(() => true);
   installVibrate(vibrate);
   setHaptics(true);
@@ -114,7 +99,6 @@ test('turning haptics off cancels vibration and unchecks the control', () => {
   setHaptics(false);
   expect(localStorage.getItem(LOCAL_STORAGE_KEYS.hapticsOn)).toBe('false');
   expect(vibrate).toHaveBeenCalledWith(0);
-  expect(document.querySelector<HTMLInputElement>('#hapticsPref')?.checked).toBe(false);
   playHaptic('shot');
   expect(vibrate).toHaveBeenCalledTimes(1);
 });

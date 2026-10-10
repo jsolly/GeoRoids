@@ -66,3 +66,35 @@ test('a keyboard pilot can zoom the focused furnace map within its bounds', () =
   zoom('-', 20);
   expect(map.style.transform).toBe('scale(0.4)');
 });
+
+test('disposing the travel map releases captured fingers and retires detached controls', () => {
+  const destination = CIVIC_LOTS[0];
+  if (!destination) {
+    throw new Error('Missing destination');
+  }
+  const container = document.createElement('div');
+  const travel = vi.fn();
+  const dispose = renderFurnaceTravelMap(container, TOWN_HEARTH, [destination], travel);
+  const marker = container.querySelector<HTMLButtonElement>('[data-furnace-id]');
+  if (!marker) {
+    throw new Error('Missing destination marker');
+  }
+  marker.setPointerCapture = vi.fn();
+  marker.hasPointerCapture = vi.fn().mockReturnValue(true);
+  marker.releasePointerCapture = vi.fn();
+  marker.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      pointerId: 41,
+      pointerType: 'touch',
+      button: 0,
+      bubbles: true,
+    })
+  );
+  expect(marker.setPointerCapture).toHaveBeenCalledWith(41);
+  dispose();
+  dispose();
+  expect(marker.releasePointerCapture).toHaveBeenCalledExactlyOnceWith(41);
+  expect(container.childNodes).toHaveLength(0);
+  marker.click();
+  expect(travel).not.toHaveBeenCalled();
+});

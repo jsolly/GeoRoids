@@ -84,11 +84,15 @@ test('pruneDuplicateOwnRemotes deletes same-name remotes in place', () => {
   expect([...players.keys()].sort()).toEqual(['friend', 'me']);
 });
 
-test('pagehide runs the disconnect callback', () => {
+test('pagehide disconnects only while the browser runtime is mounted', () => {
+  const scope = new AbortController();
   let called = 0;
   bindPageHideDisconnect(() => {
     called += 1;
-  });
+  }, scope.signal);
+  window.dispatchEvent(new Event('pagehide'));
+  expect(called).toBe(1);
+  scope.abort();
   window.dispatchEvent(new Event('pagehide'));
   expect(called).toBe(1);
 });

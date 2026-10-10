@@ -53,7 +53,7 @@ test('phone-sized play view unhides the full touch control overlay', () => {
   document.body.classList.add('in-play');
   syncTouchChrome(true);
   const root = document.querySelector<HTMLElement>('#touch-controls');
-  expect(document.body.classList.contains('touch-play')).toBe(true);
+  expect(root?.classList.contains('is-touch')).toBe(true);
   expect(root?.hidden).toBe(false);
   expect(document.querySelector('#touch-stick')).toBeNull();
   expect(document.querySelector('#touch-fire')).toBeNull();

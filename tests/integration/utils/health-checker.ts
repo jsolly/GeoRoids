@@ -38,7 +38,7 @@ async function checkViteServer(): Promise<boolean> {
     if (
       !body.includes('GeoRoids') &&
       !body.includes('@vite/client') &&
-      !body.includes('/src/core/main.ts')
+      !body.includes('/src/components/game/GameShell.svelte')
     ) {
       console.error('Vite server responded but content seems incorrect');
       return false;

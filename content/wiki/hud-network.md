@@ -36,7 +36,7 @@ A pulsing cyan radar marker identifies a live Survey Probe. Follow its moving ho
 
 ## Sound and haptics
 
-The title screen has separate Sound Effects, Music, and Haptics settings, saved in this browser; Sound Effects start off and Music starts on. They live only on the title screen. Haptics appears only on touch devices whose browser can vibrate, so it is hidden on desktop and iPhone. If sound stops, tap the game to let automatic audio recovery retry, and check your device volume and output.
+The title screen has separate Sound, Music, and Haptics settings, saved in this browser; Sound starts off and Music starts on. They live only on the title screen. Haptics appears only on touch devices whose browser can vibrate, so it is hidden on desktop and iPhone. If sound stops, tap the game to let automatic audio recovery retry, and check your device volume and output.
 
 ## Connection interruptions
 
@@ -46,7 +46,7 @@ Published client updates refresh open tabs automatically after two checks about 
 
 ## Can't join
 
-A generic connection-failed banner can mean your nickname is in use by an online pilot (try another), the server is full, or your tab is outdated (reload). An "unexpected error" notice during play also means reload.
+A generic connection-failed banner can mean your nickname is in use by an online pilot (try another), the server is full, or your tab is outdated (reload). An "unexpected error" notice returns you to the title screen; choose Enter Game to restart, or reload if the problem repeats.
 
 ## Diagnostics
 

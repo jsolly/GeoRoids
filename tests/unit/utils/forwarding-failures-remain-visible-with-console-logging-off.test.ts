@@ -24,6 +24,8 @@ vi.mock('../../../src/constants', async (importOriginal) => {
 import { setClientLogContext } from '../../../src/utils/clientLogContext';
 import { logger } from '../../../src/utils/Logger';
 
+logger.attachRuntime();
+
 afterEach(() => {
   vi.restoreAllMocks();
 });

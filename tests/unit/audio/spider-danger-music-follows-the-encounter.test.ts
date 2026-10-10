@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('../../../src/audio/audioRuntime', () => ({
   getRunningAudioContext: () => null,
@@ -11,10 +11,24 @@ import {
   pushMusicThreat,
   resetMusicThreats,
 } from '../../../src/audio/musicThreat';
-import { resetSpiderScore, updateSpiderScore } from '../../../src/audio/spiderScore';
+import {
+  mountSpiderScore,
+  resetSpiderScore,
+  updateSpiderScore,
+} from '../../../src/audio/spiderScore';
 import { setSpiderField } from '../../../src/physics/terrain/spiderSession';
 
+let lifetime: AbortController;
+
 beforeEach(() => {
+  lifetime = new AbortController();
+  mountSpiderScore(lifetime.signal);
+  resetSpiderScore();
+  resetMusicThreats();
+});
+
+afterEach(() => {
+  lifetime.abort();
   resetSpiderScore();
   resetMusicThreats();
 });

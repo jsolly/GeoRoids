@@ -34,7 +34,7 @@ test("a remote player's laser travels instead of freezing at the muzzle", () => 
     document.body.appendChild(canvas);
   }
   canvas.width = 800;
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
 
   const remote = makePlayer('remote');
   remote.ship.lasers.push(new Laser({ x: 0, y: 0 }, { x: 5, y: 0 }, 0, 0, false));

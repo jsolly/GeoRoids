@@ -13,7 +13,7 @@ export class PlayerNetwork {
     return PlayerNetwork.instance;
   }
 
-  public bindTick(tick: () => void): void {
+  public bindTick(tick: (() => void) | null): void {
     this.tick = tick;
   }
 

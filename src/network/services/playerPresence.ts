@@ -102,9 +102,9 @@ export function pruneDuplicateOwnRemotes<T extends { name: string; type: string 
 }
 
 /** Close the gameplay socket when the tab is hidden/unloaded (including bfcache). */
-export function bindPageHideDisconnect(disconnect: () => void): void {
+export function bindPageHideDisconnect(disconnect: () => void, signal: AbortSignal): void {
   if (typeof window === 'undefined') {
     return;
   }
-  window.addEventListener('pagehide', disconnect);
+  window.addEventListener('pagehide', disconnect, { signal });
 }

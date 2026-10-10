@@ -40,11 +40,9 @@ export function resetSpiderScore(): void {
   silence();
 }
 
-window.addEventListener('playViewOff', () => {
-  // Music beds reset the complete count on this event; discard our old ownership.
-  ownsMusicThreat = false;
-  silence();
-});
+export function mountSpiderScore(signal: AbortSignal): void {
+  window.addEventListener('playViewOff', resetSpiderScore, { signal });
+}
 
 function tone(
   context: AudioContext,

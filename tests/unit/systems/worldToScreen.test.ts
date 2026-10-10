@@ -35,7 +35,7 @@ test.each([
       document.body.append(canvas);
     }
     restoreViewport = setWindowViewport(width, height);
-    canvasManager.initialize();
+    canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
     const ship = { x: -200, y: 300 };
     const world = { x: -130, y: 260 };
     const out = { x: 0, y: 0 };

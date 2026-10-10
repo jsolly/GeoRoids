@@ -36,14 +36,23 @@ function collapsePlayfieldSelection(): void {
 }
 
 let listenersInitialized = false;
+let listenerScope: AbortController | null = null;
 
 /** Keep iOS highlight/copy banners off the playfield while still allowing form fields. */
 export function initializePlayfieldSelection(): void {
   if (typeof document === 'undefined' || listenersInitialized) {
     return;
   }
-  document.addEventListener('selectstart', suppressPlayfieldGesture);
-  document.addEventListener('contextmenu', suppressPlayfieldGesture);
-  document.addEventListener('selectionchange', collapsePlayfieldSelection);
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
+  document.addEventListener('selectstart', suppressPlayfieldGesture, { signal });
+  document.addEventListener('contextmenu', suppressPlayfieldGesture, { signal });
+  document.addEventListener('selectionchange', collapsePlayfieldSelection, { signal });
   listenersInitialized = true;
+}
+
+export function disposePlayfieldSelection(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  listenersInitialized = false;
 }

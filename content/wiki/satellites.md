@@ -22,7 +22,7 @@ Glowing Landsat 7, Terra, Aqua, GOES-16, ENVISAT, and WorldView-3 satellites are
 
 ## Equipped satellites
 
-Open Inventory with V or its button and choose Equip to deploy one satellite alongside your normal tool (one active at a time). It identifies nearby minerals for the crew and records you for shared rewards. Health drains with time and impacts, so damage shortens its scanning lifetime.
+Open Inventory with V or its button and choose Equip to deploy one satellite alongside your normal tool (one active at a time); use Previous and Next to browse a full inventory. It identifies nearby minerals for the crew and records you for shared rewards. Health drains with time and impacts, so damage shortens its scanning lifetime.
 
 ## Storage and loss
 

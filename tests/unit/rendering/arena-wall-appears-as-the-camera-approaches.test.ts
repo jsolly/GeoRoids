@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 test('the arena wall paints when the camera approaches it and skips fully invisible glow', () => {
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   canvasManager.clearPlayfield();
   const context = canvasManager.requireContext();
   const canvas = canvasManager.requireCanvas();

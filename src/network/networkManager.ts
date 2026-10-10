@@ -14,7 +14,6 @@ export class NetworkManager {
 
   private constructor() {
     this.connectionManager = ConnectionManager.getInstance();
-    this.setupConnectionHandlers();
   }
 
   static getInstance(): NetworkManager {
@@ -98,19 +97,45 @@ export class NetworkManager {
     return this.connectionManager.sendMessage(message);
   }
 
-  private setupConnectionHandlers(): void {
+  private runtimeListeners: AbortController | null = null;
+
+  attachRuntime(): void {
+    if (this.runtimeListeners) {
+      return;
+    }
+    this.runtimeListeners = new AbortController();
+    const { signal } = this.runtimeListeners;
+    this.connectionManager.attachRuntime(signal);
     // Listen for connection events
-    window.addEventListener('networkConnected', () => {
-      logger.info('NETWORK', 'Connected to game server');
-    });
+    window.addEventListener(
+      'networkConnected',
+      () => {
+        logger.info('NETWORK', 'Connected to game server');
+      },
+      { signal }
+    );
 
-    window.addEventListener('networkDisconnected', (event) => {
-      const customEvent = event as CustomEvent<{ reason: string }>;
-      logger.warn('NETWORK', `Disconnected: ${customEvent.detail.reason}`);
-    });
+    window.addEventListener(
+      'networkDisconnected',
+      (event) => {
+        const customEvent = event as CustomEvent<{ reason: string }>;
+        logger.warn('NETWORK', `Disconnected: ${customEvent.detail.reason}`);
+      },
+      { signal }
+    );
 
-    window.addEventListener('networkReconnected', () => {
-      logger.info('NETWORK', 'Reconnected to game server');
-    });
+    window.addEventListener(
+      'networkReconnected',
+      () => {
+        logger.info('NETWORK', 'Reconnected to game server');
+      },
+      { signal }
+    );
+  }
+
+  detachRuntime(): void {
+    this.runtimeListeners?.abort();
+    this.runtimeListeners = null;
+    this.disconnect();
   }
 }

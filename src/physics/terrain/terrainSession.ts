@@ -44,7 +44,7 @@ function regionKey(region: ContourRegion): string {
   return `${region.cx}:${region.cy}:${region.radius}:${region.gridSize}`;
 }
 
-function cancelPrefetch(): void {
+export function stopTerrainPrefetch(): void {
   if (prefetchTimer !== undefined) {
     clearTimeout(prefetchTimer);
     prefetchTimer = undefined;
@@ -52,7 +52,7 @@ function cancelPrefetch(): void {
 }
 
 function clearContourPatches(): void {
-  cancelPrefetch();
+  stopTerrainPrefetch();
   contourPatches.clear();
   contourPatchBuilds = 0;
   contourPatchAccess = 0;

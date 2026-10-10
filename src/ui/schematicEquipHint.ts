@@ -1,3 +1,5 @@
+let listenerScope: AbortController | null = null;
+
 import { PALETTE } from '../constants';
 import type { DrawingContext } from '../rendering/drawingContext';
 import { headingCueTipDistance } from '../rendering/headingCueRenderer';
@@ -48,13 +50,19 @@ export function initializeSchematicEquipHint(): void {
   if (initialized || typeof window === 'undefined') {
     return;
   }
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
   initialized = true;
-  window.addEventListener('playViewOff', clearHint);
-  window.addEventListener('gameSchematicOpen', () => {
-    dismissed = true;
-    startedAt = null;
-    pending = false;
-  });
+  window.addEventListener('playViewOff', clearHint, { signal });
+  window.addEventListener(
+    'gameSchematicOpen',
+    () => {
+      dismissed = true;
+      startedAt = null;
+      pending = false;
+    },
+    { signal }
+  );
 }
 
 function schematicEquipHintLines(): readonly [string, string] {
@@ -108,4 +116,11 @@ export function drawSchematicEquipHint(
     ctx.fillText(line, screenX, firstLineY + index * HINT_LINE_HEIGHT);
   }
   ctx.restore();
+}
+
+export function disposeSchematicEquipHint(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  initialized = false;
+  clearHint();
 }

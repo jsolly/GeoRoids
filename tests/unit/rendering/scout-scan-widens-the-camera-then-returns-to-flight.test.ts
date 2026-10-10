@@ -24,7 +24,7 @@ function mountCanvas(): CanvasRenderingContext2D {
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
   document.body.append(canvas);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   return canvasManager.requireContext();
 }
 

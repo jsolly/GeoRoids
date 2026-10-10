@@ -60,7 +60,7 @@ function recordingContext() {
     document.body.append(canvas);
   }
   restoreViewport = setWindowViewport(800, 600);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   let points: Array<{ x: number; y: number }> = [];
   let arcs: Array<Parameters<CanvasRenderingContext2D['arc']>> = [];

@@ -16,7 +16,7 @@ function clientAssets(): Plugin {
     ) {
       const chunks = Object.values(bundle).filter((item) => item.type === 'chunk');
       const roots = chunks.filter((chunk) =>
-        Object.keys(chunk.modules).some((id) => /\/src\/core\/main\.ts$/u.test(id))
+        Object.keys(chunk.modules).some((id) => /\/src\/runtime\/gameRuntime\.ts$/u.test(id))
       );
       // Astro also builds server-side page renderers. Only the client graph has this module.
       if (!roots.length) {

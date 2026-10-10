@@ -1,14 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { initTitleTerrain } from '../../../src/rendering/titleTerrain';
 
 const originalViewport = { width: window.innerWidth, height: window.innerHeight };
-const productionHtml = readFileSync(
-  resolve(__dirname, '../../../src/components/LegacyGameDocument.astro'),
-  'utf8'
-);
+const canvasHtml = '<canvas id="title-terrain" aria-hidden="true"></canvas>';
 
 afterEach(() => {
   Object.defineProperty(window, 'innerWidth', {
@@ -29,7 +24,7 @@ test.each([
 ])(
   'homepage paints neutral contours without elevation numbers or stars at $width px',
   ({ width, height }) => {
-    const dom = new window.DOMParser().parseFromString(productionHtml, 'text/html');
+    const dom = new window.DOMParser().parseFromString(canvasHtml, 'text/html');
     vi.stubGlobal('document', dom);
     vi.stubGlobal('HTMLCanvasElement', window.HTMLCanvasElement);
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });

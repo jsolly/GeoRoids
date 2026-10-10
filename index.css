@@ -18,10 +18,6 @@
   }
 
   /* Global styles */
-  * {
-    font-size: 1.1em;
-    color: white;
-  }
 
   html,
   body {
@@ -65,25 +61,6 @@
     background-color: var(--palette-bg, #000011);
   }
 
-  :where(#start-screen) * {
-    font-size: inherit;
-  }
-
-  #start-screen {
-    --start-control-width: 280px;
-    width: min(92%, 560px);
-    max-width: 560px;
-    max-height: calc(100dvh - 40px);
-    padding: 32px;
-    font-size: 1rem;
-    background: rgba(8, 18, 25, 0.96);
-    border: 1px solid #354952;
-    border-radius: 12px;
-    box-shadow: 0 16px 64px #0008;
-    backdrop-filter: none;
-    text-align: left;
-  }
-
   /* Ensure the game wrapper doesn't create black areas */
   #gameWrapper {
     padding: 0;
@@ -101,7 +78,7 @@
 
   /* Game area styling */
   #gameArea {
-    display: none; /* Hidden by default */
+    display: block; /* Hidden by default */
     width: 100%;
     height: 100%;
     background: transparent;
@@ -129,8 +106,7 @@
   }
 
   /* Playfield chrome above the local radar: Map and Inventory on every device. */
-  .universe-map-toggle,
-  .ship-schematic-toggle {
+  .universe-map-toggle {
     position: absolute;
     left: var(--map-toggle-x);
     top: var(--map-toggle-y);
@@ -152,116 +128,12 @@
     touch-action: manipulation;
   }
 
-  .ship-schematic-toggle {
-    left: auto;
-    right: max(12px, env(safe-area-inset-right));
-    top: var(--schematic-toggle-y);
-    min-width: 118px;
-  }
-
-  .town-store-dialog {
-    width: min(640px, calc(100vw - 24px));
-    max-height: calc(100dvh - 24px);
-    margin: auto;
-    padding: 18px 20px 16px;
-    border: 1px solid color-mix(in srgb, var(--palette-hud, #e2e8f0) 45%, transparent);
-    background: #000011;
-    color: var(--palette-hud, #e2e8f0);
-  }
-
-  .town-store-dialog:modal {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    overflow: auto;
-  }
-
-  .town-store-dialog::backdrop {
-    background: color-mix(in srgb, #000011 82%, transparent);
-  }
-
-  .town-store-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .town-store-eyebrow {
-    margin: 0;
-    color: var(--palette-hud-muted, #64748b);
-    font: 11px / 1.2 var(--font-mono, monospace);
-    letter-spacing: 0.18em;
-  }
-
-  .town-store-header h2,
-  .town-store-copy strong {
-    margin: 4px 0 0;
-    color: var(--palette-local, #5eead4);
-    font: 700 1.05rem / 1.2 var(--font-mono, monospace);
-  }
-
-  .town-store-dialog p,
-  .town-store-copy small {
-    margin: 0;
-    color: var(--palette-hud-muted, #64748b);
-    font: 12px / 1.5 var(--font-mono, monospace);
-  }
-
-  .town-store-choices {
-    display: grid;
-    gap: 12px;
-    margin-block: 20px;
-  }
-
-  .town-store-choices[hidden] {
-    display: none;
-  }
-
-  .town-store-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 35%, transparent);
-  }
-
-  .town-store-copy {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .town-store-header button,
-  .town-store-dialog button {
-    color: var(--palette-hud, #e2e8f0);
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 80%, transparent);
-  }
-
-  .town-store-header button {
-    width: 36px;
-    height: 36px;
-    font-size: 1.4rem;
-    line-height: 1;
-  }
-
-  .town-store-choices button,
-  #town-store-back,
-  .town-store-row button,
-  .furnace-destinations button,
-  #town-store-return {
+  .furnace-destinations button {
     min-height: 36px;
     padding: 0.3rem 0.7rem;
     font: 700 0.7rem / 1 var(--font-mono, monospace);
     letter-spacing: 0.08em;
     text-transform: uppercase;
-  }
-
-  .town-store-choices button,
-  #town-store-back {
-    min-height: 48px;
   }
 
   .furnace-destinations {
@@ -353,27 +225,15 @@
     line-height: 1.3;
   }
 
-  .town-store-dialog h3 {
-    font: 700 0.85rem / 1.5 var(--font-mono, monospace);
-    color: var(--palette-hud, #e2e8f0);
-  }
-
-  .town-store-dialog button:disabled {
-    opacity: 0.55;
-  }
-
   .universe-map-toggle:hover,
-  .universe-map-toggle:focus-visible,
-  .ship-schematic-toggle:hover,
-  .ship-schematic-toggle:focus-visible {
+  .universe-map-toggle:focus-visible {
     color: var(--palette-hud, #e2e8f0);
     border-color: var(--palette-hud, #e2e8f0);
     box-shadow: 0 0 16px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
   }
 
   .universe-map-toggle kbd,
-  .universe-map-dialog kbd,
-  .ship-schematic-toggle kbd {
+  .universe-map-dialog kbd {
     padding: 0.08rem 0.25rem;
     border: 1px solid currentColor;
     border-radius: 3px;
@@ -385,8 +245,7 @@
 
   @media (pointer: coarse), (hover: none) {
     .universe-map-toggle kbd,
-    .universe-map-dialog kbd,
-    .ship-schematic-toggle kbd {
+    .universe-map-dialog kbd {
       display: none;
     }
   }
@@ -396,8 +255,7 @@
   }
 
   .universe-map-toggle.universe-map-touch kbd,
-  .universe-map-dialog.universe-map-touch kbd,
-  .ship-schematic-toggle.ship-schematic-touch kbd {
+  .universe-map-dialog.universe-map-touch kbd {
     display: none;
   }
 
@@ -680,79 +538,9 @@
     text-decoration: none;
   }
 
-  .screen,
-  .screen * {
-    box-sizing: border-box;
-  }
-
-  .screen {
-    touch-action: manipulation;
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    max-width: 650px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto; /* Enable scrolling when needed */
-    padding: 40px;
-    background-color: rgba(20, 20, 30, 0.95); /* Lighter, more visible background */
-    border-radius: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.25); /* More visible border */
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.8),
-      0 0 0 1px rgba(255, 255, 255, 0.1); /* Enhanced shadow and inner glow */
-    backdrop-filter: blur(10px); /* Add subtle blur effect */
-  }
-
   /* Custom scrollbar styling */
-  .screen::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .screen::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-  }
-
-  .screen::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    transition: background 0.3s ease;
-  }
-
-  .screen::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-  }
 
   /* Enhanced title with better contrast */
-  .screen h1 {
-    font-size: 3.2em;
-    font-weight: bold;
-    margin-bottom: 1em; /* Reduced margin */
-    text-align: center;
-    text-shadow:
-      0 0 16px color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent),
-      0 0 36px color-mix(in srgb, var(--palette-accent, #a78bfa) 25%, transparent);
-    letter-spacing: 2px;
-    color: var(--palette-accent, #a78bfa);
-    position: relative;
-  }
-
-  #start-screen h1 {
-    margin: 0 0 28px;
-    color: #e2eee9;
-    font-size: 2.5rem;
-    font-weight: 650;
-    letter-spacing: -0.06em;
-    text-align: left;
-    text-shadow: none;
-  }
-
-  .screen h1::after {
-    content: none;
-  }
 
   /* Title/menu only — phosphor control legend. Hidden in live play via body.in-play. */
 
@@ -770,192 +558,10 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .ship-kit-select {
-    border: 0;
-    margin: 0 0 1.1em;
-    padding: 0;
-  }
-
-  .ship-kit-select legend {
-    font: 500 0.75rem / 1.5 var(--font-mono);
-    color: #9cafa9;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-  }
-
-  .ship-kit-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .ship-kit-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 16px 14px;
-    background: #0c1a22;
-    border: 1px solid #34464f;
-    color: #e2eee9;
-    border-radius: 6px;
-    cursor: pointer;
-    min-height: 156px;
-    text-align: left;
-  }
-
   .ship-kit-silhouette {
     display: block;
     width: 48px;
     height: 36px;
-  }
-
-  .ship-kit-card.is-selected,
-  .ship-kit-card:focus-visible {
-    border-color: #7ad6bb;
-    background: #10292b;
-    box-shadow: inset 0 0 0 1px #7ad6bb;
-  }
-
-  .ship-kit-name {
-    font-size: 1rem;
-    font-weight: 600;
-  }
-
-  .ship-kit-ability {
-    font-size: 0.75rem;
-    line-height: 1.5;
-    color: #a9bbb8;
-  }
-
-  .ship-kit-role {
-    font: 0.65rem / 1.5 var(--font-mono);
-    color: #7ad6bb;
-    margin-top: auto;
-  }
-
-  .game-modes {
-    margin-bottom: 1.5em;
-  }
-
-  .start-actions,
-  .settings {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8em;
-    align-items: stretch;
-    width: min(100%, var(--start-control-width, 280px));
-    margin-inline: auto;
-  }
-
-  .enter-game {
-    width: 100%;
-    appearance: none;
-    display: block;
-    min-height: 48px;
-    padding: 12px 20px;
-    font:
-      600 1rem / 1.5 system-ui,
-      sans-serif;
-    color: #0c2020;
-    background: #7ad6bb;
-    border: 1px solid #7ad6bb;
-    border-radius: 6px;
-    cursor: pointer;
-    text-shadow: none;
-    box-shadow: none;
-    transition: background 0.15s;
-  }
-
-  .enter-game:hover,
-  .enter-game:focus-visible {
-    background: #9be5d0;
-    color: #0c2020;
-    border-color: #9be5d0;
-    box-shadow: none;
-    transform: none;
-  }
-
-  .enter-game::before {
-    content: none;
-  }
-
-  .settings {
-    margin-bottom: 1.5em;
-  }
-
-  .preference-toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 20px;
-  }
-
-  #start-screen .game-modes {
-    margin-bottom: 0.9em;
-  }
-
-  #start-screen .settings {
-    margin-bottom: 0.75em;
-    gap: 0.45em;
-  }
-
-  .sound-toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    min-height: 44px;
-  }
-
-  .sound-toggle-row:hover {
-    background: transparent;
-  }
-
-  .sound-toggle-label {
-    cursor: pointer;
-    font:
-      400 0.8rem / 1.5 system-ui,
-      sans-serif;
-    color: #a9bbb8;
-  }
-
-  .sound-toggle {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    cursor: pointer;
-    accent-color: #7ad6bb;
-  }
-
-  .sound-toggle:disabled,
-  .sound-toggle[aria-disabled="true"] {
-    cursor: not-allowed;
-    opacity: 0.55;
-  }
-
-  .sound-toggle-row:has(.sound-toggle:disabled),
-  .sound-toggle-row:has(.sound-toggle[aria-disabled="true"]) {
-    opacity: 0.7;
-  }
-
-  .sound-toggle-row:has(.sound-toggle:disabled):hover,
-  .sound-toggle-row:has(.sound-toggle[aria-disabled="true"]):hover {
-    transform: none;
-    box-shadow: none;
-  }
-
-  .preference-toggles .sound-toggle-row {
-    min-width: 0;
-    width: auto;
-    max-width: none;
-  }
-
-  .sound-toggle-row[hidden] {
-    display: none;
   }
 
   .debug-identity {
@@ -1169,11 +775,6 @@
     margin-top: 0.5rem;
   }
 
-  .enter-game.active-mode {
-    transform: scale(1.02);
-    border-width: 3px;
-  }
-
   #start-game.active-mode {
     background-color: color-mix(in srgb, var(--palette-accent, #a78bfa) 16%, transparent);
     border-color: var(--palette-accent, #a78bfa);
@@ -1182,116 +783,8 @@
   }
 
   /* Responsive adjustments */
-  @media (max-height: 700px) {
-    .screen {
-      max-height: 95vh;
-      padding: 30px;
-    }
-
-    .screen h1 {
-      font-size: 2.8em;
-      margin-bottom: 1em;
-    }
-
-    .game-modes {
-      margin-bottom: 1.5em;
-    }
-
-    .settings {
-      margin-bottom: 1.5em;
-    }
-
-    .enter-game {
-      padding: 0.6em 1em;
-    }
-  }
-
-  @media (max-width: 700px) {
-    .screen {
-      max-width: 95%;
-      width: 95%;
-      padding: 25px;
-    }
-
-    .screen h1 {
-      font-size: 2.2em;
-    }
-
-    .enter-game {
-      font-size: 1em;
-      padding: 0.7em 1em;
-    }
-
-    .sound-toggle-row {
-      padding: 0.3em 0.6em;
-    }
-
-    .preference-toggles .sound-toggle-row {
-      min-width: 0;
-    }
-
-    #start-screen {
-      padding: 24px;
-    }
-  }
-
-  @media (min-width: 800px) {
-    .screen {
-      max-width: 700px;
-      padding: 50px;
-    }
-
-    #start-screen {
-      --start-control-width: 320px;
-      padding: 36px;
-    }
-  }
-
-  .nickname-label {
-    display: block;
-    margin-bottom: 8px;
-    color: #9cafa9;
-    font: 500 0.75rem / 1.5 var(--font-mono);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .nickname-input {
-    display: block;
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 48px;
-    margin-bottom: 24px;
-    padding: 12px 14px;
-    color: #e2eee9;
-    font:
-      16px / 1.5 system-ui,
-      sans-serif;
-    background: #0c1a22;
-    border: 1px solid #34464f;
-    border-radius: 6px;
-  }
-
-  .nickname-input:focus {
-    border-color: #7ad6bb;
-    outline: 2px solid #7ad6bb;
-    outline-offset: 2px;
-    box-shadow: none;
-  }
-
-  .nickname-input::placeholder {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
-  .nickname-input:hover {
-    border-color: rgba(255, 255, 255, 0.3);
-    background-color: rgba(255, 255, 255, 0.12);
-  }
 
   /* Additional visual enhancements */
-  .screen::before {
-    content: none;
-  }
 
   /* Build info styling */
   .build-info {
@@ -1426,35 +919,6 @@
       width: 48px;
       right: max(20px, env(safe-area-inset-right, 0px));
     }
-
-    .screen {
-      max-height: 92vh;
-      padding: 16px 20px;
-    }
-
-    .screen h1 {
-      font-size: 1.6em;
-      margin-bottom: 0.4em;
-    }
-  }
-
-  @media (max-width: 430px) {
-    .screen {
-      width: min(96%, 420px);
-      max-width: 96%;
-      padding: 18px 14px;
-      border-radius: 16px;
-    }
-
-    .screen h1 {
-      font-size: 1.7em;
-      margin-bottom: 0.55em;
-    }
-
-    #start-screen {
-      --start-control-width: 100%;
-      padding: 24px 20px;
-    }
   }
 
   /* Compact action row above the steering area; Contour Lock stays at bottom center. */
@@ -1464,7 +928,6 @@
     --action-width: calc((100vw - var(--action-left) - var(--action-right) - 18px) / 4);
   }
 
-  body.touch-play .ship-schematic-toggle,
   body.touch-play .universe-map-toggle,
   body.touch-play .touch-ability,
   body.touch-play .debug-hud-toggle {
@@ -1477,17 +940,12 @@
     border-radius: 6px;
   }
 
-  body.touch-play .ship-schematic-toggle,
   body.touch-play .universe-map-toggle,
   body.touch-play .touch-ability {
     top: var(--mobile-controls-top);
     bottom: auto;
     right: auto;
     width: var(--action-width);
-  }
-
-  body.touch-play .ship-schematic-toggle {
-    left: var(--action-left);
   }
 
   body.touch-play .universe-map-toggle {
@@ -1539,10 +997,6 @@
     display: none;
   }
 
-  .nickname-input.default-nickname {
-    color: #e2eee9;
-  }
-
   /* Companion reference, reachable before joining a game. */
   .manual-entry {
     margin: 8px 0 0;
@@ -1556,322 +1010,6 @@
     color: #5eead4;
     text-decoration: underline;
     text-underline-offset: 4px;
-  }
-
-  .ship-schematic-dialog {
-    width: min(920px, calc(100vw - 24px));
-    max-height: calc(100dvh - 24px);
-    margin: auto;
-    padding: 18px 20px 16px;
-    border: 1px solid color-mix(in srgb, var(--palette-hud, #e2e8f0) 45%, transparent);
-    background: #000011;
-    color: var(--palette-hud, #e2e8f0);
-  }
-
-  .ship-schematic-dialog:modal {
-    display: flex;
-    flex-direction: column;
-    overflow: auto;
-  }
-
-  .ship-schematic-dialog::backdrop {
-    background: color-mix(in srgb, #000011 82%, transparent);
-  }
-
-  .ship-schematic-dialog,
-  .ship-schematic-dialog * {
-    box-sizing: border-box;
-  }
-
-  .ship-schematic-header,
-  .ship-schematic-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    gap: 16px;
-  }
-
-  .ship-schematic-eyebrow {
-    margin: 0;
-    color: var(--palette-hud-muted, #64748b);
-    font: 11px / 1.2 var(--font-mono, monospace);
-    letter-spacing: 0.18em;
-  }
-
-  .ship-schematic-header h2,
-  .ship-schematic-detail h3 {
-    margin: 4px 0 0;
-    color: var(--palette-local, #5eead4);
-    font: 700 1.05rem / 1.2 var(--font-mono, monospace);
-  }
-
-  .ship-schematic-header button,
-  .ship-schematic-footer button,
-  .ship-schematic-card {
-    color: var(--palette-hud, #e2e8f0);
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 80%, transparent);
-    box-shadow: none;
-  }
-
-  .ship-schematic-header button {
-    width: 36px;
-    height: 36px;
-    font-size: 1.4rem;
-    line-height: 1;
-  }
-
-  .ship-schematic-dialog [hidden] {
-    display: none;
-  }
-
-  .ship-schematic-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(168px, 280px);
-    gap: 12px 16px;
-    align-items: start;
-    margin: 14px 0;
-  }
-
-  .satellite-inventory {
-    min-width: 0;
-    border-left: 1px solid var(--palette-hud-muted, #64748b);
-    padding: 0 0 0 12px;
-  }
-
-  .satellite-inventory h3 {
-    margin: 0;
-    font: 700 1rem / 1.3 var(--font-mono, monospace);
-    color: var(--palette-local, #5eead4);
-  }
-
-  .satellite-inventory p,
-  .satellite-inventory-row span {
-    color: color-mix(in srgb, var(--palette-hud, #e2e8f0) 30%, var(--palette-hud-muted, #64748b));
-    font: 12px / 1.5 var(--font-mono, monospace);
-  }
-
-  .satellite-inventory > p {
-    margin: 6px 0 12px;
-  }
-
-  .satellite-inventory-status {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .satellite-inventory-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 35%, transparent);
-  }
-
-  .satellite-inventory-row strong {
-    font: 600 14px / 1.5 var(--font-mono, monospace);
-  }
-
-  .satellite-inventory-row strong,
-  .satellite-inventory-row span {
-    display: block;
-  }
-
-  .satellite-inventory-row button {
-    font: 600 13px / 1.4 var(--font-mono, monospace);
-    flex-shrink: 0;
-    min-height: 44px;
-    padding: 8px 14px;
-    color: var(--palette-local, #5eead4);
-    border: 1px solid currentColor;
-    background: transparent;
-  }
-
-  .satellite-inventory-row button:disabled {
-    opacity: 0.45;
-  }
-
-  .ship-schematic-stage {
-    position: relative;
-    min-width: 0;
-    min-height: 220px;
-  }
-
-  #ship-schematic-canvas {
-    display: block;
-    width: 100%;
-    height: 220px;
-  }
-
-  .ship-schematic-cards {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .ship-schematic-card {
-    pointer-events: auto;
-    width: 100%;
-    min-width: 0;
-    min-height: 92px;
-    padding: 10px 12px;
-    text-align: left;
-    overflow-wrap: anywhere;
-  }
-
-  .ship-schematic-card-name {
-    display: block;
-    color: var(--palette-hud, #e2e8f0);
-    font: 600 0.85rem / 1.3 var(--font-mono, monospace);
-  }
-
-  .ship-schematic-card-hint {
-    display: block;
-    margin-top: 6px;
-    color: var(--palette-hud-muted, #64748b);
-    font: 11px / 1.4 var(--font-mono, monospace);
-  }
-
-  .ship-schematic-badge {
-    display: block;
-    visibility: hidden;
-    margin-top: 8px;
-    color: var(--palette-local, #5eead4);
-    font: 10px / 1 var(--font-mono, monospace);
-    letter-spacing: 0.14em;
-  }
-
-  .ship-schematic-card.is-active {
-    border-color: var(--palette-local, #5eead4);
-  }
-
-  .ship-schematic-card:disabled {
-    cursor: not-allowed;
-    border-style: dashed;
-  }
-
-  .ship-schematic-card:disabled .ship-schematic-badge {
-    visibility: visible;
-    color: var(--palette-hud-muted, #64748b);
-  }
-
-  .ship-schematic-card.is-active .ship-schematic-badge {
-    visibility: visible;
-  }
-
-  .ship-schematic-detail {
-    display: grid;
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .ship-schematic-detail > div {
-    grid-area: 1 / 1;
-  }
-
-  .ship-schematic-detail-reserve {
-    visibility: hidden;
-    pointer-events: none;
-  }
-
-  .ship-schematic-detail p {
-    margin: 6px 0 0;
-    color: var(--palette-hud-muted, #64748b);
-    font: 13px / 1.45 var(--font-mono, monospace);
-  }
-
-  #ship-schematic-tool {
-    flex-shrink: 0;
-    width: 180px;
-    height: 64px;
-  }
-
-  #ship-schematic-return {
-    flex: 0 0 196px;
-    padding: 8px 16px;
-    color: var(--palette-local, #5eead4);
-    border-color: color-mix(in srgb, var(--palette-local, #5eead4) 70%, transparent);
-  }
-
-  @media (max-width: 700px) {
-    .ship-schematic-dialog {
-      width: min(920px, calc(100vw - 16px));
-      max-height: calc(100dvh - 16px);
-      padding: 12px;
-    }
-
-    .ship-schematic-body {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 10px;
-      margin: 8px 0;
-    }
-
-    .satellite-inventory {
-      border-left: 0;
-      border-top: 1px solid var(--palette-hud-muted, #64748b);
-      padding: 10px 0 0;
-    }
-
-    .satellite-inventory > p,
-    .satellite-inventory-silk,
-    .satellite-inventory-empty,
-    .satellite-inventory-row span {
-      text-wrap: pretty;
-      overflow-wrap: break-word;
-    }
-
-    .satellite-inventory-row {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .ship-schematic-stage {
-      width: min(100%, 240px);
-      justify-self: center;
-      min-height: 132px;
-    }
-
-    #ship-schematic-canvas {
-      height: 132px;
-    }
-
-    .ship-schematic-cards {
-      position: static;
-      margin-top: 8px;
-      gap: 8px;
-      flex-wrap: nowrap;
-    }
-
-    .ship-schematic-card {
-      width: 100%;
-      padding: 8px;
-      min-height: 72px;
-    }
-
-    .ship-schematic-footer {
-      flex-wrap: wrap;
-      align-items: flex-end;
-    }
-
-    .ship-schematic-detail {
-      flex-basis: 100%;
-    }
-
-    #ship-schematic-return {
-      flex-basis: auto;
-    }
-
-    #ship-schematic-tool {
-      width: 140px;
-      height: 48px;
-    }
   }
 
   /* After other * rules so in-play selection suppression stays last in the layer. */
@@ -1893,5 +1031,11 @@
     -webkit-touch-callout: default;
     -webkit-user-drag: auto;
     -webkit-tap-highlight-color: revert;
+  }
+}
+@layer georoids {
+  #gameArea[hidden],
+  #start-screen[hidden] {
+    display: none;
   }
 }

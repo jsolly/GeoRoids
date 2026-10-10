@@ -5,7 +5,7 @@ import { publishHarpoonField } from '../../../../src/entities/ship/harpoonField'
 import { controlSources, resetControlSources } from '../../../../src/input/controlSources';
 import { keyDown, keyUp, reconcilePlayerInput } from '../../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
-import { setSelectedShipKitId } from '../../../../src/ui/shipKitSelect';
+import { setSelectedShipKitId } from '../../../../src/runtime/shipSelection';
 
 // Keyboard steering and combat remain usable while the ship automatically cruises.
 

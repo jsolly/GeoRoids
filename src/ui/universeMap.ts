@@ -1,3 +1,5 @@
+let listenerScope: AbortController | null = null;
+
 import { beltSlotPosition, beltSlots } from '../../shared/asteroidBelt';
 import { oreResource } from '../../shared/economy';
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
@@ -25,9 +27,14 @@ import {
 import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
 import { drawCourtMapMark } from '../rendering/ricochetCourtRenderer';
 import { travelCameraRotation } from '../rendering/travelCamera';
+import {
+  closeGameOverlay,
+  isGameOverlayOpen,
+  openGameOverlay,
+  subscribeGameOverlay,
+} from '../runtime/overlayState';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
-import { requestTownStoreClose } from './townStoreState';
 import {
   canPlaceMapAssetLabel,
   canPlaceMapCrewLabel,
@@ -114,7 +121,7 @@ export function bindUniverseMapField(source: () => readonly Roid[]): void {
 }
 
 let initialized = false;
-let mapOpen = false;
+let unsubscribeOverlay: (() => void) | undefined;
 let frameRequest: number | null = null;
 let closeInProgress = false;
 let openInputRelease: (() => void) | undefined;
@@ -940,7 +947,7 @@ function drawCourtLandmark(
 }
 
 function renderMap(): void {
-  if (!elements || !mapOpen) {
+  if (!elements || !isUniverseMapOpen()) {
     return;
   }
   resizeCanvas();
@@ -1039,7 +1046,7 @@ function renderMap(): void {
 }
 
 function renderLoop(): void {
-  if (!mapOpen) {
+  if (!isUniverseMapOpen()) {
     frameRequest = null;
     return;
   }
@@ -1061,10 +1068,9 @@ function stopRenderLoop(): void {
 }
 
 function openMap(): void {
-  if (!elements || mapOpen || !document.body.classList.contains('in-play')) {
+  if (!elements || isUniverseMapOpen() || !document.body.classList.contains('in-play')) {
     return;
   }
-  requestTownStoreClose();
   try {
     elements.dialog.showModal();
   } catch (error) {
@@ -1076,7 +1082,7 @@ function openMap(): void {
     return;
   }
   const local = PlayerManager.getInstance().getLocalPlayer();
-  mapOpen = true;
+  openGameOverlay('universe-map');
   nextLocationUpdateAt = 0;
   syncMapInputChrome();
   drawMapLegend(elements.dialog);
@@ -1093,13 +1099,23 @@ function openMap(): void {
   elements.close.focus({ preventScroll: true });
 }
 
+function releaseMapPointers(): void {
+  const captured = [...mapPointers.keys()];
+  mapPointers.clear();
+  for (const id of captured) {
+    if (elements?.canvas.hasPointerCapture?.(id)) {
+      elements.canvas.releasePointerCapture(id);
+    }
+  }
+}
+
 function closeMap(): void {
-  if (!elements || !mapOpen || closeInProgress) {
+  if (!elements?.dialog.open || closeInProgress) {
     return;
   }
   closeInProgress = true;
-  mapOpen = false;
-  mapPointers.clear();
+  closeGameOverlay('universe-map');
+  releaseMapPointers();
   stopRenderLoop();
   elements.dialog.close();
   closeInProgress = false;
@@ -1108,11 +1124,11 @@ function closeMap(): void {
 }
 
 function handleDialogClosed(): void {
-  if (closeInProgress || !mapOpen) {
+  if (closeInProgress || !isUniverseMapOpen()) {
     return;
   }
-  mapOpen = false;
-  mapPointers.clear();
+  closeGameOverlay('universe-map');
+  releaseMapPointers();
   stopRenderLoop();
   window.dispatchEvent(new CustomEvent('gameMapClose'));
   playFeedback('interface');
@@ -1122,7 +1138,7 @@ function handleMapKeydown(ev: KeyboardEvent): void {
   if (ev.code === 'KeyM') {
     const target = ev.target;
     if (
-      !mapOpen &&
+      !isUniverseMapOpen() &&
       (!document.body.classList.contains('in-play') ||
         (target instanceof HTMLElement &&
           (target.isContentEditable || target.matches('input, textarea, select'))))
@@ -1134,14 +1150,14 @@ function handleMapKeydown(ev: KeyboardEvent): void {
     if (ev.repeat) {
       return;
     }
-    if (mapOpen) {
+    if (isUniverseMapOpen()) {
       closeMap();
     } else {
       openMap();
     }
     return;
   }
-  if (!mapOpen) {
+  if (!isUniverseMapOpen()) {
     return;
   }
   if (ev.code === 'Escape') {
@@ -1233,7 +1249,7 @@ function mapGesture(): { center: Position; distance: number } | undefined {
 }
 
 function onPointerDown(ev: PointerEvent): void {
-  if (!elements || !mapOpen || (ev.button !== 0 && ev.pointerType !== 'touch')) {
+  if (!elements || !isUniverseMapOpen() || (ev.button !== 0 && ev.pointerType !== 'touch')) {
     return;
   }
   const point = canvasPoint(ev);
@@ -1246,7 +1262,7 @@ function onPointerDown(ev: PointerEvent): void {
 }
 
 function onPointerMove(ev: PointerEvent): void {
-  if (!elements || !mapOpen || !mapPointers.has(ev.pointerId)) {
+  if (!elements || !isUniverseMapOpen() || !mapPointers.has(ev.pointerId)) {
     return;
   }
   const point = canvasPoint(ev);
@@ -1283,7 +1299,7 @@ function onPointerUp(ev: PointerEvent): void {
 }
 
 function onWheel(ev: WheelEvent): void {
-  if (!mapOpen) {
+  if (!isUniverseMapOpen()) {
     return;
   }
   const point = canvasPoint(ev);
@@ -1296,53 +1312,78 @@ function onWheel(ev: WheelEvent): void {
 }
 
 export function isUniverseMapOpen(): boolean {
-  return mapOpen;
+  return isGameOverlayOpen('universe-map');
 }
 
 export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
   if (initialized || typeof document === 'undefined') {
     return;
   }
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
   elements = ensureElements();
   if (!elements) {
     return;
   }
   openInputRelease = options?.onOpen;
   initialized = true;
+  unsubscribeOverlay = subscribeGameOverlay((next, previous) => {
+    if (previous === 'universe-map' && next !== 'universe-map') {
+      closeMap();
+    }
+  });
 
-  elements.toggle.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    openMap();
-  });
-  elements.close.addEventListener('click', closeMap);
-  elements.center.addEventListener('click', centerOnLocalPlayer);
-  elements.dialog.addEventListener('close', handleDialogClosed);
-  elements.dialog.addEventListener('cancel', (ev) => {
-    ev.preventDefault();
-    closeMap();
-  });
-  elements.canvas.addEventListener('pointerdown', onPointerDown);
-  elements.canvas.addEventListener('pointermove', onPointerMove);
-  elements.canvas.addEventListener('pointerup', onPointerUp);
-  elements.canvas.addEventListener('pointercancel', onPointerUp);
-  elements.canvas.addEventListener('lostpointercapture', onPointerUp);
-  elements.canvas.addEventListener('wheel', onWheel, { passive: false });
-  document.addEventListener('keydown', handleMapKeydown, true);
-  window.addEventListener('resize', () => {
-    syncMapInputChrome();
-    if (mapOpen) {
-      resizeCanvas();
-      renderMap();
-    }
-  });
-  window.addEventListener('playViewOff', () => {
-    const wasOpen = mapOpen;
-    closeMap();
-    if (wasOpen) {
-      document.querySelector<HTMLInputElement>('#playerNameInput')?.focus({ preventScroll: true });
-    }
-  });
+  elements.toggle.addEventListener(
+    'click',
+    (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openMap();
+    },
+    { signal }
+  );
+  elements.close.addEventListener('click', closeMap, { signal });
+  elements.center.addEventListener('click', centerOnLocalPlayer, { signal });
+  elements.dialog.addEventListener('close', handleDialogClosed, { signal });
+  elements.dialog.addEventListener(
+    'cancel',
+    (ev) => {
+      ev.preventDefault();
+      closeMap();
+    },
+    { signal }
+  );
+  elements.canvas.addEventListener('pointerdown', onPointerDown, { signal });
+  elements.canvas.addEventListener('pointermove', onPointerMove, { signal });
+  elements.canvas.addEventListener('pointerup', onPointerUp, { signal });
+  elements.canvas.addEventListener('pointercancel', onPointerUp, { signal });
+  elements.canvas.addEventListener('lostpointercapture', onPointerUp, { signal });
+  elements.canvas.addEventListener('wheel', onWheel, { passive: false, signal });
+  document.addEventListener('keydown', handleMapKeydown, { capture: true, signal });
+  window.addEventListener(
+    'resize',
+    () => {
+      syncMapInputChrome();
+      if (isUniverseMapOpen()) {
+        resizeCanvas();
+        renderMap();
+      }
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'playViewOff',
+    () => {
+      const wasOpen = isUniverseMapOpen();
+      closeMap();
+      if (wasOpen) {
+        document
+          .querySelector<HTMLInputElement>('#playerNameInput')
+          ?.focus({ preventScroll: true });
+      }
+    },
+    { signal }
+  );
   syncMapInputChrome();
 }
 
@@ -1380,4 +1421,16 @@ export function drawSpawnChart(
     }
   }
   context.restore();
+}
+
+export function disposeUniverseMap(): void {
+  unsubscribeOverlay?.();
+  unsubscribeOverlay = undefined;
+  listenerScope?.abort();
+  listenerScope = null;
+  initialized = false;
+  closeMap();
+  elements = null;
+  openInputRelease = undefined;
+  readMapRoids = () => [];
 }

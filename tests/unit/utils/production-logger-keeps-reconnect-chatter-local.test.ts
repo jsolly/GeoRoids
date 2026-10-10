@@ -29,6 +29,8 @@ vi.mock('../../../src/constants', async (importOriginal) => {
 
 import { logger } from '../../../src/utils/Logger';
 
+logger.attachRuntime();
+
 test('the production logger keeps reconnect chatter off the log socket', async () => {
   for (const message of [
     'reconnect_scheduled',

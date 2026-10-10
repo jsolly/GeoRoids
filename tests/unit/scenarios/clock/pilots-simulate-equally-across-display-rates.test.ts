@@ -10,7 +10,7 @@ const game = GameController.getInstance();
 
 beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(0.5);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
 });
 
 afterEach(() => {

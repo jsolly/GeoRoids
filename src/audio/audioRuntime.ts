@@ -4,6 +4,7 @@ import { logger } from '../utils/Logger';
 
 type AudioLibrary = typeof import('howler');
 let library: AudioLibrary | undefined;
+let generation = 0;
 let _loading: Promise<void> | undefined;
 let context: AudioContext | undefined;
 let unlockSource: AudioBufferSourceNode | undefined;
@@ -383,8 +384,12 @@ export function activateAudio(): void {
     initializeMusic();
     return;
   }
+  const ticket = generation;
   _loading ??= import('howler')
     .then((audio) => {
+      if (ticket !== generation) {
+        return;
+      }
       library = audio;
       // The gesture-created context is also Howler's context. Avoid Howler's
       // HTML-media unlock pool and automatic context replacement on mobile.
@@ -402,6 +407,9 @@ export function activateAudio(): void {
       }
     })
     .catch((error: unknown) => {
+      if (ticket !== generation) {
+        return;
+      }
       _loading = undefined;
       report(error);
     });
@@ -415,7 +423,7 @@ export function registerAudioSound(
   sfxInitializers.add(initialize);
   sfxStopHooks.add(stop);
   resetHooks.add(reset);
-  if (library && sfxEnabled()) {
+  if (library && context && sfxEnabled()) {
     initialize(library);
   }
 }
@@ -428,7 +436,7 @@ export function registerMusicSound(
   musicInitializers.add(initialize);
   musicStopHooks.add(stop);
   resetHooks.add(reset);
-  if (library && musicEnabled()) {
+  if (library && context && musicEnabled()) {
     initialize(library);
   }
 }
@@ -492,4 +500,29 @@ export function readAudioDiagnostics() {
     needsPlaybackRestart,
     masterGain: library?.Howler.masterGain?.gain.value ?? null,
   };
+}
+
+/** Retire the mounted game's audio, including a delayed Howler import. */
+export function disposeAudioRuntime(): void {
+  generation++;
+  _loading = undefined;
+  stopClockMonitor();
+  stopSources();
+  for (const reset of resetHooks) {
+    reset();
+  }
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  document.removeEventListener('pointerdown', resumeFromGesture, true);
+  document.removeEventListener('touchend', resumeFromGesture, true);
+  document.removeEventListener('keydown', resumeFromGesture, true);
+  listenersInstalled = false;
+  const previous = context;
+  previous?.removeEventListener('statechange', onContextStateChange);
+  context = undefined;
+  resuming = undefined;
+  suspending = undefined;
+  needsPlaybackRestart = false;
+  if (previous && previous.state !== 'closed') {
+    void previous.close().catch(report);
+  }
 }

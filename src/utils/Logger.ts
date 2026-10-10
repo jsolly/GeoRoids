@@ -20,6 +20,7 @@ function levelName(level: LogLevel): 'debug' | 'info' | 'warn' | 'error' {
 type LogForwarderModule = {
   forwardLogToServer: (line: string) => void;
   startClientLogForwarder: () => void;
+  stopClientLogForwarder: () => void;
 };
 
 class Logger {
@@ -28,6 +29,9 @@ class Logger {
   private currentLevel: LogLevel;
   private readonly recentDiagnostics: string[] = [];
   private static isForwarderInitialized = false;
+  private runtimeActive = false;
+  private runtimeGeneration = 0;
+  private forwarder: LogForwarderModule | undefined;
   private static forwarderLoad: Promise<LogForwarderModule> | null = null;
 
   private constructor() {
@@ -138,9 +142,29 @@ class Logger {
     return Logger.forwarderLoad;
   }
 
+  attachRuntime(): void {
+    this.runtimeActive = true;
+  }
+
+  detachRuntime(): void {
+    this.runtimeActive = false;
+    this.runtimeGeneration++;
+    this.forwarder?.stopClientLogForwarder();
+    Logger.isForwarderInitialized = false;
+  }
+
   private forwardToServer(line: string): void {
+    if (!this.runtimeActive) {
+      return;
+    }
+    const generation = this.runtimeGeneration;
     this.loadForwarder()
-      .then(({ forwardLogToServer, startClientLogForwarder }) => {
+      .then((forwarder) => {
+        if (!this.runtimeActive || generation !== this.runtimeGeneration) {
+          return;
+        }
+        this.forwarder = forwarder;
+        const { forwardLogToServer, startClientLogForwarder } = forwarder;
         if (!Logger.isForwarderInitialized) {
           startClientLogForwarder();
           Logger.isForwarderInitialized = true;
@@ -149,7 +173,11 @@ class Logger {
         Logger.forwardingFailureReported = false;
       })
       .catch((error: unknown) => {
-        if (Logger.forwardingFailureReported) {
+        if (
+          !this.runtimeActive ||
+          generation !== this.runtimeGeneration ||
+          Logger.forwardingFailureReported
+        ) {
           return;
         }
         Logger.forwardingFailureReported = true;

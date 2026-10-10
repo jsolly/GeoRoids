@@ -23,7 +23,7 @@ afterEach(() => {
 
 test('successive frames reuse shot sources and remove a departed pilot without retaining their lasers', () => {
   vi.stubGlobal('Path2D', TestPath2D);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const local = PlayerManager.getInstance().createLocalPlayer();
   local.id = 'local-pilot';
   local.ship.position = { x: 0, y: 0 };

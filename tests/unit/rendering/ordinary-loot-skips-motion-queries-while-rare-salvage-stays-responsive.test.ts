@@ -10,7 +10,7 @@ import { setWindowViewport } from '../../support/viewport';
 test('ordinary loot skips motion queries while newly visible rare salvage follows current preferences', () => {
   const restoreViewport = setWindowViewport(800, 600);
   LootField.getInstance().clear();
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   const ship = new Ship({ position: { x: 0, y: 0 } });
   let reduceMotion = false;

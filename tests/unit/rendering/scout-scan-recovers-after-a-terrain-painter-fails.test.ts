@@ -37,7 +37,7 @@ test('a failed terrain stroke during Scout scan restores flight coordinates and 
   pilot.id = 'scanning-pilot';
   pilot.ship.position = { x: 0, y: 0 };
   pilot.ship.abilityActiveFrames = SHIP_ABILITY.SCAN_FRAMES;
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   const viewport = canvasManager.getViewportSize();
   const target = scanCameraZoom(pilot.ship, viewport.width, viewport.height);

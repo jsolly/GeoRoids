@@ -255,10 +255,6 @@ function onPlayViewOff(): void {
 
 export function setMusic(pref: boolean): void {
   setStoredItem(LOCAL_STORAGE_KEYS.musicOn, String(pref));
-  const checkbox = document.querySelector<HTMLInputElement>('#musicPref');
-  if (checkbox) {
-    checkbox.checked = pref;
-  }
   if (pref) {
     activateAudio();
     syncMusicBeds();
@@ -289,11 +285,28 @@ function unloadBeds(): void {
 registerMusicBedAvailability(musicBedsAreConfigured());
 registerMusicSound(startMusic, stopImmediate, unloadBeds);
 registerMusicThreatListener(syncMusicBeds);
-window.addEventListener('playViewOn', syncMusicBeds);
-window.addEventListener('playViewOff', onPlayViewOff);
-document.addEventListener('pointerdown', onGesture, true);
-document.addEventListener('touchend', onGesture, true);
-document.addEventListener('keydown', onGesture, true);
+let listenerScope: AbortController | null = null;
+
+export function mountMusicBeds(): void {
+  if (listenerScope) {
+    return;
+  }
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
+  window.addEventListener('playViewOn', syncMusicBeds, { signal });
+  window.addEventListener('playViewOff', onPlayViewOff, { signal });
+  document.addEventListener('pointerdown', onGesture, { capture: true, signal });
+  document.addEventListener('touchend', onGesture, { capture: true, signal });
+  document.addEventListener('keydown', onGesture, { capture: true, signal });
+}
+
+export function disposeMusicBeds(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  stopImmediate();
+  unloadBeds();
+  resetMusicThreats();
+}
 
 export function readMusicDiagnostics() {
   return {

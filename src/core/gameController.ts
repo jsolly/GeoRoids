@@ -12,7 +12,8 @@ import type {
 import { playDestructionSound } from '../audio/destructionSounds';
 import { playFeedback } from '../audio/feedbackSounds';
 import { playRespawn } from '../audio/interactionSounds';
-import { bindGameAudio } from '../audio/spatialAudio';
+import { bindGameAudio, resetGameAudio } from '../audio/spatialAudio';
+import { mountSpiderScore } from '../audio/spiderScore';
 import { GAME } from '../constants';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { entityFactory } from '../entities/EntityFactory';
@@ -48,16 +49,16 @@ import {
   getTerrainContours,
   getTerrainField,
   getTerrainSeed,
+  stopTerrainPrefetch,
 } from '../physics/terrain/terrainSession';
 import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
+import { getSelectedShipKitId } from '../runtime/shipSelection';
 import { syncCargoFullHint } from '../ui/cargoFullHint';
-import { syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
+import { mountFurnaceTravelPrompt, syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
-import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { playSpawnFlyIn } from '../ui/spawnFlyIn';
-import { syncTownStoreChrome } from '../ui/townStore';
 import { setPlayView } from '../ui/uiUtils';
 import { bindUniverseMapField } from '../ui/universeMap';
 import { logger } from '../utils/Logger';
@@ -100,6 +101,21 @@ export class GameController {
     });
     this.inputManager = InputManager.getInstance();
     this.collisionManager = CollisionManager.getInstance();
+    // Initialize with empty asteroid belt - will be populated by server
+    this.currRoidBelt = entityFactory.createEmptyRoidBelt();
+  }
+
+  private runtimeListeners: AbortController | null = null;
+  private joinGeneration = 0;
+
+  /** Reattach the retained production graph for one mounted browser shell. */
+  attachRuntime(): void {
+    if (this.runtimeListeners) {
+      return;
+    }
+    this.runtimeListeners = new AbortController();
+    mountSpiderScore(this.runtimeListeners.signal);
+    mountFurnaceTravelPrompt(this.runtimeListeners.signal);
     PlayerNetwork.getInstance().bindTick(() => this.updateNetworkPlayerState());
     bindGameAudio({
       getListenerPosition: () => this.playerManager.getLocalShip()?.position,
@@ -117,19 +133,30 @@ export class GameController {
       },
     });
 
-    // Initialize with empty asteroid belt - will be populated by server
-    this.currRoidBelt = entityFactory.createEmptyRoidBelt();
     bindHarpoonFieldSource(() => this.harpoonBodies());
     bindUniverseMapField(() => this.currRoidBelt.roids);
+    this.networkManager.attachRuntime();
+    this.setupNetworkDisconnectionHandler(this.runtimeListeners.signal);
+    this.setupShipExplodedHandler(this.runtimeListeners.signal);
+    window.gameController = this;
+  }
 
-    // Set up network disconnection handler
-    this.setupNetworkDisconnectionHandler();
-
-    this.setupShipExplodedHandler();
-
-    // Expose game controller globally for testing
-    if (typeof window !== 'undefined') {
-      window.gameController = this;
+  detachRuntime(): void {
+    this.joinGeneration++;
+    this.gameStateManager.setIsGameRunning(false);
+    this.runtimeListeners?.abort();
+    this.runtimeListeners = null;
+    this.cleanupServerAsteroidListeners();
+    this.inputManager.detachRuntime();
+    PlayerNetwork.getInstance().stopNetworkUpdates();
+    PlayerNetwork.getInstance().bindTick(null);
+    this.networkManager.detachRuntime();
+    resetGameAudio();
+    stopTerrainPrefetch();
+    bindHarpoonFieldSource(null);
+    bindUniverseMapField(() => []);
+    if (window.gameController === this) {
+      delete window.gameController;
     }
   }
 
@@ -158,17 +185,19 @@ export class GameController {
 
   async startGame(playerName?: string, kitId?: ShipKitId): Promise<void> {
     logger.debug('GAME_CONTROLLER', 'startGame called', { kitId });
+    this.attachRuntime();
+    const generation = ++this.joinGeneration;
     const joinStartedAt = performance.now();
     try {
       this.resetSessionForNewGame();
       clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
 
-      // Reset button text to default state
-      this.inputManager.resetButtonText();
-
       // Connect before joining the server-owned world.
       await this.networkManager.connect();
+      if (generation !== this.joinGeneration) {
+        return;
+      }
 
       logger.debug('NETWORK', 'Connected to server, using server-authoritative game state');
       // Empty belt + listeners must be ready before join so the first
@@ -176,6 +205,9 @@ export class GameController {
       this.currRoidBelt = entityFactory.createEmptyRoidBelt();
       this.setupServerAsteroidListeners();
       const joined = await this.networkManager.joinAndWaitForWorld();
+      if (generation !== this.joinGeneration) {
+        return;
+      }
       if (!joined) {
         this.gameStateManager.setIsGameRunning(false);
         setPlayView(false);
@@ -197,6 +229,9 @@ export class GameController {
       playSpawnFlyIn();
       window.dispatchEvent(new CustomEvent('gameStart'));
     } catch (error) {
+      if (generation !== this.joinGeneration) {
+        return;
+      }
       clientPerformance.joinFailed();
       this.gameStateManager.setIsGameRunning(false);
       this.networkManager.disconnect();
@@ -364,30 +399,34 @@ export class GameController {
     this.networkManager.disconnect({ newSession: true });
   }
 
-  private setupShipExplodedHandler(): void {
-    window.addEventListener('shipExploded', (event) => {
-      const customEvent = event as CustomEvent<{
-        shipId: string;
-        cause?: string;
-      }>;
-      const cause = customEvent.detail.cause;
-      if (!cause) {
-        return;
-      }
-
-      const localPlayer = this.playerManager.getLocalPlayer();
-      if (localPlayer?.ship.id === customEvent.detail.shipId) {
-        localPlayer.onShipExploded({ cause });
-        return;
-      }
-
-      for (const player of this.networkManager.getAllPlayers()) {
-        if (player.ship.id === customEvent.detail.shipId) {
-          player.onShipExploded({ cause });
+  private setupShipExplodedHandler(signal: AbortSignal): void {
+    window.addEventListener(
+      'shipExploded',
+      (event) => {
+        const customEvent = event as CustomEvent<{
+          shipId: string;
+          cause?: string;
+        }>;
+        const cause = customEvent.detail.cause;
+        if (!cause) {
           return;
         }
-      }
-    });
+
+        const localPlayer = this.playerManager.getLocalPlayer();
+        if (localPlayer?.ship.id === customEvent.detail.shipId) {
+          localPlayer.onShipExploded({ cause });
+          return;
+        }
+
+        for (const player of this.networkManager.getAllPlayers()) {
+          if (player.ship.id === customEvent.detail.shipId) {
+            player.onShipExploded({ cause });
+            return;
+          }
+        }
+      },
+      { signal }
+    );
   }
 
   getCurrPlayer() {
@@ -454,6 +493,9 @@ export class GameController {
   stopAfterFrameFailure(): void {
     this.gameStateManager.setIsGameRunning(false);
     PlayerNetwork.getInstance().stopNetworkUpdates();
+    this.inputManager.releaseHeldInput();
+    this.networkManager.disconnect();
+    setPlayView(false);
   }
 
   updateNetworkPlayerState(): void {
@@ -559,40 +601,52 @@ export class GameController {
     showNetworkBanner(`${message} Select Enter Game to try again.`);
   }
 
-  private setupNetworkDisconnectionHandler(): void {
+  private setupNetworkDisconnectionHandler(signal: AbortSignal): void {
     // Listen for network disconnection events
-    window.addEventListener('networkDisconnected', (event) => {
-      const customEvent = event as CustomEvent<{ reason: string }>;
-      logger.warn(
-        'NETWORK',
-        `Network disconnected: ${customEvent.detail.reason} - attempting reconnection`
-      );
+    window.addEventListener(
+      'networkDisconnected',
+      (event) => {
+        const customEvent = event as CustomEvent<{ reason: string }>;
+        logger.warn(
+          'NETWORK',
+          `Network disconnected: ${customEvent.detail.reason} - attempting reconnection`
+        );
 
-      // Don't stop the game immediately - let the NetworkManager handle reconnection
-      // The game continues running while reconnection attempts are made
-    });
+        // Don't stop the game immediately - let the NetworkManager handle reconnection
+        // The game continues running while reconnection attempts are made
+      },
+      { signal }
+    );
 
     // Listen for successful reconnection
-    window.addEventListener('networkReconnected', () => {
-      logger.info('NETWORK', 'Successfully reconnected to server - re-joining the live field');
-      this.networkManager.initializeAsteroidSync();
-    });
+    window.addEventListener(
+      'networkReconnected',
+      () => {
+        logger.info('NETWORK', 'Successfully reconnected to server - re-joining the live field');
+        this.networkManager.initializeAsteroidSync();
+      },
+      { signal }
+    );
 
     // Listen for permanent disconnection (after all reconnection attempts fail)
-    window.addEventListener('networkPermanentlyDisconnected', (event) => {
-      const customEvent = event as CustomEvent<{ reason: string }>;
-      logger.error(
-        'NETWORK',
-        `Permanently disconnected: ${customEvent.detail.reason} - stopping game`
-      );
+    window.addEventListener(
+      'networkPermanentlyDisconnected',
+      (event) => {
+        const customEvent = event as CustomEvent<{ reason: string }>;
+        logger.error(
+          'NETWORK',
+          `Permanently disconnected: ${customEvent.detail.reason} - stopping game`
+        );
 
-      // Only stop the game when reconnection has permanently failed
-      this.gameStateManager.setIsGameRunning(false);
-      setPlayView(false);
+        // Only stop the game when reconnection has permanently failed
+        this.gameStateManager.setIsGameRunning(false);
+        setPlayView(false);
 
-      // Show permanent disconnection message
-      this.showConnectionFailureMessage('network', 'Connection permanently lost');
-    });
+        // Show permanent disconnection message
+        this.showConnectionFailureMessage('network', 'Connection permanently lost');
+      },
+      { signal }
+    );
   }
 
   /** Resume from current authoritative state instead of replaying hidden presentation time. */
@@ -620,7 +674,6 @@ export class GameController {
   /** Movement, timers, and swept collisions share one 60 Hz step. */
   private advanceSimulationFrame(currPlayer: Player): void {
     InputManager.getInstance().updateMovementLock();
-    syncTownStoreChrome();
     syncFurnaceTravelPrompt();
     syncCargoFullHint();
     tickTouchControls(currPlayer);

@@ -221,6 +221,9 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     expect(check()).toContain('source review passed');
     // Every new frontend language must invalidate on addition, edit and deletion.
     for (const path of [
+      'src/runtime/review-fixture.ts',
+      'src/diagnostics/review-fixture.ts',
+      'src/release/review-fixture.ts',
       'src/components/wiki/ReviewFixture.svelte',
       'src/pages/review-fixture.astro',
       'src/styles/review-fixture.css',

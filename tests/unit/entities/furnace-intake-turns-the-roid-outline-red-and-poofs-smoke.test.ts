@@ -47,7 +47,7 @@ function asteroidScene() {
     document.body.append(canvas);
   }
   restoreViewport = setWindowViewport(800, 600);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   const pilot = entityFactory.createPlayer({
     id: 'observer',

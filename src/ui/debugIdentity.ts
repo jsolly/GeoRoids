@@ -1,17 +1,18 @@
 import { debugIsOn } from '../constants/user-preferences';
 import { buildClientDiagnostics } from '../diagnostics/clientDiagnostics';
 import { getClientLogContext } from '../utils/clientLogContext';
-import { attachEventListener } from '../utils/dom';
 import { logger } from '../utils/Logger';
 import { syncDebugHudVisibility } from './debugHud';
 
 const COPY_LABEL = 'Copy';
 const COPIED_LABEL = 'Copied!';
 const PLAYER_ID_PENDING = 'Available after Enter Game';
-const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
+const copyResetTimers = new Map<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
 let listenersBound = false;
+let listenerScope: AbortController | null = null;
 let confirmedPlayerId = '';
+let previousDebugMode: boolean | undefined;
 
 function setHidden(element: HTMLElement | null, hidden: boolean): void {
   if (element) {
@@ -27,17 +28,24 @@ function copyAriaLabel(button: HTMLButtonElement, copied: boolean): string {
   return copied ? `Copied ${target}` : `Copy ${target}`;
 }
 
-async function copyText(value: string, input?: HTMLInputElement | null): Promise<boolean> {
+async function copyText(
+  value: string,
+  signal: AbortSignal,
+  input?: HTMLInputElement | null
+): Promise<boolean> {
   if (!value) {
     return false;
   }
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(value);
-      return true;
+      return !signal.aborted;
     }
   } catch {
     // Fall through to the select-all path when the clipboard API is blocked.
+  }
+  if (signal.aborted || (input && !input.isConnected)) {
+    return false;
   }
   const previousFocus = document.activeElement;
   const target = input ?? document.createElement('textarea');
@@ -66,7 +74,7 @@ async function copyText(value: string, input?: HTMLInputElement | null): Promise
 }
 
 function flashCopyResult(button: HTMLButtonElement | null, copied: boolean): void {
-  if (!button) {
+  if (!button || !listenersBound || !button.isConnected) {
     return;
   }
   const label = button.dataset['copyLabel'] ?? COPY_LABEL;
@@ -145,60 +153,128 @@ export function mountDebugIdentity(): void {
   if (typeof document === 'undefined') {
     return;
   }
-  syncDebugMode();
   if (listenersBound) {
+    syncDebugMode();
     return;
   }
+  previousDebugMode = document.body.classList.contains('debug-on');
+  syncDebugMode();
   listenersBound = true;
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
 
   const playerInput = document.querySelector<HTMLInputElement>('#debug-player-id');
   const sessionInput = document.querySelector<HTMLInputElement>('#debug-session-id');
-  attachEventListener(playerInput, 'focus', () => {
-    if (playerInput) {
-      selectReadableId(playerInput);
-    }
-  });
-  attachEventListener(playerInput, 'click', () => {
-    if (playerInput) {
-      selectReadableId(playerInput);
-    }
-  });
-  attachEventListener(sessionInput, 'focus', () => {
-    if (sessionInput) {
-      selectReadableId(sessionInput);
-    }
-  });
-  attachEventListener(sessionInput, 'click', () => {
-    if (sessionInput) {
-      selectReadableId(sessionInput);
-    }
-  });
+  playerInput?.addEventListener(
+    'focus',
+    () => {
+      if (playerInput) {
+        selectReadableId(playerInput);
+      }
+    },
+    { signal }
+  );
+  playerInput?.addEventListener(
+    'click',
+    () => {
+      if (playerInput) {
+        selectReadableId(playerInput);
+      }
+    },
+    { signal }
+  );
+  sessionInput?.addEventListener(
+    'focus',
+    () => {
+      if (sessionInput) {
+        selectReadableId(sessionInput);
+      }
+    },
+    { signal }
+  );
+  sessionInput?.addEventListener(
+    'click',
+    () => {
+      if (sessionInput) {
+        selectReadableId(sessionInput);
+      }
+    },
+    { signal }
+  );
 
   const copyPlayer = document.querySelector<HTMLButtonElement>('#copy-debug-player-id');
   const copySession = document.querySelector<HTMLButtonElement>('#copy-debug-session-id');
-  attachEventListener(copyPlayer, 'click', async () => {
-    flashCopyResult(copyPlayer, await copyText(confirmedPlayerId, playerInput));
-  });
-  attachEventListener(copySession, 'click', async () => {
-    flashCopyResult(copySession, await copyText(getClientLogContext().sessionId, sessionInput));
-  });
+  copyPlayer?.addEventListener(
+    'click',
+    async () => {
+      const copied = await copyText(confirmedPlayerId, signal, playerInput);
+      if (!signal.aborted) {
+        flashCopyResult(copyPlayer, copied);
+      }
+    },
+    { signal }
+  );
+  copySession?.addEventListener(
+    'click',
+    async () => {
+      const copied = await copyText(getClientLogContext().sessionId, signal, sessionInput);
+      if (!signal.aborted) {
+        flashCopyResult(copySession, copied);
+      }
+    },
+    { signal }
+  );
 
   const copyDiagnostics = document.querySelector<HTMLButtonElement>('#copy-debug-diagnostics');
-  attachEventListener(copyDiagnostics, 'click', async () => {
-    flashCopyResult(copyDiagnostics, await copyText(buildClientDiagnostics()));
-  });
+  copyDiagnostics?.addEventListener(
+    'click',
+    async () => {
+      const copied = await copyText(buildClientDiagnostics(), signal);
+      if (!signal.aborted) {
+        flashCopyResult(copyDiagnostics, copied);
+      }
+    },
+    { signal }
+  );
 
-  window.addEventListener('playerIdentityChanged', (event) => {
-    const playerId = event.detail?.playerId;
-    if (playerId) {
-      confirmedPlayerId = playerId;
+  window.addEventListener(
+    'playerIdentityChanged',
+    (event) => {
+      const playerId = event.detail?.playerId;
+      if (playerId) {
+        confirmedPlayerId = playerId;
+        syncDebugIdentity();
+      }
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'playViewOn',
+    () => {
       syncDebugIdentity();
-    }
-  });
-  window.addEventListener('playViewOn', () => {
-    syncDebugIdentity();
-  });
-  window.addEventListener('playViewOff', () => {
-    syncDebugIdentity();
-  });
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'playViewOff',
+    () => {
+      syncDebugIdentity();
+    },
+    { signal }
+  );
+}
+
+export function disposeDebugIdentity(): void {
+  if (previousDebugMode !== undefined) {
+    document.body.classList.toggle('debug-on', previousDebugMode);
+    previousDebugMode = undefined;
+  }
+  listenerScope?.abort();
+  listenerScope = null;
+  listenersBound = false;
+  confirmedPlayerId = '';
+  for (const timer of copyResetTimers.values()) {
+    clearTimeout(timer);
+  }
+  copyResetTimers.clear();
 }

@@ -1,3 +1,5 @@
+let listenerScope: AbortController | null = null;
+
 import { playFeedback } from '../audio/feedbackSounds';
 import { logger } from '../utils/Logger';
 
@@ -13,6 +15,7 @@ import { logger } from '../utils/Logger';
 const BANNER_ID = 'network-status-banner';
 let initialized = false;
 let lossAnnounced = false;
+let bannerHost: HTMLElement | undefined;
 
 function getOrCreateBanner(): HTMLElement | null {
   if (typeof document === 'undefined') {
@@ -38,7 +41,7 @@ function getOrCreateBanner(): HTMLElement | null {
       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
       display: 'none',
     });
-    (document.body ?? document.documentElement).appendChild(el);
+    (bannerHost ?? document.body ?? document.documentElement).appendChild(el);
   }
   return el;
 }
@@ -80,29 +83,53 @@ export function isNetworkBannerVisible(): boolean {
  * Wire the banner to the network lifecycle events dispatched by
  * ConnectionManager. Idempotent — safe to call more than once.
  */
-export function initNetworkStatusUI(): void {
+export function initNetworkStatusUI(host: HTMLElement = document.body): void {
   if (initialized || typeof window === 'undefined') {
     return;
   }
+  bannerHost = host;
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
   initialized = true;
 
-  window.addEventListener('networkConnected', () => hideNetworkBanner());
-  window.addEventListener('networkReconnected', () => hideNetworkBanner());
-  window.addEventListener('networkReconnecting', () => {
-    showNetworkBanner(RECONNECTING_BANNER_TEXT, 'reconnect');
-  });
-  window.addEventListener('networkDisconnected', (event) => {
-    const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
-    showNetworkBanner(DISCONNECT_BANNER_TEXT);
-    logger.warn('NETWORK', 'Displayed disconnect banner', { reason });
-  });
-  window.addEventListener('networkPermanentlyDisconnected', (event) => {
-    if (!lossAnnounced) {
-      playFeedback('connectionLost');
-      lossAnnounced = true;
-    }
-    const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
-    showNetworkBanner(DISCONNECT_BANNER_TEXT);
-    logger.warn('NETWORK', 'Displayed permanent disconnect banner', { reason });
-  });
+  window.addEventListener('networkConnected', () => hideNetworkBanner(), { signal });
+  window.addEventListener('networkReconnected', () => hideNetworkBanner(), { signal });
+  window.addEventListener(
+    'networkReconnecting',
+    () => {
+      showNetworkBanner(RECONNECTING_BANNER_TEXT, 'reconnect');
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'networkDisconnected',
+    (event) => {
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
+      showNetworkBanner(DISCONNECT_BANNER_TEXT);
+      logger.warn('NETWORK', 'Displayed disconnect banner', { reason });
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'networkPermanentlyDisconnected',
+    (event) => {
+      if (!lossAnnounced) {
+        playFeedback('connectionLost');
+        lossAnnounced = true;
+      }
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
+      showNetworkBanner(DISCONNECT_BANNER_TEXT);
+      logger.warn('NETWORK', 'Displayed permanent disconnect banner', { reason });
+    },
+    { signal }
+  );
+}
+
+export function disposeNetworkStatusUI(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  initialized = false;
+  hideNetworkBanner();
+  bannerHost?.querySelector(`#${BANNER_ID}`)?.remove();
+  bannerHost = undefined;
 }

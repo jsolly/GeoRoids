@@ -92,3 +92,24 @@ test('descriptive release metadata does not gate usable routes and gameplay asse
     assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 2 });
   });
 });
+
+test('Astro island component and renderer entries prove the dynamic gameplay graph is reachable', () => {
+  fixture(({ root, write }) => {
+    const html = readFileSync(join(root, 'dist/index.html'), 'utf8').replace(
+      '<script type="module" src="/_astro/page.js"></script>',
+      '<script type="module">/* hydration bootstrap */</script><astro-island component-url="/_astro/page.js" renderer-url="/_astro/renderer.js"><canvas id="island-fallback"></canvas></astro-island>'
+    );
+    write('dist/index.html', html);
+    write('dist/debug/index.html', html);
+    const manifest = JSON.parse(readFileSync(join(root, 'dist/client-assets.json'), 'utf8'));
+    manifest.modules['_astro/renderer.js'] = [];
+    write('dist/client-assets.json', JSON.stringify(manifest));
+    write('dist/_astro/renderer.js', 'export const hydrate = true;');
+    assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 3 });
+    write(
+      'dist/index.html',
+      html.replace('/_astro/renderer.js', 'https://example.com/renderer.js')
+    );
+    assert.throws(() => checkBuiltClient(root), /not first-party/u);
+  });
+});

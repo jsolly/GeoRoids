@@ -79,7 +79,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Movement values',
       paragraphs: [
         `Both kits share maximum velocity ${SHIP.MAX_VELOCITY}; thrust and turn rate differ per kit (see the ship pages). Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
-        `Shift, right-click, or the Contour Lock button catches the nearest visible contour within ${CONTOUR_LOCK.captureRadius} world units. Locked travel follows its curves at ${CONTOUR_LOCK.speedMultiplier} times maximum contour cruise. Tap the same control again to release. Steering is ignored while locked; damage, the wall, asteroid contact even while protected, a shove above cruise speed, opening a menu or map, death, and furnace travel also release it, while lasers pass through invulnerable hulls without releasing it. There is no charge or cooldown.`,
+        `Shift, right-click, or the Contour Lock button catches the nearest visible contour within ${CONTOUR_LOCK.captureRadius} world units. Mobile flicks can catch an adjacent line within ${CONTOUR_LOCK.hopRadius} world units. Locked travel follows its curves at ${CONTOUR_LOCK.speedMultiplier} times maximum contour cruise. Tap the same control again to release. Steering is ignored while locked; damage, the wall, asteroid contact even while protected, a shove above cruise speed, opening a menu or map, death, and furnace travel also release it, while lasers pass through invulnerable hulls without releasing it. There is no charge or cooldown.`,
       ],
     },
     {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { playFeedback } from '../../../src/audio/feedbackSounds';
 import {
   playAbilityActivation,
   playHarpoonLatch,
@@ -95,4 +96,21 @@ describe('interaction sound cues', () => {
 
     expect(playSpy).not.toHaveBeenCalled();
   });
+});
+
+test('contour flick results use distinct local cues and obey the sound preference', () => {
+  const sources: string[] = [];
+  vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+    sources.push(this.src);
+  });
+  playFeedback('contourFlickSuccess');
+  playFeedback('contourFlickBlocked');
+  expect(sources).toEqual([
+    '/sounds/contour-flick-success.m4a',
+    '/sounds/contour-flick-blocked.m4a',
+  ]);
+  setSound(false);
+  playFeedback('contourFlickSuccess');
+  playFeedback('contourFlickBlocked');
+  expect(sources).toHaveLength(2);
 });

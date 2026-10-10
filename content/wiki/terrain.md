@@ -18,7 +18,7 @@ media:
 
 Follow the neutral gray contours in either direction for extra speed, most where lines are packed tightly and little where they are widely spaced; diagonal travel earns less, while perpendicular crossings and empty space keep normal cruise. Curved streamlines trail behind your ship as the terrain bonus builds, then fade as you turn across the grain. Ordinary terrain travel causes no damage, sideways pull, or shot deflection.
 
-Tap Contour Lock near a visible line to catch it and follow its curves at stronger speed. Steering is ignored until you tap the control again, take damage, hit the wall or an asteroid (even while protected), are shoved hard, or open a menu; see [Controls](/wiki/#controls) for the full list. Lasers pass through invulnerable hulls. Locking has no charge or cooldown.
+Tap Contour Lock near a visible line to catch it and follow its curves at stronger speed, including shallow bends where the ordinary terrain bonus fades. Steering is ignored until you tap the control again, take damage, hit the wall or an asteroid (even while protected), are shoved hard, or open a menu; see [Controls](/wiki/#controls) for the full list. Lasers pass through invulnerable hulls. Locking has no charge or cooldown. On mobile, [flick to reverse or catch an adjacent line](/wiki/#controls) when it is within reach.
 
 ## Outer boundary
 

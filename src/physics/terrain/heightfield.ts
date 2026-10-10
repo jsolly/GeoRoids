@@ -284,19 +284,25 @@ export function sampleGradientInto(
   out: { x: number; y: number },
   field: Heightfield,
   x: number,
-  y: number
+  y: number,
+  epsilon: number = TERRAIN.GRADIENT_EPS
 ): { x: number; y: number } {
   if (Math.hypot(x - field.cx, y - field.cy) >= field.radius) {
     out.x = 0;
     out.y = 0;
     return out;
   }
-  const e = TERRAIN.GRADIENT_EPS;
+  const e = epsilon;
   out.x = (sampleHeight(field, x + e, y) - sampleHeight(field, x - e, y)) / (2 * e);
   out.y = (sampleHeight(field, x, y + e) - sampleHeight(field, x, y - e)) / (2 * e);
   return out;
 }
 
-export function sampleGradient(field: Heightfield, x: number, y: number): { x: number; y: number } {
-  return sampleGradientInto({ x: 0, y: 0 }, field, x, y);
+export function sampleGradient(
+  field: Heightfield,
+  x: number,
+  y: number,
+  epsilon: number = TERRAIN.GRADIENT_EPS
+): { x: number; y: number } {
+  return sampleGradientInto({ x: 0, y: 0 }, field, x, y, epsilon);
 }

@@ -50,7 +50,7 @@ A generic connection-failed banner can mean your nickname is in use by an online
 
 ## Diagnostics
 
-Visit `/debug` for player and page session IDs, frame rate, and connection health. Logging defaults to Info; add `?log-level=debug`, `info`, or `warn` to change it for that visit. Use Copy Diagnostics when reporting trouble, including silent audio.
+Visit `/debug` for player and page session IDs, frame rate, and connection health. Logging defaults to Info; add `?log-level=debug`, `info`, or `warn` to change it for that visit. Use Copy Diagnostics when reporting trouble, including silent audio or unexpected Contour Lock releases. Lock-release records name the cause; server position or heading rejections also record rail distance, alignment, and the acquisition window.
 
 ## Graphics option
 

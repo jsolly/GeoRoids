@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import {
   CONTOUR_LOCK,
   contourLockDistance,
@@ -12,6 +12,7 @@ import { findContourCapture } from '../../../src/physics/terrain/contourCapture'
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 import { terrainSpeedLimit } from '../../../src/physics/terrain/terrainTravel';
+import { logger } from '../../../src/utils/Logger';
 
 beforeEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius }));
 
@@ -106,3 +107,54 @@ test('a surviving laser impact releases the rail immediately', () => {
   expect(ship.health).toBeGreaterThan(0);
   expect(ship.contourLocked).toBe(false);
 });
+
+test('a diagonal flick takes the reachable reverse route around an adjacent bend', () => {
+  const ship = new Ship({ position: { x: -5500.184203251847, y: 748.8849359526744 } });
+  const original = { height: -0.16, direction: 1 } as const;
+  ship.contourLock = original;
+  const velocity = contourLockVelocity(
+    ship.position,
+    original,
+    cruiseSpeed(ship.mass, ship.maxVelocity)
+  );
+  if (!velocity) {
+    throw new Error('Missing fixture guidance');
+  }
+  ship.velocity = velocity;
+  ship.angle = Math.atan2(-velocity.y, velocity.x);
+  const start = { ...ship.position };
+  expect(ship.hopContour({ x: -0.8967584163341472, y: -0.4425204432948521 })).toBe(true);
+  expect(ship.position).toEqual(start);
+  const target = ship.contourLock;
+  expect(target?.direction).toBe(-1);
+  for (let frame = 0; frame < 90; frame++) {
+    ship.update();
+  }
+  expect(ship.contourLock).toEqual(target);
+});
+
+test.each(['manual', 'damage', 'authoritative'] as const)(
+  'a local pilot records a %s contour release once',
+  (reason) => {
+    const ship = pilot();
+    expect(ship.toggleContourLock()).toBe(true);
+    const lock = ship.contourLock;
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    try {
+      if (reason === 'manual') {
+        ship.toggleContourLock();
+      } else if (reason === 'damage') {
+        ship.takeDamage(1);
+      } else {
+        ship.contourLock = null;
+      }
+      ship.releaseContourLock();
+      const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
+      expect(releases).toHaveLength(1);
+      expect(releases[0]?.[2]).toMatchObject({ reason, lock, position: ship.position });
+      expect(ship.contourLock).toBeNull();
+    } finally {
+      info.mockRestore();
+    }
+  }
+);

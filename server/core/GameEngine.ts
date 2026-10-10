@@ -140,6 +140,7 @@ import {
 } from './AsteroidManager.ts';
 import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
+import { releaseActorContourLock } from './contourLockDiagnostics';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { LootManager } from './LootManager';
@@ -877,7 +878,7 @@ export class GameEngine {
       this.finishFurnaceTravel(traveler, this.getServerTime());
     }
     this.capturePilot(id);
-    this.playerMotion.forgetActor(id);
+    this.playerMotion.forgetActor(id, this.getServerTime());
     const departing = this.getPlayer(id);
     if (departing) {
       this.cancelArmedBoost(departing.id, departing.harpoonTargetId);
@@ -1532,11 +1533,11 @@ export class GameEngine {
     }
     const wasHeld = entity.overlayHold === true;
     if (held) {
+      releaseActorContourLock(entity, 'overlay', this.getServerTime());
       entity.overlayHold = true;
       entity.velocity = { x: 0, y: 0 };
       entity.knockbackVelocityLimit = 0;
       entity.thrusting = false;
-      entity.contourLock = null;
       return;
     }
     if (wasHeld) {
@@ -1974,7 +1975,7 @@ export class GameEngine {
     const destroyedAsteroids = new Set<string>();
     const bumperKeys = this.resolveTowedAsteroidImpacts(entities, destroyedAsteroids);
     for (const hit of ramHits) {
-      this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime());
+      this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime(), 'collision');
       if (bumperKeys.has(`${hit.shipId}:${hit.asteroidId}`)) {
         continue;
       }
@@ -2980,7 +2981,7 @@ export class GameEngine {
     this.cancelArmedBoost(actor.id, actor.harpoonTargetId);
     clearHaulerLatch(actor);
     actor.abilityActiveFrames = 0;
-    actor.contourLock = null;
+    releaseActorContourLock(actor, 'furnace', now);
     actor.velocity = { x: 0, y: 0 };
     actor.thrusting = false;
     actor.overlayHold = true;

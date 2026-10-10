@@ -84,7 +84,7 @@ function updateCruise(player: Player): void {
   }
   player.ship.thrusting = alive && !player.ship.movementLocked && !player.ship.cargoHover;
   if (!alive) {
-    player.ship.releaseContourLock();
+    player.ship.releaseContourLock('inactive');
   }
 }
 

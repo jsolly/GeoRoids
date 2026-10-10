@@ -106,6 +106,7 @@ export class PlayerMotionReconciliation {
     // Never write health or resurrect a local predicted death. Lifecycle belongs
     // to Player.updateFromServer; motion/resources are reconciled here, while
     // ship.thrusting remains owned by local keyboard, mouse, and touch intent.
+    this.reconcileContourLock(snapshot, ship, newEpoch || resumed || wasConstrained);
     if (state.mode !== 'free' || newEpoch || resumed || wasConstrained) {
       ship.position = { ...snapshot.position };
       ship.velocity = { ...snapshot.velocity };
@@ -113,7 +114,6 @@ export class PlayerMotionReconciliation {
       ship.angle = snapshot.angle;
       ship.mass = snapshot.mass;
     }
-    this.reconcileContourLock(snapshot, ship, newEpoch || resumed || wasConstrained);
     return true;
   }
 
@@ -124,7 +124,7 @@ export class PlayerMotionReconciliation {
       this.acknowledgedContourLockVersion = ship.contourLockInputVersion;
       this.pendingContourLock = undefined;
       if (ship.movementLocked || ship.exploding || ship.health <= 0) {
-        ship.releaseContourLock();
+        ship.releaseContourLock('movement-lock');
       }
       return;
     }

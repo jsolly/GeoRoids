@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { decodeClientCommand } from '../../../server/communication/clientCommandDecoder';
+import { logger } from '../../../setup/serverLogger';
 import {
   CONTOUR_LOCK,
   contourLockDistance,
@@ -22,7 +23,10 @@ let world: GameServerWorld;
 beforeEach(() => {
   world = new GameServerWorld();
 });
-afterEach(() => world.dispose());
+afterEach(() => {
+  world.dispose();
+  vi.restoreAllMocks();
+});
 
 function railPilot() {
   const pilot = world.join('Rail pilot', { x: 2250, y: 0 });
@@ -341,12 +345,12 @@ test.each([0, 30])(
   }
 );
 
-test('a pilot cannot select a distant rail or change its level during a continuous lock', () => {
+test('a pilot cannot select a distant rail or skip a level during a continuous lock', () => {
   const { actor, state, pose } = railPilot();
   expect(pose(0, { ...state, height: state.height + 1 }).ok).toBe(false);
   expect(actor.contourLock).toBeNull();
   expect(pose(1).ok).toBe(true);
-  expect(pose(2, { ...state, height: state.height + TERRAIN.CONTOUR_INTERVAL }).ok).toBe(false);
+  expect(pose(2, { ...state, height: state.height + 2 * TERRAIN.CONTOUR_INTERVAL }).ok).toBe(false);
   expect(actor.contourLock).toBeNull();
 });
 
@@ -465,3 +469,228 @@ test.each(['constructor', '__proto__', 'unexpected'])(
     ).not.toThrow();
   }
 );
+
+test('a settled pilot glides onto the adjacent rail and the server accepts the whole transition', () => {
+  const { actor, state, pose } = railPilot();
+  const ship = new Ship({ kitId: actor.kitId, position: { ...actor.position } });
+  ship.contourLock = state;
+  expect(pose(0).ok).toBe(true);
+  const start = { ...ship.position };
+  expect(ship.hopContour({ x: -1, y: 0 })).toBe(true);
+  expect(ship.position).toEqual(start);
+  expect(ship.contourLock).toEqual({
+    height: state.height - TERRAIN.CONTOUR_INTERVAL,
+    direction: state.direction,
+  });
+  expect(pose(1, ship.contourLock, ship.position, ship.velocity).ok).toBe(true);
+  const target = ship.contourLock;
+  expect(ship.hopContour({ x: -1, y: 0 })).toBe(false);
+  for (let frame = 1; frame <= 90; frame++) {
+    ship.update();
+    const outcome = pose(1 + (frame * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+    expect(outcome.ok, JSON.stringify({ frame, outcome })).toBe(true);
+  }
+  expect(actor.contourLock).toEqual(target);
+  if (!target) {
+    throw new Error('Expected hop target');
+  }
+  expect(contourLockDistance(actor.position, target)).toBeLessThan(CONTOUR_LOCK.railTolerance);
+});
+
+test('a hop cannot start another acquisition in mid-glide', () => {
+  const { actor, state, pose } = railPilot();
+  expect(pose(0).ok).toBe(true);
+  expect(pose(3, { height: state.height - TERRAIN.CONTOUR_INTERVAL, direction: 1 }).ok).toBe(true);
+  expect(pose(4, state).ok).toBe(false);
+  expect(actor.contourLock).toBeNull();
+});
+
+test('a buffered flick can catch a rail that came within reach after the last accepted pose', () => {
+  world.dispose();
+  world = new GameServerWorld(TERRAIN.DEFAULT_SEED);
+  const { actor, cruise, now, pose } = railPilot();
+  const old: ContourLockState = { height: 0.08, direction: 1 };
+  const start = { x: -4995.842222553734, y: -4996.116910407352 };
+  world.engine.playerMotion.placeActorForTesting(actor.id, start, now);
+  const ship = new Ship({ kitId: actor.kitId, position: { ...start } });
+  ship.contourLock = old;
+  const velocity = contourLockVelocity(start, old, cruise);
+  if (!velocity) {
+    throw new Error('Missing initial rail');
+  }
+  ship.velocity = velocity;
+  ship.angle = Math.atan2(-velocity.y, velocity.x);
+  expect(pose(0, old, start, velocity).ok).toBe(true);
+  const candidate: ContourLockState = { height: 0, direction: 1 };
+  expect(contourLockDistance(start, candidate)).toBeGreaterThan(CONTOUR_LOCK.hopRadius);
+  for (let frame = 0; frame < 2; frame++) {
+    ship.update();
+  }
+  expect(contourLockDistance(ship.position, candidate)).toBeGreaterThan(CONTOUR_LOCK.captureRadius);
+  expect(contourLockDistance(ship.position, candidate)).toBeLessThan(CONTOUR_LOCK.hopRadius);
+  expect(ship.hopContour({ x: -0.8967584163341465, y: -0.44252044329485324 })).toBe(true);
+  expect(ship.contourLock).toEqual(candidate);
+  const outcome = pose((2 * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+  expect(outcome.ok, JSON.stringify(outcome)).toBe(true);
+  for (let frame = 3; frame <= 90; frame++) {
+    ship.update();
+    const result = pose((frame * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+    expect(result.ok, JSON.stringify({ frame, result })).toBe(true);
+  }
+  expect(actor.contourLock).toEqual(candidate);
+});
+
+test.each([0, 1])('a curved hop can report its new rail after %s movement ticks', (ticks) => {
+  world.dispose();
+  world = new GameServerWorld(TERRAIN.DEFAULT_SEED);
+  const { actor, cruise, now, pose } = railPilot();
+  const old: ContourLockState = { height: 0.16, direction: 1 };
+  const start = { x: -5003.3253003798745, y: -651.5074246238948 };
+  world.engine.playerMotion.placeActorForTesting(actor.id, start, now);
+  const ship = new Ship({ kitId: actor.kitId, position: { ...start } });
+  ship.contourLock = old;
+  const velocity = contourLockVelocity(start, old, cruise);
+  if (!velocity) {
+    throw new Error('Missing initial rail');
+  }
+  ship.velocity = velocity;
+  ship.angle = Math.atan2(-velocity.y, velocity.x);
+  expect(pose(0, old, start, velocity).ok).toBe(true);
+  expect(ship.hopContour({ x: -0.4161468365471424, y: 0.9092974268256817 })).toBe(true);
+  expect(ship.contourLock).toEqual({ height: 0.08, direction: 1 });
+  for (let frame = 0; frame < ticks; frame++) {
+    ship.update();
+  }
+  const result = pose(1 + (ticks * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+  expect(result.ok, JSON.stringify(result)).toBe(true);
+});
+
+test.each(['same', 'adjacent'] as const)(
+  'a settled pilot can reverse onto the %s rail without teleporting',
+  (route) => {
+    const { actor, state, cruise, pose } = railPilot();
+    const ship = new Ship({ kitId: actor.kitId, position: { ...actor.position } });
+    ship.contourLock = state;
+    const forward = contourLockVelocity(ship.position, state, cruise);
+    if (!forward) {
+      throw new Error('Missing fixture guidance');
+    }
+    ship.velocity = forward;
+    expect(pose(0, state, ship.position, ship.velocity).ok).toBe(true);
+    const start = { ...ship.position };
+    const gradient = sampleGradient(getTerrainField(), start.x, start.y);
+    const magnitude = Math.hypot(gradient.x, gradient.y);
+    const flick =
+      route === 'same'
+        ? { x: -forward.x, y: -forward.y }
+        : {
+            x: (-gradient.x + gradient.y * 0.6) / magnitude,
+            y: (-gradient.y - gradient.x * 0.6) / magnitude,
+          };
+    expect(ship.hopContour(flick)).toBe(true);
+    expect(ship.position).toEqual(start);
+    expect(ship.contourLock).toEqual({
+      height: route === 'same' ? state.height : state.height - TERRAIN.CONTOUR_INTERVAL,
+      direction: -1,
+    });
+    expect(pose(1, ship.contourLock, ship.position, ship.velocity).ok).toBe(true);
+    const target = ship.contourLock;
+    for (let frame = 1; frame <= 60; frame++) {
+      ship.update();
+      const result = pose(1 + (frame * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+      expect(result.ok, JSON.stringify({ frame, result })).toBe(true);
+    }
+    expect(actor.contourLock).toEqual(target);
+  }
+);
+
+test.each([
+  { x: -5498.79035132918, y: -5497.784770565292, height: 0.24, direction: 1 as const },
+  { x: -5498.79035132918, y: -5497.784770565292, height: 0.24, direction: -1 as const },
+  { x: -5492.069073525674, y: 1996.0205480837283, height: -0.56, direction: 1 as const },
+  { x: -5492.069073525674, y: 1996.0205480837283, height: -0.56, direction: -1 as const },
+])(
+  'a collision-free pilot stays locked through curved contour $height for forty seconds in direction $direction',
+  (fixture) => {
+    world.dispose();
+    world = new GameServerWorld(TERRAIN.DEFAULT_SEED);
+    const { actor, pose, now } = railPilot();
+    const ship = new Ship({
+      kitId: actor.kitId,
+      position: { x: fixture.x, y: fixture.y },
+    });
+    const lock: ContourLockState = { height: fixture.height, direction: fixture.direction };
+    world.engine.playerMotion.placeActorForTesting(actor.id, ship.position, now);
+    ship.contourLock = lock;
+    expect(pose(0, lock, ship.position, ship.velocity).ok).toBe(true);
+    for (let frame = 1; frame <= 2400; frame++) {
+      ship.update();
+      if (frame % 3 === 0) {
+        const outcome = pose((frame * 1000) / 60, ship.contourLock, ship.position, ship.velocity);
+        expect(outcome.ok, JSON.stringify({ frame, outcome, position: ship.position })).toBe(true);
+      }
+      expect(ship.contourLock, `client released at frame ${frame}`).toEqual(lock);
+      expect(actor.contourLock, `server released at frame ${frame}`).toEqual(lock);
+      expect(contourLockDistance(ship.position, lock)).toBeLessThan(CONTOUR_LOCK.railTolerance);
+    }
+  }
+);
+
+test.each(['distance', 'heading', 'route'] as const)(
+  'a rejected contour %s records its release reason once',
+  (failure) => {
+    const { actor, state, cruise, pose, now } = railPilot();
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    expect(pose(0).ok).toBe(true);
+    const forward = contourLockVelocity(actor.position, state, cruise);
+    if (!forward) {
+      throw new Error('Missing fixture guidance');
+    }
+    const position =
+      failure === 'route'
+        ? { x: actor.position.x - forward.x, y: actor.position.y - forward.y }
+        : failure === 'distance'
+          ? { x: actor.position.x + 100, y: actor.position.y + 100 }
+          : { x: actor.position.x + forward.x, y: actor.position.y + forward.y };
+    const velocity = failure === 'heading' ? { x: -forward.x, y: -forward.y } : forward;
+    const rejected = pose(1000, state, position, velocity);
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok) {
+      throw new Error('Expected rejection');
+    }
+    if (failure === 'route') {
+      expect(rejected.envelope?.check).toBe('rail');
+    } else {
+      expect(rejected.contour).toMatchObject({
+        reason: `rail-${failure}`,
+        position,
+        velocity,
+        lock: state,
+        allowedDistance: 6,
+        acquisitionAgeMs: 1000,
+      });
+      expect(rejected.contour?.gradientMagnitude).toBeGreaterThan(0);
+    }
+    world.engine.playerMotion.releaseContourLock(actor.id, now + 1000);
+    const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
+    expect(releases).toHaveLength(1);
+    expect(releases[0]?.[2]).toMatchObject({
+      playerId: actor.id,
+      reason: `rail-${failure}`,
+      lock: state,
+    });
+    expect(actor.contourLock).toBeNull();
+  }
+);
+
+test('a departing locked pilot records one terminal release before ownership is removed', () => {
+  const { pilot, actor, pose, state } = railPilot();
+  expect(pose(0).ok).toBe(true);
+  const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+  world.core.handleClientMessage({ type: 'leave', id: actor.id }, pilot.socket);
+  world.engine.playerMotion.transportClosed(pilot.socket, world.engine.getServerTime());
+  const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
+  expect(releases).toHaveLength(1);
+  expect(releases[0]?.[2]).toMatchObject({ playerId: actor.id, reason: 'removed', lock: state });
+  expect(world.engine.getPlayer(actor.id)).toBeUndefined();
+});

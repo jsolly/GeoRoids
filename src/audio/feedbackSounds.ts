@@ -4,6 +4,10 @@ import { playWorldSound } from './spatialAudio';
 
 // Sparse acknowledgements. No loops or periodic alarm; continuous flight stays quiet.
 const feedback = {
+  contourLockAcquired: new Sound('/sounds/contour-lock-acquired.m4a', 2, 0.045),
+  contourLockReleased: new Sound('/sounds/contour-lock-released.m4a', 2, 0.035),
+  contourFlickSuccess: new Sound('/sounds/contour-flick-success.m4a', 2, 0.045),
+  contourFlickBlocked: new Sound('/sounds/contour-flick-blocked.m4a', 2, 0.035),
   connectionLost: new Sound('/sounds/connection-lost.m4a', 1, 0.055),
   boostIgnite: new Sound('/sounds/boost-ignite.m4a', 3, 0.05),
   hullDamage: new Sound('/sounds/hull-damage.m4a', 2, 0.065),

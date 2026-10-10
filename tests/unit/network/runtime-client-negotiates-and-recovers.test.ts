@@ -329,12 +329,60 @@ describe('actual ConnectionManager WebSocket message path', () => {
     setSound(false);
   });
 
-  test('offscreen coupling ignition still confirms release at the local ship', async () => {
-    const player = entityFactory.createLocalPlayer('Hauler pilot', { x: 0, y: 0 }, 'hauler');
+  test.each([false, true])(
+    'a coupling accepted without a visible latch confirms release; ignition: %s',
+    async (ignited) => {
+      const player = entityFactory.createLocalPlayer('Hauler pilot', { x: 0, y: 0 }, 'hauler');
+      vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+      const ws = await connect();
+      acknowledge(ws);
+      ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
+      setSound(true);
+      bindGameAudio({
+        getListenerPosition: () => player.ship.position,
+        getViewport: () => ({ width: 390, height: 844 }),
+      });
+      const played: string[] = [];
+      vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+        played.push(this.src);
+      });
+      try {
+        ws.receive('abilityUsed', {
+          id: player.id,
+          kitId: 'hauler',
+          abilityId: 'harpoon',
+          harpoonTargetId: null,
+          abilityActiveFrames: 0,
+          ...(ignited
+            ? {
+                boostIgnitionPosition: {
+                  x: player.ship.position.x + 250,
+                  y: player.ship.position.y,
+                },
+              }
+            : {}),
+        });
+        expect(played).toEqual(['/sounds/harpoon-release.m4a']);
+      } finally {
+        resetGameAudio();
+        setSound(false);
+      }
+    }
+  );
+
+  test('tow ability events and following snapshots share one sound per transition', async () => {
+    setSelectedShipKitId('hauler');
+    const player = entityFactory.createLocalPlayer('Tow audio pilot', { x: 0, y: 0 }, 'hauler');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
-    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
+    const frame = captureSnapshot(snapshotFixture());
+    const pilot = frame.entities[0];
+    assert.ok(pilot);
+    pilot.id = manager.getClientId();
+    pilot.kitId = 'hauler';
+    pilot.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
+    ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
     setSound(true);
     bindGameAudio({
       getListenerPosition: () => player.ship.position,
@@ -345,15 +393,38 @@ describe('actual ConnectionManager WebSocket message path', () => {
       played.push(this.src);
     });
     try {
-      ws.receive('abilityUsed', {
+      const outbound = {
         id: player.id,
-        kitId: 'hauler',
+        kitId: 'hauler' as const,
         abilityId: 'harpoon',
-        harpoonTargetId: null,
         abilityActiveFrames: 0,
-        boostIgnitionPosition: { x: player.ship.position.x + 250, y: player.ship.position.y },
-      });
-      expect(played).toEqual(['/sounds/harpoon-release.m4a']);
+        harpoonTargetId: null,
+        utilityFlight: {
+          kind: 'tow' as const,
+          phase: 'outbound' as const,
+          position: { ...player.ship.position },
+          velocity: { x: 10, y: 0 },
+          remainingDistance: 100,
+        },
+      };
+      ws.receive('abilityUsed', outbound);
+      ws.receive('abilityUsed', outbound);
+      player.updateFromServer(outbound);
+      const latched = {
+        ...outbound,
+        utilityFlight: null,
+        harpoonTargetId: 'tow-rock',
+        harpoonLatchPos: { ...player.ship.position },
+      };
+      ws.receive('abilityUsed', latched);
+      player.updateFromServer(latched);
+      ws.receive('abilityUsed', { ...latched, harpoonTargetId: null });
+      player.updateFromServer({ harpoonTargetId: null });
+      expect(played).toEqual([
+        '/sounds/harpoon-launch.m4a',
+        '/sounds/harpoon-latch.m4a',
+        '/sounds/harpoon-release.m4a',
+      ]);
     } finally {
       resetGameAudio();
       setSound(false);
@@ -1217,6 +1288,30 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(emptyBelt).encode(2));
     expect(player.ship.harpoonTargetId).toBe('asteroid-1');
     expect(player.ship.harpoonLatchPos).toEqual({ x: 1, y: 2 });
+  });
+
+  test('socket closure records a contour release once and resume does not repeat it', async () => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'scout');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
+    let ws = await connect();
+    acknowledge(ws);
+    player.ship.contourLock = { height: 0.08, direction: 1 };
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    ws.close();
+    expect(player.ship.contourLock).toBeNull();
+    ws = await connect();
+    acknowledge(ws);
+    const snapshot = captureSnapshot(snapshotFixture());
+    const entity = snapshot.entities[0];
+    assert.ok(entity);
+    entity.id = manager.getClientId();
+    delete entity.contourLock;
+    entity.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
+    ws.receive('snapshot', new SnapshotEncoder(snapshot).encode(1));
+    const releases = info.mock.calls.filter(([, event]) => event === 'contour_lock_released');
+    expect(releases).toHaveLength(1);
+    expect(releases[0]?.[2]).toMatchObject({ reason: 'transport-closed' });
   });
 
   test('socket-flap Hauler visuals clear on an authoritative release', async () => {

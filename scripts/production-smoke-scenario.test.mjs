@@ -7,7 +7,7 @@ import test from 'node:test';
 import { tsImport } from 'tsx/esm/api';
 import WebSocket from 'ws';
 import { runNetworkSmoke, SmokeFailure } from './production-smoke-network.mjs';
-import { productionUrl, smoke, waitForClientRelease } from './production-smoke-scenario.mjs';
+import { productionUrl, smoke, waitForClientAssets } from './production-smoke-scenario.mjs';
 
 const { decodeClientCommand } = await tsImport(
   '../server/communication/clientCommandDecoder.ts',
@@ -27,8 +27,6 @@ const healthy = {
 const env = {
   PRODUCTION_SMOKE_REQUEST_ID: 'coded-smoke',
   PRODUCTION_SMOKE_RELEASE_SHA: release,
-  PRODUCTION_SMOKE_SERVER_SHA: release,
-  PRODUCTION_SMOKE_GITHUB_TOKEN: 'private-github-token',
 };
 
 function controlledClock() {
@@ -259,7 +257,7 @@ async function fixture(run) {
   }
 }
 
-test('the deployed HTTP release and genuine current-protocol gameplay produce a canonical receipt without private credentials', async () => {
+test('the deployed HTTP assets and genuine current-protocol gameplay produce a canonical receipt without private credentials', async () => {
   await fixture(async (artifacts) => {
     const transport = codedSocket(),
       clock = controlledClock();
@@ -300,7 +298,6 @@ test('the deployed HTTP release and genuine current-protocol gameplay produce a 
 for (const outcome of [
   'wrong-player',
   'old-protocol',
-  'stale-server',
   'snapshot-before-join',
   'malformed-snapshot',
   'missing-second-snapshot',
@@ -337,7 +334,6 @@ for (const outcome of [
   });
 }
 for (const world of [
-  { ...healthy, releaseId: oldRelease },
   { ...healthy, world: { ...healthy.world, persistence: { mode: 'memory', failed: false } } },
   { ...healthy, world: { ...healthy.world, persistence: { mode: 'worker', failed: true } } },
   { ...healthy, world: { ...healthy.world, loop: { stalls: 1 } } },
@@ -362,7 +358,6 @@ for (const world of [
   });
 }
 for (const options of [
-  { manifest: oldRelease },
   { assetsManifest: { releaseSha: release, gameplay: [], modules: {} } },
   {
     assetsManifest: {
@@ -378,33 +373,28 @@ for (const options of [
       modules: { 'assets/game-coded.js': ['https://cdn.example/game.js'] },
     },
   },
-  { bundle: oldRelease },
-  { bundleSource: `const env = { VITE_COMMIT_SHA: \`${oldRelease}\` };` },
-  { bundleSource: `const env = { VITE_COMMIT_SHA: "${release}' };` },
-  { bundleSource: `const env = { VITE_COMMIT_SHA: \`${release}\${suffix}\` };` },
   { assetType: 'text/html' },
   {
     html: '<html><canvas id="gameCanvas"></canvas><script type="module" src="https://cdn.example/game.js"></script></html>',
   },
   { html: '<html><script type="module" src="/assets/game-coded.js"></script></html>' },
 ]) {
-  test(`client release rejects coded stale or missing bundle ${JSON.stringify(options)}`, async () => {
+  test(`client asset checks reject coded invalid or missing assets ${JSON.stringify(options)}`, async () => {
     const clock = controlledClock();
     await assert.rejects(
-      waitForClientRelease({
-        expectedSha: release,
+      waitForClientAssets({
         verifyHttp: clientHttp(options),
         clock,
         readinessMs: 100,
         pollMs: 10,
       }),
-      /Client release readiness deadline/u
+      /Client asset readiness deadline/u
     );
     assert.equal(clock.now(), 100);
   });
 }
 
-test('Astro entry reaches a dynamically imported gameplay chunk and binds its release', async () => {
+test('Astro entry reaches a dynamically imported gameplay chunk', async () => {
   const requests = [];
   const assetsManifest = {
     releaseSha: release,
@@ -415,8 +405,7 @@ test('Astro entry reaches a dynamically imported gameplay chunk and binds its re
     assetsManifest,
     html: '<html><canvas id="gameCanvas"></canvas><script type="module" src="/_astro/page.hash.js"></script></html>',
   });
-  const observed = await waitForClientRelease({
-    expectedSha: release,
+  const observed = await waitForClientAssets({
     verifyHttp: (url) => {
       requests.push(url);
       return url.endsWith('/page.hash.js')
@@ -426,36 +415,22 @@ test('Astro entry reaches a dynamically imported gameplay chunk and binds its re
     clock: controlledClock(),
     readinessMs: 100,
   });
-  assert.deepEqual(observed, { releaseSha: release, assetCount: 2 });
+  assert.deepEqual(observed, { assetCount: 2 });
   assert.ok(requests.some((url) => url.endsWith('/engine.hash.js')));
 });
 
-for (const quote of ['"', "'", '`']) {
-  test(`client release accepts the deployed identity in a ${quote} JavaScript literal`, async () => {
-    const clock = controlledClock();
-    const observed = await waitForClientRelease({
-      expectedSha: release,
-      verifyHttp: clientHttp({
-        bundleSource: `const env = { VITE_COMMIT_SHA: ${quote}${release}${quote} };`,
-      }),
-      clock,
-      readinessMs: 100,
-      pollMs: 10,
-    });
-    assert.deepEqual(observed, { releaseSha: release, assetCount: 2 });
-    assert.equal(clock.now(), 0);
-  });
-}
-
-test('client propagation polls within its original deadline and binds the deployed entry bundle', async () => {
+test('client assets poll within the original deadline when the graph is not yet available', async () => {
   let attempts = 0;
   const clock = controlledClock();
-  const verifyHttp = async (url) =>
-    clientHttp({
-      manifest: url.endsWith('/release.json') && ++attempts < 3 ? oldRelease : release,
-    })(url);
-  const observed = await waitForClientRelease({ expectedSha: release, verifyHttp, clock });
-  assert.deepEqual(observed, { releaseSha: release, assetCount: 2 });
+  const http = clientHttp();
+  const verifyHttp = (url) => {
+    if (url.endsWith('/client-assets.json') && ++attempts < 3) {
+      throw new SmokeFailure('Client assets not available');
+    }
+    return http(url);
+  };
+  const observed = await waitForClientAssets({ verifyHttp, clock });
+  assert.deepEqual(observed, { assetCount: 2 });
   assert.equal(clock.now(), 10000);
 });
 
@@ -567,10 +542,9 @@ test('verified HTTP rejects missing assets and noncanonical redirects before ope
   }
 });
 
-test('healthy persistence must survive the accepted shot and remain on the same verified release', async () => {
+test('healthy persistence must survive the accepted shot', async () => {
   for (const changed of [
     { ...healthy, world: { ...healthy.world, persistence: { mode: 'worker', failed: true } } },
-    { ...healthy, releaseId: oldRelease },
   ]) {
     await fixture(async (artifacts) => {
       let healthChecks = 0;
@@ -653,42 +627,30 @@ test('forced socket termination is retained as failed cleanup even after a succe
   });
 });
 
-test('client-only releases derive the server minimum and bind both health checks and join to its verified ancestry', async () => {
-  await fixture(async (artifacts) => {
-    const transport = codedSocket(),
-      clock = controlledClock();
-    const checked = [];
-    const scenario = {
-      productionUrl,
-      smoke: (input) =>
-        smoke({
-          ...input,
-          resolveServerMinimum: (client) => {
-            assert.equal(client, release);
-            return release;
-          },
-          verifyAncestry: (minimum, observed) => {
-            assert.equal(minimum, release);
-            assert.equal(observed, release);
-            checked.push(observed);
-          },
-        }),
-    };
-    const receipt = await runNetworkSmoke({
-      scenario,
-      env: {
-        PRODUCTION_SMOKE_REQUEST_ID: 'coded-client-only',
-        PRODUCTION_SMOKE_RELEASE_SHA: release,
-      },
-      fetcher: clientHttp(),
-      clock,
-      createSocket: transport.createSocket,
-      artifacts,
+for (const metadata of [
+  { manifest: oldRelease, bundleSource: 'console.log("gameplay without embedded SHA");' },
+  { world: { ...healthy, releaseId: undefined } },
+]) {
+  test(`healthy gameplay passes independently of descriptive release metadata ${JSON.stringify(metadata)}`, async () => {
+    await fixture(async (artifacts) => {
+      const transport = codedSocket('stale-server');
+      const receipt = await runNetworkSmoke({
+        scenario: { productionUrl, smoke },
+        env,
+        fetcher: clientHttp(metadata),
+        clock: controlledClock(),
+        createSocket: transport.createSocket,
+        artifacts,
+      });
+      assert.equal(receipt.success, true);
+      assert.deepEqual(receipt.errors, []);
+      const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+      assert.equal(evidence.serverReleaseId, oldRelease);
+      assert.equal(evidence.shot.acknowledged, true);
+      assert.equal(evidence.socketClosed, true);
     });
-    assert.equal(receipt.success, true);
-    assert.equal(checked.length, 3);
   });
-});
+}
 
 test('a transport error during owned close cannot turn into a successful receipt', async () => {
   await fixture(async (artifacts) => {

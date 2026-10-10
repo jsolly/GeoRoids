@@ -40,9 +40,7 @@ function fixture(run) {
 }
 
 test('the build publishes distinct static routes with readable Wiki articles and reachable gameplay', () => {
-  fixture(({ root }) =>
-    assert.deepEqual(checkBuiltClient(root, sha), { releaseSha: sha, routes: 3, modules: 2 })
-  );
+  fixture(({ root }) => assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 2 }));
 });
 for (const [name, mutate, error] of [
   ['missing debug route', ({ root }) => rmSync(join(root, 'dist/debug/index.html')), /ENOENT/u],
@@ -65,16 +63,6 @@ for (const [name, mutate, error] of [
   ],
   ['missing gameplay chunk', ({ root }) => rmSync(join(root, 'dist/_astro/engine.js')), /ENOENT/u],
   [
-    'stale release',
-    ({ write }) => write('dist/release.json', JSON.stringify({ releaseSha: 'b'.repeat(40) })),
-    /Built release identity differs/u,
-  ],
-  [
-    'stale game bundle',
-    ({ write }) => write('dist/_astro/engine.js', 'const release = "old";'),
-    /lack the release identity/u,
-  ],
-  [
     'unreachable gameplay',
     ({ write }) =>
       write(
@@ -91,6 +79,16 @@ for (const [name, mutate, error] of [
   test(`a build with ${name} fails publication validation`, () =>
     fixture((state) => {
       mutate(state);
-      assert.throws(() => checkBuiltClient(state.root, sha), error);
+      assert.throws(() => checkBuiltClient(state.root), error);
     }));
 }
+
+test('descriptive release metadata does not gate usable routes and gameplay assets', () => {
+  fixture(({ root, write }) => {
+    write('dist/release.json', JSON.stringify({ releaseSha: 'another-build' }));
+    write('dist/_astro/engine.js', 'console.log("gameplay");');
+    assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 2 });
+    rmSync(join(root, 'dist/release.json'));
+    assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 2 });
+  });
+});

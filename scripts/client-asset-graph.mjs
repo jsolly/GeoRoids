@@ -11,17 +11,15 @@ function assetPath(value, javascript = false) {
 }
 
 /** Validate the emitted module graph, then prove gameplay is reachable from the page. */
-export function clientAssetGraph(manifest, releaseSha, entries) {
+export function clientAssetGraph(manifest, entries) {
   assert(
     manifest &&
-      manifest.releaseSha === releaseSha &&
-      /^[a-f0-9]{40}$/u.test(releaseSha) &&
       Array.isArray(manifest.gameplay) &&
       manifest.gameplay.length > 0 &&
       manifest.modules &&
       typeof manifest.modules === 'object' &&
       !Array.isArray(manifest.modules),
-    'Published client asset manifest is malformed or stale'
+    'Published client asset manifest is malformed'
   );
   const graph = new Map();
   for (const [module, imports] of Object.entries(manifest.modules)) {

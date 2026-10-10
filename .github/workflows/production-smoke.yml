@@ -11,10 +11,6 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && format('Production smo
         description: Full SHA of the production release to verify
         required: true
         type: string
-      server_sha:
-        description: Full separately deployed server commit SHA (when applicable)
-        required: false
-        type: string
       request_id:
         description: Unique UUID for this verification request
         required: true
@@ -38,7 +34,6 @@ jobs:
     timeout-minutes: 15
     env:
       PRODUCTION_SMOKE_RELEASE_SHA: ${{ github.event.deployment.sha || inputs.release_sha }}
-      PRODUCTION_SMOKE_SERVER_SHA: ${{ github.event.deployment.sha || inputs.server_sha }}
       PRODUCTION_SMOKE_REQUEST_ID: ${{ github.event.deployment.id || inputs.request_id }}
     steps:
       - uses: actions/checkout@v7
@@ -54,8 +49,6 @@ jobs:
       - run: npm ci
       - run: npm run smoke:scenario-contract
       - run: npm run smoke:production
-        env:
-          PRODUCTION_SMOKE_GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:

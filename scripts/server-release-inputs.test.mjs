@@ -5,11 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { test } from 'node:test';
-import {
-  minimumServerRelease,
-  requiresServerDeployment,
-  serverReleaseInputs,
-} from './server-release-inputs.mjs';
+import { requiresServerDeployment, serverReleaseInputs } from './server-release-inputs.mjs';
 
 test('shared and server-consumed client modules require a server release; unrelated UI does not', () => {
   const inheritedGit = Object.fromEntries(
@@ -63,25 +59,24 @@ test('shared and server-consumed client modules require a server release; unrela
     assert.ok(!serverReleaseInputs(cwd).includes('src/render.ts'));
     write('src/render.ts', 'export const color = "blue";');
     const ui = commit('client only');
-    assert.equal(minimumServerRelease(ui, cwd), initial);
     assert.equal(requiresServerDeployment(initial, ui, cwd), false);
     write('shared/state.ts', 'export const factor = 3;');
     const shared = commit('shared runtime');
-    assert.equal(minimumServerRelease(shared, cwd), shared);
     assert.equal(requiresServerDeployment(ui, shared, cwd), true);
     write(
       'src/runtime.ts',
       "import { factor } from '../shared/state'; export const speed = factor * 4;"
     );
     const runtime = commit('server consumed gameplay');
-    assert.equal(minimumServerRelease(runtime, cwd), runtime);
     assert.equal(requiresServerDeployment(shared, runtime, cwd), true);
     write('astro.config.mjs', 'export default {output: "static"};');
     const config = commit('Astro build configuration');
-    assert.equal(minimumServerRelease(config, cwd), config);
     assert.equal(requiresServerDeployment(runtime, config, cwd), true);
-    assert.throws(() => minimumServerRelease(ui, cwd), /target commit checkout/u);
-    assert.throws(() => minimumServerRelease('--all', cwd), /full lowercase commit SHA/u);
+    assert.throws(() => requiresServerDeployment(initial, ui, cwd), /target commit checkout/u);
+    assert.throws(
+      () => requiresServerDeployment('--all', config, cwd),
+      /full lowercase commit SHA/u
+    );
   } finally {
     rmSync(cwd, { recursive: true, force: true });
     Object.assign(process.env, inheritedGit);

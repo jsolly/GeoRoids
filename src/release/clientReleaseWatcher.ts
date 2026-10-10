@@ -13,7 +13,7 @@ export interface ClientReleaseEnvironment {
   reload: () => void;
 }
 
-/** The bundle and same-origin static manifest carry the same full Git SHA.
+/** The bundle and same-origin static manifest share a 40-hex build identifier.
  * Confirm a change twice, then permit one reload per loaded bundle in this tab.
  * If propagation serves that old bundle again, its persisted guard prevents a
  * loop. A successfully loaded newer bundle gets its own future refresh attempt.
@@ -88,7 +88,7 @@ export function watchClientRelease(
       const published = payload.releaseSha.toLowerCase();
       failureReported = false;
       // The first same-build response is the normal baseline. A page already
-      // stale on load may also refresh, after two matching full-SHA responses.
+      // stale on load may also refresh, after two matching build-identifier responses.
       if (published === build) {
         candidate = undefined;
         return;

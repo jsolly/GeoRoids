@@ -5,13 +5,9 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { clientAssetGraph } from './client-asset-graph.mjs';
-import { clientReleaseSha } from './client-release-sha.ts';
 
-export function checkBuiltClient(root = process.cwd(), expectedSha) {
-  const sha = expectedSha ?? clientReleaseSha(root);
+export function checkBuiltClient(root = process.cwd()) {
   const read = (path) => readFileSync(join(root, 'dist', path), 'utf8');
-  const release = JSON.parse(read('release.json'));
-  assert.equal(release.releaseSha, sha, 'Built release identity differs from the checkout');
   const manifest = JSON.parse(read('client-assets.json'));
   const gameDocuments = [];
   for (const path of ['index.html', 'debug/index.html', 'wiki/index.html']) {
@@ -51,7 +47,7 @@ export function checkBuiltClient(root = process.cwd(), expectedSha) {
             return source.slice(1);
           }
         );
-        gameDocuments.push(clientAssetGraph(manifest, sha, entries));
+        gameDocuments.push(clientAssetGraph(manifest, entries));
       }
     } finally {
       dom.window.close();
@@ -61,16 +57,12 @@ export function checkBuiltClient(root = process.cwd(), expectedSha) {
   for (const path of Object.keys(manifest.modules)) {
     assert(read(path).length > 0, `Emitted module is empty: ${path}`);
   }
-  assert(
-    gameDocuments[0].some((path) => read(path).includes(sha)),
-    'Game bundles lack the release identity'
-  );
-  return { releaseSha: sha, routes: 3, modules: Object.keys(manifest.modules).length };
+  return { routes: 3, modules: Object.keys(manifest.modules).length };
 }
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const result = checkBuiltClient();
   process.stdout.write(
-    `Built client verified: ${result.routes} static routes, ${result.modules} modules, ${result.releaseSha}\n`
+    `Built client verified: ${result.routes} static routes, ${result.modules} modules\n`
   );
 }

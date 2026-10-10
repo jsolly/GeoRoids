@@ -756,7 +756,7 @@ function drawNestMarks(
       nest.position.x * frame.scale,
       nest.position.y * frame.scale,
       universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom),
-      PALETTE.DANGER
+      nest.cleared ? PALETTE.CLEARED_NEST : PALETTE.DANGER
     );
   }
   context.restore();
@@ -875,7 +875,10 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
         (nest) =>
           isFiniteMapPosition(nest.position) && isRevealed(nest.position, getWorldExploration())
       )
-      .map((nest) => ({ name: 'Spider nest · guarded resource', position: nest.position })),
+      .map((nest) => ({
+        name: nest.cleared ? 'Cleared spider nest' : 'Spider nest · guarded resource',
+        position: nest.position,
+      })),
     ...players
       .filter((player) => isFiniteMapPosition(player.ship.position))
       .map((player) => ({

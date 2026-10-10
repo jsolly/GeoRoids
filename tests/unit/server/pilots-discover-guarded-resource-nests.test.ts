@@ -241,7 +241,7 @@ test('multiplayer nest creation and sleeping guards share the same active popula
 test('the map marks the guarded deposit while its spiders chase, sleep, and remain cleared', () => {
   const { manager, pilot, resource, step } = setup();
   step();
-  const marker = { id: nestCellId, resourceId: resource.id, position: { ...home } };
+  const marker = { id: nestCellId, resourceId: resource.id, cleared: false, position: { ...home } };
   expect(manager.snapshot().nests).toEqual([marker]);
   pilot.position = { ...home };
   step(120);
@@ -252,12 +252,22 @@ test('the map marks the guarded deposit while its spiders chase, sleep, and rema
   expect(manager.snapshot().nests).toEqual([marker]);
   pilot.position = { ...approach };
   step(60);
-  for (const spider of manager.snapshot().spiders) {
+  const guards = manager.snapshot().spiders;
+  for (const spider of guards.slice(0, -1)) {
     manager.removeSpider(spider.id);
   }
-  step(60);
-  expect(manager.snapshot().spiders).toEqual([]);
   expect(manager.snapshot().nests).toEqual([marker]);
+  const last = guards.at(-1);
+  if (!last) {
+    throw new Error('Expected a final guard');
+  }
+  const beforeKill = manager.snapshot();
+  manager.resolveLaserHit(last.position, last.position, SPIDER.MAX_HEALTH);
+  expect(beforeKill.nests).toEqual([marker]);
+  step(60);
+  expect(beforeKill.nests).toEqual([marker]);
+  expect(manager.snapshot().spiders).toEqual([]);
+  expect(manager.snapshot().nests).toEqual([{ ...marker, cleared: true }]);
 });
 
 test.each(['collected', 'moved', 'replaced'] as const)(
@@ -343,7 +353,12 @@ test.each(['collected', 'moved'] as const)(
         },
       });
     };
-    const marker = { id: nestCellId, resourceId: deposit.id, position: { ...home } };
+    const marker = {
+      id: nestCellId,
+      resourceId: deposit.id,
+      cleared: false,
+      position: { ...home },
+    };
     advance(1);
     expect(manager.snapshot().nests).toContainEqual(marker);
     pilot.position = { x: -20000, y: -20000 };
@@ -438,7 +453,7 @@ test('treasure that evicts an older guarded deposit changes its marker on the ne
         loot.spawnNestCache(nest.position, nowFrame);
       },
     });
-  const olderMarker = { id: '2,1', resourceId: older.id, position: west };
+  const olderMarker = { id: '2,1', resourceId: older.id, cleared: false, position: west };
   advance(1);
   expect(manager.snapshot().nests).toEqual([olderMarker]);
   const originalGuardIds = manager.snapshot().spiders.map((spider) => spider.id);
@@ -451,7 +466,7 @@ test('treasure that evicts an older guarded deposit changes its marker on the ne
   const newer = loot.spawnShard(east, 61, 0.75);
   expect(loot.get(older.id)).toBeDefined();
   advance(61);
-  const newerMarker = { id: '3,1', resourceId: newer.id, position: east };
+  const newerMarker = { id: '3,1', resourceId: newer.id, cleared: false, position: east };
   expect(loot.get(older.id)).toBeUndefined();
   expect(manager.snapshot().nests).toEqual([olderMarker, newerMarker]);
   expect(created).toEqual([older.id, newer.id]);

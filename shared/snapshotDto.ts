@@ -365,6 +365,7 @@ function uniqueRows(rule: Rule, maximum: number): Rule {
   };
 }
 const nest = shape<SpiderFieldState['nests'][number]>({
+  cleared: optional(boolean),
   id: sectorIdentity,
   resourceId: (value) => typeof value === 'string' && value.length > 0,
   position,

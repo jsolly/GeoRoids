@@ -8,6 +8,7 @@ import {
   setWorldMapAssets,
   worldFurnaces,
 } from '../../../src/network/worldExploration';
+import { setSpiderField } from '../../../src/physics/terrain/spiderSession';
 import {
   closeUniverseMap,
   initializeUniverseMap,
@@ -16,6 +17,7 @@ import {
 
 afterEach(() => {
   closeUniverseMap();
+  setSpiderField(undefined);
   worldFurnaces.replaceLit([]);
   setWorldMapAssets([]);
   setWorldExploration([]);
@@ -202,4 +204,23 @@ test('the universe map marks furnace lots before that ground is explored', () =>
   const revealed = draw();
   expect(revealed.rings).toBe(CIVIC_LOTS.length);
   expect(revealed.text).toContain(salvage.name);
+});
+
+test('the shared chart turns a discovered nest dark gray after its last guard dies', () => {
+  const { toggle, ctx } = mountUniverseMap();
+  const position = { x: 500, y: 500 };
+  const explored = new ExplorationMap();
+  explored.reveal(position, 400);
+  setWorldExploration(explored.snapshot());
+  const colors: string[] = [];
+  vi.spyOn(ctx, 'stroke').mockImplementation(function (this: CanvasRenderingContext2D) {
+    colors.push(String(this.strokeStyle));
+  });
+  for (const cleared of [false, true]) {
+    setSpiderField({ spiders: [], nests: [{ id: '0,0', resourceId: 'ore', position, cleared }] });
+    colors.length = 0;
+    toggle.click();
+    expect(colors).toContain(cleared ? '#444444' : '#f43f5e');
+    closeUniverseMap();
+  }
 });

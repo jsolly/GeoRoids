@@ -51,7 +51,7 @@ select_test_ports() {
         if ! valid_port "$REQUESTED_PROXY_PORT" || \
             { [ -n "$REQUESTED_VITE_PORT" ] && [ "$REQUESTED_PROXY_PORT" -eq "$REQUESTED_VITE_PORT" ]; } || \
             { [ -n "$REQUESTED_SERVER_PORT" ] && [ "$REQUESTED_PROXY_PORT" -eq "$REQUESTED_SERVER_PORT" ]; }; then
-            echo "❌ GEOROIDS_TEST_PROXY_PORT must be a valid TCP port distinct from the owned server and Vite ports" >&2
+            echo "❌ GEOROIDS_TEST_PROXY_PORT must be a valid TCP port distinct from the owned server and Astro ports" >&2
             return 64
         fi
     fi

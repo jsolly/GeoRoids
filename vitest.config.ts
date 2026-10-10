@@ -1,7 +1,9 @@
 import process from 'node:process';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  plugins: [svelte()],
   ...(process.env['GEOROIDS_TEST_SESSION_DIR']
     ? { cacheDir: `${process.env['GEOROIDS_TEST_SESSION_DIR']}/cache/vitest` }
     : {}),
@@ -10,6 +12,31 @@ export default defineConfig({
     setupFiles: ['tests/viteSetup.ts'],
     globals: true,
     includeTaskLocation: true,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: configDefaults.include.map((pattern) => `tests/unit/${pattern}`),
+          exclude: ['tests/unit/components/**'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'components',
+          include: configDefaults.include.map((pattern) => `tests/unit/components/${pattern}`),
+        },
+        resolve: { conditions: ['browser'] },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          include: configDefaults.include.map((pattern) => `tests/integration/${pattern}`),
+        },
+      },
+    ],
     // Vitest does not read .gitignore; keep default discovery out of nested
     // Claude desktop worktrees (other branches' test files).
     exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
@@ -41,6 +68,9 @@ export default defineConfig({
     clearMocks: false,
   },
   resolve: {
-    extensions: ['.ts'],
+    extensions: ['.ts', '.js', '.svelte'],
+    // DOM simulation does not turn Node transport dependencies into browser packages.
+    // Only the Svelte component project needs client compilation conditions.
+    conditions: ['node'],
   },
 });

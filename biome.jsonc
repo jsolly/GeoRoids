@@ -16,6 +16,7 @@
       "!!**/node_modules"
     ]
   },
+  "css": { "parser": { "tailwindDirectives": true } },
   "linter": {
     "enabled": true,
     "domains": {
@@ -319,6 +320,15 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["**/*.svelte", "**/*.astro"],
+      // Biome checks embedded scripts; framework diagnostics own template usage.
+      // Prettier formats complete component documents.
+      "formatter": { "enabled": false },
+      "linter": {
+        "rules": { "correctness": { "noUnusedImports": "off", "noUnusedVariables": "off" } }
+      }
+    },
     {
       "includes": ["tests/**", "scripts/*.ts"],
       "linter": {

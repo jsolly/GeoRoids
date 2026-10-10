@@ -198,9 +198,17 @@ export function verifyChild(root, kind, pid = process.pid) {
 }
 
 function groupMembers(group) {
-  const result = spawnSync('ps', ['-axo', 'pid=,pgid=,stat='], { encoding: 'utf8', timeout: 5000 });
-  require(result.status === 0 &&
+  // Darwin can query one process group directly, avoiding a census of unrelated
+  // host processes while proving the same owned descendants have disappeared.
+  const scoped = process.platform === 'darwin';
+  const args = scoped
+    ? ['-g', String(group), '-o', 'pid=,pgid=,stat=']
+    : ['-axo', 'pid=,pgid=,stat='];
+  const result = spawnSync('ps', args, { encoding: 'utf8', timeout: 5000 });
+  const absent = scoped && result.status === 1 && result.stdout === '' && result.stderr === '';
+  require((result.status === 0 || absent) &&
     !result.error &&
+    !result.signal &&
     !result.stderr.trim(), `Cannot inspect validation process group: ${inspectionDetails(result)}`);
   return result.stdout
     .trim()
@@ -209,6 +217,8 @@ function groupMembers(group) {
     .map((line) => {
       const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)$/u);
       require(match, 'Malformed validation process group inspection');
+      require(!scoped ||
+        Number(match[2]) === group, 'Unexpected validation process group inspection');
       return { pid: Number(match[1]), group: Number(match[2]), state: match[3] };
     })
     .filter((entry) => entry.group === group && !entry.state.includes('Z'));

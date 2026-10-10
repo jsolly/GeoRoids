@@ -34,6 +34,7 @@ test('shared and server-consumed client modules require a server release; unrela
       'server.ts',
       'tsconfig.json',
       'package.json',
+      'astro.config.mjs',
       'src/runtime.ts',
       'src/render.ts',
       'shared/state.ts'
@@ -48,6 +49,7 @@ test('shared and server-consumed client modules require a server release; unrela
     mkdirSync(join(cwd, 'src'));
     mkdirSync(join(cwd, 'shared'));
     write('package.json', '{"private":true}');
+    write('astro.config.mjs', 'export default {};');
     write('tsconfig.json', '{"compilerOptions":{"module":"ESNext","moduleResolution":"bundler"}}');
     write('server.ts', "import { speed } from './src/runtime'; console.log(speed);");
     write(
@@ -74,6 +76,10 @@ test('shared and server-consumed client modules require a server release; unrela
     const runtime = commit('server consumed gameplay');
     assert.equal(minimumServerRelease(runtime, cwd), runtime);
     assert.equal(requiresServerDeployment(shared, runtime, cwd), true);
+    write('astro.config.mjs', 'export default {output: "static"};');
+    const config = commit('Astro build configuration');
+    assert.equal(minimumServerRelease(config, cwd), config);
+    assert.equal(requiresServerDeployment(runtime, config, cwd), true);
     assert.throws(() => minimumServerRelease(ui, cwd), /target commit checkout/u);
     assert.throws(() => minimumServerRelease('--all', cwd), /full lowercase commit SHA/u);
   } finally {

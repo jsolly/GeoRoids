@@ -19,11 +19,16 @@ test('mobile sessions detect changed Wiki, build scripts and inherited compiler 
     writeFileSync(join(root, path), content);
   };
   const fixtures = [
-    { path: 'wiki/index.html', scope: 'productSha256' },
+    { path: 'src/pages/wiki.astro', scope: 'productSha256' },
+    { path: 'src/components/wiki/WikiShell.svelte', scope: 'productSha256' },
+    { path: 'src/styles/theme.css', scope: 'productSha256' },
+    { path: 'astro.config.ts', scope: 'harnessSha256' },
+    { path: 'svelte.config.js', scope: 'harnessSha256' },
+    { path: 'components.json', scope: 'harnessSha256' },
     { path: 'content/wiki/hud-network.md', scope: 'productSha256' },
     { path: 'docs/wiki-source-review.json', scope: 'productSha256' },
     { path: 'scripts/wiki-content.ts', scope: 'harnessSha256' },
-    { path: 'scripts/wiki-vite.ts', scope: 'harnessSha256' },
+    { path: 'src/wiki/contentLoader.ts', scope: 'harnessSha256' },
     { path: 'scripts/wiki-check.ts', scope: 'harnessSha256' },
     { path: 'scripts/benchmark-build-receipt.mjs', scope: 'harnessSha256' },
     { path: 'tsconfig/fleet/strict-tsc.json', scope: 'harnessSha256' },
@@ -58,6 +63,10 @@ test('mobile sessions detect changed Wiki, build scripts and inherited compiler 
       expect(changed[scope], path).not.toBe(baseline[scope]);
       expect(changed.buildSha256).toBe(baseline.buildSha256);
       expect(changed.lockfileSha256).toBe(baseline.lockfileSha256);
+      write(path, 'original');
+      expect(collectLiveReportMetadata({ root }).git).toEqual(baseline);
+      rmSync(join(root, path));
+      expect(collectLiveReportMetadata({ root }).git[scope], path).not.toBe(baseline[scope]);
       write(path, 'original');
       expect(collectLiveReportMetadata({ root }).git).toEqual(baseline);
     }

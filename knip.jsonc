@@ -7,7 +7,7 @@
     "server/world/worldStoreWorker.ts",
     ".railway/**/*.ts",
     "scripts/**/*.ts",
-    "src/wiki/main.ts",
+    "src/pages/**/*.astro",
     "benchmarks/client.html",
     "benchmarks/collision-experiment.ts",
     "benchmarks/protocol-experiment.ts",
@@ -21,8 +21,7 @@
   ],
   "project": [
     "benchmarks/**/*.ts",
-    "middleware.ts",
-    "src/**/*.{ts,tsx}",
+    "src/**/*.{ts,tsx,svelte,astro,css}",
     "server/**/*.ts",
     "shared/**/*.ts",
     "shared-types.ts",
@@ -36,5 +35,11 @@
   // tooling; Knip cannot infer those non-TypeScript consumers.
   // afconvert is the macOS system encoder used by sounds:generate.
   "ignoreBinaries": ["uvx", "afconvert"],
-  "ignoreDependencies": ["concurrently", "markdownlint-cli2", "jsonc-parser"]
+  "ignoreDependencies": [
+    "concurrently",
+    "markdownlint-cli2",
+    "jsonc-parser",
+    "shadcn-svelte",
+    "ts-prune"
+  ]
 }

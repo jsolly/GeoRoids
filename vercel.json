@@ -19,6 +19,15 @@
           "value": "no-store"
         }
       ]
+    },
+    {
+      "source": "/client-assets.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     }
   ]
 }

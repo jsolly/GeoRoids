@@ -5,7 +5,7 @@ import process from 'node:process';
 // A later bind race still fails closed: runners never attach to an existing pair.
 const selected = process.argv.slice(2);
 if (selected.length !== 3) {
-  throw new Error('Expected Vite, game-server and proxy port selections');
+  throw new Error('Expected Astro, game-server and proxy port selections');
 }
 const explicit = selected.filter(Boolean).map(Number);
 if (

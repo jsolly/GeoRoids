@@ -1,0 +1,334 @@
+---
+// Temporary single-owner host until the Svelte game-shell stage.
+import '../../index.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000011" />
+    <meta name="color-scheme" content="dark" />
+    <script>
+      import '../core/main';
+      import '../release/clientReleaseEntry';
+    </script>
+    <title>GeoRoids</title>
+    <meta
+      name="description"
+      content="Play GeoRoids, a free cooperative space game. Survey the unknown, tow asteroids to furnaces, and share discoveries with your crew."
+    />
+    <link rel="canonical" href="https://www.georoids.com/" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="GeoRoids — Cooperative Space Game" />
+    <meta
+      property="og:description"
+      content="Survey the unknown, tow asteroids to furnaces, and share discoveries with your crew in this free cooperative space game."
+    />
+    <meta property="og:url" content="https://www.georoids.com/" />
+    <meta name="twitter:card" content="summary" />
+  </head>
+
+  <body>
+    <div id="safe-area-probe" aria-hidden="true"></div>
+    <canvas id="title-terrain" aria-hidden="true"></canvas>
+    <main id="gameWrapper">
+      <div id="start-screen" class="screen">
+        <h1>GeoRoids</h1>
+
+        <!-- Join the multiplayer session -->
+        <div class="game-modes">
+          <div>
+            <label for="playerNameInput" class="nickname-label">
+              Pilot name
+            </label>
+            <input
+              type="text"
+              id="playerNameInput"
+              maxlength="20"
+              placeholder="Crimson Falcon"
+              class="nickname-input"
+              autocomplete="nickname"
+            />
+          </div>
+          <fieldset class="ship-kit-select">
+            <legend>Choose your ship</legend>
+            <div id="ship-kit-grid" class="ship-kit-grid"></div>
+          </fieldset>
+          <div class="start-actions">
+            <button id="start-game" type="button" class="enter-game">
+              Enter Game
+            </button>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="settings">
+          <div class="preference-toggles">
+            <div class="sound-toggle-row">
+              <input class="sound-toggle" type="checkbox" id="soundPref" checked />
+              <label class="sound-toggle-label" for="soundPref">
+                Sound Effects
+              </label>
+            </div>
+            <div class="sound-toggle-row">
+              <input class="sound-toggle" type="checkbox" id="musicPref" checked />
+              <label class="sound-toggle-label" for="musicPref">
+                Music
+              </label>
+            </div>
+            <div id="hapticsRow" class="sound-toggle-row" hidden>
+              <input class="sound-toggle" type="checkbox" id="hapticsPref" />
+              <label class="sound-toggle-label" for="hapticsPref">
+                Haptics
+              </label>
+            </div>
+          </div>
+          <section id="debug-identity" class="debug-identity" hidden>
+            <div>
+              <label class="debug-id-label" for="debug-player-id">
+                Player ID
+              </label>
+              <div class="debug-id-row">
+                <input
+                  id="debug-player-id"
+                  class="debug-id-input"
+                  type="text"
+                  readonly
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Available after Enter Game"
+                  aria-describedby="debug-player-id-hint"
+                />
+                <button
+                  id="copy-debug-player-id"
+                  type="button"
+                  class="debug-copy"
+                  data-copy-name="player ID"
+                  aria-label="Copy player ID"
+                  disabled
+                >
+                  Copy
+                </button>
+              </div>
+              <p id="debug-player-id-hint" class="debug-id-hint">
+                Gameplay log ID
+              </p>
+            </div>
+            <div>
+              <label class="debug-id-label" for="debug-session-id">
+                Page session
+              </label>
+              <div class="debug-id-row">
+                <input
+                  id="debug-session-id"
+                  class="debug-id-input"
+                  type="text"
+                  readonly
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-describedby="debug-session-id-hint"
+                />
+                <button
+                  id="copy-debug-session-id"
+                  type="button"
+                  class="debug-copy"
+                  data-copy-name="page session"
+                  aria-label="Copy page session"
+                >
+                  Copy
+                </button>
+              </div>
+              <p id="debug-session-id-hint" class="debug-id-hint">
+                Client log session
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <p class="manual-entry">
+          <a href="/wiki/">Field manual ↗</a>
+        </p>
+      </div>
+
+      <div id="gameArea" hidden>
+        <div id="debug-play-stack" class="debug-play-stack">
+          <dl class="debug-play-identity">
+            <div>
+              <dt>Player</dt>
+              <dd id="debug-hud-player-id">—</dd>
+            </div>
+            <div>
+              <dt>Page</dt>
+              <dd id="debug-hud-session-id">—</dd>
+            </div>
+          </dl>
+          <button
+            id="debug-hud-toggle"
+            type="button"
+            class="debug-copy debug-hud-toggle"
+            aria-controls="debug-hud"
+            aria-expanded="true"
+            hidden
+          >
+            Hide HUD
+          </button>
+          <fieldset id="debug-hud" class="debug-hud" hidden>
+            <legend>Debug health</legend>
+            <dl>
+              <div class="debug-hud-row">
+                <dt>FPS</dt>
+                <dd id="debug-hud-fps">—</dd>
+              </div>
+              <div class="debug-hud-row">
+                <dt>RTT</dt>
+                <dd id="debug-hud-rtt">—</dd>
+              </div>
+              <div class="debug-hud-row">
+                <dt>SNAP</dt>
+                <dd id="debug-hud-snap">—</dd>
+              </div>
+              <div class="debug-hud-row">
+                <dt>MOVE</dt>
+                <dd id="debug-hud-move">—</dd>
+              </div>
+              <div class="debug-hud-row">
+                <dt>WORLD</dt>
+                <dd id="debug-hud-world">—</dd>
+              </div>
+              <div class="debug-hud-row">
+                <dt>REL</dt>
+                <dd id="debug-hud-rel">—</dd>
+              </div>
+            </dl>
+            <button
+              id="copy-debug-diagnostics"
+              type="button"
+              class="debug-copy debug-diagnostics-copy"
+              data-copy-name="diagnostics"
+              data-copy-label="Copy diagnostics"
+              aria-label="Copy diagnostics"
+            >
+              Copy diagnostics
+            </button>
+          </fieldset>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <button
+          id="ship-schematic-toggle"
+          type="button"
+          class="ship-schematic-toggle"
+          aria-label="Open inventory and ship schematic (V)"
+          aria-keyshortcuts="V"
+        >
+          Inventory <kbd>V</kbd>
+        </button>
+        <button
+          id="universe-map-toggle"
+          type="button"
+          class="universe-map-toggle"
+          aria-label="Open universe map (M)"
+          aria-keyshortcuts="M"
+        >
+          Map <kbd>M</kbd>
+        </button>
+        <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
+          <button
+            id="touch-contour-lock"
+            type="button"
+            class="touch-contour-lock"
+            aria-label="Contour Lock"
+            aria-pressed="false"
+          >
+            CONTOUR LOCK
+          </button>
+          <button
+            id="touch-ability"
+            type="button"
+            class="touch-ability"
+            aria-label="Ability"
+            aria-disabled="true"
+          >
+            E
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <dialog
+      id="universe-map-dialog"
+      class="universe-map-dialog"
+      aria-labelledby="universe-map-title"
+    >
+      <header class="universe-map-header">
+        <div>
+          <p class="universe-map-eyebrow">Shared field cartography</p>
+          <h2 id="universe-map-title">Universe map</h2>
+          <p class="universe-map-subtitle">
+            Your nearby discoveries. Zoom out to explore the whole world.
+          </p>
+        </div>
+        <div class="universe-map-actions">
+          <button id="universe-map-close" type="button" aria-label="Close">
+            Close <kbd>Esc</kbd>
+          </button>
+        </div>
+      </header>
+      <div class="universe-map-stage">
+        <canvas
+          id="universe-map-canvas"
+          tabindex="0"
+          role="img"
+          aria-label="Shared universe map"
+          aria-details="universe-map-locations"
+        ></canvas>
+        <ul
+          id="universe-map-locations"
+          class="universe-map-accessible"
+          aria-label="Revealed landmarks and crew coordinates"
+        ></ul>
+        <div class="universe-map-compass" aria-hidden="true">
+          <span>N</span>
+          <i></i>
+        </div>
+        <button
+          id="universe-map-center"
+          type="button"
+          class="universe-map-locate"
+          aria-label="Center on you"
+          title="Center on you"
+          aria-keyshortcuts="Home"
+          aria-pressed="true"
+        >
+          <svg
+            class="universe-map-locate-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <title>Center on you</title>
+            <circle class="universe-map-locate-dot" cx="12" cy="12" r="3" />
+            <circle class="universe-map-locate-ring" cx="12" cy="12" r="7" />
+            <path
+              class="universe-map-locate-cross"
+              d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"
+            />
+          </svg>
+        </button>
+        <div class="universe-map-legend"></div>
+      </div>
+    </dialog>
+
+    <dialog
+      id="ship-schematic-dialog"
+      class="ship-schematic-dialog"
+      aria-labelledby="ship-schematic-title"
+    ></dialog>
+
+    <div id="attribution">
+      <span id="buildInfo" class="build-info"></span>
+    </div>
+  </body>
+</html>

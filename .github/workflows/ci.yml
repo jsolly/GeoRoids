@@ -298,6 +298,10 @@ jobs:
         if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:ts
         if: steps.verified-tree.outputs.run_full != 'false'
+      - run: npm run check:frontend
+        if: steps.verified-tree.outputs.run_full != 'false'
+      - run: npm run check:format
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:benchmarks
         if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run build

@@ -5,7 +5,10 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { initTitleTerrain } from '../../../src/rendering/titleTerrain';
 
 const originalViewport = { width: window.innerWidth, height: window.innerHeight };
-const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
+const productionHtml = readFileSync(
+  resolve(__dirname, '../../../src/components/LegacyGameDocument.astro'),
+  'utf8'
+);
 
 afterEach(() => {
   Object.defineProperty(window, 'innerWidth', {

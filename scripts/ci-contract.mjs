@@ -71,6 +71,8 @@ const originalStaticCommands = [
   'npm run check:md',
   'npm run check:yaml',
   'npm run check:ts',
+  'npm run check:frontend',
+  'npm run check:format',
   'npm run check:benchmarks',
   'npm run check:test-runner',
   'npm run check:dev-server',
@@ -157,7 +159,7 @@ assert.equal(manifest.scripts['test:integration'], './scripts/test-runner.sh --r
 assert.equal(manifest.scripts['test:all'], 'npm run test && npm run test:integration');
 assert.equal(
   manifest.scripts['check:test-runner'],
-  "node scripts/validation-admission.mjs contracts -- bash -c 'bash scripts/test-runner-contract.sh && node --test scripts/test-ports.test.mjs scripts/validation-admission.test.mjs'"
+  "node scripts/validation-admission.mjs contracts -- bash -c 'bash scripts/test-runner-contract.sh && node --test scripts/test-ports.test.mjs scripts/validation-admission.test.mjs scripts/check-built-client.test.mjs scripts/check-unused-typescript.test.mjs'"
 );
 assert.match(
   read('scripts/test-runner-contract.sh'),

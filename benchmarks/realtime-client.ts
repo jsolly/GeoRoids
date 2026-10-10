@@ -1738,7 +1738,7 @@ try {
       );
       assert(
         sockets.length > 0 &&
-          sockets.every((endpoint) => {
+          sockets.every((endpoint): boolean => {
             const actual = new URL(endpoint);
             const expected = new URL(socketUrl);
             return actual.host === expected.host && actual.pathname === expected.pathname;
@@ -1748,7 +1748,7 @@ try {
       const protocolPeerFail = (error: unknown) => {
         errors.push(String(error));
       };
-      const protocolPeerOptions = (_index: number) => ({
+      const protocolPeerOptions = (_index: number): ConstructorParameters<typeof Pilot>[1] => ({
         url: new URL(`${socketUrl}?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`),
         measuring: () => measuring,
         fail: protocolPeerFail,

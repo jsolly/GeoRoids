@@ -50,6 +50,8 @@ const REQUIRED_COMMANDS = [
   'check:test-runner',
   'check:dev-server',
   'check:ts',
+  'check:frontend',
+  'check:format',
   'check:benchmarks',
   'test',
   'build',
@@ -765,7 +767,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
     });
     assert.deepEqual(f.calls, []);
     assert.equal(sessions.length, STAGES.length);
-    for (const config of ['../vite.config.ts', '../vitest.config.ts']) {
+    for (const config of ['./client-build.ts', '../vitest.config.ts']) {
       assert.match(
         readFileSync(new URL(config, import.meta.url), 'utf8'),
         /GEOROIDS_TEST_SESSION_DIR/u
@@ -1341,11 +1343,29 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         GIT_CONFIG_NOSYSTEM: '1',
         npm_config_script_shell: shell,
       });
-      const preload = join(f.root, 'controlled-grace.mjs');
+      const preload = join(f.root, 'controlled-deadline.mjs');
+      const deadlineArmed = join(f.root, 'deadline-armed');
+      const deadlineAdvance = join(f.root, 'advance-deadline');
       writeFileSync(
         preload,
-        `const schedule = globalThis.setTimeout;
-        globalThis.setTimeout = (callback, ms, ...args) => schedule(callback, ms === 45000 ? 100 : ms, ...args);`
+        `import fs from 'node:fs';
+        const schedule = globalThis.setTimeout, cancel = globalThis.clearTimeout;
+        const controlled = {}; let deadline;
+        globalThis.setTimeout = (callback, ms, ...args) => {
+          if (${JSON.stringify(fault)} === 'timeout' && ms === 1000) {
+            deadline = () => callback(...args);
+            fs.writeFileSync(${JSON.stringify(deadlineArmed)}, '');
+            return controlled;
+          }
+          return schedule(callback, ${JSON.stringify(fault)} === 'resistant' && ms === 45000 ? 100 : ms, ...args);
+        };
+        globalThis.clearTimeout = (timer) => timer === controlled ? (deadline = undefined) : cancel(timer);
+        const poll = setInterval(() => {
+          if (deadline && fs.existsSync(${JSON.stringify(deadlineAdvance)})) {
+            const fire = deadline; deadline = undefined; fire();
+          }
+        }, 10);
+        poll.unref();`
       );
       if (fault === 'resistant') {
         env.TERM_RESISTANT = '1';
@@ -1353,7 +1373,7 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
       driver = spawn(
         process.execPath,
         [
-          ...(fault === 'resistant' ? ['--import', preload] : []),
+          ...(['timeout', 'resistant'].includes(fault) ? ['--import', preload] : []),
           '--input-type=module',
           '-e',
           `
@@ -1377,11 +1397,21 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         driver.once('close', (code, signal) => accept({ code, signal }))
       );
       const deadline = Date.now() + 8000;
-      while (!records.every(existsSync)) {
-        assert(Date.now() < deadline, 'owned shell and descendant did not start');
+      const ready = () =>
+        records.every(existsSync) && (fault !== 'timeout' || existsSync(deadlineArmed));
+      while (!ready()) {
+        const readiness = `fault=${fault}; shell=${existsSync(records[0])}; descendant=${existsSync(records[1])}; deadline=${existsSync(deadlineArmed)}; driverExit=${driver.exitCode}; driverSignal=${driver.signalCode}`;
+        assert(
+          driver.exitCode === null && driver.signalCode === null,
+          `owned setup exited before readiness: ${readiness}`
+        );
+        assert(Date.now() < deadline, `owned setup readiness deadline: ${readiness}`);
         await delay(10);
       }
       const owned = records.map((path) => JSON.parse(readFileSync(path, 'utf8')));
+      if (fault === 'timeout') {
+        writeFileSync(deadlineAdvance, '');
+      }
       if (fault === 'interruption' || fault === 'resistant') {
         driver.kill('SIGTERM');
       }

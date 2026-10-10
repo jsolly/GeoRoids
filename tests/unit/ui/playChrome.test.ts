@@ -7,7 +7,10 @@ import { initializeTouchControls, syncTouchChrome } from '../../../src/input/tou
 import { NetworkManager } from '../../../src/network/networkManager';
 import { setPlayView } from '../../../src/ui/uiUtils';
 
-const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
+const productionHtml = readFileSync(
+  resolve(__dirname, '../../../src/components/LegacyGameDocument.astro'),
+  'utf8'
+);
 const productionCss = readFileSync(resolve(__dirname, '../../../index.css'), 'utf8');
 const productionPackage: { dependencies?: Record<string, string> } = JSON.parse(
   readFileSync(resolve(__dirname, '../../../package.json'), 'utf8')
@@ -72,11 +75,13 @@ test('title menu uses first-party nickname and sound chrome', () => {
     true
   );
   expect(document.querySelector('#soundPref')?.classList.contains('sound-toggle')).toBe(true);
-  expect(document.querySelector('label[for="soundPref"]')?.textContent).toBe('Sound Effects');
+  expect(document.querySelector('label[for="soundPref"]')?.textContent?.trim()).toBe(
+    'Sound Effects'
+  );
   expect(document.querySelector('#musicPref')?.classList.contains('sound-toggle')).toBe(true);
-  expect(document.querySelector('label[for="musicPref"]')?.textContent).toBe('Music');
+  expect(document.querySelector('label[for="musicPref"]')?.textContent?.trim()).toBe('Music');
   expect(document.querySelector('#hapticsPref')?.classList.contains('sound-toggle')).toBe(true);
-  expect(document.querySelector('label[for="hapticsPref"]')?.textContent).toBe('Haptics');
+  expect(document.querySelector('label[for="hapticsPref"]')?.textContent?.trim()).toBe('Haptics');
   expect(document.querySelector('.form-control')).toBeNull();
   expect(document.querySelector('.form-label')).toBeNull();
   expect(document.querySelector('.form-check-input')).toBeNull();
@@ -152,6 +157,6 @@ test('play shell creates the touch ability overlay with a semantic action button
   expect(action?.getAttribute('aria-label')).toBeTruthy();
   const boost = document.querySelector('#touch-contour-lock');
   expect(boost?.tagName).toBe('BUTTON');
-  expect(boost?.textContent).toBe('CONTOUR LOCK');
+  expect(boost?.textContent?.trim()).toBe('CONTOUR LOCK');
   expect(document.querySelector('#touch-shield')).toBeNull();
 });

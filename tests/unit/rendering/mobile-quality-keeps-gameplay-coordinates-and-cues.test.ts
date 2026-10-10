@@ -18,7 +18,7 @@ afterEach(() => {
 test('a DPR-three pilot keeps the same view and aiming coordinates at lower rendering resolution', () => {
   Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 3 });
   window.history.replaceState(null, '', '?performance=collect&renderDpr=1.5&renderGlow=off');
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const viewport = canvasManager.getViewportSize();
   const canvas = canvasManager.requireCanvas();
   expect(canvas.width).toBe(Math.round(viewport.width * 1.5));
@@ -32,7 +32,7 @@ test('a DPR-three pilot keeps the same view and aiming coordinates at lower rend
 
   canvasManager.destroy();
   window.history.replaceState(null, '', '?performance=collect&renderDpr=native');
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   expect(canvas.width).toBe(Math.round(viewport.width * 3));
   expect(canvasManager.worldToScreen(position, position)).toEqual(screen);
 });
@@ -40,7 +40,7 @@ test('a DPR-three pilot keeps the same view and aiming coordinates at lower rend
 test('diagnostic rendering caps never increase a lower-density display backing store', () => {
   Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1.25 });
   window.history.replaceState(null, '', '?performance=1&renderDpr=2');
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   expect(canvasManager.requireContext().getTransform().a).toBe(1.25);
   expect(canvasManager.requireCanvas().width).toBe(
     Math.round(canvasManager.getViewportSize().width * 1.25)

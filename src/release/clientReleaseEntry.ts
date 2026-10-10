@@ -1,13 +1,17 @@
 import { watchClientRelease } from './clientReleaseWatcher';
 
-// Independent of the match loop: open menus and background game tabs refresh too.
-if (import.meta.env.PROD) {
-  // Smoke observes the identity embedded in the executed bundle, separately from its manifest.
-  document.documentElement.dataset['clientRelease'] = import.meta.env['VITE_COMMIT_SHA'];
-  let stop: () => void = () => undefined;
+/** Independent of the match loop; owned by the mounted browser shell. */
+export function mountClientRelease(): () => void {
+  if (!import.meta.env.PROD) {
+    return () => {};
+  }
+  const previous = document.documentElement.dataset['clientRelease'];
+  const release = import.meta.env['VITE_COMMIT_SHA'];
+  document.documentElement.dataset['clientRelease'] = release;
+  let stop: () => void = () => {};
   const start = () => {
     stop();
-    stop = watchClientRelease(import.meta.env['VITE_COMMIT_SHA'], {
+    stop = watchClientRelease(release, {
       fetch: (input, init) => window.fetch(input, init),
       storage: {
         getItem: (key) => window.sessionStorage.getItem(key),
@@ -26,9 +30,21 @@ if (import.meta.env.PROD) {
   start();
   window.addEventListener('pagehide', hide);
   window.addEventListener('pageshow', show);
-  import.meta.hot?.dispose(() => {
+  let disposed = false;
+  return () => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
     stop();
     window.removeEventListener('pagehide', hide);
     window.removeEventListener('pageshow', show);
-  });
+    if (document.documentElement.dataset['clientRelease'] === release) {
+      if (previous === undefined) {
+        delete document.documentElement.dataset['clientRelease'];
+      } else {
+        document.documentElement.dataset['clientRelease'] = previous;
+      }
+    }
+  };
 }

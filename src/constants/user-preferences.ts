@@ -33,15 +33,3 @@ export function clientLogLevel(): LogLevelName {
   const level = new URLSearchParams(window.location.search).get('log-level');
   return LOG_LEVEL_NAMES.find((name) => name === level && name !== 'error') ?? 'info';
 }
-
-// Initialize checkbox state from stored preference (only in browser environment)
-if (typeof document !== 'undefined') {
-  const defaultSoundPref = document.querySelector('#soundPref') as HTMLInputElement;
-  if (defaultSoundPref) {
-    defaultSoundPref.checked = soundIsOn();
-  }
-  const defaultMusicPref = document.querySelector('#musicPref') as HTMLInputElement;
-  if (defaultMusicPref) {
-    defaultMusicPref.checked = musicIsOn();
-  }
-}

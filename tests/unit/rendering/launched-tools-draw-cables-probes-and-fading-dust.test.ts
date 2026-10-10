@@ -32,7 +32,7 @@ function scene(kitId: 'hauler' | 'scout') {
     document.body.append(canvas);
   }
   restoreViewport = setWindowViewport(800, 600);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   const ship = new Ship({ kitId, position: { x: 0, y: 0 } });
   const draw = () => {

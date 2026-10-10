@@ -6,23 +6,16 @@ import { TERRAIN } from '../physics/terrain/terrainConfig';
 import { hexToRgba } from '../utils/colorUtils';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 
-let stopDevicePixelRatioWatcher: (() => void) | null = null;
-let stopResizeListener: (() => void) | null = null;
-
 /** A fixed terrain preview, independent of the live room's terrain cache. */
-export function initTitleTerrain(): void {
-  stopDevicePixelRatioWatcher?.();
-  stopDevicePixelRatioWatcher = null;
-  stopResizeListener?.();
-  stopResizeListener = null;
-
-  const canvas = document.querySelector('#title-terrain');
+export function initTitleTerrain(
+  canvas: Element | null = document.querySelector('#title-terrain')
+): () => void {
   if (!(canvas instanceof HTMLCanvasElement)) {
-    return;
+    return () => {};
   }
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    return;
+    return () => {};
   }
 
   // The live world can span tens of thousands of units. The title is a local
@@ -76,8 +69,14 @@ export function initTitleTerrain(): void {
 
   resize();
   window.addEventListener('resize', resize);
-  stopResizeListener = (): void => {
+  const stopDpr = watchDevicePixelRatio(resize);
+  let disposed = false;
+  return () => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
     window.removeEventListener('resize', resize);
+    stopDpr();
   };
-  stopDevicePixelRatioWatcher = watchDevicePixelRatio(resize);
 }

@@ -2,8 +2,7 @@ import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
 import { worldFurnaces } from '../network/worldExploration';
 import { canvasManager } from '../rendering/canvasSurface';
-import { isShipSchematicOpen } from '../ui/shipSchematicState';
-import { isTownStoreOpen } from '../ui/townStoreState';
+import { getOpenGameOverlay } from '../runtime/overlayState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { steeringTurn } from './pointerSteering';
@@ -135,6 +134,9 @@ export function reconcilePlayerInput(player: Player): void {
 }
 
 export function keyDown(ev: KeyboardEvent, player: Player): void {
+  if (getOpenGameOverlay() !== null) {
+    return;
+  }
   logger.debug('KEYBINDINGS', 'KeyDown called', {
     key: ev.code,
     shipExploding: player.ship.exploding,
@@ -155,12 +157,12 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     switch (ev.code) {
       case 'Space':
         // Space fires while automatic cruise continues.
-        if (!isShipSchematicOpen() && !isTownStoreOpen()) {
+        if (getOpenGameOverlay() === null) {
           player.ship.shoot();
         }
         break;
       case 'KeyE':
-        if (!ev.repeat && !isShipSchematicOpen() && !isTownStoreOpen()) {
+        if (!ev.repeat && getOpenGameOverlay() === null) {
           player.ship.activateAbility();
         }
         break;

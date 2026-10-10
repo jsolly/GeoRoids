@@ -476,7 +476,14 @@ export const clientPerformance = new ClientPerformanceMetrics(
     ['1', 'collect'].includes(new URLSearchParams(window.location.search).get('performance') ?? '')
 );
 
-if (clientPerformance.enabled) {
+/** Opt-in diagnostics have the same lifetime as the mounted game. */
+export function mountPerformanceMetrics(collectorHost: HTMLElement = document.body): () => void {
+  if (!clientPerformance.enabled) {
+    return () => {};
+  }
+  const scope = new AbortController();
+  const { signal } = scope;
+
   window.georoidsPerformance = clientPerformance;
   for (const event of [
     'pointerdown',
@@ -500,34 +507,42 @@ if (clientPerformance.enabled) {
       {
         capture: true,
         passive: true,
+        signal,
       }
     );
   }
-  window.addEventListener('networkReconnecting', (event) => {
-    const detail: unknown = event instanceof CustomEvent ? event.detail : undefined;
-    if (
-      typeof detail === 'object' &&
-      detail !== null &&
-      'attempt' in detail &&
-      typeof detail.attempt === 'number'
-    ) {
-      clientPerformance.reconnect(detail.attempt, performance.now());
+  window.addEventListener(
+    'networkReconnecting',
+    (event) => {
+      const detail: unknown = event instanceof CustomEvent ? event.detail : undefined;
+      if (
+        typeof detail === 'object' &&
+        detail !== null &&
+        'attempt' in detail &&
+        typeof detail.attempt === 'number'
+      ) {
+        clientPerformance.reconnect(detail.attempt, performance.now());
+      }
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'networkPermanentlyDisconnected',
+    () => {
+      clientPerformance.joinFailed();
+      clientPerformance.recoveryFailed();
+    },
+    { signal }
+  );
+  const stopCollector =
+    new URLSearchParams(window.location.search).get('performance') === 'collect'
+      ? installPhoneCollector(clientPerformance, collectorHost)
+      : () => {};
+  return () => {
+    scope.abort();
+    stopCollector();
+    if (window.georoidsPerformance === clientPerformance) {
+      delete window.georoidsPerformance;
     }
-  });
-  window.addEventListener('networkPermanentlyDisconnected', () => {
-    clientPerformance.joinFailed();
-    clientPerformance.recoveryFailed();
-  });
-}
-
-if (
-  clientPerformance.enabled &&
-  new URLSearchParams(window.location.search).get('performance') === 'collect'
-) {
-  const install = () => installPhoneCollector(clientPerformance);
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', install, { once: true });
-  } else {
-    install();
-  }
+  };
 }

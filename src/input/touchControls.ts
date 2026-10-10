@@ -1,11 +1,12 @@
+import { getOpenGameOverlay } from '../runtime/overlayState';
+
+let listenerScope: AbortController | null = null;
+
 import { playFeedback } from '../audio/feedbackSounds';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import { rotateVectorInto } from '../rendering/travelCamera';
-import { isShipSchematicOpen } from '../ui/shipSchematicState';
-import { isTownStoreOpen } from '../ui/townStoreState';
-import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
@@ -133,7 +134,7 @@ export function setTouchHeading(player: Player, heading: number | null): void {
 }
 
 export function setTouchFire(player: Player, held: boolean): void {
-  if (isShipSchematicOpen() || isTownStoreOpen()) {
+  if (getOpenGameOverlay() !== null) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
     return;
@@ -155,12 +156,7 @@ export function setTouchFire(player: Player, held: boolean): void {
 }
 
 export function triggerTouchAbility(player: Player): boolean {
-  if (
-    isShipSchematicOpen() ||
-    isTownStoreOpen() ||
-    player.ship.health <= 0 ||
-    player.ship.exploding
-  ) {
+  if (getOpenGameOverlay() !== null || player.ship.health <= 0 || player.ship.exploding) {
     return false;
   }
   return player.ship.activateAbility();
@@ -202,7 +198,7 @@ function isInPlay(): boolean {
 }
 
 function isContourLockMenuOpen(): boolean {
-  return isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
+  return getOpenGameOverlay() !== null;
 }
 
 export function syncTouchChrome(
@@ -213,7 +209,6 @@ export function syncTouchChrome(
   }
 
   const use = inPlay && shouldUseTouchControls();
-  document.body.classList.toggle('touch-play', use);
   const root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
   if (root) {
     root.hidden = !inPlay;
@@ -749,6 +744,8 @@ export function initializeTouchControls(): void {
   if (initialized || typeof document === 'undefined') {
     return;
   }
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
 
   const { ability, contourLock } = ensureTouchDom();
   abilityButton = ability;
@@ -757,78 +754,138 @@ export function initializeTouchControls(): void {
   document.addEventListener('pointerdown', onPlayfieldPointerDown, {
     passive: false,
     capture: true,
+    signal,
   });
-  document.addEventListener('pointermove', onSteerPointerMove, { passive: false });
-  document.addEventListener('pointerup', onPlayfieldPointerUp);
-  document.addEventListener('pointercancel', onPlayfieldPointerUp);
-  document.addEventListener('lostpointercapture', onPlayfieldPointerUp);
-  document.addEventListener('touchstart', onTouchListChange, { capture: true, passive: true });
-  document.addEventListener('touchend', onTouchListChange, { capture: true, passive: true });
-  document.addEventListener('touchcancel', onTouchListChange, { capture: true, passive: true });
-
-  ability.addEventListener('pointerdown', (ev) => onAbilityPointerDown(ev, ability));
-  ability.addEventListener('pointerup', (ev) => onAbilityPointerUp(ev, ability));
-  ability.addEventListener('pointercancel', (ev) => onAbilityPointerUp(ev, ability));
-  ability.addEventListener('click', onAbilityClick);
-  ability.addEventListener('lostpointercapture', () => {
-    if (abilityPointerId !== null) {
-      resetTouchInteraction(requireLocalPlayer());
-    }
+  document.addEventListener('pointermove', onSteerPointerMove, { passive: false, signal });
+  document.addEventListener('pointerup', onPlayfieldPointerUp, { signal });
+  document.addEventListener('pointercancel', onPlayfieldPointerUp, { signal });
+  document.addEventListener('lostpointercapture', onPlayfieldPointerUp, { signal });
+  document.addEventListener('touchstart', onTouchListChange, {
+    capture: true,
+    passive: true,
+    signal,
   });
-
-  contourLock.addEventListener('pointerdown', (ev) => onContourLockPointerDown(ev, contourLock));
-  contourLock.addEventListener('pointerup', (ev) => onContourLockPointerUp(ev, contourLock));
-  contourLock.addEventListener('pointercancel', (ev) => onContourLockPointerUp(ev, contourLock));
-  contourLock.addEventListener('click', onContourLockClick);
-  contourLock.addEventListener('lostpointercapture', () => {
-    if (contourLockPointerId !== null) {
-      resetTouchInteraction(requireLocalPlayer());
-    }
+  document.addEventListener('touchend', onTouchListChange, {
+    capture: true,
+    passive: true,
+    signal,
+  });
+  document.addEventListener('touchcancel', onTouchListChange, {
+    capture: true,
+    passive: true,
+    signal,
   });
 
-  window.addEventListener('playViewOn', () => syncTouchChrome(true));
-  window.addEventListener('playViewOff', () => syncTouchChrome(false));
+  ability.addEventListener('pointerdown', (ev) => onAbilityPointerDown(ev, ability), { signal });
+  ability.addEventListener('pointerup', (ev) => onAbilityPointerUp(ev, ability), { signal });
+  ability.addEventListener('pointercancel', (ev) => onAbilityPointerUp(ev, ability), { signal });
+  ability.addEventListener('click', onAbilityClick, { signal });
+  ability.addEventListener(
+    'lostpointercapture',
+    () => {
+      if (abilityPointerId !== null) {
+        resetTouchInteraction(requireLocalPlayer());
+      }
+    },
+    { signal }
+  );
+
+  contourLock.addEventListener('pointerdown', (ev) => onContourLockPointerDown(ev, contourLock), {
+    signal,
+  });
+  contourLock.addEventListener('pointerup', (ev) => onContourLockPointerUp(ev, contourLock), {
+    signal,
+  });
+  contourLock.addEventListener('pointercancel', (ev) => onContourLockPointerUp(ev, contourLock), {
+    signal,
+  });
+  contourLock.addEventListener('click', onContourLockClick, { signal });
+  contourLock.addEventListener(
+    'lostpointercapture',
+    () => {
+      if (contourLockPointerId !== null) {
+        resetTouchInteraction(requireLocalPlayer());
+      }
+    },
+    { signal }
+  );
+
+  window.addEventListener('playViewOn', () => syncTouchChrome(true), { signal });
+  window.addEventListener('playViewOff', () => syncTouchChrome(false), { signal });
   // A modal universe map can cover the playfield while the game keeps cruising.
   // Drop any active touch gesture before the dialog takes pointer ownership.
-  window.addEventListener('gameMapOpen', () => {
-    resetTouchInteraction(requireLocalPlayer());
-    const player = requireLocalPlayer();
-    if (player) {
-      syncContourLockChrome(player);
-    }
+  window.addEventListener(
+    'gameMapOpen',
+    () => {
+      resetTouchInteraction(requireLocalPlayer());
+      const player = requireLocalPlayer();
+      if (player) {
+        syncContourLockChrome(player);
+      }
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'gameMapClose',
+    () => {
+      const player = requireLocalPlayer();
+      if (player) {
+        syncContourLockChrome(player);
+      }
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'gameSchematicOpen',
+    () => {
+      resetTouchInteraction(requireLocalPlayer());
+      const player = requireLocalPlayer();
+      if (player) {
+        syncContourLockChrome(player);
+      }
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'gameSchematicClose',
+    () => {
+      const player = requireLocalPlayer();
+      if (player) {
+        syncContourLockChrome(player);
+      }
+    },
+    { signal }
+  );
+  window.addEventListener('resize', () => syncTouchChrome(), { signal });
+  window.addEventListener(
+    'orientationchange',
+    () => {
+      resetTouchInteraction(requireLocalPlayer());
+      syncTouchChrome();
+    },
+    { signal }
+  );
+  window.addEventListener('blur', () => resetTouchInteraction(requireLocalPlayer()), { signal });
+  window.addEventListener('pagehide', () => resetTouchInteraction(requireLocalPlayer()), {
+    signal,
   });
-  window.addEventListener('gameMapClose', () => {
-    const player = requireLocalPlayer();
-    if (player) {
-      syncContourLockChrome(player);
-    }
-  });
-  window.addEventListener('gameSchematicOpen', () => {
-    resetTouchInteraction(requireLocalPlayer());
-    const player = requireLocalPlayer();
-    if (player) {
-      syncContourLockChrome(player);
-    }
-  });
-  window.addEventListener('gameSchematicClose', () => {
-    const player = requireLocalPlayer();
-    if (player) {
-      syncContourLockChrome(player);
-    }
-  });
-  window.addEventListener('resize', () => syncTouchChrome());
-  window.addEventListener('orientationchange', () => {
-    resetTouchInteraction(requireLocalPlayer());
-    syncTouchChrome();
-  });
-  window.addEventListener('blur', () => resetTouchInteraction(requireLocalPlayer()));
-  window.addEventListener('pagehide', () => resetTouchInteraction(requireLocalPlayer()));
-  document.addEventListener('visibilitychange', resetIfPageIsInactive);
-  window.visualViewport?.addEventListener('resize', () => syncTouchChrome());
+  document.addEventListener('visibilitychange', resetIfPageIsInactive, { signal });
+  window.visualViewport?.addEventListener('resize', () => syncTouchChrome(), { signal });
 
   initialized = true;
   syncTouchChrome();
   logger.debug('INPUT', 'Touch controls initialized', {
     visible: isTouchChromeVisible(),
   });
+}
+
+export function disposeTouchControls(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  initialized = false;
+  resetTouchInteraction(requireLocalPlayer(), { forgetTouches: true });
+  abilityButton = null;
+  contourLockButton = null;
+  lastAbilityChromeKey = '';
+  lastContourLockChromeKey = '';
 }

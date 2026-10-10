@@ -10,7 +10,7 @@ import {
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { handleMouseDown, handleMouseMove, handleMouseUp } from '../../../src/input/mouse';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import { setShipSchematicOpen } from '../../../src/ui/shipSchematicState';
+import { closeGameOverlay, openGameOverlay } from '../../../src/runtime/overlayState';
 
 let player: Player;
 
@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setShipSchematicOpen(false);
+  closeGameOverlay('inventory');
   resetControlSources();
   vi.restoreAllMocks();
 });
@@ -69,7 +69,7 @@ test.each(['dead', 'exploding', 'schematic'])(
       player.ship.exploding = true;
     }
     if (state === 'schematic') {
-      setShipSchematicOpen(true);
+      openGameOverlay('inventory');
     }
     handleMouseDown(new MouseEvent('mousedown', { button: 2 }), player);
     expect(player.ship.contourLocked).toBe(false);

@@ -2,12 +2,10 @@ import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import { civicLotAt } from '../../shared/furnaces';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { worldFurnaces } from '../network/worldExploration';
+import { getOpenGameOverlay } from '../runtime/overlayState';
+import { canEnterTownStore, isAtTownSquare, openTownStore } from '../runtime/townStore';
 import { SCOUT_ONLY_BUILD_HINT } from './constants';
 import { hideFieldHints, setFieldHint } from './fieldHint';
-import { isShipSchematicOpen } from './shipSchematicState';
-import { canEnterTownStore, isAtTownSquare, openTownStore } from './townStore';
-import { isTownStoreOpen } from './townStoreState';
-import { isUniverseMapOpen } from './universeMap';
 import { shouldUseTouchControls } from './viewportChrome';
 
 /** Explain who can build, or the Scout's missing points, on a dark foundation. */
@@ -37,7 +35,7 @@ function darkLotBuildHint(): string | undefined {
 function boardFromTap(): void {
   // Open after the tap completes so it cannot land on a new modal control,
   // and only while the ship is still on the footprint that offered it.
-  if (canEnterTownStore() && !isShipSchematicOpen() && !isUniverseMapOpen()) {
+  if (canEnterTownStore() && getOpenGameOverlay() === null) {
     openTownStore();
     syncFurnaceTravelPrompt();
   }
@@ -48,7 +46,7 @@ export function syncFurnaceTravelPrompt(): void {
   if (typeof document === 'undefined') {
     return;
   }
-  const overlaysClosed = !isTownStoreOpen() && !isShipSchematicOpen() && !isUniverseMapOpen();
+  const overlaysClosed = getOpenGameOverlay() === null;
   const travel = overlaysClosed && canEnterTownStore();
   if (travel) {
     const town = isAtTownSquare();
@@ -72,6 +70,6 @@ export function syncFurnaceTravelPrompt(): void {
   );
 }
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('playViewOff', hideFieldHints);
+export function mountFurnaceTravelPrompt(signal: AbortSignal): void {
+  window.addEventListener('playViewOff', hideFieldHints, { signal });
 }

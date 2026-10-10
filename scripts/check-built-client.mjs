@@ -4,7 +4,7 @@ import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
-import { clientAssetGraph } from './client-asset-graph.mjs';
+import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.mjs';
 
 export function checkBuiltClient(root = process.cwd()) {
   const read = (path) => readFileSync(join(root, 'dist', path), 'utf8');
@@ -37,16 +37,7 @@ export function checkBuiltClient(root = process.cwd()) {
         assert(!document.querySelector('#gameCanvas'), 'The Wiki contains a game host');
       } else {
         assert(document.querySelector('canvas#gameCanvas'), `Missing game canvas: ${path}`);
-        const entries = [...document.querySelectorAll('script[type="module"][src]')].map(
-          (element) => {
-            const source = element.getAttribute('src');
-            assert(
-              source.startsWith('/') && !source.startsWith('//'),
-              'Game module must be first-party'
-            );
-            return source.slice(1);
-          }
-        );
+        const { modules: entries } = clientDocumentAssets(html);
         gameDocuments.push(clientAssetGraph(manifest, entries));
       }
     } finally {

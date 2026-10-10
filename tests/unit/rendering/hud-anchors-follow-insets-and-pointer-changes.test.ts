@@ -62,7 +62,7 @@ test('unchanged viewport dimensions refresh inset and pointer anchors and releas
     }
   };
 
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   expect(layout().balance.y).toBe(55);
   const initialStyleReads = styles.mock.calls.length;
   for (let frame = 0; frame < 120; frame++) {
@@ -96,7 +96,7 @@ test('unchanged viewport dimensions refresh inset and pointer anchors and releas
   media.get('(pointer: coarse)')?.dispatchEvent(new Event('change'));
   expect(callbacks.size).toBe(0);
   probe.style.paddingTop = '60px';
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   expect(layout().balance.y).toBe(68);
   window.dispatchEvent(new Event('resize'));
   expect(callbacks.size).toBe(1);

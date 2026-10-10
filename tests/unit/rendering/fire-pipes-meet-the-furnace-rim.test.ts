@@ -35,7 +35,7 @@ test.each([false, true])(
       document.body.append(canvas);
     }
     restoreViewport = setWindowViewport(1280, 900);
-    canvasManager.initialize();
+    canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
     const lot = civicLot('street-1-0');
     if (!lot) {
       throw new Error('Missing furnace');

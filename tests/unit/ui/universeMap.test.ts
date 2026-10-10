@@ -12,6 +12,7 @@ import {
 import {
   clampUniverseMapZoom,
   closeUniverseMap,
+  disposeUniverseMap,
   initializeUniverseMap,
   isUniverseMapOpen,
   mapScreenDeltaToWorld,
@@ -22,10 +23,7 @@ import {
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
 
-const productionHtml = readFileSync(
-  resolve(__dirname, '../../../src/components/LegacyGameDocument.astro'),
-  'utf8'
-);
+const productionHtml = readFileSync(resolve(__dirname, '../../support/legacy-game.html'), 'utf8');
 
 describe('universe map play chrome', () => {
   const releaseInput = vi.fn();
@@ -325,5 +323,46 @@ describe('universe map play chrome', () => {
     }
     expect(toggle.classList.contains('universe-map-touch')).toBe(false);
     expect(toggle.getAttribute('aria-keyshortcuts')).toBe('M');
+  });
+
+  test('disposing during a pinch releases both captured pointers and remount binds one map toggle', () => {
+    const canvas = document.querySelector<HTMLCanvasElement>(`#${UNIVERSE_MAP_IDS.canvas}`);
+    const toggle = document.querySelector<HTMLButtonElement>(`#${UNIVERSE_MAP_IDS.toggle}`);
+    expect(canvas).not.toBeNull();
+    if (!canvas || !toggle) {
+      throw new Error('Map controls were not mounted');
+    }
+    const captured = new Set<number>();
+    canvas.setPointerCapture = (id) => {
+      captured.add(id);
+    };
+    canvas.hasPointerCapture = (id) => captured.has(id);
+    const release = vi.fn((id: number) => {
+      captured.delete(id);
+    });
+    canvas.releasePointerCapture = release;
+    toggle.click();
+    for (const pointerId of [11, 22]) {
+      const event = new Event('pointerdown', { bubbles: true, cancelable: true });
+      Object.assign(event, {
+        pointerId,
+        pointerType: 'touch',
+        button: 0,
+        clientX: pointerId,
+        clientY: 30,
+      });
+      canvas.dispatchEvent(event);
+    }
+    expect([...captured]).toEqual([11, 22]);
+    disposeUniverseMap();
+    expect(release.mock.calls).toEqual([[11], [22]]);
+    expect(captured.size).toBe(0);
+    expect(isUniverseMapOpen()).toBe(false);
+    toggle.click();
+    expect(isUniverseMapOpen()).toBe(false);
+    initializeUniverseMap({ onOpen: releaseInput });
+    toggle.click();
+    expect(isUniverseMapOpen()).toBe(true);
+    closeUniverseMap();
   });
 });

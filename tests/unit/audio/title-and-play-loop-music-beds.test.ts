@@ -226,7 +226,10 @@ beforeEach(async () => {
   globalAudio = { state: 'suspended', mute: vi.fn() };
   loadLibrary = vi.fn(() => ({ Howl: FakeHowl, Howler: globalAudio }));
   vi.doMock('howler', () => loadLibrary());
-  ({ setMusic, setMusicBedCatalogForTests } = await import('../../../src/audio/musicBeds'));
+  const music = await import('../../../src/audio/musicBeds');
+  setMusic = music.setMusic;
+  setMusicBedCatalogForTests = music.setMusicBedCatalogForTests;
+  music.mountMusicBeds();
   ({ pushMusicThreat, clearMusicThreat, resetMusicThreats } = await import(
     '../../../src/audio/musicThreat'
   ));

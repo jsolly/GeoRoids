@@ -1,0 +1,33 @@
+---
+import '../styles/theme.css';
+import '../../index.css';
+import GameShell from './game/GameShell.svelte';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000011" />
+    <meta name="color-scheme" content="dark" />
+    <title>GeoRoids</title>
+    <meta
+      name="description"
+      content="Play GeoRoids, a free cooperative space game. Survey the unknown, tow asteroids to furnaces, and share discoveries with your crew."
+    />
+    <link rel="canonical" href="https://www.georoids.com/" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="GeoRoids — Cooperative Space Game" />
+    <meta
+      property="og:description"
+      content="Survey the unknown, tow asteroids to furnaces, and share discoveries with your crew in this free cooperative space game."
+    />
+    <meta property="og:url" content="https://www.georoids.com/" />
+    <meta name="twitter:card" content="summary" />
+  </head>
+  <body>
+    <GameShell client:load />
+  </body>
+</html>

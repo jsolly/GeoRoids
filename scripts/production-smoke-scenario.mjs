@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import WebSocket from 'ws';
-import { clientAssetGraph } from './client-asset-graph.mjs';
+import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.mjs';
 import { requireEvidence, SmokeFailure, smokeClock } from './production-smoke-network.mjs';
 
 export const productionUrl = 'https://www.georoids.com/';
@@ -16,34 +16,16 @@ const { SNAPSHOT_VERSION, SnapshotDecoder } = await tsImport(
 );
 const { GAME, LASER } = await tsImport('../src/constants/index.ts', import.meta.url);
 
-function attribute(tag, name) {
-  return new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'iu').exec(tag)?.[1];
-}
 function documentAssets(html) {
   requireEvidence(
     /<html\b/iu.test(html) && /<canvas\b[^>]*\bid=["']gameCanvas["']/iu.test(html),
     'Published client document is malformed'
   );
-  const modules = [...html.matchAll(/<script\b[^>]*>/giu)]
-    .filter(([tag]) => attribute(tag, 'type') === 'module')
-    .map(([tag]) => attribute(tag, 'src'));
-  const links = [...html.matchAll(/<link\b[^>]*>/giu)]
-    .filter(([tag]) => ['modulepreload', 'stylesheet'].includes(attribute(tag, 'rel')))
-    .map(([tag]) => attribute(tag, 'href'));
-  requireEvidence(modules.length > 0 && modules.every(Boolean), 'Client module entry is missing');
-  const assets = [...new Set([...modules, ...links])].map((path) => {
-    requireEvidence(typeof path === 'string', 'Client bundle asset path is missing');
-    const url = new URL(path, productionUrl);
-    requireEvidence(
-      url.origin === new URL(productionUrl).origin &&
-        !url.search &&
-        !url.hash &&
-        /^\/(?:assets|_astro)\/[a-zA-Z0-9_.-]+\.(?:js|css)$/u.test(url.pathname),
-      'Client bundle asset is not first-party'
-    );
-    return url.href;
-  });
-  return { modules: modules.map((path) => new URL(path, productionUrl).href), assets };
+  const { modules, assets } = clientDocumentAssets(html);
+  return {
+    modules: modules.map((path) => new URL(`/${path}`, productionUrl).href),
+    assets: assets.map((path) => new URL(`/${path}`, productionUrl).href),
+  };
 }
 
 export async function waitForClientAssets({

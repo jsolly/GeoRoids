@@ -18,7 +18,7 @@ let testCanvas: HTMLCanvasElement;
 beforeEach(() => {
   resetControlSources();
   localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
-  // Set predictable viewport size used by canvasManager.initialize()
+  // Set predictable viewport size used by canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'))
   Object.defineProperty(window, 'innerWidth', { value: 800, writable: true });
   Object.defineProperty(window, 'innerHeight', { value: 600, writable: true });
 
@@ -27,10 +27,10 @@ beforeEach(() => {
   document.body.appendChild(testCanvas);
 
   // Initialize canvas manager
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
 
   // JSDOM layout: mock bounding rect to align with (0,0)
-  // Set mock after canvasManager.initialize() to ensure it works
+  // Set mock after canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas')) to ensure it works
   const canvas = canvasManager.getCanvas();
   if (canvas) {
     canvas.getBoundingClientRect = () => ({

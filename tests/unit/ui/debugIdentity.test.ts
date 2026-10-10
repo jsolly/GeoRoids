@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { debugIsOn } from '../../../src/constants/user-preferences';
 import {
+  disposeDebugIdentity,
   mountDebugIdentity,
   resetDebugIdentityForTests,
   syncDebugMode,
@@ -17,6 +18,7 @@ function visit(path: string): void {
 }
 
 beforeEach(() => {
+  disposeDebugIdentity();
   resetDebugIdentityForTests();
   resetSafeStorage();
   setPlayView(false);
@@ -26,6 +28,8 @@ afterEach(() => {
   visit('/');
   setPlayView(false);
   resetSafeStorage();
+  disposeDebugIdentity();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -85,3 +89,39 @@ test.each([
   visit('/');
   expect(logger.getLogLevel()).toBe(LogLevel.INFO);
 });
+
+test.each(['resolve', 'reject'] as const)(
+  'a late clipboard %s cannot focus old controls or recreate timers after remount',
+  async (outcome) => {
+    vi.useFakeTimers();
+    let accept: (() => void) | undefined;
+    let reject: ((error: Error) => void) | undefined;
+    const pending = new Promise<void>((resolve, fail) => {
+      accept = resolve;
+      reject = fail;
+    });
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: () => pending } });
+    visit('/debug');
+    const button = document.querySelector<HTMLButtonElement>('#copy-debug-session-id');
+    expect(button).not.toBeNull();
+    button?.click();
+    disposeDebugIdentity();
+    mountDebugIdentity();
+    const name = document.querySelector<HTMLInputElement>('#playerNameInput');
+    name?.focus();
+    const focus = document.activeElement;
+    const timers = vi.getTimerCount();
+    if (outcome === 'resolve') {
+      accept?.();
+    } else {
+      reject?.(new Error('Clipboard access denied'));
+    }
+    for (let turn = 0; turn < 6; turn++) {
+      await Promise.resolve();
+    }
+    expect(document.activeElement).toBe(focus);
+    expect(button?.textContent?.trim()).toBe('Copy');
+    expect(vi.getTimerCount()).toBe(timers);
+    expect(document.querySelector('textarea')).toBeNull();
+  }
+);

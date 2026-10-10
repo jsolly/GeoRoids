@@ -19,6 +19,7 @@ interface FieldHintElements {
 
 const hints = new Map<string, FieldHintElements>();
 let announcer: HTMLDivElement | null = null;
+let hintHost: HTMLElement | undefined;
 
 /**
  * One always-rendered, visually hidden live region. The faded hint elements
@@ -31,7 +32,7 @@ function ensureAnnouncer(): HTMLDivElement {
     announcer = document.createElement('div');
     announcer.className = 'field-hint-announcer';
     announcer.setAttribute('role', 'status');
-    document.body.append(announcer);
+    (hintHost ?? document.body).append(announcer);
   }
   return announcer;
 }
@@ -71,7 +72,7 @@ function create(id: string): FieldHintElements {
     });
   }
   root.append(button, line);
-  document.body.append(root);
+  (hintHost ?? document.body).append(root);
   hints.set(id, elements);
   return elements;
 }
@@ -136,6 +137,17 @@ export function hideFieldHints(): void {
   }
 }
 
-if (typeof document !== 'undefined' && document.body) {
+/** Temporary imperative hint owner, isolated from the shell's children. */
+export function mountFieldHints(host: HTMLElement): () => void {
+  hintHost = host;
   ensureAnnouncer();
+  return () => {
+    for (const hint of hints.values()) {
+      hint.root.remove();
+    }
+    hints.clear();
+    announcer?.remove();
+    announcer = null;
+    hintHost = undefined;
+  };
 }

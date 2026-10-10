@@ -19,7 +19,7 @@ test('an accepted final deposit flashes for the pilot and crew even when a purch
   canvas.id = 'gameCanvas';
   document.body.append(canvas);
   restoreViewport = setWindowViewport(800, 600);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   const labels = vi.spyOn(ctx, 'fillText');
   const pilot = new Player({

@@ -113,22 +113,45 @@ export function mountDebugHud(): void {
   if (typeof document === 'undefined') {
     return;
   }
+  disposeDebugHud();
+  listenerScope = new AbortController();
+  const { signal } = listenerScope;
   hudHidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) === 'true';
   const toggle = document.querySelector<HTMLButtonElement>('#debug-hud-toggle');
   if (toggle) {
-    toggle.onclick = () => {
-      hudHidden = !hudHidden;
-      setStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden, String(hudHidden));
-      lastPaintAt = 0;
-      paintDebugHud();
-    };
+    toggle.addEventListener(
+      'click',
+      () => {
+        hudHidden = !hudHidden;
+        setStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden, String(hudHidden));
+        lastPaintAt = 0;
+        paintDebugHud();
+      },
+      { signal }
+    );
   }
   syncDebugHudVisibility();
-  window.addEventListener('playViewOn', () => {
-    lastPaintAt = 0;
-    paintDebugHud();
-  });
-  window.addEventListener('playViewOff', () => {
-    syncDebugHudVisibility();
-  });
+  window.addEventListener(
+    'playViewOn',
+    () => {
+      lastPaintAt = 0;
+      paintDebugHud();
+    },
+    { signal }
+  );
+  window.addEventListener(
+    'playViewOff',
+    () => {
+      syncDebugHudVisibility();
+    },
+    { signal }
+  );
+}
+
+let listenerScope: AbortController | null = null;
+
+export function disposeDebugHud(): void {
+  listenerScope?.abort();
+  listenerScope = null;
+  lastPaintAt = 0;
 }

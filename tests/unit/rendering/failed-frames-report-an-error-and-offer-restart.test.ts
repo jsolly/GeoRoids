@@ -40,7 +40,7 @@ test('an actual game-loop frame failure stops work and offers one restart notice
   canvas.id = 'gameCanvas';
   document.body.appendChild(canvas);
   vi.stubGlobal('Path2D', TestPath2D);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const player = PlayerManager.getInstance().createLocalPlayer();
   player.id = 'local-pilot';
   const network = NetworkManager.getInstance();

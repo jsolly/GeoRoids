@@ -14,14 +14,18 @@ import {
   handleMouseUp,
   preventContextMenu,
 } from '../../input/mouse';
-import { initializePlayfieldSelection } from '../../input/playfieldSelection';
-import { initializeTouchControls } from '../../input/touchControls';
+import {
+  disposePlayfieldSelection,
+  initializePlayfieldSelection,
+} from '../../input/playfieldSelection';
+import { disposeTouchControls, initializeTouchControls } from '../../input/touchControls';
+import {
+  closeGameOverlay,
+  getOpenGameOverlay,
+  subscribeGameOverlay,
+} from '../../runtime/overlayState';
 import { initializeSchematicEquipHint } from '../../ui/schematicEquipHint';
-import { initializeShipSchematic } from '../../ui/shipSchematic';
-import { isShipSchematicOpen } from '../../ui/shipSchematicState';
-import { initializeTownStore } from '../../ui/townStore';
-import { isTownStoreOpen } from '../../ui/townStoreState';
-import { initializeUniverseMap, isUniverseMapOpen } from '../../ui/universeMap';
+import { disposeUniverseMap, initializeUniverseMap } from '../../ui/universeMap';
 import { logger } from '../../utils/Logger';
 import { GameStateManager } from './GameStateManager';
 
@@ -29,6 +33,8 @@ export class InputManager {
   private static instance: InputManager;
   private gameStateManager: GameStateManager;
   private listenersInitialized = false;
+  private listenerScope: AbortController | null = null;
+  private unsubscribeOverlay: (() => void) | undefined;
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -47,71 +53,108 @@ export class InputManager {
     }
 
     logger.debug('INPUT', 'Initializing InputManager listeners');
+    this.listenerScope = new AbortController();
+    const { signal } = this.listenerScope;
+    try {
+      this.installListeners(signal);
+      this.listenersInitialized = true;
+    } catch (error) {
+      this.detachRuntime();
+      throw error;
+    }
+  }
 
+  private installListeners(signal: AbortSignal): void {
     const getLocalPlayer = () => PlayerManager.getInstance().getLocalPlayer();
 
     // Keyboard listeners
-    document.addEventListener('keydown', (ev) => {
-      // The universe map owns its keyboard controls while open. This guard is
-      // intentionally duplicated with the map's capture listener so a future
-      // input source cannot make firing or steering leak through the dialog.
-      if (isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen()) {
-        return;
-      }
-      const localPlayer = getLocalPlayer();
-      if (!localPlayer) {
-        return;
-      }
-      logger.debug('INPUT', 'Key down event', {
-        key: ev.code,
-        gameRunning: this.gameStateManager.getIsGameRunning(),
-      });
-      if (this.gameStateManager.getIsGameRunning()) {
-        keyDown(ev, localPlayer);
-      } else {
-        logger.warn('INPUT', 'Key down ignored - game not running', { key: ev.code });
-      }
-    });
+    document.addEventListener(
+      'keydown',
+      (ev) => {
+        if (
+          ev.target instanceof Element &&
+          ev.target.closest('input, textarea, select, [contenteditable]')
+        ) {
+          return;
+        }
+        // The universe map owns its keyboard controls while open. This guard is
+        // intentionally duplicated with the map's capture listener so a future
+        // input source cannot make firing or steering leak through the dialog.
+        if (getOpenGameOverlay() !== null) {
+          return;
+        }
+        const localPlayer = getLocalPlayer();
+        if (!localPlayer) {
+          return;
+        }
+        logger.debug('INPUT', 'Key down event', {
+          key: ev.code,
+          gameRunning: this.gameStateManager.getIsGameRunning(),
+        });
+        if (this.gameStateManager.getIsGameRunning()) {
+          keyDown(ev, localPlayer);
+        } else {
+          logger.warn('INPUT', 'Key down ignored - game not running', { key: ev.code });
+        }
+      },
+      { signal }
+    );
 
-    document.addEventListener('keyup', (ev) => {
-      if (isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen()) {
-        return;
-      }
-      const localPlayer = getLocalPlayer();
-      if (!localPlayer) {
-        return;
-      }
-      logger.debug('INPUT', 'Key up event', {
-        key: ev.code,
-        gameRunning: this.gameStateManager.getIsGameRunning(),
-      });
-      // Always handle keyup events regardless of game state to prevent stuck keys
-      keyUp(ev, localPlayer);
-    });
+    document.addEventListener(
+      'keyup',
+      (ev) => {
+        if (getOpenGameOverlay() !== null) {
+          return;
+        }
+        const localPlayer = getLocalPlayer();
+        if (!localPlayer) {
+          return;
+        }
+        logger.debug('INPUT', 'Key up event', {
+          key: ev.code,
+          gameRunning: this.gameStateManager.getIsGameRunning(),
+        });
+        // Always handle keyup events regardless of game state to prevent stuck keys
+        keyUp(ev, localPlayer);
+      },
+      { signal }
+    );
 
     // Mouse listeners on canvas
     const canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
     if (canvas) {
-      canvas.addEventListener('mousemove', (ev) => {
-        const localPlayer = getLocalPlayer();
-        if (localPlayer && this.gameStateManager.getIsGameRunning()) {
-          handleMouseMove(ev, localPlayer);
-        }
-      });
-      canvas.addEventListener('mousedown', (ev) => {
-        const localPlayer = getLocalPlayer();
-        if (localPlayer && this.gameStateManager.getIsGameRunning()) {
-          handleMouseDown(ev, localPlayer);
-        }
-      });
-      canvas.addEventListener('mouseup', (ev) => {
-        const localPlayer = getLocalPlayer();
-        if (localPlayer && this.gameStateManager.getIsGameRunning()) {
-          handleMouseUp(ev, localPlayer);
-        }
-      });
+      canvas.addEventListener(
+        'mousemove',
+        (ev) => {
+          const localPlayer = getLocalPlayer();
+          if (localPlayer && this.gameStateManager.getIsGameRunning()) {
+            handleMouseMove(ev, localPlayer);
+          }
+        },
+        { signal }
+      );
+      canvas.addEventListener(
+        'mousedown',
+        (ev) => {
+          const localPlayer = getLocalPlayer();
+          if (localPlayer && this.gameStateManager.getIsGameRunning()) {
+            handleMouseDown(ev, localPlayer);
+          }
+        },
+        { signal }
+      );
+      canvas.addEventListener(
+        'mouseup',
+        (ev) => {
+          const localPlayer = getLocalPlayer();
+          if (localPlayer && this.gameStateManager.getIsGameRunning()) {
+            handleMouseUp(ev, localPlayer);
+          }
+        },
+        { signal }
+      );
       // Keep browser context menus out of the playfield
-      canvas.addEventListener('contextmenu', preventContextMenu);
+      canvas.addEventListener('contextmenu', preventContextMenu, { signal });
       canvas.addEventListener(
         'touchstart',
         (ev) => {
@@ -119,58 +162,69 @@ export class InputManager {
             ev.preventDefault();
           }
         },
-        { passive: false }
+        { passive: false, signal }
       );
     }
 
     // Reset shoot cooldown if the mouse is released outside the canvas
-    document.addEventListener('mouseup', (ev) => {
-      const localPlayer = getLocalPlayer();
-      if (localPlayer && ev.button === 0) {
-        localPlayer.ship.canShoot = true;
-      }
-    });
+    document.addEventListener(
+      'mouseup',
+      (ev) => {
+        const localPlayer = getLocalPlayer();
+        if (localPlayer && ev.button === 0) {
+          localPlayer.ship.canShoot = true;
+        }
+      },
+      { signal }
+    );
 
-    const releaseInput = () => {
-      this.updateMovementLock();
-      const localPlayer = getLocalPlayer();
-      resetControlSources();
-      for (const key of Object.keys(keys)) {
-        keys[key] = false;
-      }
-      if (localPlayer) {
-        getPressedKeysForPlayer(localPlayer).clear();
-        localPlayer.ship.canShoot = true;
-        reconcilePlayerInput(localPlayer);
-      }
-    };
-    window.addEventListener('blur', releaseInput);
-    window.addEventListener('pagehide', releaseInput);
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        releaseInput();
-      }
-    });
+    const releaseInput = () => this.releaseHeldInput();
+    window.addEventListener('blur', releaseInput, { signal });
+    window.addEventListener('pagehide', releaseInput, { signal });
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.hidden) {
+          releaseInput();
+        }
+      },
+      { signal }
+    );
     initializePlayfieldSelection();
     initializeTouchControls();
     initializeUniverseMap({ onOpen: releaseInput });
-    initializeShipSchematic({ onOpen: releaseInput });
-    initializeTownStore({ onOpen: releaseInput });
     initializeSchematicEquipHint();
-    window.addEventListener('gameMapClose', () => {
-      this.updateMovementLock();
-    });
-    window.addEventListener('gameSchematicClose', () => {
-      this.updateMovementLock();
-    });
-    window.addEventListener('gameStoreOpen', () => {
-      this.updateMovementLock();
-    });
-    window.addEventListener('gameStoreClose', () => {
-      this.updateMovementLock();
-    });
+    this.unsubscribeOverlay = subscribeGameOverlay(() => this.releaseHeldInput());
+  }
 
-    this.listenersInitialized = true;
+  releaseHeldInput(): void {
+    this.updateMovementLock();
+    const localPlayer = PlayerManager.getInstance().getLocalPlayer();
+    resetControlSources();
+    for (const key of Object.keys(keys)) {
+      keys[key] = false;
+    }
+    if (localPlayer) {
+      getPressedKeysForPlayer(localPlayer).clear();
+      localPlayer.ship.canShoot = true;
+      reconcilePlayerInput(localPlayer);
+    }
+  }
+
+  detachRuntime(): void {
+    const overlay = getOpenGameOverlay();
+    if (overlay !== null) {
+      closeGameOverlay(overlay);
+    }
+    this.releaseHeldInput();
+    this.unsubscribeOverlay?.();
+    this.unsubscribeOverlay = undefined;
+    this.listenerScope?.abort();
+    this.listenerScope = null;
+    this.listenersInitialized = false;
+    disposeTouchControls();
+    disposeUniverseMap();
+    disposePlayfieldSelection();
   }
 
   /** Lock navigation and collisions while a map, schematic, or town store is open. */
@@ -180,18 +234,10 @@ export class InputManager {
     if (!ship) {
       return;
     }
-    const held = isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
+    const held = getOpenGameOverlay() !== null;
     const changed = applyLocalOverlayHold(ship, held);
     if (changed) {
       PlayerManager.getInstance().updateNetworkState();
-    }
-  }
-
-  resetButtonText(): void {
-    const gameBtn = document.querySelector('#start-game') as HTMLButtonElement;
-
-    if (gameBtn) {
-      gameBtn.textContent = 'Enter Game';
     }
   }
 }

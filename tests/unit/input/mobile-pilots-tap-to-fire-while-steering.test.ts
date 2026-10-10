@@ -15,8 +15,8 @@ import { NetworkManager } from '../../../src/network/networkManager';
 import { sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { getTerrainField } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import * as townStore from '../../../src/runtime/townStore';
 import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
-import * as townStore from '../../../src/ui/townStore';
 
 let player: Player;
 let canvas: HTMLCanvasElement;

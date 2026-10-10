@@ -4,7 +4,7 @@ import { reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { handleMouseMove } from '../../../src/input/mouse';
 import { Point } from '../../../src/physics/Point';
-import { canvasManager } from '../../../src/rendering/canvasSurface';
+import { canvasManager, type PlayfieldGeometry } from '../../../src/rendering/canvasSurface';
 
 let canvas: HTMLCanvasElement;
 let originalInnerWidth: PropertyDescriptor | undefined;
@@ -106,7 +106,7 @@ beforeEach(() => {
   setWindowValue('innerHeight', 900);
   setWindowValue('devicePixelRatio', 2);
 
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   canvas.getBoundingClientRect = () =>
     ({
       left: 0,
@@ -133,6 +133,35 @@ afterEach(() => {
 });
 
 describe('the playfield viewport stays in CSS-logical coordinates', () => {
+  test('the engine sizes canvas pixels and publishes placement without mutating shell chrome', () => {
+    const parent = canvas.parentElement;
+    if (!parent) {
+      throw new Error('Missing game shell host');
+    }
+    const previous = parent.getAttribute('style');
+    parent.style.width = '321px';
+    parent.style.setProperty('--map-toggle-x', '17px');
+    const ownedStyle = parent.getAttribute('style');
+    const placements: PlayfieldGeometry[] = [];
+    try {
+      canvasManager.initialize(canvas, (geometry) => placements.push(geometry));
+      expect(canvas.width).toBe(2400);
+      expect(canvas.style.width).toBe('1200px');
+      expect(placements).toHaveLength(1);
+      expect(placements[0]).toMatchObject({ width: 1200, height: 900, touchControls: false });
+      expect(Number.isFinite(placements[0]?.mapX)).toBe(true);
+      expect(parent.getAttribute('style')).toBe(ownedStyle);
+      canvasManager.destroy();
+      expect(parent.getAttribute('style')).toBe(ownedStyle);
+    } finally {
+      if (previous === null) {
+        parent.removeAttribute('style');
+      } else {
+        parent.setAttribute('style', previous);
+      }
+    }
+  });
+
   test('high-DPI backing pixels do not change projection, aiming, or latch reach', () => {
     expect(canvas.width).toBe(2400);
     expect(canvas.height).toBe(1800);
@@ -181,7 +210,7 @@ describe('the playfield viewport stays in CSS-logical coordinates', () => {
     expect(Array.from(context.getImageData(2, 2, 1, 1).data)).toEqual(Array.from(beforeResize));
 
     canvasManager.destroy();
-    canvasManager.initialize();
+    canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
 
     expect(canvasManager.getViewportSize()).toEqual({ width: 1200, height: 900 });
     expect(canvas.width).toBe(2400);
@@ -228,7 +257,7 @@ describe('the playfield viewport stays in CSS-logical coordinates', () => {
     expect(canvas.width).toBe(2700);
     expect(canvas.height).toBe(2025);
 
-    canvasManager.initialize();
+    canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
 
     expect(canvasManager.getViewportSize()).toEqual({ width: 1200, height: 900 });
     expect(canvas.width).toBe(1500);

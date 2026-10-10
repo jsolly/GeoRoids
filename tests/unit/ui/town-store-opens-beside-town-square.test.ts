@@ -8,19 +8,22 @@ import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
 import { worldFurnaces } from '../../../src/network/worldExploration';
-import { SCOUT_ONLY_BUILD_HINT } from '../../../src/ui/constants';
-import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
+import { isGameOverlayOpen } from '../../../src/runtime/overlayState';
 import {
   applyTownStoreResult,
   closeTownStore,
-  initializeTownStore,
+  mountTownStore,
   openTownStore,
-  syncTownStoreChrome,
-  TOWN_STORE_IDS,
-} from '../../../src/ui/townStore';
-import { isTownStoreOpen } from '../../../src/ui/townStoreState';
+  purchaseTownOffer,
+  readTownStoreView,
+  selectTownView,
+} from '../../../src/runtime/townStore';
+import { mountTownTravelHost } from '../../../src/runtime/townTravelHost';
+import { SCOUT_ONLY_BUILD_HINT } from '../../../src/ui/constants';
+import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import { setWindowViewport } from '../../support/viewport';
 
+let stopStore: () => void;
 beforeAll(() => {
   const network = NetworkManager.getInstance();
   PlayerManager.getInstance({ networkPort: network, combatNetwork: network.combatNetwork });
@@ -41,11 +44,14 @@ beforeAll(() => {
   document.body.classList.add('in-play');
   PlayerManager.getInstance().createLocalPlayer('hauler');
   vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([]);
-  initializeTownStore();
+  vi.spyOn(network, 'isConnected', 'get').mockReturnValue(true);
+  stopStore = mountTownStore();
   InputManager.getInstance().initializeListeners();
 });
 
 afterAll(() => {
+  InputManager.getInstance().detachRuntime();
+  stopStore();
   closeTownStore();
   vi.restoreAllMocks();
   document.body.classList.remove('in-play');
@@ -62,7 +68,6 @@ test('the store opens at Town Square via E and buys a placeholder without an upg
   player.ship.position = { x: 0, y: 0 };
   player.score = 100;
   player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
-  syncTownStoreChrome();
   const near = readAbilityChrome(player.ship);
   expect(near.label).toBe('HOOK');
   expect(near.name).toBe('Harpoon');
@@ -73,24 +78,15 @@ test('the store opens at Town Square via E and buys a placeholder without an upg
   expect(readAbilityChrome(player.ship).label).toBe('HOOK');
   player.ship.position = { x: 40, y: 0 };
   document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
-  expect(isTownStoreOpen()).toBe(true);
-  const dialog = document.querySelector(`#${TOWN_STORE_IDS.dialog}`);
-  expect(dialog?.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`)?.hidden).toBe(true);
-  expect(dialog?.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.travel}`)?.hidden).toBe(true);
-  dialog?.querySelector<HTMLButtonElement>('[data-town-view="store"]')?.click();
-  expect(dialog?.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`)?.hidden).toBe(false);
-  expect(dialog?.textContent).toContain('Placeholder A');
-  expect(dialog?.textContent).toContain('100');
-  expect(dialog?.textContent).not.toMatch(/deliveries|bonus|10%/iu);
-  expect(dialog?.textContent).not.toContain('Ember');
+  expect(isGameOverlayOpen('town-store')).toBe(true);
+  expect(readTownStoreView().mode).toBe('entry');
+  selectTownView('store');
+  const view = readTownStoreView();
+  expect(view.mode).toBe('store');
+  expect(view.offers[0]).toMatchObject({ name: 'Placeholder A', cost: 100, available: true });
   expect(player.ship.movementLocked).toBe(true);
-
   const send = vi.spyOn(NetworkManager.getInstance(), 'sendMessage').mockReturnValue(true);
-  const buy = dialog?.querySelector<HTMLButtonElement>('button[data-offer="placeholder-1"]');
-  expect(buy?.textContent).toBe('Buy Placeholder A');
-  expect(buy?.getAttribute('aria-describedby')).toBe('town-store-price-placeholder-1');
-  buy?.focus();
-  buy?.click();
+  purchaseTownOffer('placeholder-1');
   expect(send).toHaveBeenCalledWith({
     type: 'buyStoreItem',
     id: player.id,
@@ -102,32 +98,11 @@ test('the store opens at Town Square via E and buys a placeholder without an upg
     purchases: ['placeholder-1'],
   });
   expect(player.score).toBe(0);
-  expect(buy?.textContent).toBe('Purchased');
-  expect(buy?.disabled).toBe(true);
-  expect(document.activeElement?.id).toBe(TOWN_STORE_IDS.return);
-  expect(dialog?.textContent).toContain('Unlocks at level 2');
-
-  const scoreNode = document.querySelector(`#${TOWN_STORE_IDS.score}`);
-  expect(buy).toBeTruthy();
-  expect(scoreNode).toBeTruthy();
-  const priorLabel = buy?.textContent;
-  const priorScore = scoreNode?.textContent;
-  const labelTextNode = buy?.firstChild;
-  const scoreTextNode = scoreNode?.firstChild;
-  expect(labelTextNode).toBeTruthy();
-  expect(scoreTextNode).toBeTruthy();
-  for (let frame = 0; frame < 8; frame += 1) {
-    syncTownStoreChrome();
-  }
-  expect(buy?.textContent).toBe(priorLabel);
-  expect(scoreNode?.textContent).toBe(priorScore);
-  // Same-string textContent assigns replace the Text node; stable chrome must keep it.
-  expect(buy?.firstChild).toBe(labelTextNode);
-  expect(scoreNode?.firstChild).toBe(scoreTextNode);
-  expect(document.querySelector('button[data-offer="placeholder-1"]')).toBe(buy);
+  expect(readTownStoreView().offers[0]).toMatchObject({ owned: true, available: false });
+  expect(readTownStoreView().status).toBe('Placeholder A purchased. No upgrade granted.');
 
   closeTownStore();
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
   expect(player.ship.movementLocked).toBe(false);
   send.mockRestore();
 });
@@ -139,9 +114,9 @@ test('B still toggles the store on a keyboard without an on-screen Store button'
   }
   player.ship.position = { x: 0, y: 0 };
   document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
-  expect(isTownStoreOpen()).toBe(true);
+  expect(isGameOverlayOpen('town-store')).toBe(true);
   document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
 });
 
 test('touch ability uses the kit tool over Town Square without opening the store', () => {
@@ -154,13 +129,13 @@ test('touch ability uses the kit tool over Town Square without opening the store
   const activate = vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
   expect(triggerTouchAbility(player)).toBe(true);
   expect(activate).toHaveBeenCalledOnce();
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
   activate.mockRestore();
   player.ship.position = { x: TOWN_STORE_RADIUS + 50, y: 0 };
   expect(readAbilityChrome(player.ship).label).toBe('HOOK');
   expect(triggerTouchAbility(player)).toBe(true);
   expect(player.ship.utilityFlight?.phase).toBe('outbound');
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
 });
 
 test('a hooked Hauler opens furnace travel and keeps release controls away from furnaces', () => {
@@ -192,7 +167,10 @@ test('a lit street offers free travel to Town Square and other lit streets but n
   ]);
   player.ship.position = { ...street.position };
   expect(openTownStore()).toBe(true);
-  expect(document.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`)?.hidden).toBe(true);
+  expect(readTownStoreView().mode).toBe('travel');
+  const travelHost = document.createElement('div');
+  document.body.append(travelHost);
+  const map = mountTownTravelHost(travelHost);
   expect(document.querySelector(`[data-furnace-id="${street.id}"]`)).toBeNull();
   expect(document.querySelector('[data-furnace-id="street-1-1"]')).not.toBeNull();
   expect(document.querySelector('[data-furnace-id="street-1-2"]')).toBeNull();
@@ -204,8 +182,10 @@ test('a lit street offers free travel to Town Square and other lit streets but n
     data: { destinationId: TOWN_HEARTH.id },
   });
   window.dispatchEvent(new CustomEvent('furnaceTravelResult', { detail: { ok: true } }));
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
   send.mockRestore();
+  map.dispose();
+  travelHost.remove();
   worldFurnaces.replaceLit([]);
 });
 
@@ -232,13 +212,13 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   ability.dispatchEvent(
     new PointerEvent('pointerdown', { pointerId: 7, pointerType: 'touch', bubbles: true })
   );
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
   ability.dispatchEvent(
     new PointerEvent('pointerup', { pointerId: 7, pointerType: 'touch', bubbles: true })
   );
-  expect(isTownStoreOpen()).toBe(false);
+  expect(isGameOverlayOpen('town-store')).toBe(false);
   ability.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true }));
-  expect(isTownStoreOpen()).toBe(true);
+  expect(isGameOverlayOpen('town-store')).toBe(true);
   closeTownStore();
   width.mockRestore();
 });

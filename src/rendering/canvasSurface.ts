@@ -19,6 +19,18 @@ import {
 import { configureRenderQuality } from './renderQuality';
 import { rotateVectorInto, travelCameraRotation } from './travelCamera';
 
+/** Placement values only; the shell owns all surrounding DOM styles. */
+export interface PlayfieldGeometry {
+  readonly width: number;
+  readonly height: number;
+  readonly touchControls: boolean;
+  readonly mobileControlsTop: number;
+  readonly mapX: number;
+  readonly mapY: number;
+  readonly schematicY: number;
+  readonly storeY: number;
+}
+
 const TOGGLE_STEP_PX = 52;
 /** Time constants for the camera easing out to a wide view and back to flight. */
 const CAMERA_ZOOM_OUT_SECONDS = 0.14;
@@ -66,13 +78,26 @@ class CanvasManager {
   private gpuFrameActive = false;
   private inputMediaQueries: MediaQueryList[] = [];
 
-  initialize(): void {
+  private publishGeometry: ((geometry: PlayfieldGeometry) => void) | undefined;
+
+  initialize(
+    canvas: HTMLCanvasElement | null,
+    publishGeometry?: (geometry: PlayfieldGeometry) => void
+  ): void {
     if (this.canvas) {
       this.destroy();
     }
-    this.canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
+    if (!canvas) {
+      throw new Error('The game canvas is missing.');
+    }
+    this.canvas = canvas;
+    this.publishGeometry = publishGeometry;
     const gpuRequested = new URLSearchParams(window.location.search).get('renderer') === 'webgl2';
-    this.context = this.canvas?.getContext('2d', { alpha: false }) || null;
+    this.context = canvas.getContext('2d', { alpha: false });
+    if (!this.context) {
+      this.destroy();
+      throw new Error('A canvas rendering context is unavailable.');
+    }
 
     if (this.canvas && this.context) {
       if (gpuRequested) {
@@ -197,40 +222,20 @@ class CanvasManager {
     miniMap: { x: number; y: number; size: number },
     touchControls: boolean
   ): void {
-    const chrome = this.canvas?.parentElement;
-    if (!(chrome instanceof HTMLElement)) {
-      return;
-    }
     const offsets = playfieldToggleOffsets(miniMap, touchControls, height);
     const hud = hudLayoutForCanvas({ width, height });
-    chrome.style.setProperty(
-      '--mobile-controls-top',
-      `${Math.max(hud.economyBottomY, hud.leaderboard.y + hud.leaderboard.rowHeight * hud.leaderboard.maxRows) + 12}px`
-    );
-    chrome.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
-    chrome.style.setProperty('--map-toggle-y', `${offsets.mapY}px`);
-    chrome.style.setProperty('--schematic-toggle-y', `${offsets.schematicY}px`);
-    chrome.style.setProperty('--store-toggle-y', `${offsets.storeY}px`);
-    if (chrome.id !== 'gameArea') {
-      return;
-    }
-    const cssWidth = `${width}px`;
-    const cssHeight = `${height}px`;
-    if (chrome.style.width !== cssWidth) {
-      chrome.style.width = cssWidth;
-    }
-    if (chrome.style.height !== cssHeight) {
-      chrome.style.height = cssHeight;
-    }
-  }
-
-  private clearPlayfieldChrome(): void {
-    const chrome = this.canvas?.parentElement;
-    if (!(chrome instanceof HTMLElement) || chrome.id !== 'gameArea') {
-      return;
-    }
-    chrome.style.removeProperty('width');
-    chrome.style.removeProperty('height');
+    this.publishGeometry?.({
+      width,
+      height,
+      touchControls,
+      mobileControlsTop:
+        Math.max(
+          hud.economyBottomY,
+          hud.leaderboard.y + hud.leaderboard.rowHeight * hud.leaderboard.maxRows
+        ) + 12,
+      mapX: miniMap.x,
+      ...offsets,
+    });
   }
 
   private handleCanvasResize(): void {
@@ -245,7 +250,7 @@ class CanvasManager {
   }
 
   destroy(): void {
-    this.clearPlayfieldChrome();
+    this.publishGeometry = undefined;
     this.stopDevicePixelRatioWatcher?.();
     this.stopDevicePixelRatioWatcher = null;
     if (this.resizeFrame !== null) {

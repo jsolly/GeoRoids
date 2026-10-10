@@ -23,6 +23,8 @@ export interface EventLoopHost {
   now(): number;
   paintDebugHud(now: number): void;
   observeRenderer?(): void;
+  present?(now: number): void;
+  reportFailure?(error: unknown): void;
 }
 
 export class EventLoop {
@@ -150,12 +152,17 @@ export class EventLoop {
         this.host.observeRenderer?.();
         clientPerformance.exportIfDue(rendered);
       }
+      this.host.present?.(now);
       this.scheduleFrame();
     } catch (error) {
       this.gameLoopScheduled = false;
       clientPerformance.count('frameFailures');
       this.lifecycle.stopAfterFrameFailure();
-      reportRenderError(error);
+      if (this.host.reportFailure) {
+        this.host.reportFailure(error);
+      } else {
+        reportRenderError(error);
+      }
     }
   };
 }

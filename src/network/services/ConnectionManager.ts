@@ -64,7 +64,7 @@ import { setSettlement } from '../../network/worldExploration';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { setBeltRecovery } from '../../rendering/beltRenderer';
-import { getSelectedShipKitId } from '../../ui/shipKitSelect';
+import { getSelectedShipKitId } from '../../runtime/shipSelection';
 import { getClientReleaseId } from '../../utils/buildInfo';
 import { setClientLogContext } from '../../utils/clientLogContext';
 import { logger } from '../../utils/Logger';
@@ -255,9 +255,11 @@ export class ConnectionManager {
     if (storedResumeToken) {
       this.resumeToken = storedResumeToken;
     }
-    // Tab close / bfcache must tear the socket down so the server drops us
-    // and other clients can prune this player from their leaderboard.
-    bindPageHideDisconnect(() => this.disconnect());
+  }
+
+  /** The mounted browser runtime owns tab-close/bfcache socket cleanup. */
+  attachRuntime(signal: AbortSignal): void {
+    bindPageHideDisconnect(() => this.disconnect(), signal);
   }
 
   static getInstance(): ConnectionManager {

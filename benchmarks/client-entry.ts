@@ -1,4 +1,4 @@
-import pageMarkup from '../index.html?raw';
+import { mountLegacyHosts } from '../src/runtime/legacyHosts';
 import '../index.css';
 import { CLIENT_ID_STORAGE_KEY } from '../src/network/services/clientIdentity';
 import {
@@ -30,12 +30,21 @@ export interface ClientOptions {
 const FRAME_MS = 1000 / 60;
 const EPOCH_MS = 1_700_000_000_000;
 
-// Preserve the product's DOM and CSS without its event loop, release poller, or CDN scripts.
-const markup = new DOMParser().parseFromString(pageMarkup, 'text/html');
-for (const script of markup.querySelectorAll('script')) {
-  script.remove();
+// The measurement harness owns hosts without mounting the product runtime.
+document.body.innerHTML =
+  '<div id="safe-area-probe"></div><main id="gameWrapper"><div id="gameArea"><canvas id="gameCanvas"></canvas><div id="fixture-play"></div></div><div id="fixture-menu"></div><div id="fixture-overlay"></div></main>';
+function fixtureHost(id: string): HTMLElement {
+  const host = document.querySelector<HTMLElement>(`#${id}`);
+  if (!host) {
+    throw new Error(`Missing benchmark host ${id}`);
+  }
+  return host;
 }
-document.body.innerHTML = markup.body.innerHTML;
+mountLegacyHosts({
+  legacyMenu: fixtureHost('fixture-menu'),
+  legacyPlay: fixtureHost('fixture-play'),
+  legacyOverlay: fixtureHost('fixture-overlay'),
+});
 
 async function runClientFixture(options: ClientOptions & { observe: boolean }) {
   const scene = options.scene ?? 'stationary';
@@ -110,7 +119,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       if (state.getIsGameRunning() || network.isConnected) {
         throw new Error('Fixture booted live gameplay');
       }
-      canvasManager.initialize();
+      canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
       restores.push(() => canvasManager.destroy(), stopClientLogForwarder);
       game.newGame('Benchmark Pilot', traits.kit);
       const createdLocal = game.getCurrPlayer();
@@ -200,8 +209,10 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       }
       state.clearOverlay();
       ensureTerrain(options.seed);
+      document.body.classList.add('in-play');
       setPlayView(true);
       syncTouchChrome(true);
+      document.body.classList.toggle('touch-play', options.viewport !== 'desktop');
       const probe = document.querySelector('#safe-area-probe');
       if (!(probe instanceof HTMLElement)) {
         throw new Error('Safe-area probe is missing');

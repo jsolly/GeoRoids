@@ -20,7 +20,7 @@ function recordStrokes(): {
   const canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
   document.body.append(canvas);
-  canvasManager.initialize();
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
   const ctx = canvasManager.requireContext();
   const strokes: Array<{ points: Array<{ x: number; y: number }>; width: number }> = [];
   let points: Array<{ x: number; y: number }> = [];

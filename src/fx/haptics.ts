@@ -81,30 +81,12 @@ export function playLocalHaptic(isLocal: boolean, kind: HapticKind): void {
 
 export function setHaptics(enabled: boolean): void {
   if (enabled && !hapticsApiAvailable()) {
-    syncHapticsControl();
     return;
   }
   setStoredItem(LOCAL_STORAGE_KEYS.hapticsOn, String(enabled));
   if (!enabled) {
     vibrateNow(0);
-    syncHapticsControl();
     return;
   }
   vibrateNow(PATTERNS.preview);
-  syncHapticsControl();
-}
-
-export function syncHapticsControl(): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-  const row = document.querySelector<HTMLElement>('#hapticsRow');
-  const checkbox = document.querySelector<HTMLInputElement>('#hapticsPref');
-  const supported = hapticsApiAvailable();
-  if (row) {
-    row.hidden = !supported;
-  }
-  if (checkbox) {
-    checkbox.checked = supported && hapticsPreferenceOn();
-  }
 }

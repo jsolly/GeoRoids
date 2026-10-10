@@ -31,7 +31,11 @@ Hold or drag one finger to steer; release to keep your heading. A quick tap fire
 
 ## Contour Lock
 
-Near a visible contour, tap Contour Lock to catch it and follow its curves at extra speed. The lock follows the direction your nose points. Tap the same control again to release; steering is ignored while locked. Damage, a hard shove, the world wall, asteroid contact (even while protected), opening a menu or map, death, and furnace travel also release it, and you cannot lock during knockback or while a menu is open. Lasers pass through invulnerable hulls. There is no charge or cooldown, but the button needs a nearby contour.
+Near a visible contour, tap Contour Lock to catch it and follow its curves at extra speed. The lock follows the direction your nose points, with distinct chimes when it engages or releases. Tap the same control again to release; steering is ignored while locked. Damage, a hard shove, the world wall, asteroid contact (even while protected), opening a menu or map, death, and furnace travel also release it, and you cannot lock during knockback or while a menu is open. Lasers pass through invulnerable hulls. There is no charge or cooldown, but the button needs a nearby contour. A connection interruption releases the lock; reacquire it after reconnecting.
+
+## Mobile contour hopping
+
+While settled in Contour Lock, flick back along your line to reverse, or flick toward an adjacent line to glide onto it; a diagonal flick chooses your new travel direction. Use one finger, move at least 24 screen pixels within 220 milliseconds, and release briskly. A rising chime confirms a successful change and a softer falling chime marks a blocked attempt; flicks reach a little farther than ordinary lock pickup, but unreachable lines and flicks made while still joining a line leave your route unchanged.
 
 ## Contour travel
 

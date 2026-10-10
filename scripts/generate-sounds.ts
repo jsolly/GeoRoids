@@ -29,6 +29,22 @@ function body(note: number, duration: number, gain = 0.6): Tone {
 // Shared sine partials, soft attacks and C-major pentatonic notes. Different
 // registers, contours and envelopes identify actions without unrelated timbres.
 const recipes: Record<string, Recipe> = {
+  'contour-lock-acquired': {
+    duration: 0.34,
+    tones: [bell(0, 0, 0.24, 0.35, 0.1), bell(7, 0.08, 0.26, 0.32, 0.12)],
+  },
+  'contour-lock-released': {
+    duration: 0.28,
+    tones: [bell(7, 0, 0.18, 0.3, 0.08), bell(0, 0.07, 0.21, 0.3, 0.08)],
+  },
+  'contour-flick-success': {
+    duration: 0.3,
+    tones: [bell(7, 0, 0.18, 0.36, 0.1), bell(12, 0.065, 0.23, 0.38, 0.12)],
+  },
+  'contour-flick-blocked': {
+    duration: 0.24,
+    tones: [bell(2, 0, 0.15, 0.3, 0.06), bell(0, 0.06, 0.18, 0.3, 0.06)],
+  },
   'connection-lost': { duration: 0.58, tones: [bell(2, 0, 0.32, 0.36), bell(-5, 0.15, 0.42, 0.4)] },
   'boost-ignite': {
     duration: 0.48,

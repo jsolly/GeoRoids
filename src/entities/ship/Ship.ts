@@ -3,7 +3,13 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
-import { contourLockVelocity } from '../../../shared/contourLock';
+import {
+  acceleratedContourVelocity,
+  type ContourReleaseReason,
+  canReachContour,
+  contourLockGeometry,
+  contourLockVelocity,
+} from '../../../shared/contourLock';
 import { onDarkFurnaceFootprint } from '../../../shared/furnaceField';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
@@ -21,10 +27,11 @@ import type {
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
+import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
 import { worldFurnaces } from '../../network/worldExploration';
-import { findContourCapture } from '../../physics/terrain/contourCapture';
+import { findContourCapture, findContourHop } from '../../physics/terrain/contourCapture';
 import { terrainCruiseVelocity, terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
@@ -81,7 +88,38 @@ class Ship {
   explodeTime = 0;
   angularVelocity = 0;
   thrusting: boolean = false;
-  contourLock: ContourLockState | null = null;
+  private contourLockState: ContourLockState | null = null;
+
+  get contourLock(): ContourLockState | null {
+    return this.contourLockState;
+  }
+
+  set contourLock(state: ContourLockState | null) {
+    this.setContourLock(state, 'authoritative');
+  }
+
+  private setContourLock(state: ContourLockState | null, reason: ContourReleaseReason): void {
+    const previous = this.contourLockState;
+    if (this.isLocalPlayer && previous && !state) {
+      logger.info('STATE', 'contour_lock_released', {
+        shipId: this.id,
+        reason,
+        motionEpoch: this.playerMotion?.epoch,
+        motionAck: this.playerMotion?.ack,
+        position: { ...this.position },
+        velocity: { ...this.velocity },
+        lock: { ...previous },
+        ...contourLockGeometry(this.position, previous),
+      });
+    }
+    const wasLocked = this.contourLockState !== null;
+    this.contourLockState = state;
+    // Predicted input and authoritative reconciliation share this transition.
+    // Changing rails stays locked; repeated snapshots never replay the cue.
+    if (this.isLocalPlayer && wasLocked !== (state !== null)) {
+      playFeedback(state ? 'contourLockAcquired' : 'contourLockReleased');
+    }
+  }
   /** Local input revision prevents lagging snapshots from undoing a new toggle. */
   contourLockInputVersion = 0;
 
@@ -195,7 +233,7 @@ class Ship {
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
-    this.releaseContourLock();
+    this.releaseContourLock('death');
     this.angularVelocity = 0;
     playExplosionSound(this.position);
     playLocalHaptic(this.isLocalPlayer, 'boom');
@@ -262,11 +300,11 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  releaseContourLock(): void {
+  releaseContourLock(reason: ContourReleaseReason = 'manual'): void {
     if (this.contourLock === null) {
       return;
     }
-    this.contourLock = null;
+    this.setContourLock(null, reason);
     this.contourLockInputVersion++;
     const speed = cruiseSpeed(this.mass, this.maxVelocity);
     if (this.knockbackVelocityLimit <= speed) {
@@ -289,17 +327,42 @@ class Ship {
 
   toggleContourLock(): boolean {
     if (this.contourLocked) {
-      this.releaseContourLock();
+      this.releaseContourLock('manual');
       return false;
     }
     if (!this.canLockContour()) {
       return false;
     }
     const capture = findContourCapture(this.position, this.angle);
-    const target =
-      capture &&
-      contourLockVelocity(this.position, capture, cruiseSpeed(this.mass, this.maxVelocity));
-    if (!capture || !target) {
+    return capture ? this.acquireContour(capture) : false;
+  }
+
+  hopContour(flick: Position): boolean {
+    if (!this.contourLock || !this.canLockContour()) {
+      return false;
+    }
+    const capture = findContourHop(this.position, this.contourLock, flick);
+    const cruise = cruiseSpeed(this.mass, this.maxVelocity);
+    const acceleration = (this.thrust * thrustScaleFromMass(this.mass)) / GAME.FPS;
+    return capture &&
+      canReachContour(
+        this.position,
+        capture,
+        cruise,
+        Math.hypot(this.velocity.x, this.velocity.y),
+        acceleration
+      )
+      ? this.acquireContour(capture)
+      : false;
+  }
+
+  private acquireContour(capture: ContourLockState): boolean {
+    const target = contourLockVelocity(
+      this.position,
+      capture,
+      cruiseSpeed(this.mass, this.maxVelocity)
+    );
+    if (!target) {
       return false;
     }
     // Input can publish a pose before the next movement tick. Capture intent
@@ -392,7 +455,7 @@ class Ship {
   }
 
   takeDamage(amount: number, cause?: string): void {
-    this.releaseContourLock();
+    this.releaseContourLock('damage');
     if (this.exploding || this.movementLocked) {
       return;
     }
@@ -502,13 +565,13 @@ class Ship {
   /** Advance one 60 Hz simulation step, including movement and combat timers. */
   update(): void {
     if (this.furnaceTransit) {
+      this.releaseContourLock('furnace');
       const pose = furnaceTravelPose(this.furnaceTransit, Date.now() + this.furnaceClockOffsetMs);
       this.position = { ...pose.position };
       this.angle = pose.angle;
       this.velocity = { x: 0, y: 0 };
       this.angularVelocity = 0;
       this.thrusting = false;
-      this.releaseContourLock();
       this.updateShootCooldown();
       this.moveLasers();
       return;
@@ -517,7 +580,7 @@ class Ship {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
     }
     if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
-      this.releaseContourLock();
+      this.releaseContourLock(this.exploding || this.health <= 0 ? 'death' : 'movement-lock');
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
@@ -534,7 +597,7 @@ class Ship {
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
     if (this.cargoHover && !this.movementLocked) {
-      this.releaseContourLock();
+      this.releaseContourLock('cargo-hover');
       this.velocity = { x: 0, y: 0 };
       this.thrusting = false;
       return;
@@ -549,26 +612,23 @@ class Ship {
     this.angle += this.angularVelocity;
     const speed = cruiseSpeed(this.mass, this.maxVelocity);
     if (this.knockbackVelocityLimit > speed) {
-      this.releaseContourLock();
+      this.releaseContourLock('knockback');
     }
     if (this.contourLock) {
-      const target = contourLockVelocity(this.position, this.contourLock, speed);
+      const target = acceleratedContourVelocity(
+        this.position,
+        this.contourLock,
+        speed,
+        Math.hypot(this.velocity.x, this.velocity.y),
+        (this.thrust * thrustScaleFromMass(this.mass)) / GAME.FPS
+      );
       if (target) {
-        const targetSpeed = Math.hypot(target.x, target.y);
-        const acceleration = (this.thrust * thrustScaleFromMass(this.mass)) / GAME.FPS;
-        const actualSpeed = Math.min(
-          targetSpeed,
-          Math.hypot(this.velocity.x, this.velocity.y) + (acceleration * targetSpeed) / speed
-        );
-        this.velocity = {
-          x: (target.x * actualSpeed) / targetSpeed,
-          y: (target.y * actualSpeed) / targetSpeed,
-        };
+        this.velocity = target;
         this.angle = Math.atan2(-target.y, target.x);
         this.position = addPositionAndVelocity(this.position, this.velocity);
         return;
       }
-      this.releaseContourLock();
+      this.releaseContourLock('guidance-unavailable');
     }
     const velocityLimit = Math.max(
       terrainSpeedLimit(this.position, speed),

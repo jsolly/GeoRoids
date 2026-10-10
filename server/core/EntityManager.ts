@@ -22,6 +22,7 @@ import type {
 import { PALETTE, SHIP } from '../../src/constants';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../src/entities/ship/shipKits';
+import { releaseActorContourLock } from './contourLockDiagnostics';
 import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */
@@ -235,7 +236,7 @@ export class EntityManager {
     if (entity.health <= 0 && wasAlive) {
       entity.exploding = true;
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
-      entity.contourLock = null;
+      releaseActorContourLock(entity, 'death', this.now());
     }
 
     entity.lastUpdate = this.now();
@@ -355,7 +356,7 @@ export class EntityManager {
     entity.healthRegenTimer = 0;
 
     entity.exploding = false;
-    entity.contourLock = null;
+    releaseActorContourLock(entity, 'lifecycle', this.now());
     delete entity.explodeTime;
     delete entity.deathCause;
 

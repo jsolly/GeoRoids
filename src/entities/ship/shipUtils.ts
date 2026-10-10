@@ -1,3 +1,4 @@
+import type { ContourReleaseReason } from '../../../shared/contourLock';
 import { GROWTH, maxVelocityFromMass, thrustScaleFromMass } from '../../../shared/shipGrowth';
 import type { Position, Velocity } from '../../../shared-types';
 import { GAME, SHIP } from '../../constants';
@@ -120,7 +121,7 @@ interface OverlayHoldShip extends ShipSpawnProtectionState {
   velocity: Velocity;
   angularVelocity: number;
   thrusting: boolean;
-  releaseContourLock(): void;
+  releaseContourLock(reason?: ContourReleaseReason): void;
 }
 
 /** True when a ship must not report or receive collision damage. */
@@ -137,10 +138,10 @@ export function applyLocalOverlayHold(ship: OverlayHoldShip, held: boolean): boo
   const wasHeld = ship.movementLocked;
   ship.movementLocked = held;
   if (held) {
+    ship.releaseContourLock('overlay');
     ship.velocity = { x: 0, y: 0 };
     ship.angularVelocity = 0;
     ship.thrusting = false;
-    ship.releaseContourLock();
   } else if (wasHeld && !ship.exploding && ship.health > 0) {
     applyShipSpawnProtection(ship);
   }

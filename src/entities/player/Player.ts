@@ -9,7 +9,12 @@ import type {
   ScoutUtilityId,
   ShipKitId,
 } from '../../../shared-types';
-import { playHarpoonLatch, playRespawn } from '../../audio/interactionSounds';
+import {
+  playHarpoonLatch,
+  playHarpoonLaunch,
+  playHarpoonRelease,
+  playRespawn,
+} from '../../audio/interactionSounds';
 import { playLocalHaptic } from '../../fx/haptics';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getPlayerColor } from '../../utils/colorUtils';
@@ -66,6 +71,10 @@ export class Player {
 
   /** Ship position when death forced server-authoritative movement (respawn latch). */
   private respawnLatchOrigin: Position | null = null;
+
+  // Remember heard transitions independently of predicted death clearing the ship.
+  private soundedTowOutbound = false;
+  private soundedHarpoonTarget: string | null = null;
 
   // Server-authoritative spawn-protection countdown (frames). While > 0 the
   // server ignores all incoming damage. Mirrored from the authoritative snapshot so callers
@@ -145,6 +154,9 @@ export class Player {
   }): void {
     const wasInTransit = this.ship.furnaceTransit !== null;
     if (data.furnaceTransit !== undefined) {
+      if (data.furnaceTransit) {
+        this.ship.releaseContourLock('furnace');
+      }
       this.ship.furnaceTransit = data.furnaceTransit;
     }
     // Local selection is established at join. Preserve it during runtime reconciliation.
@@ -352,14 +364,6 @@ export class Player {
         this.ship.abilityActiveFrames = data.abilityActiveFrames;
       }
     }
-    if (
-      this.ship.utilityFlight?.kind === 'tow' &&
-      this.ship.utilityFlight.phase === 'outbound' &&
-      data.harpoonTargetId
-    ) {
-      playHarpoonLatch(data.harpoonLatchPos ?? this.ship.position);
-      recordAsteroidLatch(data.harpoonTargetId);
-    }
     if (data.utilityFlight !== undefined) {
       this.ship.utilityFlight = data.utilityFlight ? structuredClone(data.utilityFlight) : null;
     }
@@ -412,6 +416,24 @@ export class Player {
         this.respawnLatchOrigin = null;
       }
     }
+
+    const outgoingTow =
+      this.ship.utilityFlight?.kind === 'tow' && this.ship.utilityFlight.phase === 'outbound';
+    const target = this.ship.harpoonTargetId;
+    if (outgoingTow && !this.soundedTowOutbound) {
+      playHarpoonLaunch(this.ship.position);
+    }
+    if (target && target !== this.soundedHarpoonTarget) {
+      playHarpoonLatch(this.ship.harpoonLatchPos ?? this.ship.position);
+      recordAsteroidLatch(target);
+    } else if (
+      (this.soundedHarpoonTarget && !target) ||
+      (this.soundedTowOutbound && !outgoingTow && !target)
+    ) {
+      playHarpoonRelease(this.ship.position);
+    }
+    this.soundedTowOutbound = outgoingTow;
+    this.soundedHarpoonTarget = target;
 
     this.lastUpdate = Date.now();
   }

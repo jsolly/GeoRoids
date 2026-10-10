@@ -30,7 +30,6 @@ import { playFeedback } from '../../audio/feedbackSounds';
 import { playLaserSound } from '../../audio/gameSounds';
 import {
   playAbilityActivation,
-  playHarpoonLatch,
   playHarpoonRelease,
   playOrbitalPickup,
 } from '../../audio/interactionSounds';
@@ -51,9 +50,9 @@ import type { Laser } from '../../entities/laser/Laser';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
-import { recordAsteroidLatch } from '../../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
-import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
+import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
+import { isTowCableUtility } from '../../entities/ship/haulerUtility';
 import { scoutUtilityOf } from '../../entities/ship/scoutUtility';
 import { setScoutUtilityOnHost } from '../../entities/ship/shipAbilities';
 import type { ShipCombatNetwork } from '../../entities/ship/shipCombatNetwork';
@@ -474,6 +473,7 @@ export class ConnectionManager {
     this.motionReconciliation.transportClosed();
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
+      localShip.releaseContourLock('transport-closed');
       localShip.serverOwnsMotion = true;
     }
     this.resetSnapshotSession();
@@ -1313,27 +1313,23 @@ export class ConnectionManager {
     const isLocalAbility =
       data.id === localPlayer?.id || data.id === this.getLocalPlayerId() || entity.type === 'local';
     if (!isHarpoonRelease) {
-      playAbilityActivation(abilityId, entity.ship.position);
+      // Tow cues follow authoritative state transitions in Player, shared by
+      // ability events and snapshots. Other tools keep their activation cue.
+      if (abilityId !== 'harpoon' || !isTowCableUtility(entity.ship)) {
+        playAbilityActivation(abilityId, entity.ship.position);
+      }
       playLocalHaptic(isLocalAbility, 'ability');
     }
-    if (abilityId === 'harpoon') {
-      if (isHarpoonRelease) {
-        playHarpoonRelease(entity.ship.position);
-        if (isFinitePosition(data.boostIgnitionPosition)) {
-          playFeedback('boostIgnite', data.boostIgnitionPosition);
-          playLocalHaptic(isLocalAbility, 'asteroidIgnition');
-        }
-      } else if (data.harpoonTargetId) {
-        const targetPosition = isFinitePosition(data.harpoonLatchPos)
-          ? data.harpoonLatchPos
-          : typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0
-            ? findHarpoonFieldBody(data.harpoonTargetId)?.position
-            : undefined;
-        playHarpoonLatch(targetPosition ?? entity.ship.position);
-        if (typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0) {
-          recordAsteroidLatch(data.harpoonTargetId);
-        }
-      }
+    if (isHarpoonRelease && !isTowCableUtility(entity.ship) && !entity.ship.harpoonTargetId) {
+      playHarpoonRelease(entity.ship.position);
+    }
+    if (
+      abilityId === 'harpoon' &&
+      isHarpoonRelease &&
+      isFinitePosition(data.boostIgnitionPosition)
+    ) {
+      playFeedback('boostIgnite', data.boostIgnitionPosition);
+      playLocalHaptic(isLocalAbility, 'asteroidIgnition');
     }
     const latch = {
       ...(data.utilityFlight !== undefined ? { utilityFlight: data.utilityFlight } : {}),

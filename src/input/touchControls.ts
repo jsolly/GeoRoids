@@ -1,6 +1,8 @@
+import { playFeedback } from '../audio/feedbackSounds';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
+import { rotateVectorInto } from '../rendering/travelCamera';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { isTownStoreOpen } from '../ui/townStoreState';
 import { isUniverseMapOpen } from '../ui/universeMap';
@@ -22,6 +24,7 @@ let steerPointerId: number | null = null;
 let steerEpoch = 0;
 let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
+let steerFlick: { x: number; y: number; startedAt: number; lockVersion: number } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
 let contourLockPointerId: number | null = null;
@@ -105,6 +108,9 @@ function syncLiveTouches(ev: TouchEvent): void {
 /** iOS can drop pointerup after capture while the live touch list still tells the truth. */
 function onTouchListChange(ev: TouchEvent): void {
   syncLiveTouches(ev);
+  if (liveTouchPoints.size > 1) {
+    steerFlick = null;
+  }
   if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
     resetTouchInteraction(requireLocalPlayer(), {
       forgetTouches: false,
@@ -349,6 +355,7 @@ function resetTouchInteraction(player: Player | null, options?: { forgetTouches?
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
   const activeContourLockPointerId = contourLockPointerId;
+  steerFlick = null;
   steerPointerId = null;
   steerTouchId = null;
   clearSteerHoldTimer();
@@ -435,6 +442,7 @@ function ensureTouchDom(): {
 
 function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): void {
   const previous = steerPointerId;
+  steerFlick = null;
   steerPointerId = null;
   steerTouchId = null;
   clearSteerHoldTimer();
@@ -444,6 +452,19 @@ function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): 
 }
 
 function beginSteerPointer(ev: PointerEvent): void {
+  const ship = requireLocalPlayer()?.ship;
+  steerFlick =
+    ship?.contourLocked &&
+    firePointerId === null &&
+    abilityPointerId === null &&
+    contourLockPointerId === null
+      ? {
+          x: ev.clientX,
+          y: ev.clientY,
+          startedAt: ev.timeStamp,
+          lockVersion: ship.contourLockInputVersion,
+        }
+      : null;
   steerPointerId = ev.pointerId;
   steerEpoch = controlSources.steeringEpoch;
   steerClientX = ev.clientX;
@@ -490,6 +511,7 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
     abandonSteerPointer(player, canvas);
   }
   if (steerPointerId !== null) {
+    steerFlick = null;
     if (steerTap) {
       moveSteering({ clientX: steerTap.x, clientY: steerTap.y });
     }
@@ -534,18 +556,42 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
     return;
   }
   ev.preventDefault();
-  const tap =
+  const flick = steerFlick;
+  const elapsed = flick ? ev.timeStamp - flick.startedAt : 0;
+  const dx = flick ? ev.clientX - flick.x : 0;
+  const dy = flick ? ev.clientY - flick.y : 0;
+  const distance = Math.hypot(dx, dy);
+  const player = requireLocalPlayer();
+  const attempted =
     ev.type === 'pointerup' &&
-    steerTap !== null &&
-    steerTap.canFire &&
+    flick !== null &&
+    elapsed > 0 &&
+    elapsed <= TAP_MAX_MS &&
+    distance >= 24 &&
+    distance / elapsed >= 0.25 &&
+    steerEpoch === controlSources.steeringEpoch &&
+    player !== null &&
+    player.ship.contourLockInputVersion === flick.lockVersion;
+  const hopped =
+    attempted &&
+    player.ship.hopContour(
+      rotateVectorInto({ x: 0, y: 0 }, dx, dy, -canvasManager.getCameraRotation())
+    );
+  if (attempted) {
+    playFeedback(hopped ? 'contourFlickSuccess' : 'contourFlickBlocked');
+  }
+  const tap =
+    !hopped &&
+    ev.type === 'pointerup' &&
+    steerTap?.canFire &&
     ev.timeStamp - steerTap.startedAt <= TAP_MAX_MS &&
     Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX;
+  steerFlick = null;
   steerPointerId = null;
   steerTouchId = null;
   clearSteerHoldTimer();
   steerTap = null;
   releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
-  const player = requireLocalPlayer();
   if (player) {
     setTouchHeading(player, null);
     if (tap) {
@@ -611,6 +657,7 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
   if (steerTap) {
     steerTap.canFire = false;
   }
+  steerFlick = null;
   abilityPointerId = ev.pointerId;
   ability.setPointerCapture(ev.pointerId);
   setAbilityPressed(true);
@@ -656,6 +703,7 @@ function onContourLockPointerDown(ev: PointerEvent, contourLock: HTMLElement): v
   if (steerTap) {
     steerTap.canFire = false;
   }
+  steerFlick = null;
   contourLockPointerId = ev.pointerId;
   contourLock.setPointerCapture(ev.pointerId);
   setContourLockPressed(true);

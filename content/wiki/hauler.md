@@ -25,7 +25,7 @@ Press E near a rock to extract collectible canisters without destroying it; E ag
 
 ## Tow cable E
 
-Aim at a rock or spider and press E to shoot a tow line; it attaches on contact, and a miss reels back. Fly latched cargo close to a lit furnace's intake, or press E again to release it early; only one Hauler can tow an ordinary rock, and no one can shoot a latched rock. Leave room for cargo to trail behind you; [delivery pays contributors](/wiki/#teamwork) when the furnace takes it in.
+Aim at a rock or spider and press E to shoot a tow line; it attaches on contact, a miss reels back, and distinct cues mark launch, attachment, and disengagement. Fly latched cargo close to a lit furnace's intake, or press E again to release it early; only one Hauler can tow an ordinary rock, and no one can shoot a latched rock. Leave room for cargo to trail behind you; [delivery pays contributors](/wiki/#teamwork) when the furnace takes it in.
 
 ## Cargo collisions
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
+import * as feedback from '../../../src/audio/feedbackSounds';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
@@ -11,6 +12,8 @@ import {
   tickTouchControls,
 } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
+import { sampleGradient } from '../../../src/physics/terrain/heightfield';
+import { getTerrainField } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import * as townStore from '../../../src/ui/townStore';
@@ -558,4 +561,130 @@ test('a pending pre-lock hold cannot turn the ship after capture and release', (
   } finally {
     vi.useRealTimers();
   }
+});
+
+function settleOnHopFixture(): void {
+  player.ship.position = { x: 2253.9780217479483, y: -0.007169463344477992 };
+  player.ship.contourLock = { height: 0.16, direction: 1 };
+}
+
+test('a brisk left flick catches the next visible contour without firing or teleporting', () => {
+  settleOnHopFixture();
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  const position = { ...player.ship.position };
+  pointer('pointerdown', 101, 0, 150, 300);
+  pointer('pointermove', 101, 40, 100, 300);
+  pointer('pointerup', 101, 80, 70, 300);
+  expect(player.ship.contourLock).toEqual({ height: 0.08, direction: 1 });
+  expect(player.ship.position).toEqual(position);
+  expect(shoot).not.toHaveBeenCalled();
+  expect(controlSources.pointerHeading).toBeNull();
+  expect(player.ship.contourLockInputVersion).toBe(1);
+});
+
+test.each(['slow', 'short', 'cancel', 'blur', 'second-finger', 'away', 'relocked'])(
+  '%s gesture leaves the original contour alone',
+  (gesture) => {
+    settleOnHopFixture();
+    pointer('pointerdown', 102, 0, 150, 300);
+    if (gesture === 'blur') {
+      window.dispatchEvent(new Event('blur'));
+    }
+    if (gesture === 'second-finger') {
+      pointer('pointerdown', 103, 20, 300, 300);
+    }
+    if (gesture === 'relocked') {
+      player.ship.releaseContourLock();
+      player.ship.contourLock = { height: 0.16, direction: 1 };
+    }
+    const x = gesture === 'short' ? 135 : gesture === 'away' ? 230 : 70;
+    pointer(
+      gesture === 'cancel' ? 'pointercancel' : 'pointerup',
+      102,
+      gesture === 'slow' ? 500 : 80,
+      x,
+      300
+    );
+    expect(player.ship.contourLock).toEqual({ height: 0.16, direction: 1 });
+    expect(player.ship.contourLockInputVersion).toBe(gesture === 'relocked' ? 1 : 0);
+  }
+);
+
+test('a flick toward a displayed contour follows the camera rotation into world space', () => {
+  settleOnHopFixture();
+  vi.spyOn(canvasManager, 'getCameraRotation').mockReturnValue(Math.PI / 2);
+  pointer('pointerdown', 110, 0, 150, 300);
+  pointer('pointermove', 110, 40, 150, 260);
+  pointer('pointerup', 110, 80, 150, 220);
+  expect(player.ship.contourLock).toEqual({ height: 0.08, direction: 1 });
+});
+
+test('using the ability with a second finger cancels a pending contour flick', () => {
+  settleOnHopFixture();
+  const ability = document.querySelector('#touch-ability');
+  if (!ability) {
+    throw new Error('Missing ability button');
+  }
+  ability.setPointerCapture = vi.fn();
+  ability.hasPointerCapture = () => false;
+  pointer('pointerdown', 111, 0, 150, 300);
+  pointer('pointerdown', 112, 20, 320, 780, ability);
+  pointer('pointerup', 112, 40, 320, 780, ability);
+  pointer('pointerup', 111, 80, 70, 300);
+  expect(player.ship.contourLock).toEqual({ height: 0.16, direction: 1 });
+});
+
+test('a backward flick reverses on the same rail and sounds one success chime', () => {
+  settleOnHopFixture();
+  const cue = vi.spyOn(feedback, 'playFeedback').mockImplementation(() => {});
+  const gradient = sampleGradient(
+    getTerrainField(),
+    player.ship.position.x,
+    player.ship.position.y
+  );
+  const scale = 80 / Math.hypot(gradient.x, gradient.y);
+  const x = 150 + gradient.y * scale;
+  const y = 300 - gradient.x * scale;
+  pointer('pointerdown', 120, 0, 150, 300);
+  pointer('pointerup', 120, 80, x, y);
+  expect(player.ship.contourLock).toEqual({ height: 0.16, direction: -1 });
+  expect(cue).toHaveBeenCalledExactlyOnceWith('contourFlickSuccess');
+});
+
+test('a blocked flick sounds once while a slow drag and cancelled flick stay silent', () => {
+  settleOnHopFixture();
+  const cue = vi.spyOn(feedback, 'playFeedback').mockImplementation(() => {});
+  pointer('pointerdown', 121, 0, 150, 300);
+  pointer('pointerup', 121, 80, 230, 300);
+  expect(player.ship.contourLock).toEqual({ height: 0.16, direction: 1 });
+  expect(cue).toHaveBeenCalledExactlyOnceWith('contourFlickBlocked');
+  cue.mockClear();
+  pointer('pointerdown', 122, 100, 150, 300);
+  pointer('pointerup', 122, 600, 70, 300);
+  pointer('pointerdown', 123, 700, 150, 300);
+  pointer('pointercancel', 123, 780, 70, 300);
+  expect(cue).not.toHaveBeenCalled();
+});
+
+test('holding Contour Lock with one finger prevents a second finger from flicking or chiming', () => {
+  settleOnHopFixture();
+  player.ship.releaseContourLock();
+  tickTouchControls(player);
+  const cue = vi.spyOn(feedback, 'playFeedback').mockImplementation(() => {});
+  const button = document.querySelector<HTMLElement>('#touch-contour-lock');
+  if (!button) {
+    throw new Error('Missing Contour Lock button');
+  }
+  button.setPointerCapture = vi.fn();
+  button.hasPointerCapture = () => false;
+  pointer('pointerdown', 130, 0, 320, 700, button);
+  const lock = player.ship.contourLock;
+  expect(lock).not.toBeNull();
+  expect(cue).toHaveBeenCalledExactlyOnceWith('contourLockAcquired');
+  cue.mockClear();
+  pointer('pointerdown', 131, 10, 150, 300);
+  pointer('pointerup', 131, 90, 70, 300);
+  expect(player.ship.contourLock).toEqual(lock);
+  expect(cue).not.toHaveBeenCalled();
+  pointer('pointerup', 130, 100, 320, 700, button);
 });

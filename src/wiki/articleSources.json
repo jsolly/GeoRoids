@@ -232,6 +232,7 @@
     "tests/unit/entities/terrain-makes-pilots-choose-their-route.test.ts",
     "src/physics/terrain/contours.ts",
     "src/physics/terrain/terrainSession.ts",
+    "shared/terrainField.ts",
     "src/rendering/contourSpatialIndex.ts",
     "shared/boundary.ts",
     "server/world/WorldStore.ts",

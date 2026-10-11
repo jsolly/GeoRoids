@@ -1,9 +1,9 @@
 import { contourLockSpeed, contourLockVelocity } from '../../shared/contourLock';
 import { type Heightfield, sampleGradient, sampleHeight } from '../../shared/heightfield';
+import { getTerrainField } from '../../shared/terrainField';
 import type { ContourLockState, Position } from '../../shared-types';
 import { PALETTE } from '../constants';
 import { findContourCapture } from '../physics/terrain/contourCapture';
-import { getTerrainField } from '../physics/terrain/terrainSession';
 import { canvasManager } from './canvasSurface';
 
 let cached: { field: Heightfield; height: number; x: number; y: number; path: Path2D } | null =

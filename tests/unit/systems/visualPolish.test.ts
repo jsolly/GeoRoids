@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { SHIP, WIRE_PALETTE } from '../../../shared/constants/gameplay';
 import { TERRAIN } from '../../../shared/terrainConfig';
+import { ensureTerrain, getTerrainField } from '../../../shared/terrainField';
 import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { Laser } from '../../../src/entities/laser/Laser';
@@ -22,7 +23,6 @@ import {
   strokeKitHullOutline,
 } from '../../../src/entities/ship/shipRenderer';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { ensureTerrain, getTerrainField } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRenderer';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';

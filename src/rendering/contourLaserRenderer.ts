@@ -1,7 +1,7 @@
+import { getTerrainField } from '../../shared/terrainField';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { type ContourLaserTick, contourLaserTickInto } from '../physics/terrain/contourLaser';
-import { getTerrainField } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';

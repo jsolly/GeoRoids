@@ -2,16 +2,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { createHeightfield, sampleGradient, sampleHeight } from '../../../shared/heightfield';
 import { TERRAIN } from '../../../shared/terrainConfig';
+import { applyTerrainSeed, ensureTerrain, getTerrainSeed } from '../../../shared/terrainField';
 import { WORLD } from '../../../shared/world';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import {
-  applyTerrainSeed,
   builtContourPatchCount,
   CONTOUR_REGION_STEP,
-  ensureTerrain,
   getTerrainContours,
-  getTerrainSeed,
   peekBuiltContourPatch,
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
@@ -205,4 +203,26 @@ test('crossing into the next contour patch reuses a warmed neighbor instead of r
   expect(
     levels.some((level) => level.segments.some((segment) => segment.ax > 2048 || segment.bx > 2048))
   ).toBe(true);
+});
+
+test('a reconnect into a new room seed redraws contour patches from the new terrain', async () => {
+  vi.useFakeTimers();
+  ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+  const origin = { x: 0, y: 0 };
+  const before = getTerrainContours(origin, 800);
+  expect(builtContourPatchCount()).toBe(1);
+
+  // The server's snapshot names a different room before the neighbor prefetch runs.
+  applyTerrainSeed(TERRAIN.DEFAULT_SEED + 7);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(builtContourPatchCount()).toBe(0);
+  expect(peekBuiltContourPatch({ x: CONTOUR_REGION_STEP, y: 0 }, 800)).toBeUndefined();
+
+  const after = getTerrainContours(origin, 800);
+  expect(builtContourPatchCount()).toBe(1);
+  expect(after).not.toEqual(before);
+
+  // Returning to the original room draws its original contours again.
+  applyTerrainSeed(TERRAIN.DEFAULT_SEED);
+  expect(getTerrainContours(origin, 800)).toEqual(before);
 });

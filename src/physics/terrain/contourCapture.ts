@@ -1,9 +1,10 @@
 import { CONTOUR_LOCK, canHopContour, contourLockDistance } from '../../../shared/contourLock';
 import { sampleGradient } from '../../../shared/heightfield';
+import { getTerrainField } from '../../../shared/terrainField';
 import type { ContourLockState, Position } from '../../../shared-types';
 import { canvasManager } from '../../rendering/canvasSurface';
 import { createContourQuery } from '../../rendering/contourSpatialIndex';
-import { getTerrainContours, getTerrainField } from './terrainSession';
+import { getTerrainContours } from './terrainSession';
 
 const captureCandidates = createContourQuery();
 

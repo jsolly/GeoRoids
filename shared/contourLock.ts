@@ -1,8 +1,8 @@
 import type { ContourLockState, Position, Velocity } from '../shared-types';
-import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { GAME } from './constants/gameplay';
 import { sampleGradient, sampleHeight } from './heightfield';
 import { TERRAIN } from './terrainConfig';
+import { getTerrainField } from './terrainField';
 
 /** Geometry for server rail validation; unavailable distance is explicit null. */
 export function contourLockGeometry(position: Position, state: ContourLockState) {

@@ -2,6 +2,7 @@ import { GAME } from '../../shared/constants/gameplay';
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import { sampleGradient, sampleHeight } from '../../shared/heightfield';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
+import { getTerrainField, getTerrainSeed } from '../../shared/terrainField';
 import { spiderHitRadius } from '../../shared/terrainSpider';
 import type {
   AsteroidData,
@@ -45,12 +46,7 @@ import {
 import { CollisionManager } from '../physics/CollisionManager';
 import { contourSegmentCount } from '../physics/terrain/contours';
 import { getSpiderField } from '../physics/terrain/spiderSession';
-import {
-  getTerrainContours,
-  getTerrainField,
-  getTerrainSeed,
-  stopTerrainPrefetch,
-} from '../physics/terrain/terrainSession';
+import { getTerrainContours, stopTerrainPrefetch } from '../physics/terrain/terrainSession';
 import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
 import { getSelectedShipKitId } from '../runtime/shipSelection';

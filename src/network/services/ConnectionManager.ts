@@ -8,6 +8,7 @@ import {
   type SnapshotMetadata,
 } from '../../../shared/snapshotProtocol';
 import { captureDiagnosticActorState } from '../../../shared/stateDiagnostics';
+import { applyTerrainSeed } from '../../../shared/terrainField';
 import type {
   AbilityUsedEvent,
   AsteroidData,
@@ -58,7 +59,6 @@ import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { setSettlement } from '../../network/worldExploration';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
-import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { setBeltRecovery } from '../../rendering/beltRenderer';
 import { getSelectedShipKitId } from '../../runtime/shipSelection';
 import { getClientReleaseId } from '../../utils/buildInfo';

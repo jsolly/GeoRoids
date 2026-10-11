@@ -47,6 +47,7 @@ import {
 import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
 import { GROWTH, lootOverlap } from '../shared/shipGrowth';
 import { TERRAIN } from '../shared/terrainConfig';
+import { getTerrainField, getTerrainSeed } from '../shared/terrainField';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { PALETTE, TITLE, VISUAL } from '../src/constants';
 import { lootScreenRadius } from '../src/entities/loot/lootRenderer';
@@ -73,7 +74,6 @@ import {
 import { applyShipImpactFlash, tickShipImpactFlash } from '../src/entities/ship/shipUtils';
 import { steeringTurn } from '../src/input/pointerSteering';
 import { extractIsoContours } from '../src/physics/terrain/contours';
-import { getTerrainField, getTerrainSeed } from '../src/physics/terrain/terrainSession';
 import { drawCargoHoldArtwork } from '../src/rendering/cargoHoldRenderer';
 import { drawCargoOffloadArtwork } from '../src/rendering/cargoOffloadRenderer';
 import { drawContourSpeedLines } from '../src/rendering/contourSpeedLines';

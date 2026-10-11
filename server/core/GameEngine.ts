@@ -72,6 +72,7 @@ import {
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { TERRAIN } from '../../shared/terrainConfig';
+import { ensureTerrain, getTerrainSeed } from '../../shared/terrainField';
 import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
 import {
   insideTownStore,
@@ -117,7 +118,6 @@ import {
   hullRadiusForKit,
   SHIP_ABILITY,
 } from '../../src/entities/ship/shipKits';
-import { ensureTerrain, getTerrainSeed } from '../../src/physics/terrain/terrainSession';
 import { serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
 import { crawlerEvidence, FixtureCombatRecorder } from '../testing/FixtureCombatRecorder';

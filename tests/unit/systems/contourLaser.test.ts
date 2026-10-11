@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createHeightfield, sampleGradient } from '../../../shared/heightfield';
 import { TERRAIN } from '../../../shared/terrainConfig';
+import { ensureTerrain } from '../../../shared/terrainField';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { HAULER_TETHER_COLOR } from '../../../src/entities/ship/shipKits';
 import {
@@ -8,7 +9,6 @@ import {
   contourLaserTickInto,
   contourLaserTicksForShots,
 } from '../../../src/physics/terrain/contourLaser';
-import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import {
   drawContourLaserTicks,

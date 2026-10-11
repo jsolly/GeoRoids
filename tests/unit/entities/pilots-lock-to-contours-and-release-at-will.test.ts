@@ -7,11 +7,11 @@ import {
 } from '../../../shared/contourLock';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { TERRAIN } from '../../../shared/terrainConfig';
+import { ensureTerrain } from '../../../shared/terrainField';
 import { terrainSpeedLimit } from '../../../shared/terrainTravel';
 import { WORLD } from '../../../shared/world';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { findContourCapture } from '../../../src/physics/terrain/contourCapture';
-import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 
 beforeEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius }));
 

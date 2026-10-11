@@ -95,9 +95,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       );
       const { satelliteProfileAt } = await import('../shared/eoSatellites');
       const { SATELLITE_PICKUP } = await import('../shared/constants/gameplay');
-      const { ensureTerrain, getTerrainContours } = await import(
-        '../src/physics/terrain/terrainSession'
-      );
+      const { ensureTerrain } = await import('../shared/terrainField');
+      const { getTerrainContours } = await import('../src/physics/terrain/terrainSession');
       const { setPlayView } = await import('../src/ui/uiUtils');
       const game = GameController.getInstance();
       const state = GameStateManager.getInstance();

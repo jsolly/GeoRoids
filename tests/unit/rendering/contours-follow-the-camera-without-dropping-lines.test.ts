@@ -1,13 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TERRAIN } from '../../../shared/terrainConfig';
+import { ensureTerrain, getTerrainField } from '../../../shared/terrainField';
 import { CAMERA, VISUAL } from '../../../src/constants';
 import { findContourCapture } from '../../../src/physics/terrain/contourCapture';
 import type { ContourLevel } from '../../../src/physics/terrain/contours';
-import {
-  ensureTerrain,
-  getTerrainContours,
-  getTerrainField,
-} from '../../../src/physics/terrain/terrainSession';
+import { getTerrainContours } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { createContourQuery } from '../../../src/rendering/contourSpatialIndex';

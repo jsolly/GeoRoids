@@ -1,8 +1,8 @@
+import { getTerrainSeed } from '../../shared/terrainField';
 import { readAudioDiagnostics } from '../audio/audioRuntime';
 import { readMusicDiagnostics } from '../audio/musicBeds';
 import { GameController } from '../core/gameController';
 import { readTouchControlDiagnostics } from '../input/touchControls';
-import { getTerrainSeed } from '../physics/terrain/terrainSession';
 import { canvasManager } from '../rendering/canvasSurface';
 import { getClientReleaseId } from '../utils/buildInfo';
 import { getClientLogContext } from '../utils/clientLogContext';

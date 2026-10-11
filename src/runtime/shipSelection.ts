@@ -1,5 +1,5 @@
+import { parseShipKitId } from '../../shared/shipKits';
 import type { ShipKitId } from '../../shared-types';
-import { parseShipKitId } from '../entities/ship/shipKits';
 import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
 const SELECTED_KIT_STORAGE_KEY = 'georoids.selectedShipKit';

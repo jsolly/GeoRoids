@@ -1,6 +1,6 @@
 import { GAME } from '../../shared/constants/gameplay';
+import { isShipKitId, listShipKits, SHIP_ABILITY } from '../../shared/shipKits';
 import { serializeKitHullSvg } from '../entities/ship/hullOutlines';
-import { isShipKitId, listShipKits, SHIP_ABILITY } from '../entities/ship/shipKits';
 import type { WikiArticle } from './article';
 import { shipScorecard } from './shipScorecard';
 

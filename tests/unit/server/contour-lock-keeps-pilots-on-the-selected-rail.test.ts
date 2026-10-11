@@ -7,13 +7,13 @@ import {
 } from '../../../shared/contourLock';
 import { sampleGradient, sampleHeight } from '../../../shared/heightfield';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { getShipKit } from '../../../shared/shipKits';
 import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { getTerrainField } from '../../../shared/terrainField';
 import { terrainCruiseVelocity } from '../../../shared/terrainTravel';
 import type { ContourLockState, Position } from '../../../shared-types';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gameServerWorld';
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import { STEERING } from '../../../src/constants';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import type { DrawingContext } from '../../../src/rendering/drawingContext';
 import {
   drawSchematicEquipHint,

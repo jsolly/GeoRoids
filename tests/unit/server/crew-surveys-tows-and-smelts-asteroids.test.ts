@@ -3,9 +3,9 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { resolveToolFlights } from '../../support/tool-flight';
 

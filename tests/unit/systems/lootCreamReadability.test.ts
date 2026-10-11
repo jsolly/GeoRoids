@@ -5,7 +5,7 @@ import { PALETTE, VISUAL } from '../../../src/constants';
 import { LootField } from '../../../src/entities/loot/LootField';
 import { drawLootRelative, lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { HAULER_TETHER_COLOR } from '../../../src/entities/ship/shipKits';
+import { HAULER_TETHER_COLOR } from '../../../src/entities/ship/shipRenderer';
 import { Point } from '../../../src/physics/Point';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { configureRenderQuality } from '../../../src/rendering/renderQuality';

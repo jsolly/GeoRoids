@@ -27,7 +27,9 @@ their jobs. There are no faction marks or enemy colors on the crew scoreboard.
 - Tether VFX is Hauler only — cream line `#E8D5A3` + amber tip `#FDE68A`
 - Never draw the cream harpoon cable on Scout
 
-See `src/entities/ship/shipAbilities.ts` and `drawHaulerHarpoonVfx`.
+See `shared/shipAbilities.ts` for the shared rules, `src/entities/ship/harpoonField.ts`
+for the client asteroid field, and `drawHaulerHarpoonVfx` in
+`src/entities/ship/shipRenderer.ts`.
 
 ## Scout scan
 

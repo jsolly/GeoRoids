@@ -5,7 +5,7 @@ import { SATELLITE_PICKUP } from '../../../shared/constants/gameplay';
 import { ECONOMY } from '../../../shared/economy';
 import { orbitRadiusForOwner } from '../../../shared/satellitePickupMath';
 import { GROWTH } from '../../../shared/shipGrowth';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const SERVER_PICKUP_ID_PREFIX_PATTERN = /^server-pickup-/u;

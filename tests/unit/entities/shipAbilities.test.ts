@@ -1,22 +1,24 @@
 import { afterEach, expect, test } from 'vitest';
 import {
-  bindHarpoonFieldSource,
-  publishHarpoonField,
-} from '../../../src/entities/ship/harpoonField';
-import {
   type AbilityBody,
   type AbilityHost,
   activateAbilityOnHost,
-  applySharedHarpoonLatch,
   diagnoseHarpoonLatch,
   findHarpoonTarget,
   harpoonSurfaceGap,
+  predictAbilityOnHost,
   pullHarpoonTarget,
   tickAbilityHost,
   tickTowLine,
-} from '../../../src/entities/ship/shipAbilities';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
-import { attachTowCable, tickTowCable } from '../../../src/entities/ship/towCable';
+} from '../../../shared/shipAbilities';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
+import { attachTowCable, tickTowCable } from '../../../shared/towCable';
+import {
+  applySharedHarpoonLatch,
+  bindHarpoonFieldSource,
+  publishHarpoonField,
+  syncHarpoonFieldFromPlay,
+} from '../../../src/entities/ship/harpoonField';
 
 function host(kitId: AbilityHost['kitId']): AbilityHost {
   return {
@@ -132,7 +134,7 @@ test('Hauler E refreshes an unpublished live belt for Boost Coupling', () => {
   ]);
   const hauler = host('hauler');
   hauler.haulerUtility = 'boost_coupling';
-  const result = activateAbilityOnHost(hauler);
+  const result = predictAbilityOnHost(hauler, syncHarpoonFieldFromPlay());
   expect(result.activated).toBe(true);
   expect(hauler.harpoonTargetId).toBe('live-rock');
   expect(hauler.harpoonLatchPos?.x).toBe(80);
@@ -209,7 +211,7 @@ test('an omitted server latch field leaves the previous persistent latch alone',
 
 test('ability cooldown ticks down', () => {
   const scout = host('scout');
-  activateAbilityOnHost(scout);
+  predictAbilityOnHost(scout, []);
   const start = scout.abilityCooldownFrames;
   tickAbilityHost(scout);
   expect(scout.abilityCooldownFrames).toBe(start - 1);
@@ -298,7 +300,7 @@ test('a launched local tow leaves the target and its momentum alone before conta
   };
   publishHarpoonField([rock]);
   const before = { ...rock.velocity };
-  expect(activateAbilityOnHost(hauler).activated).toBe(true);
+  expect(predictAbilityOnHost(hauler, syncHarpoonFieldFromPlay()).activated).toBe(true);
   expect(hauler.harpoonTargetId).toBeNull();
   expect(hauler.utilityFlight?.phase).toBe('outbound');
   expect(rock.velocity).toEqual(before);

@@ -9,6 +9,7 @@ import { validExploration } from '../../shared/exploration';
 import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
+import { isShipKitId } from '../../shared/shipKits';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { purchasedHullColor } from '../../shared/townStore';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
@@ -23,7 +24,6 @@ import type {
   ShipKitId,
   Velocity,
 } from '../../shared-types';
-import { isShipKitId } from '../../src/entities/ship/shipKits';
 import type { LoadedWorld } from './worldPersistence';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;

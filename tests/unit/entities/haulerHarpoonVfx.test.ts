@@ -1,10 +1,11 @@
 import { expect, test } from 'vitest';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { HAULER_TETHER_COLOR, HAULER_TETHER_TIP_COLOR } from '../../../src/entities/ship/shipKits';
 import {
   canDrawHaulerHarpoon,
   drawHaulerHarpoonVfx,
+  HAULER_TETHER_COLOR,
+  HAULER_TETHER_TIP_COLOR,
   harpoonTetherStyle,
 } from '../../../src/entities/ship/shipRenderer';
 

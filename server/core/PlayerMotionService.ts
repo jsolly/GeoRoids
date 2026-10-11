@@ -14,10 +14,10 @@ import {
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { cruiseSpeed } from '../../shared/shipFlight';
+import { getShipKit, hullRadiusForKit } from '../../shared/shipKits';
 import { TERRAIN } from '../../shared/terrainConfig';
 import { terrainSpeedLimit } from '../../shared/terrainTravel';
 import type { ContourLockState, PlayerMotionState, Position } from '../../shared-types';
-import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import type { GameEntity } from './EntityManager';
 
 /** Which envelope check failed, with the numbers behind it, for diagnostics logs. */

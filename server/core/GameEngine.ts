@@ -62,7 +62,22 @@ import {
 import { sanitizePlayerName } from '../../shared/playerName';
 import { readReleaseId, releaseField } from '../../shared/releaseId';
 import { pointsForRoidSize } from '../../shared/roidScore';
+import {
+  activateAbilityOnHost,
+  clearHaulerLatch,
+  pullHarpoonTarget,
+  setHaulerUtilityOnHost,
+  setScoutUtilityOnHost,
+  tickTapExtract,
+  tickTowLine,
+} from '../../shared/shipAbilities';
 import { canCollectLoot, GROWTH } from '../../shared/shipGrowth';
+import {
+  applyShipKitStats,
+  getShipKit,
+  hullRadiusForKit,
+  SHIP_ABILITY,
+} from '../../shared/shipKits';
 import {
   haulerUtilityOf,
   isResourceTapUtility,
@@ -103,21 +118,6 @@ import type {
   ToolTargetPose,
   Velocity,
 } from '../../shared-types';
-import {
-  activateAbilityOnHost,
-  clearHaulerLatch,
-  pullHarpoonTarget,
-  setHaulerUtilityOnHost,
-  setScoutUtilityOnHost,
-  tickTapExtract,
-  tickTowLine,
-} from '../../src/entities/ship/shipAbilities';
-import {
-  applyShipKitStats,
-  getShipKit,
-  hullRadiusForKit,
-  SHIP_ABILITY,
-} from '../../src/entities/ship/shipKits';
 import { serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
 import { crawlerEvidence, FixtureCombatRecorder } from '../testing/FixtureCombatRecorder';
@@ -2814,14 +2814,14 @@ export class GameEngine {
       if (scoutUtilityOf(entity) === 'survey_probe') {
         return this.launchSurveyProbe(entity);
       }
-      const activated = activateAbilityOnHost(entity).activated;
+      const activated = activateAbilityOnHost(entity, { asteroids: [] }).activated;
       if (activated) {
         this.surveyNearbyAsteroids(entity);
       }
       return activated;
     }
     if (isTowCableUtility(entity) && !entity.harpoonTargetId) {
-      return activateAbilityOnHost(entity).activated;
+      return activateAbilityOnHost(entity, { asteroids: [] }).activated;
     }
     const cargo = new Set(
       this.entityManager.getAllEntities().map((actor) => actor.harpoonTargetId)

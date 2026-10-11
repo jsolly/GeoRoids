@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { SHIP } from '../../../../shared/constants/gameplay';
-import { getShipKit } from '../../../../src/entities/ship/shipKits';
+import { getShipKit } from '../../../../shared/shipKits';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();

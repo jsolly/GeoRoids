@@ -1,5 +1,6 @@
 import { GAME, LASER, SHIP, WIRE_PALETTE } from '../../../shared/constants/gameplay';
 import { planFurnaceRoute } from '../../../shared/furnaceTravel';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { haulerUtilityOf, isResourceTapUtility } from '../../../shared/shipUtilities';
 import { UTILITY_FLIGHT } from '../../../shared/utilityFlight';
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
@@ -30,7 +31,11 @@ import {
   projectKitHullEdges,
 } from './hullOutlines';
 import type { Ship } from './Ship';
-import { SHIP_ABILITY } from './shipKits';
+
+/** Hauler cable. Cream line separates the cable from the hull. */
+export const HAULER_TETHER_COLOR = '#E8D5A3';
+/** Latch tip / hook head. Game Director PASS: amber tip on the cream cable. */
+export const HAULER_TETHER_TIP_COLOR = '#FDE68A';
 
 const thrusterGeom = {
   rearCenter: { x: 0, y: 0 },

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { expect, test } from 'vitest';
+import { SHIP_KIT_IDS } from '../../../shared/shipKits';
 import {
   EO_OUTLINES,
   type EoOutlineId,
@@ -13,9 +14,9 @@ import {
   kitHullSvgFileName,
   listKitHullOutlines,
   projectHullPoint,
+  SHIP_HULL_TOPOLOGY,
   serializeKitHullSvg,
 } from '../../../src/entities/ship/hullOutlines';
-import { SHIP_HULL_TOPOLOGY, SHIP_KIT_IDS } from '../../../src/entities/ship/shipKits';
 
 const V1_VERSION_PATTERN = /v1/iu;
 

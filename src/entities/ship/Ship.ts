@@ -12,8 +12,23 @@ import {
 import { onDarkFurnaceFootprint } from '../../../shared/furnaceField';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
+import {
+  type AbilityWorld,
+  abilityCooldownFramesFor,
+  activateAbilityOnHost,
+  canActivateAbility,
+  predictAbilityOnHost,
+  tickAbilityHost,
+  tickTowLine,
+} from '../../../shared/shipAbilities';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GROWTH, thrustScaleFromMass } from '../../../shared/shipGrowth';
+import {
+  applyShipKitToShip,
+  DEFAULT_SHIP_KIT_ID,
+  hullRadiusForKit,
+  SHIP_ABILITY,
+} from '../../../shared/shipKits';
 import { scoutUtilityOf } from '../../../shared/shipUtilities';
 import { terrainCruiseVelocity, terrainSpeedLimit } from '../../../shared/terrainTravel';
 import type {
@@ -40,22 +55,8 @@ import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileFi
 import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
-import { getHarpoonField } from './harpoonField';
-import {
-  type AbilityWorld,
-  abilityCooldownFramesFor,
-  activateAbilityOnHost,
-  canActivateAbility,
-  tickAbilityHost,
-  tickTowLine,
-} from './shipAbilities';
+import { getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
 import type { ShipCombatNetwork } from './shipCombatNetwork';
-import {
-  applyShipKitToShip,
-  DEFAULT_SHIP_KIT_ID,
-  hullRadiusForKit,
-  SHIP_ABILITY,
-} from './shipKits';
 import {
   applyShipSpawnProtection,
   applyThrustOrFriction,
@@ -389,7 +390,11 @@ class Ship {
         return true;
       }
     }
-    return activateAbilityOnHost(this, world).activated;
+    return (
+      world
+        ? activateAbilityOnHost(this, world)
+        : predictAbilityOnHost(this, syncHarpoonFieldFromPlay())
+    ).activated;
   }
 
   moveLasers(): void {

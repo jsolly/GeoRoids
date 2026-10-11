@@ -1,5 +1,15 @@
 import { expect, test } from 'vitest';
 import {
+  type AbilityBody,
+  type AbilityHost,
+  activateAbilityOnHost,
+  pullHarpoonTarget,
+  setHaulerUtilityOnHost,
+  tickTapExtract,
+  tickTowLine,
+} from '../../../shared/shipAbilities';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
+import {
   haulerUtilityOf,
   isResourceTapUtility,
   isTowCableUtility,
@@ -8,16 +18,6 @@ import {
   UNSET_HAULER_UTILITY,
 } from '../../../shared/shipUtilities';
 import { HAULER_UTILITY } from '../../../src/entities/ship/haulerUtility';
-import {
-  type AbilityBody,
-  type AbilityHost,
-  activateAbilityOnHost,
-  pullHarpoonTarget,
-  setHaulerUtilityOnHost,
-  tickTapExtract,
-  tickTowLine,
-} from '../../../src/entities/ship/shipAbilities';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 
 function host(kitId: AbilityHost['kitId'] = 'hauler'): AbilityHost {
   return {

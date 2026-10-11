@@ -1,5 +1,6 @@
 import { isContourLockState } from '../../shared/contourLock';
 import { readReleaseId } from '../../shared/releaseId';
+import { isShipKitId } from '../../shared/shipKits';
 import { isHaulerUtilityId, isScoutUtilityId } from '../../shared/shipUtilities';
 import { SNAPSHOT_VERSION } from '../../shared/snapshotProtocol';
 import { storeOffer } from '../../shared/townStore';
@@ -14,7 +15,6 @@ import type {
   SnapshotAcknowledgement,
   Velocity,
 } from '../../shared-types';
-import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
 

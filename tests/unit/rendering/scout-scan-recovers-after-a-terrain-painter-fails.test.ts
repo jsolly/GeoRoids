@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { RoidBelt } from '../../../src/entities/roid/Roid';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { NetworkManager } from '../../../src/network/networkManager';
 import * as terrain from '../../../src/physics/terrain/terrainSession';
 import { drawGame, scanCameraZoom } from '../../../src/rendering/canvas';

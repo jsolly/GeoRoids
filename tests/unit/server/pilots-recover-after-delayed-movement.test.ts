@@ -4,8 +4,8 @@ import { ServerClock } from '../../../server/core/ServerClock';
 import { MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { getShipKit } from '../../../shared/shipKits';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
 import { RecordingSocket } from '../../support/recordingSocket';
 

@@ -2,8 +2,8 @@ import { expect, test, vi } from 'vitest';
 import { CollisionAuthority } from '../../../../server/core/CollisionAuthority';
 import { GameEngine } from '../../../../server/core/GameEngine';
 import { AsteroidSpatialIndex } from '../../../../server/world/AsteroidSpatialIndex';
+import { hullRadiusForKit } from '../../../../shared/shipKits';
 import type { AsteroidData } from '../../../../shared-types';
-import { hullRadiusForKit } from '../../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../../support/recordingSocket';
 
 vi.mock('../../../../setup/serverLogger', () => ({

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
+import { hullRadiusForKit } from '../../shared/shipKits';
 import { probePosition, SURVEY_PROBE } from '../../shared/surveyProbe';
 import { spiderHitRadius } from '../../shared/terrainSpider';
 import {
@@ -19,7 +20,6 @@ import type {
   TerrainSpider,
   ToolTargetPose,
 } from '../../shared-types';
-import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 
 interface SurveyProbeLaunchHost {

@@ -7,7 +7,9 @@ import {
 } from '../../shared/constants/health';
 import { FurnaceField } from '../../shared/furnaceField';
 import { TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
+import { tickAbilityHost } from '../../shared/shipAbilities';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
+import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../shared/shipKits';
 import type {
   ContourLockState,
   EquipmentId,
@@ -20,8 +22,6 @@ import type {
   UtilityFlight,
   Velocity,
 } from '../../shared-types';
-import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
-import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../src/entities/ship/shipKits';
 import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */

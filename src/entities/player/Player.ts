@@ -1,4 +1,5 @@
 import { canEquipUtility } from '../../../shared/equipment';
+import { applyShipKitToShip, hullRadiusForKit } from '../../../shared/shipKits';
 import { purchasedHullColor } from '../../../shared/townStore';
 import type {
   ContourLockState,
@@ -21,10 +22,9 @@ import { getPlayerColor } from '../../utils/colorUtils';
 import { preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { recordAsteroidLatch } from '../roid/roidRenderer';
+import { applySharedHarpoonLatch } from '../ship/harpoonField';
 import { Ship } from '../ship/Ship';
-import { applySharedHarpoonLatch } from '../ship/shipAbilities';
 import type { ShipCombatNetwork } from '../ship/shipCombatNetwork';
-import { applyShipKitToShip, hullRadiusForKit } from '../ship/shipKits';
 import {
   applySharedShipExplodingFlag,
   applySharedShipRespawnCue,

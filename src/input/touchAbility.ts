@@ -1,8 +1,8 @@
 import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
+import { abilityCooldownFramesFor } from '../../shared/shipAbilities';
+import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../../shared/shipKits';
 import { haulerUtilityOf, scoutUtilityOf } from '../../shared/shipUtilities';
 import type { HaulerUtilityId, ScoutUtilityId, ShipKitId, UtilityFlight } from '../../shared-types';
-import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
-import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
 import { worldFurnaces } from '../network/worldExploration';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };

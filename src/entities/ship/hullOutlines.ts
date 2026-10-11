@@ -1,5 +1,12 @@
+import { parseShipKitId } from '../../../shared/shipKits';
 import type { HaulerUtilityId, ShipKitId } from '../../../shared-types';
-import { parseShipKitId, SHIP_HULL_STYLE, type SHIP_HULL_TOPOLOGY } from './shipKits';
+
+export const SHIP_HULL_TOPOLOGY = {
+  scout: 'delta-wing',
+  hauler: 'cargo-yoke',
+} as const;
+
+const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;
 
 /** Local hull space: +f is forward, +p matches the classic triangle's rearLeft axis. */
 interface HullLocalPoint {

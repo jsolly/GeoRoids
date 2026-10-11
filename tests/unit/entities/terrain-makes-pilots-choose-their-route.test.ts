@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { sampleGradient } from '../../../shared/heightfield';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { getShipKit } from '../../../shared/shipKits';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { ensureTerrain } from '../../../shared/terrainField';
 import { terrainCruiseVelocity, terrainSpeedLimit } from '../../../shared/terrainTravel';
@@ -10,7 +11,6 @@ import {
   contourSpeedStrength,
 } from '../../../src/entities/ship/cruiseMotion';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
 
 const position = { x: -2100, y: 700 };
 const bounds = { cx: 0, cy: 0, radius: WORLD.radius };

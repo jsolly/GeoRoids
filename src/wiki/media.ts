@@ -16,12 +16,12 @@ export const media: Record<string, WikiMediaEntry> = {
     caption:
       'Press E to send one pulse that classifies nearby rocks on every teammate radar. The tag stays after the pulse ends and records the Scout for a later furnace delivery.',
     sources: [
-      'src/entities/ship/shipAbilities.ts',
+      'shared/shipAbilities.ts',
       'shared/surveyScan.ts',
       'src/entities/ship/shipRenderer.ts',
       'src/rendering/hud/minimap.ts',
       'src/rendering/hud/resourceMapMark.ts',
-      'src/entities/ship/shipKits.ts',
+      'shared/shipKits.ts',
       'server/core/GameEngine.ts',
       'shared/exploration.ts',
     ],
@@ -32,10 +32,10 @@ export const media: Record<string, WikiMediaEntry> = {
     caption:
       'Controlled demonstration: aim and E shoot a line that attaches on contact with a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Scout credit.',
     sources: [
-      'src/entities/ship/shipAbilities.ts',
+      'shared/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
-      'src/entities/ship/towCable.ts',
-      'src/entities/ship/shipKits.ts',
+      'shared/towCable.ts',
+      'shared/shipKits.ts',
       'src/entities/ship/shipRenderer.ts',
       'src/entities/ship/hullOutlines.ts',
       'shared/utilityFlight.ts',

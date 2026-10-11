@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import {
   captureSnapshot,
   SNAPSHOT_VERSION,
@@ -18,7 +19,6 @@ import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { Roid } from '../../../src/entities/roid/Roid';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp } from '../../../src/input/keybindings';
 import { handleMouseDown, handleMouseUp } from '../../../src/input/mouse';

@@ -5,10 +5,10 @@ import {
   settlementProgress,
   settlementRecipe,
 } from '../../../shared/economy';
+import { getShipKit } from '../../../shared/shipKits';
 import { PALETTE, VISUAL } from '../../constants';
 import { GameStateManager } from '../../core/services/GameStateManager';
 import { PlayerManager } from '../../entities/player/PlayerManager';
-import { getShipKit } from '../../entities/ship/shipKits';
 import { getSettlement } from '../../network/worldExploration';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { PlayfieldSize } from '../playfieldCamera';

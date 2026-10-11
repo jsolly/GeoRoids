@@ -1,6 +1,8 @@
 import { isEquipmentId } from '../../../shared/equipment';
 import { validExploration } from '../../../shared/exploration';
 import { releaseField } from '../../../shared/releaseId';
+import { setScoutUtilityOnHost } from '../../../shared/shipAbilities';
+import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../../shared/shipKits';
 import { isTowCableUtility, scoutUtilityOf } from '../../../shared/shipUtilities';
 import {
   SNAPSHOT_VERSION,
@@ -51,9 +53,7 @@ import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
-import { setScoutUtilityOnHost } from '../../entities/ship/shipAbilities';
 import type { ShipCombatNetwork } from '../../entities/ship/shipCombatNetwork';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';

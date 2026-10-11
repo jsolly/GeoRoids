@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 
 import { civicLot } from '../../../shared/furnaces';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { Player } from '../../../src/entities/player/Player';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   readAbilityChrome,

@@ -8,8 +8,8 @@ import { logger } from '../../../setup/serverLogger';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { getShipKit } from '../../../shared/shipKits';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;

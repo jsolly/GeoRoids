@@ -8,7 +8,7 @@ import {
 } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { GAME, LASER, SHIP } from '../../../shared/constants/gameplay';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
+import { getShipKit } from '../../../shared/shipKits';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 import { RecordingSocket } from '../../support/recordingSocket';
 

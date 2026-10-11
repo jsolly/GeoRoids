@@ -36,10 +36,28 @@ function requireSha(value) {
   return value;
 }
 
-/** The live server also imports gameplay modules outside server/. */
-export function serverReleaseInputs(cwd = process.cwd()) {
+const serverEntryFiles = new Set(['server.ts', 'shared-types.ts']);
+
+function trackedFiles(cwd) {
+  return git(cwd, ['ls-files', '-z']).split('\0').filter(Boolean);
+}
+
+function isDeploymentInput(path) {
+  return (
+    deploymentFiles.has(path) ||
+    deploymentDirectories.some((directory) => path.startsWith(directory))
+  );
+}
+
+/** Every module the server sources load, as the TypeScript compiler resolves them. */
+function serverModuleGraph(cwd, tracked) {
+  const roots = tracked.filter(
+    (path) =>
+      (serverEntryFiles.has(path) ||
+        deploymentDirectories.some((directory) => path.startsWith(directory))) &&
+      /\.[cm]?ts$/u.test(path)
+  );
   const temporary = mkdtempSync(join(tmpdir(), 'georoids-server-graph-'));
-  let sourceFiles;
   try {
     const configPath = join(temporary, 'tsconfig.json');
     writeFileSync(
@@ -47,7 +65,7 @@ export function serverReleaseInputs(cwd = process.cwd()) {
       JSON.stringify({
         extends: resolve(cwd, 'tsconfig.json'),
         compilerOptions: { typeRoots: [resolve(cwd, 'node_modules/@types')] },
-        files: [resolve(cwd, 'server.ts')],
+        files: roots.map((path) => resolve(cwd, path)),
         include: [],
         exclude: [],
       })
@@ -56,27 +74,32 @@ export function serverReleaseInputs(cwd = process.cwd()) {
       dirname(fileURLToPath(import.meta.resolve('typescript/package.json'))),
       'bin/tsc'
     );
-    sourceFiles = execFileSync(
+    return execFileSync(
       process.execPath,
       [compiler, '--project', configPath, '--listFilesOnly', '--pretty', 'false'],
-      {
-        cwd,
-        encoding: 'utf8',
-      }
+      { cwd, encoding: 'utf8' }
     )
       .trim()
-      .split('\n');
+      .split('\n')
+      .map((file) => relative(cwd, file));
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
-  const dependencies = new Set(sourceFiles.map((file) => relative(cwd, file)));
-  const tracked = git(cwd, ['ls-files', '-z']).split('\0').filter(Boolean);
-  const inputs = tracked.filter(
-    (path) =>
-      dependencies.has(path) ||
-      deploymentFiles.has(path) ||
-      deploymentDirectories.some((directory) => path.startsWith(directory))
-  );
+}
+
+/** Server, shared, setup and Railway modules never load the browser client under src/. */
+export function assertServerAvoidsClient(cwd = process.cwd(), tracked = trackedFiles(cwd)) {
+  const clientModules = serverModuleGraph(cwd, tracked).filter((path) => path.startsWith('src/'));
+  if (clientModules.length > 0) {
+    throw new Error(`Server modules import client sources: ${clientModules.join(', ')}`);
+  }
+}
+
+/** The server release is its deployment directories plus runtime and build manifests. */
+export function serverReleaseInputs(cwd = process.cwd()) {
+  const tracked = trackedFiles(cwd);
+  assertServerAvoidsClient(cwd, tracked);
+  const inputs = tracked.filter(isDeploymentInput);
   if (!inputs.includes('server.ts')) {
     throw new Error('Tracked server.ts is required');
   }
@@ -89,15 +112,8 @@ export function requiresServerDeployment(baseSha, targetSha, cwd = process.cwd()
   if (git(cwd, ['rev-parse', 'HEAD']) !== targetSha) {
     throw new Error('Classify server changes from the target commit checkout');
   }
-  const inputs = new Set(serverReleaseInputs(cwd));
-  return git(cwd, ['diff', '--name-only', baseSha, targetSha])
-    .split('\n')
-    .some(
-      (path) =>
-        inputs.has(path) ||
-        deploymentFiles.has(path) ||
-        deploymentDirectories.some((directory) => path.startsWith(directory))
-    );
+  serverReleaseInputs(cwd);
+  return git(cwd, ['diff', '--name-only', baseSha, targetSha]).split('\n').some(isDeploymentInput);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

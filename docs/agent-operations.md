@@ -45,7 +45,7 @@ Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManage
 | **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
 | **Public URL** | `https://georoids-production-2403.up.railway.app` (WebSocket: `wss://georoids-production-2403.up.railway.app/ws`) |
 | **Deploy** | GitHub auto-deploy from `main` is enabled (API verified 2026-09-24; #704 deployed automatically). Confirm the production Git deployment succeeded. If no deployment arrives, inspect the trigger and use a pinned `commitSha` fallback only when it does not apply unrelated staged patches. |
-| **Server release verification** | Use `scripts/server-release-inputs.mjs` to classify changes, including server-consumed modules under `src/` and runtime/build manifests. |
+| **Server release verification** | Use `scripts/server-release-inputs.mjs` to classify changes to `server/`, `shared/`, `setup/`, `.railway/`, `server.ts`, `shared-types.ts` and runtime/build manifests. It fails when any of those modules imports `src/`, so client-only changes never need a server release. |
 
 Railpack installs dependencies and runs `npm run build` during the build. The
 tracked [`.railway/railway.ts`](../.railway/railway.ts) keeps the explicit

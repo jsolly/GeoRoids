@@ -1,6 +1,7 @@
 import { GAME } from '../../shared/constants/gameplay';
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import { sampleGradient, sampleHeight } from '../../shared/heightfield';
+import { diagnosePredictedHarpoonLatch } from '../../shared/shipAbilities';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import { getTerrainField, getTerrainSeed } from '../../shared/terrainField';
 import { spiderHitRadius } from '../../shared/terrainSpider';
@@ -31,8 +32,11 @@ import {
   recordAsteroidShatter,
 } from '../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
-import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
-import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
+import {
+  bindHarpoonFieldSource,
+  publishHarpoonField,
+  syncHarpoonFieldFromPlay,
+} from '../entities/ship/harpoonField';
 import { noteFurnacePipePulse, resetFurnacePipePulses } from '../fx/furnacePipePulse';
 import { playLocalHaptic } from '../fx/haptics';
 import { tickTouchControls } from '../input/touchControls';
@@ -427,7 +431,7 @@ export class GameController {
 
   /** QA probe: kit, field, nearest gap, latch, WS. Used by the headed smoke. */
   diagnoseHarpoon():
-    | (ReturnType<typeof diagnoseHarpoonLatch> & {
+    | (ReturnType<typeof diagnosePredictedHarpoonLatch> & {
         connected: boolean;
         abilityActiveFrames: number;
         latchPos?: { x: number; y: number };
@@ -439,7 +443,7 @@ export class GameController {
       return null;
     }
     this.publishLiveHarpoonField();
-    const probe = diagnoseHarpoonLatch(local.ship);
+    const probe = diagnosePredictedHarpoonLatch(local.ship, syncHarpoonFieldFromPlay());
     return {
       ...probe,
       connected: this.networkManager.isConnected,

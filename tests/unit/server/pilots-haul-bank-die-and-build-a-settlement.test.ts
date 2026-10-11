@@ -15,8 +15,8 @@ import {
   oreYield,
 } from '../../../shared/economy';
 import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import type { AsteroidData } from '../../../shared-types';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 afterEach(() => vi.useRealTimers());

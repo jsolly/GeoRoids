@@ -1,4 +1,10 @@
 import { afterEach, expect, test } from 'vitest';
+import {
+  type AbilityHost,
+  activateAbilityOnHost,
+  predictAbilityOnHost,
+  setScoutUtilityOnHost,
+} from '../../../shared/shipAbilities';
 import { DEFAULT_SCOUT_UTILITY, scoutUtilityOf } from '../../../shared/shipUtilities';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { Player } from '../../../src/entities/player/Player';
@@ -8,11 +14,6 @@ import {
   rememberScoutUtility,
   SCOUT_UTILITY_STORAGE_KEY,
 } from '../../../src/entities/ship/scoutUtility';
-import {
-  type AbilityHost,
-  activateAbilityOnHost,
-  setScoutUtilityOnHost,
-} from '../../../src/entities/ship/shipAbilities';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   getStoredItem,
@@ -102,7 +103,7 @@ test('Mineral Scan keeps its existing active pulse and cooldown when selected ex
   const scout = host();
   setScoutUtilityOnHost(scout, 'mineral_scan');
 
-  expect(activateAbilityOnHost(scout).activated).toBe(true);
+  expect(predictAbilityOnHost(scout, []).activated).toBe(true);
   expect(scout.abilityActiveFrames).toBeGreaterThan(0);
   expect(scout.abilityCooldownFrames).toBeGreaterThan(SURVEY_PROBE.COOLDOWN_FRAMES);
 });

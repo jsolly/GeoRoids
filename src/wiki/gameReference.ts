@@ -32,13 +32,13 @@ import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
 import { GROWTH } from '../../shared/shipGrowth';
+import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../../shared/shipKits';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { TERRAIN } from '../../shared/terrainConfig';
 import { SPIDER } from '../../shared/terrainSpider';
 import { STORE_OFFERS, TOWN_STORE_RADIUS } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
-import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
 import { CONNECTION_STALE_TIMEOUT_MS } from '../network/services/connectionHealth';
 import { RECONNECT_DELAYS_MS } from '../network/services/connectionReconnect';
 

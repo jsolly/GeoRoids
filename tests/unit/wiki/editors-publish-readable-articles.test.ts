@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { readWikiArticles } from '../../../scripts/wiki-content';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
+import { getShipKit } from '../../../shared/shipKits';
 import { searchArticles } from '../../../src/wiki/search';
 
 const BROKEN_LINK_PATTERN = /broken or unsupported link/u;

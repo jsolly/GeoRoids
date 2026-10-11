@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSyn
 import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { listShipKits } from '../src/entities/ship/shipKits';
+import { listShipKits } from '../shared/shipKits';
 import { media } from '../src/wiki/media';
 import { readWikiArticles } from './wiki-content';
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { GROWTH } from '../../../shared/shipGrowth';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import { Player } from '../../../src/entities/player/Player';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { canDrawHaulerHarpoon } from '../../../src/entities/ship/shipRenderer';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 

@@ -9,7 +9,7 @@ import {
   maxVelocityFromMass,
   thrustScaleFromMass,
 } from '../../../shared/shipGrowth';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 
 describe('saved ship mass and salvage rules', () => {
   test('base mass matches the stock HP and handling', () => {

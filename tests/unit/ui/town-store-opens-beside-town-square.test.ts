@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { CIVIC_LOTS, civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';

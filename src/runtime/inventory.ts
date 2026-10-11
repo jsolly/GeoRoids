@@ -1,5 +1,7 @@
 import { GAME, SATELLITE_PICKUP } from '../../shared/constants/gameplay';
 import { canEquipUtility } from '../../shared/equipment';
+import { setHaulerUtilityOnHost, setScoutUtilityOnHost } from '../../shared/shipAbilities';
+import { getShipKit } from '../../shared/shipKits';
 import {
   HAULER_UTILITY_IDS,
   haulerUtilityOf,
@@ -25,8 +27,6 @@ import {
   rememberScoutUtility,
   SCOUT_UTILITY,
 } from '../entities/ship/scoutUtility';
-import { setHaulerUtilityOnHost, setScoutUtilityOnHost } from '../entities/ship/shipAbilities';
-import { getShipKit } from '../entities/ship/shipKits';
 import { NetworkManager } from '../network/networkManager';
 import type { SchematicSelection } from '../rendering/shipSchematicCanvas';
 import type { InventoryView } from './uiTypes';

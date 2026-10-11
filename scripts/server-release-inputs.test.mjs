@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import process from 'node:process';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { requiresServerDeployment, serverReleaseInputs } from './server-release-inputs.mjs';
 
-test('shared and server-consumed client modules require a server release; unrelated UI does not', () => {
+const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+
+test('shared modules and manifests require a server release; client sources do not', () => {
   const inheritedGit = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'))
   );
@@ -47,7 +50,7 @@ test('shared and server-consumed client modules require a server release; unrela
     write('package.json', '{"private":true}');
     write('astro.config.mjs', 'export default {};');
     write('tsconfig.json', '{"compilerOptions":{"module":"ESNext","moduleResolution":"bundler"}}');
-    write('server.ts', "import { speed } from './src/runtime'; console.log(speed);");
+    write('server.ts', "import { factor } from './shared/state'; console.log(factor);");
     write(
       'src/runtime.ts',
       "import { factor } from '../shared/state'; export const speed = factor * 2;"
@@ -55,8 +58,12 @@ test('shared and server-consumed client modules require a server release; unrela
     write('shared/state.ts', 'export const factor = 1;');
     write('src/render.ts', 'export const color = "red";');
     const initial = commit('initial server');
-    assert.ok(serverReleaseInputs(cwd).includes('src/runtime.ts'));
-    assert.ok(!serverReleaseInputs(cwd).includes('src/render.ts'));
+    const inputs = serverReleaseInputs(cwd);
+    assert.ok(inputs.includes('shared/state.ts'));
+    assert.deepEqual(
+      inputs.filter((path) => path.startsWith('src/')),
+      []
+    );
     write('src/render.ts', 'export const color = "blue";');
     const ui = commit('client only');
     assert.equal(requiresServerDeployment(initial, ui, cwd), false);
@@ -67,8 +74,8 @@ test('shared and server-consumed client modules require a server release; unrela
       'src/runtime.ts',
       "import { factor } from '../shared/state'; export const speed = factor * 4;"
     );
-    const runtime = commit('server consumed gameplay');
-    assert.equal(requiresServerDeployment(shared, runtime, cwd), true);
+    const runtime = commit('client gameplay');
+    assert.equal(requiresServerDeployment(shared, runtime, cwd), false);
     write('astro.config.mjs', 'export default {output: "static"};');
     const config = commit('Astro build configuration');
     assert.equal(requiresServerDeployment(runtime, config, cwd), true);
@@ -77,8 +84,21 @@ test('shared and server-consumed client modules require a server release; unrela
       () => requiresServerDeployment('--all', config, cwd),
       /full lowercase commit SHA/u
     );
+    write('shared/state.ts', "import { color } from '../src/render'; export const factor = color;");
+    commit('shared reaches into the client');
+    assert.throws(() => serverReleaseInputs(cwd), /client sources: src\/render\.ts/u);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
     Object.assign(process.env, inheritedGit);
   }
+});
+
+test('the GeoRoids server graph loads no client sources', () => {
+  const inputs = serverReleaseInputs(repositoryRoot);
+  assert.ok(inputs.includes('server.ts'));
+  assert.ok(inputs.includes('shared/shipAbilities.ts'));
+  assert.deepEqual(
+    inputs.filter((path) => path.startsWith('src/')),
+    []
+  );
 });

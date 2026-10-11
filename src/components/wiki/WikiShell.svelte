@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { isShipKitId } from '../../entities/ship/shipKits';
+  import { isShipKitId } from '../../../shared/shipKits';
   import type { WikiArticle } from '../../wiki/article';
   import { setMediaSource, shouldAutoplayMedia } from '../../wiki/mediaPlayback';
   import { articleHtml, overviewHtml } from '../../wiki/presentation';

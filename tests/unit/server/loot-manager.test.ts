@@ -8,9 +8,9 @@ import { RNGService } from '../../../server/core/RNGService';
 import { EQUIPMENT_DROPS } from '../../../shared/equipment';
 import { cellWorldBounds, explorationCellAt } from '../../../shared/exploration';
 import { GROWTH, lootOverlap } from '../../../shared/shipGrowth';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import { nearbyWorldRows, WORLD } from '../../../shared/world';
 import type { SavedPointLoot, ShipKitId } from '../../../shared-types';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function collectorAt(position: { x: number; y: number }): GameEntity {

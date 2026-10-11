@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cruiseSpeed } from '../../../../shared/shipFlight';
-import { getShipKit } from '../../../../src/entities/ship/shipKits';
+import { getShipKit } from '../../../../shared/shipKits';
 import { GameServerWorld, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();

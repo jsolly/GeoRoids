@@ -8,9 +8,9 @@ import {
 } from '../../shared/equipment';
 import { cellWorldBounds, explorationCellAt } from '../../shared/exploration';
 import { addLootMagnetPull, canCollectLoot, GROWTH, lootOverlap } from '../../shared/shipGrowth';
+import { hullRadiusForKit } from '../../shared/shipKits';
 import { nearbyWorldRows, WORLD } from '../../shared/world';
 import type { EquipmentId, LootData, Position, SavedPointLoot, Velocity } from '../../shared-types';
-import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import type { GameEntity } from './EntityManager';
 import type { RNGService } from './RNGService';

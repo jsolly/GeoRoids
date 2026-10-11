@@ -14,9 +14,9 @@ import {
   sectorHostsColossal,
 } from '../../../shared/asteroidScale';
 import { DAMAGE, ROID } from '../../../shared/constants/gameplay';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData, HaulerUtilityId } from '../../../shared-types';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { attachTowForScenario, resolveToolFlights } from '../../support/tool-flight';
 import {
   GameServerWorld,

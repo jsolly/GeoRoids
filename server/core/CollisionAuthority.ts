@@ -1,6 +1,6 @@
 import { type CombatCircle, circlesOverlap, isCombatantImmune } from '../../shared/combat';
+import { hullRadiusForKit } from '../../shared/shipKits';
 import type { AsteroidData, Position, SatellitePickupData, Velocity } from '../../shared-types';
-import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { GameEntity } from './EntityManager';
 

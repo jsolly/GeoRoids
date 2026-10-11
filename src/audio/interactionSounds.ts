@@ -1,6 +1,6 @@
+import type { ShipAbilityId } from '../../shared/shipKits';
 import type { Position } from '../../shared-types';
 import { AUDIO } from '../constants';
-import type { ShipAbilityId } from '../entities/ship/shipKits';
 import { Sound } from './Sound';
 import { playWorldSound } from './spatialAudio';
 

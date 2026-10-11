@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import process from 'node:process';
 import MarkdownIt from 'markdown-it';
 import { parse } from 'yaml';
-import { isShipKitId } from '../src/entities/ship/shipKits';
+import { isShipKitId } from '../shared/shipKits';
 import type { WikiArticle } from '../src/wiki/article';
 import articleSources from '../src/wiki/articleSources.json' with { type: 'json' };
 import { gameReference } from '../src/wiki/gameReference';

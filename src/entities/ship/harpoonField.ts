@@ -1,4 +1,9 @@
-import type { AbilityBody } from './shipAbilities';
+import {
+  type AbilityBody,
+  type AbilityHost,
+  clearHaulerLatch,
+} from '../../../shared/shipAbilities';
+import type { Position, UtilityFlight } from '../../../shared-types';
 
 let field: readonly AbilityBody[] = [];
 let holdEmptyField = false;
@@ -37,4 +42,44 @@ export function getHarpoonField(): readonly AbilityBody[] {
 
 export function findHarpoonFieldBody(id: string | null | undefined): AbilityBody | undefined {
   return getHarpoonField().find((body) => body.id === id);
+}
+
+interface HarpoonLatchSnapshot {
+  harpoonTargetId?: string | null;
+  harpoonLatchPos?: Position;
+  utilityFlight?: UtilityFlight | null;
+}
+
+function rememberLatchPos(
+  host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>,
+  snapshot?: HarpoonLatchSnapshot
+): void {
+  if (snapshot?.harpoonLatchPos) {
+    host.harpoonLatchPos = { x: snapshot.harpoonLatchPos.x, y: snapshot.harpoonLatchPos.y };
+    return;
+  }
+  const body = findHarpoonFieldBody(host.harpoonTargetId);
+  if (body) {
+    host.harpoonLatchPos = { x: body.position.x, y: body.position.y };
+  }
+}
+
+/** Explicit null detaches the tow on every client. */
+export function applySharedHarpoonLatch(
+  host: Pick<AbilityHost, 'kitId' | 'harpoonTargetId' | 'harpoonLatchPos'>,
+  snapshot: HarpoonLatchSnapshot
+): void {
+  if (host.kitId !== 'hauler') {
+    clearHaulerLatch(host);
+    return;
+  }
+  if (snapshot.harpoonTargetId === undefined) {
+    return;
+  }
+  host.harpoonTargetId = snapshot.harpoonTargetId;
+  if (host.harpoonTargetId === null) {
+    delete host.harpoonLatchPos;
+  } else {
+    rememberLatchPos(host, snapshot);
+  }
 }

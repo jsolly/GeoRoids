@@ -1,5 +1,5 @@
-import { GAME, SHIP } from '../../../shared/constants/gameplay';
-import type { ShipKitId } from '../../../shared-types';
+import type { ShipKitId } from '../shared-types';
+import { GAME, SHIP } from './constants/gameplay';
 
 export const SHIP_KIT_IDS = ['scout', 'hauler'] as const;
 
@@ -21,20 +21,8 @@ interface ShipKit {
   shotCooldown: number;
 }
 
-export const SHIP_HULL_TOPOLOGY = {
-  scout: 'delta-wing',
-  hauler: 'cargo-yoke',
-} as const;
-
-export const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;
-
 /** Linear playfield size vs Scout (`SHIP.SIZE`). Product bar: ~2× barge. */
 export const HAULER_TO_SCOUT_SIZE = 2;
-
-/** Hauler cable. Cream line separates the cable from the hull. */
-export const HAULER_TETHER_COLOR = '#E8D5A3';
-/** Latch tip / hook head. Game Director PASS: amber tip on the cream cable. */
-export const HAULER_TETHER_TIP_COLOR = '#FDE68A';
 
 export const SHIP_ABILITY = {
   HARPOON_RANGE: 280,

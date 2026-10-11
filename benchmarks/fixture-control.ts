@@ -7,8 +7,8 @@ import type { createServerInstance } from '../server/createServer';
 import { serverPerformanceMetrics } from '../server/performanceMetrics';
 import { TOWN_HEARTH } from '../shared/furnaces';
 import { resetShipMass } from '../shared/shipGrowth';
+import { applyShipKitStats, hullRadiusForKit } from '../shared/shipKits';
 import type { AsteroidData, Position } from '../shared-types';
-import { applyShipKitStats, hullRadiusForKit } from '../src/entities/ship/shipKits';
 import {
   captureRegionalManifest,
   parseRegionalStatus,

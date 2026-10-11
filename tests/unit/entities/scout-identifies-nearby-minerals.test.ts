@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import { GAME } from '../../../shared/constants/gameplay';
+import { predictAbilityOnHost, tickAbilityHost } from '../../../shared/shipAbilities';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { scannedMaterial } from '../../../shared/surveyScan';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { activateAbilityOnHost, tickAbilityHost } from '../../../src/entities/ship/shipAbilities';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 
 test('Scout scan identifies nearby minerals then expires without changing motion', () => {
   const ship = new Ship({ kitId: 'scout' });
@@ -15,7 +15,7 @@ test('Scout scan identifies nearby minerals then expires without changing motion
     health: 75,
   };
   expect(scannedMaterial(ship, rock)).toBeUndefined();
-  expect(activateAbilityOnHost(ship).activated).toBe(true);
+  expect(predictAbilityOnHost(ship, []).activated).toBe(true);
   expect(SHIP_ABILITY.SCAN_FRAMES).toBe(2 * GAME.FPS);
   expect(SHIP_ABILITY.COOLDOWN_FRAMES.scout).toBe(20 * GAME.FPS);
   expect(ship.abilityActiveFrames).toBe(2 * GAME.FPS);
@@ -25,17 +25,17 @@ test('Scout scan identifies nearby minerals then expires without changing motion
   expect(
     scannedMaterial(ship, { ...rock, position: { x: SHIP_ABILITY.SCAN_RANGE + 1, y: 0 } })
   ).toBeUndefined();
-  expect(activateAbilityOnHost(ship).activated).toBe(false);
+  expect(predictAbilityOnHost(ship, []).activated).toBe(false);
   for (let frame = 0; frame < SHIP_ABILITY.SCAN_FRAMES; frame++) {
     tickAbilityHost(ship);
   }
   expect(scannedMaterial(ship, rock)).toBeUndefined();
   expect(ship.abilityCooldownFrames).toBe(20 * GAME.FPS - 2 * GAME.FPS);
-  expect(activateAbilityOnHost(ship).activated).toBe(false);
+  expect(predictAbilityOnHost(ship, []).activated).toBe(false);
   while (ship.abilityCooldownFrames > 0) {
     tickAbilityHost(ship);
   }
-  expect(activateAbilityOnHost(ship).activated).toBe(true);
+  expect(predictAbilityOnHost(ship, []).activated).toBe(true);
 });
 
 test('Hauler and destroyed ships cannot classify asteroids using an active timer', () => {

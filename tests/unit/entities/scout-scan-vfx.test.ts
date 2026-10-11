@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
+import { SHIP_ABILITY } from '../../../shared/shipKits';
 import {
   drawScoutScanFx,
   type ScoutScanVisualHost,

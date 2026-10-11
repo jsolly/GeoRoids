@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { GAME, LASER, SHIP } from '../../../shared/constants/gameplay';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { getShipKit } from '../../../shared/shipKits';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { createLaser } from '../../../src/entities/laser/laserUtils';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { applyThrustOrFriction } from '../../../src/entities/ship/shipUtils';
 import { resetWorldExploration } from '../../../src/network/worldExploration';
 import { canvasManager } from '../../../src/rendering/canvasSurface';

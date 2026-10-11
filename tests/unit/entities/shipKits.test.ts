@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { SHIP } from '../../../shared/constants/gameplay';
-import { Ship } from '../../../src/entities/ship/Ship';
 import {
   applyShipKitToShip,
   DEFAULT_SHIP_KIT_ID,
@@ -10,7 +9,8 @@ import {
   listShipKits,
   parseShipKitId,
   SHIP_KIT_IDS,
-} from '../../../src/entities/ship/shipKits';
+} from '../../../shared/shipKits';
+import { Ship } from '../../../src/entities/ship/Ship';
 
 test('pilots choose exactly Scout or Hauler and retired selections fall back to Scout', () => {
   expect(SHIP_KIT_IDS).toEqual(['scout', 'hauler']);

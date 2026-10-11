@@ -44,8 +44,18 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../shared/lootBlast';
+import {
+  type AbilityHost,
+  type AbilityWorld,
+  activateAbilityOnHost,
+  predictAbilityOnHost,
+  pullHarpoonTarget,
+  tickAbilityHost,
+  tickTowLine,
+} from '../shared/shipAbilities';
 import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
 import { GROWTH, lootOverlap } from '../shared/shipGrowth';
+import { getShipKit, hullRadiusForKit } from '../shared/shipKits';
 import { TERRAIN } from '../shared/terrainConfig';
 import { getTerrainField, getTerrainSeed } from '../shared/terrainField';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
@@ -57,15 +67,6 @@ import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
 import { advanceCruiseVelocity } from '../src/entities/ship/cruiseMotion';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
 import { Ship } from '../src/entities/ship/Ship';
-import {
-  type AbilityHost,
-  type AbilityWorld,
-  activateAbilityOnHost,
-  pullHarpoonTarget,
-  tickAbilityHost,
-  tickTowLine,
-} from '../src/entities/ship/shipAbilities';
-import { getShipKit, hullRadiusForKit } from '../src/entities/ship/shipKits';
 import {
   drawScoutScanFx,
   strokeKitHullOutline,
@@ -551,7 +552,7 @@ function makeScoutDemo(): Demo {
     makeAsteroid('scan-metal', { x: 100, y: -35 }, 26, 'metal'),
     makeAsteroid('scan-rubble', { x: 40, y: 75 }, 26, 'rubble'),
   ];
-  const activated = activateAbilityOnHost(host);
+  const activated = predictAbilityOnHost(host, []);
   invariant(
     activated.activated && activated.abilityId === 'surveyScan',
     'Scout scan must activate'
@@ -734,7 +735,7 @@ function makeHaulerDemo(): Demo {
     surveyedBy: ['scout-demo'],
   };
   const scout = makeAbilityHost('scout', { x: anchor.x - 235, y: anchor.y - 62 });
-  const scan = activateAbilityOnHost(scout);
+  const scan = predictAbilityOnHost(scout, []);
   invariant(scan.activated && scan.abilityId === 'surveyScan', 'Scout scan did not tag the haul');
   invariant(scannedMaterial(scout, target) === 'metal', 'Scout scan missed the hauled metal');
   const world: AbilityWorld = {

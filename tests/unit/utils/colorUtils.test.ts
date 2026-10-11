@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
 import { DEBUG, LASER, ROID, SHIP, WIRE_PALETTE } from '../../../shared/constants/gameplay';
+import { getShipKit } from '../../../shared/shipKits';
 import { PALETTE, TITLE, VISUAL } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { getRoidStrokeWidth } from '../../../src/entities/roid/roidRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { getLaserColor, hexToRgba, laserBoltColor } from '../../../src/utils/colorUtils';
 import { isDebugMode } from '../../../src/utils/debugUtils';

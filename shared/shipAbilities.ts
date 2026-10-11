@@ -1,32 +1,3 @@
-import {
-  addBoostOwner,
-  boostOwnerIds,
-  furnaceHeading,
-  igniteBoost,
-  removeBoostOwner,
-} from '../../../shared/asteroidBoost';
-import { segmentCircleContact } from '../../../shared/asteroidPhenomena';
-import { asteroidCrewNeeded, isColossalAsteroid } from '../../../shared/asteroidScale';
-import type { FurnaceField } from '../../../shared/furnaceField';
-import {
-  haulerUtilityOf,
-  isHaulerUtilityId,
-  isResourceTapUtility,
-  isScoutUtilityId,
-  isTowCableUtility,
-  scoutUtilityOf,
-} from '../../../shared/shipUtilities';
-import { SURVEY_PROBE } from '../../../shared/surveyProbe';
-import {
-  firstToolFlightContact,
-  movingAsteroidContact,
-  relativeFlightStart,
-} from '../../../shared/toolFlightContact';
-import {
-  advanceUtilityFlight,
-  launchUtilityFlight,
-  missUtilityFlight,
-} from '../../../shared/utilityFlight';
 import type {
   AsteroidBoost,
   AsteroidData,
@@ -37,10 +8,34 @@ import type {
   ToolTargetPose,
   UtilityFlight,
   Velocity,
-} from '../../../shared-types';
-import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
+} from '../shared-types';
+import {
+  addBoostOwner,
+  boostOwnerIds,
+  furnaceHeading,
+  igniteBoost,
+  removeBoostOwner,
+} from './asteroidBoost';
+import { segmentCircleContact } from './asteroidPhenomena';
+import { asteroidCrewNeeded, isColossalAsteroid } from './asteroidScale';
+import type { FurnaceField } from './furnaceField';
 import { getShipKit, hullRadiusForKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
+import {
+  haulerUtilityOf,
+  isHaulerUtilityId,
+  isResourceTapUtility,
+  isScoutUtilityId,
+  isTowCableUtility,
+  scoutUtilityOf,
+} from './shipUtilities';
+import { SURVEY_PROBE } from './surveyProbe';
+import {
+  firstToolFlightContact,
+  movingAsteroidContact,
+  relativeFlightStart,
+} from './toolFlightContact';
 import { attachTowCable, tickTowCable } from './towCable';
+import { advanceUtilityFlight, launchUtilityFlight, missUtilityFlight } from './utilityFlight';
 
 export interface AbilityHost {
   id?: string;
@@ -87,26 +82,6 @@ interface AbilityActivation {
   abilityId?: ShipAbilityId;
 }
 
-interface HarpoonLatchSnapshot {
-  harpoonTargetId?: string | null;
-  harpoonLatchPos?: Position;
-  utilityFlight?: UtilityFlight | null;
-}
-
-function rememberLatchPos(
-  host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>,
-  snapshot?: HarpoonLatchSnapshot
-): void {
-  if (snapshot?.harpoonLatchPos) {
-    host.harpoonLatchPos = { x: snapshot.harpoonLatchPos.x, y: snapshot.harpoonLatchPos.y };
-    return;
-  }
-  const body = findHarpoonFieldBody(host.harpoonTargetId);
-  if (body) {
-    host.harpoonLatchPos = { x: body.position.x, y: body.position.y };
-  }
-}
-
 export function canActivateAbility(host: AbilityHost): boolean {
   return (
     !host.exploding &&
@@ -138,15 +113,6 @@ export function clearHaulerLatch(
   delete host.harpoonLatchPos;
   delete host.tapExtractFrames;
   delete host.tapExtractCompleted;
-}
-
-function clearHarpoonLatch(
-  host: Pick<
-    AbilityHost,
-    'harpoonTargetId' | 'harpoonLatchPos' | 'tapExtractFrames' | 'tapExtractCompleted'
-  >
-): void {
-  clearHaulerLatch(host);
 }
 
 export function setHaulerUtilityOnHost(
@@ -192,10 +158,6 @@ export function setScoutUtilityOnHost(
   return true;
 }
 
-function listHarpoonCandidates(world?: AbilityWorld): readonly AbilityBody[] {
-  return world?.asteroids ?? getHarpoonField();
-}
-
 function isHarpoonableBody(body: AbilityBody): boolean {
   return !body.exploding && (body.health === undefined || body.health > 0);
 }
@@ -211,27 +173,7 @@ export function tickAbilityHost(host: AbilityHost): void {
     host.utilityFlight = null;
   }
   if (host.kitId !== 'hauler' || host.exploding || host.health <= 0) {
-    clearHarpoonLatch(host);
-  }
-}
-
-/** Explicit null detaches the tow on every client. */
-export function applySharedHarpoonLatch(
-  host: Pick<AbilityHost, 'kitId' | 'harpoonTargetId' | 'harpoonLatchPos'>,
-  snapshot: HarpoonLatchSnapshot
-): void {
-  if (host.kitId !== 'hauler') {
-    clearHarpoonLatch(host);
-    return;
-  }
-  if (snapshot.harpoonTargetId === undefined) {
-    return;
-  }
-  host.harpoonTargetId = snapshot.harpoonTargetId;
-  if (host.harpoonTargetId === null) {
-    delete host.harpoonLatchPos;
-  } else {
-    rememberLatchPos(host, snapshot);
+    clearHaulerLatch(host);
   }
 }
 
@@ -305,13 +247,24 @@ interface HarpoonDiagnosis {
   nearest?: { id?: string; dist: number; gap: number; reason: string };
 }
 
-/** QA probe: kit, field, nearest gap, reject reason, chosen latch. */
-export function diagnoseHarpoonLatch(host: AbilityHost, world?: AbilityWorld): HarpoonDiagnosis {
-  if (!world) {
-    syncHarpoonFieldFromPlay();
-  }
+/** QA probe over an authoritative world: kit, nearest gap, reject reason, chosen latch. */
+export function diagnoseHarpoonLatch(host: AbilityHost, world: AbilityWorld): HarpoonDiagnosis {
+  return diagnoseHarpoonCandidates(host, world.asteroids);
+}
+
+/** QA probe over a client's predicted asteroid field. */
+export function diagnosePredictedHarpoonLatch(
+  host: AbilityHost,
+  asteroids: readonly AbilityBody[]
+): HarpoonDiagnosis {
+  return diagnoseHarpoonCandidates(host, asteroids);
+}
+
+function diagnoseHarpoonCandidates(
+  host: AbilityHost,
+  candidates: readonly AbilityBody[]
+): HarpoonDiagnosis {
   const range = SHIP_ABILITY.HARPOON_RANGE;
-  const candidates = listHarpoonCandidates(world);
   let nearest: HarpoonDiagnosis['nearest'];
   for (const body of candidates) {
     const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
@@ -378,7 +331,7 @@ export function pullHarpoonTarget(
 ): void {
   if (host.kitId !== 'hauler') {
     tickTowCable(host, undefined);
-    clearHarpoonLatch(host);
+    clearHaulerLatch(host);
     return;
   }
   if (!host.harpoonTargetId) {
@@ -391,7 +344,7 @@ export function pullHarpoonTarget(
   // A missing authoritative target detaches the cable.
   if (!target || !latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE * 3)) {
     tickTowCable(host, undefined);
-    clearHarpoonLatch(host);
+    clearHaulerLatch(host);
     return;
   }
 
@@ -428,10 +381,29 @@ export function tickTapExtract(
 }
 
 /**
- * Activate the host's kit ability. World effects (harpoon haul) apply
- * when a world is passed — server is authoritative for those.
+ * Authoritative activation. World effects (boost coupling, tow attachment)
+ * apply to the supplied world.
  */
-export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): AbilityActivation {
+export function activateAbilityOnHost(host: AbilityHost, world: AbilityWorld): AbilityActivation {
+  return activateAbility(host, world.asteroids, world);
+}
+
+/**
+ * Offline prediction against a client's asteroid field. It changes only the
+ * host: no boost ownership, ignition, or tow attachment.
+ */
+export function predictAbilityOnHost(
+  host: AbilityHost,
+  asteroids: readonly AbilityBody[]
+): AbilityActivation {
+  return activateAbility(host, asteroids);
+}
+
+function activateAbility(
+  host: AbilityHost,
+  candidates: readonly AbilityBody[],
+  world?: AbilityWorld
+): AbilityActivation {
   if (!canActivateAbility(host)) {
     return { activated: false };
   }
@@ -452,11 +424,11 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
         if (ownsArmedBoost && host.id && armed && target) {
           target.boost = removeBoostOwner(armed, host.id);
         }
-        clearHarpoonLatch(host);
+        clearHaulerLatch(host);
         return { activated: false };
       }
     }
-    clearHarpoonLatch(host);
+    clearHaulerLatch(host);
     return { activated: true, abilityId: 'harpoon' };
   }
 
@@ -488,13 +460,10 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
       return { activated: true, abilityId: 'harpoon' };
     }
-    if (!world) {
-      syncHarpoonFieldFromPlay();
-    }
     const latchRange = SHIP_ABILITY.HARPOON_RANGE;
     const target = findHarpoonTarget(
       host,
-      listHarpoonCandidates(world).filter((body) => canLatchBoostedBody(host, body)),
+      candidates.filter((body) => canLatchBoostedBody(host, body)),
       latchRange
     );
     if (!target) {

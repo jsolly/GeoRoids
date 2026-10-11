@@ -1,3 +1,4 @@
+import { SHIP_ABILITY } from '../../shared/shipKits';
 import { activeScanners } from '../../shared/surveyScan';
 import type { Position } from '../../shared-types';
 import { LootField } from '../entities/loot/LootField';
@@ -8,7 +9,6 @@ import { drawAsteroidShatterBursts, drawRoidsRelative } from '../entities/roid/r
 import { drawSurveyProbes } from '../entities/roid/surveyProbeRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
-import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import {
   drawHaulerHarpoonRelative,
   drawLasers,

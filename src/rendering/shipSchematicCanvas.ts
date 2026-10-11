@@ -1,3 +1,4 @@
+import { SHIP_ABILITY } from '../../shared/shipKits';
 import { HAULER_UTILITY_IDS } from '../../shared/shipUtilities';
 import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
@@ -9,7 +10,6 @@ import {
   projectHullPoint,
   projectHullPolyline,
 } from '../entities/ship/hullOutlines';
-import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import { strokeKitHullOutline } from '../entities/ship/shipRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 

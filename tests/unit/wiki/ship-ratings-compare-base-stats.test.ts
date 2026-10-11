@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { listShipKits } from '../../../src/entities/ship/shipKits';
+import { listShipKits } from '../../../shared/shipKits';
 import { shipRatings } from '../../../src/wiki/shipScorecard';
 
 test('Hauler rates highest for hull while Scout rates highest for quick, compact handling', () => {

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WIRE_PALETTE } from '../../../shared/constants/gameplay';
 import { CIVIC_LOTS } from '../../../shared/furnaces';
+import { applyShipKitToShip } from '../../../shared/shipKits';
 import { WORLD } from '../../../shared/world';
 import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, TITLE, VISUAL } from '../../../src/constants';
 import { getKitHullOutline, projectHullPolyline } from '../../../src/entities/ship/hullOutlines';
-import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
 import {
   FURNACE_MAP_INK,
   MINIMAP_FURNACE_MARK_SIZE,

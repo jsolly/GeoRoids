@@ -1,18 +1,19 @@
 import { expect, test } from 'vitest';
 import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
+import {
+  type AbilityHost,
+  activateAbilityOnHost,
+  predictAbilityOnHost,
+  setHaulerUtilityOnHost,
+  tickAbilityHost,
+  tickTowLine,
+} from '../../../shared/shipAbilities';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { movingAsteroidContact } from '../../../shared/toolFlightContact';
 import { UTILITY_FLIGHT } from '../../../shared/utilityFlight';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
-import {
-  type AbilityHost,
-  activateAbilityOnHost,
-  setHaulerUtilityOnHost,
-  tickAbilityHost,
-  tickTowLine,
-} from '../../../src/entities/ship/shipAbilities';
 
 function hauler(): AbilityHost {
   return {
@@ -106,12 +107,12 @@ test('obstructed tow lines reel back while death and tool changes discard an in-
   expect(pilot.harpoonTargetId).toBeNull();
   pilot.utilityFlight = null;
   pilot.abilityCooldownFrames = 0;
-  activateAbilityOnHost(pilot);
+  predictAbilityOnHost(pilot, []);
   expect(setHaulerUtilityOnHost(pilot, 'resource_tap')).toBe(true);
   expect(pilot.utilityFlight).toBeNull();
   pilot.haulerUtility = 'tow_cable';
   pilot.abilityCooldownFrames = 0;
-  activateAbilityOnHost(pilot);
+  predictAbilityOnHost(pilot, []);
   pilot.health = 0;
   tickAbilityHost(pilot);
   expect(pilot.utilityFlight).toBeNull();
@@ -120,8 +121,8 @@ test('obstructed tow lines reel back while death and tool changes discard an in-
 test('a second press recalls an outbound tow before it can attach', () => {
   const pilot = hauler();
   const target = rock('ahead', 140);
-  activateAbilityOnHost(pilot);
-  expect(activateAbilityOnHost(pilot).activated).toBe(true);
+  predictAbilityOnHost(pilot, []);
+  expect(predictAbilityOnHost(pilot, []).activated).toBe(true);
   expect(pilot.utilityFlight?.phase).toBe('reeling');
   tickTowLine(pilot, [target]);
   expect(pilot.harpoonTargetId).toBeNull();
@@ -222,7 +223,7 @@ test('a tow line uses the asteroid contour rather than an invisible bounding cir
   const pilot = hauler();
   const target = rock('small-contour', 100);
   target.offsets = [0.5, 0.5, 0.5, 0.5];
-  activateAbilityOnHost(pilot);
+  predictAbilityOnHost(pilot, []);
   for (let frame = 0; frame < 7; frame++) {
     tickTowLine(pilot, [target]);
   }

@@ -6,7 +6,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:466d9bf94b7f001cb0d4750a418685f547806a39b328f7fda2b9d23a8f6b9bc6",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:4613a18ab6a45927de364db10ef801db5d0f8dda0ae2305353ecda5ffaa4296d",
-    "package.json": "sha256:95b912a5172552fc34c21be4d4c65c4e2a85a57bc0b30bc0f8301979219b4af3",
+    "package.json": "sha256:0021372e781b9d4e5d7e662ba022beffaf4a2f45096a447f6425d7d135fe19f9",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -57,7 +57,7 @@
     "public/wiki/media/terrain.png": "sha256:45e89a0f083c9c619b195543040ffabf80f4427a04e38e9a92c95fe4807d8133",
     "scripts/client-build.ts": "sha256:abe7ea029d9606ce316a76b6cef432aa7002420783f8dc739622af74a90e5892",
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
-    "scripts/wiki-check.ts": "sha256:b3656545781597999c18bf934e1fb45e58f8b95c2bc4b427f534dd378c167a00",
+    "scripts/wiki-check.ts": "sha256:dcf464b75fbbcbcceb3fb885def1d2a45d24cbc34e62da4383ef6b15f8e8f857",
     "scripts/wiki-content.ts": "sha256:190a89be185ac685e37e7ae3d962d1fabb059a2a39fc3eee2f9cc09567e8a162",
     "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
@@ -560,7 +560,8 @@
     "config/typescript/strict-tsc.json": "sha256:18c63c930c268ca09f4b9fac16bb576022d8ab57acf548e74fcc4c781a67d119",
     "src/components/Context7Note.astro": "sha256:6127e526e0e9dad4bf3a088d62d19e8ee25de7c238852ee7bf60eb335967265c",
     "src/components/Context7Verification.astro": "sha256:1786a9ca8e2cf86fe7260058b76a3fc314321fb79b3dcc38d6713d1aa2dbda91",
-    "src/constants/context7.ts": "sha256:3a72e118e92f520684a84ec4c8cd91841f68ca8e83ec7b9a5cc547813ca2a18b"
+    "src/constants/context7.ts": "sha256:3a72e118e92f520684a84ec4c8cd91841f68ca8e83ec7b9a5cc547813ca2a18b",
+    "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94"
   },
   "reviews": [
     {
@@ -6525,6 +6526,17 @@
       "media": [],
       "owners": {
         "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the Wiki checker change only: the package.json digest now ignores version strings inside dependencies, devDependencies, optionalDependencies, peerDependencies and overrides, so dependency-only bumps no longer need a review. Package names, scripts, engines and all other manifest fields still invalidate it. package.json content is unchanged; its accepted hash is re-recorded in the new digest form. No Wiki article cites package.json or lists dependencies; player rules, Wiki content and demonstrations are unchanged.",
+      "sources": ["package.json", "scripts/wiki-check.ts", "scripts/wiki-source-digest.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "scripts/wiki-check.ts": "field-manual",
+        "scripts/wiki-source-digest.ts": "field-manual"
       }
     }
   ]

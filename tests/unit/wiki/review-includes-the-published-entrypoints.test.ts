@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   cpSync,
   existsSync,
@@ -14,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { expect, test } from 'vitest';
+import { wikiSourceDigest } from '../../../scripts/wiki-source-digest';
 
 const WIKI_INDEX_ENTRYPOINT_PATTERN = /src\/pages\/wiki\.astro/u;
 const NEW_GAME_RULE_PATH_PATTERN = /src\/entities\/new-game-rule\.ts/u;
@@ -53,12 +53,7 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     const hashes = Object.fromEntries(
       Object.keys(baseline.hashes)
         .filter((path) => existsSync(join(fixture, path)))
-        .map((path) => [
-          path,
-          `sha256:${createHash('sha256')
-            .update(readFileSync(join(fixture, path)))
-            .digest('hex')}`,
-        ])
+        .map((path) => [path, wikiSourceDigest(path, readFileSync(join(fixture, path)))])
     );
     const reviewPath = join(fixture, 'docs/wiki-source-review.json');
     writeFileSync(

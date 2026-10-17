@@ -4,10 +4,14 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import GameOverlay from '../../../src/components/game/GameOverlay.svelte';
 
 let overlay: ReturnType<typeof mount> | undefined;
-let mobile = false;
-let breakpointListener: (() => void) | undefined;
-const addBreakpoint = vi.fn();
-const removeBreakpoint = vi.fn();
+let viewport: EventTarget & {
+  width: number;
+  height: number;
+  offsetLeft: number;
+  offsetTop: number;
+};
+let addViewport: ReturnType<typeof vi.spyOn>;
+let removeViewport: ReturnType<typeof vi.spyOn>;
 
 async function settle() {
   flushSync();
@@ -29,27 +33,15 @@ beforeEach(() => {
   vi.useFakeTimers();
   document.body.innerHTML =
     '<button id="opener">Inventory</button><canvas id="flight" tabindex="-1"></canvas>';
-  mobile = false;
-  breakpointListener = undefined;
-  addBreakpoint.mockReset();
-  removeBreakpoint.mockReset();
-  vi.stubGlobal('matchMedia', (query: string) => ({
-    get matches() {
-      return query === '(max-width: 639px)' && mobile;
-    },
-    media: query,
-    addEventListener: (_event: string, listener: () => void) => {
-      if (query === '(max-width: 639px)') {
-        addBreakpoint(listener);
-        breakpointListener = listener;
-      }
-    },
-    removeEventListener: (_event: string, listener: () => void) => {
-      if (query === '(max-width: 639px)') {
-        removeBreakpoint(listener);
-      }
-    },
-  }));
+  viewport = Object.assign(new EventTarget(), {
+    width: 1280,
+    height: 900,
+    offsetLeft: 0,
+    offsetTop: 0,
+  });
+  addViewport = vi.spyOn(viewport, 'addEventListener');
+  removeViewport = vi.spyOn(viewport, 'removeEventListener');
+  vi.stubGlobal('visualViewport', viewport);
 });
 afterEach(async () => {
   if (overlay) {
@@ -82,7 +74,8 @@ async function start(
       restoreFocus,
       fallbackFocusTarget,
       children: createRawSnippet(() => ({
-        render: () => '<div><button id="overlay-action">Equip Tow Cable</button></div>',
+        render: () =>
+          '<div><textarea id="overlay-draft"></textarea><button id="overlay-action">Equip Tow Cable</button></div>',
       })),
     },
   });
@@ -96,7 +89,6 @@ async function start(
 test('desktop close and Escape request a controlled close and restore focus to the opener', async () => {
   const { open, onclose } = await start();
   const dialog = element('[role="dialog"]', HTMLDivElement);
-  expect(dialog.dataset['slot']).toBe('dialog-content');
   const labelledBy = dialog.getAttribute('aria-labelledby');
   const describedBy = dialog.getAttribute('aria-describedby');
   expect(labelledBy && document.querySelector(`[id="${labelledBy}"]`)?.textContent).toBe(
@@ -166,26 +158,39 @@ test.each(['hidden', 'inert', 'disabled', 'removed', 'css-hidden'])(
   }
 );
 
-test('an open overlay becomes a mobile sheet without closing and releases its breakpoint listener', async () => {
+test('a focused draft keeps the same dialog, textarea and caret across responsive layout changes', async () => {
   const { onclose } = await start();
-  element('#overlay-action', HTMLButtonElement).focus();
-  mobile = true;
-  breakpointListener?.();
+  const dialog = element('[role="dialog"]', HTMLDivElement);
+  const field = element('#overlay-draft', HTMLTextAreaElement);
+  field.value = 'Keyboard stays open';
+  field.focus();
+  field.setSelectionRange(2, 8);
+  Object.assign(viewport, { width: 390, height: 400, offsetLeft: 0, offsetTop: 60 });
+  viewport.dispatchEvent(new Event('resize'));
   await settle();
-  expect(element('[role="dialog"]', HTMLDivElement).dataset['slot']).toBe('sheet-content');
-  expect(document.activeElement).toBe(document.querySelector('#overlay-action'));
-  expect(onclose).not.toHaveBeenCalled();
-  mobile = false;
-  breakpointListener?.();
+  expect(element('[role="dialog"]', HTMLDivElement)).toBe(dialog);
+  expect(element('#overlay-draft', HTMLTextAreaElement)).toBe(field);
+  expect(document.activeElement).toBe(field);
+  expect(dialog.style.getPropertyValue('--overlay-viewport-height')).toBe('400px');
+  expect(dialog.style.getPropertyValue('--overlay-viewport-top')).toBe('60px');
+  expect([field.selectionStart, field.selectionEnd]).toEqual([2, 8]);
+  Object.assign(viewport, { width: 1280, height: 900, offsetLeft: 10, offsetTop: 0 });
+  viewport.dispatchEvent(new Event('scroll'));
   await settle();
-  expect(element('[role="dialog"]', HTMLDivElement).dataset['slot']).toBe('dialog-content');
-  expect(document.activeElement).toBe(document.querySelector('#overlay-action'));
+  expect(element('[role="dialog"]', HTMLDivElement)).toBe(dialog);
+  expect(element('#overlay-draft', HTMLTextAreaElement)).toBe(field);
+  expect(document.activeElement).toBe(field);
+  expect(field.value).toBe('Keyboard stays open');
+  expect([field.selectionStart, field.selectionEnd]).toEqual([2, 8]);
   expect(onclose).not.toHaveBeenCalled();
+  expect(dialog.style.getPropertyValue('--overlay-viewport-width')).toBe('1280px');
+  expect(dialog.style.getPropertyValue('--overlay-viewport-left')).toBe('10px');
   if (!overlay) {
-    throw new Error('Overlay missing');
+    throw new Error('Missing overlay');
   }
   await unmount(overlay);
   overlay = undefined;
-  expect(addBreakpoint).toHaveBeenCalledTimes(1);
-  expect(removeBreakpoint).toHaveBeenCalledExactlyOnceWith(addBreakpoint.mock.calls[0]?.[0]);
+  expect(addViewport).toHaveBeenCalledTimes(2);
+  expect(removeViewport).toHaveBeenCalledWith('resize', addViewport.mock.calls[0]?.[1]);
+  expect(removeViewport).toHaveBeenCalledWith('scroll', addViewport.mock.calls[1]?.[1]);
 });

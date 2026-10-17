@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { initializePlayfieldSelection } from '../../../src/input/playfieldSelection';
+import { closeGameOverlay, openGameOverlay } from '../../../src/runtime/overlayState';
 import { setPlayView } from '../../../src/ui/uiUtils';
 
 beforeEach(() => {
@@ -8,6 +9,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  closeGameOverlay('debug-report');
   document.getSelection()?.removeAllRanges();
   setPlayView(false);
   document.body.replaceChildren();
@@ -75,4 +77,33 @@ test('an editable field keeps its selection if a selectionchange fires during fl
   selection?.addRange(range);
   document.dispatchEvent(new Event('selectionchange'));
   expect(selection?.rangeCount).toBe(1);
+});
+
+test('a report textarea owns native selection while the flight remains active behind its modal', () => {
+  const text = document.createElement('p');
+  text.textContent = 'Report a problem';
+  const field = document.createElement('textarea');
+  field.value = 'Typing on my tablet';
+  document.body.append(text, field);
+  const range = document.createRange();
+  range.selectNodeContents(text);
+  const selection = document.getSelection();
+  openGameOverlay('debug-report');
+  field.focus();
+  field.setSelectionRange(0, 6);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  document.dispatchEvent(new Event('selectionchange'));
+  expect(document.activeElement).toBe(field);
+  expect([field.selectionStart, field.selectionEnd]).toEqual([0, 6]);
+  expect(selection?.rangeCount).toBe(1);
+  const context = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  text.dispatchEvent(context);
+  expect(context.defaultPrevented).toBe(false);
+  const select = new Event('selectstart', { bubbles: true, cancelable: true });
+  text.dispatchEvent(select);
+  expect(select.defaultPrevented).toBe(false);
+  closeGameOverlay('debug-report');
+  document.dispatchEvent(new Event('selectionchange'));
+  expect(selection?.rangeCount).toBe(0);
 });

@@ -345,7 +345,7 @@
     display: none;
   }
 
-  body.in-play {
+  body.in-play:not(.game-overlay-open) {
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -371,8 +371,8 @@
     --action-width: calc((100vw - var(--action-left) - var(--action-right) - 18px) / 4);
   }
 
-  /* After other * rules so in-play selection suppression stays last in the layer. */
-  body.in-play * {
+  /* Modal forms keep native touch scrolling and selection while flight stays active. */
+  body.in-play:not(.game-overlay-open) * {
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;

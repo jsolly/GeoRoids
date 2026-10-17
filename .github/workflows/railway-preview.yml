@@ -213,7 +213,7 @@ jobs:
             served="$(curl --fail --silent --max-time 20 "${origin}/preview-release.txt" || true)"
             if [[ "$served" == "$HEAD_SHA" ]] \
               && curl --fail --silent --max-time 20 --output /dev/null "${origin}/health" \
-              && curl --fail --silent --max-time 20 "${origin}/" | grep -q '<html'; then
+              && curl --fail --silent --max-time 20 "${origin}/" | grep -F '<html' >/dev/null; then
               gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$(
                 printf '%s\n\n%s\n' \
                   "Preview for \`${HEAD_REF}\` (\`${HEAD_SHA}\`): ${origin}" \

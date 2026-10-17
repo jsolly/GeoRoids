@@ -415,8 +415,24 @@ if (command === 'gh') {
   if (url.endsWith('/preview-release.txt')) process.stdout.write(process.env.FIXTURE_SERVED_SHA + '\\n');
   else if (url.endsWith('/health')) {
     if (process.env.FIXTURE_HEALTH_FAIL === '1') process.exit(22);
-  } else if (url.endsWith('/')) process.stdout.write(process.env.FIXTURE_HTML_FAIL === '1' ? '{}' : '<html></html>');
-  else throw new Error('Unexpected curl destination');
+  } else if (url.endsWith('/')) {
+    if (process.env.FIXTURE_HTML_FAIL === '1') process.stdout.write('{}');
+    else {
+      // Real curl reports 23 when grep -q closes the healthy HTML stream early.
+      process.stdout.on('error', error => {
+        if (error.code === 'EPIPE') process.exit(23);
+        throw error;
+      });
+      process.stdout.write('<html>\\n');
+      let remaining = 64;
+      const stream = () => {
+        if (remaining-- === 0) return process.stdout.end('</html>');
+        if (process.stdout.write('x'.repeat(64 * 1024))) setImmediate(stream);
+        else process.stdout.once('drain', stream);
+      };
+      setImmediate(stream);
+    }
+  } else throw new Error('Unexpected curl destination');
 } else if (command !== 'sleep') throw new Error('Unexpected fixture command');
 `;
   const runPreview = (name, overrides = {}) => {

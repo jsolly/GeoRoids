@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BugIcon from '@lucide/svelte/icons/bug';
   import type { DebugView } from '../../runtime/debugPresentation';
   import Button from '../ui/button/button.svelte';
   import Input from '../ui/input/input.svelte';
@@ -43,35 +44,33 @@
 </script>
 
 {#if inPlay}
-  <aside
-    id="debug-play-stack"
-    aria-label="Game diagnostics"
-    class="debug-panel rounded-lg border border-border bg-card/95 p-3 text-xs text-foreground"
-  >
-    <dl class="mb-2 grid gap-1 break-all">
-      <div>
-        <dt class="text-muted-foreground">Player</dt>
-        <dd id="debug-hud-player-id">{view.playerId || 'Not joined'}</dd>
-      </div>
-      <div>
-        <dt class="text-muted-foreground">Page</dt>
-        <dd id="debug-hud-session-id">{view.sessionId}</dd>
-      </div>
-    </dl>
+  <aside id="debug-play-stack" aria-label="Game diagnostics" class="debug-tools">
     <Button
       id="debug-hud-toggle"
       variant="outline"
-      class="min-h-11 w-full"
+      size="icon"
+      class="debug-toggle min-h-11 min-w-11 rounded-full bg-card/95"
+      aria-label={view.hudHidden ? 'Show diagnostics' : 'Hide diagnostics'}
+      title={view.hudHidden ? 'Show diagnostics' : 'Hide diagnostics'}
       aria-controls="debug-hud"
       aria-expanded={!view.hudHidden}
-      onclick={ontoggle}>{view.hudHidden ? 'Show HUD' : 'Hide HUD'}</Button
+      onclick={ontoggle}><BugIcon aria-hidden="true" class="size-5" /></Button
     >
-    <Button variant="outline" class="mt-2 min-h-11 w-full" onclick={onreport}
-      >Report a problem</Button
+    <section
+      id="debug-hud"
+      hidden={view.hudHidden}
+      aria-label="Diagnostic details"
+      class="debug-panel rounded-lg border border-border bg-card/95 p-3 text-xs text-foreground"
     >
-    <fieldset id="debug-hud" hidden={view.hudHidden} class="mt-3">
-      <legend class="sr-only">Debug health</legend>
-      <dl class="grid gap-1">
+      <dl class="mb-2 grid gap-1 break-all">
+        <div>
+          <dt class="text-muted-foreground">Player</dt>
+          <dd id="debug-hud-player-id">{view.playerId || 'Not joined'}</dd>
+        </div>
+        <div>
+          <dt class="text-muted-foreground">Page</dt>
+          <dd id="debug-hud-session-id">{view.sessionId}</dd>
+        </div>
         {#each rows as [key, label] (key)}
           <div class="flex justify-between gap-3">
             <dt class="text-muted-foreground">{label}</dt>
@@ -79,6 +78,9 @@
           </div>
         {/each}
       </dl>
+      <Button variant="outline" class="mt-2 min-h-11 w-full" onclick={onreport}
+        >Report a problem</Button
+      >
       <div class="mt-3">
         <CopyControl
           id="copy-debug-diagnostics"
@@ -87,7 +89,7 @@
           value={diagnostics}
         />
       </div>
-    </fieldset>
+    </section>
   </aside>
 {:else}
   <section
@@ -147,21 +149,37 @@
 {/if}
 
 <style>
-  .debug-panel {
+  .debug-tools {
     position: fixed;
     z-index: 30;
     top: max(12px, env(safe-area-inset-top));
     right: max(12px, env(safe-area-inset-right));
-    width: min(19rem, calc(100vw - 24px));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
     font-family: var(--font-sans);
+    pointer-events: none;
   }
-  @media (max-width: 639px) {
-    .debug-panel {
-      top: calc(var(--mobile-controls-top, 80px) + 56px);
-      left: max(12px, env(safe-area-inset-left));
-      width: calc(100vw - 24px);
-      max-height: min(28dvh, var(--mobile-diagnostic-max-height, 28dvh));
-      overflow: auto;
-    }
+  .debug-tools :global(.debug-toggle),
+  .debug-panel {
+    pointer-events: auto;
+  }
+  .debug-panel {
+    width: min(19rem, calc(100vw - 24px));
+    max-height: 45dvh;
+    overflow: auto;
+  }
+  .debug-panel[hidden] {
+    display: none;
+  }
+  :global(body.touch-play) .debug-tools {
+    top: calc(var(--mobile-controls-top, 80px) + 56px);
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+    align-items: flex-start;
+  }
+  :global(body.touch-play) .debug-panel {
+    max-height: min(45dvh, var(--mobile-diagnostic-max-height, 45dvh));
   }
 </style>

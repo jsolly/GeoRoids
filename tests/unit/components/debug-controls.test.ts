@@ -120,16 +120,17 @@ test('a debug pilot sees its page identity before joining and copies its accepte
   await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('joined-pilot'));
 });
 
-test('a debug pilot hides metrics and a fresh runtime preserves the preference', () => {
+test('a debug pilot starts collapsed and a fresh runtime preserves the chosen expansion', () => {
   start();
-  model?.toggleHud();
   expect(model?.read(false)?.hudHidden).toBe(true);
-  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugHudHidden)).toBe('true');
+  model?.toggleHud();
+  expect(model?.read(false)?.hudHidden).toBe(false);
+  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugHudHidden)).toBe('false');
   model?.dispose();
   model = createDebugPresentation(() => {});
-  expect(model.read(false)?.hudHidden).toBe(true);
-  model.toggleHud();
   expect(model.read(false)?.hudHidden).toBe(false);
+  model.toggleHud();
+  expect(model.read(false)?.hudHidden).toBe(true);
 });
 
 test.each(['resolve', 'reject'] as const)(
@@ -169,20 +170,27 @@ test.each(['resolve', 'reject'] as const)(
   }
 );
 
-test('the in-flight diagnostics toggle hides and restores the actual metric panel', () => {
+test('the bug button starts collapsed and toggles the entire diagnostics panel', () => {
   start('/debug', true);
   const toggle = target?.querySelector<HTMLButtonElement>('#debug-hud-toggle');
-  const hud = target?.querySelector<HTMLFieldSetElement>('#debug-hud');
+  const hud = target?.querySelector<HTMLElement>('#debug-hud');
+  expect(hud?.hidden).toBe(true);
+  expect(toggle?.getAttribute('aria-label')).toBe('Show diagnostics');
+  expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+  expect(toggle?.getAttribute('aria-controls')).toBe(hud?.id);
+  expect(toggle?.querySelector('svg')).not.toBeNull();
+  toggle?.click();
+  flushSync();
   expect(hud?.hidden).toBe(false);
+  expect(toggle?.getAttribute('aria-label')).toBe('Hide diagnostics');
+  expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+  expect(hud?.querySelector('#debug-hud-player-id')).not.toBeNull();
+  expect(hud?.querySelector('#copy-debug-diagnostics')).not.toBeNull();
+  expect(hud?.textContent).toContain('Report a problem');
   toggle?.click();
   flushSync();
   expect(hud?.hidden).toBe(true);
-  expect(toggle?.textContent).toBe('Show HUD');
   expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-  toggle?.click();
-  flushSync();
-  expect(hud?.hidden).toBe(false);
-  expect(toggle?.getAttribute('aria-expanded')).toBe('true');
 });
 
 test('Copy diagnostics releases held fire and isolates cold presses', () => {
@@ -205,11 +213,13 @@ test('Copy diagnostics releases held fire and isolates cold presses', () => {
   const keys = vi.fn();
   try {
     start('/debug', true);
+    target?.querySelector<HTMLButtonElement>('#debug-hud-toggle')?.click();
+    flushSync();
     const button = target?.querySelector<HTMLButtonElement>('#copy-debug-diagnostics');
     if (!button) {
       throw new Error('Missing in-play Copy diagnostics button');
     }
-    expect(target?.querySelector<HTMLFieldSetElement>('#debug-hud')?.hidden).toBe(false);
+    expect(target?.querySelector<HTMLElement>('#debug-hud')?.hidden).toBe(false);
     expect(button.disabled).toBe(false);
     expect(getOpenGameOverlay()).toBeNull();
     gameState.setIsGameRunning(true);

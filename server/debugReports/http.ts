@@ -10,6 +10,7 @@ const RECEIPT_AUTHORIZATION = /^Bearer [0-9a-f]{64}$/u;
 
 interface ReportHttpOptions {
   allowedOrigins: readonly string[];
+  sameOriginClient: boolean;
   railwayIngress: boolean;
   health: () => DebugJsonValue;
 }
@@ -24,6 +25,20 @@ function respond(res: ServerResponse, status: number, body: unknown): void {
     'X-Content-Type-Options': 'nosniff',
   });
   res.end(JSON.stringify(body));
+}
+
+/** Only a server serving its own client accepts a canonical Origin matching the request Host. */
+function isClientOrigin(origin: string, host: string | undefined): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.origin === origin &&
+      url.host === host
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Only Railway public HTTP ingress supplies this header; local proxies cannot select it. */
@@ -58,7 +73,11 @@ export function createDebugReportHttp(
     }
     res.setHeader('Vary', 'Origin');
     const origin = req.headers.origin;
-    if (origin && !options.allowedOrigins.includes(origin)) {
+    if (
+      origin &&
+      !options.allowedOrigins.includes(origin) &&
+      !(options.sameOriginClient && isClientOrigin(origin, req.headers.host))
+    ) {
       respond(res, 403, { error: 'Reporting origin is not allowed' });
       return true;
     }

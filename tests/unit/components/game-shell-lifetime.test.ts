@@ -295,7 +295,7 @@ test('unmount after runtime creation disposes it before a ready subscription can
 });
 
 test('play and geometry update body classes synchronously and preserve shell canvases through menu transitions', async () => {
-  document.body.classList.add('touch-play');
+  document.body.classList.add('touch-play', 'game-overlay-open');
   await start();
   await vi.dynamicImportSettled();
   await settle();
@@ -318,9 +318,14 @@ test('play and geometry update body classes synchronously and preserve shell can
     schematicY: 148,
   });
   expect(document.body.classList.contains('touch-play')).toBe(false);
+  expect(document.body.classList.contains('game-overlay-open')).toBe(false);
   publish({ ...initialView, inPlay: true });
   expect(document.body.classList.contains('in-play')).toBe(true);
   expect(document.body.classList.contains('touch-play')).toBe(true);
+  publish({ ...initialView, inPlay: true, overlay: 'debug-report' });
+  expect(document.body.classList.contains('game-overlay-open')).toBe(true);
+  publish({ ...initialView, inPlay: true });
+  expect(document.body.classList.contains('game-overlay-open')).toBe(false);
   await settle();
   expect(document.querySelector('#town-store-toggle')).toBeNull();
   const area = element('#gameArea', HTMLDivElement);
@@ -347,7 +352,7 @@ test('play and geometry update body classes synchronously and preserve shell can
   shell = undefined;
   expect(teardownOrder).toEqual(['unsubscribe', 'dispose']);
   expect(signal?.aborted).toBe(true);
-  expect(document.body.className).toBe('existing touch-play');
+  expect(document.body.className).toBe('existing touch-play game-overlay-open');
   hosts.placeChrome({
     width: 1,
     height: 1,
@@ -358,7 +363,7 @@ test('play and geometry update body classes synchronously and preserve shell can
     schematicY: 0,
   });
   publish({ ...initialView, inPlay: true });
-  expect(document.body.className).toBe('existing touch-play');
+  expect(document.body.className).toBe('existing touch-play game-overlay-open');
 });
 
 test('inventory Return focuses the playfield while a later Escape restores the inventory opener', async () => {
@@ -652,4 +657,189 @@ test('canceling an unsubmitted report recaptures the current incident before reo
   button('Cancel').click();
   await settle();
   await vi.runAllTimersAsync();
+});
+
+test('a report draft keeps its focused textarea across flight publications and keyboard viewport changes', async () => {
+  window.history.replaceState(null, '', '/debug');
+  await start();
+  await vi.dynamicImportSettled();
+  await settle();
+  vi.useFakeTimers();
+  const flight: GamePresentation = {
+    ...initialView,
+    inPlay: true,
+    overlay: 'debug-report',
+    debug: {
+      playerId: 'test-pilot',
+      sessionId: 'test-page',
+      hudHidden: false,
+      fps: '60',
+      rtt: '0',
+      snapshot: '0',
+      motion: '',
+      world: '',
+      releases: '',
+    },
+  };
+  publish(flight);
+  await settle();
+  await vi.runAllTimersAsync();
+  await settle();
+  const field = element('#debug-report-description', HTMLTextAreaElement);
+  field.focus();
+  field.value = 'The keyboard';
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  field.setSelectionRange(4, 12);
+  await settle();
+  const geometry = {
+    width: 800,
+    height: 700,
+    touchControls: true,
+    mobileControlsTop: 80,
+    mapX: 0,
+    mapY: 0,
+    schematicY: 0,
+  };
+  hosts?.placeChrome(geometry);
+  window.dispatchEvent(new Event('resize'));
+  window.visualViewport?.dispatchEvent(new Event('resize'));
+  publish({ ...flight, controls: { ...flight.controls, touchMode: true } });
+  await settle();
+  await vi.runAllTimersAsync();
+  await settle();
+  expect(element('#debug-report-description', HTMLTextAreaElement)).toBe(field);
+  expect(document.activeElement).toBe(field);
+  expect(field.value).toBe('The keyboard');
+  expect([field.selectionStart, field.selectionEnd]).toEqual([4, 12]);
+});
+
+async function startWithReportReceipt(state: 'pending' | 'blocked' | 'delivered') {
+  window.history.replaceState(null, '', '/debug');
+  const overlays = await import('../../../src/runtime/overlayState');
+  const diagnosticView: GamePresentation = {
+    ...initialView,
+    debug: {
+      playerId: '',
+      sessionId: 'test-page',
+      hudHidden: false,
+      fps: '60',
+      rtt: '0',
+      snapshot: '0',
+      motion: '',
+      world: '',
+      releases: '',
+    },
+  };
+  vi.mocked(runtime.subscribe).mockImplementation((listener) => {
+    listener(diagnosticView);
+    return overlays.subscribeGameOverlay((overlay) => listener({ ...diagnosticView, overlay }));
+  });
+  const id = crypto.randomUUID();
+  boundary.writeReport.mockResolvedValue(undefined);
+  boundary.readReport.mockResolvedValue({
+    kind: 'receipt',
+    receipt: { id, state },
+    receiptToken: 'a'.repeat(64),
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify({ id, state }), { status: 200 })
+  );
+  await start();
+  await vi.dynamicImportSettled();
+  await settle();
+  boundary.writeReport.mockClear();
+  return { overlays, id };
+}
+
+function reportButton(label: string) {
+  const found = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === label
+  );
+  if (!found) {
+    throw new Error(`Missing ${label}`);
+  }
+  return found;
+}
+
+test('Report a problem starts a fresh editor on the first click after a delivered report', async () => {
+  const { overlays } = await startWithReportReceipt('delivered');
+  boundary.writeReport.mockResolvedValue(undefined);
+  vi.mocked(runtime.commands.captureDiagnostics).mockImplementation(() => {
+    expect(overlays.getOpenGameOverlay()).toBeNull();
+    return { state: { sessionId: 'new-incident' }, recentLogs: [] };
+  });
+  reportButton('Report a problem').click();
+  reportButton('Report a problem').click();
+  await settle();
+  const field = element('#debug-report-description', HTMLTextAreaElement);
+  expect(field.value).toBe('');
+  expect(field.disabled).toBe(false);
+  expect(document.querySelector('pre')?.textContent).toContain('new-incident');
+  expect(document.body.textContent).not.toContain('Delivered');
+  expect(boundary.writeReport).toHaveBeenCalledExactlyOnceWith(null);
+  expect(runtime.commands.captureDiagnostics).toHaveBeenCalledTimes(1);
+  field.value = 'Second incident';
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  await settle();
+  expect(reportButton('Send').disabled).toBe(false);
+});
+
+test.each(['pending', 'blocked'] as const)(
+  'a %s receipt remains recoverable and New report opens a focused editor in the same dialog',
+  async (state) => {
+    const { overlays, id } = await startWithReportReceipt(state);
+    boundary.writeReport.mockResolvedValue(undefined);
+    reportButton('Report a problem').click();
+    await settle();
+    const dialog = element('[role="dialog"]', HTMLDivElement);
+    expect(document.querySelector('textarea')).toBeNull();
+    expect(dialog.textContent).toContain(id);
+    expect(boundary.writeReport).not.toHaveBeenCalled();
+    expect(reportButton('Retry / check delivery').disabled).toBe(false);
+    vi.mocked(runtime.commands.captureDiagnostics).mockReturnValue({
+      state: { sessionId: 'another-incident' },
+      recentLogs: [],
+    });
+    reportButton('New report').click();
+    await settle();
+    const field = element('#debug-report-description', HTMLTextAreaElement);
+    expect(document.querySelector('[role="dialog"]')).toBe(dialog);
+    expect(overlays.getOpenGameOverlay()).toBe('debug-report');
+    expect(field.value).toBe('');
+    expect(document.activeElement).toBe(field);
+    expect(document.querySelector('pre')?.textContent).toContain('another-incident');
+    field.value = 'Another incident';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    expect(reportButton('Send').disabled).toBe(false);
+  }
+);
+
+test('a failed delivered-receipt reset keeps the receipt and recovery controls visible', async () => {
+  const { id } = await startWithReportReceipt('delivered');
+  boundary.writeReport.mockRejectedValue(new Error('storage quota'));
+  reportButton('Report a problem').click();
+  await settle();
+  expect(document.querySelector('textarea')).toBeNull();
+  expect(document.body.textContent).toContain(id);
+  expect(document.querySelector('[role="dialog"] [role="status"]')?.textContent).toContain(
+    'Browser storage could not start a new report'
+  );
+  expect(reportButton('New report').disabled).toBe(false);
+});
+
+test('finishing a receipt reset after shell disposal does not reopen the report', async () => {
+  const { overlays } = await startWithReportReceipt('delivered');
+  const reset = deferred();
+  boundary.writeReport.mockReturnValue(reset.promise);
+  reportButton('Report a problem').click();
+  if (!shell) {
+    throw new Error('Missing shell');
+  }
+  await svelte.unmount(shell);
+  shell = undefined;
+  reset.release();
+  await settle();
+  expect(overlays.getOpenGameOverlay()).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });

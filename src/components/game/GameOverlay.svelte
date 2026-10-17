@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { onMount, type Snippet, tick } from 'svelte';
+  import type { Snippet } from 'svelte';
   import { focusReturnTarget, isExternalFocusTarget } from '../../ui/focusReturn';
   import Button from '../ui/button/button.svelte';
   import Dialog from '../ui/dialog/dialog.svelte';
   import DialogClose from '../ui/dialog/dialog-close.svelte';
-  import DialogContent from '../ui/dialog/dialog-content.svelte';
   import DialogDescription from '../ui/dialog/dialog-description.svelte';
   import DialogTitle from '../ui/dialog/dialog-title.svelte';
   import SheetContent from '../ui/sheet/sheet-content.svelte';
@@ -29,13 +28,8 @@
     restoreFocus?: boolean;
   } = $props();
 
-  let mobile = $state(false);
   let content = $state<HTMLDivElement | null>(null);
   let opener: HTMLElement | null = null;
-  let switchingFocus: number | null = null;
-  let live = true;
-  const focusable =
-    'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]';
 
   function requestOpen(next: boolean) {
     if (!next && open) {
@@ -43,18 +37,8 @@
     }
   }
 
-  function openFocus(event: Event) {
-    if (switchingFocus !== null) {
-      event.preventDefault();
-      const index = switchingFocus;
-      switchingFocus = null;
-      void tick().then(() => {
-        if (live && open && content) {
-          const targets = content.querySelectorAll<HTMLElement>(focusable);
-          (targets.item(Math.max(0, index)) ?? targets.item(0) ?? content).focus();
-        }
-      });
-    } else if (
+  function openFocus() {
+    if (
       document.activeElement instanceof HTMLElement &&
       isExternalFocusTarget(document.activeElement)
     ) {
@@ -72,79 +56,95 @@
     }
   }
 
-  onMount(() => {
-    const media = window.matchMedia('(max-width: 639px)');
-    const update = () => {
-      if (mobile === media.matches) {
-        return;
-      }
-      const focused = document.activeElement;
-      if (open && focused instanceof HTMLElement && content?.contains(focused)) {
-        switchingFocus = [...content.querySelectorAll<HTMLElement>(focusable)].indexOf(focused);
-      }
-      mobile = media.matches;
+  $effect(() => {
+    const node = content;
+    if (!node) {
+      return;
+    }
+    const viewport = window.visualViewport;
+    const fitViewport = () => {
+      node.style.setProperty(
+        '--overlay-viewport-width',
+        `${viewport?.width ?? window.innerWidth}px`
+      );
+      node.style.setProperty(
+        '--overlay-viewport-height',
+        `${viewport?.height ?? window.innerHeight}px`
+      );
+      node.style.setProperty('--overlay-viewport-left', `${viewport?.offsetLeft ?? 0}px`);
+      node.style.setProperty('--overlay-viewport-top', `${viewport?.offsetTop ?? 0}px`);
     };
-    update();
-    media.addEventListener('change', update);
+    fitViewport();
+    window.addEventListener('resize', fitViewport);
+    viewport?.addEventListener('resize', fitViewport);
+    viewport?.addEventListener('scroll', fitViewport);
     return () => {
-      live = false;
-      media.removeEventListener('change', update);
+      window.removeEventListener('resize', fitViewport);
+      viewport?.removeEventListener('resize', fitViewport);
+      viewport?.removeEventListener('scroll', fitViewport);
     };
   });
 </script>
 
-{#snippet body()}
-  <header class="grid gap-2 pr-14">
-    <DialogTitle class="text-xl font-semibold">{title}</DialogTitle>
-    <DialogDescription class="leading-relaxed">{description}</DialogDescription>
-  </header>
-  <div class="min-h-0 overflow-y-auto overscroll-contain">{@render children()}</div>
-  <DialogClose>
-    {#snippet child({ props })}
-      <Button
-        {...props}
-        variant="ghost"
-        class="absolute top-3 right-3 min-h-11 min-w-11"
-        aria-label={`Close ${title}`}
-      >
-        <span aria-hidden="true" class="text-xl">×</span>
-      </Button>
-    {/snippet}
-  </DialogClose>
-{/snippet}
-
 <Dialog bind:open={() => open, requestOpen}>
-  {#if mobile}
-    <SheetContent
-      bind:ref={content}
-      side="bottom"
-      showCloseButton={false}
-      onOpenAutoFocus={openFocus}
-      onCloseAutoFocus={closeFocus}
-      class="game-overlay max-h-[90dvh] gap-5 rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-    >
-      {@render body()}
-    </SheetContent>
-  {:else}
-    <DialogContent
-      bind:ref={content}
-      showCloseButton={false}
-      onOpenAutoFocus={openFocus}
-      onCloseAutoFocus={closeFocus}
-      class="game-overlay max-h-[85dvh] grid-rows-[auto_minmax(0,1fr)] sm:max-w-2xl"
-    >
-      {@render body()}
-    </DialogContent>
-  {/if}
+  <SheetContent
+    side="bottom"
+    bind:ref={content}
+    showCloseButton={false}
+    onOpenAutoFocus={openFocus}
+    onCloseAutoFocus={closeFocus}
+    class="game-overlay gap-6 rounded-xl p-6 ring-1 ring-foreground/10"
+  >
+    <header class="grid gap-2 pr-14">
+      <DialogTitle class="text-xl font-semibold">{title}</DialogTitle>
+      <DialogDescription class="leading-relaxed">{description}</DialogDescription>
+    </header>
+    <div class="min-h-0 overflow-y-auto overscroll-contain">{@render children()}</div>
+    <DialogClose>
+      {#snippet child({ props })}
+        <Button
+          {...props}
+          variant="ghost"
+          class="absolute top-3 right-3 min-h-11 min-w-11"
+          aria-label={`Close ${title}`}
+        >
+          <span aria-hidden="true" class="text-xl">×</span>
+        </Button>
+      {/snippet}
+    </DialogClose>
+  </SheetContent>
 </Dialog>
 
 <style>
-  :global([data-slot='dialog-overlay']:has(~ .game-overlay)),
   :global([data-slot='sheet-overlay']:has(~ .game-overlay)) {
     z-index: 1500;
   }
   :global(.game-overlay) {
     z-index: 1600;
     font-family: var(--font-sans);
+    display: grid;
+    right: auto;
+    bottom: auto;
+    height: auto;
+    top: calc(var(--overlay-viewport-top, 0px) + var(--overlay-viewport-height, 100dvh) / 2);
+    left: calc(var(--overlay-viewport-left, 0px) + var(--overlay-viewport-width, 100vw) / 2);
+    width: min(42rem, calc(var(--overlay-viewport-width, 100vw) - 2rem));
+    max-width: none;
+    max-height: calc(var(--overlay-viewport-height, 100dvh) * 0.85);
+    grid-template-rows: auto minmax(0, 1fr);
+    translate: -50% -50%;
+  }
+  @media (max-width: 639px) {
+    :global(.game-overlay) {
+      top: calc(var(--overlay-viewport-top, 0px) + var(--overlay-viewport-height, 100dvh));
+      left: var(--overlay-viewport-left, 0px);
+      width: var(--overlay-viewport-width, 100vw);
+      max-height: calc(var(--overlay-viewport-height, 100dvh) * 0.9);
+      gap: 1.25rem;
+      border-radius: 1rem 1rem 0 0;
+      padding: 1.25rem;
+      padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+      translate: 0 -100%;
+    }
   }
 </style>

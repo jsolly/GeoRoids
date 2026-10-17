@@ -3,10 +3,10 @@
   "hashes": {
     "astro.config.ts": "sha256:9ce5b438fc4a0e56809b5c02265d234df6f49cbfa8a6d7fa5c94bbeaf95522c3",
     "components.json": "sha256:d0937034ab85db4f61325c777c23bbc891a79126f09c5f13beb5187a0ff99c79",
-    "docs/diagnostics.md": "sha256:45ec24de311d7b6f8aa1f5c01e1854d4f0f7deb2aabc07260780537076758c49",
+    "docs/diagnostics.md": "sha256:99148fdd86afade2138b3748a3d6d59f88249e83ad8a368ece0e1b99e275f412",
     "docs/protocol/snapshot-v3.md": "sha256:2425524552ccba918805914510591327178fbea73e69e6ec5dbbefeab28b7d7d",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
-    "index.css": "sha256:4613a18ab6a45927de364db10ef801db5d0f8dda0ae2305353ecda5ffaa4296d",
+    "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
     "package.json": "sha256:e9861226c62748f5a2d8394801ee30f37578006563b5e85ac262217a3b4d111b",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
@@ -202,7 +202,7 @@
     "src/input/controlSources.ts": "sha256:663a7e692410c5932e5ba181821960a8b609edce74d696a14fd2364f5876017d",
     "src/input/keybindings.ts": "sha256:7fcd2f029fe5f2d9b54c87657327f1e53e0315fbac49931314ad92201a2cfc01",
     "src/input/mouse.ts": "sha256:93c92b5f28227ba963a26c65c4975f99f986bbd778b7aa4b4fd9d6a6a86ed65b",
-    "src/input/playfieldSelection.ts": "sha256:93d03e5f6255a967f6662a5e5f7e223758e18842085dddc5d03e6100877e026e",
+    "src/input/playfieldSelection.ts": "sha256:85ec3959e63df0e1730cc518385270ab42ef7a04f1ed8f52723cdc1a25b68ba0",
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
@@ -326,7 +326,7 @@
     "tests/unit/fx/haptics.test.ts": "sha256:8d63fd67b56313f6d7b55f20c573dbaf29dee0a998d7c556e7609565d2cb3727",
     "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "sha256:7e2ef2b310c8574b5fc0006f9974960cdc82e1c2cd18fce2e8115620c97df478",
     "tests/unit/input/mouseDesktop.test.ts": "sha256:29b659b72be12cbc802f3ac8bdb70f8845085e72a137c6b660a70ab1b7abd084",
-    "tests/unit/input/playfield-taps-do-not-open-copy-banners.test.ts": "sha256:66463455a2ad37deb1d2717d11f433ee789ceaef0f03acf6c1cb7f9260a73d0c",
+    "tests/unit/input/playfield-taps-do-not-open-copy-banners.test.ts": "sha256:22a1ac82af28b0dc5960427ddbfea5d538782e30607ba182ac7d6768dbeb7de2",
     "tests/unit/input/touchAbility.test.ts": "sha256:68a7586f1ef877029ed1b5d12ebdbf16cb1a0b41f0f9f83d98cecfa52490e4f4",
     "tests/unit/network/asteroidFieldSync.test.ts": "sha256:fd665ad3d5ebecebfb33574fa926a32025d7264c25992599a5ca47a85bb51c4a",
     "tests/unit/network/failed-connections-settle-and-recover.test.ts": "sha256:044ba7bbf7c75d3d01f530cae360170ff16373cc066f455ff4bff7ee7496dc4d",
@@ -411,8 +411,8 @@
     "public/sounds/contour-lock-acquired.m4a": "sha256:928afee6bf5a0bff7da80205e8a473dd811b1a16ff7e56f67a18897e4cff6c6e",
     "public/sounds/contour-lock-released.m4a": "sha256:83b3338feda3cb161d923470ec09b7a0139c4665b821aa1adbdb324e1f85bd67",
     "src/components/GameDocument.astro": "sha256:df0a02598078551d8e1d54b056e0bf5017d8fa27dc1ab8262a8d7b5b5ce03aa9",
-    "src/components/game/GameOverlay.svelte": "sha256:0cc1e00c923ce84a5c95bbb0576b4e676ccca32d8eab74757cb74ff3f1e83450",
-    "src/components/game/GameShell.svelte": "sha256:b9d634879389f2374d4a7d1c211b79a67dc4d5ab66287036a862aec9660e0146",
+    "src/components/game/GameOverlay.svelte": "sha256:ad2eb07bba13999a7612c37f07d5b20237720c6411b9e41d1aca5874f02ef66b",
+    "src/components/game/GameShell.svelte": "sha256:3882e0297aa9554b8ff93f9dd18f11db938a99fd72e74d5f358a8af953b4711b",
     "src/components/game/InventoryPanel.svelte": "sha256:784caec9a55d8f03bffcd63e2890b0133c7088f563d0c35fc76b4f4b7c206fec",
     "src/components/game/Preferences.svelte": "sha256:df781e7ca2cd79c303154149ccfd20589d8b700057080a7111cc4ba8365c6993",
     "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
@@ -448,13 +448,13 @@
     "src/runtime/uiTypes.ts": "sha256:3881aa8111c22bce128ac943f28f947375a6617dde0b013e7c45e3938058050d",
     "src/components/game/ActionControls.svelte": "sha256:932ef522d07044422346af064eb6de62ef50ea115d049fc82828b2011ecedcb1",
     "src/components/game/CopyControl.svelte": "sha256:f371385a8a0b9b76ad1fa5030e9a5d8f42c15757669525824f1dc7baff1b0c83",
-    "src/components/game/DebugPanel.svelte": "sha256:2c095596ce13d4ebb8b1af83f332ec5e74d0a932dd3a9e552c51855a6dd21d89",
+    "src/components/game/DebugPanel.svelte": "sha256:e6bdf100f5e47d5e7e3e285cbd7d13c907870117f0f6a83677d8be0785b66eb5",
     "src/components/game/FieldHints.svelte": "sha256:0e5c04183edf7d65d25b249646dfa4ad9bc18c98831bbb59363f0d004075d609",
     "src/components/game/FurnaceTravelMap.svelte": "sha256:be236cc2753114ec1cf8293d5250cb85ca61a92f1ed821dbb46d2d3fa2fde2aa",
     "src/components/game/PhoneCollector.svelte": "sha256:296e6787bf691061acec4175523e857af29bc6c732fcec0ea911dd591daa4879",
     "src/components/game/UniverseMap.svelte": "sha256:3345bef54807c88dde95b36965515c2dc7902900370c52e17a922ada27852682",
-    "src/runtime/debugPresentation.ts": "sha256:b33432018ec394f18bf6954135f0bd36a490b0a18226d7c401362f4f87b0fe6a",
-    "tests/unit/components/debug-controls.test.ts": "sha256:9cf7e86d6e94783684a533dc62eca0f50c21aa54cd2d36e6ffcca67398e0d505",
+    "src/runtime/debugPresentation.ts": "sha256:dab7edeac2cb307c71060a19ba13c62e710331cb9f8e6ff292867307d189f189",
+    "tests/unit/components/debug-controls.test.ts": "sha256:72710435fff8c415dcbc5b6b09df7fa97d7bb9c2eddf63a35d6ab7beb199c7db",
     "shared/shipUtilities.ts": "sha256:856565c7cd9efe53477f84fa86f503e60764ff6de547f3e4826ed871d79d2b5b",
     "src/components/ui/table/table-body.svelte": "sha256:09b78e9184fe01f58dd7266b3be1ef5769a780fb6b7132d08123fc1469cf1ca2",
     "src/components/ui/table/table-caption.svelte": "sha256:6248005e803c6adafca297f1e4f1c0d89791d9a991497aef8065d252995eece3",
@@ -548,11 +548,11 @@
     "tests/unit/rendering/ship-light-casts-wreck-shadows-and-colors-speed.test.ts": "sha256:1476e3dfe24147762c632608e10347e74d8177d018ac1d2803d2d1acc1071474",
     "src/components/UpdateNotice.svelte": "sha256:5b84008e476dfc180e1c0afda269f8b208e057cdad614c71f393a2d88a0b3328",
     "shared/debugReports.ts": "sha256:18361ef763d8deb776023942bbe320da2f46ad0573d942276512607bcf1485db",
-    "src/components/game/DebugReportForm.svelte": "sha256:8fba14fdd7e9dea0eb196b6e10c07256a16b9f8eb7cfa89aab17e418b82d8614",
+    "src/components/game/DebugReportForm.svelte": "sha256:e4c36e2e7a3d9d15e5b7c30e188e566b4acd0f7a29613c1a68b1b7d81f10a9f1",
     "src/diagnostics/debugReportClient.ts": "sha256:a5c9ad047183d75781c8be22a4ed1cf89f61752df49ddeb8a36385cdda11d398",
     "src/diagnostics/debugReportStorage.ts": "sha256:21114a7c8b67da1165bfaf33b2f5ee53c353efd3ea80bedbbfc1f9b9aacb212d",
     "scripts/build-vercel-output.mjs": "sha256:084559299214645fac9f3d1c0300cf5d2445ba6cf4f5cc30c5f6755b3e5d65f3",
-    "server/createServer.ts": "sha256:de76d0c6bbd6ed8857b11bc9157d3ecba631dc9cd4e234c0c480f9cf19557c29",
+    "server/createServer.ts": "sha256:7499d6311193e05d8e0d91b5cdb332edbb49f19efc4dcec08d7b6a5603f6798e",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
     "config/app/astro.ts": "sha256:cce6892ee22a630ddcdadd2a7a2ccea02d748361f883224a85686bdadd574e2b",
     "config/app/svelte.js": "sha256:9f2f3ce97f92d71c67e146ef4f859f1675ef3a536fbcd82b597481b35263d2dd",
@@ -560,7 +560,8 @@
     "config/typescript/frontend.json": "sha256:a5ba9f4bc0471de88c6e709b575d078ce426d9a01b45f4e18fbfe6bca4f02202",
     "config/typescript/project.json": "sha256:cf55dc1b76655c336c420ecb22b1eff078abacd97e6c67182cbc00023e657b61",
     "config/typescript/strict-tsc.json": "sha256:18c63c930c268ca09f4b9fac16bb576022d8ab57acf548e74fcc4c781a67d119",
-    "prettier.config.js": "sha256:7238fe130a57c07819fca4b9f6a546b4332cb8cde41184b3428c8b779823780f"
+    "prettier.config.js": "sha256:7238fe130a57c07819fca4b9f6a546b4332cb8cde41184b3428c8b779823780f",
+    "src/diagnostics/reportInputDiagnostics.ts": "sha256:6dca366e212141f3b034b4f3109625a80f32c916cec4c33c66edde00b1d8518e"
   },
   "reviews": [
     {
@@ -6420,6 +6421,69 @@
         "config/typescript/strict-tsc.json": "field-manual",
         "prettier.config.js": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed exactly ten changed sources for the compact diagnostics toggle and report dialog focus, viewport, gesture and selection handling. Updated diagnostics instructions and confirmed controls and gameplay demonstrations remain unchanged. Six focused test files with 100 cases passed; TypeScript, Astro/Svelte diagnostics, Knip, changed-file Biome and Markdownlint passed. The old selection handler mutation was rejected. Physical Fire/iPhone keyboard behavior and native desktop/mobile browser verification remain pending; this source acceptance does not certify them.",
+      "sources": [
+        "docs/diagnostics.md",
+        "index.css",
+        "src/components/game/DebugPanel.svelte",
+        "src/components/game/DebugReportForm.svelte",
+        "src/components/game/GameOverlay.svelte",
+        "src/components/game/GameShell.svelte",
+        "src/input/playfieldSelection.ts",
+        "src/runtime/debugPresentation.ts",
+        "tests/unit/components/debug-controls.test.ts",
+        "tests/unit/input/playfield-taps-do-not-open-copy-banners.test.ts"
+      ],
+      "topics": ["controls", "hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed same-origin preview report admission and bounded editor-event metadata against the diagnostics article and HUD Wiki. Focused report persistence/origin integration and editor privacy/disposal/component submission tests passed; frontend diagnostics passed. No gameplay demonstration changes.",
+      "sources": [
+        "docs/diagnostics.md",
+        "server/createServer.ts",
+        "src/components/game/DebugReportForm.svelte",
+        "src/diagnostics/reportInputDiagnostics.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "src/diagnostics/reportInputDiagnostics.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed import ordering and explicit block formatting only; report behavior and existing source verification remain unchanged.",
+      "sources": ["src/components/game/DebugReportForm.svelte"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed report receipt transitions against the diagnostics article. Delivered report launchers start a fresh editor; pending and blocked receipts retain recovery, and New report opens a focused editor in place. Focused component coverage passed for these transitions, failed storage resets and shell disposal; gameplay rules and demonstrations are unchanged.",
+      "sources": [
+        "src/components/game/DebugReportForm.svelte",
+        "src/components/game/GameShell.svelte"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the report documentation against the receipt transition implementation and updated the Diagnostics Wiki entry; no gameplay illustrations change.",
+      "sources": ["docs/diagnostics.md"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "After integrating the reviewed configuration migration from main, reviewed explicit nullable boolean comparisons only. Report transitions, controls and demonstrations remain unchanged.",
+      "sources": ["src/components/game/GameShell.svelte"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

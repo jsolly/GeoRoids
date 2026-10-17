@@ -33,7 +33,7 @@ export function createDebugPresentation(changed: () => void) {
   const lifetime = new AbortController();
   let disposed = false;
   let playerId = '';
-  let hidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) === 'true';
+  let hidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) !== 'false';
   let nextSampleAt = 0;
   let metrics = { fps: '—', rtt: '—', snapshot: '—', motion: '—', world: '—', releases: '—' };
   logger.applyConfiguredLogLevel();

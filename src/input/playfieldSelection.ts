@@ -1,7 +1,8 @@
+import { getOpenGameOverlay } from '../runtime/overlayState';
 import { isPlayViewOn } from '../ui/uiUtils';
 
-function isInPlay(): boolean {
-  return isPlayViewOn();
+function isPlayfieldActive(): boolean {
+  return isPlayViewOn() && getOpenGameOverlay() === null;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -15,14 +16,14 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function suppressPlayfieldGesture(ev: Event): void {
-  if (!isInPlay() || isEditableTarget(ev.target) || !ev.cancelable) {
+  if (!isPlayfieldActive() || isEditableTarget(ev.target) || !ev.cancelable) {
     return;
   }
   ev.preventDefault();
 }
 
 function collapsePlayfieldSelection(): void {
-  if (!isInPlay() || typeof document === 'undefined') {
+  if (!isPlayfieldActive() || typeof document === 'undefined') {
     return;
   }
   const selection = document.getSelection();

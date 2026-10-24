@@ -93,7 +93,7 @@
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
     "server/core/AsteroidManager.ts": "sha256:78025c1a549f82c7ec210745b668a85c5241f82f77d591d7057606bdd606c323",
     "server/core/BeltCrawlerManager.ts": "sha256:bcfa5747f3432d2b0769effb71e73fd845aded57db71c115a772be1b6377ab45",
-    "server/core/BotFleet.ts": "sha256:cc8818c7eff9b44c90748c64750e3ebae12665154bd6d410bd6e481bf3586366",
+    "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
@@ -523,7 +523,7 @@
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:e6b50f2bb529ef1436b88e4836829991fd6e7976528a941fb21b65d251d6e841",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
-    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:9781ac2d8e9fa4886e3c237a34ad46a150accad2d00b6895fe294489ec265e29",
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:e1f3b9bdfacf8d81d22ca2ad3b6d9b528ee39dac1e61d99b2c2e62378ed05a63",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:377940687704e60d6cf1a4a04df6cc6216ca6b2944751fbfe4c7d95b40d4c74e",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:7396ba9a8763fd29dc74172de3933d6fd81bd0d3f4708032899a8a6812fea49e",
@@ -7101,6 +7101,16 @@
       "sources": [
         "server/core/BotFleet.ts",
         "shared/aiShips.ts",
+        "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
+      ],
+      "topics": ["combat-survival", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed hull-aware idle loiter targets clamped inside the world by the stopping tolerance. Four edge scenarios through GameEngine reproduced lethal boundary collisions before the fix and now keep workers alive without invulnerability; all 16 bot tests and TypeScript checks pass. Updated teamwork; combat still applies lethal boundary damage and existing demonstrations are unchanged.",
+      "sources": [
+        "server/core/BotFleet.ts",
         "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
       ],
       "topics": ["combat-survival", "teamwork"],

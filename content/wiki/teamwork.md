@@ -20,7 +20,7 @@ Human pilots fly on the same team, with informal duels at the [Ricochet Court](/
 
 ## AI Workers
 
-Green ships named AI Worker collect nearby loose point cargo and return it to a lit furnace, contributing to the shared settlement rather than a pilot's bank. Between jobs they hang back in your general vicinity, giving you room to fly; they leave equipment, silk, and satellites for you, so protect them from [AI Raiders](/wiki/#combat-survival). The world has one worker and one raider while pilots are connected; workers need a lit furnace near the crew to offload.
+Green ships named AI Worker collect nearby loose point cargo and return it to a lit furnace, contributing to the shared settlement rather than a pilot's bank. Between jobs they hang back in your general vicinity with loiter targets safely inside the world boundary; they leave equipment, silk, and satellites for you, so protect them from [AI Raiders](/wiki/#combat-survival). The world has one worker and one raider while pilots are connected; workers need a lit furnace near the crew to offload.
 
 ## Scan, tow, deliver
 

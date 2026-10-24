@@ -61,6 +61,26 @@ function botSpawn(anchor: Position, role: BotRole): Position {
   return position;
 }
 
+function workerLoiterPosition(actor: GameEntity, human: GameEntity): Position {
+  const humanDistance = distance(actor.position, human.position);
+  const angle =
+    humanDistance > 0
+      ? Math.atan2(actor.position.y - human.position.y, actor.position.x - human.position.x)
+      : -actor.angle;
+  const position = {
+    x: human.position.x + Math.cos(angle) * AI_SHIPS.workerLoiterRadius,
+    y: human.position.y + Math.sin(angle) * AI_SHIPS.workerLoiterRadius,
+  };
+  // Leave room for the hull and for stopping anywhere within the loiter tolerance.
+  const limit = WORLD.radius - hullRadiusForKit(actor.kitId) - AI_SHIPS.workerLoiterTolerance;
+  const radius = Math.hypot(position.x, position.y);
+  if (radius > limit) {
+    position.x *= limit / radius;
+    position.y *= limit / radius;
+  }
+  return position;
+}
+
 /** Server-owned decisions; existing engine owners apply physical and economic effects. */
 export class BotFleet {
   private readonly bots = new Map<BotRole, Bot>();
@@ -154,18 +174,10 @@ export class BotFleet {
                   distance(actor.position, candidate.position) <= AI_SHIPS.engagementRadius
               )
             );
-      const humanDistance = distance(actor.position, human.position);
-      const loiterAngle =
-        humanDistance > 0
-          ? Math.atan2(actor.position.y - human.position.y, actor.position.x - human.position.x)
-          : -actor.angle;
       const destination =
         target?.position ??
         (role === 'worker'
-          ? {
-              x: human.position.x + Math.cos(loiterAngle) * AI_SHIPS.workerLoiterRadius,
-              y: human.position.y + Math.sin(loiterAngle) * AI_SHIPS.workerLoiterRadius,
-            }
+          ? workerLoiterPosition(actor, human)
           : inBotSanctuary(human.position)
             ? botSpawn(human.position, role)
             : human.position);

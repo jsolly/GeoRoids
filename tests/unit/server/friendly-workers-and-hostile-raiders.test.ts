@@ -84,6 +84,37 @@ test('one bot of each role moves without becoming a human, stale socket or saved
   expect(engine.hasSavedPilot(worker.id)).toBe(false);
 });
 
+test.each([0, 25])(
+  'an idle worker gives pilots room and catches up without crowding, carrying %i points',
+  (cargo) => {
+    const { pilot, frame, bot } = world();
+    pilot.position = { x: 5000, y: 4000 };
+    const worker = bot('worker');
+    worker.position = { x: 5100, y: 4000 };
+    worker.velocity = { x: 0, y: 0 };
+    worker.angle = 0;
+    worker.cargo = cargo;
+    // Isolate loitering from raider attacks and cargo spills.
+    bot('raider').position = { x: 5000, y: 4500 };
+    bot('raider').respawnTimer = 10_000;
+    const separation = () =>
+      Math.hypot(worker.position.x - pilot.position.x, worker.position.y - pilot.position.y);
+    frame(240);
+    expect(separation()).toBeGreaterThanOrEqual(350);
+    expect(separation()).toBeLessThanOrEqual(550);
+    expect(worker.thrusting).toBe(false);
+    const resting = { ...worker.position };
+    frame(120);
+    expect(worker.position).toEqual(resting);
+    pilot.position.x -= 900;
+    frame(600);
+    expect(separation()).toBeGreaterThanOrEqual(350);
+    expect(separation()).toBeLessThanOrEqual(550);
+    expect(worker.thrusting).toBe(false);
+    expect(worker.cargo).toBe(cargo);
+  }
+);
+
 test('a worker banks recovered points in the shared settlement and leaves equipment for humans', () => {
   const store = new WorldStore(':memory:');
   cleanup.push(() => store.close());

@@ -154,11 +154,21 @@ export class BotFleet {
                   distance(actor.position, candidate.position) <= AI_SHIPS.engagementRadius
               )
             );
+      const humanDistance = distance(actor.position, human.position);
+      const loiterAngle =
+        humanDistance > 0
+          ? Math.atan2(actor.position.y - human.position.y, actor.position.x - human.position.x)
+          : -actor.angle;
       const destination =
         target?.position ??
-        (role === 'raider' && inBotSanctuary(human.position)
-          ? botSpawn(human.position, role)
-          : human.position);
+        (role === 'worker'
+          ? {
+              x: human.position.x + Math.cos(loiterAngle) * AI_SHIPS.workerLoiterRadius,
+              y: human.position.y + Math.sin(loiterAngle) * AI_SHIPS.workerLoiterRadius,
+            }
+          : inBotSanctuary(human.position)
+            ? botSpawn(human.position, role)
+            : human.position);
       const remaining = distance(actor.position, destination);
       const wanted = Math.atan2(
         -(destination.y - actor.position.y),
@@ -182,7 +192,12 @@ export class BotFleet {
       }
       const maxTurn = (SHIP.TURN_SPEED * Math.PI) / 180 / GAME.FPS;
       actor.angle += Math.max(-maxTurn, Math.min(maxTurn, turn));
-      const stoppingDistance = role === 'raider' && target ? 260 : 20;
+      const stoppingDistance =
+        role === 'worker' && !target
+          ? AI_SHIPS.workerLoiterTolerance
+          : role === 'raider' && target
+            ? 260
+            : 20;
       actor.thrusting = remaining > stoppingDistance;
       if (actor.thrusting) {
         const targetVelocity = terrainCruiseVelocity(
@@ -224,16 +239,16 @@ export class BotFleet {
     actor: GameEntity,
     human: GameEntity,
     host: FleetHost
-  ): { position: Position } {
+  ): { position: Position } | undefined {
     if (actor.cargo > 0) {
       const furnace = host.furnaceNear(actor.position);
-      return distance(furnace.position, human.position) < AI_SHIPS.tetherRadius ? furnace : human;
+      return distance(furnace.position, human.position) < AI_SHIPS.tetherRadius
+        ? furnace
+        : undefined;
     }
-    return (
-      nearest(
-        actor.position,
-        host.lootNear(actor.position).filter((loot) => loot.kind === 'points')
-      ) ?? human
+    return nearest(
+      actor.position,
+      host.lootNear(actor.position).filter((loot) => loot.kind === 'points')
     );
   }
 }

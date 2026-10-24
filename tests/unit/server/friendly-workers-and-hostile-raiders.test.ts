@@ -10,8 +10,11 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { AI_SHIPS, inBotSanctuary } from '../../../shared/aiShips';
+import { checkBoundaryCollision } from '../../../shared/boundary';
 import { DAMAGE, GAME, LASER, SHIP } from '../../../shared/constants/gameplay';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { WORLD } from '../../../shared/world';
 import type { BotRole } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -83,6 +86,63 @@ test('one bot of each role moves without becoming a human, stale socket or saved
   expect(engine.getSnapshotState().entities.filter((entry) => entry.botRole)).toHaveLength(2);
   expect(engine.hasSavedPilot(worker.id)).toBe(false);
 });
+
+test.each([0, 25])(
+  'an idle worker gives pilots room and catches up without crowding, carrying %i points',
+  (cargo) => {
+    const { pilot, frame, bot } = world();
+    pilot.position = { x: 5000, y: 4000 };
+    const worker = bot('worker');
+    worker.position = { x: 5100, y: 4000 };
+    worker.velocity = { x: 0, y: 0 };
+    worker.angle = 0;
+    worker.cargo = cargo;
+    // Isolate loitering from raider attacks and cargo spills.
+    bot('raider').position = { x: 5000, y: 4500 };
+    bot('raider').respawnTimer = 10_000;
+    const separation = () =>
+      Math.hypot(worker.position.x - pilot.position.x, worker.position.y - pilot.position.y);
+    frame(240);
+    expect(separation()).toBeGreaterThanOrEqual(350);
+    expect(separation()).toBeLessThanOrEqual(550);
+    expect(worker.thrusting).toBe(false);
+    const resting = { ...worker.position };
+    frame(120);
+    expect(worker.position).toEqual(resting);
+    pilot.position.x -= 900;
+    frame(600);
+    expect(separation()).toBeGreaterThanOrEqual(350);
+    expect(separation()).toBeLessThanOrEqual(550);
+    expect(worker.thrusting).toBe(false);
+    expect(worker.cargo).toBe(cargo);
+  }
+);
+
+test.each([0, Math.PI / 2, Math.PI, -Math.PI / 2])(
+  'an idle worker beside a pilot at the world edge stays alive at bearing %f',
+  (bearing) => {
+    const { pilot, frame, bot } = world();
+    const worker = bot('worker');
+    const atRadius = (radius: number) => ({
+      x: Math.cos(bearing) * radius,
+      y: Math.sin(bearing) * radius,
+    });
+    pilot.position = atRadius(WORLD.radius - 100);
+    worker.position = atRadius(WORLD.radius - 50);
+    worker.velocity = { x: 0, y: 0 };
+    worker.angle = -bearing;
+    delete worker.spawnProtectionTimer;
+    bot('raider').position = atRadius(WORLD.radius - 500);
+    bot('raider').respawnTimer = 10_000;
+    for (let tick = 0; tick < 240; tick++) {
+      frame();
+      expect(worker.health).toBe(worker.maxHealth);
+      expect(worker.exploding).toBe(false);
+      expect(checkBoundaryCollision(worker.position, hullRadiusForKit(worker.kitId))).toBe(false);
+    }
+    expect(worker.thrusting).toBe(false);
+  }
+);
 
 test('a worker banks recovered points in the shared settlement and leaves equipment for humans', () => {
   const store = new WorldStore(':memory:');

@@ -9,6 +9,8 @@ export const AI_SHIPS = {
   sanctuaryRadius: 600,
   tetherRadius: 1_800,
   workRadius: 700,
+  workerLoiterRadius: 450,
+  workerLoiterTolerance: 100,
   avoidRadius: 200,
   engagementRadius: 900,
 } as const;

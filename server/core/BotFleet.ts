@@ -61,6 +61,26 @@ function botSpawn(anchor: Position, role: BotRole): Position {
   return position;
 }
 
+function workerLoiterPosition(actor: GameEntity, human: GameEntity): Position {
+  const humanDistance = distance(actor.position, human.position);
+  const angle =
+    humanDistance > 0
+      ? Math.atan2(actor.position.y - human.position.y, actor.position.x - human.position.x)
+      : -actor.angle;
+  const position = {
+    x: human.position.x + Math.cos(angle) * AI_SHIPS.workerLoiterRadius,
+    y: human.position.y + Math.sin(angle) * AI_SHIPS.workerLoiterRadius,
+  };
+  // Leave room for the hull and for stopping anywhere within the loiter tolerance.
+  const limit = WORLD.radius - hullRadiusForKit(actor.kitId) - AI_SHIPS.workerLoiterTolerance;
+  const radius = Math.hypot(position.x, position.y);
+  if (radius > limit) {
+    position.x *= limit / radius;
+    position.y *= limit / radius;
+  }
+  return position;
+}
+
 /** Server-owned decisions; existing engine owners apply physical and economic effects. */
 export class BotFleet {
   private readonly bots = new Map<BotRole, Bot>();
@@ -156,9 +176,11 @@ export class BotFleet {
             );
       const destination =
         target?.position ??
-        (role === 'raider' && inBotSanctuary(human.position)
-          ? botSpawn(human.position, role)
-          : human.position);
+        (role === 'worker'
+          ? workerLoiterPosition(actor, human)
+          : inBotSanctuary(human.position)
+            ? botSpawn(human.position, role)
+            : human.position);
       const remaining = distance(actor.position, destination);
       const wanted = Math.atan2(
         -(destination.y - actor.position.y),
@@ -182,7 +204,12 @@ export class BotFleet {
       }
       const maxTurn = (SHIP.TURN_SPEED * Math.PI) / 180 / GAME.FPS;
       actor.angle += Math.max(-maxTurn, Math.min(maxTurn, turn));
-      const stoppingDistance = role === 'raider' && target ? 260 : 20;
+      const stoppingDistance =
+        role === 'worker' && !target
+          ? AI_SHIPS.workerLoiterTolerance
+          : role === 'raider' && target
+            ? 260
+            : 20;
       actor.thrusting = remaining > stoppingDistance;
       if (actor.thrusting) {
         const targetVelocity = terrainCruiseVelocity(
@@ -224,16 +251,16 @@ export class BotFleet {
     actor: GameEntity,
     human: GameEntity,
     host: FleetHost
-  ): { position: Position } {
+  ): { position: Position } | undefined {
     if (actor.cargo > 0) {
       const furnace = host.furnaceNear(actor.position);
-      return distance(furnace.position, human.position) < AI_SHIPS.tetherRadius ? furnace : human;
+      return distance(furnace.position, human.position) < AI_SHIPS.tetherRadius
+        ? furnace
+        : undefined;
     }
-    return (
-      nearest(
-        actor.position,
-        host.lootNear(actor.position).filter((loot) => loot.kind === 'points')
-      ) ?? human
+    return nearest(
+      actor.position,
+      host.lootNear(actor.position).filter((loot) => loot.kind === 'points')
     );
   }
 }

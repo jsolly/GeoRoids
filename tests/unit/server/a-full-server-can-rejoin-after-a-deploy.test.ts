@@ -203,6 +203,53 @@ test('a fleet the edge cannot attribute shares the lane rather than one address 
   });
 });
 
+test('pilots sharing one prefix keep an honest first pass before they share a budget', () => {
+  const admission = createConnectionAdmission(false);
+  const now = 6_000_000;
+
+  // Distinct hosts inside one prefix — an ISP block, a campus range, a cloud
+  // subnet. Nothing in an upgrade separates them from one host rotating
+  // addresses inside that prefix, so they share a budget past the ladder.
+  // Charging only past-ladder spend keeps the first pass open for all of them.
+  for (let pilot = 0; pilot < 40; pilot += 1) {
+    expect(admission.admit(`203.0.113.${pilot}`, '/ws', now).accepted).toBe(true);
+  }
+  // Beyond the ladder they draw on the lane's heavy share, which is fleet-sized,
+  // so the prefix is bounded well above what the fleet needs rather than at it.
+  const admitted = WORST_HONEST_UPGRADES_PER_PILOT + GAMEPLAY_LADDER_SHARE;
+  for (let attempt = 40; attempt < admitted; attempt += 1) {
+    expect(admission.admit(`203.0.113.${attempt % 40}`, '/ws', now).accepted).toBe(true);
+  }
+  expect(admission.admit('203.0.113.1', '/ws', now)).toMatchObject({
+    accepted: false,
+    refusedBy: 'reserve',
+    network: '203.0.113.0/24',
+  });
+});
+
+test('a fleet behind one NAT is still bounded by the per-address budget', () => {
+  const admission = createConnectionAdmission(false);
+  const now = 10_000_000;
+
+  // A NAT reaches the edge as one address, so the per-address budget bounds the
+  // whole group — and MAX_PLAYERS is above that budget. Neither the network
+  // keying nor the reserve helps: the prefix of one address is no narrower than
+  // the address, and the per-address budget is read before the reserve. Pinned
+  // so it is not mistaken for something the reserve covers, which is a claim an
+  // earlier revision of this branch made in its own comments.
+  let refused = 0;
+  for (let pilot = 0; pilot < MAX_PLAYERS; pilot += 1) {
+    const decision = admission.admit('198.51.100.7', '/ws', now);
+    if (!decision.accepted) {
+      refused += 1;
+      expect(decision.refusedBy).toBe('client');
+    }
+  }
+  expect(refused).toBe(MAX_PLAYERS - GAMEPLAY_CONNECTIONS_PER_WINDOW);
+  // Unattributable traffic is the case that does degrade to the whole lane.
+  expect(MAX_PLAYERS).toBeGreaterThan(GAMEPLAY_CONNECTIONS_PER_WINDOW);
+});
+
 test('the ceilings cover the fleet retry ladder the client actually uses', () => {
   // The ladder is the client's, so the server restates its length and this
   // pins the two against each other: the server may not import src/.
@@ -220,8 +267,8 @@ test('the ceilings cover the fleet retry ladder the client actually uses', () =>
   // Both halves of the ceiling have to be fleet-sized for the split to help.
   // The reserve has to cover the fleet, or saturating the lane still refuses
   // pilots who have spent nothing; the remaining share has to cover it too, or
-  // a fleet sharing one NAT is locked out once past the ladder, which is the
-  // lockout moved rather than removed.
+  // a fleet spread across one prefix is locked out once past the ladder, which
+  // is the lockout moved rather than removed.
   expect(GAMEPLAY_FLEET_RESERVE).toBeGreaterThanOrEqual(worstHonestFleetDemand);
   expect(GAMEPLAY_LADDER_SHARE).toBeGreaterThanOrEqual(worstHonestFleetDemand);
   expect(LOG_FLEET_RESERVE).toBeGreaterThanOrEqual(MAX_PLAYERS);

@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:80226a4bf5867640b64aedc0f584bd81d1f99b2939b36396dc1d9a154a57309c",
+    "server/communication/connectionAdmission.ts": "sha256:a0481ac0df8acbcaa689cd731d9a30c91b4ab9e72ed0d95fa13d793d2b0b2649",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -573,7 +573,7 @@
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
     "server/communication/clientAddress.ts": "sha256:0f68f179d913880a958e379b19a9f245536ee4f4a6c4a46a0eca6a53ed0e3d0e",
-    "server/communication/clientNetwork.ts": "sha256:b65ef2768e653750d25f125312a7eea1b813880a8eb5037277916798f61c93ad"
+    "server/communication/clientNetwork.ts": "sha256:ed4275cc78601404d8826d132cbea1cb28a39cde01bf0496146757bab3b31625"
   },
   "reviews": [
     {
@@ -7160,6 +7160,19 @@
       "owners": {
         "server/communication/connectionAdmission.ts": "hud-network",
         "server/communication/clientAddress.ts": "hud-network",
+        "server/communication/clientNetwork.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Correction to this branch's own comments, not a behaviour change. The previous note and these files claimed the fleet reserve means 'a fleet entirely behind one NAT still rejoins'. That is false and I verified it against the built module: a NAT reaches the edge as one address, 100 pilots on a single address get 50 refused by the per-address budget, which is read before the reserve, and the prefix of one address is no narrower than the address. What the share actually covers is a fleet of distinct hosts spread across one prefix, which the probe confirms at 0 refused. Comments in clientNetwork.ts and connectionAdmission.ts now say which case each bound covers; a new test pins the one-address limit as a known pre-existing bound so it cannot be mistaken for something the reserve closes, and re-adds the shared-prefix case that was lost when this branch took the base file wholesale during the merge resolution. Re-read hud-network's Connection interruptions and Can't join: unaffected either way, since no documented banner cause, retry window or join capacity changes and the article never described a rate limit. No demonstration cites these sources (checked src/wiki/media.ts). Ran lint, the admission tests (17 passing), and two further mutation checks on the new guards: removing the per-address bound and never enforcing the reserve each fail a named test, and both were reverted.",
+      "sources": [
+        "server/communication/clientNetwork.ts",
+        "server/communication/connectionAdmission.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network",
         "server/communication/clientNetwork.ts": "hud-network"
       }
     }

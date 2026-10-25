@@ -51,9 +51,15 @@ export const LOG_CONNECTIONS_PER_WINDOW_ALL = MAX_PLAYERS * 2;
  * Each ceiling is twice its lane's worst honest demand, so half of it is that
  * demand exactly. Reserving half therefore leaves a half that is also
  * fleet-sized: honest traffic can always spend its worst case whatever a flood
- * is doing, and a fleet sharing one NAT still rejoins once past the ladder,
- * because the remaining share alone covers it. A test pins both halves against
- * that demand rather than against this arithmetic.
+ * is doing, and a fleet spread across one prefix still rejoins once past the
+ * ladder, because the remaining share alone covers it. A test pins both halves
+ * against that demand rather than against this arithmetic.
+ *
+ * It does not help a fleet behind one NAT, which reaches the edge as a single
+ * address: the per-address budget is read before this and refuses the fleet's
+ * excess over it. That bound predates the lane ceiling and is unchanged here;
+ * `a-full-server-can-rejoin-after-a-deploy` pins it so it is not mistaken for
+ * something the reserve covers.
  */
 export const GAMEPLAY_FLEET_RESERVE = GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL / 2;
 export const LOG_FLEET_RESERVE = LOG_CONNECTIONS_PER_WINDOW_ALL / 2;

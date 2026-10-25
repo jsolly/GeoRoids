@@ -87,11 +87,15 @@ export function normalizeClientAddress(value: string): string | null {
  * it nothing and buys a fresh budget every time; /24 is the IPv4 equivalent at
  * a far higher price. Charging the prefix as well makes that rotation finite.
  *
- * Nothing in an upgrade separates pilots genuinely sharing one NAT or campus
- * network from one host rotating addresses inside its prefix, so they share
- * this budget. `connectionAdmission` charges a network only for spend past an
- * honest retry ladder, and sizes that share for a whole fleet, so even a fleet
- * entirely behind one network rejoins.
+ * Nothing in an upgrade separates pilots genuinely sharing a prefix — an ISP
+ * block, a campus range, a cloud subnet — from one host rotating addresses
+ * inside it, so they share this budget. `connectionAdmission` charges a network
+ * only for spend past an honest retry ladder, and sizes that share for a whole
+ * fleet, so a fleet spread across one prefix still rejoins.
+ *
+ * This bounds a prefix, not a single address. A fleet behind one NAT reaches
+ * the edge as one address, where the per-address budget bounds it: that budget
+ * is read first and nothing here changes it.
  */
 export function clientNetwork(address: string): string {
   if (isIPv4(address)) {

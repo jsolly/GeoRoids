@@ -3,7 +3,7 @@ import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
 import { ASTEROID_INTERACTIONS_CAPABILITY, SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
-import { resolveClientAddress } from './communication/clientAddress';
+import { resolveUpgradeAddress } from './communication/clientAddress';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   connectionLimitsDisabled,
@@ -313,26 +313,26 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       }
       // A missing or unparseable `X-Real-IP` falls back to the socket peer rather
       // than refusing: under Railway that is the proxy, so those callers share one
-      // budget — coarse, but the lane ceiling still bounds them, and a pilot is
+      // budget — coarse, but the wider budgets still bound them, and a pilot is
       // never locked out by an ingress change.
-      const clientIp =
-        resolveClientAddress(info.req, railwayIngress) ??
-        info.req.socket.remoteAddress ??
-        'unknown';
+      const clientIp = resolveUpgradeAddress(info.req, railwayIngress);
       const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
           const spend = `${admissionDecision.count}/${admissionDecision.limit}`;
-          // A single flapping address and an exhausted lane read the same to a
-          // client but mean opposite things here: one caller to look at, or the
-          // whole lane saturated, which is load or an address the edge cannot
-          // tell apart. Logging them alike hides the second behind the first.
+          const { lane, network } = admissionDecision;
+          // These read the same to a client and mean different things here: one
+          // flapping caller to look at, a network past an honest retry ladder
+          // held off the fleet's reserve, or the whole lane saturated. Logging
+          // them alike hides the wider ones behind the narrowest.
           logger.warn(
-            admissionDecision.laneExhausted
-              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend}); refused ${clientIp}`
-              : admissionDecision.lane === 'logs'
-                ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
-                : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
+            admissionDecision.refusedBy === 'lane'
+              ? `🚫 ${lane} connection lane exhausted across all addresses (${spend}); refused ${clientIp}`
+              : admissionDecision.refusedBy === 'reserve'
+                ? `🚫 ${lane} network ${network} is past its upgrade share (${spend}); refused ${clientIp} to keep the fleet reserve open`
+                : lane === 'logs'
+                  ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
+                  : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
           );
         }
         done(

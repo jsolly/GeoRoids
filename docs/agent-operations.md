@@ -205,6 +205,30 @@ ignores forwarded address headers. Before release, verify that Railway replaces
 client-supplied `X-Real-IP` values. Do not expose this reporting listener through
 an untrusted internal proxy that can choose that header.
 
+Gameplay admission now rests on the same header: `server/communication/clientAddress.ts`
+resolves it for both the reporting listener and the WebSocket upgrade limiter, so a
+pass-through value would void every per-address upgrade budget at once. Verify it
+without submitting a report, because `clientAddress` runs before the method and
+content-type checks: send a value that cannot parse as an address and read the status.
+
+```sh
+curl -sS -H 'X-Real-IP: not-an-address' \
+  https://georoids-production-2403.up.railway.app/debug-reports
+```
+
+A pass-through answers `503 Reporting ingress address is unavailable`. Anything
+else — `405 Unsupported report method or path` for the request above — means no
+client-chosen value reached the server. Also send the header twice and send it
+empty: an appended value joins into one unparseable string and fails the same way.
+A 405 does not by itself prove the header is trusted, only that a client cannot
+choose it; confirm reporting is configured (`/health` carries `debugReports`)
+so the status is not the unconfigured 503.
+
+Verified 2026-10-25 against the live production ingress at release
+`c487d041d435e37a7171ab4da96656d38f24beaf`: garbage, duplicated, and empty
+`X-Real-IP` values and an `X-Forwarded-For`-only spoof all answered 405, never the
+ingress 503. Railway replaces the header. Re-verify on any ingress or domain change.
+
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
 and a 100 MiB or 200-report pending limit. New acceptance reserves at least
 256 MiB free space for the world database. Full or unavailable storage rejects

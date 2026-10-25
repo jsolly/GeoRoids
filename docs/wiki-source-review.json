@@ -102,8 +102,8 @@
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
     "server/core/LootManager.ts": "sha256:bad0eaa4e555d9853b5054ebc9ec7e32aae26fed2a9d78b902d6c63925568a5e",
-    "server/core/PlayerMotionService.ts": "sha256:cc986967abc3a74d31c22bdd3c22fdfdafc1551d11fbc6b6659a9730d3a58bef",
-    "server/core/RNGService.ts": "sha256:c6a852821c514621ded484d570859144e6b035de82fb74e6e851ef68358f03eb",
+    "server/core/PlayerMotionService.ts": "sha256:eb65d65298ade163a684a41a2d8f3eaca3d7dd6626dcdcd563518d98cb745475",
+    "server/core/RNGService.ts": "sha256:d539b5041594b9e7037d6967a149a42348b47febf3a5275c302e6a34166af582",
     "server/core/RolyPolyManager.ts": "sha256:1564c9b42dbf3091f1ba8cbe90b10f63458a9d3b5e9830b66b46fc733bd05cad",
     "server/core/SatellitePickupManager.ts": "sha256:e44b5e648b8490c81fec961a251ef8f8473d78036331ebdac9acb7ce5c83083a",
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
@@ -7116,6 +7116,15 @@
       "topics": ["combat-survival", "teamwork"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed two dead-code deletions, both provably unreachable, so no player-visible rule can have changed. PlayerMotionService.quit(socket) had zero callers repo-wide; the live leave paths are untouched: transportClosed (wired from createServer.ts:464 and GameStateBroadcaster.ts:687 on socket close), forgetActor, reconnect-grace expiry, and reset. Checked the five mapped articles for a documented quit action that quit() might have been the unwired implementation of, and found none; the controls.md line about leaving the tab or app releasing held controls is client-side control release, not server session teardown. RNGService getState and setState had zero callers; RNG stream position is not persisted and was not persisted before this change. Checked every article for a seed-reproducibility or identical-world-after-restart claim that this could contradict and found none: the teamwork line about the asteroid field surviving restarts is persisted world state, which is saved and restored independently of the RNG stream. No demonstration cites either source. Ran lint, typecheck, knip, ts-prune, 745 unit and component tests across 116 files, and the two directly affected contract suites (check-unused-typescript and gate-contract, 28 tests).",
+      "sources": ["server/core/PlayerMotionService.ts", "server/core/RNGService.ts"],
+      "topics": ["asteroids", "controls", "hud-network", "scout", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "server/core/RNGService.ts": "asteroids"
+      }
     }
   ]
 }

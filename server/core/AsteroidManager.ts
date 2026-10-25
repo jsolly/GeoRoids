@@ -3,6 +3,7 @@ import { tickAsteroidBoost } from '../../shared/asteroidBoost';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { containAsteroidPosition, stepAsteroidMotionInto } from '../../shared/asteroidMotion';
 import { isColossalAsteroid } from '../../shared/asteroidScale';
+import { hostsBeltCrawlers } from '../../shared/beltCrawler';
 import { DAMAGE, GAME, ROID } from '../../shared/constants/gameplay';
 import { stepContourAsteroid } from '../../shared/contourAsteroid';
 
@@ -35,6 +36,12 @@ export class AsteroidManager {
    * until `boostedAsteroids` prunes it, so callers re-check `phase`.
    */
   private readonly boosted = new Set<string>();
+  /**
+   * Ids of rocks the crawler frame must visit, by the same superset rule: a
+   * native belt slot, or a row already carrying crawlers. Membership follows
+   * the rock's id and `beltCrawlerIds`, so motion never changes it.
+   */
+  private readonly crawlerHosts = new Set<string>();
   private rng: RNGService;
   /** Per-manager identity prevents delayed reports surviving a server restart. */
   private readonly managerNonce = randomUUID();
@@ -70,6 +77,11 @@ export class AsteroidManager {
     if (asteroid.boost) {
       this.boosted.add(asteroid.id);
     }
+    // The slot rule reads the id, so it is settled once here rather than
+    // re-derived for every rock on every frame.
+    if (hostsBeltCrawlers(asteroid)) {
+      this.crawlerHosts.add(asteroid.id);
+    }
   }
 
   public removeAsteroid(asteroidId: string): AsteroidData | undefined {
@@ -78,6 +90,7 @@ export class AsteroidManager {
       this.asteroids.delete(asteroidId);
       this.index.remove(asteroidId);
       this.boosted.delete(asteroidId);
+      this.crawlerHosts.delete(asteroidId);
     }
     return asteroid;
   }
@@ -112,6 +125,9 @@ export class AsteroidManager {
       // Position, size or outline may have changed the rock's cells.
       this.index.move(asteroid);
       this.noteBoost(asteroidId);
+      if (hostsBeltCrawlers(asteroid)) {
+        this.crawlerHosts.add(asteroidId);
+      }
     }
     return asteroid;
   }
@@ -132,6 +148,7 @@ export class AsteroidManager {
     this.asteroids.clear();
     this.index.clear();
     this.boosted.clear();
+    this.crawlerHosts.clear();
   }
 
   /**
@@ -165,6 +182,16 @@ export class AsteroidManager {
     }
   }
 
+  /** Every rock a crawler frame must visit, without walking the belt. */
+  public *crawlerHostAsteroids(): IterableIterator<AsteroidData> {
+    for (const id of this.crawlerHosts) {
+      const rock = this.asteroids.get(id);
+      if (rock) {
+        yield rock;
+      }
+    }
+  }
+
   /**
    * Advance every asteroid one simulation frame (same units as client `moveRoids`:
    * velocity is pixels per 60 FPS tick).
@@ -181,6 +208,11 @@ export class AsteroidManager {
       // free: a row armed in place is tracked within one frame of play.
       if (asteroid.boost) {
         this.boosted.add(asteroid.id);
+      }
+      // Same free backstop for crawler rows written in place. Only the cheap
+      // field is read here; the slot regex stays at admission.
+      if (asteroid.beltCrawlerIds !== undefined) {
+        this.crawlerHosts.add(asteroid.id);
       }
       if (!stepContourAsteroid(asteroid)) {
         stepAsteroidMotionInto(

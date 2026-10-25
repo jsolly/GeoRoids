@@ -3,14 +3,14 @@
 The 60 Hz loop owes the awake asteroid belt a fixed number of walks. Two of
 them are structural; everything else must reach its rocks directly.
 
-| Pass | Owner | Why it walks everything |
-| --- | --- | --- |
-| Motion | `AsteroidManager.updateMotion` | Every awake rock steps position, rotation and boost. |
-| Belt crawlers | `BeltCrawlerManager.advance` | Finds hosts carrying crawlers or in a crawler slot. |
+The 60 Hz loop walks the awake asteroid belt exactly once, in
+`AsteroidManager.updateMotion`, because every awake rock steps its position,
+rotation and boost each frame. Nothing else may walk it: every other concern
+is rare enough to reach its own rocks directly.
 
-`tests/unit/server/boosted-cargo-reaches-a-furnace-without-a-second-belt-walk.test.ts`
-counts the walks and the whole-belt copies a frame makes, using
-`tests/support/beltTraversalInstrumentation.ts`. A third full-belt walk in
+`tests/unit/server/the-frame-walks-the-asteroid-belt-once.test.ts` counts the
+walks and the whole-belt copies a frame makes, using
+`tests/support/beltTraversalInstrumentation.ts`. A second full-belt walk in
 `advanceOneFrame`, or any `getAllAsteroids()` call inside it, fails that test.
 
 Note the scope. `AsteroidManager` holds only the rocks in awake sectors, so a
@@ -19,14 +19,13 @@ world; `tests/unit/server/crew-resumes-a-persistent-open-world.test.ts` pins
 that bound. The cost removed below was redundancy on top of a mandatory pass,
 not a walk over the stored world.
 
-## What changed
+## What changed: boosted cargo
 
 `tickAbilities` and `processFurnaceDeliveries` each called
 `AsteroidManager.getAllAsteroids()` — `Array.from(this.asteroids.values())` —
 every frame, then used the copy at one place apiece: a filter for
-`boost.phase === 'armed'` and one for `'burning'`. A frame cost four belt
-walks and two throwaway belt-sized arrays to service a case that is normally
-empty. It now costs two walks and no copies.
+`boost.phase === 'armed'` and one for `'burning'`. A frame cost two belt walks
+and two throwaway belt-sized arrays to service a case that is normally empty.
 
 `AsteroidManager` tracks the ids of rocks carrying a boost and exposes them as
 `boostedAsteroids()`. Both consumers read that instead of the belt.
@@ -57,7 +56,8 @@ entry is a defect, and each way a boost can appear has a home:
 Removals need no announcement: they only make the set a larger superset.
 
 Each of those five points has a mutation check in the guard test; dropping any
-one of them fails it.
+one of them fails it. The crawler set is maintained at the same points, by the
+same rule.
 
 ## Obstacles that shaped this
 
@@ -79,12 +79,32 @@ the spatial index is already maintained. It was rejected because frontier
 furnaces and civic modules accumulate as a world is settled, so the work would
 grow with world progress, and `FurnaceField` exposes no bounded enumeration.
 
-## Known remaining pass
+## What changed: belt crawlers
 
-`BeltCrawlerManager.advance` walks `spatialIndex().values()` every frame, in
-`advanceSpiderField`, to find hosts where `beltCrawlerIds` is set or the
-deterministic belt slot is a multiple of six. Both are knowable at admission,
-so the same tracked-set treatment would fit, with `initializeHost` and crawler
-damage as the announcement points. It is left alone deliberately: it is a
-separate state machine with its own test surface, and the guard above pins it
-at one pass so it cannot grow unnoticed.
+`BeltCrawlerManager.advance` walked `spatialIndex().values()` every frame, in
+`advanceSpiderField`, to find hosts where `beltCrawlerIds` was set or the
+deterministic belt slot was a multiple of six. The caller now selects those
+hosts and passes them in, from a second tracked set on `AsteroidManager`.
+
+Membership follows the rock's id and `beltCrawlerIds`, neither of which motion
+changes, so the set is settled at admission and never re-derived per frame.
+That matters: the slot test is a regex on the id, and running it for every
+awake rock on every frame was part of the cost.
+
+`shared/beltCrawler.ts` now owns the rule as `hostsBeltCrawlers`, with the
+stride named `BELT_CRAWLER.NATIVE_SLOT_STRIDE`. It had been an unnamed `% 6`
+in two places.
+
+The one way a rock becomes a host out of band is a crawler transferring onto
+it — `transfer` calls `initializeHost` on a destination found by a local
+spatial query. That needs no announcement: the transferred body is in
+`this.bodies`, so `advance` visits the caller's candidates **plus the rocks its
+own bodies sit on**. The crawler manager keeps that invariant to itself
+instead of pushing a notification contract onto its caller.
+
+Order is preserved. The set is keyed by id and `Set` iteration follows
+insertion order, which matches the belt map's, and body hosts are appended.
+Appending cannot change which crawlers get created at
+`BELT_CRAWLER.MAX_ACTIVE`, because a transferred crawler already has its body;
+the population limit only gates creating one.
+`campaign-spiders-share-reserved-population.test.ts` covers that limit.

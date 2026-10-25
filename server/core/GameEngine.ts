@@ -1732,6 +1732,7 @@ export class GameEngine {
       ...attacks,
       ...this.beltCrawlers.advance({
         index: this.asteroidManager.spatialIndex(),
+        hosts: this.asteroidManager.crawlerHostAsteroids(),
         players: this.entityManager
           .getAllEntities()
           .filter((entity) => Boolean(entity.ws) || entity.botRole !== undefined)

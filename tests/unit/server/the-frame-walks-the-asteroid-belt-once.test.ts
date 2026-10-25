@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beltAsteroid } from '../../../shared/asteroidBelt';
+import { nativeCrawlerSlot } from '../../../shared/beltCrawler';
 import { TOWN_HEARTH } from '../../../shared/furnaces';
 import type { AsteroidData } from '../../../shared-types';
 import { instrumentBeltTraversals } from '../../support/beltTraversalInstrumentation';
@@ -12,11 +14,11 @@ import {
 useQuietServerConsole();
 
 /**
- * One frame owes the belt a single motion pass, plus the belt crawlers' own
- * pass. Boost work is rare, so it must reach its rocks directly instead of
- * walking the belt again.
+ * One frame owes the belt a single motion pass, for physics. Every other
+ * concern is rare enough to reach its own rocks directly, so a second walk
+ * means something started scanning the belt again.
  */
-const BELT_PASSES_PER_FRAME = 2;
+const BELT_PASSES_PER_FRAME = 1;
 
 function cargo(id: string, position: { x: number; y: number }): AsteroidData {
   return {
@@ -36,7 +38,7 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
   };
 }
 
-describe('Boosted cargo reaches a furnace without walking the belt again', () => {
+describe('A frame walks the asteroid belt once, for physics', () => {
   let world: GameServerWorld;
   let hauler: Pilot;
   let probe: ReturnType<typeof instrumentBeltTraversals>;
@@ -151,6 +153,23 @@ describe('Boosted cargo reaches a furnace without walking the belt again', () =>
 
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
     expect(world.engine.getGameState().settlement.resources.metal).toBeGreaterThan(0);
+  });
+
+  test('a belt crawler advances on its native slot without a belt walk', () => {
+    fillBelt(200);
+    // Slot 0 is a native crawler slot, so this rock is born carrying one.
+    const occupied = beltAsteroid(7, 0, 1);
+    expect(nativeCrawlerSlot(occupied.id)).toBe(true);
+    world.engine.addAsteroid(occupied);
+    world.move(hauler, { ...occupied.position });
+
+    frameCost();
+
+    const crawlers = world.engine
+      .getSpiderField()
+      .spiders.filter((spider) => spider.crawler?.hostId === occupied.id);
+    expect(crawlers).toHaveLength(1);
+    expect(occupied.beltCrawlerIds).toEqual([`belt-crawler:${occupied.id}:0`]);
   });
 
   test('a belt four times larger costs the frame no extra pass', () => {

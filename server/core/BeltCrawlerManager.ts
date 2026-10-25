@@ -1,11 +1,10 @@
-import { beltSlotForAsteroid } from '../../shared/asteroidBelt';
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
 import {
   asteroidPolygonPoints,
   findNearestAsteroidImpact,
   REFLECTION_LIMITS,
 } from '../../shared/asteroidReflection';
-import { BELT_CRAWLER } from '../../shared/beltCrawler';
+import { BELT_CRAWLER, hostsBeltCrawlers, nativeCrawlerSlot } from '../../shared/beltCrawler';
 import type { AsteroidData, Position, TerrainSpider } from '../../shared-types';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { SpiderAttack } from './TerrainSpiderManager';
@@ -20,8 +19,14 @@ interface Actor {
   radius: number;
 }
 interface AdvanceOptions {
-  /** The live rock field: host lookup, host iteration and spatial queries. */
+  /** The live rock field: host lookup and spatial queries. */
   index: AsteroidSpatialIndex;
+  /**
+   * The rocks that may carry crawlers, so the frame never walks the belt to
+   * find them. Extra rows are harmless; the hosts of live bodies are added
+   * below, so a transfer destination needs no announcement.
+   */
+  hosts: Iterable<AsteroidData>;
   players: readonly Actor[];
   nowFrame: number;
 }
@@ -182,7 +187,30 @@ export class BeltCrawlerManager {
     );
   }
 
-  public advance({ index: rockIndex, players, nowFrame }: AdvanceOptions): SpiderAttack[] {
+  /**
+   * The caller's candidates plus the rocks its own bodies sit on, each once
+   * and in the caller's order. A transfer lands a body on a rock the caller
+   * may not count as a host yet, and that body still owes this frame a move.
+   */
+  private hostsToVisit(hosts: Iterable<AsteroidData>): AsteroidData[] {
+    const visiting: AsteroidData[] = [];
+    const seen = new Set<string>();
+    for (const host of hosts) {
+      if (!seen.has(host.id)) {
+        seen.add(host.id);
+        visiting.push(host);
+      }
+    }
+    for (const body of this.bodies.values()) {
+      if (!seen.has(body.host.id)) {
+        seen.add(body.host.id);
+        visiting.push(body.host);
+      }
+    }
+    return visiting;
+  }
+
+  public advance({ index: rockIndex, hosts, players, nowFrame }: AdvanceOptions): SpiderAttack[] {
     this.spatial = rockIndex;
     this.players = players;
     for (const [id, body] of this.bodies) {
@@ -195,9 +223,8 @@ export class BeltCrawlerManager {
       (player) => player.health > 0 && !player.exploding && player.respawnTimer === undefined
     );
     const processed = new Set<string>();
-    for (const host of rockIndex.values()) {
-      const slot = beltSlotForAsteroid(host.id);
-      if (host.health <= 0 || (!host.beltCrawlerIds && (slot === undefined || slot % 6 !== 0))) {
+    for (const host of this.hostsToVisit(hosts)) {
+      if (host.health <= 0 || !hostsBeltCrawlers(host)) {
         continue;
       }
       this.initializeHost(host);
@@ -406,8 +433,7 @@ export class BeltCrawlerManager {
       }
       return;
     }
-    const slot = beltSlotForAsteroid(host.id);
-    const native = slot !== undefined && slot % 6 === 0;
+    const native = nativeCrawlerSlot(host.id);
     const saved = host.beltCrawlerHealth?.[0];
     host.beltCrawlerHealth = native
       ? [saved === undefined ? BELT_CRAWLER.MAX_HEALTH : clamp(saved)]

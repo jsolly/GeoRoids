@@ -3,7 +3,9 @@ import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
 import { SHIP } from '../../../../shared/constants/gameplay';
+import { hullRadiusForKit } from '../../../../shared/shipKits';
 import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../../shared/snapshotProtocol';
+import { WORLD } from '../../../../shared/world';
 import type {
   AsteroidData,
   Position,
@@ -299,12 +301,36 @@ export class GameServerWorld {
     this.core.handleClientMessage(message, pilot.socket);
   }
 
+  /**
+   * Fly the pilot into the arena wall for real: park the hull on the last
+   * position the motion envelope accepts, then report one legal outward step.
+   * The server reads that pose's geometry itself, exactly as it does in play.
+   */
   hitBoundary(pilot: Pilot): void {
+    const actor = this.entity(pilot);
+    const now = this.engine.getServerTime();
+    const edge = { x: WORLD.radius - hullRadiusForKit(actor.kitId), y: 0 };
+    if (!this.engine.playerMotion.placeActorForTesting(pilot.id, edge, now)) {
+      throw new Error(`${pilot.name} has no current motion session`);
+    }
+    const parked = this.entity(pilot);
+    const motion = parked.playerMotion;
+    if (!motion) {
+      throw new Error(`${pilot.name} lost its motion session at the wall`);
+    }
+    const step = this.engine.playerMotion.legalSpeed(parked, now) * 0.9;
     this.send(pilot, {
-      type: 'collisionDamage',
+      type: 'update',
+      id: pilot.id,
       data: {
-        targetPlayerId: pilot.id,
-        attackerId: 'boundary',
+        position: { x: edge.x + step, y: 0 },
+        velocity: { x: step, y: 0 },
+        angle: 0,
+        thrusting: true,
+        // Carry the hold forward: this helper reports flight, not a menu change.
+        overlayHold: parked.overlayHold === true,
+        motionEpoch: motion.epoch,
+        motionSequence: motion.ack + 1,
       },
     });
   }

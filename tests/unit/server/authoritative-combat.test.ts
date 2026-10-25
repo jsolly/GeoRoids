@@ -4,7 +4,9 @@ import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
 import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
+import { hullRadiusForKit } from '../../../shared/shipKits';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { attachTowForScenario } from '../../support/tool-flight';
@@ -316,7 +318,7 @@ describe('server-authoritative combat', () => {
     });
   });
 
-  test('client asteroid, ship-ship, and cross-target boundary reports are ignored', () => {
+  test('every client collision report is inert, including a pilot reporting its own wall hit', () => {
     engine.createAsteroids(0);
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
@@ -351,6 +353,14 @@ describe('server-authoritative combat', () => {
       {
         type: 'collisionDamage',
         data: { targetPlayerId: 'retro', attackerId: 'boundary' },
+      },
+      novaWs
+    );
+    // The self-targeted boundary report used to be an at-will self-destruct.
+    wsCore.handleClientMessage(
+      {
+        type: 'collisionDamage',
+        data: { targetPlayerId: 'nova', attackerId: 'boundary' },
       },
       novaWs
     );
@@ -477,20 +487,78 @@ describe('server-authoritative combat', () => {
     expect(engine.spawnPlayerLaser(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)).toBeNull();
   });
 
-  test('boundary collisionDamage still applies when the reporter is the target', () => {
+  test('a reported pose that touches the wall is read by the server and kills', () => {
+    clearAsteroidField(engine);
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
-    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } });
+    // Last position the motion envelope accepts; one step further touches the wall.
+    const edge = { x: WORLD.radius - hullRadiusForKit('scout'), y: 0 };
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: edge });
     clearProtection(engine, 'nova');
+    const now = engine.getServerTime();
+    assert.ok(engine.playerMotion.placeActorForTesting('nova', edge, now));
+    const parked = engine.getPlayer('nova');
+    assert.ok(parked?.playerMotion);
+    const step = engine.playerMotion.legalSpeed(parked, now) * 0.9;
 
     wsCore.handleClientMessage(
       {
-        type: 'collisionDamage',
-        data: { targetPlayerId: 'nova', attackerId: 'boundary' },
+        type: 'update',
+        id: 'nova',
+        data: {
+          position: { x: edge.x + step, y: 0 },
+          velocity: { x: step, y: 0 },
+          angle: 0,
+          thrusting: true,
+          motionEpoch: parked.playerMotion.epoch,
+          motionSequence: parked.playerMotion.ack + 1,
+        },
       },
       novaWs
     );
 
     expect(engine.getPlayer('nova')?.health).toBe(0);
+    expect(engine.getPlayer('nova')?.exploding).toBe(true);
+    expect(novaWs.lastReceived('playerDamaged')?.data).toMatchObject({
+      targetPlayerId: 'nova',
+      attackerId: 'boundary',
+      isDestroyed: true,
+    });
+  });
+
+  test('a pilot in town cannot claim a wall pose, so the wall is no self-destruct', () => {
+    clearAsteroidField(engine);
+    const wsCore = new WebSocketCore(engine);
+    const novaWs = new RecordingSocket();
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } });
+    clearProtection(engine, 'nova');
+    const now = engine.getServerTime();
+    assert.ok(engine.playerMotion.placeActorForTesting('nova', { x: 0, y: 0 }, now));
+    const parked = engine.getPlayer('nova');
+    assert.ok(parked?.playerMotion);
+
+    // A legal velocity with a wall-side position: unreachable from town, so the
+    // envelope rejects it on displacement and never reads its wall geometry.
+    wsCore.handleClientMessage(
+      {
+        type: 'update',
+        id: 'nova',
+        data: {
+          position: { x: WORLD.radius, y: 0 },
+          velocity: { x: 1, y: 0 },
+          angle: 0,
+          thrusting: true,
+          motionEpoch: parked.playerMotion.epoch,
+          motionSequence: parked.playerMotion.ack + 1,
+        },
+      },
+      novaWs
+    );
+
+    const held = engine.getPlayer('nova');
+    expect(held?.health).toBe(SHIP.MAX_HEALTH);
+    expect(held?.exploding).toBe(false);
+    expect(held?.position).toEqual({ x: 0, y: 0 });
+    expect(novaWs.received('playerDamaged')).toHaveLength(0);
   });
 });

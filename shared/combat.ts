@@ -69,10 +69,6 @@ export function findShipAsteroidOverlaps(
   return hits;
 }
 
-export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
-  return attackerId === 'boundary';
-}
-
 /** World hazards the server may apply to crew hulls. */
 export function isWorldHazard(attackerId: string): boolean {
   return (

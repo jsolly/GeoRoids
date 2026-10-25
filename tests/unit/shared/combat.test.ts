@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
   findShipAsteroidOverlaps,
-  isClientOwnedCollisionAttacker,
   isCombatantImmune,
   isWorldHazard,
   laserDamagesShips,
@@ -50,12 +49,6 @@ describe('shared combat helpers', () => {
       { shipId: 'a', asteroidId: 'r1' },
       { shipId: 'b', asteroidId: 'r1' },
     ]);
-  });
-
-  test('only boundary collisions may be reported by clients', () => {
-    expect(isClientOwnedCollisionAttacker('boundary')).toBe(true);
-    expect(isClientOwnedCollisionAttacker('asteroid')).toBe(false);
-    expect(isClientOwnedCollisionAttacker('ricochet')).toBe(false);
   });
 
   test('world hazards include bounced lasers but not crew pilots', () => {

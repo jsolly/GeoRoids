@@ -1,6 +1,5 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
-import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
@@ -58,7 +57,6 @@ export class MessageHandler {
       [
         'update',
         'shoot',
-        'collisionDamage',
         'useAbility',
         'equipSatellite',
         'setHaulerUtility',
@@ -160,10 +158,6 @@ export class MessageHandler {
         }
         case 'shoot':
           this.handlePlayerShoot(ws, command);
-          break;
-
-        case 'collisionDamage':
-          this.handleCollisionDamage(ws, command);
           break;
 
         case 'ping':
@@ -406,6 +400,7 @@ export class MessageHandler {
       command.motionSequence,
       motionNow
     );
+    this.applyBoundaryContact(id, outcome);
     if (outcome.ok && beforeMode === 'handoff') {
       this.logMotionTransition(
         ws,
@@ -462,10 +457,6 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
-  private getReporterId(ws: WebSocket): string | undefined {
-    return this.gameEngine.getPlayerBySocket(ws)?.id;
-  }
-
   private emitShipDamage(
     targetId: string,
     attackerId: string,
@@ -491,23 +482,21 @@ export class MessageHandler {
     });
   }
 
-  private handleCollisionDamage(ws: WebSocket, command: CommandOf<'collisionDamage'>): void {
-    const { targetPlayerId, attackerId } = command;
-    logger.debug('handleCollisionDamage', { targetPlayerId });
-
-    // Asteroid impacts are resolved by the server. Clients report only their boundary hit.
-    if (!isClientOwnedCollisionAttacker(attackerId)) {
+  /**
+   * The wall is lethal on the server's own geometry, never on a client's claim.
+   * `failedEnvelopeCheck` runs `checkBoundaryCollision` only after the pose
+   * passed its speed and reachable-displacement limits, so this fires for a
+   * pilot who actually flew into the wall and not for one reporting from
+   * anywhere else. Contact kills regardless of remaining hull health; cargo
+   * still absorbs it first inside `handleShipDamage`.
+   */
+  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): void {
+    if (outcome.ok || outcome.envelope?.check !== 'boundary') {
       return;
     }
-
-    const reporterId = this.getReporterId(ws);
-    if (reporterId == null || reporterId === '' || reporterId !== targetPlayerId) {
-      return;
-    }
-
-    const before = this.gameEngine.getPlayer(targetPlayerId);
-    if (before) {
-      this.emitShipDamage(targetPlayerId, 'boundary', before.health, before.health);
+    const struck = this.gameEngine.getPlayer(playerId);
+    if (struck) {
+      this.emitShipDamage(playerId, 'boundary', struck.health, struck.health);
     }
   }
 

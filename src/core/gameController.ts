@@ -470,15 +470,11 @@ export class GameController {
       return;
     }
 
-    // Only check the locally-controlled ship. The network player list holds
-    // server-synced copies (which lag at 30 FPS) rather than the predicted
-    // local ship, and boundary damage is always attributed to the local
-    // player. Remote players self-report.
-    this.collisionManager.checkBoundaryCollisions(
-      [currPlayer.ship],
-      currPlayer.id,
-      currPlayer.cargo
-    );
+    // Only predict for the locally-controlled ship. The network player list
+    // holds server-synced copies (which lag at 30 FPS) rather than the
+    // predicted local ship, and the server kills each pilot from its own
+    // reading of their reported pose.
+    this.collisionManager.checkBoundaryCollisions([currPlayer.ship], currPlayer.cargo);
   }
 
   // Simple render method - no game logic, just rendering

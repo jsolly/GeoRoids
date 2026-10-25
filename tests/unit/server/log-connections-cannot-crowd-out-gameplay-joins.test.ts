@@ -7,22 +7,23 @@ import {
   createConnectionAdmission,
   GAMEPLAY_CONNECTIONS_PER_WINDOW,
   GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
-  GAMEPLAY_FLEET_RESERVE_PER_WINDOW,
-  HONEST_LADDER_UPGRADES_PER_WINDOW,
+  GAMEPLAY_FLEET_RESERVE,
   LOG_CONNECTIONS_PER_WINDOW,
   LOG_CONNECTIONS_PER_WINDOW_ALL,
-  LOG_FLEET_RESERVE_PER_WINDOW,
+  LOG_FLEET_RESERVE,
 } from '../../../server/communication/connectionAdmission';
 
 test('production enables connection budgets and test or development runs leave them off', () => {
   expect(LOG_CONNECTIONS_PER_WINDOW).toBe(6);
   expect(GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(50);
   expect(CONNECTION_ADMISSION_WINDOW_MS).toBe(60_000);
-  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL).toBe(600);
-  expect(LOG_CONNECTIONS_PER_WINDOW_ALL).toBe(60);
-  expect(GAMEPLAY_FLEET_RESERVE_PER_WINDOW).toBe(500);
-  expect(LOG_FLEET_RESERVE_PER_WINDOW).toBe(50);
-  expect(HONEST_LADDER_UPGRADES_PER_WINDOW).toBe(5);
+  // Pinned as literals like their siblings, so a derived ceiling cannot move
+  // both sides of its own sizing assertion. The relationship to the client's
+  // retry ladder is asserted in a-full-server-can-rejoin-after-a-deploy.
+  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL).toBe(1200);
+  expect(LOG_CONNECTIONS_PER_WINDOW_ALL).toBe(200);
+  expect(GAMEPLAY_FLEET_RESERVE).toBe(600);
+  expect(LOG_FLEET_RESERVE).toBe(100);
   expect(connectionLimitsDisabled({ nodeEnv: 'production' })).toBe(false);
   expect(connectionLimitsDisabled({ nodeEnv: 'test', vitest: 'true' })).toBe(true);
   expect(connectionLimitsDisabled({ nodeEnv: 'development' })).toBe(true);

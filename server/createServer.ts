@@ -3,12 +3,13 @@ import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
 import { ASTEROID_INTERACTIONS_CAPABILITY, SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
-import { resolveUpgradeAddress } from './communication/clientAddress';
+import { upgradeChargeAddress } from './communication/clientAddress';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   connectionLimitsDisabled,
   createConnectionAdmission,
   MAX_PLAYERS,
+  UNATTRIBUTED_CLIENT,
 } from './communication/connectionAdmission';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
 import { GameplayMessageBudget } from './communication/messageBudget';
@@ -287,6 +288,19 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     ...(process.env['VITEST'] ? { vitest: process.env['VITEST'] } : {}),
   });
   const admission = createConnectionAdmission(limitsDisabled);
+  // Losing `X-Real-IP` under Railway ingress silently returns every caller to a
+  // shared budget. That needs its own signal rather than being inferred from
+  // refusals, which read identically to one flapping client.
+  let lostAttributionWarnedAt = Number.NEGATIVE_INFINITY;
+  const reportLostAttribution = (now: number): void => {
+    if (now - lostAttributionWarnedAt < CONNECTION_ADMISSION_WINDOW_MS) {
+      return;
+    }
+    lostAttributionWarnedAt = now;
+    logger.warn(
+      '⚠️ X-Real-IP absent or unparseable under Railway ingress; upgrades charged to the shared unattributed budget'
+    );
+  };
   const logQuotaClosed = new WeakSet<WebSocket>();
 
   const wss = new WebSocketServer({
@@ -311,11 +325,15 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         done(false, 426, 'Client update required; refresh GeoRoids');
         return;
       }
-      // A missing or unparseable `X-Real-IP` falls back to the socket peer rather
-      // than refusing: under Railway that is the proxy, so those callers share one
-      // budget — coarse, but the wider budgets still bound them, and a pilot is
-      // never locked out by an ingress change.
-      const clientIp = resolveUpgradeAddress(info.req, railwayIngress);
+      // An upgrade the edge cannot attribute is charged to the shared
+      // unattributed budget, which the lane ceiling bounds. An earlier revision
+      // charged the proxy's own address instead, which put the whole fleet into
+      // one 50-per-window bucket and refused half of it — the lockout this
+      // limiter exists to prevent, reached by losing a header rather than by load.
+      const clientIp = upgradeChargeAddress(info.req, railwayIngress);
+      if (railwayIngress && clientIp === UNATTRIBUTED_CLIENT) {
+        reportLostAttribution(Date.now());
+      }
       const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
@@ -323,11 +341,12 @@ export function createServerInstance(options: CreateServerOptions = {}) {
           const { lane, network } = admissionDecision;
           // These read the same to a client and mean different things here: one
           // flapping caller to look at, a network past an honest retry ladder
-          // held off the fleet's reserve, or the whole lane saturated. Logging
-          // them alike hides the wider ones behind the narrowest.
+          // held off the fleet's reserve, or the whole lane saturated, which is
+          // load or a caller the edge cannot tell apart. Logging them alike
+          // hides the wider ones behind the narrowest.
           logger.warn(
             admissionDecision.refusedBy === 'lane'
-              ? `🚫 ${lane} connection lane exhausted across all addresses (${spend}); refused ${clientIp}`
+              ? `🚫 ${lane} connection lane exhausted across all addresses (${spend})`
               : admissionDecision.refusedBy === 'reserve'
                 ? `🚫 ${lane} network ${network} is past its upgrade share (${spend}); refused ${clientIp} to keep the fleet reserve open`
                 : lane === 'logs'

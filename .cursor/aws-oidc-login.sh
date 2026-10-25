@@ -76,16 +76,33 @@ verify_sha256() {
   [[ "${got%% *}" == "$want" ]]
 }
 
+# The CLI installed here mints this VM's STS credentials, and its installer runs
+# as root, so the bytes are pinned and sha256-checked like every other tool this
+# repository installs; bump the version and both hashes together.
+#
+# What the hashes do and do not buy: AWS publishes no SHA-256 for these bundles,
+# so these were computed in-repo from the bundles AWS served on 2026-10-25. They
+# guarantee every agent session installs identical bytes, and let a bad upstream
+# release be bisected and pinned out. They are not out-of-band tamper evidence.
+# Both arches were byte-identical to the unversioned rolling bundle when pinned,
+# so this changed nothing about what gets installed, only that it stops moving.
+AWS_CLI_VERSION=2.38.5
 install_aws_cli() {
   if command -v aws >/dev/null 2>&1; then
     return 0
   fi
-  log "installing AWS CLI v2"
-  local arch bundle dest
+  log "installing AWS CLI v2 ${AWS_CLI_VERSION}"
+  local arch bundle sha dest
   arch="$(uname -m)"
   case "$arch" in
-    aarch64 | arm64) bundle="awscli-exe-linux-aarch64.zip" ;;
-    x86_64) bundle="awscli-exe-linux-x86_64.zip" ;;
+    aarch64 | arm64)
+      bundle="awscli-exe-linux-aarch64-${AWS_CLI_VERSION}.zip"
+      sha=07711a936e9d271045ab937d2c2c5390c25f419e4ba9e25adb9e996031e3f6be
+      ;;
+    x86_64)
+      bundle="awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip"
+      sha=5def7d1b7e55d892f9a381bb2cb2081a685712464be0d36d5d706af0ac48d0d3
+      ;;
     *)
       log "unsupported arch ${arch}; install aws CLI manually" >&2
       return 1
@@ -93,6 +110,12 @@ install_aws_cli() {
   esac
   dest="$(mktemp -d)"
   fetch "https://awscli.amazonaws.com/${bundle}" "${dest}/awscliv2.zip"
+  if ! verify_sha256 "${dest}/awscliv2.zip" "$sha"; then
+    log "AWS CLI: sha256 mismatch for ${AWS_CLI_VERSION} on ${arch}; refusing to install" >&2
+    log "AWS CLI: re-pin AWS_CLI_VERSION and both hashes, or preinstall aws on the image" >&2
+    rm -rf "$dest"
+    return 1
+  fi
   unzip -q "${dest}/awscliv2.zip" -d "$dest"
   if can_run_as_root; then
     run_as_root "${dest}/aws/install"

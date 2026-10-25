@@ -265,7 +265,7 @@
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:9fb5b20dc29c2d59b54ecd9fed1fc9bb65574e0dde14a0d769d8506d1d731f03",
+    "src/core/gameController.ts": "sha256:7693f63b1c79d217385aebc94dd3bc10e4cfaf4423b2716ce058d533e865d05a",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:a4775c68fcd740081832385689f432dc68dab693f7ef9ee2300b1a9e4341f26c",
@@ -286,7 +286,7 @@
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
     "src/entities/player/playerNetworkPort.ts": "sha256:f1cef578976be6117b2d6503f4e8c4305269d76ae232b61b77c971561a4e623c",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
-    "src/entities/roid/Roid.ts": "sha256:af53d19dcab45b16545e6149d973393dc18e3e910bf673e7ec4e8b032e3fbad6",
+    "src/entities/roid/Roid.ts": "sha256:53e0f642c048db82e278bf40c2e657d4a76624058d345bf1d3b52d1a9d135d35",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
     "src/entities/roid/roidRenderer.ts": "sha256:1719c44c4d9d4cb58132858116350d026870ee40ceab50b54ed68450c1f9eb64",
@@ -7128,6 +7128,13 @@
       "note": "Reviewed the ship-lighting motion-preference hoist: drawShipLighting now reads the reduced-motion preference at most once per frame and passes it to drawEngineLight, instead of each thrusting ship querying matchMedia and allocating a MediaQueryList of its own. Light geometry, colors and the contour-speed boost flag are untouched, and performance.now() is still sampled per ship so flicker phase is unchanged. Checked both mapped articles: asteroids.md 'Shine your headlights or engine light on a hidden phosphorescent crystal' and its charging and afterglow rules, and terrain.md 'Light and wreck shadows' covering headlights illuminating the route, the engine casting blue light that turns violet at contour speed, wrecks interrupting those beams with ghostly shadows, and the light being shared by nearby pilots and charging glowtoys. Both remain accurate and no article text needed changing. Ran wiki:media:check on linux-x64: all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, which covers the demonstrations showing thrusting ships, so no media was regenerated. Ran biome check (958 files, clean) and astro sync plus tsc (clean). Ran 3 rendering test files, 5 cases: the new a-frame-of-thrusting-ships-reads-the-motion-preference-once guard, ship-light-casts-wreck-shadows-and-colors-speed, and ordinary-loot-skips-motion-queries-while-rare-salvage-stays-responsive. The new guard asserts one preference read for four thrusting ships, none when nothing thrusts, a fresh read on the next drawing frame, and that the shared value reaches each light by pinning the flicker to exactly 1 so the reach equals radius times scale times four. It was mutation-checked by restoring the per-ship read, which failed it with four reads instead of one; the defect was removed before committing.",
       "sources": ["src/rendering/shipLighting.ts"],
       "topics": ["asteroids", "terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the belt id index: RoidBelt gained getById backed by a Map that rebuilds whenever the public roids array changes identity or length, and gameController's snapshot-apply and destroy handlers now look rocks up through it instead of scanning the array. Which rocks exist, their material, size, fragmentation, rewards, reflection and regrowth are all untouched; the destroy path still plays the same sound and records the same shatter for the same rock object, and the universe map still reads the same array through bindUniverseMapField. Checked all three mapped articles: asteroids.md material and size rules, 'Mining and score', reflective faces and powered rocks; field-manual.md 'Mine rocks, collect loot, and deliver ore to lit furnaces for score; harvested fields slowly regrow'; and hud-network.md minimap and full chart behavior including the explored-ground tint, fog over uncharted rocks and the Survey Probe marker. All three remain accurate and no article text needed changing. Ran wiki:media:check on linux-x64: all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, so no media was regenerated. Ran biome check (958 files, clean) and astro sync plus tsc (clean). Ran 7 test files, 26 cases, covering the new the-belt-finds-rocks-by-id-after-callers-edit-it guard, asteroids, asteroidFieldSync, hotPathAllocations, pilots-simulate-equally-across-display-rates, simplified-scan-keeps-local-navigation-exact and contour-shots-follow-the-current-pilots. The guard covers every way callers edit the array behind the index: direct push, splice, wholesale replacement with a same-length array, id reuse by a fresh object, truncation via length and regrowth after it. It was mutation-checked with a build-once index that never invalidates, which failed it because a spliced-out rock still resolved; the defect was removed before committing.",
+      "sources": ["src/core/gameController.ts", "src/entities/roid/Roid.ts"],
+      "topics": ["asteroids", "field-manual", "hud-network"],
       "media": [],
       "owners": {}
     }

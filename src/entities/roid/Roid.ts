@@ -99,9 +99,32 @@ class Roid {
 
 class RoidBelt {
   roids: Roid[] = [];
+  private byId = new Map<string, Roid>();
+  private indexedRoids: Roid[] | null = null;
+  private indexedLength = -1;
 
   getRoids(): Roid[] {
     return this.roids;
+  }
+
+  /**
+   * The rock with this id, without scanning the belt.
+   *
+   * Every snapshot reports one row per nearby asteroid, so a linear scan per row
+   * costs the square of the field size on the apply path. `roids` stays a plain
+   * public array that callers may push, splice or replace, so the index rebuilds
+   * whenever that array's identity or length no longer matches what was indexed.
+   */
+  getById(id: string): Roid | undefined {
+    if (this.indexedRoids !== this.roids || this.indexedLength !== this.roids.length) {
+      this.byId.clear();
+      for (const roid of this.roids) {
+        this.byId.set(roid.id, roid);
+      }
+      this.indexedRoids = this.roids;
+      this.indexedLength = this.roids.length;
+    }
+    return this.byId.get(id);
   }
 
   moveRoids(): void {

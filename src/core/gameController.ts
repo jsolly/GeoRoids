@@ -251,7 +251,7 @@ export class GameController {
   };
 
   private applyServerAsteroidUpdated = (asteroidId: string, updates: AsteroidData): void => {
-    const roid = this.currRoidBelt.roids.find((candidate) => candidate.id === asteroidId);
+    const roid = this.currRoidBelt.getById(asteroidId);
     if (roid) {
       applyAsteroidKinematics(roid, updates);
     }
@@ -263,11 +263,7 @@ export class GameController {
   ): void => {
     const { asteroidId } = event;
 
-    const index = this.currRoidBelt.roids.findIndex((r) => r.id === asteroidId);
-    if (index === -1) {
-      return;
-    }
-    const roid = this.currRoidBelt.roids[index];
+    const roid = this.currRoidBelt.getById(asteroidId);
     if (!roid) {
       return;
     }
@@ -279,7 +275,10 @@ export class GameController {
         event.consumedBy === 'furnace' ? 'furnace' : 'break'
       );
     }
-    this.currRoidBelt.roids.splice(index, 1);
+    const index = this.currRoidBelt.roids.indexOf(roid);
+    if (index !== -1) {
+      this.currRoidBelt.roids.splice(index, 1);
+    }
   };
 
   private applyServerAsteroidDestroyed = (event: AsteroidDestroyEvent): void => {

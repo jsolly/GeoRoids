@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:436bf2d0628d9296f6387f2c10952a5bea7cad7394e6b5a4776239531576d6a8",
+    "server/communication/MessageHandler.ts": "sha256:730e084e127700e8542622228bd3c1e1b6b854948d1fb0697fc5a4c5d4465dd4",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:5cd434471089030385b9e3b7c0f93fefffbaa6541fb68de3415c52489891b09a",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -507,7 +507,7 @@
     "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:57a98c39546a62319b123349ecf852e2d3b37ff47607293cd209b5cd0894f8f4",
     "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-cargo-and-bank.test.ts": "sha256:f599eff926157f07fc6ddcb3c0f8300a149656027467471bdbc1b6001424c0ea",
     "tests/unit/server/a-new-utc-month-keeps-the-world-and-scores.test.ts": "sha256:918640016895e0e34ad0fbdefd752cecb09668adc166f3dc0b830af4ebce3460",
-    "tests/unit/server/authoritative-combat.test.ts": "sha256:c2a5569eb422a3a1b034be75da38960e4a113df53e000a31c770f3690b6c02d5",
+    "tests/unit/server/authoritative-combat.test.ts": "sha256:e86658205255ac69c955dbbb0843ace5fea5078039dfb80b6911cd7bbc0fb972",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:e7825cd740c4c87a4de9155c75aafae2484b9d0710da846fee5483dfa0e801ee",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:eebef9e38211a9b82cb133bb3262e04f8de150861269245f3e39db75a0238187",
@@ -7143,6 +7143,16 @@
       "owners": {
         "src/physics/CollisionManager.ts": "terrain"
       }
+    },
+    {
+      "note": "Server-side diagnostics only: a lethal wall contact no longer emits the motion_command_rejected warning, because the pose rejection it reports is ordinary gameplay already recorded as player_died, and it was consuming that warning's throttle window. A survivable wall contact still logs the rejection. No gameplay rule, damage value, broadcast or client behaviour changed. Re-read the citing articles: controls and combat-survival still hold (the world wall still releases Contour Lock even while protected, cargo still spills before hull damage, an empty hold still dies outright at the wall), and hauler cargo collisions, asteroids and teamwork describe rules this does not touch. Also re-read hud-network / Diagnostics, which is not a citing topic here: its promise that position or heading rejections record rail distance, alignment and the acquisition window is contour-specific and unaffected, and boundary rejections never carried those fields. No demonstration is affected and none was regenerated. Verified with a new runtime diagnostics case asserting player_died without motion_command_rejected and then a genuine displacement violation still warning on the same socket, mutation-checked by removing the suppression and by making it blanket.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "tests/unit/server/authoritative-combat.test.ts"
+      ],
+      "topics": ["asteroids", "combat-survival", "controls", "hauler", "teamwork"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

@@ -526,6 +526,67 @@ describe('server-authoritative combat', () => {
     });
   });
 
+  test('a lethal wall contact records the death without spending the rejection warning', () => {
+    clearAsteroidField(engine);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const wsCore = new WebSocketCore(engine);
+    const novaWs = new RecordingSocket();
+    const edge = { x: WORLD.radius - hullRadiusForKit('scout'), y: 0 };
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: edge });
+    clearProtection(engine, 'nova');
+    const now = engine.getServerTime();
+    assert.ok(engine.playerMotion.placeActorForTesting('nova', edge, now));
+    const parked = engine.getPlayer('nova');
+    assert.ok(parked?.playerMotion);
+    const step = engine.playerMotion.legalSpeed(parked, now) * 0.9;
+    const wallPose = {
+      position: { x: edge.x + step, y: 0 },
+      velocity: { x: step, y: 0 },
+      angle: 0,
+      thrusting: true,
+      motionEpoch: parked.playerMotion.epoch,
+      motionSequence: parked.playerMotion.ack + 1,
+    };
+
+    wsCore.handleClientMessage({ type: 'update', id: 'nova', data: wallPose }, novaWs);
+
+    expect(engine.getPlayer('nova')?.health).toBe(0);
+    expect(info.mock.calls.filter(([, event]) => event === 'player_died')).toHaveLength(1);
+    expect(warn.mock.calls.map(([, event]) => event)).not.toContain('motion_command_rejected');
+
+    // Fly again after the ordinary respawn and commit a real envelope
+    // violation. It still reaches the warning channel on the same socket,
+    // proving the wall death neither logged nor spent the shared throttle
+    // window, and that the suppression is specific rather than blanket.
+    for (let frame = 0; frame < SHIP.RESPAWN_DELAY_FRAMES; frame++) {
+      engine.advanceCombatFrame();
+    }
+    const revived = engine.getPlayer('nova');
+    assert.ok(revived?.playerMotion);
+    expect(revived.health).toBe(SHIP.MAX_HEALTH);
+
+    wsCore.handleClientMessage(
+      {
+        type: 'update',
+        id: 'nova',
+        data: {
+          position: { x: 20_000, y: 0 },
+          velocity: { x: 1, y: 0 },
+          angle: 0,
+          thrusting: true,
+          motionEpoch: revived.playerMotion.epoch,
+          motionSequence: revived.playerMotion.ack + 1,
+        },
+      },
+      novaWs
+    );
+
+    const rejections = warn.mock.calls.filter(([, event]) => event === 'motion_command_rejected');
+    expect(rejections).toHaveLength(1);
+    expect(rejections[0]?.[2]).toMatchObject({ envelope: { check: 'displacement' } });
+  });
+
   test('a pilot in town cannot claim a wall pose, so the wall is no self-destruct', () => {
     clearAsteroidField(engine);
     const wsCore = new WebSocketCore(engine);

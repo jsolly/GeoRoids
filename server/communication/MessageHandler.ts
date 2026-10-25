@@ -391,16 +391,21 @@ export class MessageHandler {
       },
       motionNow
     );
-    this.logMotionRejection(
-      ws,
-      'update',
-      outcome,
-      receivedAt,
-      command.motionEpoch,
-      command.motionSequence,
-      motionNow
-    );
-    this.applyBoundaryContact(id, outcome);
+    // A lethal wall contact is ordinary gameplay, already recorded as
+    // `player_died`, so it must not spend the rejection warning's throttle
+    // window: that belongs to real envelope violations. A survivable contact
+    // still logs, being the only record of a pilot pinned against the wall.
+    if (!this.applyBoundaryContact(id, outcome)) {
+      this.logMotionRejection(
+        ws,
+        'update',
+        outcome,
+        receivedAt,
+        command.motionEpoch,
+        command.motionSequence,
+        motionNow
+      );
+    }
     if (outcome.ok && beforeMode === 'handoff') {
       this.logMotionTransition(
         ws,
@@ -457,19 +462,20 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
+  /** Returns true when the hit destroyed the target. */
   private emitShipDamage(
     targetId: string,
     attackerId: string,
     damage: number,
     healthBefore: number | undefined
-  ): void {
+  ): boolean {
     const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
     if (!outcome.applied || !outcome.entity) {
-      return;
+      return false;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
     if (!outcome.isDestroyed && !healthDropped) {
-      return;
+      return false;
     }
     this.broadcaster.broadcastCombatResult({
       targetId,
@@ -480,6 +486,7 @@ export class MessageHandler {
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
+    return outcome.isDestroyed;
   }
 
   /**
@@ -488,16 +495,15 @@ export class MessageHandler {
    * passed its speed and reachable-displacement limits, so this fires for a
    * pilot who actually flew into the wall and not for one reporting from
    * anywhere else. Contact kills regardless of remaining hull health; cargo
-   * still absorbs it first inside `handleShipDamage`.
+   * still absorbs it first inside `handleShipDamage`. Returns true when the
+   * contact destroyed the hull.
    */
-  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): void {
+  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): boolean {
     if (outcome.ok || outcome.envelope?.check !== 'boundary') {
-      return;
+      return false;
     }
     const struck = this.gameEngine.getPlayer(playerId);
-    if (struck) {
-      this.emitShipDamage(playerId, 'boundary', struck.health, struck.health);
-    }
+    return struck ? this.emitShipDamage(playerId, 'boundary', struck.health, struck.health) : false;
   }
 
   private handleSetHaulerUtility(ws: WebSocket, command: CommandOf<'setHaulerUtility'>): void {

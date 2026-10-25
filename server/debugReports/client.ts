@@ -12,6 +12,24 @@ export const MAX_WORKER_RESTARTS = 3;
 const REQUEST_DEADLINE_MS = 10_000;
 
 /**
+ * How long a replacement waits for the thread it replaces to release the
+ * database. Short, because the request that triggered the restart is waiting on
+ * it, and a thread that will not stop is already the corrupt-store case.
+ */
+const WORKER_RETIRE_DEADLINE_MS = 2_000;
+
+/**
+ * How long one fault episode may go unrecorded. Identity alone bounds nothing:
+ * a store that alternates between failing and answering opens a new episode on
+ * every flap, which is one record per delivery tick -- the flood the collapsing
+ * exists to prevent, with a recovery line added between each pair.
+ */
+const FAULT_LOG_INTERVAL_MS = 900_000;
+
+/** How long a store must answer without faulting before an episode is over. */
+const FAULT_QUIET_MS = 60_000;
+
+/**
  * The queue before anything has measured it. Null is not zero: a fresh process
  * and a store that failed to answer both have an unknown depth, and publishing
  * zero would tell an operator the queue is drained.
@@ -26,6 +44,9 @@ const UNMEASURED_QUEUE: QueueDiagnostics = {
   oldestPendingAt: null,
   lastError: null,
 };
+
+/** How a fault episode ended, so one message carries every case. */
+type EpisodeOutcome = 'recovered' | 'cause-changed' | 'worker-failed' | 'closed';
 
 /**
  * Why reporting stopped. The player-facing message follows from the cause
@@ -96,23 +117,32 @@ export class DebugReportWorker {
   private generation = 0;
   private closing: Promise<void> | undefined;
   /** The fault being suppressed, so a broken store logs once rather than hourly. */
-  private faultEpisode: { detail: string; suppressed: number } | undefined;
-  private stats: QueueDiagnostics = UNMEASURED_QUEUE;
+  private faultEpisode:
+    | { detail: string; suppressed: number; lastLoggedAt: number; lastFaultAt: number }
+    | undefined;
+  // Copied, not aliased: this field is replaced rather than written through,
+  // but sharing the module constant makes one future in-place write corrupt
+  // the value every other reset reads from.
+  private stats: QueueDiagnostics = { ...UNMEASURED_QUEUE };
   constructor(private readonly config: DebugReportConfiguration) {
     this.worker = this.spawn();
   }
 
   private spawn(): Worker {
-    // Only the live thread's events describe live state. A replaced worker
-    // still emits `exit` after its own fault, and without this its successor
-    // would be marked failed and the request that restarted it rejected.
-    const generation = ++this.generation;
-    const live = (): boolean => this.generation === generation;
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
       name: 'debug-reports',
       workerData: this.config,
       execArgv: ['--import', 'tsx'],
     });
+    // Only the live thread's events describe live state. A replaced worker
+    // still emits `exit` after its own fault, and without this its successor
+    // would be marked failed and the request that restarted it rejected.
+    //
+    // Claimed after construction, not before: `new Worker` can throw, and
+    // advancing the generation first would leave the thread that is still
+    // running with every one of its events discarded.
+    const generation = ++this.generation;
+    const live = (): boolean => this.generation === generation;
     worker.on('message', (reply: ReportWorkerReply) => {
       if (live()) {
         this.receive(reply);
@@ -140,14 +170,29 @@ export class DebugReportWorker {
    * while the refusal told the player to retry later. A later request now gets
    * a fresh worker, a bounded number of times — enough that a transient SQLite
    * stall recovers, few enough that a corrupt store cannot spin.
+   *
+   * The outgoing thread has to be gone first. `DebugReportStore` is documented
+   * as the only connection to its database and opens with no busy timeout, so
+   * its bootstrap `exec` takes a write lock and throws rather than waiting. On
+   * the one path that leaves a thread alive — the request deadline, which is
+   * exactly what this recovery exists for — spawning straight away raced the
+   * dying thread for that lock: the replacement died on arrival, the report
+   * that triggered the restart was refused, and an attempt was spent without
+   * the store ever being reopened. Three of those closed reporting for the
+   * process, which is the outcome the restart was added to prevent.
    */
-  private restart(): void {
+  private async restart(): Promise<void> {
     this.restarts += 1;
     logger.warn('DEBUG_REPORTS', 'Restarting the debug report worker', {
       attempt: this.restarts,
       of: MAX_WORKER_RESTARTS,
     });
+    await this.retire(this.worker);
     this.failed = false;
+    // A replacement inherits no fault episode. Carrying one over suppressed the
+    // new thread's first storage failure as a repeat of the old thread's, so a
+    // restart that failed for the same reason read as one that worked.
+    this.faultEpisode = undefined;
     // The depth is unknown until the new thread measures it, but the failure
     // that forced this restart still happened and is still the most recent
     // thing known about the subsystem. Clearing it would undo the guard in
@@ -155,6 +200,25 @@ export class DebugReportWorker {
     // erased; the new thread's first measured reply replaces it.
     this.stats = { ...UNMEASURED_QUEUE, lastError: this.stats.lastError };
     this.worker = this.spawn();
+  }
+
+  /** Waits for a thread to stop holding the database, bounded so a wedged one cannot block a request forever. */
+  private retire(worker: Worker): Promise<void> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(deadline);
+        resolve();
+      };
+      const deadline = setTimeout(finish, WORKER_RETIRE_DEADLINE_MS);
+      deadline.unref();
+      worker.once('exit', finish);
+      void worker.terminate();
+    });
   }
   enqueue(body: string, address: string, health: DebugJsonValue): Promise<DebugReportReceipt> {
     return this.request({ type: 'enqueue', requestId: ++this.nextId, body, address, health }).then(
@@ -174,8 +238,14 @@ export class DebugReportWorker {
   }
   private request(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
     if (this.failed && this.closing === undefined && this.restarts < MAX_WORKER_RESTARTS) {
-      this.restart();
+      // The replacement cannot open the store until the outgoing thread lets
+      // go of it, so this request waits for the handover rather than racing it.
+      return this.restart().then(() => this.send(request));
     }
+    return this.send(request);
+  }
+
+  private send(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
     if (this.failed || this.closing !== undefined) {
       return Promise.reject(
         new DebugReportError(503, 'Debug report storage is unavailable. Keep your local copy.')
@@ -206,11 +276,22 @@ export class DebugReportWorker {
       if (!this.failed) {
         this.stats = reply.diagnostics;
       }
-      // A measured depth proves the store answered, so any fault episode has
-      // ended. The fault's own companion reply carries null counts, so it
-      // cannot end the episode it just opened.
       if (reply.diagnostics.pending !== null) {
-        this.endFaultEpisode();
+        // A measured depth proves the store answered, which is the one signal
+        // that a replacement actually works. Counting restarts for the life of
+        // the process instead meant three stalls days apart, each of which
+        // recovered fully, closed reporting permanently. A corrupt store never
+        // produces a measured reply, so the anti-spin half of the bound holds.
+        this.restarts = 0;
+        // It does not prove an episode is over, though. A store alternating
+        // between failing and answering produces one of these between every
+        // two faults, and closing the episode on the first reopened a new one
+        // on the next fault -- per-second logging again, now with a recovery
+        // line between each pair. Wait for the store to actually go quiet.
+        const episode = this.faultEpisode;
+        if (episode && Date.now() - episode.lastFaultAt >= FAULT_QUIET_MS) {
+          this.endFaultEpisode('recovered');
+        }
       }
       return;
     }
@@ -246,29 +327,47 @@ export class DebugReportWorker {
    * costs one line, plus one when its cause changes or it ends.
    */
   private recordFault(detail: string): void {
+    const now = Date.now();
     const episode = this.faultEpisode;
-    if (episode?.detail === detail) {
+    if (episode === undefined) {
+      this.faultEpisode = { detail, suppressed: 0, lastLoggedAt: now, lastFaultAt: now };
+      // The detail travels as structured context, like the sibling call in
+      // `fail()`, rather than interpolated into the message, so a stack cannot
+      // break the message's own bounding.
+      logger.error('DEBUG_REPORTS', 'Debug report storage failed', { detail });
+      return;
+    }
+    episode.detail = detail;
+    episode.lastFaultAt = now;
+    if (now - episode.lastLoggedAt < FAULT_LOG_INTERVAL_MS) {
       episode.suppressed += 1;
       return;
     }
-    if (episode) {
-      this.endFaultEpisode();
-    }
-    this.faultEpisode = { detail, suppressed: 0 };
-    // The detail travels as structured context, like the sibling call in
-    // `fail()`, rather than interpolated into the message, so a stack cannot
-    // break the message's own bounding.
-    logger.error('DEBUG_REPORTS', 'Debug report storage failed', { detail });
+    // Still failing a quarter of an hour on. One more record, carrying what was
+    // suppressed, so a long outage leaves a trail without flooding.
+    logger.error('DEBUG_REPORTS', 'Debug report storage still failing', {
+      detail,
+      suppressedSince: episode.suppressed,
+    });
+    episode.suppressed = 0;
+    episode.lastLoggedAt = now;
   }
 
-  private endFaultEpisode(): void {
+  /**
+   * The suppressed count is the only record of how long an episode ran, so it
+   * has to survive every way an episode can end -- including the worker dying
+   * mid-episode, which is the sequence an operator most wants to read and the
+   * one that used to drop the number entirely.
+   */
+  private endFaultEpisode(outcome: EpisodeOutcome): void {
     const episode = this.faultEpisode;
     if (!episode) {
       return;
     }
     this.faultEpisode = undefined;
-    logger.warn('DEBUG_REPORTS', 'Debug report storage stopped faulting', {
+    logger.warn('DEBUG_REPORTS', 'Debug report storage fault episode ended', {
       suppressedFaults: episode.suppressed,
+      outcome,
     });
   }
 
@@ -294,6 +393,9 @@ export class DebugReportWorker {
       return;
     }
     this.failed = true;
+    // Flushed before the failure record, so the count reads in order ahead of
+    // the cause rather than being abandoned with the episode.
+    this.endFaultEpisode(cause.kind === 'close' ? 'closed' : 'worker-failed');
     if (cause.kind === 'close') {
       this.stats = { ...this.stats, lastError: message };
     } else {

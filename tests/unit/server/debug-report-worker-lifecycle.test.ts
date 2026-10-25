@@ -3,9 +3,10 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, it as test } from 'vitest';
+import { afterEach, expect, it as test, vi } from 'vitest';
 import { DebugReportWorker } from '../../../server/debugReports/client';
 import { readDebugReportConfiguration } from '../../../server/debugReports/configuration';
+import { logger } from '../../../setup/serverLogger';
 import type { DebugReportSubmission } from '../../../shared-types';
 
 const directories: string[] = [];
@@ -187,4 +188,82 @@ test('an unmeasured report queue reads as unknown rather than drained', () => {
   expect(depth.pending).toBeNull();
   expect(depth.blocked).toBeNull();
   expect(depth.lastError).toBeNull();
+});
+
+test('a store that fails after opening publishes an unknown depth and names the cause', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-report-full-'));
+  directories.push(directory);
+  const faults = vi.spyOn(logger, 'error');
+  try {
+    // A full database is a documented production condition -- "Full or
+    // unavailable storage rejects new reports explicitly", and the store has a
+    // real `databaseBytes` limit -- so this drives the one shape no other case
+    // here reaches: a store that opened, answered, and then started failing.
+    // That is the only path into the worker's delivery-tick catch, which is
+    // what produces the fail-closed signal. Without it, reverting that reply to
+    // `pending: 0, blocked: 0` or deleting the fault reply outright failed no
+    // test anywhere, because every other case supplies its own diagnostics.
+    //
+    // A page-count ceiling is why this is deterministic. Corrupting the file
+    // instead left it to SQLite's cache whether the next read noticed, which
+    // failed three runs in five.
+    const worker = new DebugReportWorker({
+      path: join(directory, 'inbox.sqlite'),
+      token: '',
+      projectId: 'project-full',
+      sectionId: 'section-full',
+      limits: { databaseBytes: 64 * 1024 },
+    });
+    workers.push(worker);
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const report: DebugReportSubmission = {
+        version: 1,
+        id: randomUUID(),
+        receiptToken: randomBytes(32).toString('hex'),
+        description: 'x'.repeat(2000),
+        submittedAt: '2026-10-15T12:00:00.000Z',
+        diagnostics: {
+          state: {
+            version: 1,
+            capturedAt: '2026-10-15T12:00:00.000Z',
+            sessionId: 'full-store-session',
+            connected: false,
+          },
+          recentLogs: [],
+        },
+      };
+      // The store refuses once it is full, which is the documented behaviour
+      // and not what this case is about.
+      await worker.enqueue(JSON.stringify(report), 'address', {}).catch(() => undefined);
+    }
+
+    await vi.waitFor(
+      () => {
+        expect(worker.diagnostics().pending).toBeNull();
+      },
+      { timeout: 10_000 }
+    );
+    const failing = worker.diagnostics();
+    // Null, not zero. Zero is what a regression publishes for a queue nothing
+    // has counted, and `/health` would read as drained.
+    expect(failing.blocked).toBeNull();
+    // `/health` is unauthenticated, so the published string stays generic and
+    // carries no path or stack.
+    expect(failing.lastError).toBe('Debug report storage is unavailable.');
+
+    // The cause does reach the game thread's log, where an operator can read
+    // it. Deleting the worker's fault reply would leave the outage with no
+    // recorded cause at all.
+    expect(faults).toHaveBeenCalledWith(
+      'DEBUG_REPORTS',
+      'Debug report storage failed',
+      // A stack naming the store, not an errno string: which store call trips
+      // first depends on SQLite, but the frame is the actionable part and is
+      // what distinguishes this from the generic message on `/health`.
+      expect.objectContaining({ detail: expect.stringContaining('DebugReportStore') })
+    );
+  } finally {
+    faults.mockRestore();
+  }
 });

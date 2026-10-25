@@ -44,7 +44,15 @@ vi.mock('node:worker_threads', () => ({
     }
     terminate(): Promise<number> {
       this.thread.terminated += 1;
-      return Promise.resolve(0);
+      // Node raises `exit` once a terminated thread is gone, and that is the
+      // signal the restart handover waits for. A fake that never emitted it
+      // would let a missing handover pass.
+      queueMicrotask(() => {
+        for (const handler of this.thread.listeners.get('exit') ?? []) {
+          (handler as (code: unknown) => void)(1);
+        }
+      });
+      return Promise.resolve(1);
     }
   },
 }));
@@ -93,6 +101,14 @@ function emit(index: number, event: string, value: unknown): void {
 function deliver(index: number, reply: ReportWorkerReply): void {
   emit(index, 'message', reply);
 }
+/** When two records must read in order, an absent call is the failure, not a skip. */
+function callOrder(mock: { mock: { invocationCallOrder: number[] } }, index: number): number {
+  const at = mock.mock.invocationCallOrder[index];
+  if (at === undefined) {
+    throw new Error(`Expected a logged record at index ${index}, but none was emitted.`);
+  }
+  return at;
+}
 
 test('a storage fault stays visible when the thread reports counts measured before it', () => {
   const worker = new DebugReportWorker(CONFIG);
@@ -121,9 +137,18 @@ test('a faulted thread is replaced for a later report, a bounded number of times
   for (let attempt = 1; attempt <= MAX_WORKER_RESTARTS; attempt += 1) {
     emit(attempt - 1, 'error', new Error('SQLITE_IOERR: disk I/O error'));
     const accepted = worker.enqueue(BODY, 'address', {});
-    // Without the replacement the report has nowhere to go: the request is
-    // posted to the new thread, and the dead one is never written to again.
-    expect(threads.spawned).toHaveLength(attempt + 1);
+
+    // The replacement must not exist yet. `DebugReportStore` is the only
+    // connection to its database and opens with no busy timeout, so spawning
+    // before the outgoing thread lets go raced it for the write lock and the
+    // replacement died on arrival.
+    expect(threads.spawned).toHaveLength(attempt);
+    expect(thread(attempt - 1).terminated).toBe(1);
+
+    await vi.waitFor(() => {
+      expect(threads.spawned).toHaveLength(attempt + 1);
+    });
+    // Only then does the report go anywhere, and only to the new thread.
     expect(thread(attempt).sent).toEqual([
       { type: 'enqueue', requestId: attempt, body: BODY, address: 'address', health: {} },
     ]);
@@ -143,7 +168,9 @@ test('a replaced thread exiting does not close the reporter that succeeded it', 
   const worker = new DebugReportWorker(CONFIG);
   emit(0, 'error', new Error('SQLITE_BUSY: database is locked'));
   const accepted = worker.enqueue(BODY, 'address', {});
-  expect(threads.spawned).toHaveLength(2);
+  await vi.waitFor(() => {
+    expect(threads.spawned).toHaveLength(2);
+  });
 
   // A faulted thread, and one the request timeout terminates, both end with an
   // `exit` that can land after the request already replaced it. Attributing
@@ -249,44 +276,113 @@ test('a request that outlives its deadline reports the timeout once, not two oth
   }
 });
 
-test('a store that keeps faulting is logged once an episode, not once a second', () => {
-  const worker = new DebugReportWorker(CONFIG);
-  const detail = 'Error: SQLITE_IOERR: disk I/O error\n    at DebugReportStore.next';
+test('a store that keeps failing is logged on a clock, not once per delivery tick', () => {
+  vi.useFakeTimers();
+  try {
+    const worker = new DebugReportWorker(CONFIG);
+    const detail = 'Error: SQLITE_IOERR: disk I/O error\n    at DebugReportStore.next';
+    // The published depth is not what this case is about, but it must stay
+    // unknown throughout: a suppressed fault is still a fault.
+    const unknownThroughout = (): void => {
+      expect(worker.diagnostics().pending).toBeNull();
+    };
 
-  // The worker's delivery interval faults every second for as long as the store
-  // stays broken. One ERROR per tick wrote ~86,400 stack traces a day, rotated
-  // away every other diagnostic from the same incident, and pushed the log
-  // writer into dropping other components' records.
-  for (let tick = 0; tick < 600; tick += 1) {
+    // The worker's delivery interval faults every second for as long as the
+    // store stays broken. One ERROR per tick wrote ~86,400 stack traces a day,
+    // rotated away every other diagnostic from the same incident, and pushed
+    // the log writer into dropping other components' records.
+    for (let tick = 0; tick < 600; tick += 1) {
+      deliver(0, { type: 'fault', detail });
+      vi.advanceTimersByTime(1_000);
+    }
+    expect(serverLogging.error).toHaveBeenCalledTimes(1);
+    expect(serverLogging.error).toHaveBeenCalledWith(
+      'DEBUG_REPORTS',
+      'Debug report storage failed',
+      { detail }
+    );
+    unknownThroughout();
+
+    // A different cause inside the window is still suppressed. Keying the
+    // episode on fault identity alone bounded nothing: a store whose error
+    // text varies -- or which alternates between two causes -- opened a fresh
+    // episode every tick and logged every one of them.
+    deliver(0, { type: 'fault', detail: 'Error: SQLITE_FULL: database or disk is full' });
+    expect(serverLogging.error).toHaveBeenCalledTimes(1);
+
+    // Still failing a quarter of an hour on earns exactly one more record,
+    // carrying the count it stood in for, so a long outage leaves a trail.
+    vi.advanceTimersByTime(900_000);
     deliver(0, { type: 'fault', detail });
-    deliver(0, {
-      type: 'diagnostics',
-      diagnostics: {
-        pending: null,
-        blocked: null,
-        oldestPendingAt: null,
-        lastError: 'Debug report storage is unavailable.',
-      },
-    });
+    expect(serverLogging.error).toHaveBeenCalledTimes(2);
+    expect(serverLogging.error).toHaveBeenLastCalledWith(
+      'DEBUG_REPORTS',
+      'Debug report storage still failing',
+      // 599 of the identical ticks plus the one whose cause differed; the
+      // first was logged rather than suppressed.
+      { detail, suppressedSince: 600 }
+    );
+  } finally {
+    vi.useRealTimers();
   }
-  expect(serverLogging.error).toHaveBeenCalledTimes(1);
-  expect(serverLogging.error).toHaveBeenCalledWith('DEBUG_REPORTS', 'Debug report storage failed', {
-    detail,
-  });
+});
 
-  // A different cause is a different episode, so a changing fault is not lost
-  // behind the first one.
-  deliver(0, { type: 'fault', detail: 'Error: SQLITE_FULL: database or disk is full' });
-  expect(serverLogging.error).toHaveBeenCalledTimes(2);
+test('a flapping store neither re-logs each fault nor claims recovery between them', () => {
+  vi.useFakeTimers();
+  try {
+    const worker = new DebugReportWorker(CONFIG);
+    const detail = 'Error: SQLITE_BUSY: database is locked';
 
-  // Recovery is one line carrying what was suppressed, so the volume is
-  // recoverable from the log even though the records are not.
-  deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
-  expect(serverLogging.warn).toHaveBeenCalledWith(
-    'DEBUG_REPORTS',
-    'Debug report storage stopped faulting',
-    { suppressedFaults: 0 }
-  );
+    // The case identity-keyed collapsing missed entirely: a store that
+    // alternates between failing and answering. Every measured reply used to
+    // close the episode and every following fault opened a new one, so the
+    // per-second flood came straight back -- now with a recovery line between
+    // each pair, so the log also read as repeated recovery.
+    for (let flap = 0; flap < 300; flap += 1) {
+      deliver(0, { type: 'fault', detail });
+      deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+      vi.advanceTimersByTime(1_000);
+    }
+    expect(serverLogging.error).toHaveBeenCalledTimes(1);
+    expect(serverLogging.warn).not.toHaveBeenCalled();
+
+    // The episode closes only once the store has actually gone quiet.
+    vi.advanceTimersByTime(60_000);
+    deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+    expect(serverLogging.warn).toHaveBeenCalledWith(
+      'DEBUG_REPORTS',
+      'Debug report storage fault episode ended',
+      { suppressedFaults: 299, outcome: 'recovered' }
+    );
+    expect(worker.diagnostics()).toEqual(MEASURED);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('a replacement that proves it works restores the restart budget', async () => {
+  const worker = new DebugReportWorker(CONFIG);
+
+  // Three stalls days apart, each fully recovered, used to exhaust a
+  // process-lifetime budget and close reporting permanently on a healthy
+  // store. A measured depth is the one signal that proves a replacement
+  // works, and a corrupt store never produces one, so resetting on it keeps
+  // the anti-spin half of the bound intact.
+  for (let incident = 1; incident <= MAX_WORKER_RESTARTS + 2; incident += 1) {
+    emit(threads.spawned.length - 1, 'error', new Error('SQLITE_IOERR: disk I/O error'));
+    const accepted = worker.enqueue(BODY, 'address', {});
+    await vi.waitFor(() => {
+      expect(threads.spawned).toHaveLength(incident + 1);
+    });
+    const live = threads.spawned.length - 1;
+    deliver(live, { type: 'result', requestId: incident, receipt: RECEIPT });
+    await expect(accepted).resolves.toEqual(RECEIPT);
+    // Proof of life: the store answered with a real depth.
+    deliver(live, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+  }
+
+  // Five recovered incidents, more than the bound, and reporting is still open.
+  expect(threads.spawned).toHaveLength(MAX_WORKER_RESTARTS + 3);
   expect(worker.diagnostics()).toEqual(MEASURED);
 });
 
@@ -308,5 +404,36 @@ test('a storage fault detail never reaches the public health surface', () => {
   // to reach the log instead.
   expect(serverLogging.error).toHaveBeenCalledWith('DEBUG_REPORTS', 'Debug report storage failed', {
     detail: secret,
+  });
+});
+
+test('a worker that dies mid-episode still reports how many faults it suppressed', () => {
+  const worker = new DebugReportWorker(CONFIG);
+  const detail = 'Error: SQLITE_IOERR: disk I/O error';
+
+  for (let tick = 0; tick < 12; tick += 1) {
+    deliver(0, { type: 'fault', detail });
+  }
+  expect(serverLogging.error).toHaveBeenCalledTimes(1);
+
+  // The count is the only record of how long the episode ran. Abandoning the
+  // episode here loses it on exactly the sequence worth reading: a store starts
+  // failing, faults repeatedly, and then takes the worker down.
+  emit(0, 'error', new Error('SQLITE_CANTOPEN: unable to open database file'));
+
+  expect(serverLogging.warn).toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    'Debug report storage fault episode ended',
+    { suppressedFaults: 11, outcome: 'worker-failed' }
+  );
+  // And it reads in order: the count before the cause that ended it.
+  expect(callOrder(serverLogging.warn, 0)).toBeLessThan(callOrder(serverLogging.error, 1));
+
+  // The fatal cause still lands, and the depth it leaves behind is unknown.
+  expect(worker.diagnostics()).toEqual({
+    pending: null,
+    blocked: null,
+    oldestPendingAt: null,
+    lastError: WORKER_UNAVAILABLE,
   });
 });

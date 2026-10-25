@@ -91,13 +91,13 @@
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
-    "server/core/AsteroidManager.ts": "sha256:78025c1a549f82c7ec210745b668a85c5241f82f77d591d7057606bdd606c323",
+    "server/core/AsteroidManager.ts": "sha256:9427b28d5843a33b76d19a84ce8239850f41c1b469a0279de15952ffd6149d78",
     "server/core/BeltCrawlerManager.ts": "sha256:bcfa5747f3432d2b0769effb71e73fd845aded57db71c115a772be1b6377ab45",
     "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
-    "server/core/GameEngine.ts": "sha256:837f5ea6a91d746aa7dc34dd7b1b6cb3081368c5c0970d0885a340515960d583",
+    "server/core/GameEngine.ts": "sha256:4e74b850856a99d789f2000f3388fae03454e6992514efd07049e43c57036039",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -7115,6 +7115,25 @@
       ],
       "topics": ["combat-survival", "teamwork"],
       "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Routed the per-frame armed-boost and burning-boost loops onto a tracked boosted-rock set in AsteroidManager instead of two whole-belt copies; no player-visible rule changed. Re-read Hauler 'Boost Coupling E' and 'Reach and release', Asteroids colossal/powered-cargo/ore prose, Teamwork 'Scan, tow, deliver', Scout probe limits on powered rocks, Controls E behavior, and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, and equal credit for launchers and recorded scanning pilots all still hold. Field manual, combat and survival, terrain and satellites prose is untouched by the change. Ran the complete unit suite, static checks and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": ["server/core/AsteroidManager.ts", "server/core/GameEngine.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
       "owners": {}
     }
   ]

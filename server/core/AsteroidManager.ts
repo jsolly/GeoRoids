@@ -29,6 +29,12 @@ export type AsteroidHitOutcome =
 export class AsteroidManager {
   private asteroids = new Map<string, AsteroidData>();
   private readonly index = new AsteroidSpatialIndex([]);
+  /**
+   * Ids of rocks carrying a boost, so the frame reaches a rare case without
+   * walking the belt. Held as a superset: a boost cleared in place lingers
+   * until `boostedAsteroids` prunes it, so callers re-check `phase`.
+   */
+  private readonly boosted = new Set<string>();
   private rng: RNGService;
   /** Per-manager identity prevents delayed reports surviving a server restart. */
   private readonly managerNonce = randomUUID();
@@ -60,6 +66,10 @@ export class AsteroidManager {
   public addAsteroid(asteroid: AsteroidData): void {
     this.asteroids.set(asteroid.id, asteroid);
     this.index.add(asteroid);
+    // A saved world, a supply shipment or a split can arrive mid-burn.
+    if (asteroid.boost) {
+      this.boosted.add(asteroid.id);
+    }
   }
 
   public removeAsteroid(asteroidId: string): AsteroidData | undefined {
@@ -67,6 +77,7 @@ export class AsteroidManager {
     if (asteroid) {
       this.asteroids.delete(asteroidId);
       this.index.remove(asteroidId);
+      this.boosted.delete(asteroidId);
     }
     return asteroid;
   }
@@ -100,6 +111,7 @@ export class AsteroidManager {
       Object.assign(asteroid, updates);
       // Position, size or outline may have changed the rock's cells.
       this.index.move(asteroid);
+      this.noteBoost(asteroidId);
     }
     return asteroid;
   }
@@ -119,6 +131,38 @@ export class AsteroidManager {
   public clearAsteroids(): void {
     this.asteroids.clear();
     this.index.clear();
+    this.boosted.clear();
+  }
+
+  /**
+   * Note a boost written straight onto a live row, the way `refile` notes
+   * geometry written in place. `shared/shipAbilities.ts` arms and ignites a
+   * rock it reaches as a plain body, so its caller tells the manager.
+   */
+  public noteBoost(asteroidId: string): void {
+    if (this.asteroids.get(asteroidId)?.boost) {
+      this.boosted.add(asteroidId);
+    } else {
+      this.boosted.delete(asteroidId);
+    }
+  }
+
+  /**
+   * Every rock carrying a boost, without walking the belt. Yields a snapshot,
+   * because callers deliver cargo and so remove rows while reading.
+   */
+  public *boostedAsteroids(): IterableIterator<AsteroidData> {
+    if (this.boosted.size === 0) {
+      return;
+    }
+    for (const id of [...this.boosted]) {
+      const rock = this.asteroids.get(id);
+      if (!rock?.boost) {
+        this.boosted.delete(id);
+        continue;
+      }
+      yield rock;
+    }
   }
 
   /**
@@ -133,6 +177,11 @@ export class AsteroidManager {
         ? { ...asteroid.position, rotation: asteroid.rotation }
         : undefined;
       tickAsteroidBoost(asteroid, asteroid.size, this.furnaces);
+      // The pass already touches every boost, so it backstops the set for
+      // free: a row armed in place is tracked within one frame of play.
+      if (asteroid.boost) {
+        this.boosted.add(asteroid.id);
+      }
       if (!stepContourAsteroid(asteroid)) {
         stepAsteroidMotionInto(
           asteroid.position,

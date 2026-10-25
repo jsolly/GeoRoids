@@ -3443,6 +3443,13 @@ export class GameEngine {
     };
     const priorTargetId = entity.harpoonTargetId;
     const activation = activateAbilityOnHost(entity, world);
+    // Arming and ignition write `boost` straight onto the row, so the manager
+    // hears about both the rock just latched and the one left burning.
+    for (const id of [priorTargetId, entity.harpoonTargetId]) {
+      if (id != null && id !== '') {
+        this.asteroidManager.noteBoost(id);
+      }
+    }
     if (
       activation.activated &&
       entity.harpoonTargetId != null &&
@@ -3899,7 +3906,6 @@ export class GameEngine {
 
   public tickAbilities(): void {
     this.entityManager.tickAbilityState();
-    const rocks = this.getAllAsteroids();
     const towCrew = new Map<string, number>();
     for (const actor of this.entityManager.getAllEntities()) {
       if (
@@ -3992,7 +3998,7 @@ export class GameEngine {
         }
       }
     }
-    for (const rock of rocks) {
+    for (const rock of this.asteroidManager.boostedAsteroids()) {
       if (rock.boost?.phase !== 'armed') {
         continue;
       }
@@ -4118,7 +4124,7 @@ export class GameEngine {
         deliveries.push(this.deliverAsteroid(rock, furnace, this.towCrewOf(rock.id)));
       }
     }
-    for (const rock of this.getAllAsteroids()) {
+    for (const rock of this.asteroidManager.boostedAsteroids()) {
       if (rock.health <= 0 || rock.boost?.phase !== 'burning') {
         continue;
       }

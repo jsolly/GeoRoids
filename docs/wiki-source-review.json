@@ -156,7 +156,7 @@
     "shared/eoSatellites.ts": "sha256:198c46704cc1dddeca402c1bfae14d8fa3ad5329d7a7d9d7b413b65d197be9b6",
     "shared/epochField.ts": "sha256:ef83f6258bc1f007c5e5525f0186facd8087b3457ac2304aa3702426f86ee85e",
     "shared/equipment.ts": "sha256:6c1876f3ce3f3c58bb5a391448893eaeb8646e61ae4378c75a6d7823de11bb1f",
-    "shared/exploration.ts": "sha256:7d5c3c0b6673360fc25f4b3f26f605eca1b701540fc5a70e10fb484e553d1e05",
+    "shared/exploration.ts": "sha256:cec0dc7f0f1e52ae486776d2f5937fb108e2511bb85da12393483058db57edfd",
     "shared/frontier.ts": "sha256:e335478d49629e1cd48c8b00a1a4d0cc050891c55ff371b40ae58cf185bfd52a",
     "shared/furnaceField.ts": "sha256:0001eca8e7c86c20d6124be8d4a24c29a97be32d1409a82da058aeaccd1491f8",
     "shared/furnaceTravel.ts": "sha256:aaf873234df6c5ff4e9524edf4f3ed7d42aa3990685e4499662141f75ed09fb7",
@@ -7115,6 +7115,13 @@
       ],
       "topics": ["combat-survival", "teamwork"],
       "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the ExplorationMap re-encode deferral: reveal marks the encoded tile cache stale and snapshot encodes on demand, rather than rebuilding the whole tile array inside the 60 Hz tick. Revealed cells, tile ids, byte/bit layout and snapshot contents are unchanged, so no player-facing rule moved. Checked all four mapped articles: scout.md pulse range and 'Scout reveals more of the shared chart as it flies than Hauler'; teamwork.md per-pilot crew-map reveal and exploration surviving server restarts; hud-network.md explored-ground pale blue tint versus dark fog hiding uncharted rocks and loot; field-manual.md 'Choose Scout to explore with Mineral Scan' and 'one crew, one chart, and a persistent world'. All four remain accurate and no article text needed changing. Inspected the scout demonstration poster: it shows the Mineral Scan pulse circle, the ice/metal/rubble classification marks and shared crew visibility of those marks, none of which read the exploration tile cache, so the demonstration depicts no changed behavior. Ran wiki:media:check on linux-x64 and all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, so no GIF was regenerated. Ran biome check (957 files, clean) and astro sync plus tsc (clean). Ran 5 gameplay test files, 12 cases: the new revealing-ground-keeps-the-map-re-encode-out-of-the-frame guard, radar-reuses-decoded-exploration-without-changing-membership, scouts-reveal-more-shared-map-than-haulers, explored-world-keeps-the-simulation-frame-off-the-database and crew-maps-revealed-landmarks-beyond-local-snapshots. The guard was mutation-checked by restoring the eager encode, which failed it with five re-encodes across five reveals; the defect was removed before committing.",
+      "sources": ["shared/exploration.ts"],
+      "topics": ["field-manual", "hud-network", "scout", "teamwork"],
+      "media": ["scout"],
       "owners": {}
     }
   ]

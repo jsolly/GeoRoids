@@ -5,6 +5,9 @@ import type { DebugJsonValue, DebugReportReceipt } from '../../shared-types';
 import type { DebugReportConfiguration } from './configuration';
 import type { QueueDiagnostics } from './store';
 
+/** Enough for a transient stall to recover; few enough that a corrupt store cannot spin. */
+export const MAX_WORKER_RESTARTS = 3;
+
 export class DebugReportError extends Error {
   constructor(
     readonly status: number,
@@ -32,10 +35,14 @@ interface PendingOperation {
 
 /** No SQLite, credential-bearing HTTP, parsing, or diagnostic redaction runs on the game thread. */
 export class DebugReportWorker {
-  private readonly worker: Worker;
+  // Not readonly: a bounded restart replaces it after a fault.
+  private worker: Worker;
   private readonly pending = new Map<number, PendingOperation>();
   private nextId = 0;
   private failed = false;
+  private restarts = 0;
+  /** Identifies the live thread so a replaced one's late events are ignored. */
+  private generation = 0;
   private closing: Promise<void> | undefined;
   // Unknown until the worker first reports: a fresh process has not measured
   // the queue, and zero here would read as an empty one.
@@ -45,24 +52,58 @@ export class DebugReportWorker {
     oldestPendingAt: null,
     lastError: null,
   };
-  constructor(config: DebugReportConfiguration) {
-    this.worker = new Worker(new URL('./worker.ts', import.meta.url), {
+  constructor(private readonly config: DebugReportConfiguration) {
+    this.worker = this.spawn();
+  }
+
+  private spawn(): Worker {
+    // Only the live thread's events describe live state. A replaced worker
+    // still emits `exit` after its own fault, and without this its successor
+    // would be marked failed and the request that restarted it rejected.
+    const generation = ++this.generation;
+    const live = (): boolean => this.generation === generation;
+    const worker = new Worker(new URL('./worker.ts', import.meta.url), {
       name: 'debug-reports',
-      workerData: config,
+      workerData: this.config,
       execArgv: ['--import', 'tsx'],
     });
-    this.worker.on('message', (reply: ReportWorkerReply) => this.receive(reply));
+    worker.on('message', (reply: ReportWorkerReply) => {
+      if (live()) {
+        this.receive(reply);
+      }
+    });
     // The errno is the whole diagnostic for this worker: it loads `tsx` and
     // opens SQLite on the mounted volume, so SQLITE_CANTOPEN or EACCES is what
     // an operator needs. Discarding the argument threw exactly that away.
-    this.worker.on('error', (error: Error) =>
-      this.fail('Debug report worker is unavailable. Keep your local copy.', { error })
-    );
-    this.worker.on('exit', (code: number) => {
-      if (!this.closing) {
+    worker.on('error', (error: Error) => {
+      if (live()) {
+        this.fail('Debug report worker is unavailable. Keep your local copy.', { error });
+      }
+    });
+    worker.on('exit', (code: number) => {
+      if (live() && !this.closing) {
         this.fail('Debug report worker stopped. Keep your local copy.', { exitCode: code });
       }
     });
+    return worker;
+  }
+
+  /**
+   * A fault used to be terminal: nothing cleared `failed` and nothing replaced
+   * the worker, so one ten-second stall ended reporting until the process did,
+   * while the refusal told the player to retry later. A later request now gets
+   * a fresh worker, a bounded number of times — enough that a transient SQLite
+   * stall recovers, few enough that a corrupt store cannot spin.
+   */
+  private restart(): void {
+    this.restarts += 1;
+    logger.warn('DEBUG_REPORTS', 'Restarting the debug report worker', {
+      attempt: this.restarts,
+      of: MAX_WORKER_RESTARTS,
+    });
+    this.failed = false;
+    this.stats = { pending: null, blocked: null, oldestPendingAt: null, lastError: null };
+    this.worker = this.spawn();
   }
   enqueue(body: string, address: string, health: DebugJsonValue): Promise<DebugReportReceipt> {
     return this.request({ type: 'enqueue', requestId: ++this.nextId, body, address, health }).then(
@@ -81,6 +122,9 @@ export class DebugReportWorker {
     return { ...this.stats };
   }
   private request(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
+    if (this.failed && this.closing === undefined && this.restarts < MAX_WORKER_RESTARTS) {
+      this.restart();
+    }
     if (this.failed || this.closing !== undefined) {
       return Promise.reject(
         new DebugReportError(503, 'Debug report storage is unavailable. Keep your local copy.')
@@ -103,7 +147,14 @@ export class DebugReportWorker {
   }
   private receive(reply: ReportWorkerReply): void {
     if (reply.type === 'diagnostics') {
-      this.stats = reply.diagnostics;
+      // A recorded failure outranks the worker's own counts. `fail()` owns
+      // `lastError`, and for a fault it has already marked the depth unknown;
+      // a diagnostics reply still in flight carries counts measured before
+      // that failure, so letting it through would erase the record and leave
+      // `/health` reading clean while every submission answers 503.
+      if (!this.failed) {
+        this.stats = reply.diagnostics;
+      }
       return;
     }
     if (reply.type === 'fault') {
@@ -136,10 +187,12 @@ export class DebugReportWorker {
    */
   private fail(message: string, fault?: { error?: Error; exitCode?: number }): void {
     this.failed = true;
-    this.stats.lastError = message;
+    // Replaced rather than written through: `this.stats` can be the diagnostics
+    // message the thread last sent, and a failure must not reach back into it.
+    this.stats = fault
+      ? { pending: null, blocked: null, oldestPendingAt: null, lastError: message }
+      : { ...this.stats, lastError: message };
     if (fault) {
-      this.stats.pending = null;
-      this.stats.blocked = null;
       logger.error(
         'DEBUG_REPORTS',
         fault.exitCode === undefined

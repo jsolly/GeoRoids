@@ -620,6 +620,14 @@ export class MessageHandler {
       }
 
       if (hit.outcome !== 'destroyed') {
+        // A durable deposit survived the chip, so only its hit is audible;
+        // 'missing' and 'ignored' never applied and stay silent.
+        if (hit.outcome === 'damaged' && hit.origin !== undefined) {
+          this.broadcaster.broadcastAsteroidHit({
+            asteroidId: hit.asteroidId,
+            position: hit.origin,
+          });
+        }
         continue;
       }
 

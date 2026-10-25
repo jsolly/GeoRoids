@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
+    "server/communication/MessageHandler.ts": "sha256:aee55604c23e544d6cce3739453b10df85dd85fd4dded224d14ab384d28e9597",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -114,7 +114,7 @@
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
     "server/createServer.ts": "sha256:7499d6311193e05d8e0d91b5cdb332edbb49f19efc4dcec08d7b6a5603f6798e",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
-    "server/services/GameStateBroadcaster.ts": "sha256:0c641a5bea815370730c133c704525bc9376e542aefdb0b96223033b6c0468ea",
+    "server/services/GameStateBroadcaster.ts": "sha256:49a9a597bc70c6d2998090366bdd1712adde2d09b8643eab7171243d978dce3e",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
     "server/world/AsteroidSpatialIndex.ts": "sha256:9c30d118e9b5ccc0dac6028970483d4a5f6ad5d13145daec2d0de01ea2744260",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
@@ -131,7 +131,7 @@
     "server/world/worldPersistence.ts": "sha256:0846eb3503a381325733e295f7541760baf03c5d7cf1b9e64db2248c1bfba38c",
     "server/world/worldStoreWorker.ts": "sha256:10691d33041b176ff3a78464a58eab107990ac70f38339cadf521524748cc2c7",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:88d2be9701f0d600bdb35c04c70ce7a113f87adf270f5998113ec063c1ba90d8",
-    "shared-types.ts": "sha256:6fd31f27252d7c06f49c65badd1293258332ee85b4729d6a9e4abe2e9567484c",
+    "shared-types.ts": "sha256:290e3ae00d218cde18adcb8d4e4ed27b537dfc4222bbb513f009be4ba2930f09",
     "shared/aiShips.ts": "sha256:9793248321163dbc5cf6475a5e8722a9e5cc73dfdd847bf0a5bd1d6788bff4f3",
     "shared/asteroidBelt.ts": "sha256:94d55e4288a9d968066ac05f666ae0cfe757739166a00ff1dd7a368339378b49",
     "shared/asteroidBoost.ts": "sha256:98594cb2fc30bac61c5a7ce16e9015c9aeb2c5517caa9bbe05711991dbae5b9c",
@@ -203,7 +203,7 @@
     "src/audio/destructionSounds.ts": "sha256:a31ac1a208c41910d198dce4239fb0310577a242e78eb23c6d37e4243f7535f4",
     "src/audio/explosionSound.ts": "sha256:62c0a7c56e833231583255cbbb9177d4a7a9657510963667ae3206eab23834e6",
     "src/audio/feedbackSounds.ts": "sha256:148a4a5f5634e0371def37265b74a37f8039e17bfda7df37d93a041ebee8a072",
-    "src/audio/gameSounds.ts": "sha256:e72ec74f4630b1214f7d18c897b204b3fbad223672b4ec354eb6ae9002971b9a",
+    "src/audio/gameSounds.ts": "sha256:aaa752d7430c861bbe5f2fec294caffdc0b4f7e4ad082e36aca2aa2078d6eec2",
     "src/audio/interactionSounds.ts": "sha256:a48c271d1c16e404bbd0a8069a07275108b4f802df1a5906c220e0545ff6a833",
     "src/audio/musicBeds.ts": "sha256:d25010498827b44f0a43d7bb4fa683dc153d35250db3961b5243b35fa193b98b",
     "src/audio/musicCatalog.ts": "sha256:d6342a645cdb4cd5ed8729edd464cfc915dca4c0606ca75d8d280f5a144f5f43",
@@ -315,7 +315,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
-    "src/network/services/ConnectionManager.ts": "sha256:18bcfcda3ae514abec7ea74c660bbc58356f6329d70330b102e24484e155d216",
+    "src/network/services/ConnectionManager.ts": "sha256:1bee64de5304341a1d7433e8b02c5740f226c38026b8a14248bb3ac4783e3586",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -429,7 +429,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:e27b564d0e73fadbab08d8a701fee096e16f6e1f24dcb91f12ba781689df45ec",
+    "src/wiki/articleSources.json": "sha256:ee768e6c867889c2747f2c279701a0a18faf4461cd6b7ef7b6fff776f0170b48",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:ae5cb90a82273e43481bb0bba1175f53f7c4167084291b6ea969ea13c466e586",
     "src/wiki/media.ts": "sha256:ccea87e637e20748afc3a89b108d426f583e591bcd51700494d7db67bd37937a",
@@ -571,7 +571,8 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb"
+    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:ee4ffa12e69757296b7a9e3edd7b8e8177234456848a1ce52356e70fab78c156"
   },
   "reviews": [
     {
@@ -7151,6 +7152,31 @@
         "src/audio/gameSounds.ts": "hud-network",
         "src/entities/laser/Laser.ts": "combat-survival"
       }
+    },
+    {
+      "note": "Wired the hit SFX that was present but unreachable. A laser chip a durable deposit survives now broadcasts asteroidHit with the rock position, and the client plays the viewport-culled, distance-attenuated hit sound; the server previously dropped every non-destroyed outcome. Ordinary rocks still report asteroidDestroy alone, so a chip and a shatter never sound together, and 'missing' and 'ignored' outcomes stay silent. Documented the player-visible cue as asteroids / Mining sound and recorded it in the audio coverage row; mapped src/audio/gameSounds.ts to hud-network with its audio siblings. No demonstration derives from these files, so the GIFs are untouched. Verified: lint, types, knip, ts-prune, the new broadcast contract (mutation-checked by removing the broadcast), and 1221 unit tests across server, network, audio and entities.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "shared-types.ts",
+        "src/audio/gameSounds.ts",
+        "src/network/services/ConnectionManager.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "controls", "field-manual", "hud-network", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Re-reviewed the chip-cue contract after correcting its fixture types: material 'rock' is not an AsteroidMaterial (now 'ice', the ordinary first-hit case the test describes), the burning boost now uses the real AsteroidBoost shape { phase, ownerId, angle }, and the fixture id 'rubble' became 'ice-rock' so it no longer reads as a material it is not. The three assertions are unchanged — a surviving deposit reports each chip, a shatter reports destruction alone, and hits that never applied stay silent. Player rules and demonstrations are unaffected. Verified check:ts, check:lint and the three cases after the correction.",
+      "sources": ["tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"],
+      "topics": ["asteroids"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

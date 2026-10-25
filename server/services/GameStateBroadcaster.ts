@@ -18,7 +18,7 @@ import {
   nearbyAsteroidRows,
   nearbyWorldRows,
 } from '../../shared/world';
-import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
+import type { AsteroidData, AsteroidHitEvent, SatellitePickupCollected } from '../../shared-types';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 
@@ -660,6 +660,15 @@ export class GameStateBroadcaster {
   }): void {
     this.broadcastToAll({
       type: 'lootExploded',
+      data: event,
+      timestamp: Date.now(),
+    });
+  }
+
+  /** A chip a durable deposit survived; its shatter reports destruction instead. */
+  public broadcastAsteroidHit(event: AsteroidHitEvent): void {
+    this.broadcastToAll({
+      type: 'asteroidHit',
       data: event,
       timestamp: Date.now(),
     });

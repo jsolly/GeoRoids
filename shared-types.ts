@@ -316,6 +316,15 @@ export interface AsteroidDestroyEvent {
   consumedBy?: 'furnace';
 }
 
+/**
+ * A laser hit a durable deposit that survived it. Ordinary rocks report
+ * `asteroidDestroy` instead, so a chip and a shatter never sound together.
+ */
+export interface AsteroidHitEvent {
+  asteroidId: string;
+  position: Position;
+}
+
 /** A furnace a Scout lit with their own score. */
 export interface CivicModule {
   id: string;

@@ -42,6 +42,10 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'actions',
+          // These contracts run the complete gate nested, several times in a
+          // single case, so their runtime grows with every stage the gate owns.
+          // Two minutes is a budget for an ordinary test, not for this battery.
+          testTimeout: 420000,
           include: [
             'scripts/ci-contract.test.mjs',
             'scripts/gate-contract.test.mjs',

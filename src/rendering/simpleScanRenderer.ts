@@ -32,6 +32,7 @@ import type { Player } from '../entities/player/Player';
 import type { Roid } from '../entities/roid/Roid';
 import type { SatellitePickup } from '../entities/satellitePickup/SatellitePickup';
 import { laserBoltColor } from '../utils/colorUtils';
+import { formatPoints } from '../utils/formatPoints';
 import type { DrawingContext } from './drawingContext';
 import { addResourceMapPath, asteroidMapInk } from './hud/resourceMapMark';
 import type { PlayfieldSize } from './playfieldCamera';
@@ -593,7 +594,11 @@ class ScanFrame {
       ctx.setLineDash([4, 3]);
       this.circle(at, r, '#86766b');
       ctx.setLineDash([]);
-      this.label(`${lot.name} · SCORE ${lot.cost}`, { x: at.x, y: at.y + r + 12 }, '#b7a492');
+      this.label(
+        `${lot.name} · SCORE ${formatPoints(lot.cost)}`,
+        { x: at.x, y: at.y + r + 12 },
+        '#b7a492'
+      );
     }
   }
 

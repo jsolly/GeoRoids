@@ -11,6 +11,7 @@ import { GameStateManager } from '../../core/services/GameStateManager';
 import type { Player } from '../../entities/player/Player';
 import { getSettlement } from '../../network/worldExploration';
 import { hexToRgba } from '../../utils/colorUtils';
+import { formatPoints } from '../../utils/formatPoints';
 import type { PlayfieldSize } from '../playfieldCamera';
 import type { HudLayout } from './hudLayout';
 
@@ -33,13 +34,13 @@ export function drawScoreOverlay(
   if (layout.compact) {
     ctx.font = 'bold 12px Arial';
     ctx.fillText(
-      `Bank ${score.toLocaleString()} · Cargo ${pilot.cargo}/${cargoCapacity(pilot.ship.kitId)}`,
+      `Bank ${formatPoints(score)} · Cargo ${pilot.cargo}/${cargoCapacity(pilot.ship.kitId)}`,
       x,
       y + 10,
       compactWidth
     );
   } else {
-    ctx.fillText(`Bank ${score.toLocaleString()}`, x, y + 10);
+    ctx.fillText(`Bank ${formatPoints(score)}`, x, y + 10);
   }
 
   ctx.font = VISUAL.NAME_LABEL_FONT;

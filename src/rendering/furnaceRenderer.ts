@@ -6,6 +6,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { activeFurnacePipePulses, furnacePipeFrame } from '../fx/furnacePipePulse';
 import { getSettlement, getWorldExploration, worldFurnaces } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
+import { formatPoints } from '../utils/formatPoints';
 import { canvasManager } from './canvasSurface';
 import type { DrawingContext } from './drawingContext';
 import { discardRasterSurface, prepareRasterSurface, type RasterSurface } from './rasterSurface';
@@ -869,7 +870,7 @@ function drawFoundations(viewerPosition: Position, pass: 'artwork' | 'labels'): 
         screen.y,
         radius,
         lot.name,
-        `SCORE ${lot.cost.toLocaleString('en-US')}`
+        `SCORE ${formatPoints(lot.cost)}`
       );
     }
   }

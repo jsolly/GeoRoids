@@ -395,7 +395,7 @@
     "src/runtime/inventoryOverlay.ts": "sha256:6b6ad682e4daf00be55f0ceebfd9300de5d15e49ce1226d84524412422e7a4a3",
     "src/runtime/overlayState.ts": "sha256:30b41c06b5811337a6fb4f7b493c31f9886eca9ab3fd14823e65917153f135da",
     "src/runtime/presentation.ts": "sha256:3b009b5d5428a131b74ed3ef8649b115d3e308a0d822e02ab901872dc269b7eb",
-    "src/runtime/runtimeMount.ts": "sha256:7f91c3fdce76412ce2276d6e5f9f1c3091b28b7807d184243a4290b449acb640",
+    "src/runtime/runtimeMount.ts": "sha256:1537507c3b6e2b1eb26ec3d2852ce3dcb868c9cfde572032c1ef2ba8653d50ca",
     "src/runtime/shipSelection.ts": "sha256:0607fe92e1635e9f5419ab8be6dceb688397033a8ac12ad3f1b8e6330db44ef7",
     "src/runtime/townStore.ts": "sha256:e397ae292108d93a2f25ef7fe34a76e4ed706fe761c3896413071365cbc28dbe",
     "src/runtime/uiTypes.ts": "sha256:3881aa8111c22bce128ac943f28f947375a6617dde0b013e7c45e3938058050d",
@@ -7116,6 +7116,15 @@
       "topics": ["combat-survival", "teamwork"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed the client runtime mount. The change is additive: a logger.error call on the initialization-rejection branch, which previously used only error.message for the panel and dropped the stack with nothing forwarded. The diff changes no present() call and no panel message, so the hud-network claim that an unexpected error notice returns you to the title screen and that Enter Game restarts it stays exactly accurate, as does the retry path that backs it. No player-visible behavior, generated value or demonstration is affected; no demonstration cites this source. Ran lint, typecheck, the server, diagnostics, runtime and component unit suites, and the debug-reports integration suite (6 tests) which now waits for a measured queue depth instead of accepting an unmeasured one.",
+      "sources": ["src/runtime/runtimeMount.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "src/runtime/runtimeMount.ts": "hud-network"
+      }
     }
   ]
 }

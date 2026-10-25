@@ -80,6 +80,7 @@ test('cannot silently open production world storage or escape its reviewed volum
     RAILWAY_ENVIRONMENT_ID: 'owned-environment',
     RAILWAY_VOLUME_MOUNT_PATH: '/data',
     GEOROIDS_WORLD_PATH: '/data/world.sqlite',
+    TODOIST_API_TOKEN: 'reviewed-delivery-token',
   };
   expect(readDebugReportConfiguration(env, 'production')?.path).toBe('/data/debug-reports.sqlite');
   expect(
@@ -108,4 +109,48 @@ test('cannot silently open production world storage or escape its reviewed volum
       'development'
     )
   ).toBeUndefined();
+});
+
+test('reporting refuses to boot without the delivery credential it cannot work without', () => {
+  const volume = {
+    NODE_ENV: 'production',
+    RAILWAY_ENVIRONMENT_ID: 'owned-environment',
+    RAILWAY_VOLUME_MOUNT_PATH: '/data',
+    GEOROIDS_WORLD_PATH: '/data/world.sqlite',
+  };
+
+  // With the credential, the reviewed volume path is accepted as before.
+  expect(
+    readDebugReportConfiguration({ ...volume, TODOIST_API_TOKEN: 'token' }, 'production')?.token
+  ).toBe('token');
+
+  // Without it nothing can ever be delivered, so booting "configured" would
+  // accept reports into a queue that cannot drain and report a healthy-looking
+  // /health. Refusing makes the endpoint answer 503 and the client keep its copy.
+  expect(readDebugReportConfiguration(volume, 'production')).toBeUndefined();
+  expect(readDebugReportConfiguration({ ...volume, TODOIST_API_TOKEN: '' }, 'production')).toBe(
+    undefined
+  );
+});
+
+test('an unmeasured report queue reads as unknown rather than drained', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-report-depth-'));
+  directories.push(directory);
+  const worker = new DebugReportWorker({
+    path: join(directory, 'inbox.sqlite'),
+    token: 'token',
+    projectId: 'project-depth',
+    sectionId: 'section-depth',
+  });
+  workers.push(worker);
+
+  // Read synchronously, before the worker thread can deliver its first
+  // diagnostics message, so this observes the pre-measurement state with no
+  // clock or ordering dependence. Zero here would tell an operator — and the
+  // smoke receipt, which reads /health — that the queue is empty, when nothing
+  // has counted it yet.
+  const depth = worker.diagnostics();
+  expect(depth.pending).toBeNull();
+  expect(depth.blocked).toBeNull();
+  expect(depth.lastError).toBeNull();
 });

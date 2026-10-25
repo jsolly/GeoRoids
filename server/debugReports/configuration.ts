@@ -82,9 +82,16 @@ export function readDebugReportConfiguration(
       return undefined;
     }
   }
+  const token = env['TODOIST_API_TOKEN'];
+  if (!token) {
+    // Nothing can be delivered without it, so booting "configured" would accept
+    // reports into a queue that cannot drain. Refusing makes `/debug-reports`
+    // answer 503 and the client keep its report.
+    return undefined;
+  }
   return {
     path,
-    token: env['TODOIST_API_TOKEN'] ?? '',
+    token,
     projectId: destination.projectId,
     sectionId: env['GEOROIDS_DEBUG_REPORTS_SECTION_ID'] ?? destination.sectionId,
   };

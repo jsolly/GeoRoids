@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads';
+import { logger } from '../../setup/serverLogger';
 import { parseDebugReportReceipt } from '../../shared/debugReports';
 import type { DebugJsonValue, DebugReportReceipt } from '../../shared-types';
 import type { DebugReportConfiguration } from './configuration';
@@ -20,6 +21,8 @@ export type ReportWorkerReply =
   | { type: 'result'; requestId: number; receipt: DebugReportReceipt | null }
   | { type: 'error'; requestId: number; status: number; message: string }
   | { type: 'diagnostics'; diagnostics: QueueDiagnostics }
+  /** Cause of a storage failure, logged on the game thread and never published. */
+  | { type: 'fault'; detail: string }
   | { type: 'closed'; requestId: number };
 interface PendingOperation {
   resolve: (value: DebugReportReceipt | null) => void;
@@ -34,9 +37,11 @@ export class DebugReportWorker {
   private nextId = 0;
   private failed = false;
   private closing: Promise<void> | undefined;
+  // Unknown until the worker first reports: a fresh process has not measured
+  // the queue, and zero here would read as an empty one.
   private stats: QueueDiagnostics = {
-    pending: 0,
-    blocked: 0,
+    pending: null,
+    blocked: null,
     oldestPendingAt: null,
     lastError: null,
   };
@@ -47,12 +52,15 @@ export class DebugReportWorker {
       execArgv: ['--import', 'tsx'],
     });
     this.worker.on('message', (reply: ReportWorkerReply) => this.receive(reply));
-    this.worker.on('error', () =>
-      this.fail('Debug report worker is unavailable. Keep your local copy.')
+    // The errno is the whole diagnostic for this worker: it loads `tsx` and
+    // opens SQLite on the mounted volume, so SQLITE_CANTOPEN or EACCES is what
+    // an operator needs. Discarding the argument threw exactly that away.
+    this.worker.on('error', (error: Error) =>
+      this.fail('Debug report worker is unavailable. Keep your local copy.', { error })
     );
-    this.worker.on('exit', () => {
+    this.worker.on('exit', (code: number) => {
       if (!this.closing) {
-        this.fail('Debug report worker stopped. Keep your local copy.');
+        this.fail('Debug report worker stopped. Keep your local copy.', { exitCode: code });
       }
     });
   }
@@ -85,7 +93,7 @@ export class DebugReportWorker {
     }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.fail('Debug report storage timed out. Keep your local copy and retry later.');
+        this.fail('Debug report storage timed out. Keep your local copy and retry later.', {});
         void this.worker.terminate();
       }, 10_000);
       timer.unref();
@@ -96,6 +104,10 @@ export class DebugReportWorker {
   private receive(reply: ReportWorkerReply): void {
     if (reply.type === 'diagnostics') {
       this.stats = reply.diagnostics;
+      return;
+    }
+    if (reply.type === 'fault') {
+      logger.error('DEBUG_REPORTS', `Debug report storage failed: ${reply.detail}`);
       return;
     }
     const pending = this.pending.get(reply.requestId);
@@ -116,9 +128,26 @@ export class DebugReportWorker {
       }
     }
   }
-  private fail(message: string): void {
+  /**
+   * `fault` separates a dead worker from an ordinary shutdown. Only a fault is
+   * logged and only a fault discards the last measured depth: `close()` also
+   * comes through here, and treating that as a failure would log an error on
+   * every clean stop and throw away a still-valid count.
+   */
+  private fail(message: string, fault?: { error?: Error; exitCode?: number }): void {
     this.failed = true;
     this.stats.lastError = message;
+    if (fault) {
+      this.stats.pending = null;
+      this.stats.blocked = null;
+      logger.error(
+        'DEBUG_REPORTS',
+        fault.exitCode === undefined
+          ? 'Debug report worker failed'
+          : 'Debug report worker exited before close',
+        fault.error ? { error: fault.error } : { exitCode: fault.exitCode }
+      );
+    }
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
       pending.reject(new DebugReportError(503, message));

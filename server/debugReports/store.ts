@@ -38,8 +38,14 @@ export interface StoredReport {
   attempts: number;
 }
 export interface QueueDiagnostics {
-  pending: number;
-  blocked: number;
+  /**
+   * Null means the depth is unknown, not empty: the store failed to answer, or
+   * the worker has not reported yet. Reporting zero for an unmeasured queue
+   * tells an operator — and the smoke receipt, which reads `/health` — that the
+   * queue is drained when its depth is in fact unknown.
+   */
+  pending: number | null;
+  blocked: number | null;
   oldestPendingAt: string | null;
   lastError: string | null;
 }

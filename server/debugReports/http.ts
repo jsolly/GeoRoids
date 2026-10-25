@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { isIP } from 'node:net';
 import { MAX_DEBUG_REPORT_BYTES } from '../../shared/debugReports';
 import type { DebugJsonValue } from '../../shared-types';
+import { resolveClientAddress } from '../communication/clientAddress';
 import { DebugReportError, type DebugReportWorker } from './client';
 
 const JSON_CONTENT_TYPE = /^application\/json(?:\s*;|$)/iu;
@@ -41,16 +41,17 @@ function isClientOrigin(origin: string, host: string | undefined): boolean {
   }
 }
 
-/** Only Railway public HTTP ingress supplies this header; local proxies cannot select it. */
+/**
+ * Reporting refuses rather than guesses: an unattributable report would spend a
+ * shared quota, so it is better to answer 503 and let the client keep the report.
+ * The upgrade path makes the opposite call, where refusing would lock pilots out.
+ */
 function clientAddress(req: IncomingMessage, railwayIngress: boolean): string {
-  if (railwayIngress) {
-    const value = req.headers['x-real-ip'];
-    if (typeof value !== 'string' || !isIP(value)) {
-      throw new DebugReportError(503, 'Reporting ingress address is unavailable');
-    }
-    return value;
+  const address = resolveClientAddress(req, railwayIngress);
+  if (address === null) {
+    throw new DebugReportError(503, 'Reporting ingress address is unavailable');
   }
-  return req.socket.remoteAddress ?? 'unknown';
+  return address;
 }
 
 /** Routing happens before general HTTP logs, so receipt Authorization never reaches logs. */

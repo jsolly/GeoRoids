@@ -3,6 +3,7 @@ import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
 import { ASTEROID_INTERACTIONS_CAPABILITY, SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
+import { resolveClientAddress } from './communication/clientAddress';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   connectionLimitsDisabled,
@@ -72,6 +73,10 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       : (options.debugReports ?? readDebugReportConfiguration(process.env, NODE_ENV));
   const reportWorker =
     reportConfiguration !== undefined ? new DebugReportWorker(reportConfiguration) : undefined;
+  // Behind Railway's ingress the socket peer is the edge proxy, so both the
+  // reporting listener and the upgrade limiter have to charge `X-Real-IP`.
+  const railwayIngress =
+    NODE_ENV === 'production' && Boolean(process.env['RAILWAY_ENVIRONMENT_ID']);
   const reportHttp = createDebugReportHttp(reportWorker, {
     sameOriginClient: Boolean(options.serveClientFrom),
     allowedOrigins: [
@@ -81,7 +86,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         ? [`https://${process.env['RAILWAY_PUBLIC_DOMAIN']}`]
         : []),
     ],
-    railwayIngress: NODE_ENV === 'production' && Boolean(process.env['RAILWAY_ENVIRONMENT_ID']),
+    railwayIngress,
     health: () => {
       const world = gameEngine.getDiagnostics();
       const persistence = world.persistence;
@@ -306,14 +311,28 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         done(false, 426, 'Client update required; refresh GeoRoids');
         return;
       }
-      const clientIp = info.req.socket.remoteAddress || 'unknown';
+      // A missing or unparseable `X-Real-IP` falls back to the socket peer rather
+      // than refusing: under Railway that is the proxy, so those callers share one
+      // budget — coarse, but the lane ceiling still bounds them, and a pilot is
+      // never locked out by an ingress change.
+      const clientIp =
+        resolveClientAddress(info.req, railwayIngress) ??
+        info.req.socket.remoteAddress ??
+        'unknown';
       const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
+          const spend = `${admissionDecision.count}/${admissionDecision.limit}`;
+          // A single flapping address and an exhausted lane read the same to a
+          // client but mean opposite things here: one caller to look at, or the
+          // whole lane saturated, which is load or an address the edge cannot
+          // tell apart. Logging them alike hides the second behind the first.
           logger.warn(
-            admissionDecision.lane === 'logs'
-              ? `🚫 Rate limited log connection from ${clientIp} (${admissionDecision.count}/${admissionDecision.limit})`
-              : `🚫 Rate limited connection attempt from ${clientIp} (${admissionDecision.count}/${admissionDecision.limit})`
+            admissionDecision.laneExhausted
+              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend}); refused ${clientIp}`
+              : admissionDecision.lane === 'logs'
+                ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
+                : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
           );
         }
         done(

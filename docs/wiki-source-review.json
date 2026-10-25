@@ -378,7 +378,7 @@
     "src/rendering/routeWaypoints.ts": "sha256:0fee65f107d3c3064803b2dbb3b2cce749d8f0db43274c21447a0b1ad5e0f66b",
     "src/rendering/scanDetailPolicy.ts": "sha256:2b3c60bf266b4d32c9d991dba8ff20e8deeb7b983421fcf1bdb932f421a89bb4",
     "src/rendering/scanSceneryCache.ts": "sha256:9d74511e177f7c481d2bdeb92af12279090dd1e06ba9f5699a7e180858dc51b1",
-    "src/rendering/shipLighting.ts": "sha256:18382d8b548986d6a1267f02e2b1711d9665736dc65aa1bf8949870e70216eca",
+    "src/rendering/shipLighting.ts": "sha256:c9512e3a31f0fac22a3339723785e5e8d3f66b54f71127e84a93812b7214e5c9",
     "src/rendering/shipSchematicCanvas.ts": "sha256:6bd8bab01d2e1745f9da8d26233d31913f5cebb821bb0c765accbde9923db046",
     "src/rendering/simpleScanNavigation.ts": "sha256:d0f95d73652425d4baf3cee5a94131af6714c7030e13d69cd95b0856ce62d797",
     "src/rendering/simpleScanRenderer.ts": "sha256:83bf8d2f8bcc75f724460d69fead352c06f68ad384670d4e7d1cad535db75ca5",
@@ -7122,6 +7122,13 @@
       "sources": ["shared/exploration.ts"],
       "topics": ["field-manual", "hud-network", "scout", "teamwork"],
       "media": ["scout"],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the ship-lighting motion-preference hoist: drawShipLighting now reads the reduced-motion preference at most once per frame and passes it to drawEngineLight, instead of each thrusting ship querying matchMedia and allocating a MediaQueryList of its own. Light geometry, colors and the contour-speed boost flag are untouched, and performance.now() is still sampled per ship so flicker phase is unchanged. Checked both mapped articles: asteroids.md 'Shine your headlights or engine light on a hidden phosphorescent crystal' and its charging and afterglow rules, and terrain.md 'Light and wreck shadows' covering headlights illuminating the route, the engine casting blue light that turns violet at contour speed, wrecks interrupting those beams with ghostly shadows, and the light being shared by nearby pilots and charging glowtoys. Both remain accurate and no article text needed changing. Ran wiki:media:check on linux-x64: all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, which covers the demonstrations showing thrusting ships, so no media was regenerated. Ran biome check (958 files, clean) and astro sync plus tsc (clean). Ran 3 rendering test files, 5 cases: the new a-frame-of-thrusting-ships-reads-the-motion-preference-once guard, ship-light-casts-wreck-shadows-and-colors-speed, and ordinary-loot-skips-motion-queries-while-rare-salvage-stays-responsive. The new guard asserts one preference read for four thrusting ships, none when nothing thrusts, a fresh read on the next drawing frame, and that the shared value reaches each light by pinning the flicker to exactly 1 so the reach equals radius times scale times four. It was mutation-checked by restoring the per-ship read, which failed it with four reads instead of one; the defect was removed before committing.",
+      "sources": ["src/rendering/shipLighting.ts"],
+      "topics": ["asteroids", "terrain"],
+      "media": [],
       "owners": {}
     }
   ]

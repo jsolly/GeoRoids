@@ -20,6 +20,14 @@ useQuietServerConsole();
  */
 const BELT_PASSES_PER_FRAME = 1;
 
+/**
+ * Sector activation runs once a second in `RegionalAsteroidField.update`, on
+ * the cadence AGENTS.md sanctions for leaving the loop. It copies the belt to
+ * find powered rocks, to find probes, and to partition rocks by sector. A
+ * fourth copy there is new work on that cadence, so this pins it too.
+ */
+const SECTOR_PASS_BELT_COPIES = 3;
+
 function cargo(id: string, position: { x: number; y: number }): AsteroidData {
   return {
     id,
@@ -170,6 +178,26 @@ describe('A frame walks the asteroid belt once, for physics', () => {
       .spiders.filter((spider) => spider.crawler?.hostId === occupied.id);
     expect(crawlers).toHaveLength(1);
     expect(occupied.beltCrawlerIds).toEqual([`belt-crawler:${occupied.id}:0`]);
+  });
+
+  test('only the once-a-second sector pass costs more than a motion pass', () => {
+    fillBelt(60);
+    const busy: { frame: number; beltPasses: number; beltCopies: number }[] = [];
+    for (let frame = 0; frame < 60; frame++) {
+      probe.reset();
+      world.engine.advanceOneFrame();
+      const { beltPasses, beltCopies } = probe.snapshot();
+      if (beltPasses > BELT_PASSES_PER_FRAME || beltCopies > 0) {
+        busy.push({ frame: world.gameTime(), beltPasses, beltCopies });
+      }
+    }
+
+    expect(busy).toHaveLength(1);
+    expect(busy[0]?.frame).toBe(60);
+    expect(busy[0]?.beltCopies).toBeLessThanOrEqual(SECTOR_PASS_BELT_COPIES);
+    expect(busy[0]?.beltPasses).toBeLessThanOrEqual(
+      BELT_PASSES_PER_FRAME + SECTOR_PASS_BELT_COPIES
+    );
   });
 
   test('a belt four times larger costs the frame no extra pass', () => {

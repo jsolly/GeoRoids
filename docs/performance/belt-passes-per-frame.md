@@ -3,15 +3,23 @@
 The 60 Hz loop owes the awake asteroid belt a fixed number of walks. Two of
 them are structural; everything else must reach its rocks directly.
 
-The 60 Hz loop walks the awake asteroid belt exactly once, in
+An ordinary 60 Hz frame walks the awake asteroid belt exactly once, in
 `AsteroidManager.updateMotion`, because every awake rock steps its position,
-rotation and boost each frame. Nothing else may walk it: every other concern
-is rare enough to reach its own rocks directly.
+rotation and boost each frame. Nothing else may walk it per frame: every other
+concern is rare enough to reach its own rocks directly.
+
+One frame in sixty costs more. `ensureAsteroidField` runs
+`RegionalAsteroidField.update` on the once-a-second cadence AGENTS.md sanctions
+for work leaving the loop, and that copies the belt three times: once in
+`update` to find powered rocks, and twice in `sleepDistantSectors` to find
+probes and to partition rocks by sector.
 
 `tests/unit/server/the-frame-walks-the-asteroid-belt-once.test.ts` counts the
 walks and the whole-belt copies a frame makes, using
-`tests/support/beltTraversalInstrumentation.ts`. A second full-belt walk in
-`advanceOneFrame`, or any `getAllAsteroids()` call inside it, fails that test.
+`tests/support/beltTraversalInstrumentation.ts`. A second full-belt walk in an
+ordinary frame, any `getAllAsteroids()` call inside one, or a fourth belt copy
+on the sector frame all fail that test. It measures a whole second, so the
+sector frame cannot hide a new per-frame pass.
 
 Note the scope. `AsteroidManager` holds only the rocks in awake sectors, so a
 belt walk is local work that grows with nearby pilots, not with the saved
@@ -108,3 +116,15 @@ Appending cannot change which crawlers get created at
 `BELT_CRAWLER.MAX_ACTIVE`, because a transferred crawler already has its body;
 the population limit only gates creating one.
 `campaign-spiders-share-reserved-population.test.ts` covers that limit.
+
+## Still open
+
+`RegionalAsteroidField.update` makes three whole-belt copies a second, and two
+of them look like one: `update` scans for `boost?.phase === 'burning' || probe`
+and `sleepDistantSectors` scans again for `probe`. The burning half could read
+`boostedAsteroids()` for free now; the probe half would want its own tracked
+set, and the sector partition needs a full walk by nature.
+
+It is left alone: once a second is a twentieth of a per-frame cost, it is a
+different module, and the guard above pins it at three so it cannot grow
+quietly.

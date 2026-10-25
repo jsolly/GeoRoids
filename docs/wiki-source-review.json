@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
-    "server/core/GameEngine.ts": "sha256:837f5ea6a91d746aa7dc34dd7b1b6cb3081368c5c0970d0885a340515960d583",
+    "server/core/GameEngine.ts": "sha256:4fb5fe30862c610fe2b935edea66d41e28b03d2f1b7c40c3035c6cb3bc519c57",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -7136,6 +7136,25 @@
       "sources": ["src/core/gameController.ts", "src/entities/roid/Roid.ts"],
       "topics": ["asteroids", "field-manual", "hud-network"],
       "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the loot-blast broad phase: the detonation loop in handleLootExplode now draws candidates from the asteroid manager's spatial index over a bounded box instead of walking getAllAsteroids, which also stopped allocating a full copy of the awake asteroid set per detonation. All three exact predicates are unchanged: burning-boost rocks are skipped, isSmallRoid still gates on size, and inBlastRadius still decides reach. The box radius is LOOT_BLAST.RADIUS + LOOT_BLAST.SMALL_ROID_MAX, which is the tight bound because a rock qualifies only when size <= SMALL_ROID_MAX and within RADIUS + size, so nothing reachable can fall outside it; note SMALL_ROID_MAX's own comment says 'size < 25' but the predicate isSmallRoid is 'size <= 24', and the bound follows the predicate. The index is documented as the one broad phase shared by lasers, collisions, crawlers, scans and snapshots, stays exact against the manager's rows, and preserves source order, so pushedAsteroidIds ordering is unchanged. Reviewed every mapped article for claims this could move. The canonical ones are loot-growth.md 'Shoot a shard, Tap canister, or silk drop from nearby to detonate it and push small rocks away' with its summary 'shoot a drop to push nearby small rocks', and combat-survival.md 'Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls'. Both still hold: the same rocks are pushed with the same impulse, the drop is still consumed, and no hull interaction changed. Nothing in field-manual, controls, scout, hauler, asteroids, satellites, terrain, teamwork or hud-network describes blast reach or candidate selection, so no article text needed changing. Ran wiki:media:check on linux-x64 and all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, covering the scout, hauler and cargo demonstrations, so none was regenerated. Ran biome check (959 files, clean) and astro sync plus tsc (clean). Ran 4 test files, 37 cases: destroy-drop-loot, lootBlast, nearby-asteroid-queries-stay-local-as-the-world-grows and loot-manager. Extended the canonical blast scenario with a case asserting the exact edge is still pushed at distance 80 plus size, that one unit beyond is not, and that rocks several cells away are never examined, counted through an instrumented boost getter because reading boost is the loop's first act. It was mutation-checked by restoring the getAllAsteroids scan, which failed it with four distant rocks read instead of none; the defect was removed before committing.",
+      "sources": ["server/core/GameEngine.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
       "owners": {}
     }
   ]

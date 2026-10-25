@@ -82,16 +82,15 @@ export function readDebugReportConfiguration(
       return undefined;
     }
   }
-  const token = env['TODOIST_API_TOKEN'];
-  if (!token) {
-    // Nothing can be delivered without it, so booting "configured" would accept
-    // reports into a queue that cannot drain. Refusing makes `/debug-reports`
-    // answer 503 and the client keep its report.
-    return undefined;
-  }
   return {
     path,
-    token,
+    // An absent credential does not refuse configuration. `DebugReportStore`
+    // records such a report as `blocked` rather than `pending`, which is the
+    // documented recovery in docs/agent-operations.md: repair the credential
+    // and let the worker drain the queue. Refusing instead threw the report
+    // away, cost local development its `.data` inbox, and added a second,
+    // undocumented disable path beside `GEOROIDS_DEBUG_REPORTS_ENABLED=0`.
+    token: env['TODOIST_API_TOKEN'] ?? '',
     projectId: destination.projectId,
     sectionId: env['GEOROIDS_DEBUG_REPORTS_SECTION_ID'] ?? destination.sectionId,
   };

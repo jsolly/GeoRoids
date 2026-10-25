@@ -111,7 +111,7 @@ test('cannot silently open production world storage or escape its reviewed volum
   ).toBeUndefined();
 });
 
-test('reporting refuses to boot without the delivery credential it cannot work without', () => {
+test('a missing delivery credential blocks reports rather than refusing to hold them', () => {
   const volume = {
     NODE_ENV: 'production',
     RAILWAY_ENVIRONMENT_ID: 'owned-environment',
@@ -119,18 +119,51 @@ test('reporting refuses to boot without the delivery credential it cannot work w
     GEOROIDS_WORLD_PATH: '/data/world.sqlite',
   };
 
-  // With the credential, the reviewed volume path is accepted as before.
   expect(
     readDebugReportConfiguration({ ...volume, TODOIST_API_TOKEN: 'token' }, 'production')?.token
   ).toBe('token');
 
-  // Without it nothing can ever be delivered, so booting "configured" would
-  // accept reports into a queue that cannot drain and report a healthy-looking
-  // /health. Refusing makes the endpoint answer 503 and the client keep its copy.
-  expect(readDebugReportConfiguration(volume, 'production')).toBeUndefined();
-  expect(readDebugReportConfiguration({ ...volume, TODOIST_API_TOKEN: '' }, 'production')).toBe(
-    undefined
+  // docs/agent-operations.md: "Credential, permission and Todoist
+  // project-capacity failures keep reports blocked. Repair the credential or
+  // capacity and let the worker retry." So an absent token still configures,
+  // and `DebugReportStore` records the report as `blocked`.
+  //
+  // An earlier revision refused configuration instead, on the premise that
+  // accepting was worse because /health would look healthy. That premise was
+  // wrong: /health publishes the blocked count, so the queue is visible, and
+  // refusing threw away a report the player is then told to keep. It also took
+  // out local development's documented `.data` inbox and added a second
+  // disable path beside the documented `GEOROIDS_DEBUG_REPORTS_ENABLED=0`.
+  expect(readDebugReportConfiguration(volume, 'production')?.token).toBe('');
+  expect(
+    readDebugReportConfiguration({ ...volume, TODOIST_API_TOKEN: '' }, 'production')?.token
+  ).toBe('');
+
+  // The documented switch is still the only way to turn reporting off.
+  expect(
+    readDebugReportConfiguration(
+      { ...volume, TODOIST_API_TOKEN: 'token', GEOROIDS_DEBUG_REPORTS_ENABLED: '0' },
+      'production'
+    )
+  ).toBeUndefined();
+});
+
+test('local development keeps its own report inbox without a production credential', () => {
+  // AGENTS.md asks for the /debug flow to be smoke-tested locally while saying
+  // agents do not configure production credentials, and
+  // docs/agent-operations.md gives development its own ignored
+  // `.data/debug-reports.sqlite`. Requiring the Todoist secret here made that
+  // flow impossible for anyone who does not hold the production account.
+  const local = readDebugReportConfiguration(
+    { GEOROIDS_DEBUG_REPORTS_PATH: '/tmp/x.sqlite' },
+    'development'
   );
+  expect(local?.path).toBe('/tmp/x.sqlite');
+  expect(local?.token).toBe('');
+
+  // Automated runs stay off, so a developer's own queue is never touched.
+  expect(readDebugReportConfiguration({ VITEST: 'true' }, 'development')).toBeUndefined();
+  expect(readDebugReportConfiguration({ NODE_ENV: 'test' }, 'development')).toBeUndefined();
 });
 
 test('an unmeasured report queue reads as unknown rather than drained', () => {
@@ -146,9 +179,10 @@ test('an unmeasured report queue reads as unknown rather than drained', () => {
 
   // Read synchronously, before the worker thread can deliver its first
   // diagnostics message, so this observes the pre-measurement state with no
-  // clock or ordering dependence. Zero here would tell an operator — and the
-  // smoke receipt, which reads /health — that the queue is empty, when nothing
-  // has counted it yet.
+  // clock or ordering dependence. Zero here would tell an operator that the
+  // queue is empty, when nothing has counted it yet. No automated check reads
+  // these two fields -- the production smoke receipt fetches /health but
+  // asserts only world.* -- so the reader this misleads is a person.
   const depth = worker.diagnostics();
   expect(depth.pending).toBeNull();
   expect(depth.blocked).toBeNull();

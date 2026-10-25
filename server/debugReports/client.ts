@@ -8,6 +8,57 @@ import type { QueueDiagnostics } from './store';
 /** Enough for a transient stall to recover; few enough that a corrupt store cannot spin. */
 export const MAX_WORKER_RESTARTS = 3;
 
+/** The request deadline docs/agent-operations.md documents for this worker. */
+const REQUEST_DEADLINE_MS = 10_000;
+
+/**
+ * The queue before anything has measured it. Null is not zero: a fresh process
+ * and a store that failed to answer both have an unknown depth, and publishing
+ * zero would tell an operator the queue is drained.
+ *
+ * `QueueDiagnostics` is owned by `./store`, but this value cannot live there:
+ * importing a value from that module would pull SQLite onto the game thread,
+ * which this file exists to prevent.
+ */
+const UNMEASURED_QUEUE: QueueDiagnostics = {
+  pending: null,
+  blocked: null,
+  oldestPendingAt: null,
+  lastError: null,
+};
+
+/**
+ * Why reporting stopped. The player-facing message follows from the cause
+ * rather than travelling beside it, so a caller cannot pair the two wrongly --
+ * the timeout path used to pass its own message and still log "worker failed"
+ * with a fabricated `exitCode: undefined`.
+ */
+type FailureCause =
+  | { kind: 'uncaught'; error: Error }
+  | { kind: 'exit'; code: number }
+  | { kind: 'timeout' }
+  | { kind: 'close' };
+
+const FAILURE_MESSAGE: Record<FailureCause['kind'], string> = {
+  uncaught: 'Debug report worker is unavailable. Keep your local copy.',
+  exit: 'Debug report worker stopped. Keep your local copy.',
+  timeout: 'Debug report storage timed out. Keep your local copy and retry later.',
+  close: 'Debug report storage is closing.',
+};
+
+/** The errno or exit code is the whole diagnostic; the kind names the rest. */
+function failureContext(cause: Exclude<FailureCause, { kind: 'close' }>): Record<string, unknown> {
+  if (cause.kind === 'uncaught') {
+    // It loads `tsx` and opens SQLite on the mounted volume, so
+    // SQLITE_CANTOPEN or EACCES is what an operator needs.
+    return { error: cause.error };
+  }
+  if (cause.kind === 'exit') {
+    return { exitCode: cause.code };
+  }
+  return { deadlineMs: REQUEST_DEADLINE_MS };
+}
+
 export class DebugReportError extends Error {
   constructor(
     readonly status: number,
@@ -44,14 +95,9 @@ export class DebugReportWorker {
   /** Identifies the live thread so a replaced one's late events are ignored. */
   private generation = 0;
   private closing: Promise<void> | undefined;
-  // Unknown until the worker first reports: a fresh process has not measured
-  // the queue, and zero here would read as an empty one.
-  private stats: QueueDiagnostics = {
-    pending: null,
-    blocked: null,
-    oldestPendingAt: null,
-    lastError: null,
-  };
+  /** The fault being suppressed, so a broken store logs once rather than hourly. */
+  private faultEpisode: { detail: string; suppressed: number } | undefined;
+  private stats: QueueDiagnostics = UNMEASURED_QUEUE;
   constructor(private readonly config: DebugReportConfiguration) {
     this.worker = this.spawn();
   }
@@ -77,12 +123,12 @@ export class DebugReportWorker {
     // an operator needs. Discarding the argument threw exactly that away.
     worker.on('error', (error: Error) => {
       if (live()) {
-        this.fail('Debug report worker is unavailable. Keep your local copy.', { error });
+        this.fail({ kind: 'uncaught', error });
       }
     });
     worker.on('exit', (code: number) => {
       if (live() && !this.closing) {
-        this.fail('Debug report worker stopped. Keep your local copy.', { exitCode: code });
+        this.fail({ kind: 'exit', code });
       }
     });
     return worker;
@@ -102,7 +148,12 @@ export class DebugReportWorker {
       of: MAX_WORKER_RESTARTS,
     });
     this.failed = false;
-    this.stats = { pending: null, blocked: null, oldestPendingAt: null, lastError: null };
+    // The depth is unknown until the new thread measures it, but the failure
+    // that forced this restart still happened and is still the most recent
+    // thing known about the subsystem. Clearing it would undo the guard in
+    // `receive()`, whose whole purpose is to stop a recorded failure being
+    // erased; the new thread's first measured reply replaces it.
+    this.stats = { ...UNMEASURED_QUEUE, lastError: this.stats.lastError };
     this.worker = this.spawn();
   }
   enqueue(body: string, address: string, health: DebugJsonValue): Promise<DebugReportReceipt> {
@@ -137,9 +188,9 @@ export class DebugReportWorker {
     }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.fail('Debug report storage timed out. Keep your local copy and retry later.', {});
+        this.fail({ kind: 'timeout' });
         void this.worker.terminate();
-      }, 10_000);
+      }, REQUEST_DEADLINE_MS);
       timer.unref();
       this.pending.set(request.requestId, { resolve, reject, timer });
       this.worker.postMessage(request);
@@ -155,10 +206,16 @@ export class DebugReportWorker {
       if (!this.failed) {
         this.stats = reply.diagnostics;
       }
+      // A measured depth proves the store answered, so any fault episode has
+      // ended. The fault's own companion reply carries null counts, so it
+      // cannot end the episode it just opened.
+      if (reply.diagnostics.pending !== null) {
+        this.endFaultEpisode();
+      }
       return;
     }
     if (reply.type === 'fault') {
-      logger.error('DEBUG_REPORTS', `Debug report storage failed: ${reply.detail}`);
+      this.recordFault(reply.detail);
       return;
     }
     const pending = this.pending.get(reply.requestId);
@@ -180,26 +237,71 @@ export class DebugReportWorker {
     }
   }
   /**
-   * `fault` separates a dead worker from an ordinary shutdown. Only a fault is
-   * logged and only a fault discards the last measured depth: `close()` also
-   * comes through here, and treating that as a failure would log an error on
-   * every clean stop and throw away a still-valid count.
+   * A broken store throws on every delivery tick, so the worker faults once a
+   * second for as long as it stays broken. Logging each one wrote roughly
+   * 86,400 stack traces a day into stdout and the rotating log: it rotated away
+   * every other diagnostic from the same incident and pushed the log writer
+   * into dropping other components' records, so one failing subsystem took out
+   * the evidence for all of them at exactly the wrong moment. One episode now
+   * costs one line, plus one when its cause changes or it ends.
    */
-  private fail(message: string, fault?: { error?: Error; exitCode?: number }): void {
+  private recordFault(detail: string): void {
+    const episode = this.faultEpisode;
+    if (episode?.detail === detail) {
+      episode.suppressed += 1;
+      return;
+    }
+    if (episode) {
+      this.endFaultEpisode();
+    }
+    this.faultEpisode = { detail, suppressed: 0 };
+    // The detail travels as structured context, like the sibling call in
+    // `fail()`, rather than interpolated into the message, so a stack cannot
+    // break the message's own bounding.
+    logger.error('DEBUG_REPORTS', 'Debug report storage failed', { detail });
+  }
+
+  private endFaultEpisode(): void {
+    const episode = this.faultEpisode;
+    if (!episode) {
+      return;
+    }
+    this.faultEpisode = undefined;
+    logger.warn('DEBUG_REPORTS', 'Debug report storage stopped faulting', {
+      suppressedFaults: episode.suppressed,
+    });
+  }
+
+  /**
+   * One failure, one record. The cause is typed because the message follows
+   * from it: passing both separately let the ten-second timeout report itself
+   * as "worker failed" with `exitCode: undefined`, naming neither the timeout
+   * nor a real exit code.
+   *
+   * The re-entry guard is load-bearing, not defensive. The timeout path calls
+   * `terminate()`, and that raises `exit` on the same generation, which used to
+   * come back through here and emit a second, contradictory line for one stall.
+   * An operator reading the log for a stalled queue got two records that
+   * disagreed, neither mentioning a timeout.
+   *
+   * `close()` also routes through here, and only a real fault discards the last
+   * measured depth: treating a clean stop as a failure logged an ERROR on every
+   * shutdown and threw away a count that was still true.
+   */
+  private fail(cause: FailureCause): void {
+    const message = FAILURE_MESSAGE[cause.kind];
+    if (this.failed) {
+      return;
+    }
     this.failed = true;
-    // Replaced rather than written through: `this.stats` can be the diagnostics
-    // message the thread last sent, and a failure must not reach back into it.
-    this.stats = fault
-      ? { pending: null, blocked: null, oldestPendingAt: null, lastError: message }
-      : { ...this.stats, lastError: message };
-    if (fault) {
-      logger.error(
-        'DEBUG_REPORTS',
-        fault.exitCode === undefined
-          ? 'Debug report worker failed'
-          : 'Debug report worker exited before close',
-        fault.error ? { error: fault.error } : { exitCode: fault.exitCode }
-      );
+    if (cause.kind === 'close') {
+      this.stats = { ...this.stats, lastError: message };
+    } else {
+      // Replaced rather than written through: `this.stats` can be the
+      // diagnostics message the thread last sent, and a failure must not reach
+      // back into it.
+      this.stats = { ...UNMEASURED_QUEUE, lastError: message };
+      logger.error('DEBUG_REPORTS', message, failureContext(cause));
     }
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -212,7 +314,7 @@ export class DebugReportWorker {
       return this.closing;
     }
     this.closing = new Promise((resolve) => {
-      this.fail('Debug report storage is closing.');
+      this.fail({ kind: 'close' });
       let settled = false;
       const finish = (): void => {
         if (settled) {

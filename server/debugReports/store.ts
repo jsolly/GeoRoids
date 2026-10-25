@@ -41,8 +41,11 @@ export interface QueueDiagnostics {
   /**
    * Null means the depth is unknown, not empty: the store failed to answer, or
    * the worker has not reported yet. Reporting zero for an unmeasured queue
-   * tells an operator — and the smoke receipt, which reads `/health` — that the
-   * queue is drained when its depth is in fact unknown.
+   * tells an operator reading `/health` that the queue is drained when its depth
+   * is in fact unknown. Nothing automated asserts these two fields: the
+   * production smoke receipt fetches `/health` but reads only `world.*`, so a
+   * wrong depth here is read by a person during an incident, not caught by a
+   * check.
    */
   pending: number | null;
   blocked: number | null;

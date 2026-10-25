@@ -40,15 +40,23 @@ export function mountRuntime<Runtime extends { dispose(): void }>(
             return;
           }
           failed = true;
-          // Only `message` reached the panel, so every startup crash was
-          // invisible to operators: the stack went nowhere and nothing was
-          // forwarded. A stale chunk URL served to a cached index rejects the
-          // dynamic import here, which is exactly the case worth seeing.
+          // Only `message` reached the panel, so the stack went nowhere at
+          // all. A stale chunk URL served to a cached index rejects the dynamic
+          // import here, which is exactly the case worth being able to read.
+          //
+          // This record stays in the browser: `Logger.forwardToServer` returns
+          // early until a runtime attaches, and on both paths that reach here
+          // none has -- the import can reject before `createGameRuntime` runs,
+          // and its own failure path detaches before rethrowing. So the stack
+          // reaches the console and the in-page diagnostics trail, not
+          // `logs/client.log`. Forwarding before a runtime exists is a separate
+          // change to the forwarder, not something this branch can assert.
+          const cause = error instanceof Error ? error : undefined;
           logger.error(
             'RUNTIME',
             'Game runtime failed to initialize',
-            error instanceof Error ? error : undefined,
-            error instanceof Error ? undefined : { error }
+            cause,
+            cause === undefined ? { error } : undefined
           );
           present({
             kind: 'error',

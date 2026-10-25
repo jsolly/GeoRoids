@@ -240,7 +240,7 @@ class Ship {
     playLocalHaptic(this.isLocalPlayer, 'boom');
   }
 
-  canShootAgain(): boolean {
+  private canShootAgain(): boolean {
     this.updateShootCooldown();
     if (this.canShoot && this.lasers.length < SHIP.MAX_LASERS) {
       return true;
@@ -470,7 +470,7 @@ class Ship {
     }
   }
 
-  updateExplosion(): void {
+  private updateExplosion(): void {
     if (this.exploding && this.explodeTime > 0) {
       this.explodeTime--;
       // Stay exploding at t=0 so a late exploding=true snapshot cannot
@@ -478,7 +478,7 @@ class Ship {
     }
   }
 
-  updateInvincibility(): void {
+  private updateInvincibility(): void {
     if (this.blinkCount > 0) {
       this.spawnProtectionTimer--;
       if (this.spawnProtectionTimer <= 0) {

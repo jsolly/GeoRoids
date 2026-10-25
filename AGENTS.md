@@ -58,6 +58,29 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
 - **Production managers use `getInstance()`** (`GameController`, `PlayerManager`, `CollisionManager`, etc.). `GameController` supplies PlayerManager's complete network capabilities at creation; later access cannot rebind them. Isolated runtime tests may construct PlayerManager and CollisionManager with explicit capabilities. `src/runtime/gameRuntime.ts` owns production EventLoop wiring and disposal. The Svelte shell owns its mount lifetime.
 - **The 60 Hz game loop never touches the disk or does O(world) work.** The saved world is read once at startup and lives in memory; changes leave the loop once a second as a batch through `WorldPersistence` (`server/world/`); unchanged-membership asteroid sectors persist drift every `WORLD.driftFlushCheckpoints` checkpoints. Do not add SQLite calls, `fs` calls, or per-saved-sector scans to `advanceOneFrame` or the message handlers; `tests/unit/server/explored-world-keeps-the-simulation-frame-off-the-database.test.ts` and `world-writes-leave-the-game-loop-once-a-second.test.ts` fail if that regresses.
 - **Snapshots and terrain work stay local.** Snapshots send each player only nearby world entities (loot, projectiles, and other players' pickups within `WORLD.interestRadius`; asteroids within the smaller `WORLD.asteroidInterestRadius` radar circle, widened to the interest square while that pilot's Mineral Scan zooms the camera out; a player's own pickups always ship) (`shared/world.ts`; applied in `server/services/GameStateBroadcaster.ts`, with sectors waking at `WORLD.interestRadius` in `server/world/RegionalAsteroidField.ts`), and the client builds contours in local patches (`src/physics/terrain/terrainSession.ts`). Never broadcast or rebuild the whole world. `tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts` guards regional asteroid queries and per-player asteroid row filtering, and `tests/unit/rendering/contours-follow-the-camera-without-dropping-lines.test.ts` guards contour patches; `tests/unit/server/pilots-share-snapshot-preparation-without-sharing-private-rows.test.ts` guards per-player filtering of loot, projectiles and non-owned pickup rows, and `tests/unit/server/satellite-inventory-survives-snapshots-and-brief-disconnects.test.ts` guards own-pickup visibility and stored-inventory privacy.
+- **Unused-code ownership, and the two blind spots that remain.** Each kind of dead
+  code has exactly one owner. Knip owns unused files and unused module exports;
+  it stops checking a module's individual exports as soon as any resolvable path
+  string reaches it (a `package.json` script, a `new URL('./x.mjs', import.meta.url)`,
+  a dynamic `import('./x.mjs')`), which covers most runners under `scripts/`. So
+  ts-prune owns unused exports for those: `config/typescript/prune.jsonc` sets
+  `allowJs` to keep `scripts/**/*.mjs` in its program, and
+  `scripts/check-unused-typescript.test.mjs` fails if that drops. Biome's
+  `noUnusedPrivateClassMembers` owns unused private class members, and
+  `scripts/check-unused-class-members.mjs` owns public methods on `src/`, `server/`
+  and `shared/` classes that nothing outside the declaring class calls — remove
+  one with no references, narrow one used only internally to `private` so Biome
+  takes over. That check skips classes that extend, implement or are extended, and
+  treats a name declared by an interface or appearing as a string literal as
+  reached, so it stays quiet on structural ports, `'name' in object` probes and
+  `vi.spyOn(target, 'name')`. Two blind spots genuinely cannot be closed from here:
+  a module reached by a dynamic `import()` has every export counted as used by both
+  tools (`scripts/gate-receipt.mjs`), and a hand-written sibling declaration file
+  wins module resolution so its implementation never enters the program at all
+  (`scripts/validation-admission.d.mts` hides `scripts/validation-admission.mjs`).
+  Adding another `.d.mts` beside a `.mjs` fails the test above. Public members of
+  test doubles, benchmark harnesses and `scripts/**/*.ts` classes are unchecked by
+  design; they exist to satisfy external shapes.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.
 - **Conventional Commits** (`feat`, `fix`, `chore`, `refactor`, `test`, `perf`, `docs`) with a scope (e.g. `feat(network): ...`).
 

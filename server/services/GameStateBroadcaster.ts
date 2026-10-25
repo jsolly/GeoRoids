@@ -622,7 +622,7 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
+  private broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
     this.broadcastToAll({
       type: 'satellitePickupCollected',
       data,
@@ -652,7 +652,7 @@ export class GameStateBroadcaster {
     }
   }
 
-  public broadcastLootExploded(event: {
+  private broadcastLootExploded(event: {
     lootId: string;
     position: { x: number; y: number };
     radius: number;

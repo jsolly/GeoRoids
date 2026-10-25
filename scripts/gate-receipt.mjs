@@ -78,6 +78,15 @@ export function fileRecord(path) {
   }
   return { mode: stat.mode & 0o111 ? '100755' : '100644', digest: digest(readFileSync(path)) };
 }
+/**
+ * Generated scratch inside the installed tree: tool downloads and extractions,
+ * loader caches, and build or test caches. The gate's own stages write these,
+ * so counting them lets a cold-cache run invalidate its own identity after
+ * every check has already passed. The identity covers installed packages; a
+ * cache is derived from them, never an input to them.
+ */
+const GENERATED_SCRATCH = /^(?:\.cache|\.vite|\.vite-temp|\.vitest-cache)(?:\/|$)/u;
+
 function walk(path, prefix = '', inventoryBoundary = null) {
   if (!existsSync(path)) {
     return [];
@@ -91,8 +100,7 @@ function walk(path, prefix = '', inventoryBoundary = null) {
   const rows = [];
   for (const name of readdirSync(path).sort()) {
     const relative = prefix ? `${prefix}/${name}` : name;
-    // Only actionlint's per-run extraction directory is generated scratch.
-    if (/^\.cache\/check-actions\/run\.[^/]+(?:\/|$)/u.test(relative)) {
+    if (GENERATED_SCRATCH.test(relative)) {
       continue;
     }
     const absolute = join(path, name);
@@ -105,7 +113,7 @@ function walk(path, prefix = '', inventoryBoundary = null) {
           const targetRelative = relativePath(boundary, target);
           if (
             (target !== boundary && !target.startsWith(`${boundary}${sep}`)) ||
-            /^\.cache\/check-actions\/run\.[^/]+(?:\/|$)/u.test(targetRelative)
+            GENERATED_SCRATCH.test(targetRelative)
           ) {
             throw new Error(`Unsupported installed directory link: ${relative}`);
           }

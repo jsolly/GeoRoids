@@ -36,9 +36,6 @@ export const EXPLOSION_FRAMES = SHIP.EXPLODE_DURATION_FRAMES;
 /** GameEngine schedules this at death; the explosion runs in parallel. */
 export const RESPAWN_COUNTDOWN_FRAMES = SHIP.RESPAWN_DELAY_FRAMES;
 export const SPAWN_PROTECTION_FRAMES = SHIP.INVINCIBILITY_DURATION_FRAMES;
-/** Circular arena used by the server (`WORLD_BOUNDARY` / EntityManager). */
-export const ARENA_RADIUS = 3100;
-
 export interface Pilot {
   id: string;
   name: string;

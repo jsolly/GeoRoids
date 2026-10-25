@@ -3,12 +3,13 @@ import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
 import { ASTEROID_INTERACTIONS_CAPABILITY, SNAPSHOT_VERSION } from '../shared/snapshotProtocol';
-import { resolveClientAddress } from './communication/clientAddress';
+import { upgradeChargeAddress } from './communication/clientAddress';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   connectionLimitsDisabled,
   createConnectionAdmission,
   MAX_PLAYERS,
+  UNATTRIBUTED_CLIENT,
 } from './communication/connectionAdmission';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
 import { GameplayMessageBudget } from './communication/messageBudget';
@@ -287,6 +288,19 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     ...(process.env['VITEST'] ? { vitest: process.env['VITEST'] } : {}),
   });
   const admission = createConnectionAdmission(limitsDisabled);
+  // Losing `X-Real-IP` under Railway ingress silently returns every caller to a
+  // shared budget. That needs its own signal rather than being inferred from
+  // refusals, which read identically to one flapping client.
+  let lostAttributionWarnedAt = Number.NEGATIVE_INFINITY;
+  const reportLostAttribution = (now: number): void => {
+    if (now - lostAttributionWarnedAt < CONNECTION_ADMISSION_WINDOW_MS) {
+      return;
+    }
+    lostAttributionWarnedAt = now;
+    logger.warn(
+      '⚠️ X-Real-IP absent or unparseable under Railway ingress; upgrades charged to the shared unattributed budget'
+    );
+  };
   const logQuotaClosed = new WeakSet<WebSocket>();
 
   const wss = new WebSocketServer({
@@ -311,14 +325,15 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         done(false, 426, 'Client update required; refresh GeoRoids');
         return;
       }
-      // A missing or unparseable `X-Real-IP` falls back to the socket peer rather
-      // than refusing: under Railway that is the proxy, so those callers share one
-      // budget — coarse, but the lane ceiling still bounds them, and a pilot is
-      // never locked out by an ingress change.
-      const clientIp =
-        resolveClientAddress(info.req, railwayIngress) ??
-        info.req.socket.remoteAddress ??
-        'unknown';
+      // An upgrade the edge cannot attribute is charged to the shared
+      // unattributed budget, which the lane ceiling bounds. An earlier revision
+      // charged the proxy's own address instead, which put the whole fleet into
+      // one 50-per-window bucket and refused half of it — the lockout this
+      // limiter exists to prevent, reached by losing a header rather than by load.
+      const clientIp = upgradeChargeAddress(info.req, railwayIngress);
+      if (railwayIngress && clientIp === UNATTRIBUTED_CLIENT) {
+        reportLostAttribution(Date.now());
+      }
       const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
@@ -329,7 +344,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
           // tell apart. Logging them alike hides the second behind the first.
           logger.warn(
             admissionDecision.laneExhausted
-              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend}); refused ${clientIp}`
+              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend})`
               : admissionDecision.lane === 'logs'
                 ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
                 : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`

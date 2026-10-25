@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:35201d5321e445a7100882a1b0d3b22261e64acc688e14e75a8498204e682d81",
+    "server/communication/connectionAdmission.ts": "sha256:966ce6f748d39aa6963d641cd1c6f2588a163f8c997e658d90f692ebcab25b3f",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:c06ecd1d11f303efd594b58850061453a17392be7baefb4bad40def50bbcf1ca",
+    "server/createServer.ts": "sha256:bbc0f309e0a19374bcbadc5c4a319ebcd1ac4f373d928bfecab4a58233c188ce",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
@@ -572,7 +572,7 @@
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
-    "server/communication/clientAddress.ts": "sha256:40f309a68ff94ec790ca213cbc8ee36fd02fc0a717644365bffeb1efaeb756e8"
+    "server/communication/clientAddress.ts": "sha256:a2a6596be6201c6ea391f5b6d1bab1e2ccbce2b5671ff9cf9f66d7891151f5e8"
   },
   "reviews": [
     {
@@ -7120,6 +7120,20 @@
     },
     {
       "note": "Reviewed connection admission and the upgrade address it charges. Read hud-network's Connection interruptions and Can't join sections: the fifteen-second retry, the restored-ship and cargo rules, the server-update reload, and the nickname-in-use/server-full/outdated-tab banner causes all stay accurate. The change gives each client its own upgrade budget behind Railway ingress and adds a lane ceiling across addresses, so it removes a refusal honest pilots could hit after a deploy rather than adding one; it does not change join capacity (MAX_PLAYERS), the retry window, or any banner the article enumerates. No demonstration cites these sources (checked src/wiki/media.ts), and no generated reference value changes. Ran lint, typecheck, knip, ts-prune, the new admission guard with four mutation checks, and all 726 server unit and integration tests.",
+      "sources": [
+        "server/communication/clientAddress.ts",
+        "server/communication/connectionAdmission.ts",
+        "server/createServer.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network",
+        "server/communication/clientAddress.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reworked after bundled review found a Critical defect in the first revision; this note corrects that revision's note, which claimed the change removes a refusal rather than adding one. That was wrong twice over: the lane ceiling IS a new aggregate refusal, and as first written it was not a per-window ceiling at all. Expiry was anchored to the last attempt, so the lane bucket -- charged by every address -- rolled only after sixty seconds of server-wide silence, making the ceiling a counter that climbed over uptime and then refused every pilot for up to a minute. Reproduced against a copy of the shipped module: at one upgrade per second from a hundred rotating honest addresses, 7,800 refusals and 130 full-lane outages in twenty-four hours, with zero callers over their own budget. Window expiry now uses a separate windowStart that a charge never moves; the same reproduction yields zero refusals at every rate tried. Re-read hud-network's Connection interruptions and Can't join sections against the corrected behavior: the fifteen-second retry, the restored-ship and cargo rules, the server-update reload and the nickname-in-use/server-full/outdated-tab banner causes all stay accurate, and the generic join-failure banner is already documented as showing no guaranteed detailed reason. Three further corrections ship with it: the ceiling was sized counting the five ladder retries but not the initial upgrade, so 600 was exactly the worst honest case rather than headroom and is now twice it, pinned against the real RECONNECT_DELAYS_MS by a test importing both; the log ceiling of 60 sat below MAX_PLAYERS and is now fleet-sized; and losing X-Real-IP now charges a shared unattributed budget bounded by the lane ceiling, instead of the proxy address, which had put the whole fleet into one 50-per-window bucket and refused half of it. No demonstration cites these sources and no generated reference value changes. Ran lint, typecheck, knip, ts-prune, 880 server and network tests across 115 files, and five mutation checks including one that reinstates the original defect and now fails. The complete npm run test and npm run build run in the pre-commit gate that gates this commit.",
       "sources": [
         "server/communication/clientAddress.ts",
         "server/communication/connectionAdmission.ts",

@@ -18,7 +18,8 @@ Publish the matching client and server revisions close together. Either deployme
 order has a temporary mismatch window: a version-2 tab cannot join a version-3
 server, and a version-3 client cannot join a version-2 server. Refreshing obtains
 the current client; it cannot finish a pending server deployment. The release
-watcher reloads stale tabs after observing a changed client manifest.
+watcher notices a changed client manifest and reloads a stale tab only after
+the player consents.
 A matching new client that met an older server may need Enter Game again once
 both deployments finish. Pilot resume credentials are retained. A version
 mismatch fails explicitly rather than starting gameplay with incomplete or

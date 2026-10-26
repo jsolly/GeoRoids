@@ -1,5 +1,10 @@
 {
   "extends": "./tsconfig.json",
+  // The release machinery under scripts/ is authored as .mjs. Knip stops
+  // checking a module's exports once any path string reaches it, which covers
+  // most of those runners, so ts-prune owns their unused exports instead. This
+  // program only reports exports; nothing here reaches the build or typecheck.
+  "compilerOptions": { "allowJs": true },
   "include": [
     "../../.railway",
     "../../src",

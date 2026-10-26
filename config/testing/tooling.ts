@@ -33,6 +33,7 @@ export default defineConfig({
             'scripts/validation-admission.test.mjs',
             'scripts/check-built-client.test.mjs',
             'scripts/check-unused-typescript.test.mjs',
+            'scripts/check-unused-class-members.test.mjs',
             'scripts/typescript-toolchain.test.mjs',
           ],
         },

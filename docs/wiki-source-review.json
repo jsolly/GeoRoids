@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:e7c0793436fb6409d8e5dfb96503e172c219284514ff2135146efdab37ac872e",
+    "package.json": "sha256:bef426fa93acbde3417c9c1c299f490e93a351fd9dae8f9c941ca03f3529b265",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -7580,6 +7580,15 @@
       ],
       "media": ["cargo", "hauler", "scout", "survival"],
       "owners": {}
+    },
+    {
+      "note": "Added the deterministic resolver for this ledger (`npm run wiki:merge`, `scripts/merge-wiki-ledger.mjs`) and registered its contract test in the runner project; package.json changed only by gaining that script, which the digest counts even though no dependency moved.\n\nEvery branch appends to this ledger, so concurrent branches collide in it routinely, and the resolution that looks obvious is unsafe. Taking the union of both sides is correct only while the two sides re-recorded disjoint sources. When both sides re-recorded the same source the merged bytes match neither recorded digest, so a union writes a digest for content that does not exist, and this check still passes, because it compares digests against files and a union is self-consistent. That is not a hypothetical: the merge recorded two batches above hit it with six such sources, and it was caught only by asserting the disjointness rather than assuming it. The resolver now asserts it, and reproduces that same six-source pending set from the three real inputs.\n\nNo player rule, article, demonstration or generated asset changes. The resolver touches no gameplay source, no runtime code and no build output; it reads three ledger inputs and writes one. Verified with its ten contract cases in the runner project, mutation checks on each of its four rules (taking theirs for a two-sided digest, resolving reviews by prefix instead of content union, tolerating a dropped base batch, and ignoring a one-sided deletion all fail a named case, each file restored byte-identically afterwards), a real conflicted merge in a temporary repository, lint, types, markdown lint and the full gate.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
     }
   ]
 }

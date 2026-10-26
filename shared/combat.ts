@@ -17,7 +17,7 @@ export interface CombatCircle {
   immune: boolean;
 }
 
-/** True when a ship must not take or report collision / combat damage. */
+/** True when a ship must not take collision / combat damage. */
 export function isCombatantImmune(state: CombatantState): boolean {
   if (state.exploding || state.health <= 0 || state.respawnTimer !== undefined) {
     return true;

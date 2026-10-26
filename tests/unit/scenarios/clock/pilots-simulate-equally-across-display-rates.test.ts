@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { checkBoundaryCollision } from '../../../../shared/boundary';
+import { SHIP } from '../../../../shared/constants/gameplay';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../../shared/gameClock';
+import { WORLD } from '../../../../shared/world';
 import { GameController } from '../../../../src/core/gameController';
 import { Laser } from '../../../../src/entities/laser/Laser';
+import { PlayerManager } from '../../../../src/entities/player/PlayerManager';
 import { Roid } from '../../../../src/entities/roid/Roid';
 import { canvasManager } from '../../../../src/rendering/canvasSurface';
 import { asteroidRow } from '../../../support/asteroid-row';
@@ -67,6 +71,47 @@ test.each([30, 60, 120, 144])(
     expect(steps).toHaveBeenCalledTimes(60);
   }
 );
+
+test('a wall contact inside a catch-up burst still reports its overlapping pose', () => {
+  const ship = arrangeFlight();
+  // Positioned so the FIRST of the burst's two frames is the one that touches
+  // the wall: `floor(59985) + 15` clears it, `floor(59986.4) + 15` does not.
+  // That makes this an intermediate frame, which no pose timer can observe.
+  ship.position = { x: WORLD.radius - ship.r, y: 0 };
+  ship.velocity = { x: SHIP.MAX_VELOCITY, y: 0 };
+  ship.angle = 0;
+  ship.angularVelocity = 0;
+  ship.thrusting = true;
+  ship.blinkCount = 0;
+  expect(checkBoundaryCollision(ship.position, ship.r)).toBe(false);
+  const reportedAt: Array<{ x: number; y: number }> = [];
+  vi.spyOn(PlayerManager.getInstance(), 'updateNetworkState').mockImplementation(() => {
+    reportedAt.push({ ...ship.position });
+  });
+
+  // A 30 Hz repaint drains two simulation frames in one synchronous loop, so the
+  // 60 Hz pose timer can only ever observe the second of them. The contact has
+  // to be reported from inside the frame that detects it, or a contact lasting
+  // one frame never reaches the server and the wall is not lethal here.
+  game.updateGame(1000 / 30);
+
+  expect(reportedAt).toHaveLength(1);
+  const carried = reportedAt[0];
+  assert.ok(carried);
+  expect(checkBoundaryCollision(carried, ship.r)).toBe(true);
+  // Captured before the burst finished: the hull has travelled further by the
+  // time the loop returns, so a pose sampled at the burst's end would carry a
+  // different, later position than this one.
+  expect(carried.x).toBeLessThan(ship.position.x);
+
+  // And only on the rising edge: a hull grinding along the wall must not add a
+  // second pose every frame, which would spend the inbound message budget that
+  // `server/communication/messageBudget.ts` reserves for commands.
+  const afterFirstContact = reportedAt.length;
+  game.updateGame(1000 / 30);
+  expect(checkBoundaryCollision(ship.position, ship.r)).toBe(true);
+  expect(reportedAt).toHaveLength(afterFirstContact);
+});
 
 test('a resumed or sub-tick frame does not advance motion or projectiles', () => {
   const ship = arrangeFlight();

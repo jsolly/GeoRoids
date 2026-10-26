@@ -463,7 +463,11 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
-  /** Returns true when the hit destroyed the target. */
+  /** Returns true when the hit ended the target's life: destroyed outright, or
+   * downed into a cooperative rescue window. `handleShipDamage` reports
+   * `isDestroyed: false` for a cooperative down (`GameEngine.downShip` sets a
+   * positive `downedUntil`), so reading that flag alone would log a wall death
+   * as a movement violation in exactly the mode the game is usually played in. */
   private emitShipDamage(
     targetId: string,
     attackerId: string,
@@ -487,7 +491,7 @@ export class MessageHandler {
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
-    return outcome.isDestroyed;
+    return outcome.isDestroyed || outcome.entity.health <= 0;
   }
 
   /**
@@ -500,17 +504,33 @@ export class MessageHandler {
    * `handleShipDamage`. Returns true when the contact destroyed the hull.
    *
    * What this trusts is that the reported position is truthful, not merely that
-   * a pose arrives. The server holds no independent position for a player, so a
-   * modified client reporting its real track clamped to the rim is never killed
-   * and still flies normally. That immunity predates this change: the retired
-   * client report was simply never sent.
+   * a pose arrives. The server owns a position for each player, but never
+   * simulates one: between its own impulses it can only validate and adopt what
+   * the hull reports. So a modified client reporting its real track clamped to
+   * the rim is never killed and still flies normally. That immunity predates
+   * this change: the retired client report was simply never sent.
+   *
+   * The reachability proof is the `displacement` check alone — the reported
+   * position must be within the travel credit of a position the server already
+   * owns. The `velocity` check bounds a number this rule never reads.
    *
    * Nor is this the only non-lethal refusal. `failedEnvelopeCheck` returns the
    * first failing check, so an overlapping pose that also trips `velocity`,
-   * `displacement` or `rail` — or one refused on a stale epoch or sequence
-   * before any envelope runs — carries no `'boundary'` and no kill. That is
-   * deliberate: such a pose is not proven reachable, and killing on one is the
-   * on-demand self-destruct this rule replaced.
+   * `displacement` or `rail` carries no `'boundary'` and no kill, and neither
+   * does one refused before any envelope runs: a stale epoch or sequence, a
+   * dead or invalid actor, furnace or contour transit, or a contour-hop combo.
+   * A pilot a menu holds is unkillable here for a different reason —
+   * `handlePlayerUpdate` substitutes the server's own position for the reported
+   * one before the envelope runs. Every one of those is deliberate: such a pose
+   * is not proven reachable, and killing on one is the on-demand self-destruct
+   * this rule replaced.
+   *
+   * One gap in the proof worth knowing: in `handoff` mode `'boundary'` is still
+   * reached on the displacement credit (about `poseLeadFrames` of travel) even
+   * though the tighter `'anchor'` bound, which is checked after it, would have
+   * refused the pose. The authoritative hull is already at the rim in that
+   * case, so this costs nothing, but the bound is displacement's, not the
+   * anchor's.
    *
    * The client does not predict this death — `CollisionManager` only flashes —
    * so the hull keeps flying outward and re-reports a deepening overlap until

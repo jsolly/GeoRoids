@@ -130,11 +130,14 @@ describe('Boundary collision', () => {
     dead.health = 0;
     const exploding = vulnerableHull(WALL_CONTACT);
     exploding.exploding = true;
+    // Last in the list, so skipping an immune hull must not skip the rest.
+    const vulnerable = vulnerableHull(WALL_CONTACT);
 
-    collisionManager.checkBoundaryCollisions([dead, exploding]);
+    collisionManager.checkBoundaryCollisions([dead, exploding, vulnerable]);
 
     expect(dead.impactFlashFrames).toBe(0);
     expect(exploding.health).toBe(100);
     expect(exploding.impactFlashFrames).toBe(0);
+    expect(vulnerable.impactFlashFrames).toBeGreaterThan(0);
   });
 });

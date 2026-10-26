@@ -77,6 +77,8 @@ export class GameController {
   private currRoidBelt: RoidBelt;
   private readonly localFirstPlayers: Player[] = [];
   private simulationAccumulatorMs = 0;
+  /** True while this contact run has already reported its overlapping pose. */
+  private boundaryContactReported = false;
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -470,11 +472,29 @@ export class GameController {
       return;
     }
 
-    // Only predict for the locally-controlled ship. The network player list
-    // holds server-synced copies (which lag at 30 FPS) rather than the
-    // predicted local ship, and the server kills each pilot from its own
-    // reading of their reported pose, so nothing here needs the hold size.
-    this.collisionManager.checkBoundaryCollisions([currPlayer.ship]);
+    // Only check the locally-controlled ship. The network player list holds
+    // server-synced copies (which lag at 30 FPS) rather than the predicted
+    // local ship, and the server kills each pilot from its own reading of
+    // their reported pose, so nothing here needs the hold size.
+    if (!this.collisionManager.checkBoundaryCollisions([currPlayer.ship])) {
+      this.boundaryContactReported = false;
+      return;
+    }
+    if (this.boundaryContactReported) {
+      return;
+    }
+    // Report this frame's overlapping position from inside the simulation
+    // frame. `updateGame` drains the tick accumulator in a synchronous loop, so
+    // the 60 Hz pose timer can only ever sample the burst's final frame: on a
+    // client advancing two frames per repaint, a contact lasting a single frame
+    // would never reach the server and the wall would not be lethal there.
+    // Only the rising edge sends, which keeps the inbound budget intact —
+    // `server/communication/messageBudget.ts` allows 120/s against roughly 90/s
+    // of poses and snapshot acknowledgments, and exceeding it terminates the
+    // socket rather than throttling it. `InputManager.updateMovementLock`
+    // reports out of band the same way.
+    this.boundaryContactReported = true;
+    this.playerManager.updateNetworkState();
   }
 
   // Simple render method - no game logic, just rendering

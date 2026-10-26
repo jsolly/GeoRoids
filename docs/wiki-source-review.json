@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:8b37ccf2bfeec1cbaac66f8166b4ceee4e19e0c747cc548249500287d15ce29e",
+    "server/communication/MessageHandler.ts": "sha256:374ddaa60cab77a32668d1955d950e2ebdb5feadf8102952a7ab52a73cd87da8",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:5cd434471089030385b9e3b7c0f93fefffbaa6541fb68de3415c52489891b09a",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -143,7 +143,7 @@
     "shared/beltCrawler.ts": "sha256:f826d22c1256908a64052d3a6ba008b39215ad17de46fded49ae118c7260abea",
     "shared/boundary.ts": "sha256:7cb7cf56b7e152f452ebf086e3d0a56e1819e8cf262c5a51f42df41b7cda398a",
     "shared/chargedWeapon.ts": "sha256:04ddbced404a5eac1a85a0760114943c196073629dff3299a57aab271ddb2919",
-    "shared/combat.ts": "sha256:4e0d9b17b298c8d38ddc39ecda42f7e5d9f7fb6e777be74bb34dd237003e128c",
+    "shared/combat.ts": "sha256:05e896c9b6ecfb70bc5c0ec237761562973225d21fe7809095144e4864f4a461",
     "shared/constants/gameplay.ts": "sha256:35ce164cb64868b3abdacbb160250367c42d0ac67af347f39611ad659bd503d5",
     "shared/constants/health.ts": "sha256:5abc3c0233548552efa4c2d4526e41d338a3b7f3a792c530bce404992098cf63",
     "shared/contourAsteroid.ts": "sha256:07e0e09198ee65dfc4ba3141910f9a35ca502c61c63389b420df9215e0e5c413",
@@ -265,7 +265,7 @@
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:5290d2ae7e0c6175a4f0c46d4c901050b72db81db20d08c3baf867640e4c493b",
+    "src/core/gameController.ts": "sha256:2783c72b9159e039d6314d8c0e69f63a700bb702228348c0adf6fe4f2127a4c9",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:a4775c68fcd740081832385689f432dc68dab693f7ef9ee2300b1a9e4341f26c",
@@ -330,7 +330,7 @@
     "src/pages/debug/index.astro": "sha256:67afd4a29476a2bb630f5681f853866f8dc18b1458e47a7b55502aab066bcb41",
     "src/pages/index.astro": "sha256:98f27a0d6da8910842b5884b0919abe5a7213379a89f6096ba82e75cb6557040",
     "src/pages/wiki.astro": "sha256:30b20fe2ccf7e6a5b85ea6bc604d454f6fe785564daf2954cd92e14f49025e61",
-    "src/physics/CollisionManager.ts": "sha256:cda63c23005e9520175352922daf59a495f5f24b623f03e557bbd6f3001b85ef",
+    "src/physics/CollisionManager.ts": "sha256:0dec95d09090114a0e31688ef71cfb01e3ff4cd60b20ab85dc70aec55035d431",
     "src/physics/terrain/contourBridgeSession.ts": "sha256:3b41164f926a30a3695428c7d882ef80757aafcfcf5fe7cb555cfeec18fc3eca",
     "src/physics/terrain/contourCapture.ts": "sha256:42ba129cd5221fef152fb7a730d8ffe69df9e13f215a76594d41379bcf539dad",
     "src/physics/terrain/contourLaser.ts": "sha256:13428129bbf5c8d90250fdfe0c6f4de634412a810b2d3ff0a581981975852a1b",
@@ -507,7 +507,7 @@
     "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:57a98c39546a62319b123349ecf852e2d3b37ff47607293cd209b5cd0894f8f4",
     "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-cargo-and-bank.test.ts": "sha256:f599eff926157f07fc6ddcb3c0f8300a149656027467471bdbc1b6001424c0ea",
     "tests/unit/server/a-new-utc-month-keeps-the-world-and-scores.test.ts": "sha256:918640016895e0e34ad0fbdefd752cecb09668adc166f3dc0b830af4ebce3460",
-    "tests/unit/server/authoritative-combat.test.ts": "sha256:4dba015cb381c849ef4d2947fa3c497834d09afb4abe07fd1103422350ec95ee",
+    "tests/unit/server/authoritative-combat.test.ts": "sha256:5853353284153b4379dc4a7712e93c7cba046fd7b7931114b09ec6795b84c29b",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:e7825cd740c4c87a4de9155c75aafae2484b9d0710da846fee5483dfa0e801ee",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:eebef9e38211a9b82cb133bb3262e04f8de150861269245f3e39db75a0238187",
@@ -7234,6 +7234,38 @@
       "note": "Digest refresh only for tests/unit/entities/shipLifecycle.test.ts. The preceding batch recorded this file, then it was reformatted to the repository Biome configuration (an earlier run had applied Biome defaults by mistake), which changed its bytes but not a single assertion. Its one wall-related case still drives CollisionManager.checkBoundaryCollisions per kit and asserts a flash with no local death. No article or demonstration text is affected; combat-survival is re-read and unchanged.",
       "sources": ["tests/unit/entities/shipLifecycle.test.ts"],
       "topics": ["combat-survival"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Wall contact is reported from inside the simulation frame that detects it, and the rejection-warning suppression now covers a cooperative downing. Two defects in the preceding batch, both found by review and both reproduced. (1) The client only reported poses on an independent 60 Hz timer, while updateGame drains the tick accumulator in a synchronous loop, so a pose could only ever observe the burst final frame. On a 30 Hz client two frames advance per repaint, so a contact lasting one frame was never reported and the wall was not lethal; measured about half of one frame near-tangential grazes, while the hull still showed the impact flash. GameController now reports the overlapping position from the contact frame itself, on the rising edge only, which keeps the inbound message budget intact because exceeding it terminates the socket rather than throttling. (2) The suppression read handleShipDamage isDestroyed, which is false for a cooperative down because downShip sets a positive downedUntil, so in the mode this game is normally played in every lethal wall contact logged a movement violation and spent the five second per socket window that belongs to real envelope violations. The gate now means the contact ended this life. Corrections to the preceding note: it said the only player visible change was the explosion arriving up to one round trip late; the hull is also drawn briefly past the wall before the refusal re-anchors it, bounded well under one hull radius at ordinary cruise. It also claimed the server holds no independent position for a player, which is false: the server owns a position, it just never simulates one, and only the displacement check proves reachability while the velocity check bounds a number this rule never reads. Those comments are corrected in the source. Player-facing review: no article or demonstration needed editing. terrain \"The circular wall destroys a vulnerable ship on contact\" still holds; the controls and terrain Contour Lock release lists still hold, because release precedes the immunity check on both sides; combat-survival cargo-before-hull still holds, and a menu held pilot is covered twice over, by the server substituting its own position for the reported one and by overlayHold being an isCombatantImmune condition. asteroids, field-manual, hauler, hud-network, satellites and teamwork were re-read and describe rules this does not touch; hud-network Diagnostics promises rail fields on contour rejections, which are untouched. The survival demonstration cites shared/combat.ts but shows an asteroid impact, not wall death, so no regeneration. Verified with npm run gate and these mutation checks: removing the out-of-band report, or firing it every overlapping frame instead of on the rising edge, fails the new catch-up burst case; a clamp in Ship.update that keeps the hull inside the wall fails the sender case, which now flies there with the real integration instead of placing the hull; keying the suppression on isDestroyed alone fails the new cooperative case; suppressing every boundary rejection fails the cargo case; disabling the overlay-hold pose substitution fails the new menu-hold case; billing maximum instead of remaining health fails the damaged-hull-with-cargo case. Lost coverage recorded: the merge-base case \"a cargo-protected wall contact flashes and reports the hit without predicting hull death\" is deleted outright, because it asserted a client prediction branch that no longer exists; the cargo rule is now pinned server side by an exact 9 HP survivor and the damaged-hull case.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "shared/combat.ts",
+        "src/core/gameController.ts",
+        "src/physics/CollisionManager.ts",
+        "tests/unit/server/authoritative-combat.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "satellites",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["survival"],
+      "owners": {
+        "src/physics/CollisionManager.ts": "terrain"
+      }
+    },
+    {
+      "note": "Digest refresh only for tests/unit/server/authoritative-combat.test.ts. The preceding batch recorded this file, then Biome sorted an import and adjusted formatting under the repository configuration, which changed its bytes and not one assertion. Its wall cases still drive the same mechanism: the lethal contact and its suppressed warning, the full-health Hauler and damaged scout, the cargo-absorbed survivor with its own rejection record, the damaged hull with a full hold, the menu-held pilot, and the pilot in town who cannot claim a wall pose. No article or demonstration text is affected; asteroids, combat-survival, hauler and teamwork are re-read and unchanged.",
+      "sources": ["tests/unit/server/authoritative-combat.test.ts"],
+      "topics": ["asteroids", "combat-survival", "hauler", "teamwork"],
       "media": [],
       "owners": {}
     }

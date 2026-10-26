@@ -27,8 +27,18 @@ export class CollisionManager {
    * erases the contact before any pose can carry it. A hull that stays alive
    * keeps flying outward instead, so it re-reports the overlap until the server
    * acts on it.
+   *
+   * For the same reason the reported position must reach the socket unclamped:
+   * rounding or clamping a hull back inside the wall anywhere between here and
+   * `ConnectionManager.sendPlayerState` would mean the server never sees a
+   * contact, and the wall would silently stop being lethal.
+   * `tests/unit/network/wall-contact-reaches-the-server.test.ts` fails if it is.
+   *
+   * Returns true when a hull registered contact, so the caller can report that
+   * frame's position at once — see `GameController.checkBoundaryCollisions`.
    */
-  checkBoundaryCollisions(ships: Ship[]): void {
+  checkBoundaryCollisions(ships: Ship[]): boolean {
+    let contact = false;
     for (const ship of ships) {
       if (ship.contourLocked && checkBoundaryCollision(ship.position, ship.r)) {
         ship.releaseContourLock();
@@ -44,7 +54,9 @@ export class CollisionManager {
           shipId: ship.id,
         });
         applyShipImpactFlash(ship);
+        contact = true;
       }
     }
+    return contact;
   }
 }

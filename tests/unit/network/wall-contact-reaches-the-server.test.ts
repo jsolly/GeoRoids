@@ -65,6 +65,11 @@ describe('wall contact reaches the server', () => {
     vi.unstubAllGlobals();
   });
 
+  test('the hull radius and world size this arrangement relies on', () => {
+    expect(HULL_RADIUS).toBe(15);
+    expect(WORLD.radius).toBe(60_000);
+  });
+
   test('the overlapping position a hull reports is what leaves the socket', async () => {
     // The server owns wall death and can only read it from the position this
     // packet carries, so nothing between the collision check and the socket may
@@ -104,8 +109,20 @@ describe('wall contact reaches the server', () => {
     row.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
 
-    // One frame of outward flight puts the hull in contact.
-    local.ship.position = { ...OVERLAPPING };
+    // Fly there with the real integration rather than placing the hull. The
+    // design rests on a live hull carrying itself from the last accepted
+    // position to an overlapping one, so a clamp or a speed limit that stopped
+    // outward travel at the rim would retire the lethal rule silently.
+    local.ship.angle = 0;
+    local.ship.thrusting = true;
+    let frames = 0;
+    while (!checkBoundaryCollision(local.ship.position, local.ship.r) && frames < 30) {
+      local.ship.update();
+      frames += 1;
+    }
+    expect(checkBoundaryCollision(local.ship.position, local.ship.r)).toBe(true);
+    const flownTo = { ...local.ship.position };
+
     CollisionManager.getInstance().checkBoundaryCollisions([local.ship]);
     expect(local.ship.health).toBeGreaterThan(0);
     expect(local.ship.exploding).toBe(false);
@@ -115,8 +132,13 @@ describe('wall contact reaches the server', () => {
     const packet = ws.sent.at(-1);
     expect(packet?.type).toBe('update');
     const reported = packet?.data?.['position'] as { x: number; y: number } | undefined;
-    expect(reported).toEqual(OVERLAPPING);
+    expect(reported).toEqual(flownTo);
     expect(checkBoundaryCollision(reported ?? LAST_ACCEPTED, HULL_RADIUS)).toBe(true);
+    // `getStateForNetwork` ships `ship.position` by reference, so the position
+    // assertions above hold even for an undecorated packet. These two are what
+    // prove the production pose allocator ran and did not refuse the
+    // overlapping pose; do not drop them as redundant.
     expect(typeof packet?.data?.['motionEpoch']).toBe('number');
+    expect(typeof packet?.data?.['motionSequence']).toBe('number');
   });
 });

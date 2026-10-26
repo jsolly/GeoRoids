@@ -9,14 +9,26 @@ import type { QueueDiagnostics } from './store';
 const REQUEST_DEADLINE_MS = 10_000;
 
 /**
- * How long one fault episode may go unrecorded. Identity alone bounds nothing:
- * a store that alternates between failing and answering opens a new episode on
- * every flap, which is one record per delivery tick -- the flood the collapsing
- * exists to prevent, with a recovery line added between each pair.
+ * How long one fault episode may go unrecorded. The worker delivers on a 1 Hz
+ * interval (`./worker` `setInterval`) and replies `fault` once per failing
+ * tick, so a store that stays broken reports about 86,400 times a day. This
+ * interval is what bounds the records that reach the log: about ninety-six a
+ * day while the fault persists, each carrying the count it stands in for.
+ *
+ * It bounds the continuous case only. Identity alone bounds nothing, because a
+ * store that alternates between failing and answering ends an episode and
+ * opens the next one, which logs immediately -- so this interval is a floor on
+ * the quiet period below, not a ceiling on the records a flapping store costs.
  */
 const FAULT_LOG_INTERVAL_MS = 900_000;
 
-/** How long a store must answer without faulting before an episode is over. */
+/**
+ * How long a store must answer without faulting before an episode is over.
+ * Longer than the 1 Hz delivery interval by a wide margin, so recovery is
+ * claimed on a store that has answered repeatedly rather than on one reply
+ * between two failures; shorter than the logging interval above, so a genuine
+ * recovery is recorded rather than collapsed into the fault it followed.
+ */
 const FAULT_QUIET_MS = 60_000;
 
 /**

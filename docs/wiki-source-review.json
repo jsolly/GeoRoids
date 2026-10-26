@@ -91,13 +91,13 @@
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
-    "server/core/AsteroidManager.ts": "sha256:78025c1a549f82c7ec210745b668a85c5241f82f77d591d7057606bdd606c323",
-    "server/core/BeltCrawlerManager.ts": "sha256:bcfa5747f3432d2b0769effb71e73fd845aded57db71c115a772be1b6377ab45",
+    "server/core/AsteroidManager.ts": "sha256:e536e0b0a44d8d4ab24fb5618210f3ab2648e516ec7c954c31e1073e54d2d959",
+    "server/core/BeltCrawlerManager.ts": "sha256:fe4a9e6b0a622452a633d016f0d76ae57ce7a9e2b464fe25bda3b7614afb55c7",
     "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:05eb50b99d590a0120a10f1f5b103cabcc74bd4b3eb529f0a04b909245768ba1",
-    "server/core/GameEngine.ts": "sha256:07c1229e5d1ab2b381c94bf8f3a87ac1b31bcc69cb92973513bfa63d0e647139",
+    "server/core/GameEngine.ts": "sha256:a28657f7a55560b428c199f3cb7b038e2f1663aee3569e0dc5f98f7c31adfc2a",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -116,7 +116,7 @@
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
-    "server/world/AsteroidSpatialIndex.ts": "sha256:9c30d118e9b5ccc0dac6028970483d4a5f6ad5d13145daec2d0de01ea2744260",
+    "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
     "server/world/InlineWorldPersistence.ts": "sha256:aa8a6f7ebbb1ce31afa87d6eae34d262c81765b8fc0788c6853f57e83b7d3828",
     "server/world/MapAssets.ts": "sha256:2ffe843156946dc2c0234948433805560daf15f424987a933cdfb2030c6519ad",
@@ -140,7 +140,7 @@
     "shared/asteroidPhenomena.ts": "sha256:ab1ac159aefa09427ff8fa76c8c649801d9fe081f8ecc45de452079856002da2",
     "shared/asteroidReflection.ts": "sha256:0fe393e733a698d711db584167259a856565458c0a5ac12e05f0e23ca0f218a8",
     "shared/asteroidScale.ts": "sha256:9d915433cc72415420657f773bfedac789b52a7edd395d79119d7c79c9eddede",
-    "shared/beltCrawler.ts": "sha256:f826d22c1256908a64052d3a6ba008b39215ad17de46fded49ae118c7260abea",
+    "shared/beltCrawler.ts": "sha256:3fd29c3e9cffac5b03ba747849b51122a2a76c6bc4d05df5723da031971e6905",
     "shared/boundary.ts": "sha256:7cb7cf56b7e152f452ebf086e3d0a56e1819e8cf262c5a51f42df41b7cda398a",
     "shared/chargedWeapon.ts": "sha256:04ddbced404a5eac1a85a0760114943c196073629dff3299a57aab271ddb2919",
     "shared/combat.ts": "sha256:ed0260bb402e44e052ca6a6ddced6add0cac57cd46c74ec4e5a5d95dd2a271e5",
@@ -510,7 +510,7 @@
     "tests/unit/server/authoritative-combat.test.ts": "sha256:81581e91345bb64716cdbdb4eeee71170788b01019d5d6aa85156bacb425c455",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:e7825cd740c4c87a4de9155c75aafae2484b9d0710da846fee5483dfa0e801ee",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
-    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:eebef9e38211a9b82cb133bb3262e04f8de150861269245f3e39db75a0238187",
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:0808cc5c78a0d4df335585469d57b16d2b8f3c65337072e234c260a60c6caa2a",
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:a211f6c8c0c593b809dde90c6f053e37e39963550b6d84d9552ebed8159e01ee",
     "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:88a7a22fe6feb765c078a330f02e175db549bd47bad8a0dce29ad9f2e84fb413",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:e05382b1eb1fbb5d5482e540c08e305f672a24b7523e3a244b7db0d1a2a85c78",
@@ -7205,6 +7205,94 @@
       "sources": ["server/services/GameStateBroadcaster.ts"],
       "topics": ["hud-network", "teamwork"],
       "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Routed the per-frame armed-boost and burning-boost loops onto a tracked boosted-rock set in AsteroidManager instead of two whole-belt copies; no player-visible rule changed. Re-read Hauler 'Boost Coupling E' and 'Reach and release', Asteroids colossal/powered-cargo/ore prose, Teamwork 'Scan, tow, deliver', Scout probe limits on powered rocks, Controls E behavior, and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, and equal credit for launchers and recorded scanning pilots all still hold. Field manual, combat and survival, terrain and satellites prose is untouched by the change. Ran the complete unit suite, static checks and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": ["server/core/AsteroidManager.ts", "server/core/GameEngine.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Belt crawlers now receive their candidate hosts from a tracked set on AsteroidManager instead of BeltCrawlerManager walking the whole spatial index each frame; the slot rule moved into shared/beltCrawler.ts as hostsBeltCrawlers with the stride named NATIVE_SLOT_STRIDE, replacing an unnamed percent-six in two places. No player-visible rule changed. Re-read Asteroids 'Belt spiders' and Terrain 'Belt crawlers': rounding rock cover, hopping between nearby rocks to chase, one shot killing an exposed body without breaking its rock, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks or dying if none is reachable, a killed crawler returning only when its host deposit is replaced, and immunity to tap, probe, direct tow and Mineral Scan all still hold; crawlers still travel with a towed host and cannot bite mid-hop. The eighteen-lone-guards belt count is preserved by NATIVE_SLOT_STRIDE and its test still passes. Ran the 18 belt-crawler cases, the reserved-population case, the belt-pass guard, lint and types, and npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": [
+        "server/core/AsteroidManager.ts",
+        "server/core/BeltCrawlerManager.ts",
+        "server/core/GameEngine.ts",
+        "shared/beltCrawler.ts",
+        "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Independent review of the belt-pass change found the documented invariant overstated, so this round corrects AsteroidManager's comments and makes crawlerHostAsteroids prune removed ids as boostedAsteroids already does, closing the one path by which the tracked set could outgrow the live belt. No player-visible rule changed and no gameplay predicate moved. Re-read Asteroids 'Belt spiders' and 'Boost Coupling'-related prose plus Hauler 'Boost Coupling E': crawlers rounding cover and hopping between rocks, one shot killing an exposed body, leaping to a reachable rock when a host breaks, a killed crawler returning only when its host deposit is replaced, arming toward the nearest furnace, a second coupling reaching full speed and delivery credit for launchers and recorded scanning pilots all still hold. Ran the 11-case belt-pass guard, the 18 belt-crawler cases, the reserved-population case and the world-write cadence case (40 passing), lint and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected by the prune.",
+      "sources": ["server/core/AsteroidManager.ts"],
+      "topics": ["asteroids", "hauler"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Third review round after independent review found the belt-pass guard's coverage claims overstated. These three sources change without any behaviour change: nativeCrawlerSlot is renamed isNativeCrawlerSlot so it no longer reads like a slot accessor beside beltSlotForAsteroid, BeltCrawlerManager follows the rename, and AsteroidSpatialIndex.values() is deleted because this change left it with no caller anywhere in server, src, shared, tests, benchmarks or scripts once BeltCrawlerManager.advance stopped walking the index (knip does not check class members, so the gate could not see the dead code). No gameplay predicate moved and no rule changed. Re-read Asteroids 'Belt spiders', Terrain 'Belt crawlers' and 'Guard patrols', Scout probe limits on powered rocks, Teamwork 'Scan, tow, deliver' and Hauler 'Boost Coupling E': crawlers rounding cover and hopping between rocks, one shot killing an exposed body, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks, a killed crawler returning only when its host deposit is replaced, immunity to tap probe tow and Mineral Scan, powered rocks refusing a probe, and equal delivery credit for launchers and recorded scanning pilots all still hold; the eighteen-lone-guards belt count is unchanged. Ran the belt-pass guard (13 cases), the 18 belt-crawler cases, reserved population, local-query, world-write cadence and persistent-world suites (56 passing), plus lint, types, knip and ts-prune; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": [
+        "server/core/BeltCrawlerManager.ts",
+        "server/world/AsteroidSpatialIndex.ts",
+        "shared/beltCrawler.ts"
+      ],
+      "topics": ["asteroids", "hauler", "scout", "teamwork", "terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Merge round: brought main (PR 879, unused-export and class-member gate holes plus the mining chip cue) into the belt-pass branch. The only file both sides touch is GameEngine.ts, where 879 narrows ensureSatellitePickups to private while this branch routes the armed-boost and burning-boost loops onto tracked sets and hands BeltCrawlerManager its hosts; the two edits share no code path and the merged file keeps both. AsteroidSpatialIndex.values() stays deleted: 879 added a public-class-member check that could not see the member on main, because BeltCrawlerManager.advance still called it there, and this branch is what orphans it, so the deletion is now required by that new gate rather than merely tidy. No player-visible rule changed and no gameplay predicate moved by the merge. Re-read Asteroids 'Belt spiders' and the colossal, powered-cargo and ore prose, Terrain 'Belt crawlers' and 'Guard patrols', Hauler 'Boost Coupling E' and 'Reach and release', Scout probe limits on powered rocks, Teamwork 'Scan, tow, deliver', Controls E behavior and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, equal delivery credit for launchers and recorded scanning pilots, crawlers rounding cover and hopping between rocks, one shot killing an exposed body, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks, and a killed crawler returning only when its host deposit is replaced all still hold, and the eighteen-lone-guards belt count is preserved by NATIVE_SLOT_STRIDE. The chip cue 879 wired is a separate deposit-damage path that this branch does not touch. Ran the complete unit suite on the pre-merge tree (393 files, 2345 tests passing) and re-ran lint, types and the merged static checks here.",
+      "sources": [
+        "server/core/AsteroidManager.ts",
+        "server/core/BeltCrawlerManager.ts",
+        "server/core/GameEngine.ts",
+        "server/world/AsteroidSpatialIndex.ts",
+        "shared/beltCrawler.ts",
+        "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
       "owners": {}
     }
   ]

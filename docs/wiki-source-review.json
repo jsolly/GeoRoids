@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:9c8fcfb6ae39ed85a1a749e0538fa18c9d3c95c1ad2285aff1bfff03492164a9",
+    "server/communication/MessageHandler.ts": "sha256:fe3e7e4eeec874d4b42e488e65b3b5c5241fbbfdb509d8265cb6f1a64d58cf8c",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:5cd434471089030385b9e3b7c0f93fefffbaa6541fb68de3415c52489891b09a",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -102,7 +102,7 @@
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
     "server/core/LootManager.ts": "sha256:bad0eaa4e555d9853b5054ebc9ec7e32aae26fed2a9d78b902d6c63925568a5e",
-    "server/core/PlayerMotionService.ts": "sha256:198c39ce68ae3523f83aa7fe72f0017814785c65898ffdeae0d321379ef00d41",
+    "server/core/PlayerMotionService.ts": "sha256:4ee2c53439e1a06b6564368ca22cb5d2a8e213f43d28d9692050d9dd8872a6bb",
     "server/core/RNGService.ts": "sha256:c6a852821c514621ded484d570859144e6b035de82fb74e6e851ef68358f03eb",
     "server/core/RolyPolyManager.ts": "sha256:1564c9b42dbf3091f1ba8cbe90b10f63458a9d3b5e9830b66b46fc733bd05cad",
     "server/core/SatellitePickupManager.ts": "sha256:e44b5e648b8490c81fec961a251ef8f8473d78036331ebdac9acb7ce5c83083a",
@@ -141,7 +141,7 @@
     "shared/asteroidReflection.ts": "sha256:0fe393e733a698d711db584167259a856565458c0a5ac12e05f0e23ca0f218a8",
     "shared/asteroidScale.ts": "sha256:9d915433cc72415420657f773bfedac789b52a7edd395d79119d7c79c9eddede",
     "shared/beltCrawler.ts": "sha256:f826d22c1256908a64052d3a6ba008b39215ad17de46fded49ae118c7260abea",
-    "shared/boundary.ts": "sha256:9dc50c5059a1640a90f0a06570f01272b3397d6f218f576fd615d6e662feea99",
+    "shared/boundary.ts": "sha256:7cb7cf56b7e152f452ebf086e3d0a56e1819e8cf262c5a51f42df41b7cda398a",
     "shared/chargedWeapon.ts": "sha256:04ddbced404a5eac1a85a0760114943c196073629dff3299a57aab271ddb2919",
     "shared/combat.ts": "sha256:4e0d9b17b298c8d38ddc39ecda42f7e5d9f7fb6e777be74bb34dd237003e128c",
     "shared/constants/gameplay.ts": "sha256:35ce164cb64868b3abdacbb160250367c42d0ac67af347f39611ad659bd503d5",
@@ -316,7 +316,7 @@
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
     "src/network/services/ConnectionManager.ts": "sha256:18bcfcda3ae514abec7ea74c660bbc58356f6329d70330b102e24484e155d216",
-    "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
+    "src/network/services/PlayerMotionReconciliation.ts": "sha256:40948db5996bdbed42aa2705131bafd15e22032ce8714ab5cad06e34cd45842e",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
     "src/network/services/connectionHealth.ts": "sha256:9946b4a2b5fd045ec6686f52a38e223724801a4077a9e3216290a35b022ff582",
@@ -330,7 +330,7 @@
     "src/pages/debug/index.astro": "sha256:67afd4a29476a2bb630f5681f853866f8dc18b1458e47a7b55502aab066bcb41",
     "src/pages/index.astro": "sha256:98f27a0d6da8910842b5884b0919abe5a7213379a89f6096ba82e75cb6557040",
     "src/pages/wiki.astro": "sha256:30b20fe2ccf7e6a5b85ea6bc604d454f6fe785564daf2954cd92e14f49025e61",
-    "src/physics/CollisionManager.ts": "sha256:dd01ce1cd7a4eaeaade11e7c1d39c71b4cd3ed3996a39af79f2ced0cec4a4b4f",
+    "src/physics/CollisionManager.ts": "sha256:7943dfc02853acedb2f46d6a371972f7d7f3ebbb291c4c54d681d54996318a44",
     "src/physics/terrain/contourBridgeSession.ts": "sha256:3b41164f926a30a3695428c7d882ef80757aafcfcf5fe7cb555cfeec18fc3eca",
     "src/physics/terrain/contourCapture.ts": "sha256:42ba129cd5221fef152fb7a730d8ffe69df9e13f215a76594d41379bcf539dad",
     "src/physics/terrain/contourLaser.ts": "sha256:13428129bbf5c8d90250fdfe0c6f4de634412a810b2d3ff0a581981975852a1b",
@@ -479,7 +479,7 @@
     "tests/unit/network/cooperative-state-survives-snapshot-v3.test.ts": "sha256:a7734cc5bf0e260c5b320d92710f784ea08efae5a7083eef86626491f30c4bd3",
     "tests/unit/network/failed-connections-settle-and-recover.test.ts": "sha256:59123600e203afb56fb50dfeed7afe73eddb7887eaab89af91302dee29c12adc",
     "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts": "sha256:4eb7350fd05099f2adbeb17843b51898e16b5051b2cae6c4abd6efa26acbf19d",
-    "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts": "sha256:345a2d82c98332478056ea6022f1e8e0459e03bd1decb4628635d2b2d448d36c",
+    "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts": "sha256:36b05504894947951f51c0c8797c409a4ec93d6d04a0de8c9edf5e64245aad67",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts": "sha256:66e28e876eaea9dfe8f992a609513f32e60305d2d11c64b2bad7636ee1ca3987",
     "tests/unit/network/resume-credential-stores-release-provenance.test.ts": "sha256:6ad859a57905a6db1119e110a3d35409da4639f49a74bafbaa133676654df9c7",
     "tests/unit/performance/resuming-pilots-count-one-disconnect-through-reconnect-retries.test.ts": "sha256:7b5add8d4d85cb66b5f86931a3690f969f49d8b3e5fa1c29d0d1c7d597ec2cce",
@@ -507,7 +507,7 @@
     "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:57a98c39546a62319b123349ecf852e2d3b37ff47607293cd209b5cd0894f8f4",
     "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-cargo-and-bank.test.ts": "sha256:f599eff926157f07fc6ddcb3c0f8300a149656027467471bdbc1b6001424c0ea",
     "tests/unit/server/a-new-utc-month-keeps-the-world-and-scores.test.ts": "sha256:918640016895e0e34ad0fbdefd752cecb09668adc166f3dc0b830af4ebce3460",
-    "tests/unit/server/authoritative-combat.test.ts": "sha256:bb9d6915bca37d470ebe14a3f91246f2b3555d21905c9c62e96b81f40fdd8b0e",
+    "tests/unit/server/authoritative-combat.test.ts": "sha256:dd96592e40852ea9de682c19181443c1d0c5ca001e5ff609c9b9e27d69348724",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:e7825cd740c4c87a4de9155c75aafae2484b9d0710da846fee5483dfa0e801ee",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:eebef9e38211a9b82cb133bb3262e04f8de150861269245f3e39db75a0238187",
@@ -7174,6 +7174,32 @@
       ],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "SUPERSEDES the two preceding notes on this branch, which recorded claims independent review then disproved. Correction 1: the note asserting the wall was lethal via a refused pose was wrong — a live client sets its own death flags in the frame it detects overlap and buildHandoffPose then returns null, so that pose never reached the server. Correction 2: the note asserting a client 'cannot dodge' an accepted-pose velocity check was also wrong — reproduced, a client reporting honest positions with velocity {0,0} flew to and 0.9 units past the rim at full health; and that note's claim that tangential rim travel is never contact is false at the outer edge of the legal band, where the rule's whole-unit flooring admits any non-zero step. Both designs are now reverted. Current design: the client keeps reporting through a locally predicted death (PlayerMotionReconciliation.buildHandoffPose now stops only on authoritative death), the server refuses the overlapping pose it reports, and MessageHandler.applyBoundaryContact applies the lethal rule from PlayerMotionService.failedEnvelopeCheck's own checkBoundaryCollision on the reported position. No client-declared velocity is read, and a locally dead hull stops thrusting so it re-reports that position on every later pose, removing the one-frame sampling window that made the previous design miss roughly 1/stride of approaches (measured: ~50% on a 30fps client). What is trusted, stated plainly in the code: that the hull reports the pose at all; a client withholding poses is not killed but also cannot move, an immunity that predates this branch. Diagnostics change to record: a wall death now also emits one throttled motion_command_rejected with envelope.check 'boundary', where the merge base emitted none, because the kill is keyed to that rejection; hud-network's promise of rail distance, alignment and acquisition-window fields concerns contour rejections only and is unaffected. Re-read every citing article against the implementation and none needed editing: terrain / Outer boundary holds and is now actually implemented (contact destroys a vulnerable ship regardless of hull health, pinned by a full-health 140 HP Hauler and a 40 HP damaged hull); combat-survival / Damage and protection holds (cargo spills before hull damage, pinned by an exact 9 HP survivor; empty hold dies outright); the wall entry in the Contour Lock release lists (terrain, controls) holds because handleShipDamage releases the lock before its immunity check; controls' connection-interruption line, hud-network's diagnostics and reconnect lines, scout, teamwork, hauler and asteroids describe rules this does not touch. No demonstration shows the wall and none was regenerated. Mutation-checked: restoring the local-death pose suppression (the root cause review found twice) fails the new client-reporting case; never applying the boundary kill fails 12 tests across 5 files; killing on any envelope rejection fails the town-pose negative; hardcoding wall damage to 100 fails the full-health Hauler case; a 10x error in cargo residual credit fails the cargo case; dropping Math.floor fails the fractional-overhang case. Correcting an earlier note: those first two counts were recorded as 7 tests, measured as 12 across 5 files.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/PlayerMotionService.ts",
+        "shared/boundary.ts",
+        "src/network/services/PlayerMotionReconciliation.ts",
+        "src/physics/CollisionManager.ts",
+        "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts",
+        "tests/unit/server/authoritative-combat.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "hauler",
+        "hud-network",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [],
+      "owners": {
+        "src/physics/CollisionManager.ts": "terrain"
+      }
     }
   ]
 }

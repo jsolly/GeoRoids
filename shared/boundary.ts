@@ -13,23 +13,6 @@ export function checkBoundaryCollision(shipPos: Position, shipRadius: number): b
   return Math.floor(Math.hypot(shipPos.x, shipPos.y)) + shipRadius > WORLD.radius;
 }
 
-/**
- * True when one frame of this velocity carries the hull into the wall. The
- * server owns wall death from this predicate on a pose it has accepted, so a
- * client cannot avoid the wall by withholding the overlapping pose it would
- * otherwise report. Tangential travel along the rim is not contact.
- */
-export function stepReachesBoundary(
-  shipPos: Position,
-  velocity: Position,
-  shipRadius: number
-): boolean {
-  return checkBoundaryCollision(
-    { x: shipPos.x + velocity.x, y: shipPos.y + velocity.y },
-    shipRadius
-  );
-}
-
 /** Asteroids inhabit the same circular world as ships. */
 export function isPoseInAsteroidField(x: number, y: number, slop = 1): boolean {
   return Math.hypot(x, y) <= WORLD.radius + slop;

@@ -20,9 +20,10 @@ export class CollisionManager {
   }
 
   /**
-   * Local boundary prediction only. The server owns wall death: it runs the same
-   * `checkBoundaryCollision` on each reported pose and kills from its own
-   * geometry, so nothing here is reported to it.
+   * Local boundary prediction only. The server owns wall death: it runs this
+   * same `checkBoundaryCollision` on the pose the hull reports and kills from
+   * its own geometry. Predicting here does not silence that report — see
+   * `PlayerMotionReconciliation.buildHandoffPose`.
    */
   checkBoundaryCollisions(ships: Ship[], cargo: number): void {
     for (const ship of ships) {

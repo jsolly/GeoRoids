@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { checkBoundaryCollision, stepReachesBoundary } from '../../shared/boundary';
+import { checkBoundaryCollision } from '../../shared/boundary';
 import { GAME, SHIP } from '../../shared/constants/gameplay';
 import { CONTOUR_BRIDGE, contourDraftMultiplier } from '../../shared/contourBridge';
 import {
@@ -21,7 +21,13 @@ import { terrainSpeedLimit } from '../../shared/terrainTravel';
 import type { ContourLockState, PlayerMotionState, Position } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
 
-/** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
+/** Which envelope check failed, with the numbers behind it.
+ * Mostly diagnostics, but `check: 'boundary'` is gameplay-load-bearing:
+ * `MessageHandler.applyBoundaryContact` reads it to apply the lethal wall rule.
+ * It is returned only after the velocity and displacement checks pass (see
+ * `failedEnvelopeCheck`), which is what keeps a distant pilot from claiming a
+ * wall pose; `authoritative-combat.test.ts`'s "a pilot in town cannot claim a
+ * wall pose" fails if those returns are reordered. */
 interface MotionEnvelopeRejection {
   check: 'velocity' | 'displacement' | 'boundary' | 'anchor' | 'rail';
   mode: PlayerMotionState['mode'];
@@ -55,11 +61,8 @@ interface BlockedSpan {
 }
 
 export type MotionOutcome =
-  /** `blockedMs` is the server-blocked time this pose was credited beyond client silence.
-   * `boundaryContact` reports that this accepted pose's own velocity reaches the wall, so
-   * the caller applies the lethal wall rule. It is the gameplay signal; a rejection's
-   * `envelope.check` stays diagnostics-only. */
-  | { ok: true; blockedMs: number; boundaryContact?: true }
+  /** `blockedMs` is the server-blocked time this pose was credited beyond client silence. */
+  | { ok: true; blockedMs: number }
   | {
       ok: false;
       error: string;
@@ -455,6 +458,9 @@ export class PlayerMotionService {
     if (limits.displacement > limits.credit + 1e-6) {
       return 'displacement';
     }
+    // Must stay after the velocity and displacement returns above: this value
+    // is lethal (see `MotionEnvelopeRejection`), so reaching it before those
+    // checks would let a pilot anywhere in the world claim a wall contact.
     if (checkBoundaryCollision(pose.position, limits.hullRadius)) {
       return 'boundary';
     }
@@ -660,12 +666,7 @@ export class PlayerMotionService {
     session.contourLockAt = acquiredAt;
     session.actor.lastUpdate = now;
     this.publish(session);
-    // Read the wall from the pose this service just accepted, never from one it
-    // refused: a client that predicts its own death stops reporting, so a
-    // refused pose is a signal the server cannot rely on receiving.
-    return stepReachesBoundary(pose.position, pose.velocity, hullRadius)
-      ? { ok: true, blockedMs, boundaryContact: true }
-      : { ok: true, blockedMs };
+    return { ok: true, blockedMs };
   }
 
   /** Publish a server impulse as a new epoch so in-flight client poses cannot erase it. */

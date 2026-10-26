@@ -145,13 +145,17 @@ export class PlayerMotionReconciliation {
    * Also use this allocator to decorate ordinary free poses.
    */
   public buildHandoffPose(ship: Ship): PlayerPose | null {
+    // Keep reporting through a locally predicted death. The server owns wall
+    // death and reads it from the overlapping pose this hull reports, so going
+    // quiet the instant local prediction fires would hide the contact from it.
+    // `authoritativeAlive` still stops the stream once the server has confirmed
+    // the death, and `handlePlayerUpdate` ignores poses from a hull it already
+    // knows is dead.
     if (
       !this.motion ||
       !['handoff', 'free'].includes(this.motion.mode) ||
       this.waitingForResume ||
-      !this.authoritativeAlive ||
-      ship.exploding ||
-      ship.health <= 0
+      !this.authoritativeAlive
     ) {
       return null;
     }

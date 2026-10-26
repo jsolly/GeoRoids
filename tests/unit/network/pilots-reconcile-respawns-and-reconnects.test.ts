@@ -1,8 +1,11 @@
 import { describe, expect, it as test } from 'vitest';
+import { checkBoundaryCollision } from '../../../shared/boundary';
 import { SHIP } from '../../../shared/constants/gameplay';
 import { ensureTerrain, getTerrainField } from '../../../shared/terrainField';
+import { WORLD } from '../../../shared/world';
 import type { ServerEntityData } from '../../../shared-types';
 import { Ship } from '../../../src/entities/ship/Ship';
+import { applyShipBoundaryDeath } from '../../../src/entities/ship/shipUtils';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
 import { snapshotFixture } from './snapshotFixture';
 
@@ -23,6 +26,38 @@ function fixture() {
 }
 
 describe('player motion recovery', () => {
+  test('a locally predicted wall death keeps reporting, so the server can read the contact', () => {
+    const { ship, prediction } = fixture();
+    // Fly the hull into the wall and let local prediction kill it, exactly as
+    // CollisionManager does on the frame it detects the overlap.
+    ship.position = { x: WORLD.radius - ship.r + 1, y: 0 };
+    ship.blinkCount = 0;
+    expect(checkBoundaryCollision(ship.position, ship.r)).toBe(true);
+    applyShipBoundaryDeath(ship);
+    expect(ship.exploding).toBe(true);
+    expect(ship.health).toBe(0);
+
+    // The server owns wall death and reads it from this pose. Predicting locally
+    // must not silence it, or the contact never reaches the server at all.
+    const reported = prediction.buildHandoffPose(ship);
+    expect(reported).not.toBeNull();
+    expect(checkBoundaryCollision(reported?.position ?? { x: 0, y: 0 }, ship.r)).toBe(true);
+
+    // A dead hull stops thrusting, so it re-reports that overlapping position on
+    // every later pose. Whichever pose the sender happens to sample carries the
+    // contact, so a skipped simulation frame costs nothing.
+    for (let pose = 0; pose < 3; pose++) {
+      ship.update();
+      const again = prediction.buildHandoffPose(ship);
+      expect(again).not.toBeNull();
+      expect(checkBoundaryCollision(again?.position ?? { x: 0, y: 0 }, ship.r)).toBe(true);
+    }
+
+    // Once the server has confirmed the death, reporting stops.
+    prediction.rebase(row({ exploding: true, health: 0 }), ship, 34);
+    expect(prediction.buildHandoffPose(ship)).toBeNull();
+  });
+
   test('a server blast survives the flight cap and then decays back to normal control speed', () => {
     const prior = getTerrainField();
     // Gradient samples lie outside this small field, so the entire flight stays flat.

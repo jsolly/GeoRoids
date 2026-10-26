@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
-import { checkBoundaryCollision, stepReachesBoundary } from '../../../shared/boundary';
+import { checkBoundaryCollision } from '../../../shared/boundary';
 import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
 import { hullRadiusForKit } from '../../../shared/shipKits';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
@@ -488,13 +488,11 @@ describe('server-authoritative combat', () => {
     expect(engine.spawnPlayerLaser(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)).toBeNull();
   });
 
-  test('a legal rim pose whose own velocity reaches the wall is lethal', () => {
+  test('a reported pose that overlaps the wall is read by the server and kills', () => {
     clearAsteroidField(engine);
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
     const radius = hullRadiusForKit('scout');
-    // The rim: the furthest position the envelope accepts. One step of legal
-    // outward velocity from here reaches the wall.
     const rim = { x: WORLD.radius - radius, y: 0 };
     join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: rim });
     clearProtection(engine, 'nova');
@@ -503,20 +501,17 @@ describe('server-authoritative combat', () => {
     const parked = engine.getPlayer('nova');
     assert.ok(parked?.playerMotion);
     const outward = engine.playerMotion.legalSpeed(parked, now) * 0.9;
-
-    // The regression this pins: a live client never reports a position it has
-    // already called a wall hit, because it sets its own death flags in the
-    // same frame it detects the overlap and then stops decorating poses. So the
-    // kill must come from a pose whose reported position is still legal.
-    expect(checkBoundaryCollision(rim, radius)).toBe(false);
-    expect(stepReachesBoundary(rim, { x: outward, y: 0 }, radius)).toBe(true);
+    const overlapping = { x: rim.x + outward, y: 0 };
+    // A live client does report this: local death prediction no longer silences
+    // the pose stream (see pilots-reconcile-respawns-and-reconnects).
+    expect(checkBoundaryCollision(overlapping, radius)).toBe(true);
 
     wsCore.handleClientMessage(
       {
         type: 'update',
         id: 'nova',
         data: {
-          position: { ...rim },
+          position: overlapping,
           velocity: { x: outward, y: 0 },
           angle: 0,
           thrusting: true,
@@ -530,8 +525,8 @@ describe('server-authoritative combat', () => {
     const struck = engine.getPlayer('nova');
     expect(struck?.health).toBe(0);
     expect(struck?.exploding).toBe(true);
-    // The pose was accepted, so the authoritative hull stays inside the wall.
-    expect(checkBoundaryCollision(struck?.position ?? rim, radius)).toBe(false);
+    // The pose was refused, so the authoritative hull never left the world.
+    expect(checkBoundaryCollision(struck?.position ?? overlapping, radius)).toBe(false);
     expect(novaWs.lastReceived('playerDamaged')?.data).toMatchObject({
       targetPlayerId: 'nova',
       attackerId: 'boundary',
@@ -546,45 +541,62 @@ describe('server-authoritative combat', () => {
     const radius = hullRadiusForKit('hauler');
     expect(radius).toBeGreaterThan(hullRadiusForKit('scout'));
     const rim = { x: WORLD.radius - radius, y: 0 };
-    join(wsCore, haulerWs, {
-      id: 'barge',
-      name: 'Barge',
-      kitId: 'hauler',
-      position: rim,
-    });
+    join(wsCore, haulerWs, { id: 'barge', name: 'Barge', kitId: 'hauler', position: rim });
     clearProtection(engine, 'barge');
     // A Hauler carries more hull than a Scout, so a fixed damage figure would
-    // leave it alive; contact must kill regardless of remaining health.
+    // leave it alive. Damage it first too: contact kills regardless of health.
     const hauler = engine.getPlayer('barge');
     assert.ok(hauler);
     expect(hauler.maxHealth).toBeGreaterThan(SHIP.MAX_HEALTH);
-    const now = engine.getServerTime();
-    assert.ok(engine.playerMotion.placeActorForTesting('barge', rim, now));
-    const parked = engine.getPlayer('barge');
-    assert.ok(parked?.playerMotion);
-    const outward = engine.playerMotion.legalSpeed(parked, now) * 0.9;
 
-    wsCore.handleClientMessage(
-      {
-        type: 'update',
-        id: 'barge',
-        data: {
-          position: { ...rim },
-          velocity: { x: outward, y: 0 },
-          angle: 0,
-          thrusting: true,
-          motionEpoch: parked.playerMotion.epoch,
-          motionSequence: parked.playerMotion.ack + 1,
+    const flyIntoWall = (id: string, hullRadius: number, socket: RecordingSocket): void => {
+      const edge = { x: WORLD.radius - hullRadius, y: 0 };
+      const at = engine.getServerTime();
+      assert.ok(engine.playerMotion.placeActorForTesting(id, edge, at));
+      const ready = engine.getPlayer(id);
+      assert.ok(ready?.playerMotion);
+      const step = engine.playerMotion.legalSpeed(ready, at) * 0.9;
+      wsCore.handleClientMessage(
+        {
+          type: 'update',
+          id,
+          data: {
+            position: { x: edge.x + step, y: 0 },
+            velocity: { x: step, y: 0 },
+            angle: 0,
+            thrusting: true,
+            motionEpoch: ready.playerMotion.epoch,
+            motionSequence: ready.playerMotion.ack + 1,
+          },
         },
-      },
-      haulerWs
-    );
+        socket
+      );
+    };
 
+    // Full health first: a Hauler's 140 outlives any fixed damage figure, so
+    // this is what pins the damage to the hull's own remaining health.
+    expect(engine.getPlayer('barge')?.health).toBe(hauler.maxHealth);
+    flyIntoWall('barge', radius, haulerWs);
     expect(engine.getPlayer('barge')?.health).toBe(0);
     expect(engine.getPlayer('barge')?.exploding).toBe(true);
+
+    // And a part-damaged hull dies the same way: contact ignores what is left.
+    const scoutWs = new RecordingSocket();
+    const scoutRadius = hullRadiusForKit('scout');
+    join(wsCore, scoutWs, {
+      id: 'nova',
+      name: 'Nova',
+      position: { x: WORLD.radius - scoutRadius, y: 0 },
+    });
+    clearProtection(engine, 'nova');
+    engine.entityManager.updateEntity('nova', { health: 40 });
+    expect(engine.getPlayer('nova')?.health).toBe(40);
+    flyIntoWall('nova', scoutRadius, scoutWs);
+    expect(engine.getPlayer('nova')?.health).toBe(0);
+    expect(engine.getPlayer('nova')?.exploding).toBe(true);
   });
 
-  test('a survivable wall contact still logs its rejection-free diagnostics and spills cargo', () => {
+  test('a cargo-protected wall contact spills the hold and leaves the hull alive', () => {
     clearAsteroidField(engine);
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
@@ -604,7 +616,7 @@ describe('server-authoritative combat', () => {
         type: 'update',
         id: 'nova',
         data: {
-          position: { ...rim },
+          position: { x: rim.x + outward, y: 0 },
           velocity: { x: outward, y: 0 },
           angle: 0,
           thrusting: true,
@@ -615,10 +627,11 @@ describe('server-authoritative combat', () => {
       novaWs
     );
 
-    // Cargo absorbs the hit first, so the hull survives this contact.
+    // The whole 90-point hold spills, which at ECONOMY.cargoPointsPerHp = 10
+    // absorbs 9 HP of the 100 HP hit, so 91 reaches the hull and 9 is left.
     const shielded = engine.getPlayer('nova');
     expect(shielded?.cargo).toBe(0);
-    expect(shielded?.health).toBeGreaterThan(0);
+    expect(shielded?.health).toBe(9);
     expect(shielded?.exploding).toBe(false);
     expect(engine.getLoot().filter((drop) => drop.kind === 'points')).toEqual([
       expect.objectContaining({ points: 90 }),

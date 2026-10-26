@@ -2,7 +2,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
-import { checkBoundaryCollision, stepReachesBoundary } from '../../../../shared/boundary';
+import { checkBoundaryCollision } from '../../../../shared/boundary';
 import { SHIP } from '../../../../shared/constants/gameplay';
 import { hullRadiusForKit } from '../../../../shared/shipKits';
 import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../../shared/snapshotProtocol';
@@ -301,10 +301,9 @@ export class GameServerWorld {
 
   /**
    * Fly the pilot into the arena wall for real: park the hull on the rim and
-   * report a legal pose whose own velocity carries it into the wall. The server
-   * accepts that pose and reads the wall from it, exactly as it does in play —
-   * no overlapping position is ever reported, because a live client stops
-   * reporting the moment it predicts its own death.
+   * report the overlapping pose a live client reports there. The server refuses
+   * that pose and reads the wall from its own geometry, exactly as in play —
+   * local death prediction no longer silences the report.
    */
   hitBoundary(pilot: Pilot): void {
     const actor = this.entity(pilot);
@@ -322,20 +321,18 @@ export class GameServerWorld {
       throw new Error(`${pilot.name} lost its motion session at the wall`);
     }
     const outward = this.engine.playerMotion.legalSpeed(parked, now) * 0.9;
-    // The premise this helper depends on: the rim pose is legal, and one step of
-    // this velocity reaches the wall. Fail loudly rather than quietly not colliding.
     const hullRadius = hullRadiusForKit(actor.kitId);
-    if (checkBoundaryCollision(rim, hullRadius)) {
-      throw new Error(`The rim pose for ${pilot.name} is already past the wall`);
-    }
-    if (!stepReachesBoundary(rim, { x: outward, y: 0 }, hullRadius)) {
+    const contact = { x: rim.x + outward, y: 0 };
+    // The premise this helper depends on: the reported pose actually overlaps the
+    // wall. Fail loudly rather than quietly not colliding.
+    if (!checkBoundaryCollision(contact, hullRadius)) {
       throw new Error(`${pilot.name} cannot reach the wall in one legal step`);
     }
     this.send(pilot, {
       type: 'update',
       id: pilot.id,
       data: {
-        position: { ...rim },
+        position: contact,
         velocity: { x: outward, y: 0 },
         angle: 0,
         thrusting: true,

@@ -483,17 +483,25 @@ export class MessageHandler {
   }
 
   /**
-   * The wall is lethal on the server's own geometry, never on a client's claim.
-   * `acceptFreePose` sets `boundaryContact` when a pose it accepted — already
-   * inside the wall, and within its speed and reachable-displacement limits —
-   * carries a velocity that reaches the wall. A client cannot dodge this by
-   * withholding its overlapping pose, because the pose that condemns it is one
-   * the client needs the server to accept in order to keep flying. Contact
-   * kills regardless of remaining hull health; cargo still absorbs it first
-   * inside `handleShipDamage`.
+   * Wall death from the server's own geometry. `failedEnvelopeCheck` runs
+   * `checkBoundaryCollision` on the reported position and returns `'boundary'`
+   * only after that pose passed its speed and reachable-displacement limits, so
+   * a pilot elsewhere in the world cannot claim a contact. The pose itself is
+   * refused, so the authoritative hull never moves outside the wall. Contact
+   * kills regardless of remaining hull health; cargo absorbs it first inside
+   * `handleShipDamage`.
+   *
+   * What this trusts: that the hull reports the overlapping pose at all.
+   * `PlayerMotionReconciliation.buildHandoffPose` deliberately keeps reporting
+   * through a locally predicted death so it does, and a locally-dead hull stops
+   * thrusting, so it re-reports that position on every later pose rather than in
+   * one frame the server might not sample. A modified client that withholds
+   * poses entirely is not killed here, but it also cannot move: its last
+   * accepted position stands and every further pose it does send is judged from
+   * there. That immunity predates this change.
    */
   private applyBoundaryContact(playerId: string, outcome: MotionOutcome): void {
-    if (!outcome.ok || outcome.boundaryContact !== true) {
+    if (outcome.ok || outcome.envelope?.check !== 'boundary') {
       return;
     }
     const struck = this.gameEngine.getPlayer(playerId);

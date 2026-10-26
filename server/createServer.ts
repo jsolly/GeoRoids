@@ -291,15 +291,24 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   // Losing `X-Real-IP` under Railway ingress silently returns every caller to a
   // shared budget. That needs its own signal rather than being inferred from
   // refusals, which read identically to one flapping client.
-  let lostAttributionWarnedAt = Number.NEGATIVE_INFINITY;
+  //
+  // The record carries how many upgrades it stands for, because one caller can
+  // produce this by withholding the header and ingress failing produces it for
+  // the whole fleet. Those are different incidents and a bare line reads the
+  // same for both. It states what was observed rather than naming a cause it
+  // cannot tell apart.
+  let lostAttributionReportedAt = Number.NEGATIVE_INFINITY;
+  let unattributedSinceReport = 0;
   const reportLostAttribution = (now: number): void => {
-    if (now - lostAttributionWarnedAt < CONNECTION_ADMISSION_WINDOW_MS) {
+    unattributedSinceReport += 1;
+    if (now - lostAttributionReportedAt < CONNECTION_ADMISSION_WINDOW_MS) {
       return;
     }
-    lostAttributionWarnedAt = now;
     logger.warn(
-      '⚠️ X-Real-IP absent or unparseable under Railway ingress; upgrades charged to the shared unattributed budget'
+      `⚠️ X-Real-IP unusable on ${unattributedSinceReport} upgrade(s) since the last record; charged to the shared unattributed budget`
     );
+    lostAttributionReportedAt = now;
+    unattributedSinceReport = 0;
   };
   const logQuotaClosed = new WeakSet<WebSocket>();
 

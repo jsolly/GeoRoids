@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:b865b5106b63ac4a6d5a1fdd79449abf887fd05ae8893b3e1d60f2acd131485e",
+    "server/communication/connectionAdmission.ts": "sha256:60027246d8c0d36072ce58df3fb73c4753f03bf1b1ebdd42d49f01a5114eb2ea",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:2a48decb1cd0b3549263c12e9c4a3c2a68759d4352824963dbe202d394c6888c",
+    "server/createServer.ts": "sha256:69ba5c1a0447d99fc801e2719655d0656fe989dd377bd76664d487f8cf04c3c0",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
@@ -7153,6 +7153,15 @@
         "server/communication/connectionAdmission.ts",
         "server/createServer.ts"
       ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Second pass over the same two sources in this change, carrying two findings the round downgraded to Minor. Neither alters behaviour a page describes, so the hud-network conclusion recorded in the preceding entry stands unchanged and no page needs an edit. First: the bucket kept two timestamps, one for expiring a window and one for pruning. Analysis while fixing the blockers showed the two cannot be told apart through admit -- any bucket the window start would prune has already rolled its window, so bucketFor would hand that caller a fresh one regardless and the count is stale either way -- and a mutation written to prove otherwise survived, which is what established it. Keeping both implied a distinction that does not exist, so there is now one timestamp and the code states why rather than implying a test covers the difference. The observable property, that pruning never hands a caller mid-spend a fresh budget, is guarded by two cases and by a mutation that evicts live buckets. Second: the lost-attribution warning named a cause it cannot establish. One caller withholding X-Real-IP and ingress failing fleet-wide produce the same line, and they are different incidents; the record now carries how many upgrades it stands for and states what was observed instead. Volume is the only thing that separates them, which is a log-line change with no player-visible effect. Three further Minors are declined rather than carried, with reasons on the PR: replacing the unattributed sentinel with a typed absent-address input, moving the client reconnect ladder into shared/, and deriving edge trust from per-request headers instead of RAILWAY_ENVIRONMENT_ID. Each is a real design change that widens this PR past the blockers it exists to fix, and the third depends on a production verification that is human-owned. Verified again after the refactor rather than before it: 689 server unit tests across 94 files, and six mutation checks re-run against the final code, each failing a named test and the file restored byte-identical, including re-introducing a shared lane ceiling, which two cases now reject.",
+      "sources": ["server/communication/connectionAdmission.ts", "server/createServer.ts"],
       "topics": ["hud-network"],
       "media": [],
       "owners": {

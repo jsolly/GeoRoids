@@ -80,16 +80,13 @@ interface Bucket {
   /**
    * When this window opened. A charge never moves it, so the window is fixed.
    *
-   * Anchoring expiry to the last attempt instead turns a per-window budget into
-   * a lifetime one: a caller that keeps trying never rolls its own window, so a
+   * Anchoring this to the last attempt instead turns a per-window budget into a
+   * lifetime one: a caller that keeps trying never rolls its own window, so a
    * pilot flapping through a bad connection spends its 50 and is then refused
    * until it stays quiet for a whole window -- which is the lockout this
-   * limiter exists to prevent, reached from the other direction. Keep these two
-   * timestamps apart: expiry reads this one, `prune` reads the other.
+   * limiter exists to prevent, reached from the other direction.
    */
   windowStart: number;
-  /** Last attempt, for `prune` alone. */
-  lastAttempt: number;
   rejected: boolean;
 }
 
@@ -110,12 +107,11 @@ export function createConnectionAdmission(disabled: boolean) {
     if (existing && now - existing.windowStart <= CONNECTION_ADMISSION_WINDOW_MS) {
       return existing;
     }
-    return { count: 0, windowStart: now, lastAttempt: now, rejected: false };
+    return { count: 0, windowStart: now, rejected: false };
   }
 
-  function charge(store: Map<string, Bucket>, key: string, bucket: Bucket, now: number): void {
+  function charge(store: Map<string, Bucket>, key: string, bucket: Bucket): void {
     bucket.count += 1;
-    bucket.lastAttempt = now;
     store.set(key, bucket);
   }
 
@@ -144,20 +140,24 @@ export function createConnectionAdmission(disabled: boolean) {
         own.rejected = true;
         return { accepted: false, lane, firstRejection, count: own.count, limit };
       }
-      charge(buckets, key, own, now);
+      charge(buckets, key, own);
       return { accepted: true, lane, firstRejection: false, count: own.count, limit };
     },
     /**
-     * Drops buckets for addresses that stopped calling, so the map stays
-     * bounded. What matters is that it never resets a budget still being
-     * spent; reading `lastAttempt` rather than `windowStart` is not
-     * observable through `admit` -- any bucket the window start would evict
-     * has already rolled, so its count is stale either way -- it is simply the
-     * conservative one, and a test cannot tell the two apart.
+     * Drops buckets whose window has rolled, so the map stays bounded. What
+     * matters is that it never resets a budget still being spent, which the
+     * same comparison that expires a window already decides.
+     *
+     * An earlier revision kept a second timestamp for this, on the theory that
+     * pruning on the window start could evict a caller mid-window. It cannot:
+     * a bucket this deletes has rolled, so `bucketFor` would hand that caller a
+     * fresh one anyway and its count is stale either way. The two are therefore
+     * indistinguishable through `admit`, no test can tell them apart, and one
+     * timestamp is the honest shape.
      */
     prune(now: number): void {
       for (const [key, bucket] of buckets) {
-        if (now - bucket.lastAttempt > CONNECTION_ADMISSION_WINDOW_MS) {
+        if (now - bucket.windowStart > CONNECTION_ADMISSION_WINDOW_MS) {
           buckets.delete(key);
         }
       }

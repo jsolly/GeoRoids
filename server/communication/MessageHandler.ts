@@ -391,16 +391,22 @@ export class MessageHandler {
       },
       motionNow
     );
-    this.logMotionRejection(
-      ws,
-      'update',
-      outcome,
-      receivedAt,
-      command.motionEpoch,
-      command.motionSequence,
-      motionNow
-    );
-    this.applyBoundaryContact(id, outcome);
+    // A lethal wall contact is ordinary gameplay, already recorded as
+    // `player_died` with its full diagnostic state, so it must not spend the
+    // rejection warning's throttle window: that belongs to real envelope
+    // violations. A survivable contact still logs, being the only record of a
+    // pilot pinned against the wall.
+    if (!this.applyBoundaryContact(socketPlayer.id, outcome)) {
+      this.logMotionRejection(
+        ws,
+        'update',
+        outcome,
+        receivedAt,
+        command.motionEpoch,
+        command.motionSequence,
+        motionNow
+      );
+    }
     if (outcome.ok && beforeMode === 'handoff') {
       this.logMotionTransition(
         ws,
@@ -457,19 +463,20 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
+  /** Returns true when the hit destroyed the target. */
   private emitShipDamage(
     targetId: string,
     attackerId: string,
     damage: number,
     healthBefore: number | undefined
-  ): void {
+  ): boolean {
     const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
     if (!outcome.applied || !outcome.entity) {
-      return;
+      return false;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
     if (!outcome.isDestroyed && !healthDropped) {
-      return;
+      return false;
     }
     this.broadcaster.broadcastCombatResult({
       targetId,
@@ -480,6 +487,7 @@ export class MessageHandler {
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
+    return outcome.isDestroyed;
   }
 
   /**
@@ -489,25 +497,33 @@ export class MessageHandler {
    * a pilot elsewhere in the world cannot claim a contact. The pose itself is
    * refused, so the authoritative hull never moves outside the wall. Contact
    * kills regardless of remaining hull health; cargo absorbs it first inside
-   * `handleShipDamage`.
+   * `handleShipDamage`. Returns true when the contact destroyed the hull.
    *
-   * What this trusts: that the hull reports the overlapping pose at all.
-   * `PlayerMotionReconciliation.buildHandoffPose` deliberately keeps reporting
-   * through a locally predicted death so it does, and a locally-dead hull stops
-   * thrusting, so it re-reports that position on every later pose rather than in
-   * one frame the server might not sample. A modified client that withholds
-   * poses entirely is not killed here, but it also cannot move: its last
-   * accepted position stands and every further pose it does send is judged from
-   * there. That immunity predates this change.
+   * What this trusts is that the reported position is truthful, not merely that
+   * a pose arrives. The server holds no independent position for a player, so a
+   * modified client reporting its real track clamped to the rim is never killed
+   * and still flies normally. That immunity predates this change: the retired
+   * client report was simply never sent.
+   *
+   * Nor is this the only non-lethal refusal. `failedEnvelopeCheck` returns the
+   * first failing check, so an overlapping pose that also trips `velocity`,
+   * `displacement` or `rail` — or one refused on a stale epoch or sequence
+   * before any envelope runs — carries no `'boundary'` and no kill. That is
+   * deliberate: such a pose is not proven reachable, and killing on one is the
+   * on-demand self-destruct this rule replaced.
+   *
+   * The client does not predict this death — `CollisionManager` only flashes —
+   * so the hull keeps flying outward and re-reports a deepening overlap until
+   * one of its poses is judged here. Predicting it locally is what defeated an
+   * earlier attempt: the frozen hull armed the respawn latch and the next
+   * snapshot overwrote the overlapping position with the server's own.
    */
-  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): void {
+  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): boolean {
     if (outcome.ok || outcome.envelope?.check !== 'boundary') {
-      return;
+      return false;
     }
     const struck = this.gameEngine.getPlayer(playerId);
-    if (struck) {
-      this.emitShipDamage(playerId, 'boundary', struck.health, struck.health);
-    }
+    return struck ? this.emitShipDamage(playerId, 'boundary', struck.health, struck.health) : false;
   }
 
   private handleSetHaulerUtility(ws: WebSocket, command: CommandOf<'setHaulerUtility'>): void {

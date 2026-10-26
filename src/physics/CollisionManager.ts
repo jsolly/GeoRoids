@@ -1,11 +1,6 @@
 import { checkBoundaryCollision } from '../../shared/boundary';
 import type { Ship } from '../entities/ship/Ship';
-import {
-  applyShipBoundaryDeath,
-  applyShipImpactFlash,
-  isShipCollisionImmune,
-} from '../entities/ship/shipUtils';
-import { cooperativeActive } from '../network/worldCampaign';
+import { applyShipImpactFlash, isShipCollisionImmune } from '../entities/ship/shipUtils';
 
 import { logger } from '../utils/Logger';
 
@@ -20,12 +15,20 @@ export class CollisionManager {
   }
 
   /**
-   * Local boundary prediction only. The server owns wall death: it runs this
-   * same `checkBoundaryCollision` on the pose the hull reports and kills from
-   * its own geometry. Predicting here does not silence that report — see
-   * `PlayerMotionReconciliation.buildHandoffPose`.
+   * Local wall feedback only: a flash, never a death. The server owns wall
+   * death and reads it by running this same `checkBoundaryCollision` on the
+   * pose the hull reports.
+   *
+   * Predicting the death here is what the lethal rule cannot survive. A locally
+   * dead hull freezes (`Ship.update` returns before `updateMovement`) and arms
+   * the respawn latch in `Player.updateFromServer`, and the next snapshot then
+   * overwrites position and velocity with the server's row — which is always
+   * inside the wall, because the server refuses the overlapping pose. That
+   * erases the contact before any pose can carry it. A hull that stays alive
+   * keeps flying outward instead, so it re-reports the overlap until the server
+   * acts on it.
    */
-  checkBoundaryCollisions(ships: Ship[], cargo: number): void {
+  checkBoundaryCollisions(ships: Ship[]): void {
     for (const ship of ships) {
       if (ship.contourLocked && checkBoundaryCollision(ship.position, ship.r)) {
         ship.releaseContourLock();
@@ -36,25 +39,12 @@ export class CollisionManager {
       }
 
       if (checkBoundaryCollision(ship.position, ship.r)) {
-        this.handleBoundaryCollision(ship, cargo);
+        logger.debug('COLLISION', 'Ship hit boundary', {
+          shipPos: ship.position,
+          shipId: ship.id,
+        });
+        applyShipImpactFlash(ship);
       }
-    }
-  }
-
-  /**
-   * Predict the ship hitting the boundary
-   */
-  private handleBoundaryCollision(ship: Ship, cargo: number): void {
-    logger.debug('COLLISION', 'Ship hit boundary', {
-      shipPos: ship.position,
-      shipId: ship.id,
-    });
-
-    // Show a wall flash immediately; cargo protection and residual damage come from the server.
-    if (cargo > 0 || cooperativeActive()) {
-      applyShipImpactFlash(ship);
-    } else {
-      applyShipBoundaryDeath(ship);
     }
   }
 }

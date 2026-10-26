@@ -473,8 +473,8 @@ export class GameController {
     // Only predict for the locally-controlled ship. The network player list
     // holds server-synced copies (which lag at 30 FPS) rather than the
     // predicted local ship, and the server kills each pilot from its own
-    // reading of their reported pose.
-    this.collisionManager.checkBoundaryCollisions([currPlayer.ship], currPlayer.cargo);
+    // reading of their reported pose, so nothing here needs the hold size.
+    this.collisionManager.checkBoundaryCollisions([currPlayer.ship]);
   }
 
   // Simple render method - no game logic, just rendering

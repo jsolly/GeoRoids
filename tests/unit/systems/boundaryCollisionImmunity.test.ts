@@ -45,20 +45,25 @@ describe('Boundary collision', () => {
     expect(WORLD.radius).toBe(60_000);
   });
 
-  test('a vulnerable hull touching the wall predicts its death and flashes', () => {
+  test('a vulnerable hull touching the wall flashes and is never killed locally', () => {
     const ship = vulnerableHull(WALL_CONTACT);
 
-    collisionManager.checkBoundaryCollisions([ship], 0);
+    collisionManager.checkBoundaryCollisions([ship]);
 
-    expect(ship.health).toBe(0);
-    expect(ship.exploding).toBe(true);
+    // The flash is local feedback; the kill is the server's, read from the pose
+    // this hull reports. Killing it here would freeze it, which arms the
+    // respawn latch in `Player.updateFromServer` and lets the next snapshot
+    // overwrite the overlapping position with the server's always-inside row —
+    // erasing the contact before any pose can carry it.
     expect(ship.impactFlashFrames).toBeGreaterThan(0);
+    expect(ship.health).toBe(100);
+    expect(ship.exploding).toBe(false);
   });
 
   test('a hull whose edge sits exactly on the wall is left completely alone', () => {
     const ship = vulnerableHull(LAST_LEGAL);
 
-    collisionManager.checkBoundaryCollisions([ship], 0);
+    collisionManager.checkBoundaryCollisions([ship]);
 
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
@@ -68,32 +73,22 @@ describe('Boundary collision', () => {
   test('the wall rule floors the distance, so a fractional overhang is still legal', () => {
     const ship = vulnerableHull(LAST_LEGAL_FRACTIONAL);
 
-    collisionManager.checkBoundaryCollisions([ship], 0);
+    collisionManager.checkBoundaryCollisions([ship]);
 
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
     expect(ship.impactFlashFrames).toBe(0);
   });
 
-  test('the wall is a circle, so the diagonal kills at the same distance from centre', () => {
+  test('the wall is a circle, so the diagonal registers at the same distance from centre', () => {
     const touching = vulnerableHull(DIAGONAL_CONTACT);
     const clear = vulnerableHull(DIAGONAL_LAST_LEGAL);
 
-    collisionManager.checkBoundaryCollisions([touching, clear], 0);
+    collisionManager.checkBoundaryCollisions([touching, clear]);
 
-    expect(touching.exploding).toBe(true);
-    expect(clear.exploding).toBe(false);
+    expect(touching.impactFlashFrames).toBeGreaterThan(0);
+    expect(clear.impactFlashFrames).toBe(0);
     expect(clear.health).toBe(100);
-  });
-
-  test('carried cargo turns wall contact into a flash instead of a predicted death', () => {
-    const ship = vulnerableHull(WALL_CONTACT);
-
-    collisionManager.checkBoundaryCollisions([ship], 400);
-
-    expect(ship.health).toBe(100);
-    expect(ship.exploding).toBe(false);
-    expect(ship.impactFlashFrames).toBeGreaterThan(0);
   });
 
   test('wall contact drops a contour lock even when the hull cannot be damaged', () => {
@@ -101,42 +96,42 @@ describe('Boundary collision', () => {
     ship.contourLock = { height: 40, direction: 1 };
     ship.blinkCount = 12;
 
-    collisionManager.checkBoundaryCollisions([ship], 0);
+    collisionManager.checkBoundaryCollisions([ship]);
 
     expect(ship.contourLocked).toBe(false);
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
   });
 
-  test('a blinking hull at the wall predicts nothing', () => {
+  test('a blinking hull at the wall registers nothing', () => {
     const ship = vulnerableHull(WALL_CONTACT);
     ship.blinkCount = 12;
 
-    collisionManager.checkBoundaryCollisions([ship], 0);
+    collisionManager.checkBoundaryCollisions([ship]);
 
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
     expect(ship.impactFlashFrames).toBe(0);
   });
 
-  test('a hull a menu holds still at the wall predicts nothing', () => {
+  test('a hull a menu holds still at the wall registers nothing', () => {
     const ship = vulnerableHull(WALL_CONTACT);
     ship.movementLocked = true;
 
-    collisionManager.checkBoundaryCollisions([ship], 0);
+    collisionManager.checkBoundaryCollisions([ship]);
 
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
     expect(ship.impactFlashFrames).toBe(0);
   });
 
-  test('a dead or already exploding hull at the wall predicts nothing again', () => {
+  test('a dead or already exploding hull at the wall registers nothing again', () => {
     const dead = vulnerableHull(WALL_CONTACT);
     dead.health = 0;
     const exploding = vulnerableHull(WALL_CONTACT);
     exploding.exploding = true;
 
-    collisionManager.checkBoundaryCollisions([dead, exploding], 0);
+    collisionManager.checkBoundaryCollisions([dead, exploding]);
 
     expect(dead.impactFlashFrames).toBe(0);
     expect(exploding.health).toBe(100);

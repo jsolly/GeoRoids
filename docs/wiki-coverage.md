@@ -141,10 +141,12 @@ while the surviving deterministic cases define the automated proof.
   configured laser hit times its energy to the first live hull it meets,
   including its owner, and is consumed. Asteroid impacts remain world hazards
   and remove 25 health per impact, including a towed rock that hits another ship.
-  Boundary contact destroys a vulnerable ship regardless of health, enforced by
-  `server/core/GameEngine.ts` and verified in
-  `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts` and
-  `tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts`.
+  Boundary contact destroys a vulnerable ship regardless of health. The server
+  reads the contact from the position a pilot reports: `PlayerMotionService.failedEnvelopeCheck`
+  refuses that pose as `'boundary'` and `MessageHandler.applyBoundaryContact`
+  bills remaining health through `GameEngine.handleShipDamage`, so cargo absorbs
+  it first. Verified in `tests/unit/server/authoritative-combat.test.ts` and
+  `tests/unit/scenarios/boundary/`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager
   and spawn separately from asteroid destruction. Loose hardware is stationary,
   glowing, and invulnerable. The nearest living player within
@@ -247,7 +249,7 @@ Exact tuning belongs in the article's expandable reference. Media names refer to
 | Ricochets: combat-survival / Firing while moving | Wall/metal/court bounce arms shot against anyone, including owner; first vulnerable hull consumes it. | Temporary global hazard, energy/lifetime bounded. | `shared/asteroidReflection.ts`, `GameEngine.resolveEnhancedLaser`; `tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts` | reflection. |
 | Ricochet Court: combat-survival / Ricochet Court | Both panel sides reflect without energy gain; hulls pass; gaps let shots escape. | Fixed shared geometry and always-visible map mark; ordinary deaths/rewards. | `shared/ricochetCourt.ts`, `shared/laserSurface.ts`; browser scenario retired (source review remains) | Text: marker and panel rule; reflection illustrates bounce. |
 | Asteroid impacts: combat-survival / Damage and protection | Vulnerable hull loses health and ordinary rock breaks; protected hull passes unharmed. Towed rock spares own Hauler. | World hazard; lethal impact triggers final death. | `server/core/CollisionAuthority.ts`, `GameEngine.resolveTowedAsteroidImpacts`; authoritative combat tests | survival. |
-| Outer wall: terrain / Outer boundary | Vulnerable ship dies on contact; rocks bounce and lasers ricochet. | Fixed shared boundary; normal respawn. | `shared/boundary.ts` `checkBoundaryCollision` on the reported pose, refused by `PlayerMotionService.failedEnvelopeCheck` and applied by `MessageHandler.applyBoundaryContact`, `GameEngine`; `tests/unit/scenarios/boundary/boundary-hit-respawns-cleanly-with-brief-invulnerability.test.ts`, `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts` | Text: single contact rule. |
+| Outer wall: terrain / Outer boundary | Vulnerable ship dies on contact; rocks bounce and lasers ricochet. | Fixed shared boundary; normal respawn. | `shared/boundary.ts` `checkBoundaryCollision` on the reported pose, refused by `PlayerMotionService.failedEnvelopeCheck` and applied by `MessageHandler.applyBoundaryContact`, `GameEngine`. The client only flashes (`src/physics/CollisionManager.ts`): predicting the death freezes the hull and lets `Player.updateFromServer` erase the reported contact. `tests/unit/server/authoritative-combat.test.ts`, `tests/unit/network/wall-contact-reaches-the-server.test.ts`, `tests/unit/scenarios/boundary/` | Text: single contact rule. |
 | Protection: combat-survival / Damage and protection | Spawn/return blink and menu hold prevent hull damage; laser passes through protected hull. Furnace safety repels terrain spiders, not every hazard. | Temporary personal protection; contact still releases lock. | `shared/combat.ts`, `server/core/EntityManager.ts`; browser scenario retired (source review remains) | survival plus text exceptions. |
 | Regeneration: combat-survival / Recovery | Health loss or protective cargo spills restart the repair delay; immune hits do not. Heals to kit max; dead waits for respawn. | Personal health; fresh life restores hull. | `shared/constants/health.ts`, `EntityManager.updateHealthRegeneration`; `tests/unit/server/health-regeneration.test.ts` | Text: timing in generated reference. |
 | Death and respawn: combat-survival / Lives and respawn | Discards remaining cargo, releases satellites and tow; respawns at Town Square, full health and protection, unlimited lives. | Bank/tools/silk safe; no extra death stash; temporary non-colliding remains. | `GameEngine.applyShipDeath`, `EntityManager`; `tests/unit/scenarios/session/death-disconnect-rejoin-leaves-no-ghost-or-corpse.test.ts` | Text: retained/lost inventory. |

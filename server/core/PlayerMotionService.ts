@@ -24,10 +24,7 @@ import type { GameEntity } from './EntityManager';
 /** Which envelope check failed, with the numbers behind it.
  * Mostly diagnostics, but `check: 'boundary'` is gameplay-load-bearing:
  * `MessageHandler.applyBoundaryContact` reads it to apply the lethal wall rule.
- * It is returned only after the velocity and displacement checks pass (see
- * `failedEnvelopeCheck`), which is what keeps a distant pilot from claiming a
- * wall pose; `authoritative-combat.test.ts`'s "a pilot in town cannot claim a
- * wall pose" fails if those returns are reordered. */
+ * The ordering that makes it safe to read lives on `failedEnvelopeCheck`. */
 interface MotionEnvelopeRejection {
   check: 'velocity' | 'displacement' | 'boundary' | 'anchor' | 'rail';
   mode: PlayerMotionState['mode'];
@@ -458,9 +455,13 @@ export class PlayerMotionService {
     if (limits.displacement > limits.credit + 1e-6) {
       return 'displacement';
     }
-    // Must stay after the velocity and displacement returns above: this value
-    // is lethal (see `MotionEnvelopeRejection`), so reaching it before those
-    // checks would let a pilot anywhere in the world claim a wall contact.
+    // Must stay after the velocity and displacement returns above. This value
+    // is lethal — `MessageHandler.applyBoundaryContact` kills on it — so the
+    // checks that prove the reported position is one legal step from a position
+    // the server already owns have to pass first. Reaching it earlier would let
+    // a pilot anywhere in the world claim a wall contact and die on demand,
+    // which is the exploit this rule replaced. `authoritative-combat.test.ts`'s
+    // "a pilot in town cannot claim a wall pose" fails if these are reordered.
     if (checkBoundaryCollision(pose.position, limits.hullRadius)) {
       return 'boundary';
     }

@@ -22,7 +22,7 @@ export const BELT_CRAWLER = {
   RECOVERY_FRAMES: 54,
 } as const;
 
-export function nativeCrawlerSlot(id: string): boolean {
+export function isNativeCrawlerSlot(id: string): boolean {
   const slot = beltSlotForAsteroid(id);
   return slot !== undefined && slot % BELT_CRAWLER.NATIVE_SLOT_STRIDE === 0;
 }
@@ -33,5 +33,5 @@ export function nativeCrawlerSlot(id: string): boolean {
  * else in the belt has no crawler to advance.
  */
 export function hostsBeltCrawlers(rock: Pick<AsteroidData, 'id' | 'beltCrawlerIds'>): boolean {
-  return rock.beltCrawlerIds !== undefined || nativeCrawlerSlot(rock.id);
+  return rock.beltCrawlerIds !== undefined || isNativeCrawlerSlot(rock.id);
 }

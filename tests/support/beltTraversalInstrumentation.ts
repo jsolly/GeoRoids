@@ -17,6 +17,14 @@ function readMap(owner: object, key: string): Map<string, AsteroidData> {
   return value as Map<string, AsteroidData>;
 }
 
+function readSet(owner: object, key: string): Set<string> {
+  const value = readObject(owner, key);
+  if (!(value instanceof Set)) {
+    throw new Error(`Belt instrumentation expected Set ${key}`);
+  }
+  return value as Set<string>;
+}
+
 /**
  * Count the belt walks a frame actually performs. The 60 Hz loop owes the
  * asteroid belt one pass for physics; anything that walks it again shows up
@@ -25,11 +33,10 @@ function readMap(owner: object, key: string): Map<string, AsteroidData> {
  * Observe real owner operations only when requested by a test.
  */
 export function instrumentBeltTraversals(engine: GameEngine) {
-  const counts = { beltPasses: 0, rowsVisited: 0, beltCopies: 0 };
+  const counts = { beltPasses: 0, rowsVisited: 0, beltCopies: 0, trackedRows: 0 };
   const restorations: (() => void)[] = [];
   const manager = readObject(engine, 'asteroidManager');
   const rows = readMap(manager, 'asteroids');
-  const index = readObject(manager, 'index');
 
   function replace(target: object, key: PropertyKey, replacement: unknown): void {
     const descriptor = Object.getOwnPropertyDescriptor(target, key);
@@ -45,7 +52,13 @@ export function instrumentBeltTraversals(engine: GameEngine) {
     });
   }
 
-  /** Every way to walk the whole belt funnels through one of these. */
+  /**
+   * Count a belt walk. Detection is route-specific: this covers the iterating
+   * members of the backing map, which is every way production currently walks
+   * the belt. A walk written another way — a spatial query with world-sized
+   * bounds, say — would need adding here, so keep the list and the budget
+   * together.
+   */
   function countWalk(target: object, key: PropertyKey): void {
     const original: unknown = Reflect.get(target, key);
     if (typeof original !== 'function') {
@@ -67,7 +80,54 @@ export function instrumentBeltTraversals(engine: GameEngine) {
   countWalk(rows, 'values');
   countWalk(rows, Symbol.iterator);
   countWalk(rows, 'entries');
-  countWalk(index, 'values');
+  countWalk(rows, 'keys');
+
+  // `forEach` walks without an iterator, so count its callback instead.
+  const sweep: unknown = Reflect.get(rows, 'forEach');
+  if (typeof sweep !== 'function') {
+    throw new Error('Belt instrumentation expected forEach');
+  }
+  replace(rows, 'forEach', function (this: unknown, ...args: unknown[]) {
+    const visit = args[0];
+    if (typeof visit !== 'function') {
+      return Reflect.apply(sweep, this, args);
+    }
+    counts.beltPasses++;
+    return Reflect.apply(sweep, this, [
+      function (this: unknown, ...row: unknown[]) {
+        counts.rowsVisited++;
+        return Reflect.apply(visit, this, row);
+      },
+      ...args.slice(1),
+    ]);
+  });
+
+  /**
+   * Work reached through a tracked set rather than a belt walk: these are the
+   * routes that replaced the removed walks. Counts the ids each call
+   * **considers**, not the rows it yields. A set that fills with ids whose
+   * rocks are gone, or whose boost has cleared, prunes them before yielding —
+   * so counting yields would miss exactly the growth the sets are supposed to
+   * be bounded against, which is the one thing that makes them cheaper than
+   * the walk.
+   */
+  for (const [key, field] of Object.entries({
+    boostedAsteroids: 'boosted',
+    crawlerHostAsteroids: 'crawlerHosts',
+  })) {
+    const reach: unknown = Reflect.get(manager, key);
+    if (typeof reach !== 'function') {
+      throw new Error(`Belt instrumentation expected ${key}`);
+    }
+    replace(manager, key, function* (this: unknown, ...args: unknown[]) {
+      counts.trackedRows += readSet(manager, field).size;
+      const reached: unknown = Reflect.apply(reach, this, args);
+      if (typeof reached !== 'object' || reached === null || !(Symbol.iterator in reached)) {
+        throw new Error(`Belt instrumentation expected an iterable from ${key}`);
+      }
+      yield* reached as Iterable<unknown>;
+    });
+  }
 
   const copy: unknown = Reflect.get(manager, 'getAllAsteroids');
   if (typeof copy !== 'function') {
@@ -83,9 +143,9 @@ export function instrumentBeltTraversals(engine: GameEngine) {
       return { ...counts, beltRows: rows.size };
     },
     reset() {
-      counts.beltPasses = 0;
-      counts.rowsVisited = 0;
-      counts.beltCopies = 0;
+      for (const key of Object.keys(counts) as (keyof typeof counts)[]) {
+        counts[key] = 0;
+      }
     },
     dispose() {
       for (const restore of restorations.splice(0).reverse()) {

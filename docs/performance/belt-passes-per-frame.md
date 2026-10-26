@@ -1,25 +1,32 @@
 # Belt passes per frame
 
-The 60 Hz loop owes the awake asteroid belt a fixed number of walks. Two of
-them are structural; everything else must reach its rocks directly.
-
 An ordinary 60 Hz frame walks the awake asteroid belt exactly once, in
 `AsteroidManager.updateMotion`, because every awake rock steps its position,
 rotation and boost each frame. Nothing else may walk it per frame: every other
 concern is rare enough to reach its own rocks directly.
 
-One frame in sixty costs more. `ensureAsteroidField` runs
-`RegionalAsteroidField.update` on the once-a-second cadence AGENTS.md sanctions
-for work leaving the loop, and that copies the belt three times: once in
-`update` to find powered rocks, and twice in `sleepDistantSectors` to find
-probes and to partition rocks by sector.
+One frame in sixty costs more, on the cadence AGENTS.md sanctions for work
+leaving the loop. Two blocks land on it together:
+
+| Block | Belt copies | Where |
+| --- | --- | --- |
+| `ensureAsteroidField` | 3 | one in `RegionalAsteroidField.update`, two in `sleepDistantSectors` |
+| `checkpointWorld` | 4 | two in `RegionalAsteroidField.checkpoint`, two in `sleepDistantSectors` |
+
+So that frame costs **7 belt copies and 8 passes in production**, and 3 copies
+in a fixture with no `WorldPersistence`, because `checkpointWorld` returns
+early without one. Both numbers are pinned, each against the world shape that
+reaches it: an earlier version of this note claimed only the first three, and
+the guard could not see the rest because its world had no persistence.
 
 `tests/unit/server/the-frame-walks-the-asteroid-belt-once.test.ts` counts the
 walks and the whole-belt copies a frame makes, using
 `tests/support/beltTraversalInstrumentation.ts`. A second full-belt walk in an
-ordinary frame, any `getAllAsteroids()` call inside one, or a fourth belt copy
-on the sector frame all fail that test. It measures a whole second, so the
-sector frame cannot hide a new per-frame pass.
+ordinary frame, any `getAllAsteroids()` call inside one, or a changed copy
+count on the once-a-second frame all fail that test. It measures a whole
+second in both world shapes, so the sector frame cannot hide a new per-frame
+pass, and it counts the rows the frame reaches **through the tracked sets** as
+well, so a set that quietly grows to belt size is not invisible.
 
 Note the scope. `AsteroidManager` holds only the rocks in awake sectors, so a
 belt walk is local work that grows with nearby pilots, not with the saved
@@ -63,9 +70,60 @@ entry is a defect, and each way a boost can appear has a home:
 
 Removals need no announcement: they only make the set a larger superset.
 
-Each of those five points has a mutation check in the guard test; dropping any
-one of them fails it. The crawler set is maintained at the same points, by the
-same rule.
+The crawler set is maintained at the same points, from the rock's id and
+`beltCrawlerIds`. Two of its points deserve naming:
+
+- `updateAsteroid` keeps both sets because it applies an arbitrary row patch;
+  no caller passes `boost` or `beltCrawlerIds` through it today, but a method
+  taking `Partial<AsteroidData>` has to stay right for the one that does.
+- The crawler half of the `updateMotion` backstop is **not** redundant with
+  admission, and its comment says so. A crawler transferring onto a non-native
+  rock is written straight onto that row by `BeltCrawlerManager.transfer`, and
+  nothing announces it. Drop that line and the rock is never named again once
+  a population-limit dip drops its body — `setPopulationLimit` runs every
+  frame while a cooperative campaign is active — so the crawler is silently
+  lost while its row still carries a live wound.
+
+### What the guard rejects
+
+Measured by deleting each line on its own and running the guard, rather than
+reasoned about. Do not restate this as a count; a count is what drifted twice
+before. Each row is the case whose failure you will see.
+
+| Maintenance point | Rejected by |
+| --- | --- |
+| `addAsteroid` boost add | a rock admitted mid-burn |
+| `addAsteroid` crawler add | a belt crawler on its native slot |
+| `updateAsteroid` → `noteBoost` | a boost set through the manager |
+| `updateAsteroid` crawler add | a combat frame reaches a crawler host |
+| `removeAsteroid` `boosted.delete` | a delivered rock stops costing |
+| `removeAsteroid` `crawlerHosts.delete` | a belt four times larger |
+| `updateMotion` boost backstop | a boost written straight onto a tracked row |
+| `updateMotion` crawler backstop | crawler rows written straight onto a tracked row |
+| `GameEngine.useAbility`'s `noteBoost` | an owner dies; a belt four times larger |
+| `hostsToVisit`'s body union | a migrant keeps crawling (crawler suite) |
+| weakening: boost add made unconditional | a belt four times larger |
+| weakening: `hostsBeltCrawlers` always true | a belt four times larger |
+
+The last two matter because they are how a set grows without any line being
+deleted. They are caught because the instrumentation counts the ids each
+tracked-set read **considers**, not the rows it yields: a stale id is pruned
+before it is yielded, so counting yields would have missed exactly the growth
+that makes these sets cheaper than the walk.
+
+### What the guard does not reject
+
+| Point | Why |
+| --- | --- |
+| `boostedAsteroids`' prune | masked by `removeAsteroid`'s delete; the pair is rejected, neither half alone |
+| `crawlerHostAsteroids`' prune | masked the same way by `removeAsteroid`'s crawler delete |
+| `noteBoost`'s `else` delete | the superset tolerates the stale id until the next read prunes it |
+| `clearAsteroids`' two clears | reached only by a world reset, never from a frame |
+
+These are superset-shrinking hygiene: dropping one cannot lose a game action,
+because the invariant is that only a *missing* entry is a defect. What they
+protect is the bound, and the masking is why a pair test rather than a line
+test is what pins it.
 
 ## Obstacles that shaped this
 
@@ -119,12 +177,31 @@ the population limit only gates creating one.
 
 ## Still open
 
-`RegionalAsteroidField.update` makes three whole-belt copies a second, and two
-of them look like one: `update` scans for `boost?.phase === 'burning' || probe`
-and `sleepDistantSectors` scans again for `probe`. The burning half could read
-`boostedAsteroids()` for free now; the probe half would want its own tracked
-set, and the sector partition needs a full walk by nature.
+The once-a-second frame's 7 copies hold the remaining duplication.
+`RegionalAsteroidField.update` scans for `boost?.phase === 'burning' || probe`
+and `sleepDistantSectors` scans again for `probe`; `checkpoint` scans a third
+time for `burning` alone, which `boostedAsteroids()` would answer directly.
+The probe half would want its own tracked set, and the two sector partitions
+need a full walk by nature.
 
 It is left alone: once a second is a twentieth of a per-frame cost, it is a
-different module, and the guard above pins it at three so it cannot grow
+different module, and the guard above pins both counts so neither can grow
 quietly.
+
+Also deferred, with reasons:
+
+- `BeltCrawlerManager.hostsToVisit` reads `body.host` directly where the
+  module's other reads go through the injected live-host resolver. It dedupes
+  by id with the caller's rows first, so a live row always wins over a stale
+  one, and `advance` already drops bodies whose host is missing or dead.
+- `crawlerHostAsteroids` copies its id set before yielding, and its one
+  consumer drains it immediately — a second copy of a small set. The copy
+  stays because it makes the walk safe to prune during, which the two prune
+  rows above depend on.
+- `AdvanceOptions.hosts` is one-directional and enforced nowhere. Extra rows
+  are harmless, because `advance` re-checks `hostsBeltCrawlers`. An
+  under-supplied list is not: a native-slot rock whose body does not yet exist
+  would never spawn its crawler, and nothing would detect it.
+- The instrumentation installs its wrappers on the manager instance, not on
+  `AsteroidManager.prototype`, so a throw part-way through installation leaves
+  one dead engine's own properties patched rather than the shared prototype.

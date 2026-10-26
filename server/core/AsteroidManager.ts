@@ -37,9 +37,11 @@ export class AsteroidManager {
    */
   private readonly boosted = new Set<string>();
   /**
-   * Ids of rocks the crawler frame must visit, by the same superset rule: a
-   * native belt slot, or a row already carrying crawlers. Membership follows
-   * the rock's id and `beltCrawlerIds`, so motion never changes it.
+   * Ids of rocks the crawler frame must visit: a native belt slot, or a row
+   * already carrying crawlers. Membership follows the rock's id and
+   * `beltCrawlerIds`, so motion never changes it, and neither is ever unset —
+   * unlike `boosted` this set is exact rather than a superset, and only a
+   * removed row can leave a stale id behind.
    */
   private readonly crawlerHosts = new Set<string>();
   private rng: RNGService;
@@ -182,13 +184,22 @@ export class AsteroidManager {
     }
   }
 
-  /** Every rock a crawler frame must visit, without walking the belt. */
+  /**
+   * Every rock a crawler frame must visit, without walking the belt. Yields a
+   * snapshot and prunes removed ids as `boostedAsteroids` does, so a dropped
+   * removal cannot grow this set past the live belt.
+   */
   public *crawlerHostAsteroids(): IterableIterator<AsteroidData> {
-    for (const id of this.crawlerHosts) {
+    if (this.crawlerHosts.size === 0) {
+      return;
+    }
+    for (const id of [...this.crawlerHosts]) {
       const rock = this.asteroids.get(id);
-      if (rock) {
-        yield rock;
+      if (!rock) {
+        this.crawlerHosts.delete(id);
+        continue;
       }
+      yield rock;
     }
   }
 
@@ -209,8 +220,12 @@ export class AsteroidManager {
       if (asteroid.boost) {
         this.boosted.add(asteroid.id);
       }
-      // Same free backstop for crawler rows written in place. Only the cheap
-      // field is read here; the slot regex stays at admission.
+      // Load-bearing, not redundant: a crawler transferring onto a non-native
+      // rock is written straight onto that row by `BeltCrawlerManager`, and
+      // this is the only place that tracks it. Without this line the rock is
+      // never named again once its body is dropped by a population-limit dip,
+      // and the crawler is silently lost. Only the cheap field is read here;
+      // the slot regex stays at admission.
       if (asteroid.beltCrawlerIds !== undefined) {
         this.crawlerHosts.add(asteroid.id);
       }

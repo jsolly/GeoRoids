@@ -91,8 +91,8 @@
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
-    "server/core/AsteroidManager.ts": "sha256:e9df7116f9e1b5b2cf7bfbeeffcf32044140178d6a4ab96f40134687988a09b2",
-    "server/core/BeltCrawlerManager.ts": "sha256:58521e5f25045676806ddc9fc541a9605b69f0b64fa0ab327b2a4769cfac9b31",
+    "server/core/AsteroidManager.ts": "sha256:e536e0b0a44d8d4ab24fb5618210f3ab2648e516ec7c954c31e1073e54d2d959",
+    "server/core/BeltCrawlerManager.ts": "sha256:fe4a9e6b0a622452a633d016f0d76ae57ce7a9e2b464fe25bda3b7614afb55c7",
     "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
@@ -116,7 +116,7 @@
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
-    "server/world/AsteroidSpatialIndex.ts": "sha256:9c30d118e9b5ccc0dac6028970483d4a5f6ad5d13145daec2d0de01ea2744260",
+    "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
     "server/world/InlineWorldPersistence.ts": "sha256:aa8a6f7ebbb1ce31afa87d6eae34d262c81765b8fc0788c6853f57e83b7d3828",
     "server/world/MapAssets.ts": "sha256:2ffe843156946dc2c0234948433805560daf15f424987a933cdfb2030c6519ad",
@@ -140,7 +140,7 @@
     "shared/asteroidPhenomena.ts": "sha256:ab1ac159aefa09427ff8fa76c8c649801d9fe081f8ecc45de452079856002da2",
     "shared/asteroidReflection.ts": "sha256:0fe393e733a698d711db584167259a856565458c0a5ac12e05f0e23ca0f218a8",
     "shared/asteroidScale.ts": "sha256:9d915433cc72415420657f773bfedac789b52a7edd395d79119d7c79c9eddede",
-    "shared/beltCrawler.ts": "sha256:7e6e895139d941beabbec8181978ef0d02ae8ca6f1cfce1f76f06de2ffe79dd7",
+    "shared/beltCrawler.ts": "sha256:3fd29c3e9cffac5b03ba747849b51122a2a76c6bc4d05df5723da031971e6905",
     "shared/boundary.ts": "sha256:7cb7cf56b7e152f452ebf086e3d0a56e1819e8cf262c5a51f42df41b7cda398a",
     "shared/chargedWeapon.ts": "sha256:04ddbced404a5eac1a85a0760114943c196073629dff3299a57aab271ddb2919",
     "shared/combat.ts": "sha256:ed0260bb402e44e052ca6a6ddced6add0cac57cd46c74ec4e5a5d95dd2a271e5",
@@ -7159,6 +7159,24 @@
         "terrain"
       ],
       "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Independent review of the belt-pass change found the documented invariant overstated, so this round corrects AsteroidManager's comments and makes crawlerHostAsteroids prune removed ids as boostedAsteroids already does, closing the one path by which the tracked set could outgrow the live belt. No player-visible rule changed and no gameplay predicate moved. Re-read Asteroids 'Belt spiders' and 'Boost Coupling'-related prose plus Hauler 'Boost Coupling E': crawlers rounding cover and hopping between rocks, one shot killing an exposed body, leaping to a reachable rock when a host breaks, a killed crawler returning only when its host deposit is replaced, arming toward the nearest furnace, a second coupling reaching full speed and delivery credit for launchers and recorded scanning pilots all still hold. Ran the 11-case belt-pass guard, the 18 belt-crawler cases, the reserved-population case and the world-write cadence case (40 passing), lint and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected by the prune.",
+      "sources": ["server/core/AsteroidManager.ts"],
+      "topics": ["asteroids", "hauler"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Third review round after independent review found the belt-pass guard's coverage claims overstated. These three sources change without any behaviour change: nativeCrawlerSlot is renamed isNativeCrawlerSlot so it no longer reads like a slot accessor beside beltSlotForAsteroid, BeltCrawlerManager follows the rename, and AsteroidSpatialIndex.values() is deleted because this change left it with no caller anywhere in server, src, shared, tests, benchmarks or scripts once BeltCrawlerManager.advance stopped walking the index (knip does not check class members, so the gate could not see the dead code). No gameplay predicate moved and no rule changed. Re-read Asteroids 'Belt spiders', Terrain 'Belt crawlers' and 'Guard patrols', Scout probe limits on powered rocks, Teamwork 'Scan, tow, deliver' and Hauler 'Boost Coupling E': crawlers rounding cover and hopping between rocks, one shot killing an exposed body, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks, a killed crawler returning only when its host deposit is replaced, immunity to tap probe tow and Mineral Scan, powered rocks refusing a probe, and equal delivery credit for launchers and recorded scanning pilots all still hold; the eighteen-lone-guards belt count is unchanged. Ran the belt-pass guard (13 cases), the 18 belt-crawler cases, reserved population, local-query, world-write cadence and persistent-world suites (56 passing), plus lint, types, knip and ts-prune; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": [
+        "server/core/BeltCrawlerManager.ts",
+        "server/world/AsteroidSpatialIndex.ts",
+        "shared/beltCrawler.ts"
+      ],
+      "topics": ["asteroids", "hauler", "scout", "teamwork", "terrain"],
+      "media": [],
       "owners": {}
     }
   ]

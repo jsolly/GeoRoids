@@ -4,7 +4,7 @@ import {
   findNearestAsteroidImpact,
   REFLECTION_LIMITS,
 } from '../../shared/asteroidReflection';
-import { BELT_CRAWLER, hostsBeltCrawlers, nativeCrawlerSlot } from '../../shared/beltCrawler';
+import { BELT_CRAWLER, hostsBeltCrawlers, isNativeCrawlerSlot } from '../../shared/beltCrawler';
 import type { AsteroidData, Position, TerrainSpider } from '../../shared-types';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { SpiderAttack } from './TerrainSpiderManager';
@@ -433,7 +433,7 @@ export class BeltCrawlerManager {
       }
       return;
     }
-    const native = nativeCrawlerSlot(host.id);
+    const native = isNativeCrawlerSlot(host.id);
     const saved = host.beltCrawlerHealth?.[0];
     host.beltCrawlerHealth = native
       ? [saved === undefined ? BELT_CRAWLER.MAX_HEALTH : clamp(saved)]

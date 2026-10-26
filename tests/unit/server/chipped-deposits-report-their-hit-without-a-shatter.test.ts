@@ -77,6 +77,27 @@ test('a surviving deposit reports each chip and only its shatter reports destruc
   expect(socket.received('asteroidDestroy')).toHaveLength(1);
 });
 
+test('a chip reaches pilots who could hear it and no one else', () => {
+  const distant = new RecordingSocket();
+  engine.addPlayer('distant', 'Distant', distant, { x: 10000, y: 0 }, 'scout');
+  engine.addAsteroid(deposit('ore'));
+
+  expect(chip('ore').outcome).toBe('damaged');
+  expect(socket.received('asteroidHit').map((message) => message.data)).toEqual([
+    { asteroidId: 'ore', position },
+  ]);
+  // The client culls the cue outside its viewport, so a pilot far past the
+  // interest radius is never sent a message it would only discard.
+  expect(distant.received('asteroidHit')).toEqual([]);
+
+  // That socket is live, though: the shatter is not interest filtered and does
+  // arrive, so it is the chip that is scoped rather than the recipient.
+  expect(chip('ore').outcome).toBe('damaged');
+  expect(chip('ore').outcome).toBe('destroyed');
+  expect(distant.received('asteroidDestroy')).toHaveLength(1);
+  expect(distant.received('asteroidHit')).toEqual([]);
+});
+
 test('an ordinary rock shatters on its first hit and never reports a chip', () => {
   const rock = deposit('ice-rock');
   engine.addAsteroid({ ...rock, material: 'ice', health: 40, maxHealth: 40 });

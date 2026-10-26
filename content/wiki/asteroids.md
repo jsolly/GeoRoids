@@ -23,7 +23,7 @@ Ordinary ice and crystal rocks break on the first laser hit, whatever their size
 
 ## Mining sound
 
-With Sound Effects on, every laser hit a durable deposit survives plays a directional chip from the rock, so you can hear metal and colossal progress without watching its health. Ordinary ice and crystal rocks break on the first hit and play their shatter instead.
+With Sound Effects on, every laser hit a durable deposit survives plays a directional chip from the rock, so you can tell a shot landed without watching it. Only rocks on screen are audible, and the chip sounds the same for every hit, so it marks contact rather than remaining health. Ordinary ice and crystal rocks break on the first hit and play their shatter instead.
 
 ## Colossal deposits
 

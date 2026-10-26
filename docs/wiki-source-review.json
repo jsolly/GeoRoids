@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:aee55604c23e544d6cce3739453b10df85dd85fd4dded224d14ab384d28e9597",
+    "server/communication/MessageHandler.ts": "sha256:e36846a2e40fc0af865bca347ae621fdd4a5c1b6f1e95260e0ee77bf8bbcf8fa",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -114,7 +114,7 @@
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
     "server/createServer.ts": "sha256:7499d6311193e05d8e0d91b5cdb332edbb49f19efc4dcec08d7b6a5603f6798e",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
-    "server/services/GameStateBroadcaster.ts": "sha256:49a9a597bc70c6d2998090366bdd1712adde2d09b8643eab7171243d978dce3e",
+    "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
     "server/world/AsteroidSpatialIndex.ts": "sha256:9c30d118e9b5ccc0dac6028970483d4a5f6ad5d13145daec2d0de01ea2744260",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
@@ -203,7 +203,7 @@
     "src/audio/destructionSounds.ts": "sha256:a31ac1a208c41910d198dce4239fb0310577a242e78eb23c6d37e4243f7535f4",
     "src/audio/explosionSound.ts": "sha256:62c0a7c56e833231583255cbbb9177d4a7a9657510963667ae3206eab23834e6",
     "src/audio/feedbackSounds.ts": "sha256:148a4a5f5634e0371def37265b74a37f8039e17bfda7df37d93a041ebee8a072",
-    "src/audio/gameSounds.ts": "sha256:aaa752d7430c861bbe5f2fec294caffdc0b4f7e4ad082e36aca2aa2078d6eec2",
+    "src/audio/gameSounds.ts": "sha256:ec874ad57a289929686bbc4faa31f10f519f92ac9014af95e53fabc81569aae5",
     "src/audio/interactionSounds.ts": "sha256:a48c271d1c16e404bbd0a8069a07275108b4f802df1a5906c220e0545ff6a833",
     "src/audio/musicBeds.ts": "sha256:d25010498827b44f0a43d7bb4fa683dc153d35250db3961b5243b35fa193b98b",
     "src/audio/musicCatalog.ts": "sha256:d6342a645cdb4cd5ed8729edd464cfc915dca4c0606ca75d8d280f5a144f5f43",
@@ -572,7 +572,7 @@
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
-    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:ee4ffa12e69757296b7a9e3edd7b8e8177234456848a1ce52356e70fab78c156"
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585"
   },
   "reviews": [
     {
@@ -7175,6 +7175,35 @@
       "note": "Re-reviewed the chip-cue contract after correcting its fixture types: material 'rock' is not an AsteroidMaterial (now 'ice', the ordinary first-hit case the test describes), the burning boost now uses the real AsteroidBoost shape { phase, ownerId, angle }, and the fixture id 'rubble' became 'ice-rock' so it no longer reads as a material it is not. The three assertions are unchanged — a surviving deposit reports each chip, a shatter reports destruction alone, and hits that never applied stay silent. Player rules and demonstrations are unaffected. Verified check:ts, check:lint and the three cases after the correction.",
       "sources": ["tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"],
       "topics": ["asteroids"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Review fixes: the chip broadcast hoists out of the destroyed guard (identical behavior), reaches only pilots within world interest, and playHitSound requires a position. Reviewed controls, hud-network, teamwork and asteroids: only asteroids documents this cue, and its Mining sound section now scopes audibility to rocks on screen; the coverage row records one event per terminal laser impact. The interest radius is far outside the viewport that already culled the cue, so nothing player-visible changed. No demonstration derives from these files.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/audio/gameSounds.ts",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "controls", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Review follow-up: the chip's interest filter now runs inside broadcastToAll via a recipient predicate, restoring per-send error isolation, the readyState check and broadcast metrics, so a failing cue can no longer abort the authoritative destroy broadcasts in the same batch. The server test gained a positive control proving the distant socket is live. Reviewed hud-network, teamwork and asteroids: no player-visible behavior changed, so only the coverage row moved, recording that a pressured socket inside interest is still closed for recovery like any event-class message. No demonstration derives from these files.",
+      "sources": [
+        "server/services/GameStateBroadcaster.ts",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Lint follow-up only: the recipient predicate's guard uses an explicit !== true comparison to satisfy Biome's strict boolean rule. No behavior change, so no Wiki page is affected.",
+      "sources": ["server/services/GameStateBroadcaster.ts"],
+      "topics": ["hud-network", "teamwork"],
       "media": [],
       "owners": {}
     }

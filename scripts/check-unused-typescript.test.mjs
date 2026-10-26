@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
@@ -132,6 +132,19 @@ test('the committed prune program keeps the scripts/ .mjs runners in scope', () 
   // A sibling declaration file wins module resolution, so its .mjs never enters
   // the program and no gate can report that module's unused exports.
   const shadowed = parsed.fileNames.filter((path) => path.endsWith('.d.mts'));
+  for (const declaration of shadowed) {
+    const implementation = declaration.replace(/\.d\.mts$/u, '.mjs');
+    assert.ok(
+      existsSync(implementation),
+      `${relative(process.cwd(), declaration)} declares no sibling module`
+    );
+    assert.ok(
+      !parsed.fileNames.includes(implementation),
+      `${relative(process.cwd(), implementation)} entered the program, so it is not shadowed`
+    );
+  }
+  // The inventory is pinned as well, so a new shadow has to be documented in
+  // AGENTS.md beside the blind spot it opens instead of appearing silently.
   assert.deepEqual(
     shadowed.map((path) => relative(process.cwd(), path)),
     ['scripts/validation-admission.d.mts'],

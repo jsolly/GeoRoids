@@ -236,7 +236,19 @@ once. A page keeps one log socket and waits five seconds before opening
 another, including after that close. An idle log socket does not reconnect.
 Log upgrades over 6 per minute per address are refused before the handshake,
 so the browser does not treat them as open and drop its queue. Gameplay
-upgrades keep a separate budget of 50 per minute. Inspect
+upgrades keep a separate budget of 50 per minute. Behind Railway public HTTP
+ingress "per address" means the forwarded `X-Real-IP`, not the socket peer,
+which is the edge proxy and would otherwise put the whole fleet in one bucket.
+An upgrade the edge cannot attribute -- no `X-Real-IP`, or a value that is not
+a single address -- is charged to one shared budget instead, sized for a whole
+fleet at 600 per minute in each lane, so losing the header degrades to a fleet
+sharing a fleet-sized budget rather than to half the pilots being refused.
+A caller can put itself in that shared budget by withholding the header, so it
+bounds only itself: there is deliberately no limit across all addresses that
+attributable callers also answer to. Grep
+`X-Real-IP absent or unparseable` for the once-per-minute warning that says the
+edge has stopped attributing; a refusal names the charged address, which reads
+as `unattributed` when that is what it was charged to. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
 `logging.gameplayIngress` reports the per-connection `/ws` message budget

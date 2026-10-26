@@ -202,8 +202,15 @@ to 2 MiB, three per client address per hour and 30 globally per UTC day.
 These limits are independent of gameplay admission. Railway public HTTP
 ingress supplies `X-Real-IP`; local development uses the socket address and
 ignores forwarded address headers. Before release, verify that Railway replaces
-client-supplied `X-Real-IP` values. Do not expose this reporting listener through
-an untrusted internal proxy that can choose that header.
+client-supplied `X-Real-IP` values, and record that result with the release
+evidence. **That verification now covers the WebSocket upgrade path too**:
+gameplay and log admission charge the forwarded `X-Real-IP` under the same
+ingress, so if the edge passes a client-supplied value through, the per-address
+upgrade budget is void and any caller mints a fresh budget per claimed address.
+The branch's own tests cannot observe this — they synthesize headers and so
+exercise the resolver, never the real edge. Do not expose the reporting
+listener or either WebSocket listener through an untrusted internal proxy that
+can choose that header.
 
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
 and a 100 MiB or 200-report pending limit. New acceptance reserves at least

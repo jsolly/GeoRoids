@@ -326,10 +326,10 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         return;
       }
       // An upgrade the edge cannot attribute is charged to the shared
-      // unattributed budget, which the lane ceiling bounds. An earlier revision
-      // charged the proxy's own address instead, which put the whole fleet into
-      // one 50-per-window bucket and refused half of it — the lockout this
-      // limiter exists to prevent, reached by losing a header rather than by load.
+      // unattributed budget, which is sized for a whole fleet. An earlier
+      // revision charged the proxy's own address instead, which put the whole
+      // fleet into one 50-per-window bucket and refused half of it — the lockout
+      // this limiter exists to prevent, reached by losing a header, not by load.
       const clientIp = upgradeChargeAddress(info.req, railwayIngress);
       if (railwayIngress && clientIp === UNATTRIBUTED_CLIENT) {
         reportLostAttribution(Date.now());
@@ -338,16 +338,14 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
           const spend = `${admissionDecision.count}/${admissionDecision.limit}`;
-          // A single flapping address and an exhausted lane read the same to a
-          // client but mean opposite things here: one caller to look at, or the
-          // whole lane saturated, which is load or an address the edge cannot
-          // tell apart. Logging them alike hides the second behind the first.
+          // The charged address is always named, including the shared
+          // unattributed bucket: a refusal there means the fleet is sharing one
+          // budget because the edge stopped attributing, which is a different
+          // thing to look at than one flapping pilot.
           logger.warn(
-            admissionDecision.laneExhausted
-              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend})`
-              : admissionDecision.lane === 'logs'
-                ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
-                : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
+            admissionDecision.lane === 'logs'
+              ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
+              : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
           );
         }
         done(

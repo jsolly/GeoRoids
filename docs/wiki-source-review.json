@@ -7,7 +7,7 @@
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
-    "docs/diagnostics.md": "sha256:7b7cd11435899a5df1e651ba90cfb0233e35e966c19170ee5089e718cf16fad8",
+    "docs/diagnostics.md": "sha256:899f825ead3ce2bdea98463f82674ab56dae018e3120598748c884fcf06b8dca",
     "docs/protocol/snapshot-v3.md": "sha256:466d9bf94b7f001cb0d4750a418685f547806a39b328f7fda2b9d23a8f6b9bc6",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:966ce6f748d39aa6963d641cd1c6f2588a163f8c997e658d90f692ebcab25b3f",
+    "server/communication/connectionAdmission.ts": "sha256:b865b5106b63ac4a6d5a1fdd79449abf887fd05ae8893b3e1d60f2acd131485e",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:bbc0f309e0a19374bcbadc5c4a319ebcd1ac4f373d928bfecab4a58233c188ce",
+    "server/createServer.ts": "sha256:2a48decb1cd0b3549263c12e9c4a3c2a68759d4352824963dbe202d394c6888c",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
@@ -7144,6 +7144,19 @@
       "owners": {
         "server/communication/connectionAdmission.ts": "hud-network",
         "server/communication/clientAddress.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed hud-network against the removal of this branch's cross-address connection ceilings; no page needed an edit, and the change removes a player-visible failure cause rather than adding one. Independent review confirmed nine Important findings against the ceilings, three of them a denial-of-service lever reachable from one machine: a caller inside its own budget was still refused once the lane total was spent, and the one bucket a caller can select for itself -- by withholding or mangling X-Real-IP -- was granted that whole total as its own budget, so one source reproducibly refused 488 of 600 honest joins, indefinitely. The ceilings also sat under honest fleet demand in both lanes at once, refusing 400 of 600 log upgrades from pilots each inside their own budget. They are removed rather than resized: with no shared total there is nothing for a caller to exhaust, and main has no aggregate bound either, so this is no weaker than today. Unattributable callers keep a budget of their own, sized to a full fleet's worst honest demand per lane (600), so losing the header still degrades to a fleet sharing a fleet-sized budget instead of half the pilots being refused. What this means for the page: hud-network lists nickname in use, server full and outdated tab as the reasons a join fails, and that list is now more accurate, because a pilot can no longer be refused on account of other callers' traffic. The remaining refusals are unreachable in honest play -- a pilot's own budget is 50 upgrades a minute against a client ladder of six, and a full fleet's worst honest demand equals the shared budget exactly -- so no documented cause changed and none needs adding. docs/diagnostics.md is updated in the same change because it is the operator-facing description of what bounds an upgrade: it now states that per-address means the forwarded X-Real-IP behind Railway ingress, that unattributable callers share one fleet-sized budget, that there is deliberately no limit across all addresses, and it names the greppable lost-attribution warning. docs/agent-operations.md is updated too, because the before-release verification that Railway replaces client-supplied X-Real-IP now covers the WebSocket upgrade path and not only the reporting listener. No player-facing string, receipt state, limit or generated reference value changes, and no demonstration cites these sources. Verified: lint, typecheck, 689 server unit tests across 94 files, and seven mutation checks each failing a named test before being reverted -- including re-introducing a shared lane ceiling, which fails the case written for it.",
+      "sources": [
+        "docs/diagnostics.md",
+        "server/communication/connectionAdmission.ts",
+        "server/createServer.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network"
       }
     }
   ]

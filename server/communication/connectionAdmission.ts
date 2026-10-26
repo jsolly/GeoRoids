@@ -15,36 +15,42 @@ const RECONNECT_LADDER_STEPS = 5;
 export const WORST_HONEST_UPGRADES_PER_PILOT = 1 + RECONNECT_LADDER_STEPS;
 
 /**
- * Ceiling across every address in one lane, so a caller the edge cannot tell
- * apart — a spoofed `X-Real-IP`, or ingress that stops supplying one — cannot
- * buy unlimited budget by looking like many clients.
+ * What the shared unattributed bucket may spend, per lane.
  *
- * Twice the worst honest case. An earlier revision set this to exactly that
- * case and described it as headroom, which it was not: a fleet-wide stall
- * costs `MAX_PLAYERS * WORST_HONEST_UPGRADES_PER_PILOT` upgrades, so 600 left
- * nothing spare, and the sizing arithmetic behind it counted the five retries
- * while forgetting the initial upgrade.
+ * Sized to the whole fleet's worst honest demand, because that is exactly the
+ * case the bucket exists for: ingress stops supplying `X-Real-IP` and every
+ * pilot collapses onto this one key, so a full fleet must still be able to
+ * rejoin and keep forwarding records. A pilot's own budget already bounds its
+ * share of that, so the product is the honest ceiling rather than a guess.
+ *
+ * There is deliberately no ceiling across all addresses. An earlier revision
+ * added one and gave this bucket the whole of it, which made the key a caller
+ * can select for itself the cheapest way to close the lane for everyone:
+ * independent review reproduced one source refusing 488 of 600 honest joins
+ * from a single machine with no address rotation, indefinitely. The same
+ * ceiling also refused honest callers who were inside their own budget, in
+ * both lanes, because the sums of the per-address budgets a full fleet holds
+ * are larger than any ceiling that was tight enough to be worth having.
+ * Bounding a lane in aggregate without handing out that lever needs a design
+ * this change does not have; `main` has no aggregate bound either, so leaving
+ * it out is no weaker than today.
  */
-export const GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL =
-  MAX_PLAYERS * WORST_HONEST_UPGRADES_PER_PILOT * 2;
-/**
- * Diagnostics stay tighter than gameplay but are still fleet-sized: a deploy
- * or a stall makes every pilot forward a record, so honest demand starts at one
- * socket per pilot. An earlier revision used 60 — below `MAX_PLAYERS` — which
- * refused two fifths of a full fleet's telemetry at exactly the moment it was
- * worth reading, and did so on a limiter that had only just started.
- */
-export const LOG_CONNECTIONS_PER_WINDOW_ALL = MAX_PLAYERS * 2;
+export const UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW =
+  MAX_PLAYERS * WORST_HONEST_UPGRADES_PER_PILOT;
+export const UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW = MAX_PLAYERS * LOG_CONNECTIONS_PER_WINDOW;
 
 /**
  * The address charged when the edge cannot tell callers apart.
  *
- * Such traffic answers to the lane ceiling instead of one address's budget.
- * Squeezing a whole fleet through a single per-address bucket is the lockout
- * this limiter exists to prevent, so ingress that stops supplying `X-Real-IP`
- * has to degrade to "everyone shares the lane" rather than to "half the pilots
- * are refused" — which is what charging them all to the proxy's own address
- * actually did.
+ * Such traffic shares one fleet-sized budget instead of one pilot's. Squeezing
+ * a whole fleet through a single per-address bucket is the lockout this limiter
+ * exists to prevent, so ingress that stops supplying `X-Real-IP` has to degrade
+ * to "the fleet shares a fleet-sized budget" rather than to "half the pilots are
+ * refused" — which is what charging them all to the proxy's own address did.
+ *
+ * A caller can put itself in this bucket by withholding or mangling the header,
+ * so its budget bounds only itself: it is never the whole of some larger limit
+ * that attributable callers also answer to.
  */
 export const UNATTRIBUTED_CLIENT = 'unattributed';
 
@@ -67,8 +73,6 @@ interface ConnectionAdmissionDecision {
   firstRejection: boolean;
   count: number;
   limit: number;
-  /** True when the lane ceiling refused this, not the caller's own budget. */
-  laneExhausted: boolean;
 }
 
 interface Bucket {
@@ -76,10 +80,12 @@ interface Bucket {
   /**
    * When this window opened. A charge never moves it, so the window is fixed.
    *
-   * Anchoring expiry to the last attempt instead made the lane bucket — which
-   * every address charges — roll only after 60 s of server-wide silence, so a
-   * per-window ceiling became a counter that accumulated over uptime and
-   * periodically refused every pilot. Keep these two timestamps apart.
+   * Anchoring expiry to the last attempt instead turns a per-window budget into
+   * a lifetime one: a caller that keeps trying never rolls its own window, so a
+   * pilot flapping through a bad connection spends its 50 and is then refused
+   * until it stays quiet for a whole window -- which is the lockout this
+   * limiter exists to prevent, reached from the other direction. Keep these two
+   * timestamps apart: expiry reads this one, `prune` reads the other.
    */
   windowStart: number;
   /** Last attempt, for `prune` alone. */
@@ -93,7 +99,6 @@ interface Bucket {
  */
 export function createConnectionAdmission(disabled: boolean) {
   const buckets = new Map<string, Bucket>();
-  const laneTotals = new Map<string, Bucket>();
 
   /**
    * The bucket for the window containing `now`. A rolled window yields a fresh
@@ -117,73 +122,49 @@ export function createConnectionAdmission(disabled: boolean) {
   return {
     admit(ip: string, pathname: string, now: number): ConnectionAdmissionDecision {
       const lane: ConnectionLane = pathname === '/logs' ? 'logs' : 'gameplay';
-      const laneLimit =
-        lane === 'logs' ? LOG_CONNECTIONS_PER_WINDOW_ALL : GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL;
-      // Unattributable callers answer to the lane ceiling alone; see UNATTRIBUTED_CLIENT.
+      // The shared bucket gets a fleet-sized budget of its own, not a share of
+      // anything attributable callers also spend; see UNATTRIBUTED_CLIENT.
       const limit =
         ip === UNATTRIBUTED_CLIENT
-          ? laneLimit
+          ? lane === 'logs'
+            ? UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW
+            : UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW
           : lane === 'logs'
             ? LOG_CONNECTIONS_PER_WINDOW
             : GAMEPLAY_CONNECTIONS_PER_WINDOW;
       if (disabled) {
-        return {
-          accepted: true,
-          lane,
-          firstRejection: false,
-          count: 0,
-          limit,
-          laneExhausted: false,
-        };
+        return { accepted: true, lane, firstRejection: false, count: 0, limit };
       }
       const key = `${lane}:${ip}`;
       const own = bucketFor(buckets, key, now);
-      const all = bucketFor(laneTotals, lane, now);
-      // Both budgets are read before either is charged, so a refused upgrade is
-      // never billed and never moves a window.
+      // The budget is read before it is charged, so a refused upgrade is never
+      // billed and never moves a window.
       if (own.count >= limit) {
         const firstRejection = !own.rejected;
         own.rejected = true;
-        return {
-          accepted: false,
-          lane,
-          firstRejection,
-          count: own.count,
-          limit,
-          laneExhausted: false,
-        };
-      }
-      if (all.count >= laneLimit) {
-        const firstRejection = !all.rejected;
-        all.rejected = true;
-        return {
-          accepted: false,
-          lane,
-          firstRejection,
-          count: all.count,
-          limit: laneLimit,
-          laneExhausted: true,
-        };
+        return { accepted: false, lane, firstRejection, count: own.count, limit };
       }
       charge(buckets, key, own, now);
-      charge(laneTotals, lane, all, now);
-      return {
-        accepted: true,
-        lane,
-        firstRejection: false,
-        count: own.count,
-        limit,
-        laneExhausted: false,
-      };
+      return { accepted: true, lane, firstRejection: false, count: own.count, limit };
     },
+    /**
+     * Drops buckets for addresses that stopped calling, so the map stays
+     * bounded. What matters is that it never resets a budget still being
+     * spent; reading `lastAttempt` rather than `windowStart` is not
+     * observable through `admit` -- any bucket the window start would evict
+     * has already rolled, so its count is stale either way -- it is simply the
+     * conservative one, and a test cannot tell the two apart.
+     */
     prune(now: number): void {
-      for (const store of [buckets, laneTotals]) {
-        for (const [key, bucket] of store) {
-          if (now - bucket.lastAttempt > CONNECTION_ADMISSION_WINDOW_MS) {
-            store.delete(key);
-          }
+      for (const [key, bucket] of buckets) {
+        if (now - bucket.lastAttempt > CONNECTION_ADMISSION_WINDOW_MS) {
+          buckets.delete(key);
         }
       }
+    },
+    /** Live bucket count, so `prune` has something to assert against. */
+    size(): number {
+      return buckets.size;
     },
   };
 }

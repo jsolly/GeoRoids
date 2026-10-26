@@ -13,7 +13,11 @@ interface FakeThread {
   terminated: number;
 }
 
-const threads = vi.hoisted(() => ({ spawned: [] as FakeThread[] }));
+// One thread, because the class under test constructs exactly one and never
+// replaces it. An earlier revision of this branch had a worker restart and this
+// fake held a list of generations to match; keeping that shape would let a test
+// express a handover the shipped class cannot perform.
+const threads = vi.hoisted(() => ({ live: undefined as FakeThread | undefined }));
 const serverLogging = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
 
 vi.mock('../../../setup/serverLogger', () => ({
@@ -28,7 +32,7 @@ vi.mock('node:worker_threads', () => ({
     private readonly thread: FakeThread;
     constructor() {
       this.thread = { sent: [], listeners: new Map(), terminated: 0 };
-      threads.spawned.push(this.thread);
+      threads.live = this.thread;
     }
     on(event: string, handler: (value: never) => void): void {
       const attached = this.thread.listeners.get(event) ?? [];
@@ -80,24 +84,24 @@ const UNKNOWN_AFTER_FAULT = {
 };
 
 afterEach(() => {
-  threads.spawned.length = 0;
+  threads.live = undefined;
   vi.clearAllMocks();
 });
 
-function thread(index: number): FakeThread {
-  const spawned = threads.spawned[index];
-  if (!spawned) {
-    throw new Error(`No thread was spawned at index ${index}.`);
+function thread(): FakeThread {
+  const live = threads.live;
+  if (!live) {
+    throw new Error('The worker thread was never constructed.');
   }
-  return spawned;
+  return live;
 }
-function emit(index: number, event: string, value: unknown): void {
-  for (const handler of thread(index).listeners.get(event) ?? []) {
+function emit(event: string, value: unknown): void {
+  for (const handler of thread().listeners.get(event) ?? []) {
     (handler as (value: unknown) => void)(value);
   }
 }
-function deliver(index: number, reply: ReportWorkerReply): void {
-  emit(index, 'message', reply);
+function deliver(reply: ReportWorkerReply): void {
+  emit('message', reply);
 }
 /** When two records must read in order, an absent call is the failure, not a skip. */
 function callOrder(mock: { mock: { invocationCallOrder: number[] } }, index: number): number {
@@ -110,10 +114,10 @@ function callOrder(mock: { mock: { invocationCallOrder: number[] } }, index: num
 
 test('a storage fault stays visible when the thread reports counts measured before it', () => {
   const worker = new DebugReportWorker(CONFIG);
-  deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+  deliver({ type: 'diagnostics', diagnostics: { ...MEASURED } });
   expect(worker.diagnostics()).toEqual(MEASURED);
 
-  emit(0, 'error', new Error('SQLITE_CANTOPEN: unable to open database file'));
+  emit('error', new Error('SQLITE_CANTOPEN: unable to open database file'));
 
   // `/health` publishes this for an operator to read: a fault means the depth is
   // no longer measured, and the cause has to survive. Nothing automated asserts
@@ -124,16 +128,16 @@ test('a storage fault stays visible when the thread reports counts measured befo
   // A separate diagnostics message, already in flight, carrying counts taken
   // before the failure. Accepting it would leave `/health` reporting a healthy
   // queue while every submission answers 503.
-  deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+  deliver({ type: 'diagnostics', diagnostics: { ...MEASURED } });
   expect(worker.diagnostics()).toEqual(UNKNOWN_AFTER_FAULT);
 });
 
 test('a graceful stop records the reason without reporting a storage fault', async () => {
   const worker = new DebugReportWorker(CONFIG);
-  deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+  deliver({ type: 'diagnostics', diagnostics: { ...MEASURED } });
 
   const stopped = worker.close();
-  emit(0, 'exit', 0);
+  emit('exit', 0);
   await stopped;
 
   // `close()` routes through the same failure path, so an ordinary shutdown
@@ -149,7 +153,7 @@ test('a graceful stop records the reason without reporting a storage fault', asy
 test('the record an operator reads names the cause, with the errno that explains it', () => {
   const worker = new DebugReportWorker(CONFIG);
   const failure = new Error('SQLITE_CANTOPEN: unable to open database file');
-  emit(0, 'error', failure);
+  emit('error', failure);
 
   // Without this, a regression that drops the Error argument or logs at the
   // wrong level leaves the suite green while production records a storage
@@ -162,7 +166,7 @@ test('the record an operator reads names the cause, with the errno that explains
 
 test('a thread that exits on its own reports the exit code, not a generic failure', () => {
   const worker = new DebugReportWorker(CONFIG);
-  emit(0, 'exit', 3);
+  emit('exit', 3);
 
   expect(serverLogging.error).toHaveBeenCalledWith(
     'DEBUG_REPORTS',
@@ -189,8 +193,8 @@ test('a request that outlives its deadline reports the timeout once, not two oth
     // `exit` on this same generation. That used to come back through `fail()`
     // and emit a second, contradictory record, so one stalled queue handed an
     // operator two disagreeing lines, neither of them naming a timeout.
-    expect(thread(0).terminated).toBe(1);
-    emit(0, 'exit', 1);
+    expect(thread().terminated).toBe(1);
+    emit('exit', 1);
 
     expect(serverLogging.error).toHaveBeenCalledTimes(1);
     expect(serverLogging.error).toHaveBeenCalledWith(
@@ -220,7 +224,7 @@ test('a store that keeps failing is logged on a clock, not once per delivery tic
     // rotated away every other diagnostic from the same incident, and pushed
     // the log writer into dropping other components' records.
     for (let tick = 0; tick < 600; tick += 1) {
-      deliver(0, { type: 'fault', detail });
+      deliver({ type: 'fault', detail });
       vi.advanceTimersByTime(1_000);
     }
     expect(serverLogging.error).toHaveBeenCalledTimes(1);
@@ -235,13 +239,13 @@ test('a store that keeps failing is logged on a clock, not once per delivery tic
     // episode on fault identity alone bounded nothing: a store whose error
     // text varies -- or which alternates between two causes -- opened a fresh
     // episode every tick and logged every one of them.
-    deliver(0, { type: 'fault', detail: 'Error: SQLITE_FULL: database or disk is full' });
+    deliver({ type: 'fault', detail: 'Error: SQLITE_FULL: database or disk is full' });
     expect(serverLogging.error).toHaveBeenCalledTimes(1);
 
     // Still failing a quarter of an hour on earns exactly one more record,
     // carrying the count it stood in for, so a long outage leaves a trail.
     vi.advanceTimersByTime(900_000);
-    deliver(0, { type: 'fault', detail });
+    deliver({ type: 'fault', detail });
     expect(serverLogging.error).toHaveBeenCalledTimes(2);
     expect(serverLogging.error).toHaveBeenLastCalledWith(
       'DEBUG_REPORTS',
@@ -267,8 +271,8 @@ test('a flapping store neither re-logs each fault nor claims recovery between th
     // per-second flood came straight back -- now with a recovery line between
     // each pair, so the log also read as repeated recovery.
     for (let flap = 0; flap < 300; flap += 1) {
-      deliver(0, { type: 'fault', detail });
-      deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+      deliver({ type: 'fault', detail });
+      deliver({ type: 'diagnostics', diagnostics: { ...MEASURED } });
       vi.advanceTimersByTime(1_000);
     }
     expect(serverLogging.error).toHaveBeenCalledTimes(1);
@@ -276,7 +280,7 @@ test('a flapping store neither re-logs each fault nor claims recovery between th
 
     // The episode closes only once the store has actually gone quiet.
     vi.advanceTimersByTime(60_000);
-    deliver(0, { type: 'diagnostics', diagnostics: { ...MEASURED } });
+    deliver({ type: 'diagnostics', diagnostics: { ...MEASURED } });
     expect(serverLogging.warn).toHaveBeenCalledWith(
       'DEBUG_REPORTS',
       'Debug report storage fault episode ended',
@@ -292,7 +296,7 @@ test('a storage fault detail never reaches the public health surface', () => {
   const worker = new DebugReportWorker(CONFIG);
   const secret = 'SQLITE_CANTOPEN: /data/debug-reports.sqlite at DebugReportStore.open';
 
-  deliver(0, { type: 'fault', detail: secret });
+  deliver({ type: 'fault', detail: secret });
 
   // `/health` is unauthenticated. The detail exists so an operator can read the
   // cause in the server log; routing it into `lastError` instead would publish
@@ -314,14 +318,14 @@ test('a worker that dies mid-episode still reports how many faults it suppressed
   const detail = 'Error: SQLITE_IOERR: disk I/O error';
 
   for (let tick = 0; tick < 12; tick += 1) {
-    deliver(0, { type: 'fault', detail });
+    deliver({ type: 'fault', detail });
   }
   expect(serverLogging.error).toHaveBeenCalledTimes(1);
 
   // The count is the only record of how long the episode ran. Abandoning the
   // episode here loses it on exactly the sequence worth reading: a store starts
   // failing, faults repeatedly, and then takes the worker down.
-  emit(0, 'error', new Error('SQLITE_CANTOPEN: unable to open database file'));
+  emit('error', new Error('SQLITE_CANTOPEN: unable to open database file'));
 
   expect(serverLogging.warn).toHaveBeenCalledWith(
     'DEBUG_REPORTS',

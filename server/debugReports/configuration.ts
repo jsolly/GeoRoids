@@ -84,12 +84,10 @@ export function readDebugReportConfiguration(
   }
   return {
     path,
-    // An absent credential does not refuse configuration. `DebugReportStore`
-    // records such a report as `blocked` rather than `pending`, which is the
-    // documented recovery in docs/agent-operations.md: repair the credential
-    // and let the worker drain the queue. Refusing instead threw the report
-    // away, cost local development its `.data` inbox, and added a second,
-    // undocumented disable path beside `GEOROIDS_DEBUG_REPORTS_ENABLED=0`.
+    // Empty is a valid configuration: `DebugReportStore` records a report as
+    // `blocked` rather than `pending` without a credential, which is the
+    // recovery docs/agent-operations.md documents. `GEOROIDS_DEBUG_REPORTS_ENABLED=0`
+    // is the way to turn reporting off.
     token: env['TODOIST_API_TOKEN'] ?? '',
     projectId: destination.projectId,
     sectionId: env['GEOROIDS_DEBUG_REPORTS_SECTION_ID'] ?? destination.sectionId,

@@ -37,17 +37,15 @@ const UNMEASURED_QUEUE: QueueDiagnostics = {
 
 /**
  * How a fault episode ended, so one message carries every case. Derived from
- * `FailureCause` rather than listed by hand: spelling it out separately let a
- * request timeout be reported as `worker-failed`, which is the same
- * mislabelling the typed cause was introduced to remove.
+ * `FailureCause` so the two cannot drift: a hand-written list lets an outcome
+ * name a cause the episode did not actually have.
  */
 type EpisodeOutcome = 'recovered' | FailureCause['kind'];
 
 /**
- * Why reporting stopped. The player-facing message follows from the cause
- * rather than travelling beside it, so a caller cannot pair the two wrongly --
- * the timeout path used to pass its own message and still log "worker failed"
- * with a fabricated `exitCode: undefined`.
+ * Why reporting stopped. The player-facing message is derived from the cause
+ * rather than passed beside it, so no call site can pair a message with a
+ * cause that contradicts it.
  */
 type FailureCause =
   | { kind: 'uncaught'; error: Error }
@@ -296,10 +294,9 @@ export class DebugReportWorker {
   }
 
   /**
-   * The suppressed count is the only record of how long an episode ran, so it
-   * has to survive every way an episode can end -- including the worker dying
-   * mid-episode, which is the sequence an operator most wants to read and the
-   * one that used to drop the number entirely.
+   * The suppressed count is the only record of how long an episode ran, so
+   * every way an episode can end has to flush it -- including the worker dying
+   * mid-episode, which is the sequence an operator most wants to read.
    */
   private endFaultEpisode(outcome: EpisodeOutcome): void {
     const episode = this.faultEpisode;
@@ -315,19 +312,16 @@ export class DebugReportWorker {
 
   /**
    * One failure, one record. The cause is typed because the message follows
-   * from it: passing both separately let the ten-second timeout report itself
-   * as "worker failed" with `exitCode: undefined`, naming neither the timeout
-   * nor a real exit code.
+   * from it, so a deadline cannot report itself as something else.
    *
    * The re-entry guard is load-bearing, not defensive. The timeout path calls
-   * `terminate()`, and that raises `exit` on the same thread, which used to
-   * come back through here and emit a second, contradictory line for one stall.
-   * An operator reading the log for a stalled queue got two records that
-   * disagreed, neither mentioning a timeout.
+   * `terminate()`, and that raises `exit` on the same thread, which comes back
+   * through here; without the guard one stall emits two records that disagree,
+   * and the second overwrites the `lastError` naming the timeout.
    *
    * `close()` also routes through here, and only a real fault discards the last
-   * measured depth: treating a clean stop as a failure logged an ERROR on every
-   * shutdown and threw away a count that was still true.
+   * measured depth, because a clean stop is not a failure and its count is
+   * still true.
    */
   private fail(cause: FailureCause): void {
     const message = FAILURE_MESSAGE[cause.kind];

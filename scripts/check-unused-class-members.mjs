@@ -116,10 +116,11 @@ function componentMembers(root) {
  * entry is only a candidate: whether it actually reaches a given class is a
  * question for the type checker, asked once per reported member.
  */
-function reachableWithoutTheClass(program) {
+function reachableWithoutTheClass(program, checker) {
   const declaringTypes = new Map();
   const inProbes = new Map();
   const keyArguments = new Map();
+  const spreads = [];
   const add = (index, name, node) => {
     const nodes = index.get(name) ?? [];
     nodes.push(node);
@@ -151,11 +152,54 @@ function reachableWithoutTheClass(program) {
           }
         }
       }
+      if (ts.isSpreadAssignment(node)) {
+        spreads.push(node);
+      }
       ts.forEachChild(node, visit);
     };
     ts.forEachChild(file, visit);
   }
-  return { declaringTypes, inProbes, keyArguments };
+  let resolved;
+  return {
+    declaringTypes,
+    inProbes,
+    keyArguments,
+    // Resolving the spreads costs one type query each, so it is done once, and
+    // only if a field actually needs adjudicating.
+    spreadClasses: () => {
+      resolved ??= spreadClasses(spreads, checker);
+      return resolved;
+    },
+  };
+}
+
+/**
+ * The classes whose instances are copied whole by an object spread, each mapped
+ * to one such spread. `{...instance}` reads every own field without leaving a
+ * reference at any of their declarations, so a field reached only that way
+ * would otherwise be reported — and removing it would quietly empty the copy.
+ */
+function spreadClasses(spreads, checker) {
+  const found = new Map();
+  const note = (type, node) => {
+    for (const part of type.isUnion() ? type.types : [type]) {
+      for (const declaration of part.getSymbol()?.declarations ?? []) {
+        if (ts.isClassLike(declaration) && !found.has(declaration)) {
+          found.set(declaration, node);
+        }
+      }
+      // A spread of a subclass instance copies the fields it inherits too.
+      if (part.isClassOrInterface()) {
+        for (const base of checker.getBaseTypes(part)) {
+          note(base, node);
+        }
+      }
+    }
+  };
+  for (const node of spreads) {
+    note(checker.getTypeAtLocation(node.expression), node);
+  }
+  return found;
 }
 
 /**
@@ -175,11 +219,13 @@ function namesAKey(contextual) {
 /**
  * Why a member with no reference of its own is still reachable, or undefined
  * when nothing reaches it. Every answer is a type relationship a caller could
- * actually use, rather than a matching name. A base class needs no rule here:
+ * actually use, rather than a matching name, and what counts depends on how
+ * this kind of member is reached: by a call, by a read, by an assignment, or by
+ * a copy of the whole instance. A base class needs no rule here:
  * the language service links a member to the base declaration it overrides, so
  * the reference pass has already cleared it.
  */
-function reachedThroughType(name, declaringClass, checker, service, index) {
+function reachedThroughType(name, kind, declaringClass, checker, service, index) {
   const classType = instanceType(declaringClass, checker);
   const where = (node) => {
     const source = node.getSourceFile();
@@ -190,28 +236,30 @@ function reachedThroughType(name, declaringClass, checker, service, index) {
   // A structural type this class satisfies declares it, so a caller holding
   // that port reaches the member without ever naming the class.
   for (const node of index.declaringTypes.get(name) ?? []) {
-    // A named interface nothing else mentions cannot hold a caller, so
-    // declaring one is not a way to quiet this check. A type literal is written
-    // inside a signature, so it is already used where it stands.
-    if (ts.isInterfaceDeclaration(node) && !isMentionedElsewhere(node.name, service)) {
-      continue;
-    }
     const declared = ts.isInterfaceDeclaration(node)
       ? declaredTypeOf(node.name, checker)
       : checker.getTypeAtLocation(node);
     if (declared === undefined || !checker.isTypeAssignableTo(classType, declared)) {
       continue;
     }
-    // The type has to declare something a caller could call. A member typed
-    // `unknown`, or one whose type is an empty interface, accepts a method
-    // without ever offering a way to invoke it.
     const declaredMember = declared.getProperty(name);
     if (declaredMember === undefined) {
       continue;
     }
-    const memberType = checker.getTypeOfSymbolAtLocation(declaredMember, node);
-    if (memberType.getCallSignatures().length === 0) {
+    // The port has to be exercised: something must call, read or assign the
+    // member through it. A declaration nothing ever touches reaches nothing,
+    // which is why an interface written only to quiet this check does not.
+    if (!isExercised(declaredMember, service)) {
       continue;
+    }
+    // A method is reached only by calling it, so a port that accepts one
+    // without offering a call signature — a member typed `unknown`, or typed
+    // as an empty interface — is not the channel that reaches it.
+    if (kind === 'method') {
+      const memberType = checker.getTypeOfSymbolAtLocation(declaredMember, node);
+      if (memberType.getCallSignatures().length === 0) {
+        continue;
+      }
     }
     return `declared by a type this class satisfies at ${where(node)}`;
   }
@@ -229,6 +277,15 @@ function reachedThroughType(name, declaringClass, checker, service, index) {
       continue;
     }
     return `probed with \`in\` at ${where(node)}`;
+  }
+  // Copied whole by a spread of this class, which reads fields but not methods:
+  // a method lives on the prototype and an accessor is not an own property, so
+  // neither is copied.
+  if (kind === 'property') {
+    const spread = index.spreadClasses().get(declaringClass);
+    if (spread !== undefined) {
+      return `read through a spread of this class at ${where(spread)}`;
+    }
   }
   // A key of a related object, such as vi.spyOn(target, 'name').
   for (const node of index.keyArguments.get(name) ?? []) {
@@ -252,13 +309,28 @@ function reachedThroughType(name, declaringClass, checker, service, index) {
   return undefined;
 }
 
-/** Whether anything but its own declaration names this type. */
+/** Whether anything but its own declaration names this identifier. */
 function isMentionedElsewhere(name, service) {
   const file = name.getSourceFile().fileName;
   const declaration = name.getStart();
   const references = service.getReferencesAtPosition(file, declaration) ?? [];
   return references.some(
     (reference) => reference.fileName !== file || reference.textSpan.start !== declaration
+  );
+}
+
+/**
+ * Whether anything touches this declared member through the type that declares
+ * it. The question is asked of the port's own declaration, so a class that
+ * satisfies an untouched shape is not cleared by it — including the shape of a
+ * `Pick` or an extended interface, whose members resolve to the same symbol.
+ */
+function isExercised(member, service) {
+  return (member.declarations ?? []).some(
+    (declaration) =>
+      declaration.name !== undefined &&
+      ts.isIdentifier(declaration.name) &&
+      isMentionedElsewhere(declaration.name, service)
   );
 }
 
@@ -278,14 +350,53 @@ function declaredTypeOf(name, checker) {
   return symbol === undefined ? undefined : checker.getDeclaredTypeOfSymbol(symbol);
 }
 
-function isCheckableMember(member) {
-  if (!ts.isMethodDeclaration(member) || !member.name || !ts.isIdentifier(member.name)) {
-    return false;
+/**
+ * Which kind of member this declaration is, or undefined for one this check
+ * leaves alone. A `private` or `protected` member answers to Biome or to
+ * nothing at all, and an overload signature, an abstract member and a `declare`
+ * field each declare something another declaration implements. A field needs no
+ * body, so only the kinds that have one are required to carry it.
+ */
+function checkableKind(member) {
+  if (member.name === undefined || !ts.isIdentifier(member.name)) {
+    return undefined;
   }
   const flags = ts.getCombinedModifierFlags(member);
   const hidden = ts.ModifierFlags.Private | ts.ModifierFlags.Protected;
   const deferred = ts.ModifierFlags.Abstract | ts.ModifierFlags.Ambient | ts.ModifierFlags.Override;
-  return (flags & hidden) === 0 && (flags & deferred) === 0 && member.body !== undefined;
+  if ((flags & hidden) !== 0 || (flags & deferred) !== 0) {
+    return undefined;
+  }
+  if (ts.isPropertyDeclaration(member)) {
+    return 'property';
+  }
+  if (member.body === undefined) {
+    return undefined;
+  }
+  if (ts.isMethodDeclaration(member)) {
+    return 'method';
+  }
+  if (ts.isGetAccessor(member)) {
+    return 'getter';
+  }
+  return ts.isSetAccessor(member) ? 'setter' : undefined;
+}
+
+/**
+ * Whether a reference exercises this kind of member. A getter is reached by a
+ * read and a setter by a write, and a get/set pair shares one symbol, so
+ * judging either by every reference would let its partner speak for it.
+ * Compound assignment reports as a write, which is the honest answer for a
+ * field whose only use accumulates into it and nothing reads.
+ */
+function exercises(kind, reference) {
+  if (kind === 'getter') {
+    return reference.isWriteAccess !== true;
+  }
+  if (kind === 'setter') {
+    return reference.isWriteAccess === true;
+  }
+  return true;
 }
 
 /**
@@ -306,16 +417,33 @@ function declarationPositions(node, file) {
   return positions;
 }
 
-function remedy(internal, componentOnly) {
+function remedy({ kind, internal, reads, componentOnly, paired }) {
   if (componentOnly) {
     return 'only a component calls it; cover the behavior from a test';
   }
-  return internal > 0
-    ? `used only inside its class (${internal}); make it private`
-    : 'no TypeScript references; remove it';
+  // An accessor is reached by one kind of access, so say which one is missing
+  // rather than claiming nothing names it: its partner shares the name.
+  if (internal === 0 && kind === 'getter') {
+    return 'nothing reads it; remove the getter';
+  }
+  if (internal === 0 && kind === 'setter') {
+    return 'nothing assigns it; remove the setter';
+  }
+  if (internal === 0) {
+    return 'no TypeScript references; remove it';
+  }
+  // A field nothing reads is dead storage wherever it is written from, so
+  // narrowing it to `private` would only move the finding to Biome.
+  if (kind === 'property' && reads === 0) {
+    return `written but never read (${internal}); remove it`;
+  }
+  const naming = { getter: 'read', setter: 'assigned' }[kind] ?? 'used';
+  // TypeScript requires the two halves of a pair to agree on visibility.
+  const how = paired ? 'make the accessor pair private' : 'make it private';
+  return `${naming} only inside its class (${internal}); ${how}`;
 }
 
-/** Public production methods no caller outside the declaring class reaches. */
+/** Public production members no caller outside the declaring class reaches. */
 function unusedClassMembers(root = process.cwd(), configName = 'config/typescript/prune.jsonc') {
   const service = languageService(root, configName);
   const program = service.getProgram();
@@ -328,7 +456,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
     typeof checker.isTypeAssignableTo === 'function',
     'This TypeScript build cannot answer assignability, so reachability cannot be judged'
   );
-  const index = reachableWithoutTheClass(program);
+  const index = reachableWithoutTheClass(program, checker);
   const fromComponents = componentMembers(root);
   const scanned = program
     .getSourceFiles()
@@ -352,7 +480,8 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
       if (ts.isClassLike(node)) {
         const declared = declarationPositions(node, file);
         for (const member of node.members) {
-          if (!isCheckableMember(member)) {
+          const kind = checkableKind(member);
+          if (kind === undefined) {
             continue;
           }
           const name = member.name.text;
@@ -367,14 +496,22 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             ),
             `Cannot resolve references for ${name} in ${path}`
           );
+          const positions = declared.get(name) ?? new Set();
+          // An overload signature and a get/set partner declare this member
+          // rather than reaching it, as does its own declaration.
+          const declares = (reference) =>
+            reference.fileName === file.fileName && positions.has(reference.textSpan.start);
           const inside = (reference) =>
             reference.fileName === file.fileName &&
             reference.textSpan.start >= node.getStart(file) &&
             reference.textSpan.start < node.getEnd();
-          if (references.some((reference) => !inside(reference))) {
+          const uses = references.filter(
+            (reference) => !declares(reference) && exercises(kind, reference)
+          );
+          if (uses.some((reference) => !inside(reference))) {
             continue;
           }
-          const reason = reachedThroughType(name, node, checker, service, index);
+          const reason = reachedThroughType(name, kind, node, checker, service, index);
           if (reason !== undefined) {
             cleared.push({
               member: `${node.name?.text ?? '(anonymous)'}.${name}`,
@@ -384,13 +521,24 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             });
             continue;
           }
-          const positions = declared.get(name) ?? new Set();
           findings.push({
             member: `${node.name?.text ?? '(anonymous)'}.${name}`,
             path,
             line: file.getLineAndCharacterOfPosition(declaration).line + 1,
-            internal: references.filter(
-              (reference) => inside(reference) && !positions.has(reference.textSpan.start)
+            kind,
+            // Overload signatures repeat a name as well, so the partner has
+            // to be identified by kind rather than by name alone.
+            paired: node.members.some(
+              (other) =>
+                other !== member &&
+                other.name !== undefined &&
+                ts.isIdentifier(other.name) &&
+                other.name.text === name &&
+                (ts.isGetAccessor(other) || ts.isSetAccessor(other))
+            ),
+            internal: uses.length,
+            reads: references.filter(
+              (reference) => !declares(reference) && reference.isWriteAccess !== true
             ).length,
             componentOnly: (fromComponents.get(moduleKey(file.fileName)) ?? new Set()).has(name),
           });
@@ -406,8 +554,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
 export function checkUnusedClassMembers(root = process.cwd(), configName) {
   const { findings, cleared } = unusedClassMembers(root, configName);
   const report = findings.map(
-    ({ member, path, line, internal, componentOnly }) =>
-      `${member} ${path}:${line} - ${remedy(internal, componentOnly)}\n`
+    (finding) => `${finding.member} ${finding.path}:${finding.line} - ${remedy(finding)}\n`
   );
   // Each member kept without a reference of its own says which relationship
   // kept it, so a run that reports nothing can be audited rather than trusted.

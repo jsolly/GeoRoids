@@ -148,10 +148,10 @@ class Ship {
 
   impactFlashFrames: number = 0;
   blinkOn: boolean; // Will be set in constructor based on blinkCount
-  lastShotTime: number = 0;
+  private lastShotTime: number = 0;
   shotCooldown: number = 250;
   color: string = PALETTE.LOCAL;
-  frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
+  private frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
   /** In-flight menus stop navigation without pausing combat or lifecycle timers. */
   movementLocked = false;
   /** Automatic cargo stop, released by steering; grants no damage immunity. */

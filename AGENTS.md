@@ -65,37 +65,54 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   ts-prune owns unused exports for those: `config/typescript/prune.jsonc` sets
   `allowJs` to keep `scripts/**/*.mjs` in its program, and
   `scripts/check-unused-typescript.test.mjs` fails if that drops. Biome's
-  `noUnusedPrivateClassMembers` owns unused private class members, and
-  `scripts/check-unused-class-members.mjs` owns public methods — on class
-  declarations and class expressions alike — that nothing outside the declaring
-  class calls. Remove one with no references, narrow one used only internally to
-  `private` so Biome takes over, or give one a caller.
+  `noUnusedPrivateClassMembers` owns unused `private` and `#private` class
+  members, and `scripts/check-unused-class-members.mjs` — the gate's
+  `check:members` stage, its own stage so that its verdicts do not read as a
+  ts-prune failure — owns public methods, fields and accessors, on class
+  declarations and class expressions alike, that nothing outside the declaring
+  class reaches. Remove one with no references, narrow one used only internally
+  to `private` so Biome takes over, or give one a caller.
 - **What that member check leaves alone.** It judges `src/`, `server/` and
   `shared/` by directory prefix, so `setup/`, `.railway/`, `benchmarks/`,
   `scripts/` whatever the extension, and the repo-root modules (`server.ts`,
   `shared-types.ts`) all sit outside it, as do test doubles and benchmark
-  harnesses that exist to satisfy external shapes. `protected` methods are out
-  of scope too, and Biome's rule covers only `private` ones, so an unused
-  protected method answers to neither gate. Public class properties and
-  accessors have no owner at all, and neither do properties of plain objects and
-  constants. No class is skipped for its shape, though: one that extends,
+  harnesses that exist to satisfy external shapes. `protected` members are out
+  of scope too, and Biome's rule covers only private ones, so an unused
+  protected member answers to neither gate; an abstract or `declare` member
+  defers to the declaration that implements it. Properties of plain objects and
+  constants have no owner at all. Each kind is judged by the access that reaches
+  it: a field by reads and writes, a getter by reads, a setter by writes — a
+  pair shares one symbol, so judging either by every reference would let its
+  partner speak for it — and a field nothing reads anywhere is dead storage
+  however it is written, so its remedy is removal rather than a narrowing Biome
+  would then report. No class is skipped for its shape, though: one that extends,
   implements, is extended or is abstract has its own members judged, because the
   language service resolves a call made through a subclass instance and links a
   member to the base declaration it overrides.
 - **A member with no reference of its own is cleared only by a type
   relationship.** For each one the check asks the type checker whether a
-  structural type the class satisfies declares it with a member a caller could
-  actually call, whether an `in` probe tests an object the class could be, or
-  whether a string names a key of an object that carries it, the way
-  `vi.spyOn(target, 'name')` does. It rejects what looks like a relationship but
-  is not: a declaration of the same name the class does not satisfy, a member
-  typed so loosely it offers no way to invoke anything, an `unknown`, `any` or
-  `object` counterparty that every class is assignable to, and an interface
-  nothing else mentions — declaring one is no more a way to quiet this check
-  than deleting a component's call site. Bracket access needs no allowance
-  because the service resolves `object['name']()` itself. Each member kept this
-  way is printed with the relationship and the file it was found in, so a run
-  that reports nothing can be audited instead of trusted, and
+  structural type the class satisfies declares it and something exercises that
+  port, whether an `in` probe tests an object the class could be, whether a
+  string names a key of an object that carries it the way `vi.spyOn(target,
+  'name')` does, or — for a field only — whether a spread copies an instance of
+  the class whole, which reads every own field without leaving a reference at
+  any declaration (`src/rendering/beltRenderer.ts` spreads a `Roid`; removing
+  such a field would quietly empty the copy). A method is reached only by
+  calling it, so its port must also offer a call signature; a field is reached
+  by reading or assigning it, so an ordinary `number` port reaches one, which is
+  how `Ship.tapExtractFrames` is reached through `shared/shipAbilities.ts`. A
+  spread clears no method or accessor: a method lives on the prototype and an
+  accessor is not an own property, so neither is copied. The check rejects what
+  looks like a relationship but is not: a declaration of the same name the class
+  does not satisfy, a method port typed so loosely it offers no way to invoke
+  anything, an `unknown`, `any` or `object` counterparty that every class is
+  assignable to, and a shape nothing ever touches — writing an interface is no
+  more a way to quiet this check than deleting a component's call site. Bracket
+  access needs no allowance because the service resolves `object['name']()`
+  itself. Each member kept this way is printed with the relationship and the
+  file it was found in, so a run that reports nothing can be audited instead of
+  trusted — that audit line is what exposed a dead `SatellitePickup.velocity`
+  hiding behind a port no pickup is ever passed to — and
   `scripts/check-unused-class-members.test.mjs` pins every rule together with
   the negative that matters.
 - **What that still does not prove.** The evidence may sit anywhere in the prune
@@ -105,10 +122,17 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   consumer. And a relationship is not a caller: the check establishes that the
   class satisfies a port something declared, not that any value of the class
   ever flows into it. Asked of every judged member rather than only the ones
-  without a reference, the rules would clear roughly a sixth of the surface, so
-  a clean run is good evidence and not a proof. Narrowing that further needs to
-  follow values into the positions those types occupy, which risks reporting
-  live code and is deliberately not attempted.
+  without a reference, the rules would clear about one method in six but roughly
+  three fields in five, because a field's type is ordinary — a `number`, a
+  shared `Position` — and this codebase deliberately hands entities to `shared/`
+  helpers by shape. So a clean run is good evidence for a method and weaker
+  evidence for a field, and in neither case a proof. Narrowing that further
+  needs to follow values into the positions those types occupy, which risks
+  reporting live code and is deliberately not attempted. A spread is the only
+  whole-object read the check models, and on this tree it is the only one that
+  exists: a serializer, an `Object.values` or an object rest pattern over an
+  instance would read every field just as invisibly, so introducing one means a
+  field reached only that way is reported.
 - **A component's call is not a reference the check can find**, since its
   program resolves no `.svelte` or `.astro` file. It therefore reads the
   components that import a module and reports a method one of them names as

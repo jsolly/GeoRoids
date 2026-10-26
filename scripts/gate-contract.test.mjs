@@ -45,6 +45,7 @@ const REQUIRED_COMMANDS = [
   'check:lint',
   'check:knip',
   'check:ts-prune',
+  'check:members',
   'check:md',
   'check:yaml',
   'check:actions',
@@ -400,9 +401,9 @@ test('literal tuning skips only graphs while partial staging never certifies can
     assert.equal(result.candidateCertified, false);
     assert.deepEqual(
       f.calls,
-      STAGES.filter(([, command]) => !['check:knip', 'check:ts-prune'].includes(command)).map(
-        ([, command]) => command
-      )
+      STAGES.filter(
+        ([, command]) => !['check:knip', 'check:ts-prune', 'check:members'].includes(command)
+      ).map(([, command]) => command)
     );
     f.calls.length = 0;
     await f.gate();
@@ -1082,6 +1083,7 @@ test('changed TypeScript symlink plus literal tuning requires both graph checks'
     await f.gate();
     assert.ok(f.calls.includes('check:knip'));
     assert.ok(f.calls.includes('check:ts-prune'));
+    assert.ok(f.calls.includes('check:members'));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

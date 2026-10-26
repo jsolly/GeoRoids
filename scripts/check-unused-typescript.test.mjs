@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
+import ts from 'typescript';
 import { test } from 'vitest';
 import unusedConfig from '../config/quality/knip.js';
 import { checkUnusedTypescript, frontendEntry } from './check-unused-typescript.mjs';
@@ -34,7 +35,13 @@ test('frontend imports and inherited tool entries preserve exact TypeScript expo
       'config/typescript/prune.jsonc',
       JSON.stringify({
         extends: './base.json',
-        include: ['../../src/**/*.ts', '../../config/app/**/*.ts', '../../config/testing/**/*.ts'],
+        compilerOptions: { allowJs: true },
+        include: [
+          '../../src/**/*.ts',
+          '../../scripts/**/*.mjs',
+          '../../config/app/**/*.ts',
+          '../../config/testing/**/*.ts',
+        ],
         files: ['../../tool.config.ts'],
       })
     );
@@ -81,6 +88,22 @@ test('frontend imports and inherited tool entries preserve exact TypeScript expo
     fails('orphanVitest');
     write('config/testing/vitest.ts', 'export default {};');
     passes();
+    // The release machinery under scripts/ is authored as .mjs, so allowJs keeps
+    // those modules in this program; Knip stops checking a module's exports once
+    // a path string reaches it, which covers most of those runners.
+    mkdirSync(join(root, 'scripts'));
+    write('scripts/runner.mjs', 'export function used() {\n  return 1;\n}');
+    write('src/main.ts', 'import {used} from "../scripts/runner.mjs"; console.log(used());');
+    passes();
+    write(
+      'scripts/runner.mjs',
+      'export function used() {\n  return 1;\n}\nexport const spare = 2;'
+    );
+    fails('spare');
+    write('scripts/runner.mjs', 'export function used() {\n  return 1;\n}');
+    write('src/main.ts', 'console.log("entry");');
+    fails('used');
+    rmSync(join(root, 'scripts/runner.mjs'));
     write('src/values.ts', `${live} export const mentionedOnly = 1;`);
     write(
       'src/Comment.svelte',
@@ -96,6 +119,37 @@ test('frontend imports and inherited tool entries preserve exact TypeScript expo
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('the committed prune program keeps the scripts/ .mjs runners in scope', () => {
+  const configPath = resolve('config/typescript/prune.jsonc');
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  assert.equal(config.error, undefined);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath));
+  assert.equal(parsed.options.allowJs, true, 'Unused .mjs exports need allowJs');
+  const runners = parsed.fileNames.filter((path) => /scripts\/[^/]+\.mjs$/u.test(path));
+  assert.ok(runners.length > 10, `Expected the scripts/ runners in scope, saw ${runners.length}`);
+  // A sibling declaration file wins module resolution, so its .mjs never enters
+  // the program and no gate can report that module's unused exports.
+  const shadowed = parsed.fileNames.filter((path) => path.endsWith('.d.mts'));
+  for (const declaration of shadowed) {
+    const implementation = declaration.replace(/\.d\.mts$/u, '.mjs');
+    assert.ok(
+      existsSync(implementation),
+      `${relative(process.cwd(), declaration)} declares no sibling module`
+    );
+    assert.ok(
+      !parsed.fileNames.includes(implementation),
+      `${relative(process.cwd(), implementation)} entered the program, so it is not shadowed`
+    );
+  }
+  // The inventory is pinned as well, so a new shadow has to be documented in
+  // AGENTS.md beside the blind spot it opens instead of appearing silently.
+  assert.deepEqual(
+    shadowed.map((path) => relative(process.cwd(), path)),
+    ['scripts/validation-admission.d.mts'],
+    'A new hand-written declaration file hides its .mjs from the unused-export gate'
+  );
 });
 
 test('the unused-file gate rejects an orphaned Svelte component and follows its Astro consumer', () => {

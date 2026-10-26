@@ -1069,7 +1069,16 @@ test('every gate stage writes generated caches in its issued artifact session', 
   }
 });
 
-test('hostile inherited Git repository, index and config never affect parent state', () => {
+// This case spawns a nested Vitest run of this same file that excludes only
+// itself, so it costs the sum of every other case here and every case added
+// here is paid for twice. It measured 117.6s in a cloud sandbox against the
+// 120000 default, which is why it carries its own ceiling; CI's runner is far
+// cheaper, spending 98s on the whole check:actions step. The nested run is
+// bounded below that ceiling so a hang reports as a spawn timeout carrying the
+// child's output rather than an opaque one.
+test('hostile inherited Git repository, index and config never affect parent state', {
+  timeout: 240000,
+}, () => {
   const f = fixture();
   try {
     f.git('config', '--local', 'fixture.guard', 'original');
@@ -1119,8 +1128,12 @@ test('hostile inherited Git repository, index and config never affect parent sta
         },
         encoding: 'utf8',
         maxBuffer: 16 * 1024 * 1024,
+        timeout: 220000,
       }
     );
+    if (result.error) {
+      assert.fail(`${result.error.message}\n${result.stdout}${result.stderr}`);
+    }
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /every gate stage writes generated caches/u);
     for (const [name, bytes] of tracked) {

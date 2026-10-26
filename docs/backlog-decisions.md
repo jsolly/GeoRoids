@@ -93,9 +93,9 @@ proof without importing future demonstration artwork.
 Keep `chooseCrewSpawn` in `shared/player.ts` and snapshot `isPaused`; both have
 live consumers. Keep the owner-less burn normalizer until the production scan
 and retained-backup dates satisfy its existing task; [world operations](persistent-world.md)
-records the older-backup restore caveat. Keep wire `deathCause` and
-`findShipAsteroidOverlaps` until W2 and W3 meet their merged-and-live prerequisite
-in [task `6hjWGhm4rvX2f5pv`](https://app.todoist.com/app/task/6hjWGhm4rvX2f5pv).
+records the older-backup restore caveat. John lifted the stale-tab hold on wire
+`deathCause` on 2026-10-26
+([task `6hjWGhm4rvX2f5pv`](https://app.todoist.com/app/task/6hjWGhm4rvX2f5pv)).
 Other unverified sweep rows remain planning data on
 [task `6hjWGhqrx6rhMrrv`](https://app.todoist.com/app/task/6hjWGhqrx6rhMrrv),
 not evidence of dead code.

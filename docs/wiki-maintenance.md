@@ -97,6 +97,55 @@ For a change confined to the Wiki checker, a review command from `/Users/johnsol
 npm run wiki:review -- --source scripts/wiki-check.ts --topic field-manual --owner scripts/wiki-check.ts=field-manual --note "Reviewed scoped maintenance checks; player rules and demonstrations are unchanged."
 ```
 
+## Merging the ledger
+
+Every branch appends to `docs/wiki-source-review.json`, so concurrent branches
+collide in it routinely. Resolve it with `npm run wiki:merge` during the
+conflicted merge; it reads the three conflict stages Git already holds, writes
+the resolution, and leaves staging to you.
+
+Do not resolve it by hand, and do not resolve it with `--accept`. The obvious
+resolution is the union of both sides, and that is correct only while the two
+sides re-recorded disjoint sources. When both sides re-recorded the same source,
+the merged bytes match neither recorded digest, so a union writes a digest for
+content that does not exist — and `npm run check:wiki` still passes, because it
+compares digests against files and a union is self-consistent. The gate cannot
+catch that resolution; only the disjointness check can.
+
+The resolver never emits a digest it cannot prove:
+
+| Case | Result |
+| --- | --- |
+| Untouched by both sides | the shared value, proven by all three agreeing |
+| Re-recorded by one side | that side's value, proven because only it moved |
+| Re-recorded by both | reset to the merge-base value, so the source reports pending |
+| Added by both, digests differ | omitted, so the source reports pending |
+| Removed by either side | omitted, correct whether or not the merged tree keeps the file |
+
+Review batches union by content rather than by index, because merging main
+interleaves other branches' batches and the arrays then agree on no index beyond
+the base. Dropping a batch the merge base holds is refused outright, as is a
+two-sided edit of the top-level note. Anything the resolver leaves pending is
+ordinary review work: inspect those sources and record them with
+`npm run wiki:review` before committing the merge.
+
+To resolve it automatically instead, register the same script as a Git merge
+driver in your own checkout. The repository deliberately does not register it:
+`scripts/repo-hooks.py` installs executable hooks outside the worktree from
+reviewed `origin/main` only, so a branch can never change what Git runs, and a
+driver pointing into the worktree would reopen exactly that. Opt in locally if
+you accept that:
+
+```sh
+git config merge.wiki-ledger.name 'GeoRoids wiki review ledger'
+git config merge.wiki-ledger.driver 'node scripts/merge-wiki-ledger.mjs %O %A %B'
+printf 'docs/wiki-source-review.json merge=wiki-ledger\n' >> .git/info/exclude.gitattributes
+git config core.attributesFile "$(git rev-parse --git-dir)/info/exclude.gitattributes"
+```
+
+`scripts/merge-wiki-ledger.test.mjs` pins each rule above, including that a
+union of two-sided digests fails and that a real conflicted merge resolves.
+
 ## Live CMS acceptance
 
 Fixture checks prove collection validation and rendering, but do not verify an

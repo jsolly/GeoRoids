@@ -22,7 +22,7 @@ let transportFailureReported = false;
 let lastSocketAttemptAt = 0;
 
 const MAX_QUEUE_BYTES = 256 * 1024;
-const MIN_SOCKET_GAP_MS = 5000;
+export const MIN_SOCKET_GAP_MS = 5000;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const MAX_SOCKET_BUFFERED_BYTES = 64 * 1024;
 

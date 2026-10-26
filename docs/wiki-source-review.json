@@ -7,7 +7,7 @@
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
-    "docs/diagnostics.md": "sha256:7b7cd11435899a5df1e651ba90cfb0233e35e966c19170ee5089e718cf16fad8",
+    "docs/diagnostics.md": "sha256:d7bd48090ef24fa22a1a044c7dc098d08ba0ced7d4172cf3692ec6e260fa971b",
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:56a718eb6a611b6d84b94e17829c8390ee52ebca1208b8091a4ad88664aa2fe9",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:5cd434471089030385b9e3b7c0f93fefffbaa6541fb68de3415c52489891b09a",
-    "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
+    "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -421,7 +421,7 @@
     "src/utils/colorUtils.ts": "sha256:b71943b98a819ae1bc881ec8642b850fc0971aee34c3339cf30666bbb280d6bb",
     "src/utils/globalErrorLogging.ts": "sha256:92f69fe910c3058bda0122c7ee4d831fb0933654ee4eebcfe508697bb6182a08",
     "src/utils/logForwardPolicy.ts": "sha256:a43283cb6f407c1c73022a83bfed26b7fb7a1102bf8912488592b58145f51b6a",
-    "src/utils/logForwarder.ts": "sha256:e44fbb1e33beeee252f8addf2562015cbe4ce731fa63bf0485ec93221a1902c0",
+    "src/utils/logForwarder.ts": "sha256:4786a5f03e93f4ec12cbaf12621a804ccc892f6cad52770c46648be33c753dc3",
     "src/utils/logLevel.ts": "sha256:7fee2d1f18de529d2297e37d9c1609043bdcce18bd5e91d311e9553f70f017ef",
     "src/utils/logsWebSocketUrl.ts": "sha256:e42295acd48125bedc1ab867dd1616de888d82816e00f8c888cf68da449f65a2",
     "src/utils/mathUtils.ts": "sha256:e020acef679a1c4e56d06a2b655fd6567a6876906224d9510f37a56559cf72d9",
@@ -7588,6 +7588,29 @@
       "media": [],
       "owners": {
         "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed hud-network against fleet-sizing the two connection budgets; no page needs an edit, and the change removes a player-visible failure cause rather than adding one. Behind Railway public HTTP ingress the socket address the limiter keys on is the edge proxy, so every pilot is charged to one bucket and each lane's budget is spent by the whole fleet. A gameplay budget of 50 therefore sat below the 100 pilots the server accepts: a deploy or a stall re-upgrades the fleet at once and the 51st reconnect was refused with 429, so a full server could not come back. The diagnostics lane was worse, 6 sockets a minute for the entire server, when a deploy makes every pilot forward a record. Both are now MAX_PLAYERS times one pilot's honest demand in that lane, 600 each, so a full fleet climbing the client's real retry ladder fits with nothing refused. What this means for the page: hud-network's Can't join section lists nickname in use, server full and outdated tab as the reasons a join fails, and that list becomes more accurate rather than less, because a rate-limited join after a deploy was a real fourth cause that the section never documented and that honest play can no longer reach. No cause is added: the budgets are still enforced, they simply no longer sit below the capacity the server advertises, and a refusal does not extend the window so a retrying fleet still recovers on time. No player-facing string, receipt state, generated reference value or demonstration changes. docs/diagnostics.md is updated in the same change because it is the operator-facing description of these budgets and stated both the old figures and a per-address framing that is misleading behind the edge; it now says the fleet shares each budget, how each is derived, and that per-client fairness is explicitly not provided. Deliberately NOT included: charging each pilot's own forwarded address, which is what would provide per-client fairness. That was attempted in jsolly/GeoRoids#873 across four revisions and independent review confirmed six Critical findings against it -- the forwarded header is caller-supplied, which makes the bucket map attacker-diverse, and every bound added to contain that either refused honest callers or became a shared resource one host could exhaust. This change keeps the single bucket, so it adds no key, no map and no bound. Verified: lint, typecheck, markdown lint, the server unit suite, and six mutation checks each failing a named test with the file restored byte-identical, including both pre-fix budget values, a per-pilot rather than per-fleet sizing, removing enforcement entirely, a refusal extending the window, and the restated ladder length drifting from the client's.",
+      "sources": ["docs/diagnostics.md", "server/communication/connectionAdmission.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Corrective review of the fleet-sized connection budgets; supersedes this branch's earlier entry for the same change, whose figures and promises independent review falsified. Reviewed hud-network again: no page needs an edit, and the change removes a player-visible join-failure cause rather than adding one. Behind Railway public HTTP ingress the socket address the limiter keys on is the edge proxy, so every pilot is charged to one bucket and each lane's budget is spent by the whole fleet. A gameplay budget of 50 sat below the 100 pilots the server accepts: a deploy or a stall re-upgrades the fleet at once and the 51st reconnect was refused with 429, so a full server could not come back; the diagnostics lane was worse, 6 sockets for the entire server, when a deploy makes every pilot forward a record. Each budget is now MAX_PLAYERS times one pilot's demand in that lane: 600 gameplay, the upgrade plus every rung of the real retry ladder, and 300 log, the record a deploy makes a pilot forward plus two retries. Three corrections to the earlier entry, all from independent review. First, it said 600 for both and called the gameplay figure one pilot's honest demand; the ladder figure is one drop episode's demand rather than a window's, because the client resets its ladder on every successful open, and the constant is renamed to say so. Second, the log figure of 6 contradicted the forwarder's own five-second socket floor, which permits twelve attempts a window per pilot; the lane is now derived from deploy demand instead and is deliberately held BELOW that twelve, because every admitted socket brings a fresh 256 KiB ingress quota and client.log retains one 10 MiB segment plus one rotation, so a fleet-wide twelve would license 300 MiB a window into 20 MiB of retained evidence. A test fails if the lane is raised to that ceiling. Third, the earlier entry claimed a retrying fleet still recovers on time; it does not. The limiter rolls a bucket only after a full window with no accepted upgrade in the lane, so accepted upgrades accumulate with no decay and a continuously busy lane reaches its budget eventually, and the gameplay ladder gives up after its fifth retry, 15.5 seconds in, and shows the permanent-disconnect banner, so a pilot refused through every rung reloads even though the bucket clears inside the minute. That client behavior is unchanged here and already described by the page's reconnect guidance; docs/diagnostics.md is corrected to stop promising otherwise. What this means for the page: hud-network's Can't join section lists nickname in use, server full and outdated tab, and that list becomes more accurate rather than less, because a rate-limited join after a deploy was a real fourth cause the section never documented and that a fleet-sized budget makes far harder to reach. It is NOT unreachable and the page is not changed to promise that. No player-facing string, receipt state, generated reference value or demonstration changes. src/utils/logForwarder.ts changes by exactly one word, MIN_SOCKET_GAP_MS becoming exported so the five-second floor the comments and tests reason about is the real one; no forwarder behavior, queue bound or socket policy changes. Deliberately not included: charging each pilot's own forwarded address, attempted in jsolly/GeoRoids#873 across four revisions with six Critical findings confirmed against it, because the forwarded header is caller-supplied, which makes the bucket map attacker-diverse, and every bound added to contain that either refused honest callers or became a shared resource one host could exhaust. Also not included, and named in the source instead: making the window a true fixed window, which would remove the accumulation above but trade it for a sustained caller holding the whole budget indefinitely; a bound on concurrent sockets and a deadline for an unjoined socket, which is what actually holds the cost of a raised budget, since the message and byte quotas are per socket rather than per address and MAX_PLAYERS is enforced on the join message rather than on the upgrade; and a client.log rotation sized for what the lane can now receive. The old budgets provided none of those either, they only slowed the accumulation, so the raise shifts that rate twelvefold for gameplay and fiftyfold for logs and the documentation now says so rather than calling the raise free.",
+      "sources": [
+        "docs/diagnostics.md",
+        "server/communication/connectionAdmission.ts",
+        "src/utils/logForwarder.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network",
+        "src/utils/logForwarder.ts": "hud-network"
       }
     }
   ]

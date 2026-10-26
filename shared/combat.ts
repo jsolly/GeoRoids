@@ -46,29 +46,6 @@ export function circlesOverlap(
   return dx * dx + dy * dy < minDist * minDist;
 }
 
-export function findShipAsteroidOverlaps(
-  ships: CombatCircle[],
-  asteroids: Array<{ id: string; position: Position; radius: number }>,
-  shouldSkip?: (shipId: string, asteroidId: string) => boolean
-): Array<{ shipId: string; asteroidId: string }> {
-  const hits: Array<{ shipId: string; asteroidId: string }> = [];
-  for (const ship of ships) {
-    if (ship.immune) {
-      continue;
-    }
-    for (const asteroid of asteroids) {
-      if (shouldSkip?.(ship.id, asteroid.id) === true) {
-        continue;
-      }
-      if (circlesOverlap(ship.position, ship.radius, asteroid.position, asteroid.radius)) {
-        hits.push({ shipId: ship.id, asteroidId: asteroid.id });
-        break;
-      }
-    }
-  }
-  return hits;
-}
-
 /** World hazards the server may apply to crew hulls. */
 export function isWorldHazard(attackerId: string): boolean {
   return (

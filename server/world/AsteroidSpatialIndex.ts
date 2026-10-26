@@ -75,13 +75,6 @@ export class AsteroidSpatialIndex {
     return this.entries.get(id)?.rock;
   }
 
-  /** Every indexed row in source order: new rows append, replaced rows keep their slot. */
-  *values(): IterableIterator<AsteroidData> {
-    for (const entry of this.entries.values()) {
-      yield entry.rock;
-    }
-  }
-
   clear(): void {
     this.cells.clear();
     this.motionCells.clear();

@@ -18,6 +18,7 @@ import type {
   AbilityUsedEvent,
   AsteroidData,
   AsteroidDestroyEvent,
+  AsteroidHitEvent,
   ClientGameplayMessage,
   ClientWireMessage,
   FurnaceDelivery,
@@ -32,7 +33,7 @@ import type {
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
 import { playFeedback } from '../../audio/feedbackSounds';
-import { playLaserSound } from '../../audio/gameSounds';
+import { playHitSound, playLaserSound } from '../../audio/gameSounds';
 import {
   playAbilityActivation,
   playHarpoonRelease,
@@ -1027,6 +1028,9 @@ export class ConnectionManager {
       case 'asteroidDestroy':
         this.handleAsteroidDestroyed(data as AsteroidDestroyEvent);
         break;
+      case 'asteroidHit':
+        this.handleAsteroidHit(data as AsteroidHitEvent);
+        break;
       case 'satellitePickupCollected':
         this.handleSatellitePickupCollected(data as SatellitePickupCollected);
         break;
@@ -1690,6 +1694,14 @@ export class ConnectionManager {
       ...(data.origin !== undefined ? { origin: data.origin } : {}),
       ...(data.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
     });
+  }
+
+  /** A durable deposit took a chip; its shatter plays a destruction sound instead. */
+  private handleAsteroidHit(data: AsteroidHitEvent): void {
+    if (!data?.asteroidId || !isFinitePosition(data.position)) {
+      return;
+    }
+    playHitSound(data.position);
   }
 
   private handleSatellitePickupCollected(data: SatellitePickupCollected): void {

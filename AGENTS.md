@@ -54,10 +54,64 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
 - **No barrel files / re-exports** — import from the defining module.
 - **Relative paths only** — no `@`-style aliases.
 - **No CDN for app assets** — never load runtime CSS or JS from CDNs. Prefer npm, local files, or same-origin Vite/Railway builds.
-- **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`config/quality/biome.settings.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. Pinned Prettier formats Astro/Svelte documents (`check:format`); `astro check` and `svelte-check` run framework diagnostics. Knip and ts-prune check unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
+- **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`config/quality/biome.settings.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. Pinned Prettier formats Astro/Svelte documents (`check:format`); `astro check` and `svelte-check` run framework diagnostics. Knip, ts-prune and the unused-member check cover unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
 - **Production managers use `getInstance()`** (`GameController`, `PlayerManager`, `CollisionManager`, etc.). `GameController` supplies PlayerManager's complete network capabilities at creation; later access cannot rebind them. Isolated runtime tests may construct PlayerManager with explicit capabilities; CollisionManager flashes local collision feedback, reports contact to its caller, and takes none. `src/runtime/gameRuntime.ts` owns production EventLoop wiring and disposal. The Svelte shell owns its mount lifetime.
-- **The 60 Hz game loop never touches the disk or does O(world) work.** The saved world is read once at startup and lives in memory; changes leave the loop once a second as a batch through `WorldPersistence` (`server/world/`); unchanged-membership asteroid sectors persist drift every `WORLD.driftFlushCheckpoints` checkpoints. Do not add SQLite calls, `fs` calls, or per-saved-sector scans to `advanceOneFrame` or the message handlers; `tests/unit/server/explored-world-keeps-the-simulation-frame-off-the-database.test.ts` and `world-writes-leave-the-game-loop-once-a-second.test.ts` fail if that regresses.
+- **The 60 Hz game loop never touches the disk or does O(world) work.** The saved world is read once at startup and lives in memory; changes leave the loop once a second as a batch through `WorldPersistence` (`server/world/`); unchanged-membership asteroid sectors persist drift every `WORLD.driftFlushCheckpoints` checkpoints. Do not add SQLite calls, `fs` calls, or per-saved-sector scans to `advanceOneFrame` or the message handlers; `tests/unit/server/explored-world-keeps-the-simulation-frame-off-the-database.test.ts` and `world-writes-leave-the-game-loop-once-a-second.test.ts` fail if the loop reaches the disk. The work half has its own guard: an ordinary frame owes the asteroid belt exactly one motion pass, and only the once-a-second frame may cost more — 7 belt copies in production, where `ensureAsteroidField` and `checkpointWorld` both land. `tests/unit/server/the-frame-walks-the-asteroid-belt-once.test.ts` counts a whole second in both world shapes, with and without `WorldPersistence`, and counts the ids each tracked-set read considers, so a second full-belt walk in `advanceOneFrame`, a higher once-a-second copy count, or a tracked set grown toward belt size all fail. That note's tables name which maintenance points the guard rejects and which it cannot. Inside the frame, reach a rare case through a tracked set or `spatialIndex()`, not `getAllAsteroids()`. See [belt passes per frame](docs/performance/belt-passes-per-frame.md).
 - **Snapshots and terrain work stay local.** Snapshots send each player only nearby world entities (loot, projectiles, and other players' pickups within `WORLD.interestRadius`; asteroids within the smaller `WORLD.asteroidInterestRadius` radar circle, widened to the interest square while that pilot's Mineral Scan zooms the camera out; a player's own pickups always ship) (`shared/world.ts`; applied in `server/services/GameStateBroadcaster.ts`, with sectors waking at `WORLD.interestRadius` in `server/world/RegionalAsteroidField.ts`), and the client builds contours in local patches (`src/physics/terrain/terrainSession.ts`). Never broadcast or rebuild the whole world. `tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts` guards regional asteroid queries and per-player asteroid row filtering, and `tests/unit/rendering/contours-follow-the-camera-without-dropping-lines.test.ts` guards contour patches; `tests/unit/server/pilots-share-snapshot-preparation-without-sharing-private-rows.test.ts` guards per-player filtering of loot, projectiles and non-owned pickup rows, and `tests/unit/server/satellite-inventory-survives-snapshots-and-brief-disconnects.test.ts` guards own-pickup visibility and stored-inventory privacy.
+- **Unused-code ownership.** Knip owns unused files and unused module exports;
+  it stops checking a module's individual exports as soon as any resolvable path
+  string reaches it (a `package.json` script, a `new URL('./x.mjs', import.meta.url)`,
+  a dynamic `import('./x.mjs')`), which covers most runners under `scripts/`. So
+  ts-prune owns unused exports for those: `config/typescript/prune.jsonc` sets
+  `allowJs` to keep `scripts/**/*.mjs` in its program, and
+  `scripts/check-unused-typescript.test.mjs` fails if that drops. Biome's
+  `noUnusedPrivateClassMembers` owns unused private class members, and
+  `scripts/check-unused-class-members.mjs` owns public methods — on class
+  declarations and class expressions alike — that nothing outside the declaring
+  class calls. Remove one with no references, narrow one used only internally to
+  `private` so Biome takes over, or give one a caller.
+- **What that member check leaves alone.** It judges `src/`, `server/` and
+  `shared/` by directory prefix, so `setup/`, `.railway/`, `benchmarks/`,
+  `scripts/` whatever the extension, and the repo-root modules (`server.ts`,
+  `shared-types.ts`) all sit outside it, as do test doubles and benchmark
+  harnesses that exist to satisfy external shapes. It also skips a class
+  entirely when the class has any `extends` or `implements` clause, when it is
+  abstract, or when its name appears in a heritage clause anywhere, `tests/`
+  included; those answer to their own contract. On this tree that leaves 22
+  public methods across `MapAssets`, `InlineWorldPersistence` and
+  `WorkerWorldPersistence` unjudged. Public class properties and accessors have
+  no owner at all, and neither do properties of plain objects and constants.
+- **A green run is not proof, because two of its tests are name-based.** It
+  treats a member as reached when an interface or object type declares that
+  name, or when a string with that name is an `in` operand or a call argument.
+  On this tree those two clear 197 of 608 judged methods — about a third —
+  before any reference lookup happens. Bracket access needs no allowance,
+  because the language service resolves `object['name']()` itself.
+  `scripts/check-unused-class-members.test.mjs` pins each test, including that
+  an unrelated bare string exempts nothing.
+- **A component's call is not a reference the check can find**, since its
+  program resolves no `.svelte` or `.astro` file. It therefore reads the
+  components that import a module and reports a method one of them names as
+  "only a component calls it" rather than as dead code; markup counts, because
+  two of `WikiScrollMemory`'s ten public methods — `noteScroll` and
+  `prepareForTraversal` — are reached only from outside its script block. The
+  answer is a test that proves the behavior; `tests/AGENTS.md` still forbids a
+  call-only test written to clear a gate. That signal is a name match within an
+  importing module, so a component holding an instance it did not import stays
+  invisible: never delete a component's call site, or the method behind it, to
+  quiet this check, and rely on `svelte-check` to catch it if you do.
+  `WikiScrollMemory` shows how little silence proves. Six of its ten public
+  methods are quiet only because
+  `tests/unit/wiki/back-returns-to-the-scrolled-field-manual.test.ts` calls
+  them; `hold`, `capture` and `dispose` are name-exempt as well; and `release`
+  has no TypeScript caller at all, quiet because two name tests both match it —
+  a type declaring `release`, and `'release'` as a call argument elsewhere.
+- **Two unused-code blind spots genuinely cannot be closed from here:** a module
+  reached by a dynamic `import()` has every export counted as used by both tools
+  (`scripts/gate-receipt.mjs`), and a hand-written sibling declaration file wins
+  module resolution so its implementation never enters the program at all
+  (`scripts/validation-admission.d.mts` hides `scripts/validation-admission.mjs`).
+  Adding another `.d.mts` beside a `.mjs` fails the test above.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.
 - **Conventional Commits** (`feat`, `fix`, `chore`, `refactor`, `test`, `perf`, `docs`) with a scope (e.g. `feat(network): ...`).
 

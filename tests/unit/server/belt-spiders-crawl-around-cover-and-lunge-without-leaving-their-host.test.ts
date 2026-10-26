@@ -3,7 +3,7 @@ import { BeltCrawlerManager } from '../../../server/core/BeltCrawlerManager';
 import type { SpiderAttack } from '../../../server/core/TerrainSpiderManager';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import { beltAsteroid, beltSlots } from '../../../shared/asteroidBelt';
-import { BELT_CRAWLER } from '../../../shared/beltCrawler';
+import { BELT_CRAWLER, hostsBeltCrawlers } from '../../../shared/beltCrawler';
 import type { AsteroidData, Position } from '../../../shared-types';
 
 function host(): AsteroidData {
@@ -21,9 +21,15 @@ function host(): AsteroidData {
     offsets: [1, 1, 1, 1],
   };
 }
-/** A crawler frame reads its rock field through the caller's spatial index. */
+/**
+ * A crawler frame reads its rock field through the caller's spatial index, and
+ * its candidate hosts through the caller's own selection, as the server does.
+ */
 function field(rocks: readonly AsteroidData[]) {
-  return { index: new AsteroidSpatialIndex(rocks) };
+  return {
+    index: new AsteroidSpatialIndex(rocks),
+    hosts: rocks.filter((rock) => hostsBeltCrawlers(rock)),
+  };
 }
 function pilot(position: Position) {
   return { id: 'pilot', position, health: 100, exploding: false, radius: 18 };
@@ -228,6 +234,30 @@ test('a wounded spider escapes a destroyed rock, stays shootable, and survives s
   manager.clear();
   manager.advance({ ...field([structuredClone(destination)]), players: [], nowFrame: 22 });
   expect(manager.snapshot()[0]?.health).toBe(BELT_CRAWLER.MAX_HEALTH - graze);
+});
+
+test('a migrant keeps crawling when the caller has not counted its new host yet', () => {
+  const manager = new BeltCrawlerManager();
+  const rock = host();
+  rock.health = 150;
+  const destination = { ...host(), id: 'ordinary-destination', position: { x: 300, y: 0 } };
+  manager.advance({ ...field([rock, destination]), players: [], nowFrame: 0 });
+  manager.escapeDestroyedHost(rock, new AsteroidSpatialIndex([destination]), 1);
+  const landed = manager.snapshot()[0];
+  if (!landed) {
+    throw new Error('Expected migrant');
+  }
+  // A caller that chose its hosts before the escape cannot name this
+  // destination; the migrant's own body is what keeps it on the frame.
+  manager.advance({
+    index: new AsteroidSpatialIndex([destination]),
+    hosts: [],
+    players: [],
+    nowFrame: 19,
+  });
+  const airborne = manager.snapshot()[0];
+  expect(airborne?.crawler).toMatchObject({ hostId: destination.id, progress: 0.5 });
+  expect(airborne?.position.x).toBeGreaterThan(landed.position.x);
 });
 
 test('escape preserves the destination native guard and does not resurrect a killed migrant', () => {

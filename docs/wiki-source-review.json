@@ -8,7 +8,7 @@
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
     "docs/diagnostics.md": "sha256:7b7cd11435899a5df1e651ba90cfb0233e35e966c19170ee5089e718cf16fad8",
-    "docs/protocol/snapshot-v3.md": "sha256:466d9bf94b7f001cb0d4750a418685f547806a39b328f7fda2b9d23a8f6b9bc6",
+    "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
     "package.json": "sha256:e7c0793436fb6409d8e5dfb96503e172c219284514ff2135146efdab37ac872e",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:05eb50b99d590a0120a10f1f5b103cabcc74bd4b3eb529f0a04b909245768ba1",
-    "server/core/GameEngine.ts": "sha256:a28657f7a55560b428c199f3cb7b038e2f1663aee3569e0dc5f98f7c31adfc2a",
+    "server/core/GameEngine.ts": "sha256:f80ef0700590ec5b6d9bc68178695180ac71c857994c707c909114618b5d509e",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -131,7 +131,7 @@
     "server/world/worldPersistence.ts": "sha256:0846eb3503a381325733e295f7541760baf03c5d7cf1b9e64db2248c1bfba38c",
     "server/world/worldStoreWorker.ts": "sha256:10691d33041b176ff3a78464a58eab107990ac70f38339cadf521524748cc2c7",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:88d2be9701f0d600bdb35c04c70ce7a113f87adf270f5998113ec063c1ba90d8",
-    "shared-types.ts": "sha256:290e3ae00d218cde18adcb8d4e4ed27b537dfc4222bbb513f009be4ba2930f09",
+    "shared-types.ts": "sha256:b6d252cd8e219b6be8e0d5be2d779c71e385667041f7ef16f8f720b8e41c2a94",
     "shared/aiShips.ts": "sha256:9793248321163dbc5cf6475a5e8722a9e5cc73dfdd847bf0a5bd1d6788bff4f3",
     "shared/asteroidBelt.ts": "sha256:94d55e4288a9d968066ac05f666ae0cfe757739166a00ff1dd7a368339378b49",
     "shared/asteroidBoost.ts": "sha256:98594cb2fc30bac61c5a7ce16e9015c9aeb2c5517caa9bbe05711991dbae5b9c",
@@ -143,7 +143,7 @@
     "shared/beltCrawler.ts": "sha256:3fd29c3e9cffac5b03ba747849b51122a2a76c6bc4d05df5723da031971e6905",
     "shared/boundary.ts": "sha256:7cb7cf56b7e152f452ebf086e3d0a56e1819e8cf262c5a51f42df41b7cda398a",
     "shared/chargedWeapon.ts": "sha256:04ddbced404a5eac1a85a0760114943c196073629dff3299a57aab271ddb2919",
-    "shared/combat.ts": "sha256:ed0260bb402e44e052ca6a6ddced6add0cac57cd46c74ec4e5a5d95dd2a271e5",
+    "shared/combat.ts": "sha256:c271554b4efc6d24ef4514670aa3db06db70e094c9af3204cda569adc1f80918",
     "shared/constants/gameplay.ts": "sha256:35ce164cb64868b3abdacbb160250367c42d0ac67af347f39611ad659bd503d5",
     "shared/constants/health.ts": "sha256:5abc3c0233548552efa4c2d4526e41d338a3b7f3a792c530bce404992098cf63",
     "shared/contourAsteroid.ts": "sha256:07e0e09198ee65dfc4ba3141910f9a35ca502c61c63389b420df9215e0e5c413",
@@ -180,7 +180,7 @@
     "shared/shipGrowth.ts": "sha256:4ec71107db82a77a70837f0afeda3969d52f254776aea95851c8ac456b2e5aa3",
     "shared/shipKits.ts": "sha256:c66d042bbcdbc4f3d1c26dffb20eb7b2e4916fcb9795a8b4dfcdaf610138995f",
     "shared/shipUtilities.ts": "sha256:856565c7cd9efe53477f84fa86f503e60764ff6de547f3e4826ed871d79d2b5b",
-    "shared/snapshotDto.ts": "sha256:3fcc1521e2bcc271717dc39839ac0563e0f438acbb2db754022437a522a2a51b",
+    "shared/snapshotDto.ts": "sha256:4823146a99c185bc09531f946c7534602f2cb1bafef6f05f784e7f4855c65bf9",
     "shared/snapshotMotion.ts": "sha256:e2e9e93f355b39b82d9fbd435bff15bc55a112e2c4833809be9ea9fd26a3881f",
     "shared/snapshotPrecision.ts": "sha256:592dcfd00520da748c0ef07acdfc537005223733e474d9dcf9282a46c6d7ee5d",
     "shared/snapshotProtocol.ts": "sha256:534f2145e03adbf0568d914aeeae6e9a0fbeb576441881a688ec0b57ece3c149",
@@ -7294,6 +7294,33 @@
       ],
       "media": ["cargo", "hauler", "scout"],
       "owners": {}
+    },
+    {
+      "note": "Player rules and demonstrations are unchanged. The protocol note now matches the consent reload already described in the network article.",
+      "sources": [
+        "docs/protocol/snapshot-v3.md",
+        "server/core/GameEngine.ts",
+        "shared-types.ts",
+        "shared/combat.ts",
+        "shared/snapshotDto.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout", "survival"],
+      "owners": {
+        "shared/snapshotDto.ts": "hud-network"
+      }
     }
   ]
 }

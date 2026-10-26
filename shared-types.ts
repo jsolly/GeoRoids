@@ -468,8 +468,6 @@ export interface ServerEntityData {
   haulerUtility?: HaulerUtilityId;
   /** Equipped Scout utility. Omitted on other kits. Missing means mineral scan. */
   scoutUtility?: ScoutUtilityId;
-  /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
-  deathCause?: string;
   playerMotion?: PlayerMotionState;
 }
 

@@ -3385,7 +3385,6 @@ export class GameEngine {
             ...(entity.kitId === 'hauler' ? { haulerUtility: haulerUtilityOf(entity) } : {}),
             ...(entity.kitId === 'scout' ? { scoutUtility: scoutUtilityOf(entity) } : {}),
             ...(entity.playerMotion !== undefined ? { playerMotion: entity.playerMotion } : {}),
-            ...(entity.deathCause !== undefined ? { deathCause: entity.deathCause } : {}),
           }) satisfies ServerEntityData
       ),
       satellitePickups,

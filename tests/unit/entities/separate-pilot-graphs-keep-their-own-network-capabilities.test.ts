@@ -4,7 +4,7 @@ import { createPlayer } from '../../../src/entities/player/createPlayer';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import type { ShipCombatNetwork } from '../../../src/entities/ship/shipCombatNetwork';
 
-function pilotGraph(id: string) {
+function pilotGraph(id: string, delivered = true) {
   const remote = createPlayer({
     id: `${id}-crew`,
     name: `${id} crew`,
@@ -14,7 +14,7 @@ function pilotGraph(id: string) {
   const port = {
     getAllPlayers: () => [remote],
     setLocalPlayerName: vi.fn(),
-    updatePlayerState: vi.fn(),
+    updatePlayerState: vi.fn(() => delivered),
   };
   const combat = {
     isConnected: true,
@@ -73,6 +73,19 @@ test('creating a second pilot graph preserves the first pilot’s crew, input, s
   expect(a.port.updatePlayerState).toHaveBeenCalledTimes(1);
   expect(a.combat.sendShoot).toHaveBeenCalledTimes(1);
   expect(a.combat.sendAbility).toHaveBeenCalledTimes(1);
+});
+
+test('an isolated pilot graph reports whether its port actually delivered the pose', () => {
+  // `GameController.reportBoundaryContact` latches on this boolean, so a graph
+  // composed with explicit capabilities has to pass the port's answer back
+  // rather than reporting its own call. A fake returning nothing used to
+  // satisfy the signature and leave that contract unpinned here.
+  const sent = pilotGraph('delivering');
+  expect(sent.manager.updateNetworkState()).toBe(true);
+
+  const refused = pilotGraph('refusing', false);
+  expect(refused.manager.updateNetworkState()).toBe(false);
+  expect(refused.port.updatePlayerState).toHaveBeenCalledTimes(1);
 });
 
 test('production player composition requires one complete pair and refuses another graph’s capabilities', () => {

@@ -243,9 +243,6 @@ export async function runGate({
           ...environment,
           GEOROIDS_REVIEW_RECEIPT: reviewReceipt,
           GEOROIDS_TEST_SESSION_DIR: sessionDirectory,
-          ...(command === 'check:test-runner'
-            ? { GEOROIDS_CONTRACT_EVIDENCE_DIR: join(sessionDirectory, 'contracts') }
-            : {}),
         },
       });
       if (result.status !== 0 || result.signal || result.error) {

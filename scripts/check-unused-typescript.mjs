@@ -107,7 +107,11 @@ export function frontendEntry(root) {
     }
   }
   // The tools consume defaults; named exports still need real callers.
-  for (const config of ['config/app/astro.ts', 'config/testing/vitest.ts']) {
+  for (const config of [
+    'config/app/astro.ts',
+    'config/testing/tooling.ts',
+    'config/testing/vitest.ts',
+  ]) {
     const path = join(root, config);
     if (existsSync(path)) {
       const alias = `toolConfig${serial++}`;

@@ -516,7 +516,6 @@ export type ClientWireMessage =
   | { type: 'equipSatellite'; id: string; data: { pickupId: string } }
   | { type: 'buyStoreItem'; id: string; data: { offerId: string } }
   | { type: 'travelFurnace'; id: string; data: { destinationId: string } }
-  | { type: 'collisionDamage'; data: { targetPlayerId: string; attackerId: 'boundary' } }
   | PingMessage;
 
 /** Commands a pilot may send only after the server acknowledged its join. */
@@ -532,7 +531,6 @@ export type ClientGameplayMessage = Extract<
       | 'equipSatellite'
       | 'buyStoreItem'
       | 'travelFurnace'
-      | 'collisionDamage'
       | 'snapshotResync';
   }
 >;

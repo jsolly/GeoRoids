@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  isClientOwnedCollisionAttacker,
-  isCombatantImmune,
-  isWorldHazard,
-  laserDamagesShips,
-} from '../../../shared/combat';
+import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../../shared/combat';
 
 describe('shared combat helpers', () => {
   test('treats exploding, dead, blinking, and protected players as immune', () => {
@@ -33,12 +28,6 @@ describe('shared combat helpers', () => {
         overlayHold: true,
       })
     ).toBe(true);
-  });
-
-  test('only boundary collisions may be reported by clients', () => {
-    expect(isClientOwnedCollisionAttacker('boundary')).toBe(true);
-    expect(isClientOwnedCollisionAttacker('asteroid')).toBe(false);
-    expect(isClientOwnedCollisionAttacker('ricochet')).toBe(false);
   });
 
   test('world hazards include bounced lasers but not crew pilots', () => {

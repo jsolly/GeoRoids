@@ -17,7 +17,7 @@ export interface CombatCircle {
   immune: boolean;
 }
 
-/** True when a ship must not take or report collision / combat damage. */
+/** True when a ship must not take collision / combat damage. */
 export function isCombatantImmune(state: CombatantState): boolean {
   if (state.exploding || state.health <= 0 || state.respawnTimer !== undefined) {
     return true;
@@ -44,10 +44,6 @@ export function circlesOverlap(
   const dy = a.y - b.y;
   const minDist = radiusA + radiusB;
   return dx * dx + dy * dy < minDist * minDist;
-}
-
-export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
-  return attackerId === 'boundary';
 }
 
 /** World hazards the server may apply to crew hulls. */

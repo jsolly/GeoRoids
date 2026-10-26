@@ -48,7 +48,7 @@ describe('Boundary collision', () => {
   test('a vulnerable hull touching the wall flashes and is never killed locally', () => {
     const ship = vulnerableHull(WALL_CONTACT);
 
-    collisionManager.checkBoundaryCollisions([ship]);
+    expect(collisionManager.checkBoundaryCollisions([ship])).toBe(true);
 
     // The flash is local feedback; the kill is the server's, read from the pose
     // this hull reports. Killing it here would freeze it, which arms the
@@ -107,7 +107,10 @@ describe('Boundary collision', () => {
     const ship = vulnerableHull(WALL_CONTACT);
     ship.blinkCount = 12;
 
-    collisionManager.checkBoundaryCollisions([ship]);
+    // The return value decides whether `GameController` reports the contact out
+    // of band, so a protected hull must report none: otherwise a pilot pinned at
+    // the rim behind spawn blink sends a pose per contact run for nothing.
+    expect(collisionManager.checkBoundaryCollisions([ship])).toBe(false);
 
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
@@ -118,7 +121,7 @@ describe('Boundary collision', () => {
     const ship = vulnerableHull(WALL_CONTACT);
     ship.movementLocked = true;
 
-    collisionManager.checkBoundaryCollisions([ship]);
+    expect(collisionManager.checkBoundaryCollisions([ship])).toBe(false);
 
     expect(ship.health).toBe(100);
     expect(ship.exploding).toBe(false);
@@ -133,7 +136,8 @@ describe('Boundary collision', () => {
     // Last in the list, so skipping an immune hull must not skip the rest.
     const vulnerable = vulnerableHull(WALL_CONTACT);
 
-    collisionManager.checkBoundaryCollisions([dead, exploding, vulnerable]);
+    // True because the vulnerable hull registered, despite the two immune ones.
+    expect(collisionManager.checkBoundaryCollisions([dead, exploding, vulnerable])).toBe(true);
 
     expect(dead.impactFlashFrames).toBe(0);
     expect(exploding.health).toBe(100);

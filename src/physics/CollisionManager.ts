@@ -35,7 +35,7 @@ export class CollisionManager {
    * `tests/unit/network/wall-contact-reaches-the-server.test.ts` fails if it is.
    *
    * Returns true when a hull registered contact, so the caller can report that
-   * frame's position at once — see `GameController.checkBoundaryCollisions`.
+   * frame's position at once — see `GameController.reportBoundaryContact`.
    */
   checkBoundaryCollisions(ships: Ship[]): boolean {
     let contact = false;

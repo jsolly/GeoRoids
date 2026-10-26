@@ -127,7 +127,13 @@ describe('wall contact reaches the server', () => {
     expect(local.ship.health).toBeGreaterThan(0);
     expect(local.ship.exploding).toBe(false);
 
-    manager.sendPlayerState({ id: manager.getLocalPlayerId(), ...local.getStateForNetwork() });
+    // Report through the production chain that `GameController` actually calls —
+    // `updateNetworkState` → `updatePlayerState` → `sendPlayerState` — rather
+    // than the sender alone. The latch that decides whether a contact run has
+    // been reported is set from this boolean, so a hop that returns `true`
+    // without sending would re-latch the run on a report that never left and
+    // retire the lethal rule for any contact lasting a single frame.
+    expect(PlayerManager.getInstance().updateNetworkState()).toBe(true);
 
     const packet = ws.sent.at(-1);
     expect(packet?.type).toBe('update');
@@ -140,5 +146,12 @@ describe('wall contact reaches the server', () => {
     // overlapping pose; do not drop them as redundant.
     expect(typeof packet?.data?.['motionEpoch']).toBe('number');
     expect(typeof packet?.data?.['motionSequence']).toBe('number');
+
+    // And the other direction: a socket that cannot carry the pose must say so,
+    // so the caller retries instead of believing the contact was reported.
+    const delivered = ws.sent.length;
+    ws.readyState = 3;
+    expect(PlayerManager.getInstance().updateNetworkState()).toBe(false);
+    expect(ws.sent).toHaveLength(delivered);
   });
 });

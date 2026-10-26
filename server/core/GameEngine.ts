@@ -2148,7 +2148,10 @@ export class GameEngine {
   }
 
   /**
-   * One record per applied hit. Only an ordinary surviving hit is throttled: a
+   * A record for each hit that changes health, except an ordinary surviving hit
+   * inside the one-second window. A hit a hold absorbs entirely changes no
+   * health and is not logged here at all; the refused pose is what records it.
+   * Only an ordinary surviving hit is throttled: a
    * hit that ends a life is the record `MessageHandler.applyBoundaryContact`
    * suppresses the motion-rejection warning in favour of, so it has to be
    * written every time. A cooperative downing ends a life without destroying

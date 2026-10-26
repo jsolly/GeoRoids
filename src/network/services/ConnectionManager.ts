@@ -1760,6 +1760,10 @@ export class ConnectionManager {
       const shouldLogDamage = data.isDestroyed || observedAt - this.lastDamageStateLogAt >= 1000;
       if (shouldLogDamage) {
         this.lastDamageStateLogAt = observedAt;
+        // The server distinguishes a cooperative downing as `player_downed`;
+        // this mirror deliberately does not, because `playerDamaged` carries only
+        // `isDestroyed`. The server record is the authority for damage and death
+        // (`docs/diagnostics.md`), so a downing reads as `damage_applied` here.
         logger.info('STATE', data.isDestroyed ? 'player_died' : 'damage_applied', {
           observedAt,
           playerId: data.targetPlayerId,

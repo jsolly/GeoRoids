@@ -173,6 +173,33 @@ test('a wall contact report that never left is retried on the next frame', () =>
   expect(attempts).toHaveLength(3);
 });
 
+test('a new session does not inherit a latched wall contact', () => {
+  const ship = arrangeFlight();
+  ship.position = { x: WORLD.radius - ship.r + 1, y: 0 };
+  ship.blinkCount = 0;
+  expect(checkBoundaryCollision(ship.position, ship.r)).toBe(true);
+  let reports = 0;
+  vi.spyOn(PlayerManager.getInstance(), 'updateNetworkState').mockImplementation(() => {
+    reports += 1;
+    return true;
+  });
+
+  game.updateGame(GAME_TICK_MS);
+  expect(reports).toBe(1);
+
+  // Starting a session clears the latch. Without that, a pilot who ends one
+  // session in contact would have the next session's first wall contact
+  // swallowed, and only the pose timer — which cannot see an intermediate
+  // catch-up frame — would carry it.
+  const fresh = arrangeFlight();
+  fresh.position = { x: WORLD.radius - fresh.r + 1, y: 0 };
+  fresh.blinkCount = 0;
+  expect(checkBoundaryCollision(fresh.position, fresh.r)).toBe(true);
+
+  game.updateGame(GAME_TICK_MS);
+  expect(reports).toBe(2);
+});
+
 test('a resumed or sub-tick frame does not advance motion or projectiles', () => {
   const ship = arrangeFlight();
   const steps = vi.spyOn(ship, 'update');

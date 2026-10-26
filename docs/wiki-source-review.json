@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
-    "server/core/GameEngine.ts": "sha256:669295abc8978dd17e523f6f197c86b15f83feed1d4a7b57980eadf122bf3e34",
+    "server/core/GameEngine.ts": "sha256:2d43f8b4bf5ea9e8ba3887fab4a779bffe6dd1c55e63b317182d2ebf798ef517",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -265,7 +265,7 @@
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:5cdfa2929cc9238d401d65bbd94e1c5b67975e6fdc08c6246bad189ca2032ff9",
+    "src/core/gameController.ts": "sha256:b3e3fe68ba9902c10d29852a7f784de0154d812012d5000ae051267c41b8901e",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:a4775c68fcd740081832385689f432dc68dab693f7ef9ee2300b1a9e4341f26c",
@@ -315,7 +315,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
-    "src/network/services/ConnectionManager.ts": "sha256:6ab5b5dbd024b077c028c08db99f1ae110e46b1a5fb903eee9763c1e3d89693d",
+    "src/network/services/ConnectionManager.ts": "sha256:74924faeae0497658942f8273c6c12ef5e3e67d241dafa99a5989bca56c476b6",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -330,7 +330,7 @@
     "src/pages/debug/index.astro": "sha256:67afd4a29476a2bb630f5681f853866f8dc18b1458e47a7b55502aab066bcb41",
     "src/pages/index.astro": "sha256:98f27a0d6da8910842b5884b0919abe5a7213379a89f6096ba82e75cb6557040",
     "src/pages/wiki.astro": "sha256:30b20fe2ccf7e6a5b85ea6bc604d454f6fe785564daf2954cd92e14f49025e61",
-    "src/physics/CollisionManager.ts": "sha256:0dec95d09090114a0e31688ef71cfb01e3ff4cd60b20ab85dc70aec55035d431",
+    "src/physics/CollisionManager.ts": "sha256:df39ac737cc65982ab9cf36261259bf104f47abb137d1190803bbac10579a344",
     "src/physics/terrain/contourBridgeSession.ts": "sha256:3b41164f926a30a3695428c7d882ef80757aafcfcf5fe7cb555cfeec18fc3eca",
     "src/physics/terrain/contourCapture.ts": "sha256:42ba129cd5221fef152fb7a730d8ffe69df9e13f215a76594d41379bcf539dad",
     "src/physics/terrain/contourLaser.ts": "sha256:13428129bbf5c8d90250fdfe0c6f4de634412a810b2d3ff0a581981975852a1b",
@@ -7296,6 +7296,32 @@
       "owners": {
         "src/entities/player/PlayerManager.ts": "hud-network",
         "src/entities/player/playerNetworkPort.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Comment and coverage corrections only; no behaviour changes. Review found that the delivery boolean introduced by the preceding batch was observed only through a mock: reverting either production hop, PlayerManager.updateNetworkState or ConnectionManager.updatePlayerState, to return true unconditionally left the complete unit suite byte-identical while re-opening the defect the boolean exists to prevent. The sender case now drives the real chain, updateNetworkState to updatePlayerState to sendPlayerState, and asserts both directions: true with the socket open and joined, false with nothing appended once it is closed. Two further unasserted properties are now pinned: CollisionManager.checkBoundaryCollisions returns false for a blinking, menu-held, dead or exploding hull and true for a vulnerable one, so a protected pilot at the rim reports nothing out of band; and GameController.newGame clearing the contact latch is asserted directly rather than only through test ordering, which previously meant the property passed when that case ran alone. Four comments were corrected, three of them introduced by the preceding batch and all of the same class this branch kept producing. The CollisionManager docblock still pointed at GameController.checkBoundaryCollisions, which the preceding batch renamed to reportBoundaryContact, leaving the only cross-reference that explains the contact return naming a symbol that does not exist. logDamageState opened with \"One record per applied hit\", which is false twice over: an ordinary surviving hit inside the one-second window is dropped, and a hit a hold absorbs entirely changes no health and never reaches the function, which is the case this branch added a test for. The budget comment in reportBoundaryContact still said only the rising edge sends, which was true when the latch was armed before the call but not once it is armed from the send result; it now names the property the safety actually rests on, that a refused attempt sends nothing before a packet is built. And the client damage mirror in ConnectionManager, which still logs isDestroyed as player_died or damage_applied, now records why it deliberately does not distinguish a downing: playerDamaged carries only isDestroyed, and the server record is the authority for damage and death. Correction to the preceding note: it said that when a rescue window expires, finishDowned bypasses logDamageState so a rescued pilot \"produces none at all\". That overstated it. A rescued pilot does leave the unthrottled player_downed record of the life-ending hit; what it lacks is a death record, because finishDowned never runs for a rescue. A cooperative wall death therefore reads player_downed with attackerId boundary followed by player_respawned, and a rescue reads player_downed alone. Both are complete narratives, which is why the missing rescue-expiry event stays out of scope. Player-facing review: no article or demonstration needed editing, and this batch changes no behaviour at all. terrain \"The circular wall destroys a vulnerable ship on contact\" still holds; the controls and terrain Contour Lock release lists still hold; combat-survival cargo-before-hull still holds; hud-network Diagnostics promises contour rail fields and report tooling, not damage or death records. asteroids, field-manual, hauler, loot-growth, satellites, scout and teamwork were re-read and describe rules this does not touch. The scout, hauler and cargo demonstrations cite server/core/GameEngine.ts but show scan sharing, tow delivery and offload, none of which involves wall contact or a log line, so no regeneration. Verified with npm run gate and the complete unit suite at 2346 passing, and these mutation checks: returning true unconditionally from either delivery hop fails the sender case; reporting contact for an immune hull fails the blinking and menu-held cases; and removing the newGame latch reset fails the new-session case even when run in isolation.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "src/core/gameController.ts",
+        "src/network/services/ConnectionManager.ts",
+        "src/physics/CollisionManager.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {
+        "src/physics/CollisionManager.ts": "terrain"
       }
     }
   ]

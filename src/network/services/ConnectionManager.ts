@@ -795,8 +795,8 @@ export class ConnectionManager {
     }
   }
 
-  updatePlayerState(state: Omit<PlayerUpdate, 'id'>): void {
-    this.sendPlayerState({ id: this.getLocalPlayerId(), ...state });
+  updatePlayerState(state: Omit<PlayerUpdate, 'id'>): boolean {
+    return this.sendPlayerState({ id: this.getLocalPlayerId(), ...state });
   }
 
   // Send player state to server

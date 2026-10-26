@@ -83,10 +83,18 @@ test('a wall contact inside a catch-up burst still reports its overlapping pose'
   ship.angularVelocity = 0;
   ship.thrusting = true;
   ship.blinkCount = 0;
+  // Independent pins: the arrangement above depends on these three constants,
+  // so a change to any of them must fail here rather than move both sides of
+  // the geometry assertions at once.
+  expect(ship.r).toBe(15);
+  expect(WORLD.radius).toBe(60_000);
+  expect(SHIP.MAX_VELOCITY).toBeGreaterThan(1);
   expect(checkBoundaryCollision(ship.position, ship.r)).toBe(false);
   const reportedAt: Array<{ x: number; y: number }> = [];
   vi.spyOn(PlayerManager.getInstance(), 'updateNetworkState').mockImplementation(() => {
     reportedAt.push({ ...ship.position });
+    // The latch records delivery, so a report must look delivered here.
+    return true;
   });
 
   // A 30 Hz repaint drains two simulation frames in one synchronous loop, so the
@@ -111,6 +119,58 @@ test('a wall contact inside a catch-up burst still reports its overlapping pose'
   game.updateGame(1000 / 30);
   expect(checkBoundaryCollision(ship.position, ship.r)).toBe(true);
   expect(reportedAt).toHaveLength(afterFirstContact);
+
+  // Leaving contact has to re-arm the latch, or only the first wall contact of
+  // a session is ever reported from its own frame and every later one falls
+  // back on the pose timer that cannot see an intermediate burst frame.
+  ship.position = { x: 0, y: 0 };
+  game.updateGame(GAME_TICK_MS);
+  expect(checkBoundaryCollision(ship.position, ship.r)).toBe(false);
+  expect(reportedAt).toHaveLength(afterFirstContact);
+
+  ship.position = { x: WORLD.radius - ship.r, y: 0 };
+  ship.velocity = { x: SHIP.MAX_VELOCITY, y: 0 };
+  ship.angle = 0;
+  ship.angularVelocity = 0;
+  game.updateGame(1000 / 30);
+
+  expect(reportedAt).toHaveLength(afterFirstContact + 1);
+  const second = reportedAt[afterFirstContact];
+  assert.ok(second);
+  expect(checkBoundaryCollision(second, ship.r)).toBe(true);
+});
+
+test('a wall contact report that never left is retried on the next frame', () => {
+  const ship = arrangeFlight();
+  ship.position = { x: WORLD.radius - ship.r + 1, y: 0 };
+  ship.velocity = { x: SHIP.MAX_VELOCITY, y: 0 };
+  ship.angle = 0;
+  ship.angularVelocity = 0;
+  ship.thrusting = true;
+  ship.blinkCount = 0;
+  expect(checkBoundaryCollision(ship.position, ship.r)).toBe(true);
+  let delivered = false;
+  const attempts: boolean[] = [];
+  vi.spyOn(PlayerManager.getInstance(), 'updateNetworkState').mockImplementation(() => {
+    attempts.push(delivered);
+    return delivered;
+  });
+
+  // A socket that is closed, still resuming, or in furnace transit sends
+  // nothing and says so. The run's single report must not be spent on an
+  // attempt that never reached the server.
+  game.updateGame(GAME_TICK_MS);
+  expect(attempts).toHaveLength(1);
+  game.updateGame(GAME_TICK_MS);
+  expect(attempts).toHaveLength(2);
+
+  delivered = true;
+  game.updateGame(GAME_TICK_MS);
+  expect(attempts).toHaveLength(3);
+
+  // Delivered, so the rest of this contact run stays quiet.
+  game.updateGame(GAME_TICK_MS);
+  expect(attempts).toHaveLength(3);
 });
 
 test('a resumed or sub-tick frame does not advance motion or projectiles', () => {

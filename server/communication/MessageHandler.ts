@@ -391,11 +391,13 @@ export class MessageHandler {
       },
       motionNow
     );
-    // A lethal wall contact is ordinary gameplay, already recorded as
-    // `player_died` with its full diagnostic state, so it must not spend the
-    // rejection warning's throttle window: that belongs to real envelope
-    // violations. A survivable contact still logs, being the only record of a
-    // pilot pinned against the wall.
+    // A contact that ends a life is ordinary gameplay, already recorded by
+    // `GameEngine.logDamageState` as `player_died`, or as `player_downed` when
+    // the cooperative campaign routes the hull into a rescue window instead.
+    // Both are written unthrottled, so suppressing the rejection warning here
+    // loses nothing: that throttle window belongs to real envelope violations.
+    // A contact the hull survives still logs, being the only record of a pilot
+    // pinned against the wall.
     if (!this.applyBoundaryContact(socketPlayer.id, outcome)) {
       this.logMotionRejection(
         ws,
@@ -501,7 +503,8 @@ export class MessageHandler {
    * a pilot elsewhere in the world cannot claim a contact. The pose itself is
    * refused, so the authoritative hull never moves outside the wall. Contact
    * kills regardless of remaining hull health; cargo absorbs it first inside
-   * `handleShipDamage`. Returns true when the contact destroyed the hull.
+   * `handleShipDamage`. Returns true when the contact ended this life, whether
+   * by destroying the hull or by downing it — see `emitShipDamage`.
    *
    * What this trusts is that the reported position is truthful, not merely that
    * a pose arrives. The server owns a position for each player, but never
@@ -518,7 +521,8 @@ export class MessageHandler {
    * first failing check, so an overlapping pose that also trips `velocity`,
    * `displacement` or `rail` carries no `'boundary'` and no kill, and neither
    * does one refused before any envelope runs: a stale epoch or sequence, a
-   * dead or invalid actor, furnace or contour transit, or a contour-hop combo.
+   * dead or invalid actor, furnace or contour transit, a contour-hop combo, or
+   * a contour rejection, which reports `contour` and carries no envelope.
    * A pilot a menu holds is unkillable here for a different reason —
    * `handlePlayerUpdate` substitutes the server's own position for the reported
    * one before the envelope runs. Every one of those is deliberate: such a pose

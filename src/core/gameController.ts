@@ -77,7 +77,7 @@ export class GameController {
   private currRoidBelt: RoidBelt;
   private readonly localFirstPlayers: Player[] = [];
   private simulationAccumulatorMs = 0;
-  /** True while this contact run has already reported its overlapping pose. */
+  /** True once this contact run's overlapping pose has actually been sent. */
   private boundaryContactReported = false;
 
   private constructor() {
@@ -174,6 +174,7 @@ export class GameController {
     clearAsteroidShatters();
     resetFurnacePipePulses();
     this.simulationAccumulatorMs = 0;
+    this.boundaryContactReported = false;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
 
@@ -445,8 +446,8 @@ export class GameController {
     this.currRoidBelt.moveRoids();
     this.publishLiveHarpoonField();
 
-    // Check boundary collisions for ships
-    this.checkBoundaryCollisions();
+    // Flash local wall contact, and report it before the frame ends
+    this.reportBoundaryContact();
 
     // Update game state manager
     this.gameStateManager.updatePickupMessageTimer();
@@ -465,8 +466,12 @@ export class GameController {
     return this.localFirstPlayers;
   }
 
-  // Check boundary collisions for ships
-  private checkBoundaryCollisions(): void {
+  /**
+   * Flash the local hull on wall contact and make sure the server sees it.
+   * The latch means one report per contact run, and it is set from the send's
+   * own result so a refused pose is retried on the next overlapping frame.
+   */
+  private reportBoundaryContact(): void {
     const currPlayer = this.playerManager.getLocalPlayer();
     if (!currPlayer) {
       return;
@@ -493,8 +498,7 @@ export class GameController {
     // of poses and snapshot acknowledgments, and exceeding it terminates the
     // socket rather than throttling it. `InputManager.updateMovementLock`
     // reports out of band the same way.
-    this.boundaryContactReported = true;
-    this.playerManager.updateNetworkState();
+    this.boundaryContactReported = this.playerManager.updateNetworkState();
   }
 
   // Simple render method - no game logic, just rendering

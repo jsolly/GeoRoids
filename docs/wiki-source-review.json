@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:374ddaa60cab77a32668d1955d950e2ebdb5feadf8102952a7ab52a73cd87da8",
+    "server/communication/MessageHandler.ts": "sha256:c14c48b34348983422390bbb60daf7c6a38056e3bd4d79469a84387ba7b02cb4",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:5cd434471089030385b9e3b7c0f93fefffbaa6541fb68de3415c52489891b09a",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
-    "server/core/GameEngine.ts": "sha256:837f5ea6a91d746aa7dc34dd7b1b6cb3081368c5c0970d0885a340515960d583",
+    "server/core/GameEngine.ts": "sha256:669295abc8978dd17e523f6f197c86b15f83feed1d4a7b57980eadf122bf3e34",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -265,7 +265,7 @@
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:2783c72b9159e039d6314d8c0e69f63a700bb702228348c0adf6fe4f2127a4c9",
+    "src/core/gameController.ts": "sha256:5cdfa2929cc9238d401d65bbd94e1c5b67975e6fdc08c6246bad189ca2032ff9",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:a4775c68fcd740081832385689f432dc68dab693f7ef9ee2300b1a9e4341f26c",
@@ -282,9 +282,9 @@
     "src/entities/loot/LootField.ts": "sha256:696cc5e32f6ba4c925861543d00f4863576785bac82bb0908b8595e615d7f2a9",
     "src/entities/loot/lootRenderer.ts": "sha256:636ad62b6bb7e7c2ff08f3bc902a74cf58133daa37e3fbd8d87acd09c6593f95",
     "src/entities/player/Player.ts": "sha256:8141506af5f732f7e05bfebc56e92003936e971f308d038705eb19d52d9202b5",
-    "src/entities/player/PlayerManager.ts": "sha256:63fcf0400ddc1a83ae272b29a47299923ba7d341cafde26e5545397a00e7dcdf",
+    "src/entities/player/PlayerManager.ts": "sha256:53e0d6731ca2004cd283b62690646f808aa01a6b096041493d185a74c44fd116",
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
-    "src/entities/player/playerNetworkPort.ts": "sha256:f1cef578976be6117b2d6503f4e8c4305269d76ae232b61b77c971561a4e623c",
+    "src/entities/player/playerNetworkPort.ts": "sha256:246be082754cfbc4da4b6386815029f34b891f32411f76b0132a3b750a73a46a",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
     "src/entities/roid/Roid.ts": "sha256:af53d19dcab45b16545e6149d973393dc18e3e910bf673e7ec4e8b032e3fbad6",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
@@ -315,7 +315,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
-    "src/network/services/ConnectionManager.ts": "sha256:18bcfcda3ae514abec7ea74c660bbc58356f6329d70330b102e24484e155d216",
+    "src/network/services/ConnectionManager.ts": "sha256:6ab5b5dbd024b077c028c08db99f1ae110e46b1a5fb903eee9763c1e3d89693d",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -7268,6 +7268,35 @@
       "topics": ["asteroids", "combat-survival", "hauler", "teamwork"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "A wall contact that ends a life now always leaves a record, and the contact report is retried until it is actually sent. Two defects in the preceding batch, both found by review. (1) The rejection-warning suppression was justified by a player_died record that cooperative play never writes: GameEngine.handleShipDamage routes a zero-health pilot through downShip, which sets a positive downedUntil, so finalDeath was false and logDamageState emitted damage_applied, which is dropped whenever the same hull logged within the preceding second. A pilot pinned at the rim is normally taking other damage, so the fatal contact could leave no server record at all once the warning was suppressed. logDamageState now takes an outcome of destroyed, downed or survived: only a surviving hit is throttled, and a cooperative downing writes its own unthrottled player_downed event. The suppression comment names both records instead of asserting player_died for a path that never produces one. (2) The out-of-band contact report armed its latch before sending and discarded the result, so a pose refused by a closed, resuming or transiting socket consumed the run report with no retry; and nothing reset the latch across a session. The latch is now set from the send result, GameController.newGame clears it, and the method is named reportBoundaryContact for what it does. Corrections to the preceding note and its code: the outer applyBoundaryContact docblock still said the return means the hull was destroyed, which contradicted the contract the same commit gave it and would have led a maintainer to revert the gate; the non-lethal refusal list omitted a contour rejection, which reports contour and carries no envelope; the coverage row still said the client only flashes, when the client also reports the overlapping pose from the contact frame; and the AGENTS.md line said CollisionManager renders feedback when it sets a flash flag and now also returns a contact signal. Found and NOT fixed, recorded deliberately: when a cooperative rescue window expires, finishDowned calls applyShipDeath directly and bypasses logDamageState, so that later death emits no record either, and a rescued pilot produces none at all. That predates this branch and is not wall contact, so it is out of scope here. Player-facing review: no article or demonstration needed editing. terrain \"The circular wall destroys a vulnerable ship on contact\" still holds; the controls and terrain Contour Lock release lists still hold; combat-survival cargo-before-hull still holds; hud-network Diagnostics promises rail fields on contour rejections, which are untouched, and player_downed is a server log event with no client surface. asteroids, field-manual, hauler, loot-growth, satellites, scout and teamwork were re-read and describe rules this does not touch. The scout, hauler and cargo demonstrations cite server/core/GameEngine.ts but none shows wall contact or a server log line, so no regeneration. Verified with npm run gate, the complete unit suite at 2345 passing, and these mutation checks: making a cooperative down throttleable again, or logging it as damage_applied again, or keying the suppression on isDestroyed alone, each fails the cooperative case, which now takes an ordinary hit first so the throttle is armed exactly as it is in play; removing the latch reset fails the catch-up burst case third phase; setting the latch regardless of delivery fails the new refused-report retry case. No coverage was removed this round.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/GameEngine.ts",
+        "src/core/gameController.ts",
+        "src/entities/player/PlayerManager.ts",
+        "src/entities/player/playerNetworkPort.ts",
+        "src/network/services/ConnectionManager.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {
+        "src/entities/player/PlayerManager.ts": "hud-network",
+        "src/entities/player/playerNetworkPort.ts": "hud-network"
+      }
     }
   ]
 }

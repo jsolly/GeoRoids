@@ -2125,7 +2125,7 @@ export class GameEngine {
 
     if (damaged.health > 0) {
       if (damaged.health < healthBefore) {
-        this.logDamageState(damaged, attackerId, damage, healthBefore, false);
+        this.logDamageState(damaged, attackerId, damage, healthBefore, 'survived');
       }
       return { applied: true, isDestroyed: false, entity: damaged };
     }
@@ -2137,25 +2137,46 @@ export class GameEngine {
     }
     const finalDeath =
       damaged.downedUntil == null || damaged.downedUntil === 0 || Number.isNaN(damaged.downedUntil);
-    this.logDamageState(damaged, attackerId, damage, healthBefore, finalDeath);
+    this.logDamageState(
+      damaged,
+      attackerId,
+      damage,
+      healthBefore,
+      finalDeath ? 'destroyed' : 'downed'
+    );
     return { applied: true, isDestroyed: finalDeath, entity: damaged };
   }
 
+  /**
+   * One record per applied hit. Only an ordinary surviving hit is throttled: a
+   * hit that ends a life is the record `MessageHandler.applyBoundaryContact`
+   * suppresses the motion-rejection warning in favour of, so it has to be
+   * written every time. A cooperative downing ends a life without destroying
+   * the hull, and before it had its own event it was logged as a throttleable
+   * `damage_applied` — which meant a wall death in cooperative play could leave
+   * no record at all once the warning was suppressed.
+   */
   private logDamageState(
     entity: GameEntity,
     attackerId: string,
     damage: number,
     healthBefore: number,
-    destroyed: boolean
+    outcome: 'destroyed' | 'downed' | 'survived'
   ): void {
     const observedAt = Date.now();
     const throttleAt = this.getServerTime();
     const lastThrottleAt = this.damageStateLogs.get(entity) ?? -Infinity;
-    if (!destroyed && throttleAt - lastThrottleAt < 1000) {
+    if (outcome === 'survived' && throttleAt - lastThrottleAt < 1000) {
       return;
     }
     this.damageStateLogs.set(entity, throttleAt);
-    logger.info('STATE', destroyed ? 'player_died' : 'damage_applied', {
+    const event =
+      outcome === 'destroyed'
+        ? 'player_died'
+        : outcome === 'downed'
+          ? 'player_downed'
+          : 'damage_applied';
+    logger.info('STATE', event, {
       releaseId: SERVER_RELEASE_ID,
       playerId: entity.id,
       attackerId,

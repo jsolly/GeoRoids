@@ -31,13 +31,12 @@ function activatedEngine(): { engine: GameEngine; cleanup: () => void } {
   db.exec('UPDATE cooperative_schema SET activated=1');
   db.close();
   const store = new WorldStore(path);
-  let elapsed = 0;
-  const clock = new ServerClock({ wallNow: () => 0, monotonicNow: () => elapsed });
+  // Nothing here depends on elapsed time, so the clock is a constant.
+  const clock = new ServerClock({ wallNow: () => 0, monotonicNow: () => 0 });
   const engine = new GameEngine(4242, clock, new InlineWorldPersistence(store));
   return {
     engine,
     cleanup: () => {
-      elapsed = 0;
       store.close();
       rmSync(dir, { recursive: true, force: true });
     },
@@ -47,6 +46,7 @@ function activatedEngine(): { engine: GameEngine; cleanup: () => void } {
 test('a cooperative wall death is recorded as gameplay, not as a movement violation', () => {
   const { engine, cleanup } = activatedEngine();
   const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
   try {
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
@@ -80,6 +80,14 @@ test('a cooperative wall death is recorded as gameplay, not as a movement violat
     const overlapping = { x: rim.x + outward, y: 0 };
     expect(checkBoundaryCollision(overlapping, radius)).toBe(true);
 
+    // Take an ordinary hit first. It writes `damage_applied` and arms that
+    // record's one-second per-entity throttle, which is what made the fatal
+    // contact silent: a pilot pinned at the rim is normally taking other
+    // damage, and the terminal record has to survive that.
+    engine.handleShipDamage(joined.id, 'asteroid', 10);
+    expect(engine.getPlayer(joined.id)?.health).toBe(90);
+    expect(info.mock.calls.filter(([, event]) => event === 'damage_applied')).toHaveLength(1);
+
     wsCore.handleClientMessage(
       {
         type: 'update',
@@ -106,7 +114,16 @@ test('a cooperative wall death is recorded as gameplay, not as a movement violat
     expect(downed?.health).toBe(0);
     expect(downed?.downedUntil).toBeGreaterThan(0);
     expect(warn.mock.calls.map(([, event]) => event)).not.toContain('motion_command_rejected');
+
+    // Suppressing the warning is only honest because a terminal record is
+    // written instead, and unthrottled: `damage_applied` is dropped whenever
+    // the same hull logged within the preceding second, which at the wall is
+    // the ordinary case.
+    const terminal = info.mock.calls.filter(([, event]) => event === 'player_downed');
+    expect(terminal).toHaveLength(1);
+    expect(terminal[0]?.[2]).toMatchObject({ playerId: joined.id, attackerId: 'boundary' });
   } finally {
+    info.mockRestore();
     warn.mockRestore();
     cleanup();
   }

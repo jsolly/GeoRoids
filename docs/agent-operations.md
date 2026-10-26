@@ -202,8 +202,15 @@ to 2 MiB, three per client address per hour and 30 globally per UTC day.
 These limits are independent of gameplay admission. Railway public HTTP
 ingress supplies `X-Real-IP`; local development uses the socket address and
 ignores forwarded address headers. Before release, verify that Railway replaces
-client-supplied `X-Real-IP` values. Do not expose this reporting listener through
-an untrusted internal proxy that can choose that header.
+client-supplied `X-Real-IP` values, and record that result with the release
+evidence. **That verification now covers the WebSocket upgrade path too**:
+gameplay and log admission charge the forwarded `X-Real-IP` under the same
+ingress, so if the edge passes a client-supplied value through, the per-address
+upgrade budget is void and any caller mints a fresh budget per claimed address.
+The branch's own tests cannot observe this — they synthesize headers and so
+exercise the resolver, never the real edge. Do not expose the reporting
+listener or either WebSocket listener through an untrusted internal proxy that
+can choose that header.
 
 Gameplay admission now rests on the same header: `server/communication/clientAddress.ts`
 resolves it for both the reporting listener and the WebSocket upgrade limiter, so a
@@ -275,7 +282,7 @@ npm run check:format       # pinned Prettier checks Astro/Svelte formats
 npm run check:lint         # Biome with config/quality/biome.settings.jsonc
 npm run check:lint-policy  # reject inherited warn/info Biome severities
 npm run check:knip         # fail on unused files/exports/dependencies and config hints
-npm run check:ts-prune     # fail on unconsumed TypeScript exports
+npm run check:ts-prune     # fail on unconsumed TypeScript exports and unreachable public class members
 npm run check:md           # markdownlint-cli2
 npm run check:yaml         # yamllint --strict
 npm run check:actions      # actionlint + ShellCheck

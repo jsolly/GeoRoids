@@ -619,6 +619,16 @@ export class MessageHandler {
         continue;
       }
 
+      // A durable deposit survived the chip, so only its hit is audible; a
+      // shatter is already audible as a destruction, and 'missing' and
+      // 'ignored' never applied, so both stay silent.
+      if (hit.outcome === 'damaged' && hit.origin !== undefined) {
+        this.broadcaster.broadcastAsteroidHit({
+          asteroidId: hit.asteroidId,
+          position: hit.origin,
+        });
+      }
+
       if (hit.outcome !== 'destroyed') {
         continue;
       }

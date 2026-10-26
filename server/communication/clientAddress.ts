@@ -100,8 +100,8 @@ export function resolveClientAddress(req: IncomingMessage, railwayIngress: boole
 /**
  * The address a gameplay or log upgrade is charged to. Never null: an upgrade
  * the edge cannot attribute is charged to the shared `UNATTRIBUTED_CLIENT`
- * budget, which the lane ceiling bounds, because refusing it outright would
- * lock pilots out for an ingress change.
+ * budget, which is fleet-sized in its own right, because refusing it outright
+ * would lock pilots out for an ingress change.
  */
 export function upgradeChargeAddress(req: IncomingMessage, railwayIngress: boolean): string {
   return resolveClientAddress(req, railwayIngress) ?? UNATTRIBUTED_CLIENT;

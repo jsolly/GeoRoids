@@ -100,7 +100,7 @@ export class EntityManager {
   }
 
   // Entity management
-  public addEntity(entity: GameEntity): void {
+  private addEntity(entity: GameEntity): void {
     this.entities.set(entity.id, entity);
     logger.debug('ENTITY', 'Entity added', { entityId: entity.id, entityType: entity.type });
   }

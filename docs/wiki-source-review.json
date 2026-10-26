@@ -7,11 +7,11 @@
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
-    "docs/diagnostics.md": "sha256:7b7cd11435899a5df1e651ba90cfb0233e35e966c19170ee5089e718cf16fad8",
+    "docs/diagnostics.md": "sha256:2cc5bbf857e7f0fa9cfb4b0deaa3d4eed89feef8e75886de55d548a0c582587b",
     "docs/protocol/snapshot-v3.md": "sha256:466d9bf94b7f001cb0d4750a418685f547806a39b328f7fda2b9d23a8f6b9bc6",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:7f37664cb85dabb7c462eb70530ef219e1e1768a25f5db24d45a49d9fd894f83",
+    "package.json": "sha256:e7c0793436fb6409d8e5dfb96503e172c219284514ff2135146efdab37ac872e",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -84,26 +84,28 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
+    "server/communication/MessageHandler.ts": "sha256:e36846a2e40fc0af865bca347ae621fdd4a5c1b6f1e95260e0ee77bf8bbcf8fa",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
+    "server/communication/clientAddress.ts": "sha256:b669aaae9b4f1daa8cd762251310d858473577a67daffe22fb0f0e363376a523",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:966ce6f748d39aa6963d641cd1c6f2588a163f8c997e658d90f692ebcab25b3f",
+    "server/communication/connectionAdmission.ts": "sha256:9d0547e25316e21215f9d4a22072eb9e20c4c1f37463dd6fec913f4cfc5ed859",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
+    "server/communication/lostAttribution.ts": "sha256:77e5bbbc2eab2c7742e0236ad0386b365ea9e4bc031a9f8220cd55b3355e6876",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
-    "server/core/AsteroidManager.ts": "sha256:78025c1a549f82c7ec210745b668a85c5241f82f77d591d7057606bdd606c323",
-    "server/core/BeltCrawlerManager.ts": "sha256:bcfa5747f3432d2b0769effb71e73fd845aded57db71c115a772be1b6377ab45",
+    "server/core/AsteroidManager.ts": "sha256:e536e0b0a44d8d4ab24fb5618210f3ab2648e516ec7c954c31e1073e54d2d959",
+    "server/core/BeltCrawlerManager.ts": "sha256:fe4a9e6b0a622452a633d016f0d76ae57ce7a9e2b464fe25bda3b7614afb55c7",
     "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
-    "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
-    "server/core/GameEngine.ts": "sha256:837f5ea6a91d746aa7dc34dd7b1b6cb3081368c5c0970d0885a340515960d583",
+    "server/core/EntityManager.ts": "sha256:05eb50b99d590a0120a10f1f5b103cabcc74bd4b3eb529f0a04b909245768ba1",
+    "server/core/GameEngine.ts": "sha256:a28657f7a55560b428c199f3cb7b038e2f1663aee3569e0dc5f98f7c31adfc2a",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
     "server/core/LootManager.ts": "sha256:bad0eaa4e555d9853b5054ebc9ec7e32aae26fed2a9d78b902d6c63925568a5e",
-    "server/core/PlayerMotionService.ts": "sha256:cc986967abc3a74d31c22bdd3c22fdfdafc1551d11fbc6b6659a9730d3a58bef",
-    "server/core/RNGService.ts": "sha256:c6a852821c514621ded484d570859144e6b035de82fb74e6e851ef68358f03eb",
+    "server/core/PlayerMotionService.ts": "sha256:eb65d65298ade163a684a41a2d8f3eaca3d7dd6626dcdcd563518d98cb745475",
+    "server/core/RNGService.ts": "sha256:d539b5041594b9e7037d6967a149a42348b47febf3a5275c302e6a34166af582",
     "server/core/RolyPolyManager.ts": "sha256:1564c9b42dbf3091f1ba8cbe90b10f63458a9d3b5e9830b66b46fc733bd05cad",
     "server/core/SatellitePickupManager.ts": "sha256:e44b5e648b8490c81fec961a251ef8f8473d78036331ebdac9acb7ce5c83083a",
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
@@ -112,11 +114,11 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:bbc0f309e0a19374bcbadc5c4a319ebcd1ac4f373d928bfecab4a58233c188ce",
+    "server/createServer.ts": "sha256:a8f11ee11749ee76c01a4e75eb08a5f374740028d08d70f65fb358f7114f2f82",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
-    "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
+    "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
-    "server/world/AsteroidSpatialIndex.ts": "sha256:9c30d118e9b5ccc0dac6028970483d4a5f6ad5d13145daec2d0de01ea2744260",
+    "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
     "server/world/InlineWorldPersistence.ts": "sha256:aa8a6f7ebbb1ce31afa87d6eae34d262c81765b8fc0788c6853f57e83b7d3828",
     "server/world/MapAssets.ts": "sha256:2ffe843156946dc2c0234948433805560daf15f424987a933cdfb2030c6519ad",
@@ -131,7 +133,7 @@
     "server/world/worldPersistence.ts": "sha256:0846eb3503a381325733e295f7541760baf03c5d7cf1b9e64db2248c1bfba38c",
     "server/world/worldStoreWorker.ts": "sha256:10691d33041b176ff3a78464a58eab107990ac70f38339cadf521524748cc2c7",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:88d2be9701f0d600bdb35c04c70ce7a113f87adf270f5998113ec063c1ba90d8",
-    "shared-types.ts": "sha256:6fd31f27252d7c06f49c65badd1293258332ee85b4729d6a9e4abe2e9567484c",
+    "shared-types.ts": "sha256:290e3ae00d218cde18adcb8d4e4ed27b537dfc4222bbb513f009be4ba2930f09",
     "shared/aiShips.ts": "sha256:9793248321163dbc5cf6475a5e8722a9e5cc73dfdd847bf0a5bd1d6788bff4f3",
     "shared/asteroidBelt.ts": "sha256:94d55e4288a9d968066ac05f666ae0cfe757739166a00ff1dd7a368339378b49",
     "shared/asteroidBoost.ts": "sha256:98594cb2fc30bac61c5a7ce16e9015c9aeb2c5517caa9bbe05711991dbae5b9c",
@@ -140,7 +142,7 @@
     "shared/asteroidPhenomena.ts": "sha256:ab1ac159aefa09427ff8fa76c8c649801d9fe081f8ecc45de452079856002da2",
     "shared/asteroidReflection.ts": "sha256:0fe393e733a698d711db584167259a856565458c0a5ac12e05f0e23ca0f218a8",
     "shared/asteroidScale.ts": "sha256:9d915433cc72415420657f773bfedac789b52a7edd395d79119d7c79c9eddede",
-    "shared/beltCrawler.ts": "sha256:f826d22c1256908a64052d3a6ba008b39215ad17de46fded49ae118c7260abea",
+    "shared/beltCrawler.ts": "sha256:3fd29c3e9cffac5b03ba747849b51122a2a76c6bc4d05df5723da031971e6905",
     "shared/boundary.ts": "sha256:7cb7cf56b7e152f452ebf086e3d0a56e1819e8cf262c5a51f42df41b7cda398a",
     "shared/chargedWeapon.ts": "sha256:04ddbced404a5eac1a85a0760114943c196073629dff3299a57aab271ddb2919",
     "shared/combat.ts": "sha256:ed0260bb402e44e052ca6a6ddced6add0cac57cd46c74ec4e5a5d95dd2a271e5",
@@ -203,7 +205,7 @@
     "src/audio/destructionSounds.ts": "sha256:a31ac1a208c41910d198dce4239fb0310577a242e78eb23c6d37e4243f7535f4",
     "src/audio/explosionSound.ts": "sha256:62c0a7c56e833231583255cbbb9177d4a7a9657510963667ae3206eab23834e6",
     "src/audio/feedbackSounds.ts": "sha256:148a4a5f5634e0371def37265b74a37f8039e17bfda7df37d93a041ebee8a072",
-    "src/audio/gameSounds.ts": "sha256:616cc0b2342dc8d4272383e8925b01d6d554164e6874a94eababeba67cbf5d2d",
+    "src/audio/gameSounds.ts": "sha256:ec874ad57a289929686bbc4faa31f10f519f92ac9014af95e53fabc81569aae5",
     "src/audio/interactionSounds.ts": "sha256:a48c271d1c16e404bbd0a8069a07275108b4f802df1a5906c220e0545ff6a833",
     "src/audio/musicBeds.ts": "sha256:d25010498827b44f0a43d7bb4fa683dc153d35250db3961b5243b35fa193b98b",
     "src/audio/musicCatalog.ts": "sha256:d6342a645cdb4cd5ed8729edd464cfc915dca4c0606ca75d8d280f5a144f5f43",
@@ -277,7 +279,7 @@
     "src/diagnostics/phoneRecordingSummary.ts": "sha256:cb82f64f277b0c4d786039f6a42754ac5ab823189084f77d06bb571e2179321b",
     "src/diagnostics/reportInputDiagnostics.ts": "sha256:6dca366e212141f3b034b4f3109625a80f32c916cec4c33c66edde00b1d8518e",
     "src/entities/laser/AuthoritativeProjectileField.ts": "sha256:01f08320e6968fa4e8b07d798fe226117b29042aecada94cfb373517334aad67",
-    "src/entities/laser/Laser.ts": "sha256:d482cbf287826e87b2aa4d17db13fd7495af82d44c24ca653434f8de0738ea16",
+    "src/entities/laser/Laser.ts": "sha256:930c1f38f84ad021ecb43dd68240b00e8578578e21b7900c4434b68a41ab3fb3",
     "src/entities/laser/laserUtils.ts": "sha256:e7e20a0c5f6f6cb577898bb0f531b19866c833c44a090d56da833d1c71c97b01",
     "src/entities/loot/LootField.ts": "sha256:696cc5e32f6ba4c925861543d00f4863576785bac82bb0908b8595e615d7f2a9",
     "src/entities/loot/lootRenderer.ts": "sha256:636ad62b6bb7e7c2ff08f3bc902a74cf58133daa37e3fbd8d87acd09c6593f95",
@@ -286,7 +288,7 @@
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
     "src/entities/player/playerNetworkPort.ts": "sha256:f1cef578976be6117b2d6503f4e8c4305269d76ae232b61b77c971561a4e623c",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
-    "src/entities/roid/Roid.ts": "sha256:af53d19dcab45b16545e6149d973393dc18e3e910bf673e7ec4e8b032e3fbad6",
+    "src/entities/roid/Roid.ts": "sha256:30899ebb25280060ba7f85cfbe2d9ea61c747e564a42e0cbee8f6451bcb8ed7f",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
     "src/entities/roid/roidRenderer.ts": "sha256:1719c44c4d9d4cb58132858116350d026870ee40ceab50b54ed68450c1f9eb64",
@@ -297,7 +299,7 @@
     "src/entities/satellitePickup/satelliteHealthRenderer.ts": "sha256:0f8ce5d5175126394203274d0976ea9e061bcdfc943a262739468bfe079795bd",
     "src/entities/satellitePickup/satellitePickupGlow.ts": "sha256:d2f65deea8024004454313ce1c1bc697dc88dee0ac2d311835aef74397c1313c",
     "src/entities/satellitePickup/satellitePickupRenderer.ts": "sha256:427ff0116adea82f066009f8b98c8e5399095991fb44835b050fa21487e04730",
-    "src/entities/ship/Ship.ts": "sha256:594c1deb9234d9ddbf7cbb41dc4d17c42a602083aa74e9c4a613e7887b5759fb",
+    "src/entities/ship/Ship.ts": "sha256:355201ff73ff6025ad9ee91a3af70b7765a425f7e8bc5e55f0eab394b627df8c",
     "src/entities/ship/cruiseMotion.ts": "sha256:098644690d5029ca6363d4d951e2fbff4ef0c34483afc0fe42e25e050d876f0b",
     "src/entities/ship/harpoonField.ts": "sha256:7ebbb27e4ede9b08eceb6149a006b503b92bc6b190e3027473aa1bccb41d083f",
     "src/entities/ship/haulerUtility.ts": "sha256:2d2e7eeed64a4a53ddb2e35c882c4d0492e98f7f05fbe18f805fdbf712539f2f",
@@ -315,7 +317,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
-    "src/network/services/ConnectionManager.ts": "sha256:18bcfcda3ae514abec7ea74c660bbc58356f6329d70330b102e24484e155d216",
+    "src/network/services/ConnectionManager.ts": "sha256:1bee64de5304341a1d7433e8b02c5740f226c38026b8a14248bb3ac4783e3586",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -429,7 +431,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:e27b564d0e73fadbab08d8a701fee096e16f6e1f24dcb91f12ba781689df45ec",
+    "src/wiki/articleSources.json": "sha256:ee768e6c867889c2747f2c279701a0a18faf4461cd6b7ef7b6fff776f0170b48",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:ae5cb90a82273e43481bb0bba1175f53f7c4167084291b6ea969ea13c466e586",
     "src/wiki/media.ts": "sha256:ccea87e637e20748afc3a89b108d426f583e591bcd51700494d7db67bd37937a",
@@ -510,9 +512,10 @@
     "tests/unit/server/authoritative-combat.test.ts": "sha256:81581e91345bb64716cdbdb4eeee71170788b01019d5d6aa85156bacb425c455",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:e7825cd740c4c87a4de9155c75aafae2484b9d0710da846fee5483dfa0e801ee",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
-    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:eebef9e38211a9b82cb133bb3262e04f8de150861269245f3e39db75a0238187",
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:0808cc5c78a0d4df335585469d57b16d2b8f3c65337072e234c260a60c6caa2a",
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:a211f6c8c0c593b809dde90c6f053e37e39963550b6d84d9552ebed8159e01ee",
     "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:88a7a22fe6feb765c078a330f02e175db549bd47bad8a0dce29ad9f2e84fb413",
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:e05382b1eb1fbb5d5482e540c08e305f672a24b7523e3a244b7db0d1a2a85c78",
     "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:f71b82291d9b7cb431b3242fad4854ccf75227c3ef682fde5bab9c8ce84ce9ad",
     "tests/unit/server/contour-riding-rocks-drop-navigation-crystals.test.ts": "sha256:bac294d107876ca053de51802167966eb7f9aa740840adf92723c6b12e1f1086",
@@ -571,8 +574,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
-    "server/communication/clientAddress.ts": "sha256:89f6cfc8dccc8d242200afd2a8893ec5c6825355a088f86c0e8615aacf38f1a1"
+    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb"
   },
   "reviews": [
     {
@@ -7119,6 +7121,183 @@
       "owners": {}
     },
     {
+      "note": "Reviewed dead-code removal and visibility narrowing surfaced by the extended unused-export gate and the new unused public class member check. No player-visible rule changed: PlayerMotionService.quit, the RNGService state accessors and the Roid/Laser playHitSound wrappers (with the hit SFX only they reached) had no caller anywhere in repository history, and every narrowed member keeps its existing internal callers. Simulation behavior is unchanged, so the scout, hauler, cargo, terrain and survival demonstrations still illustrate the same rules; CI's wiki-media lane verifies their reproducibility. Lint, types, knip, ts-prune, the complete unit suite and the runner contracts passed on this tree.",
+      "sources": [
+        "package.json",
+        "server/core/EntityManager.ts",
+        "server/core/GameEngine.ts",
+        "server/core/PlayerMotionService.ts",
+        "server/core/RNGService.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/audio/gameSounds.ts",
+        "src/entities/laser/Laser.ts",
+        "src/entities/roid/Roid.ts",
+        "src/entities/ship/Ship.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout", "survival", "terrain"],
+      "owners": {
+        "package.json": "field-manual",
+        "server/core/RNGService.ts": "asteroids",
+        "src/audio/gameSounds.ts": "hud-network",
+        "src/entities/laser/Laser.ts": "combat-survival"
+      }
+    },
+    {
+      "note": "Wired the hit SFX that was present but unreachable. A laser chip a durable deposit survives now broadcasts asteroidHit with the rock position, and the client plays the viewport-culled, distance-attenuated hit sound; the server previously dropped every non-destroyed outcome. Ordinary rocks still report asteroidDestroy alone, so a chip and a shatter never sound together, and 'missing' and 'ignored' outcomes stay silent. Documented the player-visible cue as asteroids / Mining sound and recorded it in the audio coverage row; mapped src/audio/gameSounds.ts to hud-network with its audio siblings. No demonstration derives from these files, so the GIFs are untouched. Verified: lint, types, knip, ts-prune, the new broadcast contract (mutation-checked by removing the broadcast), and 1221 unit tests across server, network, audio and entities.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "shared-types.ts",
+        "src/audio/gameSounds.ts",
+        "src/network/services/ConnectionManager.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "controls", "field-manual", "hud-network", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Re-reviewed the chip-cue contract after correcting its fixture types: material 'rock' is not an AsteroidMaterial (now 'ice', the ordinary first-hit case the test describes), the burning boost now uses the real AsteroidBoost shape { phase, ownerId, angle }, and the fixture id 'rubble' became 'ice-rock' so it no longer reads as a material it is not. The three assertions are unchanged — a surviving deposit reports each chip, a shatter reports destruction alone, and hits that never applied stay silent. Player rules and demonstrations are unaffected. Verified check:ts, check:lint and the three cases after the correction.",
+      "sources": ["tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"],
+      "topics": ["asteroids"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Review fixes: the chip broadcast hoists out of the destroyed guard (identical behavior), reaches only pilots within world interest, and playHitSound requires a position. Reviewed controls, hud-network, teamwork and asteroids: only asteroids documents this cue, and its Mining sound section now scopes audibility to rocks on screen; the coverage row records one event per terminal laser impact. The interest radius is far outside the viewport that already culled the cue, so nothing player-visible changed. No demonstration derives from these files.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/audio/gameSounds.ts",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "controls", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Review follow-up: the chip's interest filter now runs inside broadcastToAll via a recipient predicate, restoring per-send error isolation, the readyState check and broadcast metrics, so a failing cue can no longer abort the authoritative destroy broadcasts in the same batch. The server test gained a positive control proving the distant socket is live. Reviewed hud-network, teamwork and asteroids: no player-visible behavior changed, so only the coverage row moved, recording that a pressured socket inside interest is still closed for recovery like any event-class message. No demonstration derives from these files.",
+      "sources": [
+        "server/services/GameStateBroadcaster.ts",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Lint follow-up only: the recipient predicate's guard uses an explicit !== true comparison to satisfy Biome's strict boolean rule. No behavior change, so no Wiki page is affected.",
+      "sources": ["server/services/GameStateBroadcaster.ts"],
+      "topics": ["hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Routed the per-frame armed-boost and burning-boost loops onto a tracked boosted-rock set in AsteroidManager instead of two whole-belt copies; no player-visible rule changed. Re-read Hauler 'Boost Coupling E' and 'Reach and release', Asteroids colossal/powered-cargo/ore prose, Teamwork 'Scan, tow, deliver', Scout probe limits on powered rocks, Controls E behavior, and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, and equal credit for launchers and recorded scanning pilots all still hold. Field manual, combat and survival, terrain and satellites prose is untouched by the change. Ran the complete unit suite, static checks and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": ["server/core/AsteroidManager.ts", "server/core/GameEngine.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Belt crawlers now receive their candidate hosts from a tracked set on AsteroidManager instead of BeltCrawlerManager walking the whole spatial index each frame; the slot rule moved into shared/beltCrawler.ts as hostsBeltCrawlers with the stride named NATIVE_SLOT_STRIDE, replacing an unnamed percent-six in two places. No player-visible rule changed. Re-read Asteroids 'Belt spiders' and Terrain 'Belt crawlers': rounding rock cover, hopping between nearby rocks to chase, one shot killing an exposed body without breaking its rock, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks or dying if none is reachable, a killed crawler returning only when its host deposit is replaced, and immunity to tap, probe, direct tow and Mineral Scan all still hold; crawlers still travel with a towed host and cannot bite mid-hop. The eighteen-lone-guards belt count is preserved by NATIVE_SLOT_STRIDE and its test still passes. Ran the 18 belt-crawler cases, the reserved-population case, the belt-pass guard, lint and types, and npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": [
+        "server/core/AsteroidManager.ts",
+        "server/core/BeltCrawlerManager.ts",
+        "server/core/GameEngine.ts",
+        "shared/beltCrawler.ts",
+        "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Independent review of the belt-pass change found the documented invariant overstated, so this round corrects AsteroidManager's comments and makes crawlerHostAsteroids prune removed ids as boostedAsteroids already does, closing the one path by which the tracked set could outgrow the live belt. No player-visible rule changed and no gameplay predicate moved. Re-read Asteroids 'Belt spiders' and 'Boost Coupling'-related prose plus Hauler 'Boost Coupling E': crawlers rounding cover and hopping between rocks, one shot killing an exposed body, leaping to a reachable rock when a host breaks, a killed crawler returning only when its host deposit is replaced, arming toward the nearest furnace, a second coupling reaching full speed and delivery credit for launchers and recorded scanning pilots all still hold. Ran the 11-case belt-pass guard, the 18 belt-crawler cases, the reserved-population case and the world-write cadence case (40 passing), lint and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected by the prune.",
+      "sources": ["server/core/AsteroidManager.ts"],
+      "topics": ["asteroids", "hauler"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Third review round after independent review found the belt-pass guard's coverage claims overstated. These three sources change without any behaviour change: nativeCrawlerSlot is renamed isNativeCrawlerSlot so it no longer reads like a slot accessor beside beltSlotForAsteroid, BeltCrawlerManager follows the rename, and AsteroidSpatialIndex.values() is deleted because this change left it with no caller anywhere in server, src, shared, tests, benchmarks or scripts once BeltCrawlerManager.advance stopped walking the index (knip does not check class members, so the gate could not see the dead code). No gameplay predicate moved and no rule changed. Re-read Asteroids 'Belt spiders', Terrain 'Belt crawlers' and 'Guard patrols', Scout probe limits on powered rocks, Teamwork 'Scan, tow, deliver' and Hauler 'Boost Coupling E': crawlers rounding cover and hopping between rocks, one shot killing an exposed body, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks, a killed crawler returning only when its host deposit is replaced, immunity to tap probe tow and Mineral Scan, powered rocks refusing a probe, and equal delivery credit for launchers and recorded scanning pilots all still hold; the eighteen-lone-guards belt count is unchanged. Ran the belt-pass guard (13 cases), the 18 belt-crawler cases, reserved population, local-query, world-write cadence and persistent-world suites (56 passing), plus lint, types, knip and ts-prune; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
+      "sources": [
+        "server/core/BeltCrawlerManager.ts",
+        "server/world/AsteroidSpatialIndex.ts",
+        "shared/beltCrawler.ts"
+      ],
+      "topics": ["asteroids", "hauler", "scout", "teamwork", "terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Merge round: brought main (PR 879, unused-export and class-member gate holes plus the mining chip cue) into the belt-pass branch. The only file both sides touch is GameEngine.ts, where 879 narrows ensureSatellitePickups to private while this branch routes the armed-boost and burning-boost loops onto tracked sets and hands BeltCrawlerManager its hosts; the two edits share no code path and the merged file keeps both. AsteroidSpatialIndex.values() stays deleted: 879 added a public-class-member check that could not see the member on main, because BeltCrawlerManager.advance still called it there, and this branch is what orphans it, so the deletion is now required by that new gate rather than merely tidy. No player-visible rule changed and no gameplay predicate moved by the merge. Re-read Asteroids 'Belt spiders' and the colossal, powered-cargo and ore prose, Terrain 'Belt crawlers' and 'Guard patrols', Hauler 'Boost Coupling E' and 'Reach and release', Scout probe limits on powered rocks, Teamwork 'Scan, tow, deliver', Controls E behavior and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, equal delivery credit for launchers and recorded scanning pilots, crawlers rounding cover and hopping between rocks, one shot killing an exposed body, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks, and a killed crawler returning only when its host deposit is replaced all still hold, and the eighteen-lone-guards belt count is preserved by NATIVE_SLOT_STRIDE. The chip cue 879 wired is a separate deposit-damage path that this branch does not touch. Ran the complete unit suite on the pre-merge tree (393 files, 2345 tests passing) and re-ran lint, types and the merged static checks here.",
+      "sources": [
+        "server/core/AsteroidManager.ts",
+        "server/core/BeltCrawlerManager.ts",
+        "server/core/GameEngine.ts",
+        "server/world/AsteroidSpatialIndex.ts",
+        "shared/beltCrawler.ts",
+        "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
       "note": "Reviewed connection admission and the upgrade address it charges. Read hud-network's Connection interruptions and Can't join sections: the fifteen-second retry, the restored-ship and cargo rules, the server-update reload, and the nickname-in-use/server-full/outdated-tab banner causes all stay accurate. The change gives each client its own upgrade budget behind Railway ingress and adds a lane ceiling across addresses, so it removes a refusal honest pilots could hit after a deploy rather than adding one; it does not change join capacity (MAX_PLAYERS), the retry window, or any banner the article enumerates. No demonstration cites these sources (checked src/wiki/media.ts), and no generated reference value changes. Ran lint, typecheck, knip, ts-prune, the new admission guard with four mutation checks, and all 726 server unit and integration tests.",
       "sources": [
         "server/communication/clientAddress.ts",
@@ -7144,6 +7323,52 @@
       "owners": {
         "server/communication/connectionAdmission.ts": "hud-network",
         "server/communication/clientAddress.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed hud-network against the removal of this branch's cross-address connection ceilings; no page needed an edit, and the change removes a player-visible failure cause rather than adding one. Independent review confirmed nine Important findings against the ceilings, three of them a denial-of-service lever reachable from one machine: a caller inside its own budget was still refused once the lane total was spent, and the one bucket a caller can select for itself -- by withholding or mangling X-Real-IP -- was granted that whole total as its own budget, so one source reproducibly refused 488 of 600 honest joins, indefinitely. The ceilings also sat under honest fleet demand in both lanes at once, refusing 400 of 600 log upgrades from pilots each inside their own budget. They were removed rather than resized, and that went too far: a later round of the same review established that the premise behind it -- that main has no aggregate bound either -- is false. main keys on the socket peer, which behind the edge is the proxy, so every caller shares one bucket and the whole internet gets 50 accepted gameplay upgrades a minute between them; main's aggregate bound is a side effect of the very bug this change fixes, so re-keying to the real client is what removes it. A backstop across all addresses is therefore kept, sized above every way the limiter can legitimately be spent at once so it cannot refuse an honest caller, together with a ceiling on how many address buckets are tracked at all. Unattributable callers keep a budget of their own, sized to a full fleet's worst honest demand per lane (600), so losing the header still degrades to a fleet sharing a fleet-sized budget instead of half the pilots being refused. What this means for the page: hud-network lists nickname in use, server full and outdated tab as the reasons a join fails, and that list is now more accurate, because a pilot can no longer be refused on account of other callers' traffic. The remaining refusals are unreachable in honest play -- a pilot's own budget is 50 upgrades a minute against a client ladder of six, and a full fleet's worst honest demand equals the shared budget exactly -- so no documented cause changed and none needs adding. docs/diagnostics.md is updated in the same change because it is the operator-facing description of what bounds an upgrade: it now states that per-address means the forwarded X-Real-IP behind Railway ingress, that unattributable callers share one fleet-sized budget, that there is deliberately no limit across all addresses, and it names the greppable lost-attribution warning. docs/agent-operations.md is updated too, because the before-release verification that Railway replaces client-supplied X-Real-IP now covers the WebSocket upgrade path and not only the reporting listener. No player-facing string, receipt state, limit or generated reference value changes, and no demonstration cites these sources. Verified: lint, typecheck, 689 server unit tests across 94 files, and seven mutation checks each failing a named test before being reverted -- including re-introducing a shared lane ceiling, which fails the case written for it.",
+      "sources": [
+        "docs/diagnostics.md",
+        "server/communication/connectionAdmission.ts",
+        "server/createServer.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Second pass over the same two sources in this change, carrying two findings the round downgraded to Minor. Neither alters behaviour a page describes, so the hud-network conclusion recorded in the preceding entry stands unchanged and no page needs an edit. First: the bucket kept two timestamps, one for expiring a window and one for pruning. Analysis while fixing the blockers showed the two cannot be told apart through admit -- any bucket the window start would prune has already rolled its window, so bucketFor would hand that caller a fresh one regardless and the count is stale either way -- and a mutation written to prove otherwise survived, which is what established it. Keeping both implied a distinction that does not exist, so there is now one timestamp and the code states why rather than implying a test covers the difference. The observable property, that pruning never hands a caller mid-spend a fresh budget, is guarded by two cases and by a mutation that evicts live buckets. Second: the lost-attribution warning named a cause it cannot establish. One caller withholding X-Real-IP and ingress failing fleet-wide produce the same line, and they are different incidents; the record now carries how many upgrades it stands for and states what was observed instead. Volume is the only thing that separates them, which is a log-line change with no player-visible effect. Three further Minors are declined rather than carried, with reasons on the PR: replacing the unattributed sentinel with a typed absent-address input, moving the client reconnect ladder into shared/, and deriving edge trust from per-request headers instead of RAILWAY_ENVIRONMENT_ID. Each is a real design change that widens this PR past the blockers it exists to fix, and the third depends on a production verification that is human-owned. Verified again after the refactor rather than before it: 689 server unit tests across 94 files, and six mutation checks re-run against the final code, each failing a named test and the file restored byte-identical, including re-introducing a shared lane ceiling, which two cases now reject.",
+      "sources": ["server/communication/connectionAdmission.ts", "server/createServer.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed hud-network again after a second review round found that the previous revision of this change had introduced a Critical. No page needs an edit, and the conclusion recorded in the two preceding entries still holds for the player-facing surface, but one sentence in entry 250 was false and is corrected in place rather than retracted beneath itself. What the round found. Removing the cross-address ceilings was justified with the claim that main has no aggregate bound either. That is false: main keys the limiter on the socket peer, which behind Railway's edge is the proxy, so every caller shares one bucket and the whole internet gets 50 accepted gameplay upgrades a minute between them. main's aggregate bound is a side effect of the very bug this change fixes, so charging the real client removes it, and deleting the explicit ceiling on top took the server-wide accepted rate from hard-capped to uncapped. Worse, re-keying made the limiter's bucket map attacker-diverse on a path that needs no authentication and no completed handshake: /logs reaches admission directly, each distinct address inserts a retained entry of about 184 bytes held up to two windows, and an IPv6 /64 routed to one host is the ordinary case, so a caller could exhaust the container, and the prune sweep that walks the map shares an event loop with the 60 Hz frame. What ships now. A ceiling of 1,024 tracked address buckets, following the cap and inline pruning that debugReports/http.ts already uses on a map keyed through the same resolver; rolled windows are dropped before it refuses anything, and a caller that already holds a bucket is never refused by it. A lane backstop across every address, sized at a full fleet's own budgets plus the shared budget, which is every way the limiter can legitimately be spent at once, so it bounds a bypass of attribution without being able to refuse an honest caller -- the earlier ceiling failed because it was sized from the retry ladder, far below the per-address budgets a full fleet holds. And both lanes now size the shared unattributed budget by one rule, a full fleet times that lane's per-pilot budget, because deriving the gameplay one from the retry ladder meant a fleet whose pilots each dropped twice in a window lost exactly half of them -- the half-the-pilots-refused outcome the shared budget exists to prevent, which the previous entry claimed had been avoided. What this means for the page: still nothing. hud-network lists nickname in use, server full and outdated tab as the reasons a join fails, and every refusal added or kept here remains unreachable in honest play; the limits are per minute and sized at or above a full fleet's demand in every regime, attributed or not. Also fixed, and worth recording because the runbook is operator-facing: docs/diagnostics.md told operators to grep a warning string the server no longer emitted. The doc line was written in one commit and the emitter reworded in the next, so the only new observability handle was unreachable as documented. Both now agree and a test pins the agreement, along with every limit the runbook quotes, so a future rewording fails a case instead of silently breaking an incident runbook. The lost-attribution record also reported 1 upgrade for any incident that ended inside its interval and dropped the remainder; the tally is now its own module, flushed by the limiter's cleanup timer, and tested for the fleet-wide case directly. Verified: lint, typecheck, the server unit suite, and nine mutation checks across the limiter, the runbook contract and the tally, each failing a named test with every file restored byte-identical -- including restoring the unbounded map, re-sizing the backstop from the retry ladder, and reporting 1 instead of the real volume.",
+      "sources": [
+        "docs/diagnostics.md",
+        "server/communication/connectionAdmission.ts",
+        "server/communication/lostAttribution.ts",
+        "server/createServer.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network",
+        "server/communication/lostAttribution.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Re-records the same source after one line changed: the tally's interface no longer carries an export keyword, because the unused-export gate correctly reported it as used only inside its own module. No behaviour, no exported value and no player-facing surface changes, so the hud-network conclusion in the preceding entry stands unchanged and no page needs an edit. Recorded rather than skipped because the gate keys on the file digest and the digest moved. Worth noting how it was found: the full gate caught it on commit, after lint, typecheck and the server unit suite had all passed, which is the second time in this change that the gate rejected something the faster checks accepted.",
+      "sources": ["server/communication/lostAttribution.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/lostAttribution.ts": "hud-network"
       }
     },
     {
@@ -7202,6 +7427,15 @@
     },
     {
       "note": "Round-three review of the shipped change, and a correction to my own previous note. Seven lenses reviewed the net state; this is the first round to review the implementation that actually ships, because I replaced the parser after round two read it. Figure attribution, corrected the other way: the predecessor note moved the 6-of-12 and 14-of-20 refusal figures onto the per-prefix-budget mechanism. That was backwards, and a lens caught it. No revision ever implemented a per-prefix budget -- in both commits the network bucket only gated the ladder threshold, never a limit -- so that mechanism has no measurements at all and rests on arithmetic alone. The figures belong to the fair-share reserve, which I re-measured against the as-built revision: one /24 took 606 upgrades before the pool refused it at 600 of 600, and with the pool full a pilot dropping twice lost 6 of 12 and 20 pilots in one /24 lost 14 of 20, each refused by the reserve. Both earlier attempts to reproduce these, mine and a lens's, measured zero because the shared pool is charged only after a prefix passes the ladder, so flooding many prefixes with few upgrades each never fills it. The 12-to-600 figure describes a per-network variant that exists in no commit, was produced by a reviewer's mutation, and is now labelled as such rather than presented as reproducible. Code: the normalizer classified the address family up to three times; it now does so once and drops the isIPv4 import. The URL constructor is wrapped in try/catch returning null, because verifyClient wraps no handler of its own and an escaping throw reaches the uncaught-exception handler and shuts the server down, dropping every pilot; createServer already guards its other URL call the same way. No input was found that reaches it across roughly 61 million probes between two lenses. Comments: three lenses found that the anchor docblock justified itself with 1:2:3:4:5:ffff:192.0.2.4, which canonicalizes without a mapped prefix and so is rejected with or without the anchor; it now cites 1::ffff:192.0.2.4, the case an unanchored pattern really folds onto another host. Removed the claim that isIP accepts a zone suffix on a dotted quad, which is false and was verbatim residue of the deleted clientNetwork.ts, where the unconditional strip made it true and was the defect; the function's own gate depends on the opposite. Narrowed the claim that this is the one place a charged address is produced, since upgradeChargeAddress also produces the shared sentinel, and dropped the unreachable case-insensitive flag from the mapped pattern. Tests: added three IPv6-side zone negatives (fe80::1%, ::ffff:192.0.2.4%, fe80::1%eth0%x). A lens showed the zone rule was pinned only in its IPv4 instance, where a mutant throws instead of returning a key, so a gate that stripped before validating colon-bearing values survived the whole suite. Seven mutations now, six rejected by a named assertion: the family gate dropped, the strip moved before validation, the gate replaced by a colon test, the mapped pattern fully unanchored, and each anchor removed alone. The seventh, changing what the catch returns, survives and cannot be killed: the catch is unreachable, so no behavioural test can observe its body. Recorded rather than papered over. Residuals now recorded in docs/backlog-decisions.md alongside the two rejections: normalizing a link-local zone away charges two interfaces of one multi-homed peer to a single key, unreachable behind Railway's ingress, and unattributable upgrades share one budget bounded by the lane. The section is dated and anchored to the two PRs rather than to branch SHAs, which the squash merge will not preserve. Swapped the three globally routable 1.2.3.4 literals left in the source comments, which my predecessor note's sweep claim had already covered, for RFC 5737 addresses. Removed a premise docs/agent-operations.md stated twice in one section. One earlier commit, the merge commit c4c417b, does not match AGENTS.md's Conventional Commits list, and is left as is for the squash message at merge; the predecessor note said two. Re-read hud-network's Connection interruptions and Can't join: unaffected, since no documented banner cause, retry window or join capacity changes. No demonstration cites this source (checked src/wiki/media.ts). The complete npm run test and npm run build run in npm run gate, which gates this commit. One lens disclosed that its fixture symlinked node_modules, so vitest wrote content-addressed caches into the checkout's gitignored node_modules; I verified the index, HEAD and every tracked path unchanged before accepting that lens's work.",
+      "sources": ["server/communication/clientAddress.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/clientAddress.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Merged the rewritten PR #873 base into this follow-up and reconciled the claims its rewrite falsified. #873 moved from 3d03cc99 to bce300c7 while this branch sat green: it absorbed main (#879, #878), removed its lane ceiling after a review round found the ceiling itself was the attack, then restored a resized one after a later round found the removal left the server-wide rate uncapped. None of that touches clientAddress.ts, so the normalizer merges unchanged; what it falsifies is the surrounding record. Four claims corrected. The record said the lane ceiling was the only wider control; there are three, and they are now named by owner rather than enumerated here. It said a prefix budget must be at least the fleet's worst honest demand, which is half the lane ceiling, so two prefixes fill the lane; the ceiling is no longer twice that demand, so the argument is restated as a ratio rather than a pair of figures, which is also why resizing the ceiling does not rescue the mechanism. It said the controls are the per-address budget and a ceiling sized at twice worst honest demand; that size is gone. And upgradeChargeAddress's docblock said the shared UNATTRIBUTED_CLIENT budget is bounded by the lane ceiling, which describes the exact shape that review round found exploitable, where one junk header key could close the lane; it is now fleet-sized in its own right. The 606-upgrade measurement is left as recorded but tied explicitly to that revision's 1200-wide lane so it reads as history rather than current sizing. Resolved the docs/wiki-source-review.json conflict as a content union, not with --accept: the reviews array turned out to be append-only in content but not in index, because merging main interleaved other branches' entries, so set logic on entry content was required rather than a prefix comparison. Verified 0 base entries dropped and 0 conflicting digests: this branch had changed one path, the base 24, disjoint. Also recording a discrepancy found in the base and reported rather than touched, since it is another branch: #873's description still states there is deliberately no ceiling across all addresses and that the ceilings are removed rather than resized, while connectionAdmission.ts at bce300c7 defines GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL and LOG_CONNECTIONS_PER_WINDOW_ALL, reads a laneTotals bucket in admit, and refuses with scope lane; its own comment explains that the deletion was justified with a claim it calls FALSE. The body was not updated after the ceiling returned. Re-read hud-network's Connection interruptions and Can't join: still unaffected, since no documented banner cause, retry window or join capacity changes. No demonstration cites this source (checked src/wiki/media.ts). The complete npm run test and npm run build run in npm run gate, which gates this commit.",
       "sources": ["server/communication/clientAddress.ts"],
       "topics": ["hud-network"],
       "media": [],

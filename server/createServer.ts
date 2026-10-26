@@ -12,6 +12,7 @@ import {
   UNATTRIBUTED_CLIENT,
 } from './communication/connectionAdmission';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
+import { createLostAttributionTally } from './communication/lostAttribution';
 import { GameplayMessageBudget } from './communication/messageBudget';
 import { WebSocketCore } from './communication/WebSocketCore';
 import { readServerConfiguration } from './configuration';
@@ -290,15 +291,19 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const admission = createConnectionAdmission(limitsDisabled);
   // Losing `X-Real-IP` under Railway ingress silently returns every caller to a
   // shared budget. That needs its own signal rather than being inferred from
-  // refusals, which read identically to one flapping client.
-  let lostAttributionWarnedAt = Number.NEGATIVE_INFINITY;
-  const reportLostAttribution = (now: number): void => {
-    if (now - lostAttributionWarnedAt < CONNECTION_ADMISSION_WINDOW_MS) {
+  // refusals, which read identically to one flapping client. The record carries
+  // how many upgrades it stands for, because one caller withholding the header
+  // and ingress failing for a whole fleet are different incidents that a bare
+  // line reads the same for. It is flushed on the limiter's own cleanup timer,
+  // so an incident that ends between upgrades still reports its real volume.
+  const lostAttribution = createLostAttributionTally();
+  const flushLostAttribution = (): void => {
+    const unattributed = lostAttribution.flush();
+    if (unattributed === null) {
       return;
     }
-    lostAttributionWarnedAt = now;
     logger.warn(
-      '⚠️ X-Real-IP absent or unparseable under Railway ingress; upgrades charged to the shared unattributed budget'
+      `⚠️ X-Real-IP unusable on ${unattributed} upgrade(s) under Railway ingress; charged to the shared unattributed budget`
     );
   };
   const logQuotaClosed = new WeakSet<WebSocket>();
@@ -326,29 +331,32 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         return;
       }
       // An upgrade the edge cannot attribute is charged to the shared
-      // unattributed budget, which the lane ceiling bounds. An earlier revision
-      // charged the proxy's own address instead, which put the whole fleet into
-      // one 50-per-window bucket and refused half of it — the lockout this
-      // limiter exists to prevent, reached by losing a header rather than by load.
+      // unattributed budget, which is sized for a whole fleet. An earlier
+      // revision charged the proxy's own address instead, which put the whole
+      // fleet into one 50-per-window bucket and refused half of it — the lockout
+      // this limiter exists to prevent, reached by losing a header, not by load.
       const clientIp = upgradeChargeAddress(info.req, railwayIngress);
       if (railwayIngress && clientIp === UNATTRIBUTED_CLIENT) {
-        reportLostAttribution(Date.now());
+        lostAttribution.note();
       }
       const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
           const spend = `${admissionDecision.count}/${admissionDecision.limit}`;
-          // A single flapping address and an exhausted lane read the same to a
-          // client but mean opposite things here: one caller to look at, or the
-          // whole lane saturated, which is load or an address the edge cannot
-          // tell apart. Logging them alike hides the second behind the first.
-          logger.warn(
-            admissionDecision.laneExhausted
-              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend})`
-              : admissionDecision.lane === 'logs'
-                ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
-                : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
-          );
+          // Which bound refused is the first thing an operator needs: one
+          // flapping pilot, a lane backstop reached across every address, and a
+          // tracking ceiling full of one-shot addresses are three different
+          // incidents that otherwise print the same line. The charged address
+          // is always named, including the shared unattributed bucket.
+          const where =
+            admissionDecision.scope === 'lane'
+              ? `${admissionDecision.lane} lane backstop`
+              : admissionDecision.scope === 'tracking'
+                ? 'tracked-address ceiling'
+                : admissionDecision.lane === 'logs'
+                  ? 'log connection budget'
+                  : 'connection budget';
+          logger.warn(`🚫 Rate limited: ${where} from ${clientIp} (${spend})`);
         }
         done(
           false,
@@ -377,6 +385,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   }
   const cleanupInterval = setInterval(() => {
     admission.prune(Date.now());
+    flushLostAttribution();
   }, CONNECTION_ADMISSION_WINDOW_MS);
 
   wss.on('error', (error) => {

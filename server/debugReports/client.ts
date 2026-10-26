@@ -213,7 +213,7 @@ export class DebugReportWorker {
       if (
         reply.diagnostics.pending !== null &&
         episode &&
-        Date.now() - episode.lastFaultAt >= FAULT_QUIET_MS
+        globalThis.performance.now() - episode.lastFaultAt >= FAULT_QUIET_MS
       ) {
         this.endFaultEpisode('recovered');
       }
@@ -251,15 +251,26 @@ export class DebugReportWorker {
    *
    * An episode now costs one record on its first fault and one more every
    * `FAULT_LOG_INTERVAL_MS` while it continues, each carrying the count it
-   * stood in for, plus one when it ends. So a storage outage lasting a day
-   * costs about ninety-six records rather than 86,400. The cause is **not**
+   * stood in for, plus one when it ends. A store that fails continuously for a
+   * day therefore costs about ninety-six records rather than 86,400.
+   *
+   * That is the continuous case and not a ceiling. `FAULT_QUIET_MS` is shorter
+   * than the interval, so a store that answers for a minute between failures
+   * ends one episode and opens another, and a new episode logs at once.
+   * Bounding that as well would mean staying quiet about a store that keeps
+   * breaking.
+   *
+   * The cause is **not**
    * part of that decision: keying on it bounded nothing, because a store that
    * alternates between two errors opens a fresh episode on every tick. A cause
    * that changes mid-episode is therefore carried in the next interval's
    * record, not logged on the spot.
    */
   private recordFault(detail: string): void {
-    const now = Date.now();
+    // Monotonic, like the rest of the server's timing: a wall-clock step
+    // backwards would suppress a storage failure, and one forwards would fake
+    // the quiet period that ends an episode.
+    const now = globalThis.performance.now();
     const episode = this.faultEpisode;
     if (episode === undefined) {
       this.faultEpisode = { suppressed: 0, lastLoggedAt: now, lastFaultAt: now };

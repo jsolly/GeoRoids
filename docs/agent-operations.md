@@ -212,7 +212,12 @@ new reports explicitly. Delivered payloads are reclaimed; minimal duplicate
 and receipt records persist. Pending reports are never evicted.
 
 `GET /health` includes aggregate `debugReports` counts, the oldest pending
-timestamp and a safe delivery error. Reporting failure does not make gameplay
+timestamp and a safe delivery error. Those counts and that timestamp are null
+when the depth is unknown rather than zero: before the worker's first report on
+a fresh process, and after a worker failure, which discards the last measured
+depth because it can no longer be trusted. Null means unmeasured, not drained;
+read the delivery error beside it for the cause. Only a number says the queue
+was counted. Reporting failure does not make gameplay
 unhealthy. Credential, permission and Todoist project-capacity failures keep
 reports blocked. Repair the credential or capacity and let the worker retry;
 configuration changes require a service restart. Transient failures retry with

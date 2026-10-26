@@ -93,9 +93,9 @@ proof without importing future demonstration artwork.
 Keep `chooseCrewSpawn` in `shared/player.ts` and snapshot `isPaused`; both have
 live consumers. Keep the owner-less burn normalizer until the production scan
 and retained-backup dates satisfy its existing task; [world operations](persistent-world.md)
-records the older-backup restore caveat. Keep wire `deathCause` and
-`findShipAsteroidOverlaps` until W2 and W3 meet their merged-and-live prerequisite
-in [task `6hjWGhm4rvX2f5pv`](https://app.todoist.com/app/task/6hjWGhm4rvX2f5pv).
+records the older-backup restore caveat. John lifted the stale-tab hold on wire
+`deathCause` on 2026-10-26
+([task `6hjWGhm4rvX2f5pv`](https://app.todoist.com/app/task/6hjWGhm4rvX2f5pv)).
 Other unverified sweep rows remain planning data on
 [task `6hjWGhqrx6rhMrrv`](https://app.todoist.com/app/task/6hjWGhqrx6rhMrrv),
 not evidence of dead code.
@@ -117,10 +117,11 @@ without new evidence.
 built.** Sparing an honest fleet that shares one prefix requires a budget of at
 least the fleet's worst honest demand, `MAX_PLAYERS *
 WORST_HONEST_UPGRADES_PER_PILOT`; sized any smaller it refuses ordinary
-shared-prefix traffic. The lane ceiling is a small multiple of that same
-demand, so a handful of prefixes still fill the lane. The ratio is what
-defeats the mechanism, not either figure, which is why resizing the ceiling
-does not rescue it. No revision implemented it, so it has no
+shared-prefix traffic. The lane ceiling is a multiple of that same demand —
+it is sized from the per-address budgets a full fleet holds, not from the
+ladder — so a number of prefixes well inside one end-site delegation still
+fills it. The ratio is what defeats the mechanism, not either figure, which is
+why resizing the ceiling does not rescue it. No revision implemented it, so it has no
 measurements of its own — the arithmetic is the whole argument.
 
 **A fair share of the lane for callers under an honest retry rate — built,

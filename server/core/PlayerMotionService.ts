@@ -407,15 +407,6 @@ export class PlayerMotionService {
     this.handoff(session, now);
   }
 
-  public quit(socket: WebSocket): string | undefined {
-    const session = this.owner(socket);
-    if (!session) {
-      return undefined;
-    }
-    this.removeSession(session);
-    return session.actor.id;
-  }
-
   private removeSession(session: Session): void {
     session.actor.contourLock = null;
     if (session.socket) {

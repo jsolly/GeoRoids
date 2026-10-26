@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:466d9bf94b7f001cb0d4750a418685f547806a39b328f7fda2b9d23a8f6b9bc6",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:7f37664cb85dabb7c462eb70530ef219e1e1768a25f5db24d45a49d9fd894f83",
+    "package.json": "sha256:e7c0793436fb6409d8e5dfb96503e172c219284514ff2135146efdab37ac872e",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
-    "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
+    "server/communication/MessageHandler.ts": "sha256:e36846a2e40fc0af865bca347ae621fdd4a5c1b6f1e95260e0ee77bf8bbcf8fa",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
     "server/communication/connectionAdmission.ts": "sha256:a2a9327cb76fedd362cc156431b31c5d648a0dc222b44b1f87558acc56d5910a",
@@ -96,14 +96,14 @@
     "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
-    "server/core/EntityManager.ts": "sha256:4b1e37e750da4fc63807faed0be42c5ea252a86fc4dae85a79ea587ec6e64fa7",
-    "server/core/GameEngine.ts": "sha256:2c8ed257fcf8aad59b4268d08e5b75c52afc97a258bbc01bc1ae3dc0c85adcd7",
+    "server/core/EntityManager.ts": "sha256:05eb50b99d590a0120a10f1f5b103cabcc74bd4b3eb529f0a04b909245768ba1",
+    "server/core/GameEngine.ts": "sha256:a28657f7a55560b428c199f3cb7b038e2f1663aee3569e0dc5f98f7c31adfc2a",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
     "server/core/LootManager.ts": "sha256:bad0eaa4e555d9853b5054ebc9ec7e32aae26fed2a9d78b902d6c63925568a5e",
-    "server/core/PlayerMotionService.ts": "sha256:cc986967abc3a74d31c22bdd3c22fdfdafc1551d11fbc6b6659a9730d3a58bef",
-    "server/core/RNGService.ts": "sha256:c6a852821c514621ded484d570859144e6b035de82fb74e6e851ef68358f03eb",
+    "server/core/PlayerMotionService.ts": "sha256:eb65d65298ade163a684a41a2d8f3eaca3d7dd6626dcdcd563518d98cb745475",
+    "server/core/RNGService.ts": "sha256:d539b5041594b9e7037d6967a149a42348b47febf3a5275c302e6a34166af582",
     "server/core/RolyPolyManager.ts": "sha256:1564c9b42dbf3091f1ba8cbe90b10f63458a9d3b5e9830b66b46fc733bd05cad",
     "server/core/SatellitePickupManager.ts": "sha256:e44b5e648b8490c81fec961a251ef8f8473d78036331ebdac9acb7ce5c83083a",
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
@@ -114,7 +114,7 @@
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
     "server/createServer.ts": "sha256:7499d6311193e05d8e0d91b5cdb332edbb49f19efc4dcec08d7b6a5603f6798e",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
-    "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
+    "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
     "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
@@ -131,7 +131,7 @@
     "server/world/worldPersistence.ts": "sha256:0846eb3503a381325733e295f7541760baf03c5d7cf1b9e64db2248c1bfba38c",
     "server/world/worldStoreWorker.ts": "sha256:10691d33041b176ff3a78464a58eab107990ac70f38339cadf521524748cc2c7",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:88d2be9701f0d600bdb35c04c70ce7a113f87adf270f5998113ec063c1ba90d8",
-    "shared-types.ts": "sha256:6fd31f27252d7c06f49c65badd1293258332ee85b4729d6a9e4abe2e9567484c",
+    "shared-types.ts": "sha256:290e3ae00d218cde18adcb8d4e4ed27b537dfc4222bbb513f009be4ba2930f09",
     "shared/aiShips.ts": "sha256:9793248321163dbc5cf6475a5e8722a9e5cc73dfdd847bf0a5bd1d6788bff4f3",
     "shared/asteroidBelt.ts": "sha256:94d55e4288a9d968066ac05f666ae0cfe757739166a00ff1dd7a368339378b49",
     "shared/asteroidBoost.ts": "sha256:98594cb2fc30bac61c5a7ce16e9015c9aeb2c5517caa9bbe05711991dbae5b9c",
@@ -203,7 +203,7 @@
     "src/audio/destructionSounds.ts": "sha256:a31ac1a208c41910d198dce4239fb0310577a242e78eb23c6d37e4243f7535f4",
     "src/audio/explosionSound.ts": "sha256:62c0a7c56e833231583255cbbb9177d4a7a9657510963667ae3206eab23834e6",
     "src/audio/feedbackSounds.ts": "sha256:148a4a5f5634e0371def37265b74a37f8039e17bfda7df37d93a041ebee8a072",
-    "src/audio/gameSounds.ts": "sha256:616cc0b2342dc8d4272383e8925b01d6d554164e6874a94eababeba67cbf5d2d",
+    "src/audio/gameSounds.ts": "sha256:ec874ad57a289929686bbc4faa31f10f519f92ac9014af95e53fabc81569aae5",
     "src/audio/interactionSounds.ts": "sha256:a48c271d1c16e404bbd0a8069a07275108b4f802df1a5906c220e0545ff6a833",
     "src/audio/musicBeds.ts": "sha256:d25010498827b44f0a43d7bb4fa683dc153d35250db3961b5243b35fa193b98b",
     "src/audio/musicCatalog.ts": "sha256:d6342a645cdb4cd5ed8729edd464cfc915dca4c0606ca75d8d280f5a144f5f43",
@@ -277,7 +277,7 @@
     "src/diagnostics/phoneRecordingSummary.ts": "sha256:cb82f64f277b0c4d786039f6a42754ac5ab823189084f77d06bb571e2179321b",
     "src/diagnostics/reportInputDiagnostics.ts": "sha256:6dca366e212141f3b034b4f3109625a80f32c916cec4c33c66edde00b1d8518e",
     "src/entities/laser/AuthoritativeProjectileField.ts": "sha256:01f08320e6968fa4e8b07d798fe226117b29042aecada94cfb373517334aad67",
-    "src/entities/laser/Laser.ts": "sha256:d482cbf287826e87b2aa4d17db13fd7495af82d44c24ca653434f8de0738ea16",
+    "src/entities/laser/Laser.ts": "sha256:930c1f38f84ad021ecb43dd68240b00e8578578e21b7900c4434b68a41ab3fb3",
     "src/entities/laser/laserUtils.ts": "sha256:e7e20a0c5f6f6cb577898bb0f531b19866c833c44a090d56da833d1c71c97b01",
     "src/entities/loot/LootField.ts": "sha256:696cc5e32f6ba4c925861543d00f4863576785bac82bb0908b8595e615d7f2a9",
     "src/entities/loot/lootRenderer.ts": "sha256:636ad62b6bb7e7c2ff08f3bc902a74cf58133daa37e3fbd8d87acd09c6593f95",
@@ -286,7 +286,7 @@
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
     "src/entities/player/playerNetworkPort.ts": "sha256:f1cef578976be6117b2d6503f4e8c4305269d76ae232b61b77c971561a4e623c",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
-    "src/entities/roid/Roid.ts": "sha256:af53d19dcab45b16545e6149d973393dc18e3e910bf673e7ec4e8b032e3fbad6",
+    "src/entities/roid/Roid.ts": "sha256:30899ebb25280060ba7f85cfbe2d9ea61c747e564a42e0cbee8f6451bcb8ed7f",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
     "src/entities/roid/roidRenderer.ts": "sha256:1719c44c4d9d4cb58132858116350d026870ee40ceab50b54ed68450c1f9eb64",
@@ -297,7 +297,7 @@
     "src/entities/satellitePickup/satelliteHealthRenderer.ts": "sha256:0f8ce5d5175126394203274d0976ea9e061bcdfc943a262739468bfe079795bd",
     "src/entities/satellitePickup/satellitePickupGlow.ts": "sha256:d2f65deea8024004454313ce1c1bc697dc88dee0ac2d311835aef74397c1313c",
     "src/entities/satellitePickup/satellitePickupRenderer.ts": "sha256:427ff0116adea82f066009f8b98c8e5399095991fb44835b050fa21487e04730",
-    "src/entities/ship/Ship.ts": "sha256:594c1deb9234d9ddbf7cbb41dc4d17c42a602083aa74e9c4a613e7887b5759fb",
+    "src/entities/ship/Ship.ts": "sha256:355201ff73ff6025ad9ee91a3af70b7765a425f7e8bc5e55f0eab394b627df8c",
     "src/entities/ship/cruiseMotion.ts": "sha256:098644690d5029ca6363d4d951e2fbff4ef0c34483afc0fe42e25e050d876f0b",
     "src/entities/ship/harpoonField.ts": "sha256:7ebbb27e4ede9b08eceb6149a006b503b92bc6b190e3027473aa1bccb41d083f",
     "src/entities/ship/haulerUtility.ts": "sha256:2d2e7eeed64a4a53ddb2e35c882c4d0492e98f7f05fbe18f805fdbf712539f2f",
@@ -315,7 +315,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92df9136722ef0e66117cd5a2da5ec387b79ce3a4b0f70bc444b26e9125cf697",
-    "src/network/services/ConnectionManager.ts": "sha256:18bcfcda3ae514abec7ea74c660bbc58356f6329d70330b102e24484e155d216",
+    "src/network/services/ConnectionManager.ts": "sha256:1bee64de5304341a1d7433e8b02c5740f226c38026b8a14248bb3ac4783e3586",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -429,7 +429,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:e27b564d0e73fadbab08d8a701fee096e16f6e1f24dcb91f12ba781689df45ec",
+    "src/wiki/articleSources.json": "sha256:ee768e6c867889c2747f2c279701a0a18faf4461cd6b7ef7b6fff776f0170b48",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:ae5cb90a82273e43481bb0bba1175f53f7c4167084291b6ea969ea13c466e586",
     "src/wiki/media.ts": "sha256:ccea87e637e20748afc3a89b108d426f583e591bcd51700494d7db67bd37937a",
@@ -571,7 +571,8 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb"
+    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585"
   },
   "reviews": [
     {
@@ -7118,6 +7119,95 @@
       "owners": {}
     },
     {
+      "note": "Reviewed dead-code removal and visibility narrowing surfaced by the extended unused-export gate and the new unused public class member check. No player-visible rule changed: PlayerMotionService.quit, the RNGService state accessors and the Roid/Laser playHitSound wrappers (with the hit SFX only they reached) had no caller anywhere in repository history, and every narrowed member keeps its existing internal callers. Simulation behavior is unchanged, so the scout, hauler, cargo, terrain and survival demonstrations still illustrate the same rules; CI's wiki-media lane verifies their reproducibility. Lint, types, knip, ts-prune, the complete unit suite and the runner contracts passed on this tree.",
+      "sources": [
+        "package.json",
+        "server/core/EntityManager.ts",
+        "server/core/GameEngine.ts",
+        "server/core/PlayerMotionService.ts",
+        "server/core/RNGService.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/audio/gameSounds.ts",
+        "src/entities/laser/Laser.ts",
+        "src/entities/roid/Roid.ts",
+        "src/entities/ship/Ship.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout", "survival", "terrain"],
+      "owners": {
+        "package.json": "field-manual",
+        "server/core/RNGService.ts": "asteroids",
+        "src/audio/gameSounds.ts": "hud-network",
+        "src/entities/laser/Laser.ts": "combat-survival"
+      }
+    },
+    {
+      "note": "Wired the hit SFX that was present but unreachable. A laser chip a durable deposit survives now broadcasts asteroidHit with the rock position, and the client plays the viewport-culled, distance-attenuated hit sound; the server previously dropped every non-destroyed outcome. Ordinary rocks still report asteroidDestroy alone, so a chip and a shatter never sound together, and 'missing' and 'ignored' outcomes stay silent. Documented the player-visible cue as asteroids / Mining sound and recorded it in the audio coverage row; mapped src/audio/gameSounds.ts to hud-network with its audio siblings. No demonstration derives from these files, so the GIFs are untouched. Verified: lint, types, knip, ts-prune, the new broadcast contract (mutation-checked by removing the broadcast), and 1221 unit tests across server, network, audio and entities.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "shared-types.ts",
+        "src/audio/gameSounds.ts",
+        "src/network/services/ConnectionManager.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "controls", "field-manual", "hud-network", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Re-reviewed the chip-cue contract after correcting its fixture types: material 'rock' is not an AsteroidMaterial (now 'ice', the ordinary first-hit case the test describes), the burning boost now uses the real AsteroidBoost shape { phase, ownerId, angle }, and the fixture id 'rubble' became 'ice-rock' so it no longer reads as a material it is not. The three assertions are unchanged — a surviving deposit reports each chip, a shatter reports destruction alone, and hits that never applied stay silent. Player rules and demonstrations are unaffected. Verified check:ts, check:lint and the three cases after the correction.",
+      "sources": ["tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"],
+      "topics": ["asteroids"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Review fixes: the chip broadcast hoists out of the destroyed guard (identical behavior), reaches only pilots within world interest, and playHitSound requires a position. Reviewed controls, hud-network, teamwork and asteroids: only asteroids documents this cue, and its Mining sound section now scopes audibility to rocks on screen; the coverage row records one event per terminal laser impact. The interest radius is far outside the viewport that already culled the cue, so nothing player-visible changed. No demonstration derives from these files.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/audio/gameSounds.ts",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "controls", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Review follow-up: the chip's interest filter now runs inside broadcastToAll via a recipient predicate, restoring per-send error isolation, the readyState check and broadcast metrics, so a failing cue can no longer abort the authoritative destroy broadcasts in the same batch. The server test gained a positive control proving the distant socket is live. Reviewed hud-network, teamwork and asteroids: no player-visible behavior changed, so only the coverage row moved, recording that a pressured socket inside interest is still closed for recovery like any event-class message. No demonstration derives from these files.",
+      "sources": [
+        "server/services/GameStateBroadcaster.ts",
+        "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+      ],
+      "topics": ["asteroids", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Lint follow-up only: the recipient predicate's guard uses an explicit !== true comparison to satisfy Biome's strict boolean rule. No behavior change, so no Wiki page is affected.",
+      "sources": ["server/services/GameStateBroadcaster.ts"],
+      "topics": ["hud-network", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
       "note": "Routed the per-frame armed-boost and burning-boost loops onto a tracked boosted-rock set in AsteroidManager instead of two whole-belt copies; no player-visible rule changed. Re-read Hauler 'Boost Coupling E' and 'Reach and release', Asteroids colossal/powered-cargo/ore prose, Teamwork 'Scan, tow, deliver', Scout probe limits on powered rocks, Controls E behavior, and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, and equal credit for launchers and recorded scanning pilots all still hold. Field manual, combat and survival, terrain and satellites prose is untouched by the change. Ran the complete unit suite, static checks and types; npm run wiki:media:check reproduced all 10 GIFs and 10 posters byte for byte on linux-x64, so the Hauler, Scout and cargo demonstrations are unaffected.",
       "sources": ["server/core/AsteroidManager.ts", "server/core/GameEngine.ts"],
       "topics": [
@@ -7177,6 +7267,32 @@
       ],
       "topics": ["asteroids", "hauler", "scout", "teamwork", "terrain"],
       "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Merge round: brought main (PR 879, unused-export and class-member gate holes plus the mining chip cue) into the belt-pass branch. The only file both sides touch is GameEngine.ts, where 879 narrows ensureSatellitePickups to private while this branch routes the armed-boost and burning-boost loops onto tracked sets and hands BeltCrawlerManager its hosts; the two edits share no code path and the merged file keeps both. AsteroidSpatialIndex.values() stays deleted: 879 added a public-class-member check that could not see the member on main, because BeltCrawlerManager.advance still called it there, and this branch is what orphans it, so the deletion is now required by that new gate rather than merely tidy. No player-visible rule changed and no gameplay predicate moved by the merge. Re-read Asteroids 'Belt spiders' and the colossal, powered-cargo and ore prose, Terrain 'Belt crawlers' and 'Guard patrols', Hauler 'Boost Coupling E' and 'Reach and release', Scout probe limits on powered rocks, Teamwork 'Scan, tow, deliver', Controls E behavior and the HUD delivery messages: arming toward the nearest furnace, a second coupling reaching full speed, swap-to-cancel, loss by range, powered cargo ignoring tools and collisions, equal delivery credit for launchers and recorded scanning pilots, crawlers rounding cover and hopping between rocks, one shot killing an exposed body, solid rock blocking attacks and shots, leaping to a reachable rock when a host breaks, and a killed crawler returning only when its host deposit is replaced all still hold, and the eighteen-lone-guards belt count is preserved by NATIVE_SLOT_STRIDE. The chip cue 879 wired is a separate deposit-damage path that this branch does not touch. Ran the complete unit suite on the pre-merge tree (393 files, 2345 tests passing) and re-ran lint, types and the merged static checks here.",
+      "sources": [
+        "server/core/AsteroidManager.ts",
+        "server/core/BeltCrawlerManager.ts",
+        "server/core/GameEngine.ts",
+        "server/world/AsteroidSpatialIndex.ts",
+        "shared/beltCrawler.ts",
+        "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
       "owners": {}
     }
   ]

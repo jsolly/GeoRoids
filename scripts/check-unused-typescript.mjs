@@ -20,7 +20,8 @@ import ts from 'typescript';
 const componentExtension = /\.(?:svelte|astro)$/u;
 const nonTypescriptExtension = /\.(?:svelte|astro|css)$/u;
 
-function components(directory) {
+/** Component files, enumerated once for both unused-code gates. */
+export function components(directory) {
   if (!existsSync(directory)) {
     return [];
   }

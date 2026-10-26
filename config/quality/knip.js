@@ -8,6 +8,10 @@ const config = {
     'server/debugReports/worker.ts',
     '.railway/**/*.ts',
     'scripts/**/*.ts',
+    // A shell runner launches this listener through dev-server-contract.sh, which
+    // Knip cannot follow from the spawning test. It exports nothing, so entry
+    // placement forfeits no unused-export coverage.
+    'scripts/contract-listener.mjs',
     'src/pages/**/*.astro',
     'benchmarks/client.html',
     'benchmarks/protocol-experiment.ts',
@@ -25,7 +29,7 @@ const config = {
     'shared-types.ts',
     'setup/**/*.ts',
     '.railway/**/*.ts',
-    'scripts/**/*.ts',
+    'scripts/**/*.{ts,mjs}',
     'tests/**/*.ts',
     'config/app/**/*.ts',
     'config/testing/**/*.ts',
@@ -34,13 +38,7 @@ const config = {
   // tooling; Knip cannot infer those non-TypeScript consumers.
   // afconvert is the macOS system encoder used by sounds:generate.
   ignoreBinaries: ['uvx', 'afconvert'],
-  ignoreDependencies: [
-    'concurrently',
-    'markdownlint-cli2',
-    'jsonc-parser',
-    'shadcn-svelte',
-    'ts-prune',
-  ],
+  ignoreDependencies: ['concurrently', 'markdownlint-cli2', 'jsonc-parser', 'shadcn-svelte'],
   astro: { config: ['config/app/astro.ts'] },
   svelte: { entry: ['config/app/svelte.js', 'vite.config.{js,mjs,ts,cjs,mts,cts}'] },
   vitest: { config: ['config/testing/vitest.ts', 'config/testing/tooling.ts'] },

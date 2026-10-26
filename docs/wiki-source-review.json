@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:53dbf1705382582a7b8ce01d95e8c4f95984b6e7c8c0d61356e3cc0550a868c3",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:a0481ac0df8acbcaa689cd731d9a30c91b4ab9e72ed0d95fa13d793d2b0b2649",
+    "server/communication/connectionAdmission.ts": "sha256:966ce6f748d39aa6963d641cd1c6f2588a163f8c997e658d90f692ebcab25b3f",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:1f03467a8a41402fe471f2c9460fcd90d77d7299fa260ed26ab7194346bd3447",
+    "server/createServer.ts": "sha256:bbc0f309e0a19374bcbadc5c4a319ebcd1ac4f373d928bfecab4a58233c188ce",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:44a0b44b8658d641531e1acb5d0f13c34c6eeb1c61e68a0a29f1bae48d6a32cc",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
@@ -572,8 +572,7 @@
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
-    "server/communication/clientAddress.ts": "sha256:0f68f179d913880a958e379b19a9f245536ee4f4a6c4a46a0eca6a53ed0e3d0e",
-    "server/communication/clientNetwork.ts": "sha256:ed4275cc78601404d8826d132cbea1cb28a39cde01bf0496146757bab3b31625"
+    "server/communication/clientAddress.ts": "sha256:89f6cfc8dccc8d242200afd2a8893ec5c6825355a088f86c0e8615aacf38f1a1"
   },
   "reviews": [
     {
@@ -7174,6 +7173,40 @@
       "owners": {
         "server/communication/connectionAdmission.ts": "hud-network",
         "server/communication/clientNetwork.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reshaped after bundled review found a Critical in this branch's own fair-share tier, and this note corrects its two predecessors. Seven independent lenses reviewed the complete change; four reproduced the same defect in separate isolated fixtures. The earlier notes claimed the change 'removes a refusal honest pilots could hit rather than adding one' and that both halves of each ceiling stay fleet-sized. Both were false and the second was already a correction of a third wrong claim. Measured against the previous revision: a pilot that drops twice in one window lost 6 of 12 upgrades where the base admitted all 12; 20 pilots in one ISP /24 lost 14 of 20; 100 flooding prefixes refused the entire honest fleet; one /64 drained the shared past-ladder pool with 606 admitted upgrades while the lane sat half idle, and the denial logged nothing because the attacker's own earlier refusal consumed the lane's single warn-once flag. The fair-share tier and the per-prefix budget are therefore both removed and connectionAdmission.ts and createServer.ts are reverted to the reviewed base; clientNetwork.ts is deleted. What ships is address normalization alone, folded into clientAddress.ts where the charged address is produced, which collapses every spelling of one host to one key at no cost to any honest caller, plus the live Railway ingress verification and a record in docs/agent-operations.md of both rejected mechanisms with these measurements. Re-read hud-network's Connection interruptions and Can't join sections: unaffected, since no documented banner cause, retry window or join capacity changes, the article never described a rate limit, and docs/wiki-coverage.md row 300 already records the join banner as giving no guaranteed detailed reason. No demonstration cites these sources (checked src/wiki/media.ts). Ran lint, markdownlint, the two admission suites (15 passing) and five mutation checks on the normalizer (header branch unnormalized, socket branch unnormalized, zone suffix keying its own bucket, IPv4-mapped not collapsed, IPv6 not expanded), each rejected by a named test and reverted.",
+      "sources": [
+        "server/communication/clientAddress.ts",
+        "server/communication/clientNetwork.ts",
+        "server/communication/connectionAdmission.ts",
+        "server/createServer.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/clientAddress.ts": "hud-network",
+        "server/communication/clientNetwork.ts": "hud-network",
+        "server/communication/connectionAdmission.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Round-two review of the reshaped change; this note records what that review changed and corrects the figures its predecessor got wrong. Seven lenses reviewed the net state. The hand-written IPv6 parser is replaced by Node's own URL host serializer plus one anchored mapped-prefix fold: I verified the swap myself over 100,028 inputs with zero equivalence-class disagreements and zero throws, and it deletes about sixty lines of security-relevant parsing whose null paths were unreachable behind the isIP gate. Four lenses independently found that the zone suffix was stripped before validation, so 192.0.2.4%eth0 became the key 192.0.2.4 where the base refused it; the strip now happens only for a value Node already accepted with a zone. The predecessor note said a pilot dropping twice lost 6 of 12 upgrades and 20 pilots in one ISP /24 lost 14 of 20 as though the fair-share tier caused that unattended: both are zero on an idle limiter and appear only once another caller has filled the shared past-ladder pool, and those figures actually belong to the per-prefix-budget mechanism, not the fair-share one. The corrected record, with each figure's precondition and the right attribution, now lives in docs/backlog-decisions.md, which is where this repository keeps measured rejections; docs/agent-operations.md keeps only the live ingress verification and a pointer, so the new heading no longer nests the report-database limits and the release-acceptance procedure under an upgrade-limiter section. Tests: restored the two resolveClientAddress assertions the reshape deleted, which were the only coverage of the reporting listener's own normalized quota key; restored the fleet-scale NAT case the reshape also dropped; replaced four assertions that compared the helper with itself (satisfied by null on both sides) with pinned literals, the rule tests/AGENTS.md states and an earlier note on this branch cited; added the IPv4-compatible, IPv4-translated and ffff-in-group-five cases that pin the collapse direction, a case for a zone on a dotted quad, and a negative case for an unparseable socket address. Swapped the globally routable 1.2.3.4 literals I had introduced for RFC 5737 documentation addresses. Re-read hud-network's Connection interruptions and Can't join: unaffected, since no documented banner cause, retry window or join capacity changes and docs/wiki-coverage.md row 300 already records the join banner as giving no detailed reason. No demonstration cites this source (checked src/wiki/media.ts). Ran lint, markdownlint, the two admission suites (16 passing) and five mutation checks, each rejected by a named test and reverted: zone stripped before validation, mapped pattern unanchored, header branch unnormalized, socket branch unnormalized, and an unvalidated value returned as its own key. The unanchored-pattern mutation initially survived, which showed my claim that the anchor made that failure structurally impossible was itself untested; 1::ffff:192.0.2.4 now pins it. Commit types on two earlier commits on this branch do not match AGENTS.md's Conventional Commits list and are left as is for the squash message at merge.",
+      "sources": ["server/communication/clientAddress.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/clientAddress.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Round-three review of the shipped change, and a correction to my own previous note. Seven lenses reviewed the net state; this is the first round to review the implementation that actually ships, because I replaced the parser after round two read it. Figure attribution, corrected the other way: the predecessor note moved the 6-of-12 and 14-of-20 refusal figures onto the per-prefix-budget mechanism. That was backwards, and a lens caught it. No revision ever implemented a per-prefix budget -- in both commits the network bucket only gated the ladder threshold, never a limit -- so that mechanism has no measurements at all and rests on arithmetic alone. The figures belong to the fair-share reserve, which I re-measured against the as-built revision: one /24 took 606 upgrades before the pool refused it at 600 of 600, and with the pool full a pilot dropping twice lost 6 of 12 and 20 pilots in one /24 lost 14 of 20, each refused by the reserve. Both earlier attempts to reproduce these, mine and a lens's, measured zero because the shared pool is charged only after a prefix passes the ladder, so flooding many prefixes with few upgrades each never fills it. The 12-to-600 figure describes a per-network variant that exists in no commit, was produced by a reviewer's mutation, and is now labelled as such rather than presented as reproducible. Code: the normalizer classified the address family up to three times; it now does so once and drops the isIPv4 import. The URL constructor is wrapped in try/catch returning null, because verifyClient wraps no handler of its own and an escaping throw reaches the uncaught-exception handler and shuts the server down, dropping every pilot; createServer already guards its other URL call the same way. No input was found that reaches it across roughly 61 million probes between two lenses. Comments: three lenses found that the anchor docblock justified itself with 1:2:3:4:5:ffff:192.0.2.4, which canonicalizes without a mapped prefix and so is rejected with or without the anchor; it now cites 1::ffff:192.0.2.4, the case an unanchored pattern really folds onto another host. Removed the claim that isIP accepts a zone suffix on a dotted quad, which is false and was verbatim residue of the deleted clientNetwork.ts, where the unconditional strip made it true and was the defect; the function's own gate depends on the opposite. Narrowed the claim that this is the one place a charged address is produced, since upgradeChargeAddress also produces the shared sentinel, and dropped the unreachable case-insensitive flag from the mapped pattern. Tests: added three IPv6-side zone negatives (fe80::1%, ::ffff:192.0.2.4%, fe80::1%eth0%x). A lens showed the zone rule was pinned only in its IPv4 instance, where a mutant throws instead of returning a key, so a gate that stripped before validating colon-bearing values survived the whole suite. Seven mutations now, six rejected by a named assertion: the family gate dropped, the strip moved before validation, the gate replaced by a colon test, the mapped pattern fully unanchored, and each anchor removed alone. The seventh, changing what the catch returns, survives and cannot be killed: the catch is unreachable, so no behavioural test can observe its body. Recorded rather than papered over. Residuals now recorded in docs/backlog-decisions.md alongside the two rejections: normalizing a link-local zone away charges two interfaces of one multi-homed peer to a single key, unreachable behind Railway's ingress, and unattributable upgrades share one budget bounded by the lane. The section is dated and anchored to the two PRs rather than to branch SHAs, which the squash merge will not preserve. Swapped the three globally routable 1.2.3.4 literals left in the source comments, which my predecessor note's sweep claim had already covered, for RFC 5737 addresses. Removed a premise docs/agent-operations.md stated twice in one section. One earlier commit, the merge commit c4c417b, does not match AGENTS.md's Conventional Commits list, and is left as is for the squash message at merge; the predecessor note said two. Re-read hud-network's Connection interruptions and Can't join: unaffected, since no documented banner cause, retry window or join capacity changes. No demonstration cites this source (checked src/wiki/media.ts). The complete npm run test and npm run build run in npm run gate, which gates this commit. One lens disclosed that its fixture symlinked node_modules, so vitest wrote content-addressed caches into the checkout's gitignored node_modules; I verified the index, HEAD and every tracked path unchanged before accepting that lens's work.",
+      "sources": ["server/communication/clientAddress.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/clientAddress.ts": "hud-network"
       }
     }
   ]

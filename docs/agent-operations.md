@@ -207,7 +207,11 @@ an untrusted internal proxy that can choose that header.
 
 Gameplay admission now rests on the same header: `server/communication/clientAddress.ts`
 resolves it for both the reporting listener and the WebSocket upgrade limiter, so a
-pass-through value would void every per-address upgrade budget at once. Verify it
+pass-through value would void every per-address upgrade budget at once. Its
+`normalizeClientAddress` gives each budget one key per host; wider aggregation was
+measured and rejected, recorded in [backlog
+decisions](backlog-decisions.md#upgrade-bucket-keys-are-normalized-not-aggregated-2026-10-26).
+Verify it
 without submitting a report, because `clientAddress` runs before the method and
 content-type checks: send a value that cannot parse as an address and read the status.
 

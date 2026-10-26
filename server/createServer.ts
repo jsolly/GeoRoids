@@ -338,20 +338,16 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
           const spend = `${admissionDecision.count}/${admissionDecision.limit}`;
-          const { lane, network } = admissionDecision;
-          // These read the same to a client and mean different things here: one
-          // flapping caller to look at, a network past an honest retry ladder
-          // held off the fleet's reserve, or the whole lane saturated, which is
-          // load or a caller the edge cannot tell apart. Logging them alike
-          // hides the wider ones behind the narrowest.
+          // A single flapping address and an exhausted lane read the same to a
+          // client but mean opposite things here: one caller to look at, or the
+          // whole lane saturated, which is load or an address the edge cannot
+          // tell apart. Logging them alike hides the second behind the first.
           logger.warn(
-            admissionDecision.refusedBy === 'lane'
-              ? `🚫 ${lane} connection lane exhausted across all addresses (${spend})`
-              : admissionDecision.refusedBy === 'reserve'
-                ? `🚫 ${lane} network ${network} is past its upgrade share (${spend}); refused ${clientIp} to keep the fleet reserve open`
-                : lane === 'logs'
-                  ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
-                  : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
+            admissionDecision.laneExhausted
+              ? `🚫 ${admissionDecision.lane} connection lane exhausted across all addresses (${spend})`
+              : admissionDecision.lane === 'logs'
+                ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
+                : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
           );
         }
         done(

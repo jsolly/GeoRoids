@@ -3,18 +3,16 @@
 import type { IncomingMessage } from 'node:http';
 import { expect, test } from 'vitest';
 import {
+  normalizeClientAddress,
   resolveClientAddress,
   upgradeChargeAddress,
 } from '../../../server/communication/clientAddress';
-import { clientNetwork, normalizeClientAddress } from '../../../server/communication/clientNetwork';
 import {
   CONNECTION_ADMISSION_WINDOW_MS,
   createConnectionAdmission,
   GAMEPLAY_CONNECTIONS_PER_WINDOW,
   GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
-  GAMEPLAY_FLEET_RESERVE,
   LOG_CONNECTIONS_PER_WINDOW_ALL,
-  LOG_FLEET_RESERVE,
   MAX_PLAYERS,
   UNATTRIBUTED_CLIENT,
   WORST_HONEST_UPGRADES_PER_PILOT,
@@ -26,30 +24,6 @@ function request(
   remoteAddress?: string
 ): IncomingMessage {
   return { headers, socket: { remoteAddress } } as unknown as IncomingMessage;
-}
-
-/** What a network past the honest ladder may still draw from the gameplay lane. */
-const GAMEPLAY_LADDER_SHARE = GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL - GAMEPLAY_FLEET_RESERVE;
-
-/**
- * Spends the gameplay lane from fresh networks, each inside the honest ladder,
- * so the lane ceiling is what binds rather than the share for heavy callers.
- * Returns how many were refused, so a filler that stops working cannot pass.
- */
-function spendLaneHonestly(
-  admission: ReturnType<typeof createConnectionAdmission>,
-  upgrades: number,
-  at: number
-) {
-  const refused: string[] = [];
-  for (let index = 0; index < upgrades; index += 1) {
-    const network = Math.floor(index / WORST_HONEST_UPGRADES_PER_PILOT);
-    const address = `10.${Math.floor(network / 256)}.${network % 256}.7`;
-    if (!admission.admit(address, '/ws', at).accepted) {
-      refused.push(address);
-    }
-  }
-  return refused;
 }
 
 test('every pilot on a full server rejoins in one window instead of sharing one budget', () => {
@@ -94,58 +68,27 @@ test('steady honest traffic never exhausts the lane, however long the server run
   expect(refused).toBe(0);
 });
 
-test('the gameplay lane refuses upgrades once honest networks have spent its total', () => {
+test('the gameplay lane refuses upgrades once its total is spent, whatever address they claim', () => {
   const admission = createConnectionAdmission(false);
   const now = 3_000_000;
 
-  // Every caller here stays inside its honest ladder, so nothing is held back
-  // from the reserve and the absolute ceiling is what finally binds. Claiming a
-  // fresh address no longer reaches it: spend is charged to the prefix too, and
-  // a single prefix is bounded well below the lane.
-  expect(spendLaneHonestly(admission, GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL, now)).toEqual([]);
-  expect(admission.admit('10.9.9.9', '/ws', now + 1)).toMatchObject({
+  // A fresh address every time, so no per-address bucket is ever reached.
+  for (let attempt = 0; attempt < GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL; attempt += 1) {
+    expect(
+      admission.admit(`10.1.${Math.floor(attempt / 256)}.${attempt % 256}`, '/ws', now).accepted
+    ).toBe(true);
+  }
+  const refused = admission.admit('10.9.9.9', '/ws', now + 1);
+  expect(refused).toMatchObject({
     accepted: false,
     lane: 'gameplay',
     firstRejection: true,
-    refusedBy: 'lane',
+    laneExhausted: true,
     count: GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
     limit: GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
   });
   // The ceiling is a gameplay total: a diagnostic socket keeps its own.
   expect(admission.admit('10.9.9.9', '/logs', now + 1).accepted).toBe(true);
-});
-
-test('a pilot who has spent nothing still joins while one prefix floods the lane', () => {
-  const admission = createConnectionAdmission(false);
-  const now = 7_000_000;
-
-  // A fresh address every attempt, all inside one IPv6 /64 — the block a
-  // residential or cloud host is handed, so rotating the low bits is free and
-  // used to buy a fresh per-address budget every time. Spend is charged to the
-  // prefix, so the rotation buys its honest ladder plus the lane's heavy share.
-  const admitted = WORST_HONEST_UPGRADES_PER_PILOT + GAMEPLAY_LADDER_SHARE;
-  for (let attempt = 0; attempt < admitted; attempt += 1) {
-    expect(
-      admission.admit(`2001:db8:dead:beef::${attempt.toString(16)}`, '/ws', now).accepted
-    ).toBe(true);
-  }
-  expect(admission.admit('2001:db8:dead:beef::ffff', '/ws', now)).toMatchObject({
-    accepted: false,
-    firstRejection: true,
-    refusedBy: 'reserve',
-    network: '2001:0db8:dead:beef::/64',
-    count: GAMEPLAY_LADDER_SHARE,
-    limit: GAMEPLAY_LADDER_SHARE,
-  });
-
-  // The reserve is the point. Before it the ceiling was one counter, so a
-  // flood that reached it refused every later upgrade in the window, including
-  // from a network that had spent nothing — and a client gives up after its
-  // ladder, so that refusal is a banner rather than a wait.
-  expect(admission.admit('203.0.113.5', '/ws', now)).toMatchObject({
-    accepted: true,
-    refusedBy: null,
-  });
 });
 
 test('an upgrade the lane ceiling refused neither spends nor extends the caller window', () => {
@@ -156,12 +99,12 @@ test('an upgrade the lane ceiling refused neither spends nor extends the caller 
   // rather than the only value it could have held.
   expect(admission.admit('192.0.2.7', '/ws', start).accepted).toBe(true);
   expect(admission.admit('192.0.2.7', '/ws', start + 10).accepted).toBe(true);
-  expect(spendLaneHonestly(admission, GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL - 2, start + 20)).toEqual(
-    []
-  );
+  for (let attempt = 2; attempt < GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL; attempt += 1) {
+    admission.admit(`10.2.${Math.floor(attempt / 256)}.${attempt % 256}`, '/ws', start + 20);
+  }
   expect(admission.admit('192.0.2.7', '/ws', start + 59_000)).toMatchObject({
     accepted: false,
-    refusedBy: 'lane',
+    laneExhausted: true,
   });
 
   // That refusal left this caller's window anchored to its own first accepted
@@ -186,68 +129,6 @@ test('a fleet the edge cannot attribute shares the lane rather than one address 
   }
   expect(refused).toBe(0);
   expect(MAX_PLAYERS).toBeGreaterThan(GAMEPLAY_CONNECTIONS_PER_WINDOW);
-
-  // The whole lane, not the share left to networks past the honest ladder.
-  // Charging the ladder here would hand a lost header a second, tighter
-  // ceiling, which is the same lockout in a smaller size: losing attribution
-  // is not a caller's choice, and the edge replaces a client-supplied
-  // X-Real-IP (verified; see docs/agent-operations.md), so this traffic is
-  // never an attacker's doing.
-  for (let spent = MAX_PLAYERS; spent < GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL; spent += 1) {
-    expect(admission.admit(UNATTRIBUTED_CLIENT, '/ws', now).accepted).toBe(true);
-  }
-  expect(admission.admit(UNATTRIBUTED_CLIENT, '/ws', now)).toMatchObject({
-    accepted: false,
-    refusedBy: 'client',
-    limit: GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
-  });
-});
-
-test('pilots sharing one prefix keep an honest first pass before they share a budget', () => {
-  const admission = createConnectionAdmission(false);
-  const now = 6_000_000;
-
-  // Distinct hosts inside one prefix — an ISP block, a campus range, a cloud
-  // subnet. Nothing in an upgrade separates them from one host rotating
-  // addresses inside that prefix, so they share a budget past the ladder.
-  // Charging only past-ladder spend keeps the first pass open for all of them.
-  for (let pilot = 0; pilot < 40; pilot += 1) {
-    expect(admission.admit(`203.0.113.${pilot}`, '/ws', now).accepted).toBe(true);
-  }
-  // Beyond the ladder they draw on the lane's heavy share, which is fleet-sized,
-  // so the prefix is bounded well above what the fleet needs rather than at it.
-  const admitted = WORST_HONEST_UPGRADES_PER_PILOT + GAMEPLAY_LADDER_SHARE;
-  for (let attempt = 40; attempt < admitted; attempt += 1) {
-    expect(admission.admit(`203.0.113.${attempt % 40}`, '/ws', now).accepted).toBe(true);
-  }
-  expect(admission.admit('203.0.113.1', '/ws', now)).toMatchObject({
-    accepted: false,
-    refusedBy: 'reserve',
-    network: '203.0.113.0/24',
-  });
-});
-
-test('a fleet behind one NAT is still bounded by the per-address budget', () => {
-  const admission = createConnectionAdmission(false);
-  const now = 10_000_000;
-
-  // A NAT reaches the edge as one address, so the per-address budget bounds the
-  // whole group — and MAX_PLAYERS is above that budget. Neither the network
-  // keying nor the reserve helps: the prefix of one address is no narrower than
-  // the address, and the per-address budget is read before the reserve. Pinned
-  // so it is not mistaken for something the reserve covers, which is a claim an
-  // earlier revision of this branch made in its own comments.
-  let refused = 0;
-  for (let pilot = 0; pilot < MAX_PLAYERS; pilot += 1) {
-    const decision = admission.admit('198.51.100.7', '/ws', now);
-    if (!decision.accepted) {
-      refused += 1;
-      expect(decision.refusedBy).toBe('client');
-    }
-  }
-  expect(refused).toBe(MAX_PLAYERS - GAMEPLAY_CONNECTIONS_PER_WINDOW);
-  // Unattributable traffic is the case that does degrade to the whole lane.
-  expect(MAX_PLAYERS).toBeGreaterThan(GAMEPLAY_CONNECTIONS_PER_WINDOW);
 });
 
 test('the ceilings cover the fleet retry ladder the client actually uses', () => {
@@ -263,53 +144,6 @@ test('the ceilings cover the fleet retry ladder the client actually uses', () =>
   // A deploy or stall makes every pilot forward a record, so logs are
   // fleet-sized too, not a handful.
   expect(LOG_CONNECTIONS_PER_WINDOW_ALL).toBeGreaterThanOrEqual(MAX_PLAYERS);
-
-  // Both halves of the ceiling have to be fleet-sized for the split to help.
-  // The reserve has to cover the fleet, or saturating the lane still refuses
-  // pilots who have spent nothing; the remaining share has to cover it too, or
-  // a fleet spread across one prefix is locked out once past the ladder, which
-  // is the lockout moved rather than removed.
-  expect(GAMEPLAY_FLEET_RESERVE).toBeGreaterThanOrEqual(worstHonestFleetDemand);
-  expect(GAMEPLAY_LADDER_SHARE).toBeGreaterThanOrEqual(worstHonestFleetDemand);
-  expect(LOG_FLEET_RESERVE).toBeGreaterThanOrEqual(MAX_PLAYERS);
-  expect(LOG_CONNECTIONS_PER_WINDOW_ALL - LOG_FLEET_RESERVE).toBeGreaterThanOrEqual(MAX_PLAYERS);
-});
-
-test('one host cannot hold several upgrade budgets by respelling its address', () => {
-  // `isIP` is a format check, not a normalizer, so each spelling of one host
-  // used to key its own bucket and charge nothing to the others.
-  expect(normalizeClientAddress('::ffff:1.2.3.4')).toBe('1.2.3.4');
-  expect(normalizeClientAddress('::FFFF:1.2.3.4')).toBe('1.2.3.4');
-  expect(normalizeClientAddress('::ffff:0102:0304')).toBe('1.2.3.4');
-  expect(normalizeClientAddress('fe80::1%eth0')).toBe(normalizeClientAddress('fe80::1'));
-  expect(normalizeClientAddress('fe80::1%25eth0')).toBe(normalizeClientAddress('fe80::1'));
-  expect(normalizeClientAddress('2001:db8::1')).toBe(
-    normalizeClientAddress('2001:0db8:0000:0000:0000:0000:0000:0001')
-  );
-  // A value that only looks like an address never becomes a key.
-  expect(normalizeClientAddress('1.2.3.04')).toBe(null);
-  expect(normalizeClientAddress('203.0.113.42, 9.9.9.9')).toBe(null);
-  expect(normalizeClientAddress('not-an-address')).toBe(null);
-  expect(normalizeClientAddress('')).toBe(null);
-  expect(normalizeClientAddress('1:2:3:4:5:6:7:8:9')).toBe(null);
-  expect(normalizeClientAddress('fe80::1::2')).toBe(null);
-
-  expect(clientNetwork('1.2.3.4')).toBe('1.2.3.0/24');
-  expect(clientNetwork(normalizeClientAddress('2001:db8:1:2:3:4:5:6') ?? '')).toBe(
-    '2001:0db8:0001:0002::/64'
-  );
-
-  // The spellings share one budget in the limiter, not just in the helper.
-  const admission = createConnectionAdmission(false);
-  const now = 8_000_000;
-  for (let attempt = 0; attempt < GAMEPLAY_CONNECTIONS_PER_WINDOW; attempt += 1) {
-    expect(admission.admit('1.2.3.4', '/ws', now).accepted).toBe(true);
-  }
-  expect(admission.admit('::ffff:1.2.3.4', '/ws', now)).toMatchObject({
-    accepted: false,
-    refusedBy: 'client',
-    count: GAMEPLAY_CONNECTIONS_PER_WINDOW,
-  });
 });
 
 test('the whole honest fleet climbs its retry ladder inside one window', () => {
@@ -353,11 +187,16 @@ test('the claimed forwarded address is trusted only behind Railway ingress', () 
   expect(resolveClientAddress(request({}, '172.16.0.1'), true)).toBe(null);
   expect(resolveClientAddress(request({}), false)).toBe(null);
 
-  // Either side of the ingress, one host resolves to one spelling.
+  // The reporting listener consumes this resolver directly rather than through
+  // `upgradeChargeAddress`, so its quota key needs its own assertions: covering
+  // normalization only through the composition lets it be moved out of here
+  // with the suite still green.
   expect(resolveClientAddress(request({ 'x-real-ip': '::ffff:203.0.113.42' }), true)).toBe(
     '203.0.113.42'
   );
   expect(resolveClientAddress(request({}, '::ffff:172.16.0.1'), false)).toBe('172.16.0.1');
+  // A socket peer that is not an address is refused rather than becoming a key.
+  expect(resolveClientAddress(request({}, 'not-an-address'), false)).toBe(null);
 });
 
 test('the address an upgrade is charged to never falls back to the proxy peer', () => {
@@ -375,4 +214,107 @@ test('the address an upgrade is charged to never falls back to the proxy peer', 
   // Without ingress the socket peer is the client and is charged as before.
   expect(upgradeChargeAddress(request({}, '172.16.0.1'), false)).toBe('172.16.0.1');
   expect(upgradeChargeAddress(request({}), false)).toBe(UNATTRIBUTED_CLIENT);
+});
+
+test('one host cannot hold several upgrade budgets by respelling its address', () => {
+  // `isIP` is a format check, not a normalizer, so each spelling of one host
+  // used to key its own bucket and charge nothing to the others. Expected
+  // values are literals: comparing the helper with itself would pass even if it
+  // returned null for both sides.
+  expect(normalizeClientAddress('::ffff:192.0.2.4')).toBe('192.0.2.4');
+  expect(normalizeClientAddress('::FFFF:192.0.2.4')).toBe('192.0.2.4');
+  // The same mapped address written as hex groups rather than a dotted tail.
+  expect(normalizeClientAddress('::ffff:c000:0204')).toBe('192.0.2.4');
+  expect(normalizeClientAddress('fe80::1%eth0')).toBe('fe80::1');
+  expect(normalizeClientAddress('fe80::1%25eth0')).toBe('fe80::1');
+  expect(normalizeClientAddress('2001:0db8:0000:0000:0000:0000:0000:0001')).toBe('2001:db8::1');
+
+  // Only the mapped prefix names an IPv4 host. These three carry the same
+  // trailing quad, or `ffff` in the same group, and are each a different host:
+  // folding any of them onto 192.0.2.4 would put two hosts in one budget.
+  expect(normalizeClientAddress('::192.0.2.4')).toBe('::c000:204');
+  expect(normalizeClientAddress('::ffff:0:192.0.2.4')).toBe('::ffff:0:c000:204');
+  expect(normalizeClientAddress('1:2:3:4:5:ffff:192.0.2.4')).toBe('1:2:3:4:5:ffff:c000:204');
+  // This one is the case that catches an unanchored mapped pattern: its
+  // canonical form contains `::ffff:c000:204` without starting with it, so a
+  // pattern matching anywhere in the string would fold a distinct host onto
+  // 192.0.2.4 and put the two in one budget.
+  expect(normalizeClientAddress('1::ffff:192.0.2.4')).toBe('1::ffff:c000:204');
+
+  // A value that only looks like an address never becomes a key.
+  expect(normalizeClientAddress('1.2.3.04')).toBe(null);
+  expect(normalizeClientAddress('203.0.113.42, 9.9.9.9')).toBe(null);
+  expect(normalizeClientAddress('not-an-address')).toBe(null);
+  expect(normalizeClientAddress('')).toBe(null);
+  expect(normalizeClientAddress('1:2:3:4:5:6:7:8:9')).toBe(null);
+  expect(normalizeClientAddress('fe80::1::2')).toBe(null);
+  // A zone index belongs to IPv6 only, so stripping one off a dotted quad must
+  // not turn an unparseable value into that quad's key.
+  expect(normalizeClientAddress('192.0.2.4%eth0')).toBe(null);
+  expect(normalizeClientAddress('192.0.2.4%')).toBe(null);
+  // The same rule on the IPv6 side, where stripping first would succeed and so
+  // needs its own pin: each of these is a value `isIP` rejects whose bare part
+  // parses, so a gate that strips before validating would mint a key here.
+  expect(normalizeClientAddress('fe80::1%')).toBe(null);
+  expect(normalizeClientAddress('::ffff:192.0.2.4%')).toBe(null);
+  expect(normalizeClientAddress('fe80::1%eth0%x')).toBe(null);
+  // Nothing normalizes onto the shared sentinel, so no caller reaches it.
+  expect(normalizeClientAddress(UNATTRIBUTED_CLIENT)).toBe(null);
+});
+
+test('the spelling a caller sends does not change the budget its upgrade is charged to', () => {
+  // The limiter keys on whatever it is handed, so collapsing the spellings has
+  // to happen where the charged address is produced. That is the whole of the
+  // fix: a prefix budget was tried and rejected, because a shared /24 or /64
+  // and one host rotating inside it cannot be told apart at an upgrade.
+  const spellings = ['192.0.2.4', '::ffff:192.0.2.4', '::FFFF:192.0.2.4', '::ffff:c000:0204'];
+  const charged = spellings.map((spelling) =>
+    upgradeChargeAddress(request({ 'x-real-ip': spelling }, '172.16.0.1'), true)
+  );
+  expect(charged).toEqual(['192.0.2.4', '192.0.2.4', '192.0.2.4', '192.0.2.4']);
+
+  // Either side of the ingress, and with a zone index the socket may carry.
+  expect(upgradeChargeAddress(request({}, '::ffff:172.16.0.1'), false)).toBe('172.16.0.1');
+  expect(upgradeChargeAddress(request({}, 'fe80::1%eth0'), false)).toBe('fe80::1');
+
+  // One spelling therefore spends one budget: the 51st upgrade is refused
+  // whichever of them the caller sends.
+  const admission = createConnectionAdmission(false);
+  const now = 8_000_000;
+  for (let attempt = 0; attempt < GAMEPLAY_CONNECTIONS_PER_WINDOW; attempt += 1) {
+    const spelling = spellings[attempt % spellings.length] ?? '192.0.2.4';
+    const charge = upgradeChargeAddress(request({ 'x-real-ip': spelling }, '172.16.0.1'), true);
+    expect(admission.admit(charge, '/ws', now).accepted).toBe(true);
+  }
+  expect(
+    admission.admit(
+      upgradeChargeAddress(request({ 'x-real-ip': '::ffff:192.0.2.4' }), true),
+      '/ws',
+      now
+    )
+  ).toMatchObject({
+    accepted: false,
+    count: GAMEPLAY_CONNECTIONS_PER_WINDOW,
+    limit: GAMEPLAY_CONNECTIONS_PER_WINDOW,
+  });
+});
+
+test('a fleet behind one NAT is still bounded by the per-address budget', () => {
+  const admission = createConnectionAdmission(false);
+  const now = 9_000_000;
+
+  // A NAT reaches the edge as one address, and MAX_PLAYERS is above the
+  // per-address budget, so the group's excess is refused. Normalizing a key
+  // does not change that and nothing here claims it does; this is the base
+  // bound, pinned at fleet scale so it is not mistaken for something the
+  // normalizer addresses.
+  let refused = 0;
+  for (let pilot = 0; pilot < MAX_PLAYERS; pilot += 1) {
+    const decision = admission.admit('198.51.100.7', '/ws', now);
+    if (!decision.accepted) {
+      refused += 1;
+      expect(decision.limit).toBe(GAMEPLAY_CONNECTIONS_PER_WINDOW);
+    }
+  }
+  expect(refused).toBe(MAX_PLAYERS - GAMEPLAY_CONNECTIONS_PER_WINDOW);
 });

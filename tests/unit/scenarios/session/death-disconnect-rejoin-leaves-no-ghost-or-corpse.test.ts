@@ -20,13 +20,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
   });
 
   test('resuming after a death keeps the authoritative respawn lifecycle', () => {
-    world.send(ace, {
-      type: 'collisionDamage',
-      data: {
-        targetPlayerId: ace.id,
-        attackerId: 'boundary',
-      },
-    });
+    world.hitBoundary(ace);
     expect(world.entity(ace).exploding).toBe(true);
     expect(world.entity(ace).health).toBe(0);
 
@@ -43,13 +37,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
   });
 
   test('disconnect after death removes the corpse so the peer is not left with a ghost', () => {
-    world.send(ace, {
-      type: 'collisionDamage',
-      data: {
-        targetPlayerId: ace.id,
-        attackerId: 'boundary',
-      },
-    });
+    world.hitBoundary(ace);
     expect(world.entity(ace).health).toBe(0);
 
     bo.socket.clear();
@@ -62,13 +50,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
   });
 
   test('a new tab with the same name cannot take over without the private resume token', () => {
-    world.send(ace, {
-      type: 'collisionDamage',
-      data: {
-        targetPlayerId: ace.id,
-        attackerId: 'boundary',
-      },
-    });
+    world.hitBoundary(ace);
     expect(world.entity(ace).exploding).toBe(true);
 
     bo.socket.clear();

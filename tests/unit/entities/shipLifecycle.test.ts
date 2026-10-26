@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../shared/constants/gameplay';
+import { WORLD } from '../../../shared/world';
 import { Player } from '../../../src/entities/player/Player';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
   applySharedShipRespawnCue,
-  applyShipBoundaryDeath,
   applyShipSpawnProtection,
   applyShipSpawnProtectionForRemainingFrames,
   clearShipSpawnProtection,
@@ -14,6 +14,8 @@ import {
   shouldApplyDamagedHealth,
   shouldDrawShipHull,
 } from '../../../src/entities/ship/shipUtils';
+
+import { CollisionManager } from '../../../src/physics/CollisionManager';
 
 import { RecordingSocket } from '../../support/recordingSocket';
 import { SHIP_KINDS } from '../scenarios/support/shipKinds';
@@ -85,13 +87,19 @@ describe('shared ship HUD and respawn timers', () => {
     }
   );
 
-  test.each(SHIP_KINDS)('$kind explodes and flashes on a boundary hit', ({ options }) => {
+  test.each(SHIP_KINDS)('$kind flashes on a boundary hit without dying locally', ({ options }) => {
     const ship = new Ship(options);
     ship.health = 100;
-    applyShipBoundaryDeath(ship);
-    expect(ship.health).toBe(0);
-    expect(ship.exploding).toBe(true);
+    ship.blinkCount = 0;
+    ship.position = { x: WORLD.radius, y: 0 };
+
+    CollisionManager.getInstance().checkBoundaryCollisions([ship]);
+
+    // Every hull reports the contact instead of predicting its own death; the
+    // server kills from its own reading of that pose.
     expect(ship.impactFlashFrames).toBeGreaterThan(0);
+    expect(ship.health).toBe(100);
+    expect(ship.exploding).toBe(false);
   });
 });
 

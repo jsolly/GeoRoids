@@ -45,6 +45,7 @@ const LASER_SOUND_PATH_PATTERN = /sounds\/laser\.m4a$/u;
 const LOOT_PICKUP_SOUND_PATH_PATTERN = /sounds\/loot-pickup\.m4a$/u;
 const SURVEY_SCAN_SOUND_PATH_PATTERN = /survey-scan\.m4a$/u;
 const ORBITAL_PICKUP_SOUND_PATH_PATTERN = /orbital-pickup\.m4a$/u;
+const HIT_SOUND_PATH_PATTERN = /sounds\/hit\.m4a$/u;
 const CLIENT_RELEASE_ID_PATTERN = /^(dev|[a-f0-9]{40})$/u;
 const RESUME_TOKEN_PATTERN = /^[a-z0-9]{64}$/u;
 const JOIN_ACK_ORDER_ERROR_PATTERN = /before.*join ack/u;
@@ -1065,6 +1066,50 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('satellitePickupCollected', { ...pickup, position: { x: 30, y: 0 } });
       expect(paths).toHaveLength(2);
       expect(paths[1]).toMatch(ORBITAL_PICKUP_SOUND_PATH_PATTERN);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
+  test('a chipped deposit plays one directional hit cue and malformed events stay silent', async () => {
+    const player = createPlayer({
+      name: 'Mining pilot',
+      type: 'local',
+      position: { x: 0, y: 0 },
+      kitId: 'scout',
+      ...(manager.combatNetwork !== undefined ? { combatNetwork: manager.combatNetwork } : {}),
+    });
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(emptySnapshotFixture())).encode(1));
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const paths: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      paths.push(this.src);
+      return Promise.resolve();
+    });
+    try {
+      // An event without a rock, or without a usable position, never sounds.
+      // The position-less shape is the one the guard exists for: without it the
+      // cue would play centred at full volume instead of being culled.
+      ws.receive('asteroidHit', { asteroidId: '', position: { x: 30, y: 0 } });
+      ws.receive('asteroidHit', { asteroidId: 'ore' });
+      ws.receive('asteroidHit', { asteroidId: 'ore', position: { x: Number.NaN, y: 0 } });
+      expect(paths).toEqual([]);
+
+      // The cue is directional, so a chip beyond the viewport stays silent.
+      ws.receive('asteroidHit', { asteroidId: 'ore', position: { x: 10000, y: 0 } });
+      expect(paths).toEqual([]);
+
+      ws.receive('asteroidHit', { asteroidId: 'ore', position: { x: 30, y: 0 } });
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toMatch(HIT_SOUND_PATH_PATTERN);
     } finally {
       resetGameAudio();
       setSound(false);

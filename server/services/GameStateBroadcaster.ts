@@ -18,7 +18,8 @@ import {
   nearbyAsteroidRows,
   nearbyWorldRows,
 } from '../../shared/world';
-import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
+import type { AsteroidData, AsteroidHitEvent, SatellitePickupCollected } from '../../shared-types';
+import type { GameEntity } from '../core/EntityManager';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 
@@ -622,7 +623,7 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
+  private broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
     this.broadcastToAll({
       type: 'satellitePickupCollected',
       data,
@@ -652,7 +653,7 @@ export class GameStateBroadcaster {
     }
   }
 
-  public broadcastLootExploded(event: {
+  private broadcastLootExploded(event: {
     lootId: string;
     position: { x: number; y: number };
     radius: number;
@@ -663,6 +664,23 @@ export class GameStateBroadcaster {
       data: event,
       timestamp: Date.now(),
     });
+  }
+
+  /** A chip a durable deposit survived; its shatter reports destruction instead. */
+  public broadcastAsteroidHit(event: AsteroidHitEvent): void {
+    // The client culls this cue outside the viewport, which is smaller than the
+    // interest radius, so sending it to the whole world would spend a message
+    // per pilot to be discarded on arrival. Event-class backpressure closes a
+    // socket rather than skipping it, which no cosmetic cue is worth.
+    this.broadcastToAll(
+      {
+        type: 'asteroidHit',
+        data: event,
+        timestamp: Date.now(),
+      },
+      undefined,
+      (pilot) => isWithinWorldInterest(event.position, pilot.position)
+    );
   }
 
   public broadcastAsteroidDestruction(
@@ -770,20 +788,28 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastToAll(message: unknown, excludeId?: string): void {
+  public broadcastToAll(
+    message: unknown,
+    excludeId?: string,
+    reaches?: (player: GameEntity) => boolean
+  ): void {
     if (!serverPerformanceMetrics.enabled) {
-      this.broadcastToAllInternal(message, excludeId);
+      this.broadcastToAllInternal(message, excludeId, reaches);
       return;
     }
     const startedAt = globalThis.performance.now();
     try {
-      this.broadcastToAllInternal(message, excludeId);
+      this.broadcastToAllInternal(message, excludeId, reaches);
     } finally {
       serverPerformanceMetrics.recordBroadcast(globalThis.performance.now() - startedAt);
     }
   }
 
-  private broadcastToAllInternal(message: unknown, excludeId?: string): void {
+  private broadcastToAllInternal(
+    message: unknown,
+    excludeId?: string,
+    reaches?: (player: GameEntity) => boolean
+  ): void {
     let messageStr: string;
     try {
       messageStr = JSON.stringify(message);
@@ -798,6 +824,10 @@ export class GameStateBroadcaster {
 
     for (const player of players) {
       if (excludeId != null && excludeId !== '' && player.id === excludeId) {
+        continue;
+      }
+
+      if (reaches !== undefined && reaches(player) !== true) {
         continue;
       }
 

@@ -82,7 +82,6 @@ export type ClientCommand =
       laserDirection: Velocity;
       requestId?: string;
     }
-  | { type: 'collisionDamage'; targetPlayerId: string; attackerId: string }
   | PingMessage;
 
 type ClientCommandDecodeResult =
@@ -388,16 +387,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
             },
           }
         : invalid(type, 'Missing finite laser coordinates for shoot');
-    }
-    case 'collisionDamage': {
-      const targetPlayerId = readNonEmptyString(fields['targetPlayerId']);
-      const attackerId = readNonEmptyString(fields['attackerId']);
-      return targetPlayerId != null &&
-        targetPlayerId !== '' &&
-        attackerId != null &&
-        attackerId !== ''
-        ? { ok: true, command: { type, targetPlayerId, attackerId } }
-        : invalid(type, 'Missing required fields for collisionDamage');
     }
     default:
       return {

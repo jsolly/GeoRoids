@@ -150,7 +150,7 @@ function atomicJson(path, value) {
   }
 }
 
-export function benchmarkBuildReceipt(action, directory, websocketUrl, preparedPath) {
+function benchmarkBuildReceipt(action, directory, websocketUrl, preparedPath) {
   const root = realpathSync(directory);
   if (action === 'ports') {
     // These are candidates, never permission to attach to or stop a listener.

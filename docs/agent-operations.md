@@ -247,7 +247,7 @@ npm run check:format       # pinned Prettier checks Astro/Svelte formats
 npm run check:lint         # Biome with config/quality/biome.settings.jsonc
 npm run check:lint-policy  # reject inherited warn/info Biome severities
 npm run check:knip         # fail on unused files/exports/dependencies and config hints
-npm run check:ts-prune     # fail on unconsumed TypeScript exports
+npm run check:ts-prune     # fail on unconsumed TypeScript exports and unreachable public class members
 npm run check:md           # markdownlint-cli2
 npm run check:yaml         # yamllint --strict
 npm run check:actions      # actionlint + ShellCheck
@@ -290,7 +290,7 @@ Asteroids live on the server; clients render snapshots. Clients still simulate t
 
 `shared/` holds the gameplay rules both sides must agree on (ship flight, combat, asteroid materials/reflection, furnaces, economy, exploration, world interest radii in `shared/world.ts`). Client prediction and the server simulation import the same module, so change a rule there once rather than mirroring it in `src/` and `server/`.
 
-The injected slice covers EventLoop lifecycle, collision messaging, PlayerManager's
+The injected slice covers EventLoop lifecycle, PlayerManager's
 network port, and each Ship's combat capability. GameController creates the
 production PlayerManager with ConnectionManager's capabilities;
 authoritative snapshot creation passes that same connection's capability through

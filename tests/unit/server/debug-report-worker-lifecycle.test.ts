@@ -195,18 +195,17 @@ test('a store that fails after opening publishes an unknown depth and names the 
   directories.push(directory);
   const faults = vi.spyOn(logger, 'error');
   try {
-    // A full database is a documented production condition -- "Full or
-    // unavailable storage rejects new reports explicitly", and the store has a
-    // real `databaseBytes` limit -- so this drives the one shape no other case
-    // here reaches: a store that opened, answered, and then started failing.
-    // That is the only path into the worker's delivery-tick catch, which is
-    // what produces the fail-closed signal. Without it, reverting that reply to
-    // `pending: 0, blocked: 0` or deleting the fault reply outright failed no
-    // test anywhere, because every other case supplies its own diagnostics.
+    // This drives the one shape no other case here reaches: a store that
+    // opened, answered, and then started failing. That is the only path into
+    // the worker's delivery-tick catch, which produces the fail-closed signal.
+    // Without it, reverting that reply to `pending: 0, blocked: 0` or deleting
+    // the fault reply outright failed no test anywhere, because every other
+    // case supplies its own diagnostics literal.
     //
-    // A page-count ceiling is why this is deterministic. Corrupting the file
-    // instead left it to SQLite's cache whether the next read noticed, which
-    // failed three runs in five.
+    // A full database is the lever, driven through the store's own
+    // `databaseBytes` limit. Revoking write access would be more direct but
+    // cannot work here: the server runs as root, and root bypasses file
+    // permission checks entirely.
     const worker = new DebugReportWorker({
       path: join(directory, 'inbox.sqlite'),
       token: '',
@@ -216,6 +215,7 @@ test('a store that fails after opening publishes an unknown depth and names the 
     });
     workers.push(worker);
 
+    let refusals = 0;
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const report: DebugReportSubmission = {
         version: 1,
@@ -233,10 +233,22 @@ test('a store that fails after opening publishes an unknown depth and names the 
           recentLogs: [],
         },
       };
-      // The store refuses once it is full, which is the documented behaviour
-      // and not what this case is about.
-      await worker.enqueue(JSON.stringify(report), 'address', {}).catch(() => undefined);
+      // A distinct address per submission, so the loop is bounded by the
+      // store's size limit and not by the documented three-per-address-per-hour
+      // quota. Reusing one address made that quota do the refusing, which is a
+      // different rule and would have left the store comfortably empty.
+      try {
+        await worker.enqueue(JSON.stringify(report), `198.51.100.${attempt}`, {});
+      } catch {
+        refusals += 1;
+      }
     }
+    // The store refused some of them, which is its documented behaviour once
+    // full and not what this case is about. The cause is asserted below from
+    // the fault detail rather than from these refusals: the client-facing
+    // message is deliberately generic, so it cannot tell a full store from any
+    // other failure.
+    expect(refusals).toBeGreaterThan(0);
 
     await vi.waitFor(
       () => {
@@ -244,13 +256,12 @@ test('a store that fails after opening publishes an unknown depth and names the 
       },
       { timeout: 10_000 }
     );
-    const failing = worker.diagnostics();
     // Null, not zero. Zero is what a regression publishes for a queue nothing
     // has counted, and `/health` would read as drained.
-    expect(failing.blocked).toBeNull();
+    expect(worker.diagnostics().blocked).toBeNull();
     // `/health` is unauthenticated, so the published string stays generic and
     // carries no path or stack.
-    expect(failing.lastError).toBe('Debug report storage is unavailable.');
+    expect(worker.diagnostics().lastError).toBe('Debug report storage is unavailable.');
 
     // The cause does reach the game thread's log, where an operator can read
     // it. Deleting the worker's fault reply would leave the outage with no
@@ -258,10 +269,17 @@ test('a store that fails after opening publishes an unknown depth and names the 
     expect(faults).toHaveBeenCalledWith(
       'DEBUG_REPORTS',
       'Debug report storage failed',
-      // A stack naming the store, not an errno string: which store call trips
-      // first depends on SQLite, but the frame is the actionable part and is
-      // what distinguishes this from the generic message on `/health`.
-      expect.objectContaining({ detail: expect.stringContaining('DebugReportStore') })
+      // Naming the mechanism, so this case states why it reaches the fault
+      // rather than resting on page arithmetic. Without it the guard could
+      // stop guarding -- if a change to the payload or SQLite's page size left
+      // the store with room, the fault would never happen and this would be an
+      // opaque ten-second timeout inside `npm run gate`. Now it fails saying
+      // the store did not fill. The frame is asserted too, because a stack
+      // naming the store is the actionable part for an operator and is what
+      // distinguishes this record from the generic string on `/health`.
+      expect.objectContaining({
+        detail: expect.stringMatching(/database or disk is full[\s\S]*DebugReportStore/u),
+      })
     );
   } finally {
     faults.mockRestore();

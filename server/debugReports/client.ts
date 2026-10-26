@@ -5,18 +5,8 @@ import type { DebugJsonValue, DebugReportReceipt } from '../../shared-types';
 import type { DebugReportConfiguration } from './configuration';
 import type { QueueDiagnostics } from './store';
 
-/** Enough for a transient stall to recover; few enough that a corrupt store cannot spin. */
-export const MAX_WORKER_RESTARTS = 3;
-
 /** The request deadline docs/agent-operations.md documents for this worker. */
 const REQUEST_DEADLINE_MS = 10_000;
-
-/**
- * How long a replacement waits for the thread it replaces to release the
- * database. Short, because the request that triggered the restart is waiting on
- * it, and a thread that will not stop is already the corrupt-store case.
- */
-const WORKER_RETIRE_DEADLINE_MS = 2_000;
 
 /**
  * How long one fault episode may go unrecorded. Identity alone bounds nothing:
@@ -46,7 +36,7 @@ const UNMEASURED_QUEUE: QueueDiagnostics = {
 };
 
 /** How a fault episode ended, so one message carries every case. */
-type EpisodeOutcome = 'recovered' | 'cause-changed' | 'worker-failed' | 'closed';
+type EpisodeOutcome = 'recovered' | 'worker-failed' | 'closed';
 
 /**
  * Why reporting stopped. The player-facing message follows from the cause
@@ -105,16 +95,23 @@ interface PendingOperation {
   timer: NodeJS.Timeout;
 }
 
-/** No SQLite, credential-bearing HTTP, parsing, or diagnostic redaction runs on the game thread. */
+/**
+ * No SQLite, credential-bearing HTTP, parsing, or diagnostic redaction runs on
+ * the game thread.
+ *
+ * One thread for the life of the process. A fault closes reporting until the
+ * next deploy, fail-closed and with its cause logged; `/debug-reports` then
+ * answers 503 and the player keeps a local copy. Replacing a faulted thread
+ * needs more than a respawn -- the store is single-connection and the HTTP
+ * layer admits concurrent requests, so a replacement has to be single-flight,
+ * own the thread it supersedes through shutdown, and sit outside the request
+ * deadline. That belongs in its own change.
+ */
 export class DebugReportWorker {
-  // Not readonly: a bounded restart replaces it after a fault.
-  private worker: Worker;
+  private readonly worker: Worker;
   private readonly pending = new Map<number, PendingOperation>();
   private nextId = 0;
   private failed = false;
-  private restarts = 0;
-  /** Identifies the live thread so a replaced one's late events are ignored. */
-  private generation = 0;
   private closing: Promise<void> | undefined;
   /** The fault being suppressed, so a broken store logs once rather than hourly. */
   private faultEpisode:
@@ -134,92 +131,19 @@ export class DebugReportWorker {
       workerData: this.config,
       execArgv: ['--import', 'tsx'],
     });
-    // Only the live thread's events describe live state. A replaced worker
-    // still emits `exit` after its own fault, and without this its successor
-    // would be marked failed and the request that restarted it rejected.
-    //
-    // Claimed after construction, not before: `new Worker` can throw, and
-    // advancing the generation first would leave the thread that is still
-    // running with every one of its events discarded.
-    const generation = ++this.generation;
-    const live = (): boolean => this.generation === generation;
-    worker.on('message', (reply: ReportWorkerReply) => {
-      if (live()) {
-        this.receive(reply);
-      }
-    });
+    worker.on('message', (reply: ReportWorkerReply) => this.receive(reply));
     // The errno is the whole diagnostic for this worker: it loads `tsx` and
     // opens SQLite on the mounted volume, so SQLITE_CANTOPEN or EACCES is what
     // an operator needs. Discarding the argument threw exactly that away.
-    worker.on('error', (error: Error) => {
-      if (live()) {
-        this.fail({ kind: 'uncaught', error });
-      }
-    });
+    worker.on('error', (error: Error) => this.fail({ kind: 'uncaught', error }));
     worker.on('exit', (code: number) => {
-      if (live() && !this.closing) {
+      if (!this.closing) {
         this.fail({ kind: 'exit', code });
       }
     });
     return worker;
   }
 
-  /**
-   * A fault used to be terminal: nothing cleared `failed` and nothing replaced
-   * the worker, so one ten-second stall ended reporting until the process did,
-   * while the refusal told the player to retry later. A later request now gets
-   * a fresh worker, a bounded number of times — enough that a transient SQLite
-   * stall recovers, few enough that a corrupt store cannot spin.
-   *
-   * The outgoing thread has to be gone first. `DebugReportStore` is documented
-   * as the only connection to its database and opens with no busy timeout, so
-   * its bootstrap `exec` takes a write lock and throws rather than waiting. On
-   * the one path that leaves a thread alive — the request deadline, which is
-   * exactly what this recovery exists for — spawning straight away raced the
-   * dying thread for that lock: the replacement died on arrival, the report
-   * that triggered the restart was refused, and an attempt was spent without
-   * the store ever being reopened. Three of those closed reporting for the
-   * process, which is the outcome the restart was added to prevent.
-   */
-  private async restart(): Promise<void> {
-    this.restarts += 1;
-    logger.warn('DEBUG_REPORTS', 'Restarting the debug report worker', {
-      attempt: this.restarts,
-      of: MAX_WORKER_RESTARTS,
-    });
-    await this.retire(this.worker);
-    this.failed = false;
-    // A replacement inherits no fault episode. Carrying one over suppressed the
-    // new thread's first storage failure as a repeat of the old thread's, so a
-    // restart that failed for the same reason read as one that worked.
-    this.faultEpisode = undefined;
-    // The depth is unknown until the new thread measures it, but the failure
-    // that forced this restart still happened and is still the most recent
-    // thing known about the subsystem. Clearing it would undo the guard in
-    // `receive()`, whose whole purpose is to stop a recorded failure being
-    // erased; the new thread's first measured reply replaces it.
-    this.stats = { ...UNMEASURED_QUEUE, lastError: this.stats.lastError };
-    this.worker = this.spawn();
-  }
-
-  /** Waits for a thread to stop holding the database, bounded so a wedged one cannot block a request forever. */
-  private retire(worker: Worker): Promise<void> {
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(deadline);
-        resolve();
-      };
-      const deadline = setTimeout(finish, WORKER_RETIRE_DEADLINE_MS);
-      deadline.unref();
-      worker.once('exit', finish);
-      void worker.terminate();
-    });
-  }
   enqueue(body: string, address: string, health: DebugJsonValue): Promise<DebugReportReceipt> {
     return this.request({ type: 'enqueue', requestId: ++this.nextId, body, address, health }).then(
       (receipt) => {
@@ -237,15 +161,6 @@ export class DebugReportWorker {
     return { ...this.stats };
   }
   private request(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
-    if (this.failed && this.closing === undefined && this.restarts < MAX_WORKER_RESTARTS) {
-      // The replacement cannot open the store until the outgoing thread lets
-      // go of it, so this request waits for the handover rather than racing it.
-      return this.restart().then(() => this.send(request));
-    }
-    return this.send(request);
-  }
-
-  private send(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
     if (this.failed || this.closing !== undefined) {
       return Promise.reject(
         new DebugReportError(503, 'Debug report storage is unavailable. Keep your local copy.')
@@ -276,22 +191,18 @@ export class DebugReportWorker {
       if (!this.failed) {
         this.stats = reply.diagnostics;
       }
-      if (reply.diagnostics.pending !== null) {
-        // A measured depth proves the store answered, which is the one signal
-        // that a replacement actually works. Counting restarts for the life of
-        // the process instead meant three stalls days apart, each of which
-        // recovered fully, closed reporting permanently. A corrupt store never
-        // produces a measured reply, so the anti-spin half of the bound holds.
-        this.restarts = 0;
-        // It does not prove an episode is over, though. A store alternating
-        // between failing and answering produces one of these between every
-        // two faults, and closing the episode on the first reopened a new one
-        // on the next fault -- per-second logging again, now with a recovery
-        // line between each pair. Wait for the store to actually go quiet.
-        const episode = this.faultEpisode;
-        if (episode && Date.now() - episode.lastFaultAt >= FAULT_QUIET_MS) {
-          this.endFaultEpisode('recovered');
-        }
+      // A measured depth proves the store answered, but not that an episode is
+      // over: a store alternating between failing and answering produces one
+      // of these between every two faults, and closing the episode on the
+      // first reopened a new one on the next fault -- per-second logging
+      // again, with a recovery line between each pair. Wait for it to go quiet.
+      const episode = this.faultEpisode;
+      if (
+        reply.diagnostics.pending !== null &&
+        episode &&
+        Date.now() - episode.lastFaultAt >= FAULT_QUIET_MS
+      ) {
+        this.endFaultEpisode('recovered');
       }
       return;
     }
@@ -378,7 +289,7 @@ export class DebugReportWorker {
    * nor a real exit code.
    *
    * The re-entry guard is load-bearing, not defensive. The timeout path calls
-   * `terminate()`, and that raises `exit` on the same generation, which used to
+   * `terminate()`, and that raises `exit` on the same thread, which used to
    * come back through here and emit a second, contradictory line for one stall.
    * An operator reading the log for a stalled queue got two records that
    * disagreed, neither mentioning a timeout.

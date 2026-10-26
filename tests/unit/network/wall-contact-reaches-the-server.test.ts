@@ -147,9 +147,23 @@ describe('wall contact reaches the server', () => {
     expect(typeof packet?.data?.['motionEpoch']).toBe('number');
     expect(typeof packet?.data?.['motionSequence']).toBe('number');
 
-    // And the other direction: a socket that cannot carry the pose must say so,
-    // so the caller retries instead of believing the contact was reported.
+    // And the other direction: a pose the socket cannot carry must say so, so
+    // the caller retries instead of believing the contact was reported. Each of
+    // these refusals sends nothing, and the latch reads the boolean rather than
+    // the attempt, so each has to answer `false` for the retry to happen.
     const delivered = ws.sent.length;
+
+    // Furnace transit: the hull is not flying its own pose.
+    local.ship.furnaceTransit = {
+      sourceId: 'furnace-a',
+      destinationId: 'furnace-b',
+      startedAt: Date.now(),
+      durationMs: 1000,
+    };
+    expect(PlayerManager.getInstance().updateNetworkState()).toBe(false);
+    local.ship.furnaceTransit = null;
+
+    // Closed socket.
     ws.readyState = 3;
     expect(PlayerManager.getInstance().updateNetworkState()).toBe(false);
     expect(ws.sent).toHaveLength(delivered);

@@ -2149,12 +2149,12 @@ export class GameEngine {
 
   /**
    * A record for each hit that changes health, except an ordinary surviving hit
-   * inside the one-second window. A hit a hold absorbs entirely changes no
-   * health and is not logged here at all; the refused pose is what records it.
-   * Only an ordinary surviving hit is throttled: a
-   * hit that ends a life is the record `MessageHandler.applyBoundaryContact`
-   * suppresses the motion-rejection warning in favour of, so it has to be
-   * written every time. A cooperative downing ends a life without destroying
+   * inside the one-second window. Only that case is throttled: a hit that ends
+   * a life is the record `MessageHandler.applyBoundaryContact` suppresses the
+   * motion-rejection warning in favour of, so it has to be written every time.
+   * A hit a hold absorbs entirely changes no health and is not logged here at
+   * all; for a wall contact the refused pose carries that record instead, under
+   * its own throttle. A cooperative downing ends a life without destroying
    * the hull, and before it had its own event it was logged as a throttleable
    * `damage_applied` — which meant a wall death in cooperative play could leave
    * no record at all once the warning was suppressed.

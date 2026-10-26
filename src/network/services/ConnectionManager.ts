@@ -1761,9 +1761,13 @@ export class ConnectionManager {
       if (shouldLogDamage) {
         this.lastDamageStateLogAt = observedAt;
         // The server distinguishes a cooperative downing as `player_downed`;
-        // this mirror deliberately does not, because `playerDamaged` carries only
-        // `isDestroyed`. The server record is the authority for damage and death
-        // (`docs/diagnostics.md`), so a downing reads as `damage_applied` here.
+        // this mirror deliberately does not. The discriminator is on the wire —
+        // `remainingHealth <= 0` with `isDestroyed` false is a downing, and the
+        // record below already carries it as `healthAfter` — but production
+        // forwards only `player_died` and `player_respawned`
+        // (`src/utils/logForwardPolicy.ts`), so a client row for a downing never
+        // ships, and the server record is the authority for damage and death
+        // (`docs/diagnostics.md`). A downing reads as `damage_applied` here.
         logger.info('STATE', data.isDestroyed ? 'player_died' : 'damage_applied', {
           observedAt,
           playerId: data.targetPlayerId,

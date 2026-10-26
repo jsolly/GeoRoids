@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { GAMEPLAY_MESSAGE_BUDGET } from '../../../../server/communication/messageBudget';
 import { checkBoundaryCollision } from '../../../../shared/boundary';
 import { SHIP } from '../../../../shared/constants/gameplay';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../../shared/gameClock';
@@ -171,6 +172,59 @@ test('a wall contact report that never left is retried on the next frame', () =>
   // Delivered, so the rest of this contact run stays quiet.
   game.updateGame(GAME_TICK_MS);
   expect(attempts).toHaveLength(3);
+});
+
+test('a hull skimming the wall cannot outspend the inbound message budget', () => {
+  const ship = arrangeFlight();
+  ship.velocity = { x: 0, y: 0 };
+  ship.angularVelocity = 0;
+  ship.thrusting = false;
+  ship.blinkCount = 0;
+  const inside = { x: WORLD.radius - ship.r - 1, y: 0 };
+  const touching = { x: WORLD.radius - ship.r + 1, y: 0 };
+  expect(checkBoundaryCollision(inside, ship.r)).toBe(false);
+  expect(checkBoundaryCollision(touching, ship.r)).toBe(true);
+  let reports = 0;
+  vi.spyOn(PlayerManager.getInstance(), 'updateNetworkState').mockImplementation(() => {
+    reports += 1;
+    return true;
+  });
+
+  // The wall rule floors the radius, so a hull travelling almost tangentially
+  // along the rim can cross the threshold back and forth. Alternating every
+  // frame is the fastest that can happen: a rising edge needs an intervening
+  // frame out of contact, so one second of 60 Hz frames holds at most 30 of
+  // them. Drive exactly that worst case.
+  for (let frame = 0; frame < 60; frame++) {
+    ship.position = frame % 2 === 0 ? { ...touching } : { ...inside };
+    game.updateGame(GAME_TICK_MS);
+  }
+
+  expect(reports).toBe(30);
+  // Honest gameplay traffic is 60 poses plus 30 applied-snapshot
+  // acknowledgments per second, as `GAMEPLAY_MESSAGE_BUDGET`'s own docblock
+  // records. The worst case above has to fit in what is left, because
+  // exceeding the budget drops the connection instead of throttling it.
+  const honestTrafficPerSecond = 60 + 30;
+  expect(honestTrafficPerSecond + reports).toBeLessThanOrEqual(
+    GAMEPLAY_MESSAGE_BUDGET.messagesPerSecond
+  );
+
+  // Alternating every frame never asks the latch to hold, because leaving
+  // contact clears it anyway. Dwelling in contact is what the latch is for:
+  // two frames against the wall for every frame off it leaves 20 rising edges
+  // across the same second, not the 40 contact frames.
+  reports = 0;
+  for (let frame = 0; frame < 60; frame++) {
+    ship.position = frame % 3 === 2 ? { ...inside } : { ...touching };
+    game.updateGame(GAME_TICK_MS);
+  }
+  expect(reports).toBe(20);
+  // It also cannot be sustained: every one of those contacts is a pose the
+  // server refuses, and a vulnerable hull is destroyed on the first one. Only
+  // a hold large enough to absorb the hit survives to graze again, and each
+  // contact spills from it (`tests/unit/server/authoritative-combat.test.ts`),
+  // so the rate above is a ceiling for a few frames rather than a steady state.
 });
 
 test('a new session does not inherit a latched wall contact', () => {

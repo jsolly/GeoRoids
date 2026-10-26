@@ -493,9 +493,10 @@ export class GameController {
     // the 60 Hz pose timer can only ever sample the burst's final frame: on a
     // client advancing two frames per repaint, a contact lasting a single frame
     // would never reach the server and the wall would not be lethal there.
-    // At most one *delivered* report per contact run. A refused attempt sends
-    // nothing — `sendPlayerState` returns false before it builds a packet — so
-    // retrying on later overlapping frames costs no inbound budget:
+    // At most one *delivered* report per contact run. A refused attempt puts
+    // nothing on the wire — `sendPlayerState` refuses before building a packet,
+    // and a send that throws retires the socket — so retrying on later
+    // overlapping frames costs no inbound budget:
     // `server/communication/messageBudget.ts` allows 120/s against roughly 90/s
     // of poses and snapshot acknowledgments, and exceeding it terminates the
     // socket rather than throttling it. `InputManager.updateMovementLock`

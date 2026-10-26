@@ -28,11 +28,16 @@ export class CollisionManager {
    * keeps flying outward instead, so it re-reports the overlap until the server
    * acts on it.
    *
-   * For the same reason the reported position must reach the socket unclamped:
-   * rounding or clamping a hull back inside the wall anywhere between here and
-   * `ConnectionManager.sendPlayerState` would mean the server never sees a
-   * contact, and the wall would silently stop being lethal.
-   * `tests/unit/network/wall-contact-reaches-the-server.test.ts` fails if it is.
+   * For the same reason the reported position must reach the socket unclamped.
+   * Two places carry it: `ship.position` itself, and
+   * `PlayerMotionReconciliation.buildHandoffPose`, which copies it into the
+   * pose. Rounding or clamping a hull back inside the wall in either one would
+   * mean the server never sees a contact, and the wall would silently stop
+   * being lethal; `tests/unit/network/wall-contact-reaches-the-server.test.ts`
+   * fails if it is. `Player.getStateForNetwork` is not on that list: its
+   * position is overwritten by the pose allocator in
+   * `ConnectionManager.sendPlayerState`, so a clamp there never reaches the
+   * wire and no test guards it.
    *
    * Returns true when a hull registered contact, so the caller can report that
    * frame's position at once — see `GameController.reportBoundaryContact`.

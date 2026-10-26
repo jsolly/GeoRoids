@@ -1,5 +1,6 @@
 /* @vitest-environment node */
 
+import { readFileSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { expect, test } from 'vitest';
 import {
@@ -10,8 +11,11 @@ import {
   CONNECTION_ADMISSION_WINDOW_MS,
   createConnectionAdmission,
   GAMEPLAY_CONNECTIONS_PER_WINDOW,
+  GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
   LOG_CONNECTIONS_PER_WINDOW,
+  LOG_CONNECTIONS_PER_WINDOW_ALL,
   MAX_PLAYERS,
+  MAX_TRACKED_ADDRESSES,
   UNATTRIBUTED_CLIENT,
   UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW,
   UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW,
@@ -95,28 +99,109 @@ test('a refused upgrade neither spends budget nor extends the caller window', ()
   ).toMatchObject({ accepted: true, count: 1 });
 });
 
-test('a fleet the edge cannot attribute climbs its whole ladder on the shared budget', () => {
+test('a fleet the edge cannot attribute keeps the budget it had when attributed', () => {
   const admission = createConnectionAdmission(false);
   const now = 5_000_000;
 
-  // Ingress that stops supplying X-Real-IP used to charge every pilot to the
-  // proxy's own address, refusing MAX_PLAYERS - 50 of them per window. The
-  // shared budget is sized for the case it exists for, so the whole fleet can
-  // drop and climb its retry ladder without a single refusal.
+  // The case an earlier revision got wrong, and the reason both lanes now size
+  // this bucket by the same rule. Its gameplay budget came from the retry
+  // ladder, so a fleet whose pilots each drop TWICE inside one window -- 12
+  // upgrades each, far inside the 50 they hold when attributed -- was admitted
+  // in full when attributed and lost exactly half when not. "Half the pilots
+  // refused" is the outcome this bucket exists to prevent.
+  const perPilot = 2 * WORST_HONEST_UPGRADES_PER_PILOT;
+  expect(perPilot).toBeLessThan(GAMEPLAY_CONNECTIONS_PER_WINDOW);
   let refused = 0;
-  for (let attempt = 0; attempt < MAX_PLAYERS * WORST_HONEST_UPGRADES_PER_PILOT; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_PLAYERS * perPilot; attempt += 1) {
     if (!admission.admit(UNATTRIBUTED_CLIENT, '/ws', now).accepted) {
       refused += 1;
     }
   }
   expect(refused).toBe(0);
-  expect(MAX_PLAYERS).toBeGreaterThan(GAMEPLAY_CONNECTIONS_PER_WINDOW);
 
-  // It is a budget and not a blank cheque: the next one is refused, and the
-  // refusal names the shared budget rather than a pilot's own.
-  expect(admission.admit(UNATTRIBUTED_CLIENT, '/ws', now)).toMatchObject({
+  // Parity, stated as the invariant rather than as a number: the shared bucket
+  // may spend exactly what a full fleet may spend when the edge can tell its
+  // pilots apart.
+  expect(UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(
+    MAX_PLAYERS * GAMEPLAY_CONNECTIONS_PER_WINDOW
+  );
+  expect(UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW).toBe(MAX_PLAYERS * LOG_CONNECTIONS_PER_WINDOW);
+});
+
+test('the tracking ceiling bounds the bucket map on an unauthenticated path', () => {
+  const admission = createConnectionAdmission(false);
+  const now = 5_200_000;
+
+  // Re-keying from the socket peer to the forwarded address made this map
+  // attacker-diverse, and /logs reaches admit with no auth and no handshake, so
+  // without a ceiling a caller presenting distinct addresses grows it without
+  // limit until the container dies. Drive well past the ceiling.
+  for (let index = 0; index < MAX_TRACKED_ADDRESSES * 3; index += 1) {
+    admission.admit(`10.${(index >> 16) & 255}.${(index >> 8) & 255}.${index & 255}`, '/logs', now);
+  }
+  expect(admission.size()).toBeLessThanOrEqual(MAX_TRACKED_ADDRESSES);
+
+  // The refusal says which bound stopped it, because an operator reading one
+  // address over its own budget and the whole map being full needs to tell them
+  // apart.
+  expect(admission.admit('203.0.113.77', '/logs', now)).toMatchObject({
     accepted: false,
-    limit: UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW,
+    scope: 'tracking',
+    limit: MAX_TRACKED_ADDRESSES,
+  });
+
+  // A caller that already holds a bucket is unaffected by a full map: the
+  // ceiling is checked only where a new key would be inserted.
+  expect(admission.admit('10.0.0.0', '/logs', now).accepted).toBe(true);
+
+  // And the map drains once the windows roll rather than staying full forever.
+  admission.prune(now + CONNECTION_ADMISSION_WINDOW_MS + 1);
+  expect(admission.size()).toBe(0);
+});
+
+test('the lane backstop is above every honest demand, so it refuses no honest caller', () => {
+  const admission = createConnectionAdmission(false);
+  const now = 5_400_000;
+
+  // The backstop exists to bound a bypass of per-address attribution, not to
+  // ration honest traffic. An earlier revision sized it from the retry ladder,
+  // which put it BELOW the sum of the per-address budgets a full fleet holds,
+  // so spending it refused honest callers and became a denial of service.
+  // It is now that sum plus the shared bucket, which is every way the limiter
+  // can legitimately be spent at once.
+  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL).toBe(
+    MAX_PLAYERS * GAMEPLAY_CONNECTIONS_PER_WINDOW + UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW
+  );
+  expect(LOG_CONNECTIONS_PER_WINDOW_ALL).toBe(
+    MAX_PLAYERS * LOG_CONNECTIONS_PER_WINDOW + UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW
+  );
+  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL).toBeGreaterThan(
+    UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW
+  );
+
+  // Driven, not only asserted: the shared bucket fully spent AND a full fleet
+  // each spending its own budget, in one window, with nothing refused by the
+  // backstop.
+  let refusedByLane = 0;
+  for (let attempt = 0; attempt < UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW; attempt += 1) {
+    if (admission.admit(UNATTRIBUTED_CLIENT, '/ws', now).scope === 'lane') {
+      refusedByLane += 1;
+    }
+  }
+  for (let pilot = 0; pilot < MAX_PLAYERS; pilot += 1) {
+    for (let attempt = 0; attempt < GAMEPLAY_CONNECTIONS_PER_WINDOW; attempt += 1) {
+      if (admission.admit(`198.51.100.${pilot}`, '/ws', now).scope === 'lane') {
+        refusedByLane += 1;
+      }
+    }
+  }
+  expect(refusedByLane).toBe(0);
+
+  // One more is over the backstop, and it says so.
+  expect(admission.admit('203.0.113.9', '/ws', now)).toMatchObject({
+    accepted: false,
+    scope: 'lane',
+    limit: GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
   });
 });
 
@@ -131,7 +216,7 @@ test('flooding the bucket a caller can choose cannot refuse an attributed pilot'
   // 488 of 600 honest joins from a single machine, indefinitely. Spend the
   // shared budget to its limit and past it, from the key a caller can pick.
   let accepted = 0;
-  for (let attempt = 0; attempt < UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW * 2; attempt += 1) {
+  for (let attempt = 0; attempt < UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW + 50; attempt += 1) {
     if (admission.admit(UNATTRIBUTED_CLIENT, '/ws', now).accepted) {
       accepted += 1;
     }
@@ -152,22 +237,16 @@ test('flooding the bucket a caller can choose cannot refuse an attributed pilot'
   expect(admission.admit('203.0.113.1', '/logs', now).accepted).toBe(true);
 });
 
-test('the shared budgets are the fleet demand the client ladder actually produces', () => {
+test('a pilot can climb its whole retry ladder inside its own budget', () => {
   // The ladder is the client's, so the server restates its length and this pins
   // the two against each other: the server may not import src/.
   expect(WORST_HONEST_UPGRADES_PER_PILOT).toBe(1 + RECONNECT_DELAYS_MS.length);
 
-  // Each shared budget is exactly a full fleet's worst honest demand in its own
-  // lane: one upgrade per pilot plus every ladder rung for gameplay, and each
-  // pilot's own log budget for diagnostics. Both are derived rather than
-  // chosen, because every hand-picked figure on this branch was wrong -- 600
-  // described as having headroom when it was the demand exactly, a logs figure
-  // of 60 below MAX_PLAYERS, and a ceiling three times under the budgets a
-  // fleet already holds.
-  expect(UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(
-    MAX_PLAYERS * (1 + RECONNECT_DELAYS_MS.length)
-  );
-  expect(UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW).toBe(MAX_PLAYERS * LOG_CONNECTIONS_PER_WINDOW);
+  // What the ladder is still load-bearing for, now that no limit is derived
+  // from it: a pilot's own budget has to cover the upgrade plus every rung, or
+  // an honest reconnect is refused by its own budget.
+  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW).toBeGreaterThanOrEqual(WORST_HONEST_UPGRADES_PER_PILOT);
+  expect(LOG_CONNECTIONS_PER_WINDOW).toBeGreaterThanOrEqual(1);
 });
 
 test('prune drops the buckets of addresses that stopped calling, and keeps the rest', () => {
@@ -286,6 +365,36 @@ test('a full fleet forwards its records after a deploy without one refusal', () 
     count: LOG_CONNECTIONS_PER_WINDOW,
     limit: LOG_CONNECTIONS_PER_WINDOW,
   });
+});
+
+test('the runbook greps a string the server actually emits, and quotes the real limits', () => {
+  // This exists because the two drifted apart within one change: the grep token
+  // was documented against the string of the day, the emitter was reworded one
+  // commit later, and the only new observability handle became unreachable as
+  // documented. Six review lenses found it and no test could. Pinning the
+  // literal means a future rewording fails here instead of silently breaking a
+  // runbook an operator follows during an incident.
+  const runbook = readFileSync('docs/diagnostics.md', 'utf8');
+  const server = readFileSync('server/createServer.ts', 'utf8');
+
+  const quoted = runbook.match(/Grep\n?`([^`]+)`/u);
+  expect(quoted).not.toBeNull();
+  const token = quoted?.[1] ?? '';
+  expect(token.length).toBeGreaterThan(8);
+  expect(server).toContain(token);
+
+  // The limits the runbook quotes are the limits that ship. An operator sizing
+  // an incident against stale numbers reaches the wrong conclusion as surely as
+  // one grepping a string that is not there.
+  for (const figure of [
+    UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW,
+    UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW,
+    GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
+    LOG_CONNECTIONS_PER_WINDOW_ALL,
+    MAX_TRACKED_ADDRESSES,
+  ]) {
+    expect(runbook).toContain(figure.toLocaleString('en-US'));
+  }
 });
 
 test('the claimed forwarded address is trusted only behind Railway ingress', () => {

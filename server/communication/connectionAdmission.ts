@@ -17,41 +17,74 @@ export const WORST_HONEST_UPGRADES_PER_PILOT = 1 + RECONNECT_LADDER_STEPS;
 /**
  * What the shared unattributed bucket may spend, per lane.
  *
- * Sized to the whole fleet's worst honest demand, because that is exactly the
- * case the bucket exists for: ingress stops supplying `X-Real-IP` and every
- * pilot collapses onto this one key, so a full fleet must still be able to
- * rejoin and keep forwarding records. A pilot's own budget already bounds its
- * share of that, so the product is the honest ceiling rather than a guess.
+ * Both lanes use ONE rule: a full fleet times that lane's per-pilot budget. The
+ * bucket exists for a fleet collapsed onto a single key by ingress that stopped
+ * supplying `X-Real-IP`, so parity with the attributed regime is the only
+ * sizing that keeps the degradation honest.
  *
- * There is deliberately no ceiling across all addresses. An earlier revision
- * added one and gave this bucket the whole of it, which made the key a caller
- * can select for itself the cheapest way to close the lane for everyone:
- * independent review reproduced one source refusing 488 of 600 honest joins
- * from a single machine with no address rotation, indefinitely. The same
- * ceiling also refused honest callers who were inside their own budget, in
- * both lanes, because the sums of the per-address budgets a full fleet holds
- * are larger than any ceiling that was tight enough to be worth having.
- * Bounding a lane in aggregate without handing out that lever needs a design
- * this change does not have; `main` has no aggregate bound either, so leaving
- * it out is no weaker than today.
+ * An earlier revision sized the gameplay one from the retry ladder instead, and
+ * the two lanes then derived their budgets by different rules. Independent
+ * review reproduced the consequence: a full fleet whose pilots each drop twice
+ * inside one window is admitted in full when attributed and loses exactly half
+ * when not -- "half the pilots refused", which is the outcome this bucket is
+ * supposed to prevent, reached in the lane that decides whether a pilot rejoins.
  */
 export const UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW =
-  MAX_PLAYERS * WORST_HONEST_UPGRADES_PER_PILOT;
+  MAX_PLAYERS * GAMEPLAY_CONNECTIONS_PER_WINDOW;
 export const UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW = MAX_PLAYERS * LOG_CONNECTIONS_PER_WINDOW;
 
 /**
- * The address charged when the edge cannot tell callers apart.
+ * A backstop across every address in one lane. It exists for one job: to bound
+ * what a bypass of per-address attribution can spend. It is NOT a fair-share
+ * device and must never refuse an honest caller.
  *
- * Such traffic shares one fleet-sized budget instead of one pilot's. Squeezing
- * a whole fleet through a single per-address bucket is the lockout this limiter
- * exists to prevent, so ingress that stops supplying `X-Real-IP` has to degrade
- * to "the fleet shares a fleet-sized budget" rather than to "half the pilots are
- * refused" — which is what charging them all to the proxy's own address did.
+ * Sized so it cannot: a full fleet's attributed demand is
+ * `MAX_PLAYERS * <per-pilot budget>`, the shared bucket above may spend the
+ * same again, and this is their sum. So the worst honest attributed fleet,
+ * running at the same time as a fully spent shared bucket, still fits.
  *
- * A caller can put itself in this bucket by withholding or mangling the header,
- * so its budget bounds only itself: it is never the whole of some larger limit
- * that attributable callers also answer to.
+ * An earlier revision had a ceiling and deleted it; both were wrong, for
+ * reasons worth keeping:
+ *
+ * - As first shipped it was sized from the retry ladder
+ *   (`MAX_PLAYERS * WORST_HONEST_UPGRADES_PER_PILOT * 2`), which is far BELOW
+ *   the sum of the per-address budgets a full fleet actually holds. It
+ *   therefore refused callers who were inside their own budget, and spending it
+ *   became a denial of service: review reproduced one source refusing 488 of
+ *   600 honest joins from a single machine. Sizing from the per-address budget
+ *   rather than the ladder is what fixes that, and the relationship is pinned
+ *   by a test rather than asserted here.
+ * - Deleting it was justified with "`main` has no aggregate bound either". That
+ *   was FALSE. On `main` the key is the socket peer, which behind Railway's
+ *   edge is the proxy, so every caller shared ONE bucket and the whole internet
+ *   got 50 accepted gameplay upgrades a minute between them. `main`'s aggregate
+ *   bound is a side effect of the very bug this file now fixes, so re-keying to
+ *   the real client removes it. Leaving it removed took the server-wide rate
+ *   from hard-capped to uncapped.
  */
+export const GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL =
+  MAX_PLAYERS * GAMEPLAY_CONNECTIONS_PER_WINDOW + UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW;
+export const LOG_CONNECTIONS_PER_WINDOW_ALL =
+  MAX_PLAYERS * LOG_CONNECTIONS_PER_WINDOW + UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW;
+
+/**
+ * How many live per-address buckets the limiter will hold.
+ *
+ * Re-keying from the socket peer to the forwarded address made this map
+ * attacker-diverse: on `main` it held one key per edge proxy, here it holds one
+ * per claimed client. `/logs` upgrades reach `admit` with no auth and no
+ * completed handshake, so without a bound a caller presenting distinct
+ * addresses -- an IPv6 /64 routed to one host is the ordinary case -- grows it
+ * without limit and exhausts the container. Measured at 184 bytes an entry,
+ * retained up to two windows.
+ *
+ * The figure and the shape both follow `../debugReports/http.ts`, which caps
+ * its own address-keyed map and prunes inline on every request. A full fleet
+ * needs `MAX_PLAYERS` per lane, so this leaves room for several times the
+ * honest working set.
+ */
+export const MAX_TRACKED_ADDRESSES = 1_024;
+
 export const UNATTRIBUTED_CLIENT = 'unattributed';
 
 export function connectionLimitsDisabled(env: {
@@ -73,6 +106,8 @@ interface ConnectionAdmissionDecision {
   firstRejection: boolean;
   count: number;
   limit: number;
+  /** Which bound refused: the caller's own budget, the lane backstop, or the tracking ceiling. */
+  scope: 'address' | 'lane' | 'tracking';
 }
 
 interface Bucket {
@@ -96,6 +131,7 @@ interface Bucket {
  */
 export function createConnectionAdmission(disabled: boolean) {
   const buckets = new Map<string, Bucket>();
+  const laneTotals = new Map<string, Bucket>();
 
   /**
    * The bucket for the window containing `now`. A rolled window yields a fresh
@@ -115,6 +151,15 @@ export function createConnectionAdmission(disabled: boolean) {
     store.set(key, bucket);
   }
 
+  /** Drops every bucket whose window has rolled. */
+  function dropRolled(now: number): void {
+    for (const [key, bucket] of buckets) {
+      if (now - bucket.windowStart > CONNECTION_ADMISSION_WINDOW_MS) {
+        buckets.delete(key);
+      }
+    }
+  }
+
   return {
     admit(ip: string, pathname: string, now: number): ConnectionAdmissionDecision {
       const lane: ConnectionLane = pathname === '/logs' ? 'logs' : 'gameplay';
@@ -129,19 +174,60 @@ export function createConnectionAdmission(disabled: boolean) {
             ? LOG_CONNECTIONS_PER_WINDOW
             : GAMEPLAY_CONNECTIONS_PER_WINDOW;
       if (disabled) {
-        return { accepted: true, lane, firstRejection: false, count: 0, limit };
+        return { accepted: true, lane, firstRejection: false, count: 0, limit, scope: 'address' };
       }
+      const laneLimit =
+        lane === 'logs' ? LOG_CONNECTIONS_PER_WINDOW_ALL : GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL;
       const key = `${lane}:${ip}`;
       const own = bucketFor(buckets, key, now);
-      // The budget is read before it is charged, so a refused upgrade is never
-      // billed and never moves a window.
+      const all = bucketFor(laneTotals, lane, now);
+      // Every budget is read before any of them is charged, so a refused
+      // upgrade is never billed and never moves a window.
       if (own.count >= limit) {
         const firstRejection = !own.rejected;
         own.rejected = true;
-        return { accepted: false, lane, firstRejection, count: own.count, limit };
+        return { accepted: false, lane, firstRejection, count: own.count, limit, scope: 'address' };
+      }
+      if (all.count >= laneLimit) {
+        const firstRejection = !all.rejected;
+        all.rejected = true;
+        return {
+          accepted: false,
+          lane,
+          firstRejection,
+          count: all.count,
+          limit: laneLimit,
+          scope: 'lane',
+        };
+      }
+      // A new key is what grows the map, so the ceiling is checked here and not
+      // on a caller that already has a bucket. Rolled windows are dropped first,
+      // so a window's worth of one-shot addresses cannot occupy the ceiling.
+      if (!buckets.has(key)) {
+        if (buckets.size >= MAX_TRACKED_ADDRESSES) {
+          dropRolled(now);
+        }
+        if (buckets.size >= MAX_TRACKED_ADDRESSES) {
+          return {
+            accepted: false,
+            lane,
+            firstRejection: true,
+            count: buckets.size,
+            limit: MAX_TRACKED_ADDRESSES,
+            scope: 'tracking',
+          };
+        }
       }
       charge(buckets, key, own);
-      return { accepted: true, lane, firstRejection: false, count: own.count, limit };
+      charge(laneTotals, lane, all);
+      return {
+        accepted: true,
+        lane,
+        firstRejection: false,
+        count: own.count,
+        limit,
+        scope: 'address',
+      };
     },
     /**
      * Drops buckets whose window has rolled, so the map stays bounded. What
@@ -156,9 +242,10 @@ export function createConnectionAdmission(disabled: boolean) {
      * timestamp is the honest shape.
      */
     prune(now: number): void {
-      for (const [key, bucket] of buckets) {
+      dropRolled(now);
+      for (const [key, bucket] of laneTotals) {
         if (now - bucket.windowStart > CONNECTION_ADMISSION_WINDOW_MS) {
-          buckets.delete(key);
+          laneTotals.delete(key);
         }
       }
     },

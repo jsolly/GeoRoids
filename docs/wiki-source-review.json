@@ -7,7 +7,7 @@
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
-    "docs/diagnostics.md": "sha256:899f825ead3ce2bdea98463f82674ab56dae018e3120598748c884fcf06b8dca",
+    "docs/diagnostics.md": "sha256:2cc5bbf857e7f0fa9cfb4b0deaa3d4eed89feef8e75886de55d548a0c582587b",
     "docs/protocol/snapshot-v3.md": "sha256:466d9bf94b7f001cb0d4750a418685f547806a39b328f7fda2b9d23a8f6b9bc6",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
@@ -87,7 +87,7 @@
     "server/communication/MessageHandler.ts": "sha256:e36846a2e40fc0af865bca347ae621fdd4a5c1b6f1e95260e0ee77bf8bbcf8fa",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8f78ce6b844dfa331dd7881ca6e26e3b226de65a5ecb358db42598ab3a138cf7",
-    "server/communication/connectionAdmission.ts": "sha256:60027246d8c0d36072ce58df3fb73c4753f03bf1b1ebdd42d49f01a5114eb2ea",
+    "server/communication/connectionAdmission.ts": "sha256:9d0547e25316e21215f9d4a22072eb9e20c4c1f37463dd6fec913f4cfc5ed859",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:69ba5c1a0447d99fc801e2719655d0656fe989dd377bd76664d487f8cf04c3c0",
+    "server/createServer.ts": "sha256:a8f11ee11749ee76c01a4e75eb08a5f374740028d08d70f65fb358f7114f2f82",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
@@ -573,7 +573,8 @@
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
     "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585",
-    "server/communication/clientAddress.ts": "sha256:a2a6596be6201c6ea391f5b6d1bab1e2ccbce2b5671ff9cf9f66d7891151f5e8"
+    "server/communication/clientAddress.ts": "sha256:a2a6596be6201c6ea391f5b6d1bab1e2ccbce2b5671ff9cf9f66d7891151f5e8",
+    "server/communication/lostAttribution.ts": "sha256:77e5bbbc2eab2c7742e0236ad0386b365ea9e4bc031a9f8220cd55b3355e6876"
   },
   "reviews": [
     {
@@ -596,7 +597,7 @@
       "owners": {}
     },
     {
-      "note": "Reviewed merged package manifest: preserve PR6 complete gate commands and main\u2019s landed Knip 6.38.0 update. No gameplay controls, Wiki prose, demonstrations or runtime dependency behavior changed.",
+      "note": "Reviewed merged package manifest: preserve PR6 complete gate commands and main’s landed Knip 6.38.0 update. No gameplay controls, Wiki prose, demonstrations or runtime dependency behavior changed.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],
@@ -2564,7 +2565,7 @@
       }
     },
     {
-      "note": "Removed cooperative mining targets, timers, tags, split audio/shockwaves and the split demonstration. Reviewed first-hit ordinary mining, retained durable metal/colossal/rubble behavior and data, protocol3 negotiation and storage migration; updated asteroid/Hauler/controls guidance and references. Baseline76 passed; migrated focused gameplay/network/persistence checks passed after fixture corrections. Types, Biome, Knip and Markdown checks passed. All10 surviving demos reproduced byte-for-byte with Pillow12.3.0. Two simultaneous local Chromium clients at1280x900 and390x844 fired competing shots: one destruction/drop set, ordinary shatter and audio starts, metal health75\u219250 on both. Game and asteroid Wiki screenshots inspected at both widths; no console warnings/errors. No physical-phone or human listening claim. Full gate follows this scoped acceptance. Integrated cleared-nest main changes; preserved their independent review and current snapshot rows.",
+      "note": "Removed cooperative mining targets, timers, tags, split audio/shockwaves and the split demonstration. Reviewed first-hit ordinary mining, retained durable metal/colossal/rubble behavior and data, protocol3 negotiation and storage migration; updated asteroid/Hauler/controls guidance and references. Baseline76 passed; migrated focused gameplay/network/persistence checks passed after fixture corrections. Types, Biome, Knip and Markdown checks passed. All10 surviving demos reproduced byte-for-byte with Pillow12.3.0. Two simultaneous local Chromium clients at1280x900 and390x844 fired competing shots: one destruction/drop set, ordinary shatter and audio starts, metal health75→50 on both. Game and asteroid Wiki screenshots inspected at both widths; no console warnings/errors. No physical-phone or human listening claim. Full gate follows this scoped acceptance. Integrated cleared-nest main changes; preserved their independent review and current snapshot rows.",
       "sources": [
         "docs/protocol/snapshot-v2.md",
         "docs/protocol/snapshot-v3.md",
@@ -7173,7 +7174,7 @@
       }
     },
     {
-      "note": "Re-reviewed the chip-cue contract after correcting its fixture types: material 'rock' is not an AsteroidMaterial (now 'ice', the ordinary first-hit case the test describes), the burning boost now uses the real AsteroidBoost shape { phase, ownerId, angle }, and the fixture id 'rubble' became 'ice-rock' so it no longer reads as a material it is not. The three assertions are unchanged \u2014 a surviving deposit reports each chip, a shatter reports destruction alone, and hits that never applied stay silent. Player rules and demonstrations are unaffected. Verified check:ts, check:lint and the three cases after the correction.",
+      "note": "Re-reviewed the chip-cue contract after correcting its fixture types: material 'rock' is not an AsteroidMaterial (now 'ice', the ordinary first-hit case the test describes), the burning boost now uses the real AsteroidBoost shape { phase, ownerId, angle }, and the fixture id 'rubble' became 'ice-rock' so it no longer reads as a material it is not. The three assertions are unchanged — a surviving deposit reports each chip, a shatter reports destruction alone, and hits that never applied stay silent. Player rules and demonstrations are unaffected. Verified check:ts, check:lint and the three cases after the correction.",
       "sources": ["tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"],
       "topics": ["asteroids"],
       "media": [],
@@ -7325,7 +7326,7 @@
       }
     },
     {
-      "note": "Reviewed hud-network against the removal of this branch's cross-address connection ceilings; no page needed an edit, and the change removes a player-visible failure cause rather than adding one. Independent review confirmed nine Important findings against the ceilings, three of them a denial-of-service lever reachable from one machine: a caller inside its own budget was still refused once the lane total was spent, and the one bucket a caller can select for itself -- by withholding or mangling X-Real-IP -- was granted that whole total as its own budget, so one source reproducibly refused 488 of 600 honest joins, indefinitely. The ceilings also sat under honest fleet demand in both lanes at once, refusing 400 of 600 log upgrades from pilots each inside their own budget. They are removed rather than resized: with no shared total there is nothing for a caller to exhaust, and main has no aggregate bound either, so this is no weaker than today. Unattributable callers keep a budget of their own, sized to a full fleet's worst honest demand per lane (600), so losing the header still degrades to a fleet sharing a fleet-sized budget instead of half the pilots being refused. What this means for the page: hud-network lists nickname in use, server full and outdated tab as the reasons a join fails, and that list is now more accurate, because a pilot can no longer be refused on account of other callers' traffic. The remaining refusals are unreachable in honest play -- a pilot's own budget is 50 upgrades a minute against a client ladder of six, and a full fleet's worst honest demand equals the shared budget exactly -- so no documented cause changed and none needs adding. docs/diagnostics.md is updated in the same change because it is the operator-facing description of what bounds an upgrade: it now states that per-address means the forwarded X-Real-IP behind Railway ingress, that unattributable callers share one fleet-sized budget, that there is deliberately no limit across all addresses, and it names the greppable lost-attribution warning. docs/agent-operations.md is updated too, because the before-release verification that Railway replaces client-supplied X-Real-IP now covers the WebSocket upgrade path and not only the reporting listener. No player-facing string, receipt state, limit or generated reference value changes, and no demonstration cites these sources. Verified: lint, typecheck, 689 server unit tests across 94 files, and seven mutation checks each failing a named test before being reverted -- including re-introducing a shared lane ceiling, which fails the case written for it.",
+      "note": "Reviewed hud-network against the removal of this branch's cross-address connection ceilings; no page needed an edit, and the change removes a player-visible failure cause rather than adding one. Independent review confirmed nine Important findings against the ceilings, three of them a denial-of-service lever reachable from one machine: a caller inside its own budget was still refused once the lane total was spent, and the one bucket a caller can select for itself -- by withholding or mangling X-Real-IP -- was granted that whole total as its own budget, so one source reproducibly refused 488 of 600 honest joins, indefinitely. The ceilings also sat under honest fleet demand in both lanes at once, refusing 400 of 600 log upgrades from pilots each inside their own budget. They were removed rather than resized, and that went too far: a later round of the same review established that the premise behind it -- that main has no aggregate bound either -- is false. main keys on the socket peer, which behind the edge is the proxy, so every caller shares one bucket and the whole internet gets 50 accepted gameplay upgrades a minute between them; main's aggregate bound is a side effect of the very bug this change fixes, so re-keying to the real client is what removes it. A backstop across all addresses is therefore kept, sized above every way the limiter can legitimately be spent at once so it cannot refuse an honest caller, together with a ceiling on how many address buckets are tracked at all. Unattributable callers keep a budget of their own, sized to a full fleet's worst honest demand per lane (600), so losing the header still degrades to a fleet sharing a fleet-sized budget instead of half the pilots being refused. What this means for the page: hud-network lists nickname in use, server full and outdated tab as the reasons a join fails, and that list is now more accurate, because a pilot can no longer be refused on account of other callers' traffic. The remaining refusals are unreachable in honest play -- a pilot's own budget is 50 upgrades a minute against a client ladder of six, and a full fleet's worst honest demand equals the shared budget exactly -- so no documented cause changed and none needs adding. docs/diagnostics.md is updated in the same change because it is the operator-facing description of what bounds an upgrade: it now states that per-address means the forwarded X-Real-IP behind Railway ingress, that unattributable callers share one fleet-sized budget, that there is deliberately no limit across all addresses, and it names the greppable lost-attribution warning. docs/agent-operations.md is updated too, because the before-release verification that Railway replaces client-supplied X-Real-IP now covers the WebSocket upgrade path and not only the reporting listener. No player-facing string, receipt state, limit or generated reference value changes, and no demonstration cites these sources. Verified: lint, typecheck, 689 server unit tests across 94 files, and seven mutation checks each failing a named test before being reverted -- including re-introducing a shared lane ceiling, which fails the case written for it.",
       "sources": [
         "docs/diagnostics.md",
         "server/communication/connectionAdmission.ts",
@@ -7344,6 +7345,30 @@
       "media": [],
       "owners": {
         "server/communication/connectionAdmission.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed hud-network again after a second review round found that the previous revision of this change had introduced a Critical. No page needs an edit, and the conclusion recorded in the two preceding entries still holds for the player-facing surface, but one sentence in entry 250 was false and is corrected in place rather than retracted beneath itself. What the round found. Removing the cross-address ceilings was justified with the claim that main has no aggregate bound either. That is false: main keys the limiter on the socket peer, which behind Railway's edge is the proxy, so every caller shares one bucket and the whole internet gets 50 accepted gameplay upgrades a minute between them. main's aggregate bound is a side effect of the very bug this change fixes, so charging the real client removes it, and deleting the explicit ceiling on top took the server-wide accepted rate from hard-capped to uncapped. Worse, re-keying made the limiter's bucket map attacker-diverse on a path that needs no authentication and no completed handshake: /logs reaches admission directly, each distinct address inserts a retained entry of about 184 bytes held up to two windows, and an IPv6 /64 routed to one host is the ordinary case, so a caller could exhaust the container, and the prune sweep that walks the map shares an event loop with the 60 Hz frame. What ships now. A ceiling of 1,024 tracked address buckets, following the cap and inline pruning that debugReports/http.ts already uses on a map keyed through the same resolver; rolled windows are dropped before it refuses anything, and a caller that already holds a bucket is never refused by it. A lane backstop across every address, sized at a full fleet's own budgets plus the shared budget, which is every way the limiter can legitimately be spent at once, so it bounds a bypass of attribution without being able to refuse an honest caller -- the earlier ceiling failed because it was sized from the retry ladder, far below the per-address budgets a full fleet holds. And both lanes now size the shared unattributed budget by one rule, a full fleet times that lane's per-pilot budget, because deriving the gameplay one from the retry ladder meant a fleet whose pilots each dropped twice in a window lost exactly half of them -- the half-the-pilots-refused outcome the shared budget exists to prevent, which the previous entry claimed had been avoided. What this means for the page: still nothing. hud-network lists nickname in use, server full and outdated tab as the reasons a join fails, and every refusal added or kept here remains unreachable in honest play; the limits are per minute and sized at or above a full fleet's demand in every regime, attributed or not. Also fixed, and worth recording because the runbook is operator-facing: docs/diagnostics.md told operators to grep a warning string the server no longer emitted. The doc line was written in one commit and the emitter reworded in the next, so the only new observability handle was unreachable as documented. Both now agree and a test pins the agreement, along with every limit the runbook quotes, so a future rewording fails a case instead of silently breaking an incident runbook. The lost-attribution record also reported 1 upgrade for any incident that ended inside its interval and dropped the remainder; the tally is now its own module, flushed by the limiter's cleanup timer, and tested for the fleet-wide case directly. Verified: lint, typecheck, the server unit suite, and nine mutation checks across the limiter, the runbook contract and the tally, each failing a named test with every file restored byte-identical -- including restoring the unbounded map, re-sizing the backstop from the retry ladder, and reporting 1 instead of the real volume.",
+      "sources": [
+        "docs/diagnostics.md",
+        "server/communication/connectionAdmission.ts",
+        "server/communication/lostAttribution.ts",
+        "server/createServer.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/connectionAdmission.ts": "hud-network",
+        "server/communication/lostAttribution.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Re-records the same source after one line changed: the tally's interface no longer carries an export keyword, because the unused-export gate correctly reported it as used only inside its own module. No behaviour, no exported value and no player-facing surface changes, so the hud-network conclusion in the preceding entry stands unchanged and no page needs an edit. Recorded rather than skipped because the gate keys on the file digest and the digest moved. Worth noting how it was found: the full gate caught it on commit, after lint, typecheck and the server unit suite had all passed, which is the second time in this change that the gate rejected something the faster checks accepted.",
+      "sources": ["server/communication/lostAttribution.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "server/communication/lostAttribution.ts": "hud-network"
       }
     }
   ]

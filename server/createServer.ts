@@ -12,6 +12,7 @@ import {
   UNATTRIBUTED_CLIENT,
 } from './communication/connectionAdmission';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
+import { createLostAttributionTally } from './communication/lostAttribution';
 import { GameplayMessageBudget } from './communication/messageBudget';
 import { WebSocketCore } from './communication/WebSocketCore';
 import { readServerConfiguration } from './configuration';
@@ -290,25 +291,20 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const admission = createConnectionAdmission(limitsDisabled);
   // Losing `X-Real-IP` under Railway ingress silently returns every caller to a
   // shared budget. That needs its own signal rather than being inferred from
-  // refusals, which read identically to one flapping client.
-  //
-  // The record carries how many upgrades it stands for, because one caller can
-  // produce this by withholding the header and ingress failing produces it for
-  // the whole fleet. Those are different incidents and a bare line reads the
-  // same for both. It states what was observed rather than naming a cause it
-  // cannot tell apart.
-  let lostAttributionReportedAt = Number.NEGATIVE_INFINITY;
-  let unattributedSinceReport = 0;
-  const reportLostAttribution = (now: number): void => {
-    unattributedSinceReport += 1;
-    if (now - lostAttributionReportedAt < CONNECTION_ADMISSION_WINDOW_MS) {
+  // refusals, which read identically to one flapping client. The record carries
+  // how many upgrades it stands for, because one caller withholding the header
+  // and ingress failing for a whole fleet are different incidents that a bare
+  // line reads the same for. It is flushed on the limiter's own cleanup timer,
+  // so an incident that ends between upgrades still reports its real volume.
+  const lostAttribution = createLostAttributionTally();
+  const flushLostAttribution = (): void => {
+    const unattributed = lostAttribution.flush();
+    if (unattributed === null) {
       return;
     }
     logger.warn(
-      `⚠️ X-Real-IP unusable on ${unattributedSinceReport} upgrade(s) since the last record; charged to the shared unattributed budget`
+      `⚠️ X-Real-IP unusable on ${unattributed} upgrade(s) under Railway ingress; charged to the shared unattributed budget`
     );
-    lostAttributionReportedAt = now;
-    unattributedSinceReport = 0;
   };
   const logQuotaClosed = new WeakSet<WebSocket>();
 
@@ -341,21 +337,26 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       // this limiter exists to prevent, reached by losing a header, not by load.
       const clientIp = upgradeChargeAddress(info.req, railwayIngress);
       if (railwayIngress && clientIp === UNATTRIBUTED_CLIENT) {
-        reportLostAttribution(Date.now());
+        lostAttribution.note();
       }
       const admissionDecision = admission.admit(clientIp, url.pathname, Date.now());
       if (!admissionDecision.accepted) {
         if (admissionDecision.firstRejection) {
           const spend = `${admissionDecision.count}/${admissionDecision.limit}`;
-          // The charged address is always named, including the shared
-          // unattributed bucket: a refusal there means the fleet is sharing one
-          // budget because the edge stopped attributing, which is a different
-          // thing to look at than one flapping pilot.
-          logger.warn(
-            admissionDecision.lane === 'logs'
-              ? `🚫 Rate limited log connection from ${clientIp} (${spend})`
-              : `🚫 Rate limited connection attempt from ${clientIp} (${spend})`
-          );
+          // Which bound refused is the first thing an operator needs: one
+          // flapping pilot, a lane backstop reached across every address, and a
+          // tracking ceiling full of one-shot addresses are three different
+          // incidents that otherwise print the same line. The charged address
+          // is always named, including the shared unattributed bucket.
+          const where =
+            admissionDecision.scope === 'lane'
+              ? `${admissionDecision.lane} lane backstop`
+              : admissionDecision.scope === 'tracking'
+                ? 'tracked-address ceiling'
+                : admissionDecision.lane === 'logs'
+                  ? 'log connection budget'
+                  : 'connection budget';
+          logger.warn(`🚫 Rate limited: ${where} from ${clientIp} (${spend})`);
         }
         done(
           false,
@@ -384,6 +385,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   }
   const cleanupInterval = setInterval(() => {
     admission.prune(Date.now());
+    flushLostAttribution();
   }, CONNECTION_ADMISSION_WINDOW_MS);
 
   wss.on('error', (error) => {

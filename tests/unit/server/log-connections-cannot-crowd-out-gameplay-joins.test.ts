@@ -6,7 +6,10 @@ import {
   connectionLimitsDisabled,
   createConnectionAdmission,
   GAMEPLAY_CONNECTIONS_PER_WINDOW,
+  GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL,
   LOG_CONNECTIONS_PER_WINDOW,
+  LOG_CONNECTIONS_PER_WINDOW_ALL,
+  MAX_TRACKED_ADDRESSES,
   UNATTRIBUTED_CLIENT,
   UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW,
   UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW,
@@ -19,8 +22,11 @@ test('production enables connection budgets and test or development runs leave t
   // Pinned as literals like their siblings, so a derived budget cannot move both
   // sides of its own sizing assertion. The relationship to the client's retry
   // ladder is asserted in a-full-server-can-rejoin-after-a-deploy.
-  expect(UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(600);
+  expect(UNATTRIBUTED_GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(5000);
   expect(UNATTRIBUTED_LOG_CONNECTIONS_PER_WINDOW).toBe(600);
+  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW_ALL).toBe(10_000);
+  expect(LOG_CONNECTIONS_PER_WINDOW_ALL).toBe(1200);
+  expect(MAX_TRACKED_ADDRESSES).toBe(1024);
   expect(connectionLimitsDisabled({ nodeEnv: 'production' })).toBe(false);
   expect(connectionLimitsDisabled({ nodeEnv: 'test', vitest: 'true' })).toBe(true);
   expect(connectionLimitsDisabled({ nodeEnv: 'development' })).toBe(true);

@@ -239,16 +239,36 @@ so the browser does not treat them as open and drop its queue. Gameplay
 upgrades keep a separate budget of 50 per minute. Behind Railway public HTTP
 ingress "per address" means the forwarded `X-Real-IP`, not the socket peer,
 which is the edge proxy and would otherwise put the whole fleet in one bucket.
+
 An upgrade the edge cannot attribute -- no `X-Real-IP`, or a value that is not
-a single address -- is charged to one shared budget instead, sized for a whole
-fleet at 600 per minute in each lane, so losing the header degrades to a fleet
+a single address -- is charged to one shared budget instead. Both lanes size it
+by the same rule, a full fleet times that lane's per-pilot budget: 5,000 a
+minute for gameplay and 600 for logs. So losing the header degrades to a fleet
 sharing a fleet-sized budget rather than to half the pilots being refused.
-A caller can put itself in that shared budget by withholding the header, so it
-bounds only itself: there is deliberately no limit across all addresses that
-attributable callers also answer to. Grep
-`X-Real-IP absent or unparseable` for the once-per-minute warning that says the
-edge has stopped attributing; a refusal names the charged address, which reads
-as `unattributed` when that is what it was charged to. Inspect
+
+Two bounds sit behind those. A **lane backstop** limits every address in a lane
+together, at 10,000 gameplay and 1,200 log upgrades a minute. It exists only to
+bound a bypass of per-address attribution and is deliberately sized above every
+way the limiter can legitimately be spent at once -- a full fleet's own budgets
+plus the shared budget -- so it cannot refuse an honest caller. A **tracked
+address ceiling** of 1,024 live buckets bounds the limiter's own memory, which
+matters because `/logs` upgrades reach it with no authentication and no
+completed handshake, and because the forwarded address is chosen by the caller.
+Rolled windows are dropped before the ceiling refuses anything.
+
+Note for anyone reading this against `main`: `main` has an aggregate bound of
+its own, by accident rather than design. It keys on the socket peer, so behind
+the edge every caller shares one bucket and the whole internet gets 50 accepted
+gameplay upgrades a minute between them. Charging the real client is what
+removes that, which is why the backstop above replaces it rather than adding
+something new.
+
+A refusal names which bound stopped it -- a pilot's own budget, the lane
+backstop, or the tracked-address ceiling -- and the address it was charged to,
+which reads as `unattributed` when that is what it was charged to. Grep
+`X-Real-IP unusable` for the warning that the edge has stopped attributing; it
+carries how many upgrades it stands for and is flushed on the limiter's own
+cleanup timer, so a short incident still reports its real volume. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
 `logging.gameplayIngress` reports the per-connection `/ws` message budget

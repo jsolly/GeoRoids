@@ -39,6 +39,7 @@
     "check:ts-prune": "node scripts/check-unused-typescript.mjs && node scripts/check-unused-class-members.mjs",
     "check:wiki": "tsx scripts/wiki-check.ts",
     "wiki:review": "tsx scripts/wiki-check.ts --accept",
+    "wiki:merge": "node scripts/merge-wiki-ledger.mjs --merge",
     "wiki:media": "tsx scripts/wiki-media.ts",
     "wiki:media:check": "tsx scripts/wiki-media.ts --verify",
     "test:coverage": "node scripts/validation-admission.mjs unit -- vitest run --config config/testing/vitest.ts --project unit --project components --coverage",

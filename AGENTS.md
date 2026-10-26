@@ -74,38 +74,58 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   `shared/` by directory prefix, so `setup/`, `.railway/`, `benchmarks/`,
   `scripts/` whatever the extension, and the repo-root modules (`server.ts`,
   `shared-types.ts`) all sit outside it, as do test doubles and benchmark
-  harnesses that exist to satisfy external shapes. It also skips a class
-  entirely when the class has any `extends` or `implements` clause, when it is
-  abstract, or when its name appears in a heritage clause anywhere, `tests/`
-  included; those answer to their own contract. On this tree that leaves 22
-  public methods across `MapAssets`, `InlineWorldPersistence` and
-  `WorkerWorldPersistence` unjudged. Public class properties and accessors have
-  no owner at all, and neither do properties of plain objects and constants.
-- **A green run is not proof, because two of its tests are name-based.** It
-  treats a member as reached when an interface or object type declares that
-  name, or when a string with that name is an `in` operand or a call argument.
-  On this tree those two clear 197 of 608 judged methods — about a third —
-  before any reference lookup happens. Bracket access needs no allowance,
-  because the language service resolves `object['name']()` itself.
-  `scripts/check-unused-class-members.test.mjs` pins each test, including that
-  an unrelated bare string exempts nothing.
+  harnesses that exist to satisfy external shapes. `protected` methods are out
+  of scope too, and Biome's rule covers only `private` ones, so an unused
+  protected method answers to neither gate. Public class properties and
+  accessors have no owner at all, and neither do properties of plain objects and
+  constants. No class is skipped for its shape, though: one that extends,
+  implements, is extended or is abstract has its own members judged, because the
+  language service resolves a call made through a subclass instance and links a
+  member to the base declaration it overrides.
+- **A member with no reference of its own is cleared only by a type
+  relationship.** For each one the check asks the type checker whether a
+  structural type the class satisfies declares it with a member a caller could
+  actually call, whether an `in` probe tests an object the class could be, or
+  whether a string names a key of an object that carries it, the way
+  `vi.spyOn(target, 'name')` does. It rejects what looks like a relationship but
+  is not: a declaration of the same name the class does not satisfy, a member
+  typed so loosely it offers no way to invoke anything, an `unknown`, `any` or
+  `object` counterparty that every class is assignable to, and an interface
+  nothing else mentions — declaring one is no more a way to quiet this check
+  than deleting a component's call site. Bracket access needs no allowance
+  because the service resolves `object['name']()` itself. Each member kept this
+  way is printed with the relationship and the file it was found in, so a run
+  that reports nothing can be audited instead of trusted, and
+  `scripts/check-unused-class-members.test.mjs` pins every rule together with
+  the negative that matters.
+- **What that still does not prove.** The evidence may sit anywhere in the prune
+  program — `tests/`, `benchmarks/`, `scripts/`, `setup/`, `.railway/` and
+  `config/` included — even though classes in those directories are not judged;
+  `CanvasManager.getGpuFrameStats` is reached from a benchmark, which is a real
+  consumer. And a relationship is not a caller: the check establishes that the
+  class satisfies a port something declared, not that any value of the class
+  ever flows into it. Asked of every judged member rather than only the ones
+  without a reference, the rules would clear roughly a sixth of the surface, so
+  a clean run is good evidence and not a proof. Narrowing that further needs to
+  follow values into the positions those types occupy, which risks reporting
+  live code and is deliberately not attempted.
 - **A component's call is not a reference the check can find**, since its
   program resolves no `.svelte` or `.astro` file. It therefore reads the
   components that import a module and reports a method one of them names as
   "only a component calls it" rather than as dead code; markup counts, because
   two of `WikiScrollMemory`'s ten public methods — `noteScroll` and
-  `prepareForTraversal` — are reached only from outside its script block. The
-  answer is a test that proves the behavior; `tests/AGENTS.md` still forbids a
-  call-only test written to clear a gate. That signal is a name match within an
-  importing module, so a component holding an instance it did not import stays
-  invisible: never delete a component's call site, or the method behind it, to
-  quiet this check, and rely on `svelte-check` to catch it if you do.
-  `WikiScrollMemory` shows how little silence proves. Six of its ten public
-  methods are quiet only because
-  `tests/unit/wiki/back-returns-to-the-scrolled-field-manual.test.ts` calls
-  them; `hold`, `capture` and `dispose` are name-exempt as well; and `release`
-  has no TypeScript caller at all, quiet because two name tests both match it —
-  a type declaring `release`, and `'release'` as a call argument elsewhere.
+  `prepareForTraversal` — are reached only from outside its script block. That
+  verdict outranks "make it private", because privatizing a member a component
+  calls would break its call site. The answer is a test that proves the
+  behavior; `tests/AGENTS.md` still forbids a call-only test written to clear a
+  gate. The signal is a name match within an importing module, so a component
+  holding an instance it did not import stays invisible: never delete a
+  component's call site, or the method behind it, to quiet this check, and rely
+  on `svelte-check` to catch it if you do. `WikiScrollMemory.release` is the
+  worked example — no caller in `src/`, one call site in `WikiShell.svelte`, and
+  the behavior test in
+  `tests/unit/wiki/back-returns-to-the-scrolled-field-manual.test.ts` is what
+  clears it.
 - **Two unused-code blind spots genuinely cannot be closed from here:** a module
   reached by a dynamic `import()` has every export counted as used by both tools
   (`scripts/gate-receipt.mjs`), and a hand-written sibling declaration file wins

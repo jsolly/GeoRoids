@@ -111,16 +111,20 @@ function componentMembers(root) {
 }
 
 /**
- * Names a caller can reach without naming the class: members declared by an
- * interface or object type, the operand of an `in` probe, and a string argument
- * such as `vi.spyOn(target, 'name')`. Bracket access needs no entry, because
- * the service resolves `object['name']()` by itself. Plus the classes other
- * declarations extend, whose members answer to their own contract.
+ * Where a name could be reached from without naming the class, indexed by name
+ * so adjudicating one member costs a few type queries instead of a scan. Each
+ * entry is only a candidate: whether it actually reaches a given class is a
+ * question for the type checker, asked once per reported member.
  */
 function reachableWithoutTheClass(program) {
-  const contracts = new Set();
-  const literals = new Set();
-  const bases = new Set();
+  const declaringTypes = new Map();
+  const inProbes = new Map();
+  const keyArguments = new Map();
+  const add = (index, name, node) => {
+    const nodes = index.get(name) ?? [];
+    nodes.push(node);
+    index.set(name, nodes);
+  };
   for (const file of program.getSourceFiles()) {
     if (!owned(file)) {
       continue;
@@ -129,7 +133,7 @@ function reachableWithoutTheClass(program) {
       if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
         for (const member of node.members) {
           if (member.name && ts.isIdentifier(member.name)) {
-            contracts.add(member.name.text);
+            add(declaringTypes, member.name.text, node);
           }
         }
       }
@@ -138,19 +142,12 @@ function reachableWithoutTheClass(program) {
         node.operatorToken.kind === ts.SyntaxKind.InKeyword &&
         ts.isStringLiteralLike(node.left)
       ) {
-        literals.add(node.left.text);
+        add(inProbes, node.left.text, node);
       }
       if (ts.isCallExpression(node)) {
         for (const argument of node.arguments) {
           if (ts.isStringLiteralLike(argument)) {
-            literals.add(argument.text);
-          }
-        }
-      }
-      for (const clause of ts.isClassLike(node) ? (node.heritageClauses ?? []) : []) {
-        for (const type of clause.types) {
-          if (ts.isIdentifier(type.expression)) {
-            bases.add(type.expression.text);
+            add(keyArguments, argument.text, argument);
           }
         }
       }
@@ -158,20 +155,127 @@ function reachableWithoutTheClass(program) {
     };
     ts.forEachChild(file, visit);
   }
-  return { contracts, literals, bases };
+  return { declaringTypes, inProbes, keyArguments };
 }
 
 /**
- * Classes whose members this check can judge. A class in a hierarchy, or one a
- * structural port stands in for, is reached through types this check does not
- * follow, so its members stay out of scope.
+ * Whether a string in this position names a key rather than carrying text. A
+ * parameter typed `keyof T` resolves to a string literal or a union of them,
+ * which is how `vi.spyOn(target, 'name')` reaches a member the service cannot
+ * see; a plain `string` parameter is data and reaches nothing.
  */
-function isCheckableClass(node, bases) {
-  return (
-    (node.heritageClauses?.length ?? 0) === 0 &&
-    (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Abstract) === 0 &&
-    (node.name === undefined || !bases.has(node.name.text))
+function namesAKey(contextual) {
+  if (contextual === undefined) {
+    return false;
+  }
+  const parts = contextual.isUnion() ? contextual.types : [contextual];
+  return parts.every((part) => part.isStringLiteral());
+}
+
+/**
+ * Why a member with no reference of its own is still reachable, or undefined
+ * when nothing reaches it. Every answer is a type relationship a caller could
+ * actually use, rather than a matching name. A base class needs no rule here:
+ * the language service links a member to the base declaration it overrides, so
+ * the reference pass has already cleared it.
+ */
+function reachedThroughType(name, declaringClass, checker, service, index) {
+  const classType = instanceType(declaringClass, checker);
+  const where = (node) => {
+    const source = node.getSourceFile();
+    const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    return `${source.fileName}:${line}`;
+  };
+
+  // A structural type this class satisfies declares it, so a caller holding
+  // that port reaches the member without ever naming the class.
+  for (const node of index.declaringTypes.get(name) ?? []) {
+    // A named interface nothing else mentions cannot hold a caller, so
+    // declaring one is not a way to quiet this check. A type literal is written
+    // inside a signature, so it is already used where it stands.
+    if (ts.isInterfaceDeclaration(node) && !isMentionedElsewhere(node.name, service)) {
+      continue;
+    }
+    const declared = ts.isInterfaceDeclaration(node)
+      ? declaredTypeOf(node.name, checker)
+      : checker.getTypeAtLocation(node);
+    if (declared === undefined || !checker.isTypeAssignableTo(classType, declared)) {
+      continue;
+    }
+    // The type has to declare something a caller could call. A member typed
+    // `unknown`, or one whose type is an empty interface, accepts a method
+    // without ever offering a way to invoke it.
+    const declaredMember = declared.getProperty(name);
+    if (declaredMember === undefined) {
+      continue;
+    }
+    const memberType = checker.getTypeOfSymbolAtLocation(declaredMember, node);
+    if (memberType.getCallSignatures().length === 0) {
+      continue;
+    }
+    return `declared by a type this class satisfies at ${where(node)}`;
+  }
+  // `'name' in object`, where the object could be one of these.
+  for (const node of index.inProbes.get(name) ?? []) {
+    const probed = checker.getTypeAtLocation(node.right);
+    // `unknown`, `any`, `object` and `{}` are assignable from every class, so
+    // accepting them would make this a name match again. Only a counterparty
+    // with a shape of its own says anything about this class.
+    if (
+      probed === undefined ||
+      checker.getPropertiesOfType(probed).length === 0 ||
+      !checker.isTypeAssignableTo(classType, probed)
+    ) {
+      continue;
+    }
+    return `probed with \`in\` at ${where(node)}`;
+  }
+  // A key of a related object, such as vi.spyOn(target, 'name').
+  for (const node of index.keyArguments.get(name) ?? []) {
+    if (!namesAKey(checker.getContextualType(node))) {
+      continue;
+    }
+    const call = node.parent;
+    if (!ts.isCallExpression(call)) {
+      continue;
+    }
+    for (const sibling of call.arguments) {
+      if (sibling === node) {
+        continue;
+      }
+      const target = checker.getTypeAtLocation(sibling);
+      if (target.getProperty(name) !== undefined && checker.isTypeAssignableTo(classType, target)) {
+        return `named as a key of this class at ${where(node)}`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Whether anything but its own declaration names this type. */
+function isMentionedElsewhere(name, service) {
+  const file = name.getSourceFile().fileName;
+  const declaration = name.getStart();
+  const references = service.getReferencesAtPosition(file, declaration) ?? [];
+  return references.some(
+    (reference) => reference.fileName !== file || reference.textSpan.start !== declaration
   );
+}
+
+/** The type of an instance of this class, named or not. */
+function instanceType(node, checker) {
+  const declared = node.name === undefined ? undefined : declaredTypeOf(node.name, checker);
+  if (declared !== undefined) {
+    return declared;
+  }
+  const constructed = checker.getTypeAtLocation(node);
+  const signatures = constructed.getConstructSignatures();
+  return signatures.length > 0 ? signatures[0].getReturnType() : constructed;
+}
+
+function declaredTypeOf(name, checker) {
+  const symbol = checker.getSymbolAtLocation(name);
+  return symbol === undefined ? undefined : checker.getDeclaredTypeOfSymbol(symbol);
 }
 
 function isCheckableMember(member) {
@@ -216,7 +320,15 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
   const service = languageService(root, configName);
   const program = service.getProgram();
   assert(program, 'Cannot build the unused-member program');
-  const { contracts, literals, bases } = reachableWithoutTheClass(program);
+  const checker = program.getTypeChecker();
+  // The relationship queries below are the whole point of this check, so a
+  // TypeScript release that withdraws one has to fail it rather than quietly
+  // return to matching names.
+  assert(
+    typeof checker.isTypeAssignableTo === 'function',
+    'This TypeScript build cannot answer assignability, so reachability cannot be judged'
+  );
+  const index = reachableWithoutTheClass(program);
   const fromComponents = componentMembers(root);
   const scanned = program
     .getSourceFiles()
@@ -233,19 +345,17 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
     'The unused-member program resolved no production files under these directories'
   );
   const findings = [];
+  const cleared = [];
   for (const file of scanned) {
     const path = relative(root, file.fileName);
     const visit = (node) => {
-      if (ts.isClassLike(node) && isCheckableClass(node, bases)) {
+      if (ts.isClassLike(node)) {
         const declared = declarationPositions(node, file);
         for (const member of node.members) {
           if (!isCheckableMember(member)) {
             continue;
           }
           const name = member.name.text;
-          if (contracts.has(name) || literals.has(name)) {
-            continue;
-          }
           const declaration = member.name.getStart(file);
           const references = service.getReferencesAtPosition(file.fileName, declaration) ?? [];
           // A dead member still reports its own declaration, so nothing at all
@@ -264,6 +374,16 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
           if (references.some((reference) => !inside(reference))) {
             continue;
           }
+          const reason = reachedThroughType(name, node, checker, service, index);
+          if (reason !== undefined) {
+            cleared.push({
+              member: `${node.name?.text ?? '(anonymous)'}.${name}`,
+              path,
+              line: file.getLineAndCharacterOfPosition(declaration).line + 1,
+              reason: reason.split(`${root}${sep}`).join(''),
+            });
+            continue;
+          }
           const positions = declared.get(name) ?? new Set();
           findings.push({
             member: `${node.name?.text ?? '(anonymous)'}.${name}`,
@@ -280,22 +400,29 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
     };
     ts.forEachChild(file, visit);
   }
-  return findings;
+  return { findings, cleared };
 }
 
 export function checkUnusedClassMembers(root = process.cwd(), configName) {
-  const findings = unusedClassMembers(root, configName);
+  const { findings, cleared } = unusedClassMembers(root, configName);
   const report = findings.map(
     ({ member, path, line, internal, componentOnly }) =>
       `${member} ${path}:${line} - ${remedy(internal, componentOnly)}\n`
   );
-  return {
-    status: findings.length === 0 ? 0 : 1,
-    stdout:
-      findings.length === 0
-        ? ''
-        : `Unused public class members (${findings.length})\n${report.join('')}`,
-  };
+  // Each member kept without a reference of its own says which relationship
+  // kept it, so a run that reports nothing can be audited rather than trusted.
+  const audit = cleared.map(
+    ({ member, path, line, reason }) => `${member} ${path}:${line} - ${reason}\n`
+  );
+  const problems =
+    findings.length === 0
+      ? ''
+      : `Unused public class members (${findings.length})\n${report.join('')}`;
+  const kept =
+    cleared.length === 0
+      ? ''
+      : `${problems === '' ? '' : '\n'}Reachable only through a type relationship (${cleared.length})\n${audit.join('')}`;
+  return { status: findings.length === 0 ? 0 : 1, stdout: problems + kept };
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const result = checkUnusedClassMembers();

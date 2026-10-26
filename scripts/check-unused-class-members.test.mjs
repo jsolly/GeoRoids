@@ -12,12 +12,21 @@ const makePrivate = (count) => `used only inside its class (${count}); make it p
 test('public production methods need a caller outside their own class', () => {
   const root = mkdtempSync(join(tmpdir(), 'georoids-class-member-contract-'));
   const write = (path, body) => writeFileSync(join(root, path), body);
+  const drop = (path) => rmSync(join(root, path));
   const run = () => checkUnusedClassMembers(root);
   const passes = () => {
     const result = run();
     assert.equal(result.status, 0, result.stdout);
   };
-  /** One reported line must pair this member with this remedy, and report it once. */
+  /** A clean run that still names which relationship kept this member. */
+  const clears = (member, reason) => {
+    const result = run();
+    assert.equal(result.status, 0, result.stdout);
+    const audited = result.stdout.split('\n').filter((line) => line.startsWith(`${member} `));
+    assert.equal(audited.length, 1, result.stdout);
+    assert(audited[0].includes(reason), audited[0]);
+  };
+  /** One reported line pairs this member with this remedy, and nothing else is reported. */
   const fails = (member, remedy, total = 1) => {
     const result = run();
     assert.equal(result.status, 1, result.stdout);
@@ -28,6 +37,7 @@ test('public production methods need a caller outside their own class', () => {
   };
   const engine = (members) => `export class Engine {\n${members}\n}`;
   const live = '  step(): number {\n    return 1;\n  }';
+  const reached = `${live}\n  reached(): number {\n    return 3;\n  }`;
   /** The only caller of Engine.step, so the baseline has no finding. */
   const main = 'import {Engine} from "./engine"; console.log(new Engine().step());';
   try {
@@ -53,7 +63,7 @@ test('public production methods need a caller outside their own class', () => {
         ],
       })
     );
-    // Every production directory must contribute a file, so each one carries a
+    // Every production directory must contribute a file, so each carries a
     // class whose single public method has a caller.
     write('server/host.ts', 'export class Host {\n  listen(): number {\n    return 4;\n  }\n}');
     write('shared/rules.ts', 'export class Rules {\n  apply(): number {\n    return 5;\n  }\n}');
@@ -77,9 +87,8 @@ test('public production methods need a caller outside their own class', () => {
     // inner reaches it.
     fails('Engine.inner', removeIt, 2);
 
-    // A caller outside the class clears the member, through any of the ways a
-    // caller can reach it without naming the class.
-    write('src/engine.ts', engine(`${live}\n  reached(): number {\n    return 3;\n  }`));
+    // An ordinary caller outside the class clears the member.
+    write('src/engine.ts', engine(reached));
     write(
       'src/main.ts',
       'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.reached());'
@@ -87,122 +96,172 @@ test('public production methods need a caller outside their own class', () => {
     passes();
     write('src/main.ts', main);
     fails('Engine.reached', removeIt);
-    write('src/port.ts', 'export interface Port {\n  reached(): number;\n}');
-    passes();
-    rmSync(join(root, 'src/port.ts'));
-    write('src/probe.ts', 'export const probe = (v: object) => "reached" in v;');
-    passes();
-    rmSync(join(root, 'src/probe.ts'));
-    write('src/spy.ts', 'export const spy = (t: object) => Object.keys(t).includes("reached");');
-    passes();
-    rmSync(join(root, 'src/spy.ts'));
 
-    // A bare string that happens to share the name is not a way to reach it,
-    // so an unrelated literal must not clear the finding.
+    // A structural type the class SATISFIES clears the member, because a caller
+    // holding that port reaches it without naming the class. A type the class
+    // does not satisfy is a coincidence of naming and clears nothing.
+    write(
+      'src/port.ts',
+      'export interface Port {\n  reached(): number;\n}\nexport const hold = (p: Port) => p.reached();'
+    );
+    clears('Engine.reached', 'declared by a type this class satisfies at');
+    drop('src/port.ts');
+    write(
+      'src/unrelated.ts',
+      'export interface Unrelated {\n  reached(): number;\n  absent(): string;\n}'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/unrelated.ts');
+    // A declared member that cannot be called offers a caller no way to reach
+    // the method, even though a method type is assignable to `unknown`.
+    write(
+      'src/box.ts',
+      'export interface Box {\n  reached: unknown;\n}\nexport const hold = (b: Box) => b.reached;'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/box.ts');
+
+    // A type literal nested inside a signature is how ConnectionManager
+    // .sendSnapshotResync is reached on the real tree.
+    write('src/nested.ts', 'export interface Outer {\n  inner(): {reached(): number};\n}');
+    clears('Engine.reached', 'declared by a type this class satisfies at');
+    drop('src/nested.ts');
+    // An interface nothing else mentions cannot hold a caller, so declaring one
+    // must not be a way to quiet the check.
+    write('src/lonely.ts', 'export interface Lonely {\n  reached(): number;\n}');
+    fails('Engine.reached', removeIt);
+    drop('src/lonely.ts');
+
+    // `'name' in object` clears it when the object could be this class, and
+    // not when the probed type is unrelated.
+    write('src/probe.ts', 'export const probe = (v: {step(): number}) => "reached" in v;');
+    clears('Engine.reached', 'probed with `in` at');
+    drop('src/probe.ts');
+    write('src/probe.ts', 'export const probe = (v: {absent(): string}) => "reached" in v;');
+    fails('Engine.reached', removeIt);
+    drop('src/probe.ts');
+    write('src/wide.ts', 'export const guard = (v: object) => "reached" in v;');
+    fails('Engine.reached', removeIt);
+    drop('src/wide.ts');
+    write(
+      'src/loose.ts',
+      'export const loose = (v: unknown) => typeof v === "object" && v !== null && "reached" in v;'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/loose.ts');
+
+    // A string naming a KEY of a related object clears it, as vi.spyOn does.
+    // The same string passed where a plain `string` is expected is data.
+    write(
+      'src/spy.ts',
+      'import {Engine} from "./engine";\ndeclare const spy: {on<T, K extends keyof T>(o: T, k: K): void};\nexport const watch = (e: Engine) => spy.on(e, "reached");'
+    );
+    clears('Engine.reached', 'named as a key of this class at');
+    drop('src/spy.ts');
+    write(
+      'src/label.ts',
+      'import {Engine} from "./engine";\ndeclare const label: (o: object, s: string) => void;\nexport const tag = (e: Engine) => label(e, "reached");'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/label.ts');
+    write(
+      'src/emit.ts',
+      'declare const emit: <T>(o: T, k: "reached" | "other") => void;\nexport const go = (o: {step(): number}) => emit(o, "reached");'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/emit.ts');
+    write(
+      'src/other.ts',
+      'declare const spy: {on<T, K extends keyof T>(o: T, k: K): void};\nexport const watch = (o: {reached(): number; absent(): string}) => spy.on(o, "reached");'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/other.ts');
+
+    // A bare string that merely shares the name reaches nothing.
     write('src/labels.ts', 'export const label = "reached";');
     fails('Engine.reached', removeIt);
-    rmSync(join(root, 'src/labels.ts'));
+    drop('src/labels.ts');
 
-    // Bracket access needs no allowance; the service resolves it.
+    // Bracket access needs no allowance; the language service resolves it.
     write('src/dynamic.ts', 'import {Engine} from "./engine"; new Engine()["reached"]();');
     passes();
-    rmSync(join(root, 'src/dynamic.ts'));
+    drop('src/dynamic.ts');
 
     // A caller under tests/ is a real TypeScript caller and clears the member.
-    // AGENTS.md sends an author here when only a component calls a method, so
-    // this stays pinned: WikiScrollMemory's public surface relies on it.
     write('tests/engine.test.ts', 'import {Engine} from "../src/engine"; new Engine().reached();');
     passes();
-    rmSync(join(root, 'tests/engine.test.ts'));
+    drop('tests/engine.test.ts');
     fails('Engine.reached', removeIt);
 
     // A component is not in the TypeScript program, so its call cannot clear
-    // the member, but the remedy has to say so rather than claim nothing calls it.
-    write(
-      'src/Panel.svelte',
-      '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().reached();\n</script>\n'
-    );
-    fails('Engine.reached', coverIt);
-    rmSync(join(root, 'src/Panel.svelte'));
-    write(
-      'src/Markup.svelte',
-      '<script lang="ts">\n  import {Engine} from "./engine";\n  const e = new Engine();\n</script>\n<button onclick={() => e.reached()}>go</button>\n'
-    );
-    fails('Engine.reached', coverIt);
-    rmSync(join(root, 'src/Markup.svelte'));
-    write(
-      'src/Page.astro',
-      '---\nimport {Engine} from "./engine";\nnew Engine().reached();\n---\n<div></div>\n'
-    );
-    fails('Engine.reached', coverIt);
-    rmSync(join(root, 'src/Page.astro'));
-    // A component that names the member on something it did not import cannot
-    // speak for this class, or a DOM member of the same name would keep dead
-    // code alive.
+    // the member, but the remedy has to say so rather than claim nothing calls
+    // it. Markup and Astro frontmatter count as call sites too.
+    for (const [path, body] of [
+      [
+        'src/Panel.svelte',
+        '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().reached();\n</script>\n',
+      ],
+      [
+        'src/Markup.svelte',
+        '<script lang="ts">\n  import {Engine} from "./engine";\n  const e = new Engine();\n</script>\n<button onclick={() => e.reached()}>go</button>\n',
+      ],
+      [
+        'src/Page.astro',
+        '---\nimport {Engine} from "./engine";\nnew Engine().reached();\n---\n<div></div>\n',
+      ],
+    ]) {
+      write(path, body);
+      fails('Engine.reached', coverIt);
+      drop(path);
+    }
+    // A component naming the member on something it did not import cannot
+    // speak for this class.
     write(
       'src/Unrelated.svelte',
       '<script lang="ts">\n  const box = { reached: () => 1 };\n  box.reached();\n</script>\n'
     );
     fails('Engine.reached', removeIt);
-    rmSync(join(root, 'src/Unrelated.svelte'));
+    drop('src/Unrelated.svelte');
 
-    // A component call outranks an internal one, because privatizing the member
-    // would break the component's call site.
+    // A subclass's own additions are judged; the member it overrides is cleared
+    // by the reference pass, which links it to the base declaration.
     write(
-      'src/engine.ts',
-      engine(`${live}\n  private wrapped(): number {\n    return this.shared();\n  }\n
-  shared(): number {\n    return this.step();\n  }\n
-  expose(): number {\n    return this.wrapped();\n  }`)
+      'src/sub.ts',
+      'import {Engine} from "./engine";\nexport class Sub extends Engine {\n  reached(): number {\n    return 9;\n  }\n  extra(): number {\n    return 10;\n  }\n}'
     );
     write(
       'src/main.ts',
-      'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.expose());'
+      'import {Sub} from "./sub"; const s = new Sub(); console.log(s.step(), s.reached());'
     );
-    fails('Engine.shared', makePrivate(1));
-    write(
-      'src/Shell.svelte',
-      '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().shared();\n</script>\n'
-    );
-    fails('Engine.shared', coverIt);
-    rmSync(join(root, 'src/Shell.svelte'));
-    write('src/engine.ts', engine(`${live}\n  reached(): number {\n    return 3;\n  }`));
+    fails('Sub.extra', removeIt);
+    drop('src/sub.ts');
     write('src/main.ts', main);
-    fails('Engine.reached', removeIt);
 
-    // Heritage, abstract classes and extended classes answer to their own
-    // contract, so none of their members is judged here. Engine is cleared
-    // first, so each case below can only report its own class.
+    // Engine is cleared from here on, so each case below reports exactly one
+    // finding and that finding can only be its own.
     write(
       'src/main.ts',
       'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.reached());'
     );
-    write('src/sub.ts', 'import {Engine} from "./engine"; export class Sub extends Engine {}');
-    passes();
-    rmSync(join(root, 'src/sub.ts'));
-    write(
-      'src/abstract.ts',
-      'export abstract class Base {\n  unused(): number {\n    return 6;\n  }\n}'
-    );
-    passes();
-    rmSync(join(root, 'src/abstract.ts'));
-    write('src/shape.ts', 'export interface Shape {\n  other(): number;\n}');
+
+    // Implementing an interface no longer exempts the whole class: the members
+    // the interface declares are answered for, the rest are judged.
+    write('src/shape.ts', 'export interface Shape {\n  declared(): number;\n}');
     write(
       'src/impl.ts',
-      'import type {Shape} from "./shape";\nexport class Impl implements Shape {\n  unused(): number {\n    return 7;\n  }\n}'
+      'import type {Shape} from "./shape";\nexport class Impl implements Shape {\n  declared(): number {\n    return 7;\n  }\n  undeclared(): number {\n    return 8;\n  }\n}'
     );
-    passes();
-    rmSync(join(root, 'src/impl.ts'));
-    rmSync(join(root, 'src/shape.ts'));
-    write('src/lonely.ts', 'export class Lonely {\n  idle(): number {\n    return 11;\n  }\n}');
-    fails('Lonely.idle', removeIt);
+    fails('Impl.undeclared', removeIt);
+    drop('src/impl.ts');
+    drop('src/shape.ts');
+
+    // An abstract class's concrete members are judged like any other.
     write(
-      'tests/child.test.ts',
-      'import {Lonely} from "../src/lonely"; export class Child extends Lonely {}'
+      'src/abstract.ts',
+      'export abstract class Base {\n  abstract hook(): void;\n  concrete(): number {\n    return 6;\n  }\n}'
     );
-    passes();
-    rmSync(join(root, 'tests/child.test.ts'));
-    fails('Lonely.idle', removeIt);
-    rmSync(join(root, 'src/lonely.ts'));
+    fails('Base.concrete', removeIt);
+    drop('src/abstract.ts');
 
     // A class expression declares members too, so converting a class cannot
     // drop its whole surface out of the gate.
@@ -211,7 +270,12 @@ test('public production methods need a caller outside their own class', () => {
       'export const Widget = class {\n  only(): number {\n    return 8;\n  }\n};'
     );
     fails('(anonymous).only', removeIt);
-    rmSync(join(root, 'src/widget.ts'));
+    write(
+      'src/widget.ts',
+      'export const Widget = class {\n  only(): number {\n    return 8;\n  }\n};\nexport const held: {only(): number} = new Widget();'
+    );
+    passes();
+    drop('src/widget.ts');
 
     // Members used only inside the class are over-exposed, not dead.
     write(
@@ -237,6 +301,26 @@ test('public production methods need a caller outside their own class', () => {
     );
     fails('Engine.over', makePrivate(1));
 
+    // A component call outranks an internal one, because privatizing a member
+    // a component calls would break its call site.
+    write(
+      'src/engine.ts',
+      engine(`${live}\n  private wrapped(): number {\n    return this.shared();\n  }\n
+  shared(): number {\n    return this.step();\n  }\n
+  expose(): number {\n    return this.wrapped();\n  }`)
+    );
+    write(
+      'src/main.ts',
+      'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.expose());'
+    );
+    fails('Engine.shared', makePrivate(1));
+    write(
+      'src/Shell.svelte',
+      '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().shared();\n</script>\n'
+    );
+    fails('Engine.shared', coverIt);
+    drop('src/Shell.svelte');
+
     // Every production directory is judged, not just src/.
     write('src/engine.ts', engine(live));
     write('src/main.ts', main);
@@ -252,6 +336,15 @@ test('public production methods need a caller outside their own class', () => {
     );
     fails('Rules.spare', removeIt);
     write('shared/rules.ts', 'export class Rules {\n  apply(): number {\n    return 5;\n  }\n}');
+
+    // A protected member is out of scope here, so an internal-only one is not
+    // reported as over-exposed.
+    write(
+      'src/guarded.ts',
+      'export class Guarded {\n  protected guard(): number {\n    return 1;\n  }\n  open(): number {\n    return this.guard();\n  }\n}\nexport const use = (g: Guarded) => g.open();'
+    );
+    passes();
+    drop('src/guarded.ts');
 
     // Test doubles and other non-production classes stay out of scope.
     write('tests/double.test.ts', 'export class FakeSocket {\n  send(): void {}\n}');

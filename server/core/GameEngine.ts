@@ -1959,7 +1959,7 @@ export class GameEngine {
   }
 
   /** Keep the pickup field alive for every active arena. */
-  public ensureSatellitePickups(): SatellitePickupData[] {
+  private ensureSatellitePickups(): SatellitePickupData[] {
     if (this.isPaused || this.getPlayerCount() === 0) {
       return [];
     }

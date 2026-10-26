@@ -93,7 +93,7 @@ function serverModuleGraph(cwd, tracked) {
 }
 
 /** Server, shared, setup and Railway modules never load the browser client under src/. */
-export function assertServerAvoidsClient(cwd = process.cwd(), tracked = trackedFiles(cwd)) {
+function assertServerAvoidsClient(cwd = process.cwd(), tracked = trackedFiles(cwd)) {
   const clientModules = serverModuleGraph(cwd, tracked).filter((path) => path.startsWith('src/'));
   if (clientModules.length > 0) {
     throw new Error(`Server modules import client sources: ${clientModules.join(', ')}`);

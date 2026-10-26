@@ -36,7 +36,7 @@
     "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit",
     "check:lint-policy": "vitest run --config config/testing/tooling.ts --project lint-policy",
     "check:knip": "JITI_FS_CACHE=false knip --config config/quality/knip.js --treat-config-hints-as-errors --treat-tag-hints-as-errors",
-    "check:ts-prune": "node scripts/check-unused-typescript.mjs",
+    "check:ts-prune": "node scripts/check-unused-typescript.mjs && node scripts/check-unused-class-members.mjs",
     "check:wiki": "tsx scripts/wiki-check.ts",
     "wiki:review": "tsx scripts/wiki-check.ts --accept",
     "wiki:media": "tsx scripts/wiki-media.ts",

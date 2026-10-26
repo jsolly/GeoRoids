@@ -35,8 +35,13 @@ const UNMEASURED_QUEUE: QueueDiagnostics = {
   lastError: null,
 };
 
-/** How a fault episode ended, so one message carries every case. */
-type EpisodeOutcome = 'recovered' | 'worker-failed' | 'closed';
+/**
+ * How a fault episode ended, so one message carries every case. Derived from
+ * `FailureCause` rather than listed by hand: spelling it out separately let a
+ * request timeout be reported as `worker-failed`, which is the same
+ * mislabelling the typed cause was introduced to remove.
+ */
+type EpisodeOutcome = 'recovered' | FailureCause['kind'];
 
 /**
  * Why reporting stopped. The player-facing message follows from the cause
@@ -99,9 +104,18 @@ interface PendingOperation {
  * No SQLite, credential-bearing HTTP, parsing, or diagnostic redaction runs on
  * the game thread.
  *
- * One thread for the life of the process. A fault closes reporting until the
- * next deploy, fail-closed and with its cause logged; `/debug-reports` then
- * answers 503 and the player keeps a local copy. Replacing a faulted thread
+ * One thread for the life of the process.
+ *
+ * Two different failures, deliberately: a thread-level failure -- an uncaught
+ * error, an unexpected exit, or a request past its deadline -- closes reporting
+ * until the next deploy, fail-closed and with its cause logged, so
+ * `/debug-reports` answers 503 and the player keeps a local copy. A `fault`
+ * reply is the weaker one: the store failed to answer a delivery tick, which is
+ * recorded and publishes an unknown depth, but the thread is alive and
+ * submissions are still accepted, because a store that cannot deliver can
+ * usually still take a report and hold it.
+ *
+ * Replacing a faulted thread
  * needs more than a respawn -- the store is single-connection and the HTTP
  * layer admits concurrent requests, so a replacement has to be single-flight,
  * own the thread it supersedes through shutdown, and sit outside the request
@@ -115,20 +129,19 @@ export class DebugReportWorker {
   private closing: Promise<void> | undefined;
   /** The fault being suppressed, so a broken store logs once rather than hourly. */
   private faultEpisode:
-    | { detail: string; suppressed: number; lastLoggedAt: number; lastFaultAt: number }
+    | { suppressed: number; lastLoggedAt: number; lastFaultAt: number }
     | undefined;
   // Copied, not aliased: this field is replaced rather than written through,
   // but sharing the module constant makes one future in-place write corrupt
   // the value every other reset reads from.
   private stats: QueueDiagnostics = { ...UNMEASURED_QUEUE };
-  constructor(private readonly config: DebugReportConfiguration) {
-    this.worker = this.spawn();
-  }
-
-  private spawn(): Worker {
+  // The configuration is handed to the thread and not retained: it carries the
+  // Todoist credential, and nothing here needs it again now that one thread
+  // runs for the life of the process.
+  constructor(config: DebugReportConfiguration) {
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
       name: 'debug-reports',
-      workerData: this.config,
+      workerData: config,
       execArgv: ['--import', 'tsx'],
     });
     worker.on('message', (reply: ReportWorkerReply) => this.receive(reply));
@@ -141,7 +154,7 @@ export class DebugReportWorker {
         this.fail({ kind: 'exit', code });
       }
     });
-    return worker;
+    this.worker = worker;
   }
 
   enqueue(body: string, address: string, health: DebugJsonValue): Promise<DebugReportReceipt> {
@@ -234,21 +247,28 @@ export class DebugReportWorker {
    * 86,400 stack traces a day into stdout and the rotating log: it rotated away
    * every other diagnostic from the same incident and pushed the log writer
    * into dropping other components' records, so one failing subsystem took out
-   * the evidence for all of them at exactly the wrong moment. One episode now
-   * costs one line, plus one when its cause changes or it ends.
+   * the evidence for all of them at exactly the wrong moment.
+   *
+   * An episode now costs one record on its first fault and one more every
+   * `FAULT_LOG_INTERVAL_MS` while it continues, each carrying the count it
+   * stood in for, plus one when it ends. So a storage outage lasting a day
+   * costs about ninety-six records rather than 86,400. The cause is **not**
+   * part of that decision: keying on it bounded nothing, because a store that
+   * alternates between two errors opens a fresh episode on every tick. A cause
+   * that changes mid-episode is therefore carried in the next interval's
+   * record, not logged on the spot.
    */
   private recordFault(detail: string): void {
     const now = Date.now();
     const episode = this.faultEpisode;
     if (episode === undefined) {
-      this.faultEpisode = { detail, suppressed: 0, lastLoggedAt: now, lastFaultAt: now };
+      this.faultEpisode = { suppressed: 0, lastLoggedAt: now, lastFaultAt: now };
       // The detail travels as structured context, like the sibling call in
       // `fail()`, rather than interpolated into the message, so a stack cannot
       // break the message's own bounding.
       logger.error('DEBUG_REPORTS', 'Debug report storage failed', { detail });
       return;
     }
-    episode.detail = detail;
     episode.lastFaultAt = now;
     if (now - episode.lastLoggedAt < FAULT_LOG_INTERVAL_MS) {
       episode.suppressed += 1;
@@ -306,7 +326,7 @@ export class DebugReportWorker {
     this.failed = true;
     // Flushed before the failure record, so the count reads in order ahead of
     // the cause rather than being abandoned with the episode.
-    this.endFaultEpisode(cause.kind === 'close' ? 'closed' : 'worker-failed');
+    this.endFaultEpisode(cause.kind);
     if (cause.kind === 'close') {
       this.stats = { ...this.stats, lastError: message };
     } else {

@@ -326,7 +326,10 @@ test('a worker that dies mid-episode still reports how many faults it suppressed
   expect(serverLogging.warn).toHaveBeenCalledWith(
     'DEBUG_REPORTS',
     'Debug report storage fault episode ended',
-    { suppressedFaults: 11, outcome: 'worker-failed' }
+    // The outcome names the cause rather than flattening every failure to one
+    // label: spelling the outcomes out by hand had a request timeout reported
+    // as `worker-failed`, which is the mislabelling the typed cause removed.
+    { suppressedFaults: 11, outcome: 'uncaught' }
   );
   // And it reads in order: the count before the cause that ended it.
   expect(callOrder(serverLogging.warn, 0)).toBeLessThan(callOrder(serverLogging.error, 1));

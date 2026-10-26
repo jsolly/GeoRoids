@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { checkBoundaryCollision } from '../../shared/boundary';
+import { checkBoundaryCollision, stepReachesBoundary } from '../../shared/boundary';
 import { GAME, SHIP } from '../../shared/constants/gameplay';
 import { CONTOUR_BRIDGE, contourDraftMultiplier } from '../../shared/contourBridge';
 import {
@@ -55,8 +55,11 @@ interface BlockedSpan {
 }
 
 export type MotionOutcome =
-  /** `blockedMs` is the server-blocked time this pose was credited beyond client silence. */
-  | { ok: true; blockedMs: number }
+  /** `blockedMs` is the server-blocked time this pose was credited beyond client silence.
+   * `boundaryContact` reports that this accepted pose's own velocity reaches the wall, so
+   * the caller applies the lethal wall rule. It is the gameplay signal; a rejection's
+   * `envelope.check` stays diagnostics-only. */
+  | { ok: true; blockedMs: number; boundaryContact?: true }
   | {
       ok: false;
       error: string;
@@ -657,7 +660,12 @@ export class PlayerMotionService {
     session.contourLockAt = acquiredAt;
     session.actor.lastUpdate = now;
     this.publish(session);
-    return { ok: true, blockedMs };
+    // Read the wall from the pose this service just accepted, never from one it
+    // refused: a client that predicts its own death stops reporting, so a
+    // refused pose is a signal the server cannot rely on receiving.
+    return stepReachesBoundary(pose.position, pose.velocity, hullRadius)
+      ? { ok: true, blockedMs, boundaryContact: true }
+      : { ok: true, blockedMs };
   }
 
   /** Publish a server impulse as a new epoch so in-flight client poses cannot erase it. */

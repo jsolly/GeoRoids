@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
+import { checkBoundaryCollision, stepReachesBoundary } from '../../../shared/boundary';
 import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
 import { hullRadiusForKit } from '../../../shared/shipKits';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
@@ -487,27 +488,36 @@ describe('server-authoritative combat', () => {
     expect(engine.spawnPlayerLaser(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)).toBeNull();
   });
 
-  test('a reported pose that touches the wall is read by the server and kills', () => {
+  test('a legal rim pose whose own velocity reaches the wall is lethal', () => {
     clearAsteroidField(engine);
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
-    // Last position the motion envelope accepts; one step further touches the wall.
-    const edge = { x: WORLD.radius - hullRadiusForKit('scout'), y: 0 };
-    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: edge });
+    const radius = hullRadiusForKit('scout');
+    // The rim: the furthest position the envelope accepts. One step of legal
+    // outward velocity from here reaches the wall.
+    const rim = { x: WORLD.radius - radius, y: 0 };
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: rim });
     clearProtection(engine, 'nova');
     const now = engine.getServerTime();
-    assert.ok(engine.playerMotion.placeActorForTesting('nova', edge, now));
+    assert.ok(engine.playerMotion.placeActorForTesting('nova', rim, now));
     const parked = engine.getPlayer('nova');
     assert.ok(parked?.playerMotion);
-    const step = engine.playerMotion.legalSpeed(parked, now) * 0.9;
+    const outward = engine.playerMotion.legalSpeed(parked, now) * 0.9;
+
+    // The regression this pins: a live client never reports a position it has
+    // already called a wall hit, because it sets its own death flags in the
+    // same frame it detects the overlap and then stops decorating poses. So the
+    // kill must come from a pose whose reported position is still legal.
+    expect(checkBoundaryCollision(rim, radius)).toBe(false);
+    expect(stepReachesBoundary(rim, { x: outward, y: 0 }, radius)).toBe(true);
 
     wsCore.handleClientMessage(
       {
         type: 'update',
         id: 'nova',
         data: {
-          position: { x: edge.x + step, y: 0 },
-          velocity: { x: step, y: 0 },
+          position: { ...rim },
+          velocity: { x: outward, y: 0 },
           angle: 0,
           thrusting: true,
           motionEpoch: parked.playerMotion.epoch,
@@ -517,8 +527,11 @@ describe('server-authoritative combat', () => {
       novaWs
     );
 
-    expect(engine.getPlayer('nova')?.health).toBe(0);
-    expect(engine.getPlayer('nova')?.exploding).toBe(true);
+    const struck = engine.getPlayer('nova');
+    expect(struck?.health).toBe(0);
+    expect(struck?.exploding).toBe(true);
+    // The pose was accepted, so the authoritative hull stays inside the wall.
+    expect(checkBoundaryCollision(struck?.position ?? rim, radius)).toBe(false);
     expect(novaWs.lastReceived('playerDamaged')?.data).toMatchObject({
       targetPlayerId: 'nova',
       attackerId: 'boundary',
@@ -526,65 +539,90 @@ describe('server-authoritative combat', () => {
     });
   });
 
-  test('a lethal wall contact records the death without spending the rejection warning', () => {
+  test('wall contact kills a bigger hull and a damaged hull just the same', () => {
     clearAsteroidField(engine);
-    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const wsCore = new WebSocketCore(engine);
+    const haulerWs = new RecordingSocket();
+    const radius = hullRadiusForKit('hauler');
+    expect(radius).toBeGreaterThan(hullRadiusForKit('scout'));
+    const rim = { x: WORLD.radius - radius, y: 0 };
+    join(wsCore, haulerWs, {
+      id: 'barge',
+      name: 'Barge',
+      kitId: 'hauler',
+      position: rim,
+    });
+    clearProtection(engine, 'barge');
+    // A Hauler carries more hull than a Scout, so a fixed damage figure would
+    // leave it alive; contact must kill regardless of remaining health.
+    const hauler = engine.getPlayer('barge');
+    assert.ok(hauler);
+    expect(hauler.maxHealth).toBeGreaterThan(SHIP.MAX_HEALTH);
+    const now = engine.getServerTime();
+    assert.ok(engine.playerMotion.placeActorForTesting('barge', rim, now));
+    const parked = engine.getPlayer('barge');
+    assert.ok(parked?.playerMotion);
+    const outward = engine.playerMotion.legalSpeed(parked, now) * 0.9;
+
+    wsCore.handleClientMessage(
+      {
+        type: 'update',
+        id: 'barge',
+        data: {
+          position: { ...rim },
+          velocity: { x: outward, y: 0 },
+          angle: 0,
+          thrusting: true,
+          motionEpoch: parked.playerMotion.epoch,
+          motionSequence: parked.playerMotion.ack + 1,
+        },
+      },
+      haulerWs
+    );
+
+    expect(engine.getPlayer('barge')?.health).toBe(0);
+    expect(engine.getPlayer('barge')?.exploding).toBe(true);
+  });
+
+  test('a survivable wall contact still logs its rejection-free diagnostics and spills cargo', () => {
+    clearAsteroidField(engine);
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
-    const edge = { x: WORLD.radius - hullRadiusForKit('scout'), y: 0 };
-    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: edge });
+    const radius = hullRadiusForKit('scout');
+    const rim = { x: WORLD.radius - radius, y: 0 };
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: rim });
     clearProtection(engine, 'nova');
+    engine.entityManager.updateEntity('nova', { cargo: 90 });
     const now = engine.getServerTime();
-    assert.ok(engine.playerMotion.placeActorForTesting('nova', edge, now));
+    assert.ok(engine.playerMotion.placeActorForTesting('nova', rim, now));
     const parked = engine.getPlayer('nova');
     assert.ok(parked?.playerMotion);
-    const step = engine.playerMotion.legalSpeed(parked, now) * 0.9;
-    const wallPose = {
-      position: { x: edge.x + step, y: 0 },
-      velocity: { x: step, y: 0 },
-      angle: 0,
-      thrusting: true,
-      motionEpoch: parked.playerMotion.epoch,
-      motionSequence: parked.playerMotion.ack + 1,
-    };
-
-    wsCore.handleClientMessage({ type: 'update', id: 'nova', data: wallPose }, novaWs);
-
-    expect(engine.getPlayer('nova')?.health).toBe(0);
-    expect(info.mock.calls.filter(([, event]) => event === 'player_died')).toHaveLength(1);
-    expect(warn.mock.calls.map(([, event]) => event)).not.toContain('motion_command_rejected');
-
-    // Fly again after the ordinary respawn and commit a real envelope
-    // violation. It still reaches the warning channel on the same socket,
-    // proving the wall death neither logged nor spent the shared throttle
-    // window, and that the suppression is specific rather than blanket.
-    for (let frame = 0; frame < SHIP.RESPAWN_DELAY_FRAMES; frame++) {
-      engine.advanceCombatFrame();
-    }
-    const revived = engine.getPlayer('nova');
-    assert.ok(revived?.playerMotion);
-    expect(revived.health).toBe(SHIP.MAX_HEALTH);
+    const outward = engine.playerMotion.legalSpeed(parked, now) * 0.9;
 
     wsCore.handleClientMessage(
       {
         type: 'update',
         id: 'nova',
         data: {
-          position: { x: 20_000, y: 0 },
-          velocity: { x: 1, y: 0 },
+          position: { ...rim },
+          velocity: { x: outward, y: 0 },
           angle: 0,
           thrusting: true,
-          motionEpoch: revived.playerMotion.epoch,
-          motionSequence: revived.playerMotion.ack + 1,
+          motionEpoch: parked.playerMotion.epoch,
+          motionSequence: parked.playerMotion.ack + 1,
         },
       },
       novaWs
     );
 
-    const rejections = warn.mock.calls.filter(([, event]) => event === 'motion_command_rejected');
-    expect(rejections).toHaveLength(1);
-    expect(rejections[0]?.[2]).toMatchObject({ envelope: { check: 'displacement' } });
+    // Cargo absorbs the hit first, so the hull survives this contact.
+    const shielded = engine.getPlayer('nova');
+    expect(shielded?.cargo).toBe(0);
+    expect(shielded?.health).toBeGreaterThan(0);
+    expect(shielded?.exploding).toBe(false);
+    expect(engine.getLoot().filter((drop) => drop.kind === 'points')).toEqual([
+      expect.objectContaining({ points: 90 }),
+    ]);
   });
 
   test('a pilot in town cannot claim a wall pose, so the wall is no self-destruct', () => {
@@ -599,7 +637,8 @@ describe('server-authoritative combat', () => {
     assert.ok(parked?.playerMotion);
 
     // A legal velocity with a wall-side position: unreachable from town, so the
-    // envelope rejects it on displacement and never reads its wall geometry.
+    // envelope rejects it on displacement. A rejected pose never kills, so the
+    // wall cannot be reached by claiming it.
     wsCore.handleClientMessage(
       {
         type: 'update',

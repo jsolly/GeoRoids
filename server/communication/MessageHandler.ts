@@ -391,21 +391,16 @@ export class MessageHandler {
       },
       motionNow
     );
-    // A lethal wall contact is ordinary gameplay, already recorded as
-    // `player_died`, so it must not spend the rejection warning's throttle
-    // window: that belongs to real envelope violations. A survivable contact
-    // still logs, being the only record of a pilot pinned against the wall.
-    if (!this.applyBoundaryContact(id, outcome)) {
-      this.logMotionRejection(
-        ws,
-        'update',
-        outcome,
-        receivedAt,
-        command.motionEpoch,
-        command.motionSequence,
-        motionNow
-      );
-    }
+    this.logMotionRejection(
+      ws,
+      'update',
+      outcome,
+      receivedAt,
+      command.motionEpoch,
+      command.motionSequence,
+      motionNow
+    );
+    this.applyBoundaryContact(id, outcome);
     if (outcome.ok && beforeMode === 'handoff') {
       this.logMotionTransition(
         ws,
@@ -462,20 +457,19 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
-  /** Returns true when the hit destroyed the target. */
   private emitShipDamage(
     targetId: string,
     attackerId: string,
     damage: number,
     healthBefore: number | undefined
-  ): boolean {
+  ): void {
     const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
     if (!outcome.applied || !outcome.entity) {
-      return false;
+      return;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
     if (!outcome.isDestroyed && !healthDropped) {
-      return false;
+      return;
     }
     this.broadcaster.broadcastCombatResult({
       targetId,
@@ -486,24 +480,26 @@ export class MessageHandler {
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
-    return outcome.isDestroyed;
   }
 
   /**
    * The wall is lethal on the server's own geometry, never on a client's claim.
-   * `failedEnvelopeCheck` runs `checkBoundaryCollision` only after the pose
-   * passed its speed and reachable-displacement limits, so this fires for a
-   * pilot who actually flew into the wall and not for one reporting from
-   * anywhere else. Contact kills regardless of remaining hull health; cargo
-   * still absorbs it first inside `handleShipDamage`. Returns true when the
-   * contact destroyed the hull.
+   * `acceptFreePose` sets `boundaryContact` when a pose it accepted — already
+   * inside the wall, and within its speed and reachable-displacement limits —
+   * carries a velocity that reaches the wall. A client cannot dodge this by
+   * withholding its overlapping pose, because the pose that condemns it is one
+   * the client needs the server to accept in order to keep flying. Contact
+   * kills regardless of remaining hull health; cargo still absorbs it first
+   * inside `handleShipDamage`.
    */
-  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): boolean {
-    if (outcome.ok || outcome.envelope?.check !== 'boundary') {
-      return false;
+  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): void {
+    if (!outcome.ok || outcome.boundaryContact !== true) {
+      return;
     }
     const struck = this.gameEngine.getPlayer(playerId);
-    return struck ? this.emitShipDamage(playerId, 'boundary', struck.health, struck.health) : false;
+    if (struck) {
+      this.emitShipDamage(playerId, 'boundary', struck.health, struck.health);
+    }
   }
 
   private handleSetHaulerUtility(ws: WebSocket, command: CommandOf<'setHaulerUtility'>): void {

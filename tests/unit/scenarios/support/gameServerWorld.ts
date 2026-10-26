@@ -2,6 +2,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
+import { checkBoundaryCollision, stepReachesBoundary } from '../../../../shared/boundary';
 import { SHIP } from '../../../../shared/constants/gameplay';
 import { hullRadiusForKit } from '../../../../shared/shipKits';
 import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../../shared/snapshotProtocol';
@@ -299,15 +300,20 @@ export class GameServerWorld {
   }
 
   /**
-   * Fly the pilot into the arena wall for real: park the hull on the last
-   * position the motion envelope accepts, then report one legal outward step.
-   * The server reads that pose's geometry itself, exactly as it does in play.
+   * Fly the pilot into the arena wall for real: park the hull on the rim and
+   * report a legal pose whose own velocity carries it into the wall. The server
+   * accepts that pose and reads the wall from it, exactly as it does in play —
+   * no overlapping position is ever reported, because a live client stops
+   * reporting the moment it predicts its own death.
    */
   hitBoundary(pilot: Pilot): void {
     const actor = this.entity(pilot);
+    if (actor.overlayHold === true) {
+      throw new Error(`${pilot.name} cannot fly into the wall while a menu holds it`);
+    }
     const now = this.engine.getServerTime();
-    const edge = { x: WORLD.radius - hullRadiusForKit(actor.kitId), y: 0 };
-    if (!this.engine.playerMotion.placeActorForTesting(pilot.id, edge, now)) {
+    const rim = { x: WORLD.radius - hullRadiusForKit(actor.kitId), y: 0 };
+    if (!this.engine.playerMotion.placeActorForTesting(pilot.id, rim, now)) {
       throw new Error(`${pilot.name} has no current motion session`);
     }
     const parked = this.entity(pilot);
@@ -315,17 +321,24 @@ export class GameServerWorld {
     if (!motion) {
       throw new Error(`${pilot.name} lost its motion session at the wall`);
     }
-    const step = this.engine.playerMotion.legalSpeed(parked, now) * 0.9;
+    const outward = this.engine.playerMotion.legalSpeed(parked, now) * 0.9;
+    // The premise this helper depends on: the rim pose is legal, and one step of
+    // this velocity reaches the wall. Fail loudly rather than quietly not colliding.
+    const hullRadius = hullRadiusForKit(actor.kitId);
+    if (checkBoundaryCollision(rim, hullRadius)) {
+      throw new Error(`The rim pose for ${pilot.name} is already past the wall`);
+    }
+    if (!stepReachesBoundary(rim, { x: outward, y: 0 }, hullRadius)) {
+      throw new Error(`${pilot.name} cannot reach the wall in one legal step`);
+    }
     this.send(pilot, {
       type: 'update',
       id: pilot.id,
       data: {
-        position: { x: edge.x + step, y: 0 },
-        velocity: { x: step, y: 0 },
+        position: { ...rim },
+        velocity: { x: outward, y: 0 },
         angle: 0,
         thrusting: true,
-        // Carry the hold forward: this helper reports flight, not a menu change.
-        overlayHold: parked.overlayHold === true,
         motionEpoch: motion.epoch,
         motionSequence: motion.ack + 1,
       },

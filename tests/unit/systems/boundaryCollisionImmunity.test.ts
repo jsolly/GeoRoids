@@ -18,6 +18,8 @@ const HULL_RADIUS = 15;
 const WALL_CONTACT = { x: WORLD.radius - 10, y: 0 };
 /** `floor(59_985) + 15` lands exactly on the wall: the last legal position. */
 const LAST_LEGAL = { x: WORLD.radius - HULL_RADIUS, y: 0 };
+/** Legal only because the rule floors the distance first: `59_985.9` would otherwise clear it. */
+const LAST_LEGAL_FRACTIONAL = { x: WORLD.radius - HULL_RADIUS + 0.9, y: 0 };
 /** Same contact and clearance on the diagonal, where a square arena would differ. */
 const DIAGONAL_CONTACT = { x: 42_419, y: 42_419 };
 const DIAGONAL_LAST_LEGAL = { x: 42_415, y: 42_415 };
@@ -53,8 +55,18 @@ describe('Boundary collision', () => {
     expect(ship.impactFlashFrames).toBeGreaterThan(0);
   });
 
-  test('a hull one unit short of the wall is left completely alone', () => {
+  test('a hull whose edge sits exactly on the wall is left completely alone', () => {
     const ship = vulnerableHull(LAST_LEGAL);
+
+    collisionManager.checkBoundaryCollisions([ship], 0);
+
+    expect(ship.health).toBe(100);
+    expect(ship.exploding).toBe(false);
+    expect(ship.impactFlashFrames).toBe(0);
+  });
+
+  test('the wall rule floors the distance, so a fractional overhang is still legal', () => {
+    const ship = vulnerableHull(LAST_LEGAL_FRACTIONAL);
 
     collisionManager.checkBoundaryCollisions([ship], 0);
 

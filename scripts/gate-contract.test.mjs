@@ -19,7 +19,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { afterAll, test } from 'vitest';
 import { runGate } from './gate.mjs';
-import { candidateMatches, digest, fileRecord, STAGES, sourceRows } from './gate-receipt.mjs';
+import {
+  candidateMatches,
+  digest,
+  fileRecord,
+  GRAPH_COMMANDS,
+  STAGES,
+  sourceRows,
+} from './gate-receipt.mjs';
 import { canonicalEnvironment, lifecycleCommand } from './gate-runtime.mjs';
 import { literalOnlyChange } from './literal-only-change.mjs';
 
@@ -45,6 +52,7 @@ const REQUIRED_COMMANDS = [
   'check:lint',
   'check:knip',
   'check:ts-prune',
+  'check:members',
   'check:md',
   'check:yaml',
   'check:actions',
@@ -390,6 +398,16 @@ test('a newer failed or interrupted code attempt blocks an older pass until fres
   }
 });
 
+test('the receipt validator and the runner agree on which graph checks skip', () => {
+  // `readReusable` compares the skipped and recorded commands IN ORDER, so a
+  // reorder makes every green receipt unreusable while each stage still passes.
+  assert.deepEqual(GRAPH_COMMANDS, ['check:knip', 'check:ts-prune', 'check:members']);
+  assert.deepEqual(
+    STAGES.map(([, command]) => command).filter((command) => GRAPH_COMMANDS.includes(command)),
+    GRAPH_COMMANDS
+  );
+});
+
 test('literal tuning skips only graphs while partial staging never certifies candidate', async () => {
   const f = fixture();
   try {
@@ -400,7 +418,7 @@ test('literal tuning skips only graphs while partial staging never certifies can
     assert.equal(result.candidateCertified, false);
     assert.deepEqual(
       f.calls,
-      STAGES.filter(([, command]) => !['check:knip', 'check:ts-prune'].includes(command)).map(
+      STAGES.filter(([, command]) => !GRAPH_COMMANDS.includes(command)).map(
         ([, command]) => command
       )
     );
@@ -614,6 +632,87 @@ function runtimeIdentityFixture(root) {
   });
   return { bash, python, npm, cli };
 }
+
+test('installed identity ignores the caches validation itself writes', async () => {
+  const { identity } = await import('./gate-receipt.mjs');
+  const f = fixture();
+  try {
+    mkdirSync(join(f.root, 'bin'));
+    mkdirSync(join(f.root, 'node_modules'));
+    for (const name of ['npm', 'bash', 'git', 'uvx']) {
+      writeFileSync(join(f.root, 'bin', name), name, { mode: 0o755 });
+    }
+    // runtimeIdentityFixture copies bin/npm into the CLI it then wraps, so the
+    // configuration probe identity runs must be in place before that call.
+    writeFileSync(
+      join(f.root, 'bin', 'npm'),
+      `console.log('userconfig='+(process.env.npm_config_userconfig || process.env.NPM_CONFIG_USERCONFIG || process.env.HOME+'/.npmrc')); console.log('globalconfig='+(process.env.npm_config_globalconfig || process.env.HOME+'/etc/npmrc'));`,
+      { mode: 0o755 }
+    );
+    writeFileSync(join(f.root, '.gitignore'), '.performance/\nnode_modules/\nbin/\n.env.local\n');
+    writeFileSync(join(f.root, 'node_modules', 'installed.js'), 'module.exports = 1;\n');
+    const pythonTools = runtimeIdentityFixture(f.root);
+    const env = {
+      PATH: join(f.root, 'bin'),
+      HOME: fixtureHome,
+      npm_execpath: pythonTools.cli,
+      npm_node_execpath: process.execPath,
+    };
+
+    // A cold installation: no tool downloads, loader caches or build caches yet.
+    const cold = identity(f.root, env).installation;
+
+    // Stages then write their own scratch, exactly as a real run does: pinned
+    // tool archives and their extraction directory, jiti's loader cache for the
+    // Vitest configuration, and the build and test caches.
+    const scratch = {
+      '.cache/check-actions': { 'actionlint-abc.tar.gz': 'archive', 'shellcheck-def.tar.gz': 'ar' },
+      '.cache/check-actions/run.abc123': { extracted: 'tool' },
+      '.cache/jiti': { 'testing-vitest.deadbeef.mjs': 'export default 1;\n' },
+      '.vite/deps': { '_metadata.json': '{}\n' },
+      '.vite-temp': {},
+      '.vitest-cache': { 'results.json': '{}\n' },
+    };
+    for (const [directory, files] of Object.entries(scratch)) {
+      mkdirSync(join(f.root, 'node_modules', directory), { recursive: true });
+      for (const [name, body] of Object.entries(files)) {
+        writeFileSync(join(f.root, 'node_modules', directory, name), body);
+      }
+    }
+    assert.equal(
+      identity(f.root, env).installation,
+      cold,
+      'Validation must not invalidate its own identity by writing its caches'
+    );
+
+    // A second run finds the caches present and moves them on.
+    writeFileSync(join(f.root, 'node_modules/.cache/jiti/testing-vitest.deadbeef.mjs'), 'nine\n');
+    rmSync(join(f.root, 'node_modules/.cache/check-actions/run.abc123'), {
+      recursive: true,
+      force: true,
+    });
+    assert.equal(identity(f.root, env).installation, cold, 'Cache churn is not an install change');
+
+    // The exclusion must stay narrow: a real installed package still counts.
+    mkdirSync(join(f.root, 'node_modules/.cache-like-package'));
+    writeFileSync(join(f.root, 'node_modules/.cache-like-package/index.js'), 'module.exports=2;\n');
+    assert.notEqual(
+      identity(f.root, env).installation,
+      cold,
+      'A package whose name merely begins with .cache must still be inventoried'
+    );
+    rmSync(join(f.root, 'node_modules/.cache-like-package'), { recursive: true, force: true });
+
+    writeFileSync(join(f.root, 'node_modules', 'installed.js'), 'module.exports = 2;\n');
+    assert.notEqual(
+      identity(f.root, env).installation,
+      cold,
+      'Installed bytes must still move the identity'
+    );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
 test('real identity covers installed bytes, ignored env, tool bytes, and unknown overrides', async () => {
   const { identity } = await import('./gate-receipt.mjs');
@@ -1067,7 +1166,7 @@ test('hostile inherited Git repository, index and config never affect parent sta
   }
 });
 
-test('changed TypeScript symlink plus literal tuning requires both graph checks', async () => {
+test('changed TypeScript symlink plus literal tuning requires every graph check', async () => {
   const f = fixture();
   try {
     writeFileSync(join(f.root, 'a.ts'), 'export const a=1;');
@@ -1082,6 +1181,7 @@ test('changed TypeScript symlink plus literal tuning requires both graph checks'
     await f.gate();
     assert.ok(f.calls.includes('check:knip'));
     assert.ok(f.calls.includes('check:ts-prune'));
+    assert.ok(f.calls.includes('check:members'));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

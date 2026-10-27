@@ -30,7 +30,7 @@ Dependabot keeps its explicit manual-drain invocation gate.
 Testing commands, deterministic setup, runner ownership, cleanup and evidence
 reporting live in [tests/AGENTS.md](../tests/AGENTS.md). Publication
 requires the complete `npm run gate`; a partial selection or hosted lane cannot
-replace it. `scripts/gate-receipt.mjs` `STAGES` is the source of truth: repository hook trust/bootstrap fixtures, lint policy, lint, Knip, ts-prune, Markdown, YAML, Actions, runner and dev-server contracts, TypeScript, Astro/Svelte diagnostics, frontend formatting, benchmark types, the complete unit/component suite, build, and complete server integration. Coverage reporting has no percentage merge threshold.
+replace it. `scripts/gate-receipt.mjs` `STAGES` is the source of truth: repository hook trust/bootstrap fixtures, lint policy, lint, Knip, ts-prune, class members, Markdown, YAML, Actions, runner and dev-server contracts, TypeScript, Astro/Svelte diagnostics, frontend formatting, benchmark types, the complete unit/component suite, build, and complete server integration. Coverage reporting has no percentage merge threshold.
 
 ## Production verification
 

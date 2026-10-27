@@ -50,6 +50,34 @@ function memory(start = 'index'): {
   return result;
 }
 
+test('closing wiki search returns the reader to the offset it held', () => {
+  const { scroll, writes, remembered } = memory();
+  scroll.noteScroll(640);
+  vi.advanceTimersByTime(500);
+  expect(remembered).toEqual([{ id: 'index', y: 640 }]);
+
+  // Search results replace the entry, so the offset is saved at once and the
+  // scroll that swap causes is ignored instead of recorded over it.
+  remembered.length = 0;
+  scroll.hold(640);
+  expect(remembered).toEqual([{ id: 'index', y: 640 }]);
+  scroll.noteScroll(0);
+  vi.advanceTimersByTime(500);
+  expect(remembered).toEqual([{ id: 'index', y: 640 }]);
+
+  // Clearing the search puts the reader back where they were and lets scroll
+  // recording resume.
+  writes.length = 0;
+  scroll.release();
+  expect(writes).toEqual([640]);
+  scroll.noteScroll(200);
+  vi.advanceTimersByTime(500);
+  expect(remembered).toEqual([
+    { id: 'index', y: 640 },
+    { id: 'index', y: 200 },
+  ]);
+});
+
 test('back returns to the scrolled index after an article opens at the top', () => {
   const { scroll, writes, visit } = memory();
   scroll.noteScroll(720);

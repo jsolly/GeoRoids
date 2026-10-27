@@ -234,9 +234,41 @@ The socket is terminated once it passes that quota, or on the first malformed
 or invalid frame. Later frames on it are ignored, and a malformed frame warns
 once. A page keeps one log socket and waits five seconds before opening
 another, including after that close. An idle log socket does not reconnect.
-Log upgrades over 6 per minute per address are refused before the handshake,
-so the browser does not treat them as open and drop its queue. Gameplay
-upgrades keep a separate budget of 50 per minute. Inspect
+Upgrades past a per-window budget are refused before the handshake, so the
+browser does not treat them as open and drop its queue. Each lane has its own
+budget -- 300 log and 600 gameplay upgrades -- and behind Railway public HTTP
+ingress **the fleet shares each one**, because the socket address the budget is
+keyed on is the edge proxy rather than the pilot. Both are therefore sized for a
+full fleet: `MAX_PLAYERS` times one pilot's demand in that lane -- for gameplay
+the upgrade plus every rung of the retry ladder, for logs the record a deploy
+makes every pilot forward plus two retries. The log lane is deliberately held
+below the twelve attempts a window the five-second socket floor above permits a
+pilot, so a page whose sockets keep closing can still be refused: each admitted
+socket brings a fresh 256 KiB quota and this file retains 20 MiB, so a
+fleet-wide twelve would license 300 MiB a window into it. Size the rotation
+before raising that lane. An earlier
+gameplay budget of 50 sat below the 100 the server accepts, so a deploy that
+re-upgraded the whole fleet had its 51st reconnect refused and a full server
+could not come back; the log budget of 6 was for the entire server, when a deploy
+makes every pilot forward a record. Read a budget as headroom for a burst, not as
+a rate per minute: a bucket rolls only after a full window with no accepted
+upgrade in that lane, and a refusal does not advance that clock, so accepted
+upgrades accumulate with no decay while the lane stays busy and a continuously
+busy lane reaches its budget eventually. A deploy is carried because the new
+process starts with empty buckets. When a refusal does happen the client is not
+patient: the gameplay ladder gives up after its fifth retry, 15.5 seconds in, and
+shows the permanent-disconnect banner, so a pilot refused through every rung
+needs a reload even though the bucket clears inside the minute. What these
+budgets do not provide is per-client fairness: one abusive caller can spend the
+fleet's budget, as it could before, only now the threshold is higher. The raise
+is not free either. The quotas above are per socket, not per address; a fresh
+one comes with every admitted socket, `MAX_PLAYERS` is enforced on the join
+message rather than on the upgrade, and nothing closes a socket that never
+joins. So the rate at which one address can accumulate sockets, and the bytes it
+can push through them, rise with these budgets -- twelve times for gameplay,
+fifty for logs. A bound on concurrent sockets and a deadline for an unjoined one
+are what would hold that, and neither exists yet; the old budgets only slowed
+the accumulation. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
 `logging.gameplayIngress` reports the per-connection `/ws` message budget

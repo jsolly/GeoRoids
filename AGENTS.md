@@ -79,24 +79,41 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   harnesses that exist to satisfy external shapes. `protected` members are out
   of scope too, and Biome's rule covers only private ones, so an unused
   protected member answers to neither gate; an abstract or `declare` member
-  defers to the declaration that implements it. Properties of plain objects and
-  constants have no owner at all. Each kind is judged by the access that reaches
+  defers to the declaration that implements it. An `override` member does not:
+  it was excluded while a base declaration still counted as a use, and once
+  that stopped the exclusion was the only thing standing between a public
+  member and the gate, so one keyword retired it silently. Properties of plain
+  objects and constants have no owner at all, and so is a member spelled with a
+  string name rather than an identifier. Each kind is judged by the access that reaches
   it: a field by reads and writes, a getter by reads, a setter by writes — a
   pair shares one symbol, so judging either by every reference would let its
   partner speak for it. What counts is the shape of the reference, not the
   language service's one `isWriteAccess` boolean: a compound assignment and an
   increment read a getter as well as assigning it, and a shorthand `{ value }`
-  pattern binds a local, so it only reads. Of the fields the check reports, one
+  pattern binds a local, so it only reads. A write is recognised through
+  parentheses and a non-null assertion, through a bracket key, and through an
+  array or object destructuring pattern or a `for (m.value of …)` initializer
+  standing where the assignment lands; recognising only the left operand of a
+  bare `=` reported a setter five spellings still assign, and `tsc` rejects
+  that remedy with TS2540 or TS7053. A shape the check cannot resolve to an
+  access reaches nothing rather than counting as a read, because a default of
+  read let a `{@link C.m}` doc comment or an indexed-access type retire a
+  member permanently: a gate that cannot tell must report rather than clear. Of the fields the check reports, one
   nothing reads is dead storage however it is written, so its remedy is removal
-  rather than a narrowing Biome would then report. No class is skipped for its shape, though, and no
-  member is either: one that extends, implements, is extended or is abstract has
-  every member judged. The language service links a member to the base or
+  rather than a narrowing Biome would then report. No class is skipped for its shape, though, and a
+  member is skipped only for being abstract or `declare`: one that extends,
+  implements, is extended or is abstract has every other member judged,
+  `override` included. The language service links a member to the base or
   interface declaration it implements, and that link is a trap rather than
   coverage — the declaration comes back among the member's references, so
   counting it as a use would let one `implements` clause retire a member
   silently. A reference that is itself a member declaration is therefore not a
   use, which is also why an overload signature and a get/set partner reach
-  nothing.
+  nothing. An object literal that satisfies a port declares the member the same
+  way, so it is not a caller either — while that was missed, the verdict turned
+  on whether the implementation was spelled `{ hook() {} }` or
+  `{ hook: () => 1 }`, and a port touched only by such a literal cleared a
+  member with an audit line claiming a relationship nothing exercises.
 - **A member with no reference of its own is cleared only by a type
   relationship.** For each one the check asks the type checker whether a
   structural type the class satisfies declares it and something exercises that
@@ -117,13 +134,19 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   anything, an `unknown`, `any` or `object` counterparty that every class is
   assignable to, and a shape nothing ever touches — writing an interface is no
   more a way to quiet this check than deleting a component's call site. Bracket
-  access needs no allowance because the service resolves `object['name']()`
-  itself. Each member kept this way is printed with the relationship and the
+  access needs no allowance for finding a reference, because the service
+  resolves `object['name']()` itself; classifying one does need the allowance
+  above, since the reference arrives at the key inside the quotes. Each member kept this way is printed with the relationship and the
   file it was found in, so a run that reports nothing can be audited instead of
   trusted — that audit line is what exposed a dead `SatellitePickup.velocity`
   hiding behind a port no pickup is ever passed to — and
-  `scripts/check-unused-class-members.test.mjs` pins every rule together with
-  the negative that matters.
+  `scripts/check-unused-class-members.test.mjs` carries a discriminating
+  negative for every rule and for every exclusion, each one verified by
+  mutation rather than by reading: deleting the rule has to turn the suite red.
+  Two guards survive mutation because they are unreachable rather than
+  untested — `namesAKey`'s `undefined` early return and `declaresMember`'s
+  `parent.name === name` — and the kind list is pinned against `checkableKind`,
+  because a kind missing from it is counted as a use and fails open.
 - **What that still does not prove.** The evidence may sit anywhere in the prune
   program — `tests/`, `benchmarks/`, `scripts/`, `setup/`, `.railway/` and
   `config/` included — even though classes in those directories are not judged;
@@ -141,7 +164,11 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   whole-object read the check models, and on this tree it is the only one that
   exists: a serializer, an `Object.values` or an object rest pattern over an
   instance would read every field just as invisibly, so introducing one means a
-  field reached only that way is reported. Two further residuals are known. A
+  field reached only that way is reported. The write side is the same and is
+  not modelled at all: `Object.assign(instance, { stored: 1 })` writes the
+  field through a fresh inferred property that is no reference to the member,
+  so a field written only that way looks wholly unreferenced. Two further
+  residuals are known. A
   field written only from OUTSIDE the class and read nowhere is accepted rather
   than reported, because the write is a use and nothing here establishes that
   anything reads it — the alternative reports a field whose only reader is a

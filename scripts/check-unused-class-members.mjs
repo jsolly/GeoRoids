@@ -111,10 +111,13 @@ function componentMembers(root) {
 }
 
 /**
- * Where a name could be reached from without naming the class, indexed by name
- * so adjudicating one member costs a few type queries instead of a scan. Each
- * entry is only a candidate: whether it actually reaches a given class is a
- * question for the type checker, asked once per reported member.
+ * Where a name could be reached from without naming the class. The first three
+ * indexes are keyed by name so adjudicating one member costs a few type
+ * queries instead of a scan, and each of their entries is only a candidate:
+ * whether it actually reaches a given class is a question for the type
+ * checker, asked once per reported member. `spreadClasses` is the exception
+ * and the reason this takes a `checker` — a spread names no member, so it is
+ * keyed by the class declaration it copies and already holds the answer.
  */
 function reachableWithoutTheClass(program, checker) {
   const declaringTypes = new Map();
@@ -339,7 +342,7 @@ function checkableKind(member) {
   }
   const flags = ts.getCombinedModifierFlags(member);
   const hidden = ts.ModifierFlags.Private | ts.ModifierFlags.Protected;
-  const deferred = ts.ModifierFlags.Abstract | ts.ModifierFlags.Ambient | ts.ModifierFlags.Override;
+  const deferred = ts.ModifierFlags.Abstract | ts.ModifierFlags.Ambient;
   if ((flags & hidden) !== 0 || (flags & deferred) !== 0) {
     return undefined;
   }
@@ -363,14 +366,25 @@ function checkableKind(member) {
   return ts.isSetAccessor(member) ? 'setter' : undefined;
 }
 
-/** The identifier that starts at this position, if the file holds one. */
-function identifierAt(source, position) {
+/**
+ * The name node a reference points at. A dotted access lands on an identifier
+ * and a bracket access on the string literal that spells the key, so both are
+ * resolvable; a `{@link C.m}` doc comment is not, because `forEachChild` does
+ * not descend into JSDoc, and an unresolved reference is deliberately not
+ * treated as a use.
+ */
+function nameAt(source, position) {
   let found;
   const visit = (node) => {
     if (node.getStart(source) > position || node.getEnd() < position) {
       return;
     }
     if (ts.isIdentifier(node) && node.getStart(source) === position) {
+      found = node;
+    }
+    // A bracket key is reported at the name inside the quotes, one past the
+    // literal's own start.
+    if (ts.isStringLiteralLike(node) && node.getStart(source) + 1 === position) {
       found = node;
     }
     ts.forEachChild(node, visit);
@@ -382,10 +396,81 @@ function identifierAt(source, position) {
 /** The expression a reference reaches the member through, such as `m.value`. */
 function accessExpression(name) {
   const parent = name.parent;
-  return (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) &&
-    parent.name === name
-    ? parent
-    : name;
+  if (ts.isPropertyAccessExpression(parent) && parent.name === name) {
+    return parent;
+  }
+  if (ts.isElementAccessExpression(parent) && parent.argumentExpression === name) {
+    return parent;
+  }
+  return name;
+}
+
+/**
+ * The node whose parent decides how this access is used, looking through the
+ * wrappers that do not change that: `(m.value) = 1` assigns through
+ * parentheses, and `m.value! = 1` through a non-null assertion.
+ */
+function enclosing(access) {
+  let node = access;
+  while (
+    ts.isParenthesizedExpression(node.parent) ||
+    ts.isNonNullExpression(node.parent) ||
+    ts.isAsExpression(node.parent)
+  ) {
+    node = node.parent;
+  }
+  return node;
+}
+
+/**
+ * Whether an assignment writes to this access. `m.value = 1` is the direct
+ * case; a destructuring pattern reaches the same write through an array or
+ * object literal standing on the left of the `=`, and `for (m.value of …)`
+ * through the loop's own initializer. Missing any of those spellings reports a
+ * setter that is in fact assigned, and the remedy would not compile.
+ */
+function assigns(access) {
+  const node = enclosing(access);
+  const parent = node.parent;
+  if (ts.isBinaryExpression(parent)) {
+    return parent.left === node && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+  }
+  if (ts.isForOfStatement(parent) || ts.isForInStatement(parent)) {
+    return parent.initializer === node;
+  }
+  if (ts.isArrayLiteralExpression(parent) || ts.isSpreadElement(parent)) {
+    return assigns(parent);
+  }
+  if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
+    return assigns(parent.parent);
+  }
+  return false;
+}
+
+/** Whether a compound assignment both reads and writes this access. */
+function updates(access) {
+  const node = enclosing(access);
+  const parent = node.parent;
+  if (ts.isBinaryExpression(parent) && parent.left === node) {
+    const operator = parent.operatorToken.kind;
+    return operator > ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment;
+  }
+  const increment = ts.SyntaxKind.PlusPlusToken;
+  const decrement = ts.SyntaxKind.MinusMinusToken;
+  return (
+    (ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) &&
+    parent.operand === node &&
+    (parent.operator === increment || parent.operator === decrement)
+  );
+}
+
+/**
+ * Whether this reference names the member inside a type rather than using it.
+ * `ReturnType<RoidBelt['getRoids']>` depends on the member's type and calls
+ * nothing, so it cannot keep an otherwise dead member alive.
+ */
+function namesAType(name) {
+  return ts.isLiteralTypeNode(name.parent) && ts.isIndexedAccessTypeNode(name.parent.parent);
 }
 
 /**
@@ -394,38 +479,32 @@ function accessExpression(name) {
  * assignment and `++` both read and write, and a shorthand `{ value }` pattern
  * writes a new local rather than the member, so it only reads. Accessors are
  * judged by this answer, so collapsing it to a boolean reports a getter that a
- * `+=` still calls. The shape of the syntax decides it instead.
+ * `+=` still calls. The shape of the syntax decides it instead, and a shape
+ * this cannot resolve answers `unresolved`, which reaches nothing: a default of
+ * `read` would let a doc comment or a type alias retire a member silently, and
+ * a gate that cannot tell must report rather than clear.
  */
 function accessKind(reference, program) {
   const source = program.getSourceFile(reference.fileName);
-  const name = source === undefined ? undefined : identifierAt(source, reference.textSpan.start);
+  const name = source === undefined ? undefined : nameAt(source, reference.textSpan.start);
   if (name === undefined) {
-    return reference.isWriteAccess === true ? 'write' : 'read';
+    return 'unresolved';
   }
   // A base class's or an interface's own declaration comes back among a
-  // member's references, and an overload signature repeats one, so counting
-  // those as uses lets a shape stand in for a caller.
+  // member's references, an overload signature repeats one, and an object
+  // literal that satisfies a port declares the member rather than using it, so
+  // counting any of those as uses lets a shape stand in for a caller.
   if (declaresMember(name)) {
     return 'declaration';
   }
-  const access = accessExpression(name);
-  const parent = access.parent;
-  if (ts.isBinaryExpression(parent) && parent.left === access) {
-    const operator = parent.operatorToken.kind;
-    if (operator === ts.SyntaxKind.EqualsToken) {
-      return 'write';
-    }
-    if (operator > ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment) {
-      return 'readwrite';
-    }
+  if (namesAType(name)) {
+    return 'unresolved';
   }
-  const increment = ts.SyntaxKind.PlusPlusToken;
-  const decrement = ts.SyntaxKind.MinusMinusToken;
-  if (
-    (ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) &&
-    parent.operand === access &&
-    (parent.operator === increment || parent.operator === decrement)
-  ) {
+  const access = accessExpression(name);
+  if (assigns(access)) {
+    return 'write';
+  }
+  if (updates(access)) {
     return 'readwrite';
   }
   // Everything else reads, including `{ value }` and `{ value: v }`, which bind
@@ -434,7 +513,15 @@ function accessKind(reference, program) {
   return 'read';
 }
 
-/** Whether this identifier is a member declaration's own name. */
+/**
+ * Whether this identifier is a member declaration's own name. Every kind
+ * `checkableKind` judges belongs here, plus the signature kinds a port is
+ * written with and the object-literal kinds a port is satisfied with;
+ * `scripts/check-unused-class-members.test.mjs` pins that parity, because a
+ * kind missing from this list is counted as a use and retires its member
+ * silently. A `BindingElement` is deliberately absent: `const { value } = m`
+ * declares a local and reads the member.
+ */
 function declaresMember(name) {
   const parent = name.parent;
   return (
@@ -445,6 +532,8 @@ function declaresMember(name) {
       ts.isMethodDeclaration(parent) ||
       ts.isGetAccessor(parent) ||
       ts.isSetAccessor(parent) ||
+      ts.isPropertyAssignment(parent) ||
+      ts.isShorthandPropertyAssignment(parent) ||
       ts.isParameter(parent))
   );
 }
@@ -456,7 +545,7 @@ function declaresMember(name) {
  * destructure only the getter.
  */
 function reaches(kind, access) {
-  if (access === 'declaration') {
+  if (access === 'declaration' || access === 'unresolved') {
     return false;
   }
   if (kind === 'getter') {
@@ -468,7 +557,7 @@ function reaches(kind, access) {
   return true;
 }
 
-function remedy({ kind, internal, reads, componentOnly, paired }) {
+function remedy({ kind, internal, reads, componentOnly, paired, parameter }) {
   if (componentOnly) {
     return 'only a component reaches it; cover the behavior from a test';
   }
@@ -479,6 +568,11 @@ function remedy({ kind, internal, reads, componentOnly, paired }) {
   }
   if (internal === 0 && kind === 'setter') {
     return 'nothing assigns it; remove the setter';
+  }
+  // Every construction site passes a constructor parameter, so removing it
+  // breaks each caller. What is dead is the field the modifier declares.
+  if (internal === 0 && parameter) {
+    return 'nothing reads this parameter property; drop the modifier';
   }
   if (internal === 0) {
     return 'no TypeScript references; remove it';
@@ -578,6 +672,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             path,
             line: file.getLineAndCharacterOfPosition(declaration).line + 1,
             kind,
+            parameter: ts.isParameter(member),
             // Overload signatures repeat a name as well, so the partner has
             // to be identified by kind rather than by name alone.
             paired: node.members.some(

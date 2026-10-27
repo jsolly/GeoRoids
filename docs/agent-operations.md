@@ -248,7 +248,7 @@ npm run check:lint         # Biome with config/quality/biome.settings.jsonc
 npm run check:lint-policy  # reject inherited warn/info Biome severities
 npm run check:knip         # fail on unused files/exports/dependencies and config hints
 npm run check:ts-prune     # fail on unconsumed TypeScript exports
-npm run check:members      # fail on public class members, fields and accessors nothing outside the declaring class reaches
+npm run check:members      # fail on public methods, fields and accessors nothing outside the declaring class reaches
 npm run check:md           # markdownlint-cli2
 npm run check:yaml         # yamllint --strict
 npm run check:actions      # actionlint + ShellCheck

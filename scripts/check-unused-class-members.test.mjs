@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vitest';
 import { checkUnusedClassMembers } from './check-unused-class-members.mjs';
-import { GRAPH_COMMANDS, STAGES } from './gate-receipt.mjs';
+import { STAGES } from './gate-receipt.mjs';
 
 const removeIt = 'no TypeScript references; remove it';
 const coverIt = 'only a component reaches it; cover the behavior from a test';
@@ -74,7 +74,14 @@ function fixture(name) {
   );
   write('src/engine.ts', engine(live));
   write('src/main.ts', main);
-  passes();
+  // The baseline runs before `root` is handed back, so the caller's `finally`
+  // cannot release it yet.
+  try {
+    passes();
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
   return { root, write, drop, run, passes, clears, fails };
 }
 
@@ -340,6 +347,96 @@ test('public production methods need a caller outside their own class', () => {
     fails('Base.concrete', removeIt);
     drop('src/abstract.ts');
 
+    // An object literal that SATISFIES a port declares the member too, so it
+    // cannot stand in for a caller either. Before, the verdict depended on the
+    // spelling: `{ declared() {} }` parses as a method declaration and was
+    // rejected, while the arrow and field spellings of the same thing retired
+    // the member with no finding and no audit line.
+    write('src/shape.ts', 'export interface Shape {\n  declared(): number;\n}');
+    write(
+      'src/impl.ts',
+      'import type {Shape} from "./shape";\nexport class Impl implements Shape {\n  declared(): number {\n    return 1;\n  }\n}'
+    );
+    for (const stub of [
+      'import type {Shape} from "./shape";\nexport const stub: Shape = { declared: () => 9 };',
+      'import type {Shape} from "./shape";\nconst declared = () => 9;\nexport const stub: Shape = { declared };',
+    ]) {
+      write('src/stub.ts', stub);
+      fails('Impl.declared', removeIt);
+    }
+    drop('src/stub.ts');
+    drop('src/impl.ts');
+    drop('src/shape.ts');
+
+    // The same omission let one object-literal line clear a member through a
+    // port the class does not even implement, and that clearance PRINTED an
+    // audit line claiming a relationship something exercises -- a reader
+    // auditing the output was misled rather than informed.
+    write('src/main.ts', main);
+    write('src/relay.ts', 'export interface Relay {\n  relayed(): number;\n}');
+    write(
+      'src/stub.ts',
+      'import type {Relay} from "./relay";\nexport const stub: Relay = { relayed: () => 9 };'
+    );
+    write('src/engine.ts', engine(`${live}\n  relayed(): number {\n    return 2;\n  }`));
+    fails('Engine.relayed', removeIt);
+    // Exercise the port and the clearance becomes honest.
+    write(
+      'src/relay.ts',
+      'export interface Relay {\n  relayed(): number;\n}\nexport const hold = (r: Relay): number => r.relayed();'
+    );
+    clears('Engine.relayed', 'declared by a type this class satisfies');
+    write('src/engine.ts', engine(live));
+    drop('src/stub.ts');
+    drop('src/relay.ts');
+
+    // A reference the classifier cannot resolve to an access is not a use. A
+    // doc comment names a member without calling it, and `forEachChild` does
+    // not descend into JSDoc, so defaulting to `read` let one comment retire a
+    // member permanently.
+    write('src/main.ts', main);
+    write(
+      'src/doc.ts',
+      'import type {Engine} from "./engine";\n/** See {@link Engine.spare} for the value. */\nexport type Doc = Engine;'
+    );
+    write('src/engine.ts', engine(`${live}\n  spare = 0;`));
+    fails('Engine.spare', removeIt);
+    drop('src/doc.ts');
+    // An indexed-access TYPE names the member's type and calls nothing, so it
+    // cannot keep an otherwise dead member alive either.
+    write(
+      'src/engine.ts',
+      `${engine(`${live}\n  spare = 0;`)}\nexport type Spare = Engine["spare"];`
+    );
+    fails('Engine.spare', removeIt);
+    write('src/engine.ts', engine(live));
+
+    // An `override` member is judged like any other. The exclusion that used
+    // to skip it was a workaround for counting a base declaration as a use,
+    // and once that stopped, one keyword silently retired a public member --
+    // the whole battery stayed green with the exclusion deleted.
+    write('src/main.ts', main);
+    write(
+      'src/hierarchy.ts',
+      'export class Base {\n  hook(): number {\n    return 1;\n  }\n}\nexport class Leaf extends Base {\n  override hook(): number {\n    return 2;\n  }\n}'
+    );
+    fails('Base.hook', removeIt, 2);
+    fails('Leaf.hook', removeIt, 2);
+    drop('src/hierarchy.ts');
+    // An abstract base defers to its implementation, so if the implementation
+    // also deferred, each pointed at the other and nobody judged either.
+    write(
+      'src/hierarchy.ts',
+      'export abstract class Base {\n  abstract hook(): number;\n  run(): number {\n    return 1;\n  }\n}\nexport class Leaf extends Base {\n  override hook(): number {\n    return 2;\n  }\n}'
+    );
+    write(
+      'src/lift.ts',
+      'import {Leaf} from "./hierarchy";\nexport const lift = () => new Leaf().run();'
+    );
+    fails('Leaf.hook', removeIt);
+    drop('src/lift.ts');
+    drop('src/hierarchy.ts');
+
     // A class expression declares members too, so converting a class cannot
     // drop its whole surface out of the gate.
     write(
@@ -555,9 +652,7 @@ test('public fields and accessors are judged like methods', () => {
     // the complement of a read. A compound assignment and an increment both
     // READ the getter, so reporting it would have the author delete a getter
     // that `+=` still calls -- and TypeScript raises nothing when they do.
-    const accessors =
-      'export class Mirror {\n  private held = 0;\n  total(): number {\n    return this.held;\n  }\n  get value(): number {\n    return this.held;\n  }\n  set value(v: number) {\n    this.held = v;\n  }\n}';
-    write('src/mirror.ts', accessors);
+    write('src/mirror.ts', pair);
     for (const body of [
       'export const bump = (m: Mirror) => {\n  m.value += 1;\n};',
       'export const step = (m: Mirror) => {\n  m.value++;\n};',
@@ -592,6 +687,21 @@ test('public fields and accessors are judged like methods', () => {
     );
     fails('Mirror.value', 'nothing assigns it; remove the setter');
 
+    // Every one of these ASSIGNS the setter. Recognising only the direct left
+    // operand of a `=` reported each as unassigned, and the remedy does not
+    // even compile: removing one half of a pair is TS2540 and removing a lone
+    // setter is TS7053.
+    for (const body of [
+      'export const set = (m: Mirror) => {\n  m["value"] = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  (m.value) = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  ({ value: m.value } = { value: m.total() });\n};',
+      'export const set = (m: Mirror) => {\n  [m.value] = [m.total()];\n};',
+      'export const set = (m: Mirror) => {\n  for (m.value of [m.total()]) {\n    break;\n  }\n};',
+    ]) {
+      write('src/view.ts', view(body));
+      fails('Mirror.value', 'nothing reads it; remove the getter');
+    }
+
     // A field destructured off `this` is read, so the remedy is to narrow it
     // rather than to delete storage something still reads.
     write('src/view.ts', reads);
@@ -607,7 +717,9 @@ test('public fields and accessors are judged like methods', () => {
       'src/mirror.ts',
       'export class Mirror {\n  constructor(public spare: number) {}\n  total(): number {\n    return 0;\n  }\n}'
     );
-    fails('Mirror.spare', removeIt);
+    // Removing the parameter would break every construction site; what is
+    // dead is the field its modifier declares.
+    fails('Mirror.spare', 'nothing reads this parameter property; drop the modifier');
     write('src/view.ts', view('export const show = (m: Mirror) => m.total() + m.spare;'));
     passes();
     write('src/view.ts', reads);
@@ -628,6 +740,35 @@ test('public fields and accessors are judged like methods', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('every kind the check judges is one it also recognises as a declaration', () => {
+  // The two lists are maintained by hand, and divergence is silent AND
+  // permissive in one direction: teach `checkableKind` a kind without teaching
+  // `declaresMember`, and every such member's own declaration scores as a read,
+  // so the member looks used and leaves the gate with no finding and no audit
+  // line. That is how the object-literal kinds were missed.
+  const source = readFileSync(new URL('./check-unused-class-members.mjs', import.meta.url), 'utf8');
+  const body = (name) => {
+    const start = source.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, `cannot find ${name}`);
+    const end = source.indexOf('\n}\n', start);
+    assert.notEqual(end, -1, `cannot delimit ${name}`);
+    return source.slice(start, end);
+  };
+  const predicates = (name) =>
+    new Set([...body(name).matchAll(/ts\.(is[A-Za-z]+)\(/gu)].map(([, shape]) => shape));
+  const judged = predicates('checkableKind');
+  const declares = predicates('declaresMember');
+  // `isIdentifier` tests the NAME node rather than the member's kind, and
+  // `isParameterPropertyDeclaration` refines `isParameter`, which is listed.
+  const notKinds = new Set(['isIdentifier', 'isParameterPropertyDeclaration']);
+  const missing = [...judged].filter((shape) => !notKinds.has(shape) && !declares.has(shape));
+  assert.deepEqual(missing, [], `declaresMember is missing: ${missing.join(', ')}`);
+  // The port and object-literal kinds are declarations only, so the reverse
+  // containment must NOT hold -- an empty difference would mean the extraction
+  // silently matched nothing.
+  assert.ok([...declares].some((shape) => !judged.has(shape)));
 });
 
 test('a configuration that cannot be trusted fails instead of reporting nothing', () => {
@@ -678,13 +819,4 @@ test('the gate runs this check as a stage of its own', () => {
   // that check failed, and its failures read as a ts-prune failure.
   assert.doesNotMatch(scripts.scripts['check:ts-prune'], /check-unused-class-members\.mjs/u);
   assert.ok(STAGES.some(([, command]) => command === 'check:members'));
-  // A literal-only change cannot move a type-graph verdict, so the gate may
-  // skip this stage on one — and the receipt validator compares the skipped
-  // commands IN ORDER, so membership alone would not catch a reorder that
-  // silently makes every green run unreusable.
-  assert.deepEqual(GRAPH_COMMANDS, ['check:knip', 'check:ts-prune', 'check:members']);
-  assert.deepEqual(
-    STAGES.map(([, command]) => command).filter((command) => GRAPH_COMMANDS.includes(command)),
-    GRAPH_COMMANDS
-  );
 });

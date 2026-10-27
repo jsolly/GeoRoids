@@ -70,22 +70,61 @@ fetch() {
   curl -fsSL --connect-timeout 10 --max-time 120 "$1" -o "$2"
 }
 
-verify_sha256() {
-  local file="$1" want="$2" got
-  got="$(sha256sum "$file" 2>/dev/null || shasum -a 256 "$file" 2>/dev/null || true)"
-  [[ "${got%% *}" == "$want" ]]
+# Prints a file's sha256, or fails when the image has no digest tool at all.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d' ' -f1
+  else
+    return 1
+  fi
 }
 
+# 0 verified, 1 bytes differ, 2 nothing to hash with. Collapsing the last two
+# into one status reported a toolless image as tampered bytes and sent the
+# operator to re-pin hashes that were already correct.
+verify_sha256() {
+  local got
+  got="$(sha256_of "$1")" || return 2
+  [[ "$got" == "$2" ]]
+}
+
+# The CLI installed here mints this VM's STS credentials, and its installer runs
+# as root, so the bytes are pinned and sha256-checked like every other tool this
+# repository installs; bump the version and both hashes together.
+#
+# What the hashes do and do not buy: AWS publishes no SHA-256 file for these
+# bundles, so these were computed in-repo from the bundles AWS served on
+# 2026-10-25. They guarantee every agent session installs identical bytes, and
+# let a bad upstream release be bisected and pinned out.
+#
+# They are not proof of provenance, and a stronger check does exist: AWS serves
+# a detached OpenPGP signature beside each bundle, at the bundle URL plus
+# `.sig` (566 bytes, well-formed packets, confirmed for both arches on
+# 2026-10-25). Verifying it needs the AWS public key pinned here and gpg on the
+# image, which this bootstrap does not yet require. Until it does, this pin is
+# trust-on-first-use, not attestation — an earlier revision of this comment
+# claimed no out-of-band evidence was available, which was wrong.
+# Both arches were byte-identical to the unversioned rolling bundle when pinned,
+# so this changed nothing about what gets installed, only that it stops moving.
+AWS_CLI_VERSION=2.38.5
 install_aws_cli() {
   if command -v aws >/dev/null 2>&1; then
     return 0
   fi
-  log "installing AWS CLI v2"
-  local arch bundle dest
+  log "installing AWS CLI v2 ${AWS_CLI_VERSION}"
+  local arch bundle sha dest verified
   arch="$(uname -m)"
   case "$arch" in
-    aarch64 | arm64) bundle="awscli-exe-linux-aarch64.zip" ;;
-    x86_64) bundle="awscli-exe-linux-x86_64.zip" ;;
+    aarch64 | arm64)
+      bundle="awscli-exe-linux-aarch64-${AWS_CLI_VERSION}.zip"
+      sha=07711a936e9d271045ab937d2c2c5390c25f419e4ba9e25adb9e996031e3f6be
+      ;;
+    x86_64)
+      bundle="awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip"
+      sha=5def7d1b7e55d892f9a381bb2cb2081a685712464be0d36d5d706af0ac48d0d3
+      ;;
     *)
       log "unsupported arch ${arch}; install aws CLI manually" >&2
       return 1
@@ -93,6 +132,24 @@ install_aws_cli() {
   esac
   dest="$(mktemp -d)"
   fetch "https://awscli.amazonaws.com/${bundle}" "${dest}/awscliv2.zip"
+  verified=0
+  verify_sha256 "${dest}/awscliv2.zip" "$sha" || verified=$?
+  if ((verified == 2)); then
+    log "AWS CLI: no sha256sum or shasum here, so the pinned bytes cannot be checked; refusing to install" >&2
+    log "AWS CLI: install coreutils, or preinstall aws on the image" >&2
+    rm -rf "$dest"
+    return 1
+  fi
+  if ((verified != 0)); then
+    # Name the observed digest before the only copy of the bundle is deleted,
+    # or the refusal is undiagnosable.
+    log "AWS CLI: sha256 mismatch for ${AWS_CLI_VERSION} on ${arch}; refusing to install" >&2
+    log "AWS CLI: expected ${sha}" >&2
+    log "AWS CLI: observed $(sha256_of "${dest}/awscliv2.zip" || printf unavailable)" >&2
+    log "AWS CLI: confirm the new bytes out of band before re-pinning; a mismatch is not by itself a reason to trust them" >&2
+    rm -rf "$dest"
+    return 1
+  fi
   unzip -q "${dest}/awscliv2.zip" -d "$dest"
   if can_run_as_root; then
     run_as_root "${dest}/aws/install"

@@ -174,6 +174,8 @@ const entity = shape<ServerEntityData>({
   color: string,
   cargo: counter,
   bankedCargo: optional(counter),
+  shieldFrames: optional(counter),
+  shieldCooldownFrames: optional(counter),
   weaponChargeFrames: optional(counter),
   navigationAssistFrames: optional(counter),
   contourDraftFrames: optional(counter),

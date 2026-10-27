@@ -1,6 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { LOCAL_STORAGE_KEYS } from '../../constants/user-preferences';
   import type { ActionControlsView, TouchActionElements } from '../../input/touchControls';
+  import { activateObjectMenuAction, dismissObjectMenu } from '../../input/touchControls';
+  import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
   import Button from '../ui/button/button.svelte';
 
   let {
@@ -10,11 +13,19 @@
     view: ActionControlsView;
     mountActions: (elements: TouchActionElements) => () => void;
   } = $props();
+  let showHelp = $state(getStoredItem(LOCAL_STORAGE_KEYS.mobileFlightHelpDismissed) !== 'true');
   let ability = $state<HTMLButtonElement | null>(null);
   let contourLock = $state<HTMLButtonElement | null>(null);
 
+  let fire = $state<HTMLButtonElement | null>(null);
+  let stop = $state<HTMLButtonElement | null>(null);
+  let shield = $state<HTMLButtonElement | null>(null);
+
   $effect(() => {
-    const elements = ability && contourLock ? { ability, contourLock } : null;
+    const elements =
+      ability && contourLock && fire && stop && shield
+        ? { ability, contourLock, fire, stop, shield }
+        : null;
     const mount = mountActions;
     if (elements) {
       return untrack(() => mount(elements));
@@ -67,9 +78,126 @@
     disabled={view.contourLock.disabled}
     title={view.contourLock.name}>{view.contourLock.label}</Button
   >
+  <Button
+    bind:ref={fire}
+    class="touch-fire"
+    variant="outline"
+    hidden={!view.touchMode}
+    aria-label="Fire: tap for a shot, hold to charge, drag to aim">FIRE</Button
+  >
+  <Button bind:ref={stop} class="touch-stop" hidden={!view.touchMode} aria-label="Stop travelling"
+    >STOP</Button
+  >
+  <Button
+    bind:ref={shield}
+    class="touch-shield"
+    variant="outline"
+    hidden={!view.touchMode}
+    disabled={view.shield?.disabled}
+    aria-label="Activate shield"
+    style={`--shield-cool: ${view.shield?.ratio ?? 0}`}
+  >
+    {view.shield?.active ? 'SHIELDED' : 'SHIELD'}
+    {view.shield?.seconds || ''}
+  </Button>
+  {#if view.touchMode && showHelp}
+    <div class="flight-help" role="group" aria-label="Mobile flight controls">
+      <p>
+        Tap to travel. Hold an object for actions. Tap Fire to shoot; hold to charge, drag to aim.
+        Two fingers activate Shield. Swipe or tap your tool indicator to use it.
+      </p>
+      <Button
+        onclick={() => {
+          showHelp = false;
+          setStoredItem(LOCAL_STORAGE_KEYS.mobileFlightHelpDismissed, 'true');
+        }}>Got it</Button
+      >
+    </div>
+  {/if}
+  {#if view.touchMode}
+    <p class="travel-status" aria-live="polite">
+      {view.navigation?.status || (view.holding ? 'Hold for actions…' : '')}
+    </p>
+  {/if}
+  {#if view.menu}
+    <div
+      class="object-menu"
+      role="group"
+      aria-label={`${view.menu.target.name} actions`}
+      style={`left: clamp(8px, ${view.menu.x + 20}px, calc(100% - 208px)); top: clamp(8px, ${view.menu.y - 80}px, calc(100% - 320px))`}
+    >
+      <span>{view.menu.target.name}</span>
+      {#each view.menu.actions as item}
+        <Button
+          data-object-action={item.action}
+          disabled={item.disabled}
+          onclick={() => activateObjectMenuAction(item.action)}>{item.label}</Button
+        >
+      {/each}
+      <Button onclick={dismissObjectMenu}>Cancel</Button>
+    </div>
+  {/if}
 </div>
 
 <style>
+  .touch-controls :global(.touch-fire),
+  .touch-controls :global(.touch-stop),
+  .touch-controls :global(.touch-shield) {
+    position: absolute;
+    pointer-events: auto;
+    touch-action: none;
+    min-width: 56px;
+    min-height: 48px;
+    bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  }
+  .touch-controls :global(.touch-fire) {
+    right: 16px;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+  }
+  .touch-controls :global(.touch-stop) {
+    left: 16px;
+  }
+  .touch-controls :global(.touch-shield) {
+    left: 16px;
+    bottom: max(108px, calc(env(safe-area-inset-bottom, 0px) + 108px));
+    background: conic-gradient(var(--accent) calc(var(--shield-cool) * 360deg), var(--card) 0);
+  }
+  .flight-help {
+    position: absolute;
+    top: 20%;
+    left: 10%;
+    width: 80%;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--foreground);
+    pointer-events: auto;
+    font-size: 13px;
+  }
+  .travel-status {
+    position: absolute;
+    bottom: 170px;
+    left: 16px;
+    max-width: 65%;
+    font-size: 12px;
+    color: var(--foreground);
+  }
+  .object-menu {
+    position: absolute;
+    width: 200px;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    pointer-events: auto;
+  }
+  .object-menu :global(button) {
+    min-height: 44px;
+  }
   .touch-controls {
     position: absolute;
     inset: 0;

@@ -1,14 +1,22 @@
-import { getOpenGameOverlay, subscribeGameOverlay } from '../runtime/overlayState';
-
-let listenerScope: AbortController | null = null;
-
+import { GAME, SHIP } from '../../shared/constants/gameplay';
+import { PLAYER_SHIELD } from '../../shared/playerShield';
 import { playFeedback } from '../audio/feedbackSounds';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
-import { logger } from '../utils/Logger';
+import { beginNavigation, stopNavigation } from '../entities/ship/navigation';
+import { playLocalHaptic } from '../fx/haptics';
+import { getOpenGameOverlay, subscribeGameOverlay } from '../runtime/overlayState';
 import { controlSources, resetControlSources } from './controlSources';
 import { reconcilePlayerInput, togglePlayerContourLock } from './keybindings';
-import { pointerHeadingFromCenter } from './pointerSteering';
+import {
+  chooseObjectAction,
+  type ObjectAction,
+  type ObjectMenu,
+  objectMenuAt,
+  tickObjectApproach,
+  worldPoint,
+} from './objectActions';
+import { steeringTurn } from './pointerSteering';
 import { readAbilityChrome } from './touchAbility';
 
 export type TouchInputHost = {
@@ -17,12 +25,13 @@ export type TouchInputHost = {
   readTouchMode: () => boolean;
   onActionState: () => void;
 };
-
 export type TouchActionElements = {
   ability: HTMLButtonElement;
   contourLock: HTMLButtonElement;
+  fire?: HTMLButtonElement;
+  stop?: HTMLButtonElement;
+  shield?: HTMLButtonElement;
 };
-
 export type ActionControlsView = {
   inPlay: boolean;
   touchMode: boolean;
@@ -34,192 +43,165 @@ export type ActionControlsView = {
     disabled: boolean;
     pressed: boolean;
   };
+  navigation?: { status: string; travelling: boolean };
+  shield?: { active: boolean; ratio: number; disabled: boolean; seconds: number };
+  menu?: ObjectMenu | null;
+  holding?: boolean;
 };
-
-let inputHost: TouchInputHost | null = null;
-let actionScope: AbortController | null = null;
-let unsubscribeOverlay: (() => void) | null = null;
-
-let initialized = false;
-const TAP_MAX_MS = 220;
-const TAP_SLOP_PX = 12;
-let steerPointerId: number | null = null;
-let steerEpoch = 0;
-let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
-let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
-let steerFlick: { x: number; y: number; startedAt: number; lockVersion: number } | null = null;
-let firePointerId: number | null = null;
-let abilityPointerId: number | null = null;
-let contourLockPointerId: number | null = null;
-let abilityButton: HTMLButtonElement | null = null;
-let contourLockButton: HTMLButtonElement | null = null;
-let abilityPressed = false;
-let contourLockPressed = false;
-const TOUCH_BIND_SLOP_PX = 40;
-let touchListObserved = false;
-const liveTouchPoints = new Map<number, { x: number; y: number }>();
-let steerTouchId: number | null = null;
-let steerClientX = 0;
-let steerClientY = 0;
-
 export type TouchControlDiagnostics = {
   pointerHeading: number | null;
   touchFire: boolean;
   steerPointerHeld: boolean;
   liveTouches: number | null;
 };
-
-function liveTouchCount(): number | null {
-  return touchListObserved ? liveTouchPoints.size : null;
+type Gesture =
+  | {
+      kind: 'pending' | 'rotating' | 'moved' | 'menu';
+      id: number;
+      x: number;
+      y: number;
+      at: number;
+      shipOrigin: boolean;
+      lockVersion: number;
+    }
+  | { kind: 'shield'; ids: Set<number> };
+let host: TouchInputHost | null = null;
+let scope: AbortController | null = null;
+let actionsScope: AbortController | null = null;
+let unsubscribe: (() => void) | null = null;
+let gesture: Gesture | null = null;
+let holdTimer: ReturnType<typeof setTimeout> | null = null;
+let fireTimer: ReturnType<typeof setTimeout> | null = null;
+let firing: {
+  id: number;
+  x: number;
+  y: number;
+  at: number;
+  charging: boolean;
+  dragging: boolean;
+} | null = null;
+let menu: ObjectMenu | null = null;
+let status = '';
+let rotationHeading: number | null = null;
+const captures = new Map<number, HTMLElement>();
+let abilityPressed = false;
+let contourPressed = false;
+const live = new Set<number>();
+const notify = () => host?.onActionState();
+const player = () => PlayerManager.getInstance().getLocalPlayer();
+function active(): boolean {
+  return Boolean(host?.readInPlay() && host.readTouchMode() && getOpenGameOverlay() === null);
 }
-
-function resetTouchListTracking(): void {
-  touchListObserved = false;
-  liveTouchPoints.clear();
+function clearHold(): void {
+  if (holdTimer !== null) {
+    clearTimeout(holdTimer);
+  }
+  holdTimer = null;
 }
-
-function touchIdNear(x: number, y: number): number | null {
-  let best: number | null = null;
-  let bestDist = TOUCH_BIND_SLOP_PX;
-  for (const [id, point] of liveTouchPoints) {
-    const dist = Math.hypot(point.x - x, point.y - y);
-    if (dist <= bestDist) {
-      best = id;
-      bestDist = dist;
+function clearFire(): void {
+  if (fireTimer !== null) {
+    clearTimeout(fireTimer);
+  }
+  fireTimer = null;
+}
+function release(id: number): void {
+  const element = captures.get(id);
+  captures.delete(id);
+  if (element?.hasPointerCapture?.(id)) {
+    element.releasePointerCapture(id);
+  }
+}
+function capture(element: HTMLElement, id: number): void {
+  captures.set(id, element);
+  element.setPointerCapture?.(id);
+}
+function reset(stop = true): void {
+  clearHold();
+  clearFire();
+  const captured = [...captures.entries()];
+  captures.clear();
+  const p = player();
+  p?.ship.finishWeaponCharge(false);
+  if (p && stop) {
+    stopNavigation(p.ship);
+  }
+  gesture = null;
+  firing = null;
+  menu = null;
+  rotationHeading = null;
+  live.clear();
+  abilityPressed = false;
+  contourPressed = false;
+  resetControlSources();
+  for (const [id, element] of captured) {
+    if (element.hasPointerCapture?.(id)) {
+      element.releasePointerCapture(id);
     }
   }
-  return best;
+  notify();
 }
-
-function bindSteerTouch(): void {
-  if (steerPointerId === null) {
-    steerTouchId = null;
-    return;
-  }
-  if (steerTouchId !== null) {
-    // First bind wins. A missing id stays reserved so a nearby second finger
-    // or a returning thumb cannot steal steer until the next pointerdown.
-    return;
-  }
-  const nearby = touchIdNear(steerClientX, steerClientY);
-  if (nearby !== null) {
-    steerTouchId = nearby;
-    return;
-  }
-  if (liveTouchPoints.has(steerPointerId)) {
-    steerTouchId = steerPointerId;
+export function setTouchHeading(p: Player, heading: number | null): void {
+  controlSources.pointerHeading = p.ship.contourLocked ? null : heading;
+  reconcilePlayerInput(p);
+}
+export function setTouchFire(p: Player, held: boolean): void {
+  controlSources.touchFire =
+    held && p.ship.health > 0 && !p.ship.exploding && getOpenGameOverlay() === null;
+  if (controlSources.touchFire) {
+    p.ship.shoot();
+  } else {
+    p.ship.canShoot = true;
   }
 }
-
-function syncLiveTouches(ev: TouchEvent): void {
-  const touches = ev.touches;
-  if (!touches || typeof touches.length !== 'number') {
+export function triggerTouchAbility(p: Player): boolean {
+  return (
+    getOpenGameOverlay() === null &&
+    p.ship.health > 0 &&
+    !p.ship.exploding &&
+    p.ship.activateAbility()
+  );
+}
+export function tickTouchControls(p: Player): void {
+  if (p.ship.health <= 0 || p.ship.exploding) {
+    reset();
     return;
   }
-  touchListObserved = true;
-  liveTouchPoints.clear();
-  let index = 0;
-  while (index < touches.length) {
-    const touch = touches[index++];
-    if (touch) {
-      liveTouchPoints.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
+  if (host && (!host.readTouchMode() || !host.readInPlay())) {
+    if (gesture || firing || menu) {
+      reset();
+    }
+    if (p.ship.navigation) {
+      stopNavigation(p.ship);
     }
   }
-  bindSteerTouch();
-}
-
-/** iOS can drop pointerup after capture while the live touch list still tells the truth. */
-function onTouchListChange(ev: TouchEvent): void {
-  syncLiveTouches(ev);
-  if (ev.type === 'touchcancel' || (ev.type === 'touchend' && liveTouchPoints.size < 2)) {
-    localPlayer()?.ship.finishWeaponCharge(ev.type === 'touchend');
+  reconcilePlayerInput(p);
+  if (rotationHeading !== null) {
+    p.ship.cargoHover = false;
+    p.ship.angularVelocity = steeringTurn(
+      p.ship.angle,
+      rotationHeading,
+      (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS)
+    );
   }
-  if (liveTouchPoints.size > 1) {
-    steerFlick = null;
-  }
-  if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
-    resetTouchInteraction(localPlayer(), {
-      forgetTouches: false,
-    });
+  tickObjectApproach(p);
+  if (p.ship.arrivalFrames === 12) {
+    playLocalHaptic(true, 'pickup');
   }
 }
-
 export function readTouchControlDiagnostics(): TouchControlDiagnostics {
   return {
     pointerHeading: controlSources.pointerHeading,
     touchFire: controlSources.touchFire,
-    steerPointerHeld: steerPointerId !== null,
-    liveTouches: liveTouchCount(),
+    steerPointerHeld: gesture !== null,
+    liveTouches: live.size,
   };
 }
-
-export function setTouchHeading(player: Player, heading: number | null): void {
-  controlSources.pointerHeading = player.ship.contourLocked ? null : heading;
-  reconcilePlayerInput(player);
-}
-
-export function setTouchFire(player: Player, held: boolean): void {
-  if (!held || getOpenGameOverlay() !== null || player.ship.health <= 0 || player.ship.exploding) {
-    controlSources.touchFire = false;
-    player.ship.canShoot = true;
-    return;
-  }
-
-  controlSources.touchFire = true;
-  player.ship.shoot();
-}
-
-export function triggerTouchAbility(player: Player): boolean {
-  if (getOpenGameOverlay() !== null || player.ship.health <= 0 || player.ship.exploding) {
-    return false;
-  }
-  return player.ship.activateAbility();
-}
-
-function triggerTouchContourLock(player: Player): boolean {
-  if (
-    !isInPlay() ||
-    getOpenGameOverlay() !== null ||
-    player.ship.health <= 0 ||
-    player.ship.exploding
-  ) {
-    return false;
-  }
-  const active = togglePlayerContourLock(player);
-  return active;
-}
-
-export function tickTouchControls(player: Player): void {
-  if (player.ship.health <= 0 || player.ship.exploding) {
-    resetTouchInteraction(player);
-    return;
-  }
-  if (controlSources.touchFire) {
-    player.ship.shoot();
-  }
-  reconcilePlayerInput(player);
-}
-
-function isTouchChromeVisible(): boolean {
-  return isInPlay() && (inputHost?.readTouchMode() ?? false);
-}
-
-function isInPlay(): boolean {
-  return inputHost?.readInPlay() ?? false;
-}
-
-/** Read at the presentation cadence, never from the simulation frame. */
-export function readActionControls(player: Player | null): ActionControlsView {
-  const inPlay = isInPlay();
-  const touchMode = inputHost?.readTouchMode() ?? false;
-  const alive = player !== null && player.ship.health > 0 && !player.ship.exploding;
-  const menuOpen = getOpenGameOverlay() !== null;
-  const active = alive && player.ship.contourLocked;
-  const ready = alive && !menuOpen && (active || player.ship.canLockContour());
-  const ability = player
-    ? readAbilityChrome(player.ship)
+export function readActionControls(p: Player | null): ActionControlsView {
+  const alive = p !== null && p.ship.health > 0 && !p.ship.exploding;
+  const ability = p
+    ? readAbilityChrome(p.ship)
     : {
-        label: 'E',
+        label: 'Ability',
         name: 'Ability',
         ready: false,
         active: false,
@@ -227,544 +209,464 @@ export function readActionControls(player: Player | null): ActionControlsView {
         unavailable: true,
         cooldownRatio: 0,
       };
+  const locked = Boolean(p?.ship.contourLocked);
   return {
-    inPlay,
-    touchMode,
-    ability: {
-      ...ability,
-      cooldownRatio: Math.round(ability.cooldownRatio * 1000) / 1000,
-      pressed: abilityPressed,
-      disabled: !inPlay || !touchMode || menuOpen || !ability.ready,
-    },
+    inPlay: host?.readInPlay() ?? false,
+    touchMode: host?.readTouchMode() ?? false,
+    ability: { ...ability, pressed: abilityPressed, disabled: !active() || !ability.ready },
     contourLock: {
-      label: active ? 'RELEASE LOCK' : 'CONTOUR LOCK',
-      name: active
+      label: locked ? 'RELEASE LOCK' : 'CONTOUR LOCK',
+      name: locked
         ? 'Release lock'
         : !alive
           ? 'Contour Lock unavailable while the ship is destroyed'
-          : menuOpen
-            ? 'Contour Lock unavailable while a menu is open'
-            : !ready
-              ? 'Contour Lock unavailable: approach a contour'
-              : 'Contour Lock: lock onto the nearest contour',
-      active,
-      disabled: !inPlay || !ready,
-      pressed: contourLockPressed,
+          : (p?.ship.canLockContour() ?? false) === false
+            ? 'Contour Lock unavailable: approach a contour'
+            : 'Contour Lock: lock onto the nearest contour',
+      active: locked,
+      disabled:
+        !alive || getOpenGameOverlay() !== null || !(locked || (p?.ship.canLockContour() ?? false)),
+      pressed: contourPressed,
     },
+    navigation: {
+      status:
+        p?.ship.navigationStatus !== undefined && p.ship.navigationStatus.length > 0
+          ? p.ship.navigationStatus
+          : status,
+      travelling: Boolean(p?.ship.navigation),
+    },
+    shield: {
+      active: (p?.ship.shieldFrames ?? 0) > 0,
+      seconds: Math.ceil(
+        ((p?.ship.shieldFrames ?? 0) > 0
+          ? (p?.ship.shieldFrames ?? 0)
+          : (p?.ship.shieldCooldownFrames ?? 0)) / GAME.FPS
+      ),
+      ratio: (p?.ship.shieldCooldownFrames ?? 0) / PLAYER_SHIELD.cooldownFrames,
+      disabled: !active() || !alive || (p?.ship.shieldCooldownFrames ?? 0) > 0,
+    },
+    menu,
+    holding: gesture?.kind === 'pending',
   };
 }
-
-function syncTouchMode(): void {
-  const player = localPlayer();
-  if (!isTouchChromeVisible()) {
-    resetTouchInteraction(player);
-  }
-  if (player && isInPlay()) {
-    reconcilePlayerInput(player);
-  }
-  inputHost?.onActionState();
-}
-
-function setAbilityPressed(pressed: boolean): void {
-  if (abilityPressed !== pressed) {
-    abilityPressed = pressed;
-    inputHost?.onActionState();
-  }
-}
-
-function setContourLockPressed(pressed: boolean): void {
-  if (contourLockPressed !== pressed) {
-    contourLockPressed = pressed;
-    inputHost?.onActionState();
-  }
-}
-
-function releasePointerCapture(element: HTMLElement | null, pointerId: number | null): void {
-  if (element && pointerId !== null && element.hasPointerCapture(pointerId)) {
-    element.releasePointerCapture(pointerId);
-  }
-}
-
-function clearSteerHoldTimer(): void {
-  if (steerHoldTimer !== null) {
-    clearTimeout(steerHoldTimer);
-    steerHoldTimer = null;
-  }
-}
-
-/** Clear every pointer source when the browser takes the gesture away. */
-function resetTouchInteraction(player: Player | null, options?: { forgetTouches?: boolean }): void {
-  player?.ship.finishWeaponCharge(false);
-  const canvas = inputHost?.canvas ?? null;
-  const ability = abilityButton;
-  const contourLock = contourLockButton;
-  const activeSteerPointerId = steerPointerId;
-  const activeFirePointerId = firePointerId;
-  const activeAbilityPointerId = abilityPointerId;
-  const activeContourLockPointerId = contourLockPointerId;
-  steerFlick = null;
-  steerPointerId = null;
-  steerTouchId = null;
-  clearSteerHoldTimer();
-  steerTap = null;
-  firePointerId = null;
-  abilityPointerId = null;
-  contourLockPointerId = null;
-  releasePointerCapture(canvas, activeSteerPointerId);
-  releasePointerCapture(canvas, activeFirePointerId);
-  releasePointerCapture(ability, activeAbilityPointerId);
-  releasePointerCapture(contourLock, activeContourLockPointerId);
-  if (player) {
-    setTouchHeading(player, null);
-    setTouchFire(player, false);
-  } else {
-    resetControlSources();
-  }
-  setAbilityPressed(false);
-  setContourLockPressed(false);
-  if (options?.forgetTouches !== false) {
-    resetTouchListTracking();
-  }
-}
-
-function localPlayer(): Player | null {
-  return PlayerManager.getInstance().getLocalPlayer();
-}
-
-function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): void {
-  const previous = steerPointerId;
-  steerFlick = null;
-  steerPointerId = null;
-  steerTouchId = null;
-  clearSteerHoldTimer();
-  steerTap = null;
-  releasePointerCapture(canvas, previous);
-  setTouchHeading(player, null);
-}
-
-function beginSteerPointer(ev: PointerEvent, player: Player): void {
-  const ship = player.ship;
-  steerFlick =
-    ship?.contourLocked &&
-    firePointerId === null &&
-    abilityPointerId === null &&
-    contourLockPointerId === null
-      ? {
-          x: ev.clientX,
-          y: ev.clientY,
-          startedAt: ev.timeStamp,
-          lockVersion: ship.contourLockInputVersion,
-        }
-      : null;
-  steerPointerId = ev.pointerId;
-  steerEpoch = controlSources.steeringEpoch;
-  steerClientX = ev.clientX;
-  steerClientY = ev.clientY;
-  bindSteerTouch();
-  steerTap =
-    firePointerId === null
-      ? { x: ev.clientX, y: ev.clientY, startedAt: ev.timeStamp, canFire: true }
-      : null;
-  if (steerTap) {
-    steerHoldTimer = setTimeout(() => {
-      steerHoldTimer = null;
-      steerTap = null;
-      moveSteering(ev);
-    }, TAP_MAX_MS);
-  } else {
-    moveSteering(ev);
-  }
-}
-
-function reservedSteerHasNoLiveFinger(): boolean {
-  if (steerPointerId === null || !touchListObserved) {
-    return false;
-  }
-  bindSteerTouch();
-  if (steerTouchId !== null) {
-    return !liveTouchPoints.has(steerTouchId);
-  }
-  return liveTouchPoints.size > 0 && touchIdNear(steerClientX, steerClientY) === null;
-}
-
-function onPlayfieldPointerDown(ev: PointerEvent): void {
-  const canvas = inputHost?.canvas ?? null;
-  if (
-    !canvas ||
-    !isTouchChromeVisible() ||
-    getOpenGameOverlay() !== null ||
-    ev.pointerType !== 'touch' ||
-    ev.target !== canvas
-  ) {
+export function activateObjectMenuAction(action: ObjectAction): void {
+  const p = player();
+  const selected = menu;
+  if (!p || !selected?.actions.some((a) => a.action === action && !a.disabled)) {
     return;
   }
-  const player = localPlayer();
-  if (!player || player.ship.health <= 0 || player.ship.exploding) {
+  const message = chooseObjectAction(p, selected.target, action);
+  if (action === 'inspect' || action === 'signal') {
+    status = message;
+  } else {
+    status = '';
+    p.ship.navigationStatus = message;
+  }
+  menu = null;
+  notify();
+}
+export function dismissObjectMenu(): void {
+  menu = null;
+  notify();
+}
+function down(ev: PointerEvent): void {
+  if (!active() || ev.pointerType !== 'touch' || ev.target !== host?.canvas) {
+    return;
+  }
+  const p = player();
+  if (!p || p.ship.health <= 0 || p.ship.exploding) {
     return;
   }
   ev.preventDefault();
-  reconcilePlayerInput(player);
-  if (reservedSteerHasNoLiveFinger()) {
-    abandonSteerPointer(player, canvas);
-  }
-  if (steerPointerId !== null) {
-    steerFlick = null;
-    if (steerTap) {
-      moveSteering({ clientX: steerTap.x, clientY: steerTap.y });
+  live.add(ev.pointerId);
+  capture(host.canvas, ev.pointerId);
+  if (gesture) {
+    clearHold();
+    menu = null;
+    rotationHeading = null;
+    const ids = gesture.kind === 'shield' ? gesture.ids : new Set([gesture.id]);
+    ids.add(ev.pointerId);
+    if (gesture.kind !== 'shield') {
+      p.ship.activateShield();
     }
-    clearSteerHoldTimer();
-    steerTap = null;
-    onFirePointerDown(ev, player);
+    gesture = { kind: 'shield', ids };
+    notify();
     return;
   }
-  beginSteerPointer(ev, player);
-  if (firePointerId !== null) {
-    player.ship.beginWeaponCharge();
-  }
-}
-
-function onSteerPointerMove(ev: PointerEvent): void {
-  if (ev.pointerId !== steerPointerId) {
-    return;
-  }
-  ev.preventDefault();
-  if (steerTap && Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX) {
-    return;
-  }
-  clearSteerHoldTimer();
-  steerTap = null;
-  moveSteering(ev);
-}
-
-function shouldIgnoreLostCapture(ev: PointerEvent): boolean {
-  if (ev.type !== 'lostpointercapture') {
-    return false;
-  }
-  const touches = liveTouchCount();
-  return touches !== null && touches > 0;
-}
-
-function onPlayfieldPointerUp(ev: PointerEvent): void {
-  if (shouldIgnoreLostCapture(ev) && ev.pointerId === steerPointerId) {
-    return;
-  }
-  if (ev.pointerId === steerPointerId || ev.pointerId === firePointerId) {
-    localPlayer()?.ship.finishWeaponCharge(ev.type === 'pointerup');
-  }
-  if (ev.pointerId === firePointerId) {
-    onFirePointerUp(ev);
-    return;
-  }
-  if (ev.pointerId !== steerPointerId) {
-    return;
-  }
-  ev.preventDefault();
-  const flick = steerFlick;
-  const elapsed = flick ? ev.timeStamp - flick.startedAt : 0;
-  const dx = flick ? ev.clientX - flick.x : 0;
-  const dy = flick ? ev.clientY - flick.y : 0;
-  const distance = Math.hypot(dx, dy);
-  const player = localPlayer();
-  const attempted =
-    ev.type === 'pointerup' &&
-    flick !== null &&
-    elapsed > 0 &&
-    elapsed <= TAP_MAX_MS &&
-    distance >= 24 &&
-    distance / elapsed >= 0.25 &&
-    steerEpoch === controlSources.steeringEpoch &&
-    player !== null &&
-    player.ship.contourLockInputVersion === flick.lockVersion;
-  const hopped = attempted && player.ship.hopContour({ x: dx, y: dy });
-  if (attempted) {
-    playFeedback(hopped ? 'contourFlickSuccess' : 'contourFlickBlocked');
-  }
-  const tap =
-    !hopped &&
-    ev.type === 'pointerup' &&
-    steerTap?.canFire === true &&
-    ev.timeStamp - steerTap.startedAt <= TAP_MAX_MS &&
-    Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX;
-  steerFlick = null;
-  steerPointerId = null;
-  steerTouchId = null;
-  clearSteerHoldTimer();
-  steerTap = null;
-  releasePointerCapture(inputHost?.canvas ?? null, ev.pointerId);
-  if (player) {
-    setTouchHeading(player, null);
-    if (tap) {
-      setTouchFire(player, true);
-      setTouchFire(player, false);
-    }
-  } else {
-    controlSources.pointerHeading = null;
-  }
-}
-
-function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
-  const player = localPlayer();
-  const canvas = inputHost?.canvas ?? null;
-  if (!player || !canvas || steerEpoch !== controlSources.steeringEpoch) {
-    return;
-  }
-  steerClientX = ev.clientX;
-  steerClientY = ev.clientY;
-  bindSteerTouch();
-  const rect = canvas.getBoundingClientRect();
-  // CSS pixels keep the resting zone the same physical size at every device DPR.
-  const dx = ev.clientX - rect.left - rect.width / 2;
-  const dy = ev.clientY - rect.top - rect.height / 2;
-  setTouchHeading(player, pointerHeadingFromCenter(dx, dy, player.ship.r));
-}
-
-function onFirePointerDown(ev: PointerEvent, player: Player): void {
-  if (firePointerId !== null) {
-    return;
-  }
-  firePointerId = ev.pointerId;
-  setTouchFire(player, false);
-  player.ship.beginWeaponCharge();
-}
-
-function onFirePointerUp(ev: PointerEvent): void {
-  if (ev.pointerId !== firePointerId) {
-    return;
-  }
-  ev.preventDefault();
-  firePointerId = null;
-  releasePointerCapture(inputHost?.canvas ?? null, ev.pointerId);
-  const player = localPlayer();
-  if (player) {
-    setTouchFire(player, false);
-  } else {
-    controlSources.touchFire = false;
-  }
-}
-
-function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
-  if (abilityPointerId !== null || !isTouchChromeVisible() || getOpenGameOverlay() !== null) {
-    return;
-  }
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (steerTap) {
-    steerTap.canFire = false;
-  }
-  steerFlick = null;
-  abilityPointerId = ev.pointerId;
-  ability.setPointerCapture(ev.pointerId);
-  setAbilityPressed(true);
-  const player = localPlayer();
-  if (player) {
-    triggerTouchAbility(player);
-    inputHost?.onActionState();
-  }
-}
-
-function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
-  if (ev.pointerId !== abilityPointerId) {
-    return;
-  }
-  ev.preventDefault();
-  ev.stopPropagation();
-  abilityPointerId = null;
-  releasePointerCapture(ability, ev.pointerId);
-  setAbilityPressed(false);
-}
-
-function onAbilityClick(ev: MouseEvent): void {
-  // Pointer presses already activate on pointerdown. Their click can arrive
-  // later; only keyboard/accessibility/programmatic clicks have no click count.
-  if (ev.detail !== 0 || !isTouchChromeVisible()) {
-    return;
-  }
-  ev.preventDefault();
-  ev.stopPropagation();
-  const player = localPlayer();
-  if (player) {
-    triggerTouchAbility(player);
-    inputHost?.onActionState();
-  }
-}
-
-function onContourLockPointerDown(ev: PointerEvent, contourLock: HTMLElement): void {
-  const player = localPlayer();
-  if (contourLockPointerId !== null || readActionControls(player).contourLock.disabled) {
-    return;
-  }
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (steerTap) {
-    steerTap.canFire = false;
-  }
-  steerFlick = null;
-  contourLockPointerId = ev.pointerId;
-  contourLock.setPointerCapture(ev.pointerId);
-  setContourLockPressed(true);
-  if (player) {
-    triggerTouchContourLock(player);
-    inputHost?.onActionState();
-  }
-}
-
-function onContourLockPointerUp(ev: PointerEvent, contourLock: HTMLElement): void {
-  if (ev.pointerId !== contourLockPointerId) {
-    return;
-  }
-  ev.preventDefault();
-  ev.stopPropagation();
-  contourLockPointerId = null;
-  releasePointerCapture(contourLock, ev.pointerId);
-  setContourLockPressed(false);
-}
-
-function onContourLockClick(ev: MouseEvent): void {
-  if (ev.detail !== 0) {
-    return;
-  }
-  ev.preventDefault();
-  ev.stopPropagation();
-  const player = localPlayer();
-  if (player) {
-    triggerTouchContourLock(player);
-    inputHost?.onActionState();
-  }
-  ev.stopPropagation();
-}
-
-function resetIfPageIsInactive(): void {
-  if (typeof document === 'undefined' || document.visibilityState === 'hidden') {
-    resetTouchInteraction(localPlayer());
-  }
-}
-
-export function initializeTouchControls(host: TouchInputHost): void {
-  if (initialized || typeof document === 'undefined') {
-    return;
-  }
-  inputHost = host;
-  listenerScope = new AbortController();
-  const { signal } = listenerScope;
-
-  document.addEventListener('pointerdown', onPlayfieldPointerDown, {
-    passive: false,
-    capture: true,
-    signal,
-  });
-  document.addEventListener('pointermove', onSteerPointerMove, { passive: false, signal });
-  document.addEventListener('pointerup', onPlayfieldPointerUp, { signal });
-  document.addEventListener('pointercancel', onPlayfieldPointerUp, { signal });
-  document.addEventListener('lostpointercapture', onPlayfieldPointerUp, { signal });
-  document.addEventListener('touchstart', onTouchListChange, {
-    capture: true,
-    passive: true,
-    signal,
-  });
-  document.addEventListener('touchend', onTouchListChange, {
-    capture: true,
-    passive: true,
-    signal,
-  });
-  document.addEventListener('touchcancel', onTouchListChange, {
-    capture: true,
-    passive: true,
-    signal,
-  });
-
-  window.addEventListener('playViewOn', syncTouchMode, { signal });
-  window.addEventListener('playViewOff', syncTouchMode, { signal });
-  unsubscribeOverlay = subscribeGameOverlay((overlay) => {
-    if (overlay !== null) {
-      resetTouchInteraction(localPlayer());
-    }
-    inputHost?.onActionState();
-  });
-  window.addEventListener('resize', () => syncTouchMode(), { signal });
-  window.addEventListener(
-    'orientationchange',
-    () => {
-      resetTouchInteraction(localPlayer());
-      syncTouchMode();
-    },
-    { signal }
-  );
-  window.addEventListener('blur', () => resetTouchInteraction(localPlayer()), { signal });
-  window.addEventListener('pagehide', () => resetTouchInteraction(localPlayer()), {
-    signal,
-  });
-  document.addEventListener('visibilitychange', resetIfPageIsInactive, { signal });
-  window.visualViewport?.addEventListener('resize', () => syncTouchMode(), { signal });
-
-  initialized = true;
-  syncTouchMode();
-  logger.debug('INPUT', 'Touch controls initialized', {
-    visible: isTouchChromeVisible(),
-  });
-}
-
-export function disposeTouchControls(): void {
-  listenerScope?.abort();
-  listenerScope = null;
-  initialized = false;
-  resetTouchInteraction(localPlayer(), { forgetTouches: true });
-  unsubscribeOverlay?.();
-  unsubscribeOverlay = null;
-  inputHost = null;
-}
-
-/** Bind only the mounted Svelte action elements; TypeScript owns gesture capture. */
-export function mountTouchActionControls(elements: TouchActionElements): () => void {
-  actionScope?.abort();
-  resetTouchInteraction(localPlayer());
-  const scope = new AbortController();
-  actionScope = scope;
-  const { signal } = scope;
-  const { ability, contourLock } = elements;
-  abilityButton = ability;
-  contourLockButton = contourLock;
-  ability.addEventListener('pointerdown', (ev) => onAbilityPointerDown(ev, ability), { signal });
-  ability.addEventListener('pointerup', (ev) => onAbilityPointerUp(ev, ability), { signal });
-  ability.addEventListener('pointercancel', (ev) => onAbilityPointerUp(ev, ability), { signal });
-  ability.addEventListener('click', onAbilityClick, { signal });
-  ability.addEventListener(
-    'lostpointercapture',
-    () => {
-      if (abilityPointerId !== null) {
-        resetTouchInteraction(localPlayer());
-      }
-    },
-    { signal }
-  );
-
-  contourLock.addEventListener('pointerdown', (ev) => onContourLockPointerDown(ev, contourLock), {
-    signal,
-  });
-  contourLock.addEventListener('pointerup', (ev) => onContourLockPointerUp(ev, contourLock), {
-    signal,
-  });
-  contourLock.addEventListener('pointercancel', (ev) => onContourLockPointerUp(ev, contourLock), {
-    signal,
-  });
-  contourLock.addEventListener('click', onContourLockClick, { signal });
-  contourLock.addEventListener(
-    'lostpointercapture',
-    () => {
-      if (contourLockPointerId !== null) {
-        resetTouchInteraction(localPlayer());
-      }
-    },
-    { signal }
-  );
-
-  return () => {
-    scope.abort();
-    if (actionScope !== scope) {
+  menu = null;
+  status = '';
+  const pos = worldPoint(p, ev.clientX, ev.clientY);
+  gesture = {
+    kind: 'pending',
+    id: ev.pointerId,
+    x: ev.clientX,
+    y: ev.clientY,
+    at: ev.timeStamp,
+    shipOrigin: Math.hypot(pos.x - p.ship.position.x, pos.y - p.ship.position.y) <= p.ship.r,
+    lockVersion: p.ship.contourLockInputVersion,
+  };
+  holdTimer = setTimeout(() => {
+    if (gesture?.kind !== 'pending') {
       return;
     }
-    resetTouchInteraction(localPlayer());
-    abilityButton = null;
-    contourLockButton = null;
-    actionScope = null;
+    gesture.kind = 'menu';
+    menu = objectMenuAt(p, ev.clientX, ev.clientY);
+    notify();
+  }, 450);
+  notify();
+}
+function move(ev: PointerEvent): void {
+  const p = player();
+  if (!p) {
+    return;
+  }
+  if (firing?.id === ev.pointerId) {
+    if (Math.hypot(ev.clientX - firing.x, ev.clientY - firing.y) > 12) {
+      if (!firing.dragging) {
+        stopNavigation(p.ship);
+        firing.dragging = true;
+      }
+      rotationHeading = Math.atan2(-(ev.clientY - firing.y), ev.clientX - firing.x);
+    }
+    return;
+  }
+  const g = gesture;
+  if (!g || g.kind === 'shield' || g.id !== ev.pointerId || g.kind === 'menu') {
+    return;
+  }
+  if (Math.hypot(ev.clientX - g.x, ev.clientY - g.y) <= 12) {
+    return;
+  }
+  clearHold();
+  if (g.shipOrigin) {
+    if (g.kind !== 'rotating') {
+      stopNavigation(p.ship);
+    }
+    g.kind = 'rotating';
+    const point = worldPoint(p, ev.clientX, ev.clientY);
+    rotationHeading = Math.atan2(-(point.y - p.ship.position.y), point.x - p.ship.position.x);
+  } else {
+    g.kind = 'moved';
+  }
+  notify();
+}
+function up(ev: PointerEvent): void {
+  live.delete(ev.pointerId);
+  // Release capture after state transitions to avoid replaying pointer completion.
+  queueMicrotask(() => release(ev.pointerId));
+  if (firing?.id === ev.pointerId) {
+    const f = firing;
+    firing = null;
+    clearFire();
+    rotationHeading = null;
+    const p = player();
+    if (p) {
+      if (f.charging) {
+        p.ship.finishWeaponCharge(ev.type === 'pointerup');
+      } else if (ev.type === 'pointerup' && active() && p.ship.health > 0 && !p.ship.exploding) {
+        p.ship.shoot();
+      }
+    }
+    notify();
+    return;
+  }
+  const g = gesture;
+  if (!g) {
+    return;
+  }
+  if (g.kind === 'shield') {
+    g.ids.delete(ev.pointerId);
+    if (!g.ids.size) {
+      gesture = null;
+    }
+    return;
+  }
+  if (g.id !== ev.pointerId) {
+    return;
+  }
+  clearHold();
+  gesture = null;
+  rotationHeading = null;
+  if (ev.type !== 'pointerup' || !active()) {
+    menu = null;
+    notify();
+    return;
+  }
+  const p = player();
+  if (!p) {
+    return;
+  }
+  if (p.ship.contourLockInputVersion !== g.lockVersion) {
+    menu = null;
+    notify();
+    return;
+  }
+  const duration = ev.timeStamp - g.at;
+  const dx = ev.clientX - g.x,
+    dy = ev.clientY - g.y;
+  const distance = Math.hypot(dx, dy);
+  if (g.kind === 'menu') {
+    const element = document
+      .elementFromPoint(ev.clientX, ev.clientY)
+      ?.closest<HTMLElement>('[data-object-action]');
+    const action = menu?.actions.find((a) => a.action === element?.dataset['objectAction']);
+    if (action) {
+      activateObjectMenuAction(action.action);
+    } else if (distance > 12) {
+      dismissObjectMenu();
+    }
+  } else if (g.kind === 'pending' && duration <= 220 && distance <= 12) {
+    stopNavigation(p.ship);
+    beginNavigation(p.ship, worldPoint(p, ev.clientX, ev.clientY));
+  } else if (g.kind === 'moved') {
+    if (p.ship.contourLocked) {
+      if (
+        duration > 0 &&
+        duration <= 220 &&
+        distance >= 24 &&
+        distance / duration >= 0.25 &&
+        p.ship.contourLockInputVersion === g.lockVersion
+      ) {
+        const hopped = p.ship.hopContour({ x: dx, y: dy });
+        playFeedback(hopped ? 'contourFlickSuccess' : 'contourFlickBlocked');
+      }
+    } else if (duration <= 350 && distance >= 40) {
+      triggerTouchAbility(p);
+    }
+  }
+  notify();
+}
+export function initializeTouchControls(input: TouchInputHost): void {
+  disposeTouchControls();
+  host = input;
+  scope = new AbortController();
+  const signal = scope.signal;
+  document.addEventListener('pointerdown', down, { capture: true, passive: false, signal });
+  document.addEventListener('pointermove', move, { passive: false, signal });
+  document.addEventListener('pointerup', up, { signal });
+  document.addEventListener('pointercancel', up, { signal });
+  document.addEventListener(
+    'lostpointercapture',
+    (ev) => {
+      if (live.has(ev.pointerId)) {
+        return;
+      }
+      up(ev);
+    },
+    { signal }
+  );
+  document.addEventListener(
+    'touchend',
+    (ev) => {
+      if (ev.touches.length === 0) {
+        gesture = null;
+        live.clear();
+        clearHold();
+        rotationHeading = null;
+        if (firing) {
+          const id = firing.id;
+          firing = null;
+          clearFire();
+          player()?.ship.finishWeaponCharge(false);
+          release(id);
+        }
+        for (const id of [...captures.keys()]) {
+          release(id);
+        }
+      }
+    },
+    { signal }
+  );
+  document.addEventListener('touchcancel', () => reset(), { signal });
+  for (const event of ['blur', 'pagehide', 'playViewOff', 'orientationchange']) {
+    window.addEventListener(event, () => reset(), { signal });
+  }
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.hidden) {
+        reset();
+      }
+    },
+    { signal }
+  );
+  unsubscribe = subscribeGameOverlay((overlay) => {
+    if (overlay !== null) {
+      reset();
+    }
+  });
+  notify();
+}
+export function disposeTouchControls(): void {
+  scope?.abort();
+  actionsScope?.abort();
+  unsubscribe?.();
+  unsubscribe = null;
+  if (host) {
+    reset();
+  }
+  host = null;
+  scope = null;
+  actionsScope = null;
+}
+export function mountTouchActionControls(elements: TouchActionElements): () => void {
+  actionsScope?.abort();
+  const owner = new AbortController();
+  actionsScope = owner;
+  const signal = owner.signal;
+  const bindButton = (
+    element: HTMLButtonElement | undefined,
+    run: () => void,
+    pressed: (value: boolean) => void
+  ) => {
+    let held: number | null = null;
+    element?.addEventListener(
+      'pointerdown',
+      (ev) => {
+        if (!active() && element !== elements.contourLock) {
+          return;
+        }
+        if (element.disabled || element.getAttribute('aria-disabled') === 'true') {
+          return;
+        }
+        ev.preventDefault();
+        ev.stopPropagation();
+        held = ev.pointerId;
+        capture(element, ev.pointerId);
+        pressed(true);
+        run();
+        notify();
+      },
+      { signal }
+    );
+    const finish = (ev: PointerEvent) => {
+      if (held !== ev.pointerId) {
+        return;
+      }
+      held = null;
+      pressed(false);
+      release(ev.pointerId);
+      notify();
+    };
+    element?.addEventListener('pointerup', finish, { signal });
+    element?.addEventListener('pointercancel', finish, { signal });
+    element?.addEventListener('lostpointercapture', finish, { signal });
+    element?.addEventListener(
+      'click',
+      (ev) => {
+        ev.stopPropagation();
+        if (ev.detail === 0 && (active() || element === elements.contourLock)) {
+          run();
+          notify();
+        }
+      },
+      { signal }
+    );
   };
+  bindButton(
+    elements.ability,
+    () => {
+      const p = player();
+      if (p) {
+        triggerTouchAbility(p);
+      }
+    },
+    (v) => {
+      abilityPressed = v;
+    }
+  );
+  bindButton(
+    elements.contourLock,
+    () => {
+      const p = player();
+      if (p && !readActionControls(p).contourLock.disabled) {
+        stopNavigation(p.ship);
+        togglePlayerContourLock(p);
+      }
+    },
+    (v) => {
+      contourPressed = v;
+    }
+  );
+  bindButton(
+    elements.stop,
+    () => {
+      const p = player();
+      if (p) {
+        stopNavigation(p.ship);
+        p.ship.navigationStatus = '';
+        status = '';
+      }
+    },
+    () => {}
+  );
+  bindButton(
+    elements.shield,
+    () => player()?.ship.activateShield(),
+    () => {}
+  );
+  elements.fire?.addEventListener(
+    'pointerdown',
+    (ev) => {
+      if (!active() || firing) {
+        return;
+      }
+      ev.preventDefault();
+      ev.stopPropagation();
+      const p = player();
+      if (!p || p.ship.health <= 0) {
+        return;
+      }
+      if (elements.fire) {
+        capture(elements.fire, ev.pointerId);
+      }
+      firing = {
+        id: ev.pointerId,
+        x: ev.clientX,
+        y: ev.clientY,
+        at: ev.timeStamp,
+        charging: false,
+        dragging: false,
+      };
+      fireTimer = setTimeout(() => {
+        if (firing) {
+          firing.charging = true;
+          p.ship.beginWeaponCharge();
+        }
+      }, 220);
+    },
+    { signal }
+  );
+  elements.fire?.addEventListener(
+    'lostpointercapture',
+    (ev) => {
+      if (firing?.id === ev.pointerId) {
+        clearFire();
+        firing = null;
+        rotationHeading = null;
+        player()?.ship.finishWeaponCharge(false);
+      }
+    },
+    { signal }
+  );
+  elements.fire?.addEventListener(
+    'click',
+    (ev) => {
+      if (ev.detail === 0 && active()) {
+        player()?.ship.shoot();
+      }
+    },
+    { signal }
+  );
+  return () => {
+    owner.abort();
+    if (actionsScope === owner) {
+      reset();
+      actionsScope = null;
+    }
+  };
+}
+
+export function selectedObjectId(): string | null {
+  return menu?.target.id ?? null;
 }

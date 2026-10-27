@@ -259,6 +259,9 @@ export class ConnectionManager {
       get isConnected() {
         return connection.isConnected;
       },
+      sendShield: () =>
+        this.joinAcknowledged &&
+        this.sendMessage({ type: 'activateShield', id: this.getLocalPlayerId(), data: {} }),
       sendCharge: (action) =>
         this.chargedWeapons &&
         this.joinAcknowledged &&
@@ -578,6 +581,9 @@ export class ConnectionManager {
     this.motionReconciliation.reset();
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
+      localShip.navigation = null;
+      localShip.pendingObjectAction = null;
+      localShip.thrusting = false;
       localShip.serverOwnsMotion = false;
       delete localShip.playerMotion;
       localShip.furnaceTransit = null;
@@ -1377,6 +1383,8 @@ export class ConnectionManager {
         // Apply the parsed entity directly — no per-tick snapshot wrapper.
         // Kit / ability / mass stay on the row.
         entityData.spawnProtectionTimer ??= 0;
+        entityData.shieldFrames ??= 0;
+        entityData.shieldCooldownFrames ??= 0;
         entityData.weaponChargeFrames ??= 0;
         entityData.navigationAssistFrames ??= 0;
         entityData.contourDraftFrames ??= 0;

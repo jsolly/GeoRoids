@@ -9,6 +9,7 @@ import { onDarkFurnaceFootprint } from '../../../shared/furnaceField';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { navigationCaptureRadius } from '../../../shared/navigationSalvage';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
+import { activatePlayerShield, tickPlayerShield } from '../../../shared/playerShield';
 import {
   type AbilityWorld,
   abilityCooldownFramesFor,
@@ -53,6 +54,7 @@ import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
 import { getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
+import { type NavigationOrder, steerNavigation, stopNavigation } from './navigation';
 import type { ShipCombatNetwork } from './shipCombatNetwork';
 import {
   applyShipSpawnProtection,
@@ -72,7 +74,31 @@ class Ship {
   angle: number = (90 / 180) * Math.PI;
   weaponChargeStartedAt: number | null = null;
   weaponChargeFrames = 0;
+  shieldFrames = 0;
+  shieldCooldownFrames = 0;
+  navigation: NavigationOrder | null = null;
+  pendingObjectAction: { id: string; action: 'enter' | 'unload' | 'build' } | null = null;
+  navigationStatus = '';
+  arrivalFrames = 0;
   navigationAssistFrames = 0;
+
+  activateShield(): boolean {
+    if (
+      this.health <= 0 ||
+      this.exploding ||
+      this.furnaceTransit ||
+      this.movementLocked ||
+      (this.downedUntil ?? 0) > 0 ||
+      this.shieldCooldownFrames > 0
+    ) {
+      return false;
+    }
+    if (this.combatNetwork?.isConnected === true) {
+      return this.combatNetwork.sendShield?.() ?? false;
+    }
+    return activatePlayerShield(this);
+  }
+
   contourDraftFrames = 0;
   private contourHopCount = 0;
   private contourHopAt = -Infinity;
@@ -224,6 +250,7 @@ class Ship {
   }
 
   explode(): void {
+    stopNavigation(this);
     this.finishWeaponCharge(false);
 
     this.utilityFlight = null;
@@ -458,7 +485,7 @@ class Ship {
 
   takeDamage(amount: number): void {
     this.releaseContourLock();
-    if (this.exploding || this.movementLocked) {
+    if (this.exploding || this.movementLocked || this.shieldFrames > 0) {
       return;
     }
 
@@ -508,6 +535,8 @@ class Ship {
     }
 
     for (let i = 0; i < steps; i++) {
+      tickPlayerShield(this);
+      this.arrivalFrames = Math.max(0, this.arrivalFrames - 1);
       this.updateInvincibility();
       tickShipImpactFlash(this);
       tickAbilityHost(this);
@@ -529,6 +558,7 @@ class Ship {
       return;
     }
     if (this.furnaceTransit) {
+      stopNavigation(this);
       this.releaseContourLock();
       const pose = furnaceTravelPose(this.furnaceTransit, Date.now() + this.furnaceClockOffsetMs);
       this.position = { ...pose.position };
@@ -544,7 +574,7 @@ class Ship {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
     }
     if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
-      this.releaseContourLock();
+      stopNavigation(this);
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
@@ -560,7 +590,7 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
-    if (this.cargoHover && !this.movementLocked) {
+    if (this.cargoHover && !this.movementLocked && !this.navigation) {
       this.releaseContourLock();
       this.velocity = { x: 0, y: 0 };
       this.thrusting = false;
@@ -575,6 +605,7 @@ class Ship {
     }
     this.navigationAssistFrames = Math.max(0, this.navigationAssistFrames - 1);
     this.contourDraftFrames = Math.max(0, this.contourDraftFrames - 1);
+    const navigationLimit = steerNavigation(this);
     this.angle += this.angularVelocity;
     const speed = SHIP.MAX_VELOCITY;
     if (this.knockbackVelocityLimit > speed) {
@@ -600,10 +631,13 @@ class Ship {
       terrainSpeedLimit(this.position, speed),
       this.knockbackVelocityLimit
     );
-    if (this.knockbackVelocityLimit <= speed) {
+    if (this.thrusting && this.knockbackVelocityLimit <= speed) {
       // Contour alignment adds speed while cruise continues to follow the nose.
       // A server-granted blast keeps its motion until the excess speed decays.
       advanceCruiseVelocity(this, speed);
+      if (navigationLimit !== null) {
+        this.capVelocity(navigationLimit);
+      }
     } else {
       this.velocity = applyThrustOrFriction(
         this.velocity,
@@ -612,6 +646,14 @@ class Ship {
         this.frictionCoefficient,
         velocityLimit
       );
+    }
+    if (!this.thrusting && this.knockbackVelocityLimit <= speed) {
+      const current = Math.hypot(this.velocity.x, this.velocity.y);
+      const next = Math.max(0, current - SHIP.THRUST / GAME.FPS);
+      this.velocity =
+        current > 0
+          ? { x: (this.velocity.x * next) / current, y: (this.velocity.y * next) / current }
+          : { x: 0, y: 0 };
     }
     this.capVelocity(velocityLimit);
     this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;

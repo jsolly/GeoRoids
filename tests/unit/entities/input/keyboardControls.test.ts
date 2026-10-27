@@ -7,7 +7,7 @@ import { keyDown, keyUp, reconcilePlayerInput } from '../../../../src/input/keyb
 
 import { setSelectedShipKitId } from '../../../../src/runtime/shipSelection';
 
-// Keyboard steering and combat remain usable while the ship automatically cruises.
+// Steering and combat remain independent of manual propulsion.
 
 const TURN = ((540 / 180) * Math.PI) / 60;
 
@@ -83,7 +83,7 @@ test.each(['scout', 'hauler'] as const)(
     expect(player.ship.thrusting).toBe(false);
     press('ArrowLeft');
     expect(player.ship.cargoHover).toBe(false);
-    expect(player.ship.thrusting).toBe(true);
+    expect(player.ship.thrusting).toBe(false);
     release('ArrowLeft');
     reconcilePlayerInput(player);
     expect(player.ship.cargoHover).toBe(false);
@@ -95,7 +95,7 @@ test.each(['scout', 'hauler'] as const)(
     player.cargo = 0;
     reconcilePlayerInput(player);
     expect(player.ship.cargoHover).toBe(false);
-    expect(player.ship.thrusting).toBe(true);
+    expect(player.ship.thrusting).toBe(false);
   }
 );
 
@@ -129,6 +129,7 @@ test.each(['scout', 'hauler'] as const)(
     controlSources.pointerHeading = Math.PI / 2;
     reconcilePlayerInput(player);
     expect(player.ship.cargoHover).toBe(false);
+    press('KeyW');
     player.ship.update();
     expect(player.ship.velocity).not.toEqual({ x: 0, y: 0 });
     controlSources.pointerHeading = null;
@@ -150,34 +151,31 @@ test('opposing turn keys cancel and releasing either resumes the other turn', ()
   expect(player.ship.angularVelocity).toBeCloseTo(TURN);
   release('KeyA');
   expect(player.ship.angularVelocity).toBe(0);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
 });
 
-test('Space fires and release re-arms without interrupting automatic thrust', () => {
+test('Space fires and release re-arms without starting propulsion', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
   expect(player.ship.lasers).toHaveLength(0);
   press('Space');
   expect(shoot).toHaveBeenCalledOnce();
   expect(player.ship.lasers).toHaveLength(1);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
   expect(player.ship.canShoot).toBe(false);
   release('Space');
   expect(player.ship.canShoot).toBe(true);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
 });
 
-test.each(['ArrowUp', 'KeyW', 'KeyZ'])(
-  '%s is unbound and cannot change cruise or steering',
-  (code) => {
-    press('ArrowLeft');
-    press(code);
-    expect(player.ship.angularVelocity).toBeCloseTo(TURN);
-    expect(player.ship.thrusting).toBe(true);
-    release(code);
-    expect(player.ship.angularVelocity).toBeCloseTo(TURN);
-    expect(player.ship.thrusting).toBe(true);
-  }
-);
+test.each(['ArrowUp', 'KeyW'])('%s supplies thrust without changing steering', (code) => {
+  press('ArrowLeft');
+  press(code);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN);
+  expect(player.ship.thrusting).toBe(true);
+  release(code);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN);
+  expect(player.ship.thrusting).toBe(false);
+});
 
 test('a dead pilot cannot restart thrust, turn, or fire', () => {
   player.ship.health = 0;
@@ -200,4 +198,15 @@ test.each(['scout', 'hauler'] as const)('a %s turns at the same 540-degree pace'
   expect(player.ship.angle).toBeCloseTo(TURN, 10);
   release('ArrowLeft');
   expect(player.ship.angularVelocity).toBe(0);
+});
+
+test('held thrust repeats preserve Contour Lock while a fresh thrust press releases it', () => {
+  press('KeyW');
+  player.ship.contourLock = { height: 0.1, direction: 1 };
+  keyDown(new KeyboardEvent('keydown', { code: 'KeyW', repeat: true }), player);
+  expect(player.ship.contourLocked).toBe(true);
+  release('KeyW');
+  press('KeyW');
+  expect(player.ship.contourLocked).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
 });

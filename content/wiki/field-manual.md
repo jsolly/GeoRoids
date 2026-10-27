@@ -13,9 +13,9 @@ related:
 ---
 ## Start flying
 
-Choose Scout to explore with Mineral Scan, or Hauler to deliver ore with Tow Cable, then select Enter Game (a blank callsign gets a random one, your last is remembered, and names must be unique among online pilots). New pilots launch at Town Square; the camera dives from the whole world to your ship (any key or tap skips it, and reduced-motion settings skip it). Other tools must be salvaged before you can equip them. Your ship keeps moving without a throttle; learn [steering and firing](/wiki/#controls) before heading out.
+Choose Scout to explore with Mineral Scan, or Hauler to deliver ore with Tow Cable, then select Enter Game (a blank callsign gets a random one, your last is remembered, and names must be unique among online pilots). New pilots launch at Town Square; the camera dives from the whole world to your ship (any key or tap skips it, and reduced-motion settings skip it). Other tools must be salvaged before you can equip them. Your ship stays still until you give a movement order; learn [steering and firing](/wiki/#controls) before heading out.
 
-![A Scout keeps flying after steering is released in the always-on thrust demonstration.](/wiki/uploads/georoids-first-flight.png)
+![A Scout follows a chosen destination and brakes on arrival.](/wiki/uploads/georoids-first-flight.png)
 
 ## Your expedition
 

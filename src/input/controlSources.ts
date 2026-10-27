@@ -9,7 +9,7 @@ export const controlSources: {
   steeringEpoch: 0,
 };
 
-/** Release held controls; automatic cruise is a flight rule, not an input source. */
+/** Release held controls independently of navigation orders. */
 export function resetControlSources(): void {
   controlSources.pointerHeading = null;
   controlSources.steeringEpoch++;

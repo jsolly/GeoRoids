@@ -52,6 +52,7 @@ export type ClientCommand =
   | ({ type: 'snapshotAck' } & SnapshotAcknowledgement)
   | { type: 'crewAction'; id: string; action: CrewAction }
   | { type: 'useAbility'; id: string }
+  | { type: 'activateShield'; id: string }
   | { type: 'chargeWeapon'; id: string; action: WeaponChargeAction }
   | {
       type: 'setHaulerUtility';
@@ -311,6 +312,8 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
     }
     case 'useAbility':
       return decodeUseAbility(id);
+    case 'activateShield':
+      return id ? { ok: true, command: { type, id } } : invalid(type, 'Missing shield owner');
     case 'chargeWeapon': {
       const action = fields['action'];
       return id && (action === 'start' || action === 'release' || action === 'cancel')

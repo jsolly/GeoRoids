@@ -692,6 +692,10 @@ class CanvasManager {
     return this.zoom === 1;
   }
 
+  readInputScale(): number {
+    return PLAYFIELD_CLOSE_SCALE * this.zoom;
+  }
+
   getPlayfieldScale(): number {
     return PLAYFIELD_CLOSE_SCALE;
   }

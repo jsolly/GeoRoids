@@ -75,7 +75,7 @@ test('synthetic touch-mouse events do not steal the desktop bindings', () => {
   });
   handleMouseDown(ev, player);
   expect(shoot).not.toHaveBeenCalled();
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
 });
 
 test('locked steering keys are discarded until explicit release and a new press', () => {
@@ -152,7 +152,7 @@ test('left click fires once without interrupting cruise', () => {
   expect(shoot).toHaveBeenCalledOnce();
   expect(player.ship.canShoot).toBe(false);
   expect(player.ship.lasers).toHaveLength(1);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
 });
 
 test('right click toggles contour lock once per press without firing or interrupting cruise', () => {
@@ -165,7 +165,7 @@ test('right click toggles contour lock once per press without firing or interrup
   handleMouseDown(new MouseEvent('mousedown', { button: 2 }), player);
   expect(toggle).toHaveBeenCalledOnce();
   expect(player.ship.contourLocked).toBe(true);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
   expect(shoot).not.toHaveBeenCalled();
 
   handleMouseDown(new MouseEvent('mousedown', { button: 2 }), player);

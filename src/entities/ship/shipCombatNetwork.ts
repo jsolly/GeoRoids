@@ -5,5 +5,6 @@ export interface ShipCombatNetwork {
   readonly isConnected: boolean;
   sendShoot(laser: Laser): void;
   sendAbility(): boolean;
+  sendShield?(): boolean;
   sendCharge(action: WeaponChargeAction): boolean;
 }

@@ -146,6 +146,13 @@ export class MessageHandler {
           this.handlePlayerUpdate(ws, command);
           break;
 
+        case 'activateShield': {
+          const pilot = this.gameEngine.getPlayerBySocket(ws);
+          if (pilot?.id === command.id) {
+            this.gameEngine.activateShield(pilot.id);
+          }
+          break;
+        }
         case 'chargeWeapon': {
           const pilot = this.gameEngine.getPlayerBySocket(ws);
           if (pilot?.id === command.id) {

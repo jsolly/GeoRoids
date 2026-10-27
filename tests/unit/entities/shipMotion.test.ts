@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe('shared ship motion helper', () => {
-  test('automatic thrust accelerates at the existing pace and shots keep their speed', () => {
+  test('requested thrust accelerates at the existing pace and shots keep their speed', () => {
     expect(GAME.MOTION_SCALE).toBe(0.5625);
     expect(GAME.PLAYER_SPEED_SCALE).toBe(1.25);
     expect(LASER.SPEED).toBe(300 * GAME.MOTION_SCALE);
@@ -126,6 +126,7 @@ describe('shared ship motion helper', () => {
     ship.position = { x: 0, y: 0 };
     ship.angle = 0;
     ship.velocity = { x: 0, y: 0.5 };
+    ship.thrusting = true;
     ship.update();
     expect(ship.velocity.x).toBeCloseTo(0.5 + SHIP.THRUST / GAME.FPS);
     expect(ship.velocity.y).toBeCloseTo(0);
@@ -140,6 +141,7 @@ describe('shared ship motion helper', () => {
     ship.mass = 8;
     ship.velocity = { x: 10, y: 0 };
     ship.angle = 0;
+    ship.thrusting = true;
     ship.update();
     expect(ship.velocity.x).toBeCloseTo(SHIP.MAX_VELOCITY);
     expect(ship.velocity.y).toBeCloseTo(0);
@@ -187,6 +189,7 @@ test.each(['scout', 'hauler'] as const)(
         ship.cargo = cargoCapacity(kitId) * load;
         ship.angle = 0;
         ship.velocity = { x: 0, y: 0 };
+        ship.thrusting = true;
         ship.update();
         expect(ship.velocity.x).toBeCloseTo((5 * 0.5625 * 1.25) / 60, 10);
         expect(ship.velocity.y).toBeCloseTo(0, 10);

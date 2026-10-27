@@ -37,6 +37,7 @@ import { GLOWTOY } from '../../shared/glowtoy';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { NAVIGATION_SALVAGE } from '../../shared/navigationSalvage';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
+import { PLAYER_SHIELD } from '../../shared/playerShield';
 import { ROLY_POLY } from '../../shared/rolyPoly';
 import { GROWTH } from '../../shared/shipGrowth';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../../shared/shipKits';
@@ -225,8 +226,9 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `Hold F or two playfield fingers, then release to fire a beam. Minimum charge is ${seconds(CHARGED_WEAPON.minimumFrames)}, full charge ${seconds(CHARGED_WEAPON.fullFrames)}, maximum energy ${CHARGED_WEAPON.maximumEnergy}, and cooldown ${seconds(CHARGED_WEAPON.cooldownFrames)}. The server owns elapsed charge; death, menus, cancellation and ${seconds(CHARGED_WEAPON.expiryFrames)} without release discard it.`,
+        `Hold F or the mobile Fire button, then release to fire a beam. Minimum charge is ${seconds(CHARGED_WEAPON.minimumFrames)}, full charge ${seconds(CHARGED_WEAPON.fullFrames)}, maximum energy ${CHARGED_WEAPON.maximumEnergy}, and cooldown ${seconds(CHARGED_WEAPON.cooldownFrames)}. The server owns elapsed charge; death, menus, cancellation and ${seconds(CHARGED_WEAPON.expiryFrames)} without release discard it.`,
         `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS} and expire after ${LASER.MAX_TRAVEL_DISTANCE} world units of travel; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; a towed ordinary rock uses that same impact against another ship and then breaks. A colossal deposit deals that impact without shattering. Boundary contact applies the current hull health as damage; cargo absorbs it first.`,
+        `Two playfield fingers or the Shield indicator activate ${seconds(PLAYER_SHIELD.durationFrames)} of damage immunity with a ${seconds(PLAYER_SHIELD.cooldownFrames)} cooldown starting on activation. Collision shoves and weapon use continue.`,
         `Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },

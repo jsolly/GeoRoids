@@ -395,7 +395,7 @@
     "src/runtime/inventoryOverlay.ts": "sha256:6b6ad682e4daf00be55f0ceebfd9300de5d15e49ce1226d84524412422e7a4a3",
     "src/runtime/overlayState.ts": "sha256:30b41c06b5811337a6fb4f7b493c31f9886eca9ab3fd14823e65917153f135da",
     "src/runtime/presentation.ts": "sha256:3b009b5d5428a131b74ed3ef8649b115d3e308a0d822e02ab901872dc269b7eb",
-    "src/runtime/runtimeMount.ts": "sha256:7f91c3fdce76412ce2276d6e5f9f1c3091b28b7807d184243a4290b449acb640",
+    "src/runtime/runtimeMount.ts": "sha256:55beb11d520a87354cc1116214abfd8eb8d06eba7cee91057b12036866226139",
     "src/runtime/shipSelection.ts": "sha256:0607fe92e1635e9f5419ab8be6dceb688397033a8ac12ad3f1b8e6330db44ef7",
     "src/runtime/townStore.ts": "sha256:e397ae292108d93a2f25ef7fe34a76e4ed706fe761c3896413071365cbc28dbe",
     "src/runtime/uiTypes.ts": "sha256:3881aa8111c22bce128ac943f28f947375a6617dde0b013e7c45e3938058050d",
@@ -7631,6 +7631,24 @@
       "owners": {
         "server/communication/connectionAdmission.ts": "hud-network",
         "src/utils/logForwarder.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed the client runtime mount. The change is additive: a logger.error call on the initialization-rejection branch, which previously used only error.message for the panel and dropped the stack with nothing forwarded. The diff changes no present() call and no panel message, so the hud-network claim that an unexpected error notice returns you to the title screen and that Enter Game restarts it stays exactly accurate, as does the retry path that backs it. No player-visible behavior, generated value or demonstration is affected; no demonstration cites this source. Ran lint, typecheck, the server, diagnostics, runtime and component unit suites, and the debug-reports integration suite (6 tests) which now waits for a measured queue depth instead of accepting an unmeasured one.",
+      "sources": ["src/runtime/runtimeMount.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "src/runtime/runtimeMount.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed hud-network Diagnostics against both halves of this change; no Wiki page needed an edit. Client half: the startup-failure branch in runtimeMount now records the rejected error, where previously only its message reached the panel and the stack went nowhere. That record stays in the browser -- Logger.forwardToServer returns early until a runtime attaches, and neither path reaching this branch has one, since the dynamic import can reject before createGameRuntime runs and createGameRuntime own failure path detaches before rethrowing -- so it reaches the console and the in-page diagnostics trail rather than logs/client.log. No present call, panel message or control flow changed, so the page claim that an unexpected error notice returns you to the title screen, and that Enter Game restarts it, stays exactly accurate. Server half, reviewed although server/debugReports is not a tracked Wiki source, because it changes what Send does and what /health publishes. It is NOT log-only. The documented /health contract changes: debugReports.pending and .blocked are now nullable, where null means the depth is unknown rather than drained -- before the worker first reports, after a storage fault, and after a worker failure discards a measurement it can no longer trust. docs/agent-operations.md is updated in the same change to say so, because it previously promised aggregate counts with no documented meaning for null. The oldest-pending timestamp is not part of that: it is null when no undelivered report is queued, which is the healthy steady state, and also null whenever the counts are, so it is not a depth signal on its own, and the documentation says that too. The remainder of the server half is log-only: a typed failure cause so a request deadline reports itself rather than a fabricated exit code, a re-entry guard so one stall logs one record, and fault-episode collapsing on the monotonic clock. A store failing continuously costs about ninety-six records a day instead of one per one-second delivery tick. That is the continuous case and not a ceiling: the quiet period that ends an episode is shorter than the logging interval, so a store answering for a minute between failures opens a new episode that logs at once. Also reverted on this branch, after independent review confirmed three Critical findings against it: a bounded worker restart and its thread handover. A faulted report worker stays closed until the next deploy, which is the behaviour on main and fail-closed; this change still improves on it by recording the cause. The credential gate an earlier revision added is reverted too, so an absent TODOIST_API_TOKEN configures normally and DebugReportStore records the report as blocked -- the recovery docs/agent-operations.md documents, and the blocked receipt state hud-network already describes. No player-facing string, receipt state, limit or generated reference value changes, and no demonstration cites either source. Verified on the final state of fix/diagnostics-fail-closed as published -- stated without a commit hash because a note committed in the same commit it describes cannot name its own revision: lint, typecheck, knip, format and the wiki gate clean; 2,232 unit and component tests across 376 files; 46 server integration tests; and mutation checks against every shipped guard, each failing a named test before being reverted, covering the fault-log interval, the quiet period, a frozen clock, the re-entry guard, a late diagnostics reply erasing a recorded fault, an episode abandoned on worker failure, the worker publishing zero instead of null, and the worker fault reply deleted. This entry was corrected in place more than once. wiki:review cannot record a superseding entry, because it accepts a review only for a source whose digest differs from the ledger (scripts/wiki-check.ts, the changed set), and src/runtime/runtimeMount.ts has not changed since the entry was first written. The correction therefore edits this prose and no digest.",
+      "sources": ["src/runtime/runtimeMount.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "src/runtime/runtimeMount.ts": "hud-network"
       }
     },
     {

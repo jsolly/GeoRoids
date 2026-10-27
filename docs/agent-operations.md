@@ -212,7 +212,15 @@ new reports explicitly. Delivered payloads are reclaimed; minimal duplicate
 and receipt records persist. Pending reports are never evicted.
 
 `GET /health` includes aggregate `debugReports` counts, the oldest pending
-timestamp and a safe delivery error. Reporting failure does not make gameplay
+timestamp and a safe delivery error. `pending` and `blocked` are null when the
+depth is unknown rather than zero: before the worker's first report on a fresh
+process, after a storage fault, and after a worker failure, which discards the
+last measured depth because it can no longer be trusted. For those two counts,
+null means unmeasured rather than drained, and only a number says the queue was
+counted. `oldestPendingAt` is different: it is null when no undelivered report
+is queued, which is the healthy steady state, and also null whenever the counts
+are null, so it cannot be read as a depth signal on its own. Read the two counts
+first, and the delivery error beside them when it is set. Reporting failure does not make gameplay
 unhealthy. Credential, permission and Todoist project-capacity failures keep
 reports blocked. Repair the credential or capacity and let the worker retry;
 configuration changes require a service restart. Transient failures retry with

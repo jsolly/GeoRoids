@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { createServerInstance } from '../../../server/createServer';
 import type { DebugReportSubmission } from '../../../shared-types';
 
@@ -223,9 +223,23 @@ test('preview reporting refuses foreign and malformed origins even with a forged
   });
   expect(forbiddenUpload.status).toBe(403);
   expect(forbiddenUpload.headers.get('Access-Control-Allow-Origin')).toBeNull();
-  const health = await fetch(`${origin}/health`);
-  expect(health.status).toBe(200);
-  expect(await health.json()).toMatchObject({ debugReports: { pending: 0, blocked: 0 } });
+  // The worker loads `tsx` on its own thread, so a /health read taken straight
+  // after startup can land before the queue has ever been counted. Wait for a
+  // measured depth, then assert it is empty. Asserting zero against an
+  // unmeasured queue proves nothing -- it is what a fabricated zero used to
+  // hide. The deadline bounds a failure; it is not a speed assertion.
+  await vi.waitFor(
+    async () => {
+      const health = await fetch(`${origin}/health`);
+      expect(health.status).toBe(200);
+      const body = (await health.json()) as {
+        debugReports?: { pending: number | null; blocked: number | null };
+      };
+      expect(body.debugReports?.pending).toBe(0);
+      expect(body.debugReports?.blocked).toBe(0);
+    },
+    { timeout: 20_000, interval: 100 }
+  );
 });
 
 test('production reporting still requires an explicitly allowed origin when it serves no client', async () => {

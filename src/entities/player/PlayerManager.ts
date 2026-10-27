@@ -71,10 +71,12 @@ class PlayerManager {
     this.networkPort.setLocalPlayerName(name);
   }
 
-  public updateNetworkState(): void {
+  /** False when there was nothing to send or the socket refused it. */
+  public updateNetworkState(): boolean {
     if (this.localPlayer) {
-      this.networkPort.updatePlayerState(this.localPlayer.getStateForNetwork());
+      return this.networkPort.updatePlayerState(this.localPlayer.getStateForNetwork());
     }
+    return false;
   }
 }
 

@@ -11,6 +11,7 @@
     "../../tests",
     "../../scripts",
     "../../benchmarks",
+    "../testing/tooling.ts",
     "../testing/vitest.ts",
     "../app/astro.ts",
     "../../setup",

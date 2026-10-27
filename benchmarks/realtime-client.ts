@@ -451,7 +451,7 @@ const { values } = parseArgs({
     viewport: { type: 'string', default: 'all' },
     browser: { type: 'string', default: 'chromium' },
     output: { type: 'string', default: '.performance/client.json' },
-    dpr: { type: 'string', default: '1' },
+    dpr: { type: 'string' },
     'cpu-slowdown': { type: 'string', default: '1' },
     network: { type: 'string', default: 'clean' },
     seed: { type: 'string', default: '42' },
@@ -477,7 +477,8 @@ const chromiumGpu = values['chromium-gpu'];
 const headed = values.headed;
 assert(!chromiumGpu || values.browser === 'chromium', 'chromium-gpu requires Chromium');
 const browserLaunchArgs = chromiumGpu ? ['--enable-gpu'] : [];
-const dpr = Number(values.dpr);
+const dprRequested = values.dpr !== undefined;
+const dpr = dprRequested ? Number(values.dpr) : 1;
 const cpuSlowdown = Number(values['cpu-slowdown']);
 const seed = Number(values.seed);
 const network = values.network;
@@ -524,12 +525,75 @@ assert(
 );
 const browserChannel =
   values.browser === 'chromium' ? (chromiumGpu ? 'chromium' : 'playwright-bundled') : 'webkit';
-const cases = [
+/**
+ * A cohort that sets `dpr` pins one physical device's own measured device pixel
+ * ratio, so `--dpr` does not reach it: that figure is part of the device's
+ * record rather than a knob, and changing it stops the cohort reproducing the
+ * device. Cohorts without `dpr` are layout shapes and still take `--dpr`.
+ *
+ * `fire-hd-10` reproduces the geometry recorded in
+ * docs/performance/fire-tablet-experiments.md for the `KFTUWI` tablet -- the
+ * 13th-generation Fire HD 10 that carries the sustained-60-FPS target -- as an
+ * 800 by 1094 CSS viewport at native DPR 1.5, which is the 1200 by 1641 backing
+ * canvas every capture in that record used.
+ *
+ * Geometry is the only calibrated part. No CPU factor is pinned, because none
+ * has been measured against this tablet: the runbook's slowdown lanes are
+ * stress settings still awaiting calibration, and emulation does not reproduce
+ * the device's GPU, thermal or sustained behavior. A clean run in this cohort
+ * is evidence about frame and pixel cost at the device's real resolution. It is
+ * not device acceptance, which only a physical capture gives.
+ *
+ * To isolate pixel cost here use `--render-dpr`, which caps what the product
+ * renders into the same device geometry. `--dpr` would instead assert the
+ * tablet has a resolution it does not have.
+ */
+type ViewportCase = {
+  name: string;
+  viewport: { width: number; height: number };
+  hasTouch: boolean;
+  dpr?: number;
+  backing?: { width: number; height: number };
+};
+const cases: ViewportCase[] = [
   { name: 'desktop', viewport: { width: 1920, height: 1080 }, hasTouch: false },
   { name: 'touch-portrait', viewport: { width: 390, height: 844 }, hasTouch: true },
   { name: 'touch-landscape', viewport: { width: 844, height: 390 }, hasTouch: true },
+  {
+    name: 'fire-hd-10',
+    viewport: { width: 800, height: 1094 },
+    hasTouch: true,
+    dpr: 1.5,
+    backing: { width: 1200, height: 1641 },
+  },
 ].filter((item) => values.viewport === 'all' || values.viewport === item.name);
 assert(cases.length > 0, 'Unknown viewport');
+for (const item of cases) {
+  const resolved = item.dpr ?? dpr;
+  assert(
+    Number.isFinite(resolved) && resolved >= 1 && resolved <= 4,
+    `Device DPR for ${item.name} must be 1..4`
+  );
+  // `backing` is the backing canvas the device record reports, so a cohort whose
+  // pinned DPR or viewport drifts from that record fails here instead of
+  // measuring some other geometry under the device's name.
+  if (item.backing) {
+    assert.equal(
+      Math.round(item.viewport.width * resolved),
+      item.backing.width,
+      `${item.name} backing width no longer matches its device record`
+    );
+    assert.equal(
+      Math.round(item.viewport.height * resolved),
+      item.backing.height,
+      `${item.name} backing height no longer matches its device record`
+    );
+  }
+}
+assert(
+  !dprRequested || cases.some((item) => item.dpr === undefined),
+  'Every selected viewport pins its device DPR, so --dpr would change nothing'
+);
 assert(
   !regionalWorkload || cases.length === 1,
   'Regional combat requires one viewport in a fresh owned server session'
@@ -664,7 +728,10 @@ function createMeasurement(): Measurement | undefined {
       browser: values.browser,
       browserChannel,
       headed,
-      dpr,
+      // A pinned cohort carries its own device DPR, so no single value is true
+      // of a mixed sweep. Comparison reports hold one viewport, where it is exact;
+      // every run's own figure stays in its constraints and observed metadata.
+      dpr: cases.length === 1 ? (cases[0]?.dpr ?? dpr) : null,
       cpuSlowdown,
       network,
       seed,
@@ -760,6 +827,7 @@ try {
     }
   }
   for (const scenario of cases) {
+    const caseDpr = scenario.dpr ?? dpr;
     process.stdout.write(`Starting ${scenario.name}: ${warmup}s warmup, ${seconds}s measurement\n`);
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -1042,7 +1110,7 @@ try {
     const constraints: Record<string, unknown> = {
       browserChannel,
       headed,
-      dpr,
+      dpr: caseDpr,
       cpuSlowdown,
       chromiumGpu,
       network,
@@ -1055,7 +1123,7 @@ try {
     const context = await activeBrowser.newContext({
       viewport: scenario.viewport,
       hasTouch: scenario.hasTouch,
-      deviceScaleFactor: dpr,
+      deviceScaleFactor: caseDpr,
     });
     const page = await context.newPage();
     if (headed) {
@@ -1693,7 +1761,7 @@ try {
       });
       assert.equal(metadata['visibility'], 'visible', 'Admitted page is hidden');
       assert.equal(metadata['canvasVisible'], true, 'Admitted game canvas is hidden');
-      assert.equal(metadata['dpr'], dpr, 'Browser device DPR differs from request');
+      assert.equal(metadata['dpr'], caseDpr, 'Browser device DPR differs from request');
       const backing = metadata['backing'];
       const css = metadata['css'];
       assert(
@@ -1709,7 +1777,9 @@ try {
           typeof css.height === 'number'
       );
       const effectiveDpr =
-        values['render-dpr'] === 'native' ? dpr : Math.min(dpr, Number(values['render-dpr']));
+        values['render-dpr'] === 'native'
+          ? caseDpr
+          : Math.min(caseDpr, Number(values['render-dpr']));
       assert.equal(
         backing.width,
         Math.round(css.width * effectiveDpr),

@@ -88,6 +88,28 @@ client release identifier was `698b02474f517360232e6ee42c705fd899aaa349`. The
 retained report and arithmetic locations, byte sizes and SHA-256 checksums.
 No GPU testing handoff remains open.
 
+## Emulated cohort for this geometry
+
+`benchmarks/realtime-client.ts` carries a `fire-hd-10` viewport cohort that
+reproduces this record's geometry: an 800 by 1094 CSS viewport pinned to device
+DPR 1.5, which is the 1200 by 1641 flight backing canvas every capture above
+used. The cohort pins that DPR instead of taking `--dpr`, and the harness
+refuses to start when the pinned DPR and viewport stop multiplying out to that
+backing canvas, so the cohort cannot drift away from this record unnoticed.
+
+```sh
+npm run benchmark:realtime -- --viewport fire-hd-10 --scenario combat --seed 42 --warmup 30 --seconds 180 --output .performance/fire-hd-10.json
+```
+
+Geometry is all it reproduces. No CPU slowdown is pinned, because none has been
+calibrated against this tablet; choose `--cpu-slowdown` deliberately and read the
+runbook's lanes as stress settings rather than a model of this device. Isolate
+flight pixel cost with `--render-dpr`, as the caps below describe, rather than
+`--dpr`, which this cohort rejects. Emulation still does not reproduce this
+tablet's GPU, thermal or sustained behavior, so a clean cohort run narrows where
+frame cost arises at the device's real resolution and qualifies nothing. Every
+gap this record lists stays open.
+
 ## Optional future comparisons
 
 For any future authorized device comparison, follow the

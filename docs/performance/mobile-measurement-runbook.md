@@ -78,6 +78,8 @@ Use `--render-dpr native|2|1.5|1|0.75` and `--render-glow full|off` for independ
 | Combined | 4× | 3 | Existing degraded proxy | Competing frame and receive work |
 | Severe diagnostic | 6× | 3 | Existing degraded proxy | Failure behavior; not an initial FPS gate |
 
+The `fire-hd-10` cohort pins device DPR 1.5 from the [Fire tablet record](fire-tablet-experiments.md) and rejects `--dpr`, so this table's Device DPR column does not describe it; vary only CPU and network there, and treat no slowdown as calibrated against that tablet. `--viewport all` includes it, so the baseline sweep above covers four cohorts rather than three.
+
 Run portrait and landscape, with an additional DPR 1 diagnostic when isolating pixel cost. Hold the candidate's quality tier fixed. The numbers are initial stress settings, to be calibrated against the affected device. The [report's constrained-path section](../mobile-performance-research.md#a-constrained-mobile-regression-path) cites the APIs, existing parameters, and limitations.
 
 Harness verification requirements:

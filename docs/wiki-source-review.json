@@ -231,7 +231,7 @@
     "src/components/game/Preferences.svelte": "sha256:df781e7ca2cd79c303154149ccfd20589d8b700057080a7111cc4ba8365c6993",
     "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
     "src/components/game/StartScreen.svelte": "sha256:05bd211b6486de548f5ca92a8daab1c11bd53efbfe626437ce1c4a75391e1805",
-    "src/components/game/TownPanel.svelte": "sha256:d373db9bcd7494dae3cb2d5cc03ced9f87b8493e18514107ae897424b3e34657",
+    "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
     "src/components/game/UniverseMap.svelte": "sha256:3345bef54807c88dde95b36965515c2dc7902900370c52e17a922ada27852682",
     "src/components/ui/button/button.svelte": "sha256:9225943b80347ddad9a06c5b00138d271294f5dac05e5d2f01ed436474d63f28",
     "src/components/ui/checkbox/checkbox.svelte": "sha256:9848aacf63ece5f501165a3906b1ca33c4fe29283d242d14bebd060d2a52cc99",
@@ -357,15 +357,15 @@
     "src/rendering/crewSignalRenderer.ts": "sha256:3dd933457fb43fd631c91441bf4b805fc8d82d6c7813d0fe27006c445f120ab7",
     "src/rendering/devicePixelRatioWatcher.ts": "sha256:f5bb015239f43c33ec954e43bf3fa5b6ff0cfb2db1b8e044bf29d1623a2be748",
     "src/rendering/drawingContext.ts": "sha256:e7559e853594a0f04218f6f3f6b56696fc5fdb89cc38df13663c176160dee8c2",
-    "src/rendering/furnaceRenderer.ts": "sha256:3108bbc1875ece13f178a636138f248587db5f1d6df8cbc98bc596f4e11a579e",
+    "src/rendering/furnaceRenderer.ts": "sha256:7044ac774934e4edcd9a1e1f1f8e832075c256af160c288006fbd085c1b29de3",
     "src/rendering/gpuRearRenderer.ts": "sha256:d15d65438b71907737ea17ecf7bcea54f9e7f5a0d9b3a1eca585f35f2a75bbd5",
     "src/rendering/gpuResources.ts": "sha256:4771865e5866b12493b676e8b61f37af7e719738786388e0e59fa88e296ccef6",
     "src/rendering/gpuShaders.ts": "sha256:8fc33f8f855677b975875343ed51caf0b00245546284ce8e5841db91ad654999",
     "src/rendering/headingCueRenderer.ts": "sha256:88e36fd2455459f0b4fa9003ac5fe441accd5a7f2cef41b5f41b5732f8aa9d89",
     "src/rendering/hud/furnaceMapMark.ts": "sha256:257822ef3315370b3b7abd1378d5322bcf6252851a6be959c542ed46b6089087",
-    "src/rendering/hud/gameInfo.ts": "sha256:39bf465d1638db5914d7346740119265569fb092702889c5a9c91af3db68dceb",
+    "src/rendering/hud/gameInfo.ts": "sha256:3f5f79c0c2fc69c0492180ebf3f036e405237c28859959abf6100847dba4803e",
     "src/rendering/hud/hudLayout.ts": "sha256:4cbbcf645886cd482721eccecff88036e1c8195237537377990037ecadb18aac",
-    "src/rendering/hud/leaderboard.ts": "sha256:fb1dc419a3364c7d7d384df09a02ff28adaa7803c5257c9c8392a209e5a83816",
+    "src/rendering/hud/leaderboard.ts": "sha256:b4ceaac0a63f2ea6c6dce967ee4ad9c5c7d8c347e30d1e7157111c822dbdb1b6",
     "src/rendering/hud/minimap.ts": "sha256:2f78139bdfd76f2a43f2a1559df5aced97d5376cc3a39c42b2019c12080b48ac",
     "src/rendering/hud/resourceMapMark.ts": "sha256:ba3e021db619cd0137cf1398f2e772676bd4555e8062f405aeb21abb99845e06",
     "src/rendering/nativeStarPainter.ts": "sha256:afbcce6099c3a30ff212a39485511a697e33b546fa8b1ae6624d1f21a0c7df48",
@@ -381,7 +381,7 @@
     "src/rendering/shipLighting.ts": "sha256:c9512e3a31f0fac22a3339723785e5e8d3f66b54f71127e84a93812b7214e5c9",
     "src/rendering/shipSchematicCanvas.ts": "sha256:6bd8bab01d2e1745f9da8d26233d31913f5cebb821bb0c765accbde9923db046",
     "src/rendering/simpleScanNavigation.ts": "sha256:d0f95d73652425d4baf3cee5a94131af6714c7030e13d69cd95b0856ce62d797",
-    "src/rendering/simpleScanRenderer.ts": "sha256:83bf8d2f8bcc75f724460d69fead352c06f68ad384670d4e7d1cad535db75ca5",
+    "src/rendering/simpleScanRenderer.ts": "sha256:6944b7642924be17b2d6664596ad7b3b998cc74372c5b3208b6f88a3de8f3351",
     "src/rendering/simpleScanTerrain.ts": "sha256:f5f6323bbb69fba3f13ae7c1f1a53127aa06ca85ad2f3d6c3a5bcb05a4748e60",
     "src/rendering/spiderFootContacts.ts": "sha256:242a4dd6d0056d31cb1f3e803352df26a2178b62c090f1261ab58e4a8ebb4505",
     "src/rendering/spiderRenderer.ts": "sha256:803b166e4fa3cfbe49fa0ba2762d43dd87f5bb98d08b4b67976ae55f0af42076",
@@ -406,7 +406,7 @@
     "src/ui/fieldHint.ts": "sha256:5b9a94f4e979ecfabd2b2a663300164b8cf67ace51c75b74d067c33ee6e18a1f",
     "src/ui/focusReturn.ts": "sha256:88978c309d551e08613a5d124bcfba45658001f562b8cea35cc42e3f368fb4c6",
     "src/ui/furnaceTravelMap.ts": "sha256:b7c87c0807de7fe1fbdcf16b9111e3b4a4d28f186decf11a91c2c6d4bc3a2628",
-    "src/ui/furnaceTravelPrompt.ts": "sha256:0e57ee873dda0eb711a502d8c1472255c4a0edafcca4b4b9d69e082384ad163c",
+    "src/ui/furnaceTravelPrompt.ts": "sha256:449ca8cbcbd404566d2282fbd04267d57f593f26517f96b00f411c1e0d27bfee",
     "src/ui/mapCoordinates.ts": "sha256:782466b2b970d6f8dab1f66c7fad5340de6d0d9c9d66da3b759da6ec4e1a4aba",
     "src/ui/networkStatus.ts": "sha256:5a8198723cb044cb736d2d6906dc92bbdc38249e6701e5c4d54fe00d88507495",
     "src/ui/schematicEquipHint.ts": "sha256:fa1e1828e171f8c1094f23a27e9357a195d728cb47bffcb6c1d21e7f735c3bc4",
@@ -419,6 +419,7 @@
     "src/utils/buildInfo.ts": "sha256:a01cac4ed24d1b34aac395c2dceb2b502c9832b49e81e40c926b61d10fbbc760",
     "src/utils/clientLogContext.ts": "sha256:af42b479255409d5a37c1e4d01da4c9b45dca86e94aa187b8f7dc63127d70c9c",
     "src/utils/colorUtils.ts": "sha256:b71943b98a819ae1bc881ec8642b850fc0971aee34c3339cf30666bbb280d6bb",
+    "src/utils/formatPoints.ts": "sha256:a752bfdf9ef65eb936b725b993753591057de7170442e509ef8bac0f4204665c",
     "src/utils/globalErrorLogging.ts": "sha256:92f69fe910c3058bda0122c7ee4d831fb0933654ee4eebcfe508697bb6182a08",
     "src/utils/logForwardPolicy.ts": "sha256:a43283cb6f407c1c73022a83bfed26b7fb7a1102bf8912488592b58145f51b6a",
     "src/utils/logForwarder.ts": "sha256:4786a5f03e93f4ec12cbaf12621a804ccc892f6cad52770c46648be33c753dc3",
@@ -559,7 +560,7 @@
     "tests/unit/shared/scouts-reveal-more-shared-map-than-haulers.test.ts": "sha256:111a4fe017dbb546172ac87c8eb436030f890af7dc532ef446c4be9bbf479ae0",
     "tests/unit/systems/contour-cuts-preserve-the-shared-world-shape.test.ts": "sha256:05d332f79bf241fc0e6ba3ab3528e8cd2aab01e532a1013bc8a8e4c3999ecec0",
     "tests/unit/systems/contourLaser.test.ts": "sha256:a246ca94974a4671b232f3199a0aaed3fc10732840027b816d1a4b838f000780",
-    "tests/unit/systems/hudReadability.test.ts": "sha256:302f33891dafd09b69cdf81c3fca9ae010ba9d160bec993adc11d24dec0382f7",
+    "tests/unit/systems/hudReadability.test.ts": "sha256:2c7b0d9013ef15933e45ee011d26373684c755762101c3c6700ade9c961219b5",
     "tests/unit/systems/isoContourTerrain.test.ts": "sha256:e4e5110e4c76bf291f9d016616a4b2dec5ecbfb8eb4a7e73d05ed0d28c25239f",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts": "sha256:ee8dc109344bdd51f01e99fa733b0e2af2c492060fb5fc213bb389cbed43392c",
     "tests/unit/systems/lootBlast.test.ts": "sha256:84e88e22f472da6372c995b570e8533b263035d3798bee89d1d665b705f3b831",
@@ -7739,6 +7740,43 @@
         "server/core/GameEngine.ts": "asteroids",
         "src/core/gameController.ts": "asteroids",
         "src/entities/roid/Roid.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Reviewed unifying how banked points are printed. The same quantity had four renderings: hud/gameInfo.ts and TownPanel.svelte used toLocaleString() and followed the viewer's locale, furnaceRenderer.ts pinned en-US, and simpleScanRenderer.ts and furnaceTravelPrompt.ts interpolated the raw number with no grouping at all. On a comma-decimal locale the HUD read 'Bank 24.000' while the furnace plate read 'SCORE 24,000', which in that locale reads as twenty-four. All five surfaces now call one formatter in src/utils/formatPoints.ts, pinned to en-US because every document is lang='en', there is no translation layer, and src/wiki/gameReference.ts already pins en-US for the same quantities; gameReference.ts is authored English prose and was deliberately left untouched. This is a user-visible change for viewers on comma-decimal locales: the HUD bank and the Town Square panel stop following the viewer's locale, and the universe map lot label and the build popup gain a thousands separator they never had. Checked every mapped article for a claim this could move. hud-network.md 'The HUD shows your bank, cargo capacity, kit, shared settlement progress' and its mobile two-line description; scout.md 'A popup on a dark foundation shows how many more points you need to build' and the build/spend rules; controls.md 'Town Square's Store offers placeholders purchased with banked points'; teamwork.md settlement deposits and 'these spend banked points but grant no upgrade'; hauler.md tow and delivery rules. None states a digit grouping or a formatted figure, so all remain accurate and no article text needed changing. Ran wiki:media:check on linux-x64 and all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, which confirms no demonstration shows the universe-map lot label whose output actually changed, and that the hauler demonstration's furnace plate is unaffected because en-US output is identical either way. Left src/components/game/CrewControls.svelte on viewer locale deliberately: its Deep Scanner figures are ore, not points, and teamwork.md states banked points cannot fund that project. Ran biome check (957 files, clean) and astro sync plus tsc (clean). Ran 6 test files, 45 cases, covering hudReadability, town-panel-controls, furnace-hearth-roars-inside-the-delivery-zone and three simplified-scan suites. Added a guard asserting the HUD prints the pinned grouping and never calls Number.prototype.toLocaleString, with an assertion that en-US and de-DE actually disagree so the guard cannot pass vacuously in an en-US environment. It was mutation-checked by returning the HUD to toLocaleString, which failed it with 'expected toLocaleString to not be called at all, but actually been called 1 times'; the defect was removed before committing.",
+      "sources": [
+        "src/components/game/TownPanel.svelte",
+        "src/rendering/furnaceRenderer.ts",
+        "src/rendering/hud/gameInfo.ts",
+        "src/rendering/simpleScanRenderer.ts",
+        "src/ui/furnaceTravelPrompt.ts",
+        "src/utils/formatPoints.ts",
+        "tests/unit/systems/hudReadability.test.ts"
+      ],
+      "topics": ["controls", "hauler", "hud-network", "scout", "teamwork"],
+      "media": ["hauler"],
+      "owners": {
+        "src/rendering/simpleScanRenderer.ts": "scout",
+        "src/utils/formatPoints.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed teamwork and hud-network against bringing the crew leaderboard onto the one points formatter. No article needs an edit.\n\nWhat changed and why it was added after this branch was first published. The branch's claim was that banked points print one way on every surface, and it missed the most visible one: src/rendering/hud/leaderboard.ts built its right column with entry.score.toString(), the same Player.score the branch relabels elsewhere, printed with no grouping. hudLayout.ts declares balance and leaderboard in one layout, so the HUD would have rendered \"Bank 24,000\" beside a leaderboard row reading \"24000\" in the same frame -- in a comma-decimal locale the split the branch exists to remove, reintroduced two inches away. An independent review round caught it. leaderboard.ts now calls formatPoints, so the board and the bank line agree.\n\nArticle impact: none. hud-network.md describes the leaderboard qualitatively -- \"the crew leaderboard, ranked by bank (top ten on desktop, top three on touch, so you may not appear)\" -- and says nothing about how the figure is written. teamwork.md's reward text (\"each contributor receives the same base reward\") likewise names no figure. Checked every article for a digit grouping or a four-or-more-digit figure and there is none to contradict, so no prose describes a format this could falsify.\n\nLayout consequence, checked rather than assumed. Grouping widens the right column, and nameMaxWidth is derived from the measured score width, so a long name truncates earlier than before. The canonical leaderboard scenario asserts the fitted name still ends before the score column with its six-pixel gap, now against the wider grouped score, and that the name was actually truncated. That case previously pinned the ungrouped form and failed on this change, which is how the consequence was found; it is now the thing that proves the name still fits. Mutation-checked by restoring entry.score.toString(), which fails it, with the file restored byte-identical.\n\nsrc/utils/formatPoints.ts changes only its docblock, which cited src/wiki/gameReference.ts as already pinning en-US \"for the same quantities\" and used that as the justification for the pin. That citation is false: gameReference.ts pins en-US for the furnace-lot cost at :77 but interpolates the Town Store offer costs raw at :103. The docblock now records that split instead of claiming agreement.\n\nKnown residual, recorded rather than fixed here. shared/townStore.ts gives Placeholder D a cost of 1000, so after this change the Town Store panel reads \"1,000 banked points\" while the Wiki reference for the same offer reads \"1000 banked points\". That is one quantity rendered two ways, which is the defect this branch is about -- but it lives in generated reference prose with its own review gate rather than on a live HUD surface, and bringing it in would change generated reference values and their demonstrations. It is named in the branch's record as a deliberate exclusion with that reason, replacing the earlier claim that gameReference.ts was already consistent.\n\nAlso corrected in the branch record, not in any source: the changed world-paint label is simpleScanRenderer.ts:596, the Mineral-Scan paint of the live world, not \"the universe map\" -- src/ui/universeMap.ts and its component render no cost at all. The earlier ledger entry for this branch recorded a media verification against that misnamed surface; the surface whose output actually changed is the scan paint, and no demonstration cites it.\n\nVerified: lint and format clean; 82 test files and 399 cases across ui, rendering and systems; the leaderboard mutation above. main merged in at d7d084e with docs/wiki-source-review.json resolved by npm run wiki:merge, which proved no source was re-recorded by both sides. The full pre-commit gate runs on the merged, staged tree before this is pushed.",
+      "sources": ["src/rendering/hud/leaderboard.ts", "src/utils/formatPoints.ts"],
+      "topics": ["hud-network", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/rendering/hud/leaderboard.ts": "teamwork",
+        "src/utils/formatPoints.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Re-records src/rendering/hud/leaderboard.ts after an import sort, for the same change already reviewed in this branch's preceding entry. Between that entry and this one the only edit to the file was Biome's organizeImports moving the new formatPoints import above the type-only HudLayout import; no statement, expression or rendered output changed. The review the preceding entry carries therefore still applies in full: the board prints the bank through the one formatter so a row cannot read 24000 beside a bank line reading 24,000 in the same frame; hud-network.md describes the leaderboard qualitatively as ranked by bank with no statement about how the figure is written, and teamwork.md names no figure either, with no digit grouping or four-or-more-digit number anywhere in any article to contradict; and the widened right column's effect on name truncation is pinned by the canonical leaderboard scenario and mutation-checked by restoring entry.score.toString(). Recorded as a separate entry rather than edited into the previous one because the tool appends and because the digest genuinely moved; the reason it moved is recorded here so this is not read as a second review of a second change.",
+      "sources": ["src/rendering/hud/leaderboard.ts"],
+      "topics": ["hud-network", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/rendering/hud/leaderboard.ts": "teamwork"
       }
     }
   ]

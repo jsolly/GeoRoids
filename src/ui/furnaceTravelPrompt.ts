@@ -4,6 +4,7 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import { worldFurnaces } from '../network/worldExploration';
 import { getOpenGameOverlay } from '../runtime/overlayState';
 import { canEnterTownStore, isAtTownSquare, openTownStore } from '../runtime/townStore';
+import { formatPoints } from '../utils/formatPoints';
 import { SCOUT_ONLY_BUILD_HINT } from './constants';
 import { hideFieldHints, setFieldHint } from './fieldHint';
 import { isPlayViewOn } from './uiUtils';
@@ -28,7 +29,7 @@ function darkLotBuildHint(): string | undefined {
   const lot = civicLotAt(ship.position);
   if (ship.kitId === 'scout' && lot && player.score < lot.cost) {
     const remaining = lot.cost - Math.max(0, player.score);
-    return `You need ${remaining} more ${remaining === 1 ? 'point' : 'points'} to build this furnace`;
+    return `You need ${formatPoints(remaining)} more ${remaining === 1 ? 'point' : 'points'} to build this furnace`;
   }
   return undefined;
 }

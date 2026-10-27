@@ -54,7 +54,7 @@ import { InputManager } from './services/InputManager';
 export class GameController {
   private harpoonBodies() {
     return [
-      ...this.currRoidBelt.roids,
+      ...this.currRoidBelt.getRoids(),
       ...getSpiderField().spiders.map((spider) => ({
         kind: 'spider' as const,
         id: spider.id,
@@ -132,7 +132,7 @@ export class GameController {
     });
 
     bindHarpoonFieldSource(() => this.harpoonBodies());
-    bindUniverseMapField(() => this.currRoidBelt.roids);
+    bindUniverseMapField(() => this.currRoidBelt.getRoids());
     this.networkManager.attachRuntime(this.runtimeListeners.signal);
     this.setupNetworkDisconnectionHandler(this.runtimeListeners.signal);
     window.gameController = this;
@@ -247,7 +247,7 @@ export class GameController {
 
   // Event handler methods for server asteroid synchronization
   private applyServerAsteroidCreated = (asteroid: AsteroidData): void => {
-    this.currRoidBelt.roids.push(new Roid(asteroid));
+    this.currRoidBelt.add(new Roid(asteroid));
   };
 
   private applyServerAsteroidUpdated = (asteroidId: string, updates: AsteroidData): void => {
@@ -275,10 +275,7 @@ export class GameController {
         event.consumedBy === 'furnace' ? 'furnace' : 'break'
       );
     }
-    const index = this.currRoidBelt.roids.indexOf(roid);
-    if (index !== -1) {
-      this.currRoidBelt.roids.splice(index, 1);
-    }
+    this.currRoidBelt.remove(roid);
   };
 
   private applyServerAsteroidDestroyed = (event: AsteroidDestroyEvent): void => {
@@ -319,7 +316,7 @@ export class GameController {
   private setupServerAsteroidListeners(): void {
     this.cleanupServerAsteroidListeners();
     bindAsteroidFieldApply({
-      readBelt: () => this.currRoidBelt.roids,
+      readBelt: () => this.currRoidBelt.getRoids(),
       onCreated: this.applyServerAsteroidCreated,
       onUpdated: this.applyServerAsteroidUpdated,
       onDestroyed: this.applyServerAsteroidDestroyed,
@@ -351,7 +348,7 @@ export class GameController {
   }
 
   getCurrRoidCount(): number {
-    return this.currRoidBelt.roids.length;
+    return this.currRoidBelt.size();
   }
 
   getLoot(): LootData[] {

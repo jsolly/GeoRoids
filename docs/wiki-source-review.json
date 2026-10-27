@@ -265,7 +265,7 @@
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:7693f63b1c79d217385aebc94dd3bc10e4cfaf4423b2716ce058d533e865d05a",
+    "src/core/gameController.ts": "sha256:ba794a6d6d8de72c9b4c093ceea5f164f1cf4ed7f6ab433d78627176afe50597",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:a4775c68fcd740081832385689f432dc68dab693f7ef9ee2300b1a9e4341f26c",
@@ -286,10 +286,10 @@
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
     "src/entities/player/playerNetworkPort.ts": "sha256:f1cef578976be6117b2d6503f4e8c4305269d76ae232b61b77c971561a4e623c",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
-    "src/entities/roid/Roid.ts": "sha256:53e0f642c048db82e278bf40c2e657d4a76624058d345bf1d3b52d1a9d135d35",
+    "src/entities/roid/Roid.ts": "sha256:9f518bc0092562c74d2bc9ace6313190cc76a46a1ef0eae27172c9b551190a97",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
-    "src/entities/roid/roidRenderer.ts": "sha256:1719c44c4d9d4cb58132858116350d026870ee40ceab50b54ed68450c1f9eb64",
+    "src/entities/roid/roidRenderer.ts": "sha256:5ac18c94ac605e4c589e65a7a827909bfcd51f9319433d70bd8681468906fe00",
     "src/entities/roid/surveyProbeRenderer.ts": "sha256:5d3c4a0b3b03f712c0d1c16e5acc230d8a6d7c400311c9ea646589512c63c9dc",
     "src/entities/satellite/eoOutlines.ts": "sha256:2d608104c782cfbc85e9d9cc622994d4f07fec9aa60d7e5da0cd62551651c25e",
     "src/entities/satellitePickup/SatellitePickup.ts": "sha256:75977a7cbd30d1f36aa4831fff97737a02712ccf2d32fe98b955fcb8d26fb0ab",
@@ -444,7 +444,7 @@
     "tests/unit/audio/travel-route-music-requires-moving-through-a-real-passage.test.ts": "sha256:ad5c0bc7221f2ea0d0b8ea5443c15a96bed0b910360e6e28d02d4f8085385c4a",
     "tests/unit/components/debug-controls.test.ts": "sha256:f630bcae8b900129e9d6a1c21453de02d4e9d937af358ebea7b78d0c54811149",
     "tests/unit/diagnostics/debugHudMetrics.test.ts": "sha256:932a9430957b8d172cb80179e347912fbc7fb9078576825005c9b98574d40760",
-    "tests/unit/entities/asteroids.test.ts": "sha256:fd39b80d39f4fa18bb382b54e0671010ac211d2d6c693c574b45371962a7d428",
+    "tests/unit/entities/asteroids.test.ts": "sha256:4fd8d10f2e83cc2dcd0036c9dbd9834afbede779defb1b82fb21f62c5a65b79c",
     "tests/unit/entities/combatDamage.test.ts": "sha256:ea9f152d36b69574381bc2d091207eab311d8eb9b8f6bc673b2ef83273f34a81",
     "tests/unit/entities/eoSatelliteRoster.test.ts": "sha256:8e1ad144bb2a03d19ff52b48f9011e8168fde9f0b5b779530728e94e8ecca9a3",
     "tests/unit/entities/furnace-intake-turns-the-roid-outline-red-and-poofs-smoke.test.ts": "sha256:ff32d551b78dde952936ae727e5ab013b9447cbbedc476c49aaef6cc7f3c763a",
@@ -7156,6 +7156,22 @@
       ],
       "media": ["cargo", "hauler", "scout"],
       "owners": {}
+    },
+    {
+      "note": "Corrective review of the belt id index; supersedes this branch's earlier entry for the same sources, which recorded two claims that were false. The index now cannot disagree with the belt: RoidBelt owns every membership change, `roids` is private, readers take a readonly view through getRoids(), and the Map is maintained by add(), remove() and replaceAll() rather than rebuilt when the array looks different. Nothing watches the array any more, so there is no invalidation heuristic to get wrong.\n\nWhy it changed. The earlier revision rebuilt the index whenever the public array's identity or length stopped matching what was indexed. That cannot see a removal and an addition that net to the same length on the same array object, and both production mutators worked that array in place. The pairing is ordinary traffic rather than a contrived order: applyAsteroidFieldPartition fans created before updated before removed, and every complete snapshot populates removed for rocks leaving WORLD.asteroidInterestRadius, so one rock arriving as one leaves holds the length at the indexed value across both lookups. The index then kept the departed rock and never saw the arrival.\n\nThat was player-visible, which is why the earlier entry is superseded rather than merely extended. applyServerAsteroidUpdated silently applied no kinematics to the arriving rock, so it sat where the snapshot first placed it. removeServerAsteroid returned early for it, so its asteroidDestroy event dropped playDestructionSound and recordAsteroidShatter and left the rock rendered in the belt. A twelve-tick one-in, one-out run reproduced ten missed updates and two missed reconciliations. The earlier entry said \"the destroy path still plays the same sound and records the same shatter for the same rock object\" and \"the guard covers every way callers edit the array behind the index\". Both were false on that path. Its mutation check used a build-once index that never invalidates, which is a strictly weaker defect than the real one -- a never-invalidating index strands a spliced rock immediately, so the weaker mutation failed the old guard while the real defect passed it. The replacement guard is mutation-checked by restoring the identity-and-length heuristic itself, which fails both of its new cases with the arriving rock unfindable.\n\nArticle impact: none needs an edit, and three are accurate again rather than merely still accurate. Checked asteroids.md on material and size rules, Mining and score, reflective faces and powered rocks; field-manual.md on mining rocks, collecting loot and delivering ore to lit furnaces with fields slowly regrowing; and hud-network.md on the minimap and full chart including the explored-ground tint, fog over uncharted rocks and the Survey Probe marker. Every documented rule holds under this fix. Under the previous revision the destruction sound, the shatter record and the chart's contents were intermittently false for any rock that arrived in the same snapshot window as a departure, so those articles described behavior the client did not always deliver.\n\nAlso checked hauler.md and teamwork.md, which roidRenderer.ts maps to. Neither needs an edit and neither rule changes: extraction with E, the tow line and its cues, one Hauler per ordinary rock, towed rocks breaking on contact, colossal deposits needing two Haulers, arming and igniting autonomous delivery, scanning before a tow and the shared base reward all hold. They are in the same position as the three above, though, because the previous revision could fail to render what they describe: a rock that arrived in the same snapshot window as a departure received no kinematics, so a rock under tow could sit still on the client while the server had it moving, and its delivery dropped the destroy event, so the furnace could appear to take a rock that stayed on screen. Both are rendered correctly again under this fix.\n\nWhich rocks exist, their material, size, fragmentation, rewards, reflection and regrowth are untouched. The universe map still reads the same belt through bindUniverseMapField, now as a readonly view. No player-facing string, receipt state, generated reference value or demonstration changes. src/entities/roid/roidRenderer.ts changes by one word -- drawRoidsRelative takes readonly Roid[] -- which is the compiler enforcing what the belt's docblock can only ask for, with no behavior change; drawBeltEncounters and drawSurveyProbes already took a readonly array. tests/unit/entities/asteroids.test.ts changes one push to add().\n\nDeliberately not included: a concurrent-mutation guard on getRoids(). The readonly view stops a caller mutating what it is handed through the type system, and no production caller does, but a determined caller could still cast it away; the belt's own methods are the supported path and the docblock says so.\n\nVerified: astro sync plus tsc clean across src, tests and benchmarks; 183 test files and 949 cases pass across entities, perf, core, network, rendering and scenarios; the new guard rejects the restored identity-and-length heuristic with the file restored byte-identical afterwards. The full pre-commit gate runs on the staged tree before this is pushed.",
+      "sources": [
+        "src/core/gameController.ts",
+        "src/entities/roid/Roid.ts",
+        "src/entities/roid/roidRenderer.ts",
+        "tests/unit/entities/asteroids.test.ts"
+      ],
+      "topics": ["asteroids", "field-manual", "hauler", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/entities/roid/Roid.ts": "asteroids",
+        "src/core/gameController.ts": "asteroids",
+        "src/entities/roid/roidRenderer.ts": "asteroids"
+      }
     }
   ]
 }

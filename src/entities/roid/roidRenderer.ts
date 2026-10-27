@@ -511,7 +511,7 @@ function drawRoidShatter(
   );
 }
 
-export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
+export function drawRoidsRelative(ship: Ship, roids: readonly Roid[]): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
     return;

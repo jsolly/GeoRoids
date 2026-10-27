@@ -159,7 +159,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           offsets: [1, 1, 1, 1, 1, 1, 1, 1],
         });
         roid.velocity = { x: 0.005, y: -0.003 };
-        belt.roids.push(roid);
+        belt.add(roid);
       }
       const loot = LootField.getInstance();
       loot.applySnapshot(
@@ -258,7 +258,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             purchases: local.purchases,
             exploding: local.ship.exploding,
           },
-          asteroids: belt.roids.map((roid) => ({
+          asteroids: belt.getRoids().map((roid) => ({
             id: roid.id,
             position: { ...roid.position },
             health: roid.health,
@@ -340,7 +340,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       if (options.observe) {
         for (const [kind, actors] of [
           ['localShip', [local.ship]],
-          ['asteroid', belt.roids],
+          ['asteroid', belt.getRoids()],
           ['loot', loot.getAll()],
           ['pickup', pickups.getAll()],
           ['spider', spiders],

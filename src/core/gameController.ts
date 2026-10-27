@@ -77,6 +77,8 @@ export class GameController {
   private currRoidBelt: RoidBelt;
   private readonly localFirstPlayers: Player[] = [];
   private simulationAccumulatorMs = 0;
+  /** True once this contact run's overlapping pose has actually been sent. */
+  private boundaryContactReported = false;
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -172,6 +174,7 @@ export class GameController {
     clearAsteroidShatters();
     resetFurnacePipePulses();
     this.simulationAccumulatorMs = 0;
+    this.boundaryContactReported = false;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
 
@@ -439,8 +442,8 @@ export class GameController {
     this.currRoidBelt.moveRoids();
     this.publishLiveHarpoonField();
 
-    // Check boundary collisions for ships
-    this.checkBoundaryCollisions();
+    // Flash local wall contact, and report it before the frame ends
+    this.reportBoundaryContact();
 
     // Update game state manager
     this.gameStateManager.updatePickupMessageTimer();
@@ -459,8 +462,12 @@ export class GameController {
     return this.localFirstPlayers;
   }
 
-  // Check boundary collisions for ships
-  private checkBoundaryCollisions(): void {
+  /**
+   * Flash the local hull on wall contact and make sure the server sees it.
+   * The latch means one report per contact run, and it is set from the send's
+   * own result so a refused pose is retried on the next overlapping frame.
+   */
+  private reportBoundaryContact(): void {
     const currPlayer = this.playerManager.getLocalPlayer();
     if (!currPlayer) {
       return;
@@ -468,13 +475,29 @@ export class GameController {
 
     // Only check the locally-controlled ship. The network player list holds
     // server-synced copies (which lag at 30 FPS) rather than the predicted
-    // local ship, and boundary damage is always attributed to the local
-    // player. Remote players self-report.
-    this.collisionManager.checkBoundaryCollisions(
-      [currPlayer.ship],
-      currPlayer.id,
-      currPlayer.cargo
-    );
+    // local ship, and the server kills each pilot from its own reading of
+    // their reported pose, so nothing here needs the hold size.
+    if (!this.collisionManager.checkBoundaryCollisions([currPlayer.ship])) {
+      this.boundaryContactReported = false;
+      return;
+    }
+    if (this.boundaryContactReported) {
+      return;
+    }
+    // Report this frame's overlapping position from inside the simulation
+    // frame. `updateGame` drains the tick accumulator in a synchronous loop, so
+    // the 60 Hz pose timer can only ever sample the burst's final frame: on a
+    // client advancing two frames per repaint, a contact lasting a single frame
+    // would never reach the server and the wall would not be lethal there.
+    // At most one *delivered* report per contact run. A refused attempt puts
+    // nothing on the wire — `sendPlayerState` refuses before building a packet,
+    // and a send that throws retires the socket — so retrying on later
+    // overlapping frames costs no inbound budget:
+    // `server/communication/messageBudget.ts` allows 120/s against roughly 90/s
+    // of poses and snapshot acknowledgments, and exceeding it terminates the
+    // socket rather than throttling it. `InputManager.updateMovementLock`
+    // reports out of band the same way.
+    this.boundaryContactReported = this.playerManager.updateNetworkState();
   }
 
   // Simple render method - no game logic, just rendering

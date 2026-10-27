@@ -21,7 +21,10 @@ import { terrainSpeedLimit } from '../../shared/terrainTravel';
 import type { ContourLockState, PlayerMotionState, Position } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
 
-/** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
+/** Which envelope check failed, with the numbers behind it.
+ * Mostly diagnostics, but `check: 'boundary'` is gameplay-load-bearing:
+ * `MessageHandler.applyBoundaryContact` reads it to apply the lethal wall rule.
+ * The ordering that makes it safe to read lives on `failedEnvelopeCheck`. */
 interface MotionEnvelopeRejection {
   check: 'velocity' | 'displacement' | 'boundary' | 'anchor' | 'rail';
   mode: PlayerMotionState['mode'];
@@ -407,15 +410,6 @@ export class PlayerMotionService {
     this.handoff(session, now);
   }
 
-  public quit(socket: WebSocket): string | undefined {
-    const session = this.owner(socket);
-    if (!session) {
-      return undefined;
-    }
-    this.removeSession(session);
-    return session.actor.id;
-  }
-
   private removeSession(session: Session): void {
     session.actor.contourLock = null;
     if (session.socket) {
@@ -452,6 +446,13 @@ export class PlayerMotionService {
     if (limits.displacement > limits.credit + 1e-6) {
       return 'displacement';
     }
+    // Must stay after the velocity and displacement returns above. This value
+    // is lethal — `MessageHandler.applyBoundaryContact` kills on it — so the
+    // checks that prove the reported position is one legal step from a position
+    // the server already owns have to pass first. Reaching it earlier would let
+    // a pilot anywhere in the world claim a wall contact and die on demand,
+    // which is the exploit this rule replaced. `authoritative-combat.test.ts`'s
+    // "a pilot in town cannot claim a wall pose" fails if these are reordered.
     if (checkBoundaryCollision(pose.position, limits.hullRadius)) {
       return 'boundary';
     }

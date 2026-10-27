@@ -15,8 +15,9 @@ export function playLaserSound(position?: Position): void {
 }
 
 /**
- * Shared hit SFX for laser impacts (ships and asteroids).
+ * Shared hit SFX for a laser chipping a durable deposit. Viewport-culled and
+ * distance-attenuated like the shot that caused it.
  */
-export function playHitSound(position?: Position): void {
+export function playHitSound(position: Position): void {
   playWorldSound(fxHit, position);
 }

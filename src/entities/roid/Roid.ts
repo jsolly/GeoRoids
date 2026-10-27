@@ -11,7 +11,6 @@ import type {
   Position,
   Velocity,
 } from '../../../shared-types';
-import { playHitSound as playHitSoundAt } from '../../audio/gameSounds';
 import { worldFurnaces } from '../../network/worldExploration';
 
 class Roid {
@@ -38,10 +37,6 @@ class Roid {
   probe?: AsteroidProbe | null;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
   jaggedness: number;
-
-  playHitSound(): void {
-    playHitSoundAt(this.position);
-  }
 
   constructor(row: AsteroidData) {
     this.id = row.id;

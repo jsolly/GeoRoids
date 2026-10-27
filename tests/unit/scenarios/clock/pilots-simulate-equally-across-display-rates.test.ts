@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  game.getCurrRoidBelt().roids.length = 0;
+  game.getCurrRoidBelt().replaceAll([]);
   canvasManager.destroy();
   vi.restoreAllMocks();
 });
@@ -37,7 +37,7 @@ function arrangeFlight() {
   ship.lasers = [new Laser({ x: 500, y: 500 }, { x: 2, y: 0 }, 0, 0)];
   const asteroid = new Roid(asteroidRow({ x: -500, y: -500 }, 20, 'clock-asteroid'));
   asteroid.velocity = { x: 0.2, y: -0.1 };
-  game.getCurrRoidBelt().roids = [asteroid];
+  game.getCurrRoidBelt().replaceAll([asteroid]);
   return ship;
 }
 
@@ -49,7 +49,10 @@ function flightSnapshot() {
     velocity: { ...ship.velocity },
     angle: ship.angle,
     lasers: ship.lasers.map((laser) => ({ ...laser.position, distance: laser.distTraveled })),
-    asteroids: game.getCurrRoidBelt().roids.map((asteroid) => ({ ...asteroid.position })),
+    asteroids: game
+      .getCurrRoidBelt()
+      .getRoids()
+      .map((asteroid) => ({ ...asteroid.position })),
   };
 }
 
@@ -297,7 +300,7 @@ test.each([
   ship.lasers = [laser];
   const asteroid = new Roid(asteroidRow({ x: rockX, y: 0 }, 10, 'crossed-rock'));
   asteroid.velocity = { x: 0, y: 0 };
-  game.getCurrRoidBelt().roids = [asteroid];
+  game.getCurrRoidBelt().replaceAll([asteroid]);
 
   game.updateGame(GAME_TICK_MS * 2);
 

@@ -199,6 +199,62 @@ describe('destroying asteroids drops shared shards into game state', () => {
     expect(engine.getAsteroid('big-1')?.velocity.x).toBe(0);
   });
 
+  test('blast reaches its exact edge without reading rocks beyond it', () => {
+    // A rock qualifies only when `size <= SMALL_ROID_MAX` (24) and within
+    // `RADIUS + size` (80 + size), so 104 bounds every possible push. Reading
+    // `boost` is the loop's first act, so a distant rock that is examined at all
+    // increments the counter.
+    let distantReads = 0;
+    const ws = new RecordingSocket();
+    const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
+    const place = (id: string, x: number, size: number) => {
+      engine.addAsteroid({
+        id,
+        position: { x, y: 0 },
+        velocity: { x: 0, y: 0 },
+        size,
+        jaggedness: 0.5,
+        rotation: 0,
+        angularVelocity: 0,
+        health: 10,
+        maxHealth: 10,
+        vertices: 8,
+        offsets: [1, 1, 1, 1, 1, 1, 1, 1],
+      });
+    };
+    place('seed-roid', 0, 12);
+    place('edge', 92, 12); // d === 80 + 12 exactly; the predicate is `<=`
+    place('past-edge', 93, 12); // one unit beyond the same reach
+    // Candidates are cell-granular, so these sit several cells out: a rock
+    // sharing the blast's own cells is a legitimate candidate the exact
+    // predicates reject, while these must never be looked at.
+    const countRead = () => {
+      distantReads++;
+      return undefined;
+    };
+    for (const [index, x] of [2000, 4000, 8000, 16_000].entries()) {
+      const id = `far-${index}`;
+      place(id, x, 12);
+      const row = engine.getAsteroid(id);
+      assert.ok(row, id);
+      Object.defineProperty(row, 'boost', { get: countRead });
+    }
+
+    engine.handleAsteroidHit('seed-roid', shooter.id, 'laser');
+    const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
+    assert.ok(shard, 'shard loot');
+    distantReads = 0;
+    const blast = engine.handleLootExplode(shooter.id, shard.id);
+
+    expect(blast.success).toBe(true);
+    expect(blast.pushedAsteroidIds).toContain('edge');
+    expect(blast.pushedAsteroidIds).not.toContain('past-edge');
+    expect(engine.getAsteroid('edge')?.velocity.x).toBeGreaterThan(0);
+    expect(engine.getAsteroid('past-edge')?.velocity.x).toBe(0);
+    expect(distantReads).toBe(0);
+  });
+
   test('reset clears shards with the rest of the world', () => {
     const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });

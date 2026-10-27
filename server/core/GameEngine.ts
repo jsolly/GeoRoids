@@ -4432,7 +4432,11 @@ export class GameEngine {
     const origin = loot.position;
     const pushedAsteroidIds: string[] = [];
 
-    for (const asteroid of this.asteroidManager.getAllAsteroids()) {
+    // Blast reach is bounded: a rock qualifies only when `size <= SMALL_ROID_MAX`
+    // and within `RADIUS + size`, so nothing beyond their sum can be pushed.
+    for (const asteroid of this.asteroidManager
+      .spatialIndex()
+      .query(spatialQueryBounds(origin, LOOT_BLAST.RADIUS + LOOT_BLAST.SMALL_ROID_MAX))) {
       if (
         asteroid.boost?.phase === 'burning' ||
         !isSmallRoid(asteroid.size) ||

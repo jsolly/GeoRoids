@@ -309,7 +309,14 @@ function isExercised(member, service, program) {
     }
     const file = declaration.getSourceFile().fileName;
     const references = service.getReferencesAtPosition(file, declaration.name.getStart()) ?? [];
-    return references.some((reference) => accessKind(reference, program) !== 'declaration');
+    // An access must actually touch the member. `!== 'declaration'` also admitted
+    // `'unresolved'`, so a port named only by a doc comment or an indexed-access
+    // type counted as exercised and cleared a member with an audit line claiming
+    // a relationship nothing uses.
+    return references.some((reference) => {
+      const access = accessKind(reference, program);
+      return access === 'read' || access === 'write' || access === 'readwrite';
+    });
   });
 }
 
@@ -342,7 +349,7 @@ function checkableKind(member) {
   }
   const flags = ts.getCombinedModifierFlags(member);
   const hidden = ts.ModifierFlags.Private | ts.ModifierFlags.Protected;
-  const deferred = ts.ModifierFlags.Abstract | ts.ModifierFlags.Ambient;
+  const deferred = ts.ModifierFlags.Abstract | ts.ModifierFlags.Ambient | ts.ModifierFlags.Override;
   if ((flags & hidden) !== 0 || (flags & deferred) !== 0) {
     return undefined;
   }
@@ -415,7 +422,9 @@ function enclosing(access) {
   while (
     ts.isParenthesizedExpression(node.parent) ||
     ts.isNonNullExpression(node.parent) ||
-    ts.isAsExpression(node.parent)
+    ts.isAsExpression(node.parent) ||
+    ts.isTypeAssertionExpression(node.parent) ||
+    ts.isSatisfiesExpression(node.parent)
   ) {
     node = node.parent;
   }
@@ -514,6 +523,28 @@ function accessKind(reference, program) {
 }
 
 /**
+ * Whether this member is public and answers to no gate because its name is not
+ * an identifier. A `#private` name is Biome's. A string, computed or numeric
+ * one has no owner, so the run names it instead of passing it in silence.
+ */
+function unjudgedName(member) {
+  if (
+    member.name === undefined ||
+    ts.isIdentifier(member.name) ||
+    ts.isPrivateIdentifier(member.name)
+  ) {
+    return false;
+  }
+  const spokenFor =
+    ts.ModifierFlags.Private |
+    ts.ModifierFlags.Protected |
+    ts.ModifierFlags.Abstract |
+    ts.ModifierFlags.Ambient |
+    ts.ModifierFlags.Override;
+  return (ts.getCombinedModifierFlags(member) & spokenFor) === 0;
+}
+
+/**
  * Whether this identifier is a member declaration's own name. Every kind
  * `checkableKind` judges belongs here, plus the signature kinds a port is
  * written with and the object-literal kinds a port is satisfied with;
@@ -524,17 +555,23 @@ function accessKind(reference, program) {
  */
 function declaresMember(name) {
   const parent = name.parent;
+  if (parent.name !== name) {
+    return false;
+  }
+  // An object literal that satisfies a port declares the member, but the same
+  // syntax standing where an assignment lands is a destructuring target, and
+  // there the key READS the member: `({ value } = store)` calls the getter.
+  if (ts.isPropertyAssignment(parent) || ts.isShorthandPropertyAssignment(parent)) {
+    return !assigns(parent.parent);
+  }
   return (
-    parent.name === name &&
-    (ts.isPropertySignature(parent) ||
-      ts.isMethodSignature(parent) ||
-      ts.isPropertyDeclaration(parent) ||
-      ts.isMethodDeclaration(parent) ||
-      ts.isGetAccessor(parent) ||
-      ts.isSetAccessor(parent) ||
-      ts.isPropertyAssignment(parent) ||
-      ts.isShorthandPropertyAssignment(parent) ||
-      ts.isParameter(parent))
+    ts.isPropertySignature(parent) ||
+    ts.isMethodSignature(parent) ||
+    ts.isPropertyDeclaration(parent) ||
+    ts.isMethodDeclaration(parent) ||
+    ts.isGetAccessor(parent) ||
+    ts.isSetAccessor(parent) ||
+    ts.isParameter(parent)
   );
 }
 
@@ -557,7 +594,7 @@ function reaches(kind, access) {
   return true;
 }
 
-function remedy({ kind, internal, reads, componentOnly, paired, parameter }) {
+function remedy({ kind, internal, reads, componentOnly, paired, parameter, unresolved }) {
   if (componentOnly) {
     return 'only a component reaches it; cover the behavior from a test';
   }
@@ -570,9 +607,16 @@ function remedy({ kind, internal, reads, componentOnly, paired, parameter }) {
     return 'nothing assigns it; remove the setter';
   }
   // Every construction site passes a constructor parameter, so removing it
-  // breaks each caller. What is dead is the field the modifier declares.
-  if (internal === 0 && parameter) {
+  // breaks each caller (TS2554). What is dead is the field the modifier
+  // declares, whether or not the class also writes it.
+  if (reads === 0 && parameter) {
     return 'nothing reads this parameter property; drop the modifier';
+  }
+  // A reference the check could not classify is still a reference: saying
+  // there are none sends the author to delete a member a type position or a
+  // doc comment still names, which does not compile (TS2339).
+  if (internal === 0 && unresolved > 0) {
+    return 'named only by a type or doc reference this check cannot classify; confirm by hand';
   }
   if (internal === 0) {
     return 'no TypeScript references; remove it';
@@ -580,7 +624,9 @@ function remedy({ kind, internal, reads, componentOnly, paired, parameter }) {
   // A field nothing reads is dead storage wherever it is written from, so
   // narrowing it to `private` would only move the finding to Biome.
   if (kind === 'property' && reads === 0) {
-    return `written but never read (${internal}); remove it`;
+    return unresolved > 0
+      ? `written but never read (${internal}), and named by a reference this check cannot classify; confirm by hand`
+      : `written but never read (${internal}); remove it`;
   }
   const naming = { getter: 'read', setter: 'assigned' }[kind] ?? 'used';
   // TypeScript requires the two halves of a pair to agree on visibility.
@@ -619,6 +665,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
   );
   const findings = [];
   const cleared = [];
+  const unjudged = [];
   for (const file of scanned) {
     const path = relative(root, file.fileName);
     const visit = (node) => {
@@ -629,6 +676,13 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
         for (const member of judged) {
           const kind = checkableKind(member);
           if (kind === undefined) {
+            if (unjudgedName(member)) {
+              unjudged.push({
+                member: `${node.name?.text ?? '(anonymous)'}.${member.name.getText(file)}`,
+                path,
+                line: file.getLineAndCharacterOfPosition(member.name.getStart(file)).line + 1,
+              });
+            }
             continue;
           }
           const name = member.name.text;
@@ -673,6 +727,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             line: file.getLineAndCharacterOfPosition(declaration).line + 1,
             kind,
             parameter: ts.isParameter(member),
+            unresolved: accesses.filter(({ access }) => access === 'unresolved').length,
             // Overload signatures repeat a name as well, so the partner has
             // to be identified by kind rather than by name alone.
             paired: node.members.some(
@@ -696,11 +751,11 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
     };
     ts.forEachChild(file, visit);
   }
-  return { findings, cleared };
+  return { findings, cleared, unjudged };
 }
 
 export function checkUnusedClassMembers(root = process.cwd(), configName) {
-  const { findings, cleared } = unusedClassMembers(root, configName);
+  const { findings, cleared, unjudged } = unusedClassMembers(root, configName);
   const report = findings.map(
     (finding) => `${finding.member} ${finding.path}:${finding.line} - ${remedy(finding)}\n`
   );
@@ -717,7 +772,13 @@ export function checkUnusedClassMembers(root = process.cwd(), configName) {
     cleared.length === 0
       ? ''
       : `${problems === '' ? '' : '\n'}Reachable only through a type relationship (${cleared.length})\n${audit.join('')}`;
-  return { status: findings.length === 0 ? 0 : 1, stdout: problems + kept };
+  const unowned =
+    unjudged.length === 0
+      ? ''
+      : `${problems === '' && kept === '' ? '' : '\n'}Not judged, because the name is not an identifier (${unjudged.length})\n${unjudged
+          .map(({ member, path, line }) => `${member} ${path}:${line}\n`)
+          .join('')}`;
+  return { status: findings.length === 0 ? 0 : 1, stdout: problems + kept + unowned };
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const result = checkUnusedClassMembers();

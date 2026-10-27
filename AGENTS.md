@@ -78,32 +78,42 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   `shared-types.ts`) all sit outside it, as do test doubles and benchmark
   harnesses that exist to satisfy external shapes. `protected` members are out
   of scope too, and Biome's rule covers only private ones, so an unused
-  protected member answers to neither gate; an abstract or `declare` member
-  defers to the declaration that implements it. An `override` member does not:
-  it was excluded while a base declaration still counted as a use, and once
-  that stopped the exclusion was the only thing standing between a public
-  member and the gate, so one keyword retired it silently. Properties of plain
-  objects and constants have no owner at all, and so is a member spelled with a
-  string name rather than an identifier. Each kind is judged by the access that reaches
+  protected member answers to neither gate. An `abstract`, `declare` or
+  `override` member defers to the declaration that owns it — for an `override`
+  that declaration owns its visibility too, so `private override` is a type
+  error and neither remedy this check prints would be sound; nothing escapes by
+  being overridden, because the base member is judged in its own right. One
+  shape does slip through that pair: an abstract base deferring to an
+  implementation that is itself an `override` leaves neither judged. Properties
+  of plain objects and constants have no owner at all, and nor does a member
+  whose name is not an identifier — a string, computed or numeric one. Those
+  are named in the run's own output rather than passed in silence. So a member
+  is skipped for being `private` or `protected`, `abstract`, `declare` or
+  `override`, for having a name that is not an identifier, for being an
+  overload signature with no body, or for being a plain constructor
+  parameter — and nothing else. Each kind is judged by the access that reaches
   it: a field by reads and writes, a getter by reads, a setter by writes — a
   pair shares one symbol, so judging either by every reference would let its
   partner speak for it. What counts is the shape of the reference, not the
   language service's one `isWriteAccess` boolean: a compound assignment and an
   increment read a getter as well as assigning it, and a shorthand `{ value }`
-  pattern binds a local, so it only reads. A write is recognised through
-  parentheses and a non-null assertion, through a bracket key, and through an
-  array or object destructuring pattern or a `for (m.value of …)` initializer
-  standing where the assignment lands; recognising only the left operand of a
-  bare `=` reported a setter five spellings still assign, and `tsc` rejects
-  that remedy with TS2540 or TS7053. A shape the check cannot resolve to an
+  pattern binds a local, so it only reads. A write is recognised through the
+  wrappers that do not change where an assignment lands — parentheses, a
+  non-null assertion, `as`, an angle-bracket assertion and `satisfies` — and
+  through a bracket key, an array or object destructuring target, and a
+  `for (m.value of …)` or `for (m.value in …)` initializer. Recognising only
+  the left operand of a bare `=` reported setters that every one of those
+  spellings still assigns, and `tsc` rejects that remedy with TS2540 or
+  TS7053. The key side of a destructuring target is the mirror case: there the
+  object literal reads the member, so discounting its key as a declaration
+  reported a getter the destructuring still calls. A shape the check cannot resolve to an
   access reaches nothing rather than counting as a read, because a default of
   read let a `{@link C.m}` doc comment or an indexed-access type retire a
   member permanently: a gate that cannot tell must report rather than clear. Of the fields the check reports, one
   nothing reads is dead storage however it is written, so its remedy is removal
-  rather than a narrowing Biome would then report. No class is skipped for its shape, though, and a
-  member is skipped only for being abstract or `declare`: one that extends,
-  implements, is extended or is abstract has every other member judged,
-  `override` included. The language service links a member to the base or
+  rather than a narrowing Biome would then report. No class is skipped for its
+  shape, though: one that extends, implements, is extended or is abstract has
+  every member judged that the list above does not except. The language service links a member to the base or
   interface declaration it implements, and that link is a trap rather than
   coverage — the declaration comes back among the member's references, so
   counting it as a use would let one `implements` clause retire a member
@@ -140,13 +150,19 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   file it was found in, so a run that reports nothing can be audited instead of
   trusted — that audit line is what exposed a dead `SatellitePickup.velocity`
   hiding behind a port no pickup is ever passed to — and
-  `scripts/check-unused-class-members.test.mjs` carries a discriminating
-  negative for every rule and for every exclusion, each one verified by
-  mutation rather than by reading: deleting the rule has to turn the suite red.
-  Two guards survive mutation because they are unreachable rather than
-  untested — `namesAKey`'s `undefined` early return and `declaresMember`'s
-  `parent.name === name` — and the kind list is pinned against `checkableKind`,
-  because a kind missing from it is counted as a use and fails open.
+  `scripts/check-unused-class-members.test.mjs` drives each rule from a
+  fixture that fails when the rule is deleted. Do not read that as a guarantee
+  of complete coverage: three times now this note has claimed one, and each
+  time a reviewer found rules whose deletion left the suite green — most
+  recently four write recognisers and the name-shape exclusion, all since
+  pinned. Before trusting that a rule is covered, delete it and watch the
+  suite, because a rule nothing drives fails open silently. Three guards
+  survive that treatment because they are unreachable rather than untested:
+  `namesAKey`'s `undefined` early return, `declaresMember`'s
+  `parent.name === name`, and `isExercised`'s identifier guard, which cannot
+  fire because the index only holds port members whose name is an identifier.
+  The kind list is pinned against `checkableKind` in the other direction,
+  because a kind missing from it is counted as a use.
 - **What that still does not prove.** The evidence may sit anywhere in the prune
   program — `tests/`, `benchmarks/`, `scripts/`, `setup/`, `.railway/` and
   `config/` included — even though classes in those directories are not judged;

@@ -229,8 +229,14 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         throw new Error('Canvas visibility, dimensions, or touch capability do not match fixture');
       }
 
-      // The fixed harness also runs against revisions predating the GPU API.
-      const surface: object = canvasManager;
+      // The fixed harness also runs against revisions predating the GPU API, so
+      // both members are optional: the assignment then holds whether or not the
+      // revision under test declares them, and the capability the harness
+      // depends on is visible to the type system rather than erased to `object`.
+      const surface: {
+        getRendererBackend?: () => unknown;
+        getGpuFrameStats?: () => unknown;
+      } = canvasManager;
       function rendererBackend(): 'canvas' | 'webgl2' {
         if ('getRendererBackend' in surface && typeof surface.getRendererBackend === 'function') {
           const backend: unknown = surface.getRendererBackend();

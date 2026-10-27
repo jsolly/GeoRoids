@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:bef426fa93acbde3417c9c1c299f490e93a351fd9dae8f9c941ca03f3529b265",
+    "package.json": "sha256:631eacb5a424e0babcaae9fd211132757ed82fa5a06e8164fa44bea52a8cef3e",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -292,12 +292,12 @@
     "src/entities/roid/roidRenderer.ts": "sha256:1719c44c4d9d4cb58132858116350d026870ee40ceab50b54ed68450c1f9eb64",
     "src/entities/roid/surveyProbeRenderer.ts": "sha256:5d3c4a0b3b03f712c0d1c16e5acc230d8a6d7c400311c9ea646589512c63c9dc",
     "src/entities/satellite/eoOutlines.ts": "sha256:2d608104c782cfbc85e9d9cc622994d4f07fec9aa60d7e5da0cd62551651c25e",
-    "src/entities/satellitePickup/SatellitePickup.ts": "sha256:75977a7cbd30d1f36aa4831fff97737a02712ccf2d32fe98b955fcb8d26fb0ab",
+    "src/entities/satellitePickup/SatellitePickup.ts": "sha256:6106b2d920d7e4944f09513b76d0d4f7c4403d54fe1a8132d36c7a4904484372",
     "src/entities/satellitePickup/SatellitePickupManager.ts": "sha256:34de2720789f6c48acfe3f30512a97c0c3173270554d8f192939d96aa1fd1113",
     "src/entities/satellitePickup/satelliteHealthRenderer.ts": "sha256:0f8ce5d5175126394203274d0976ea9e061bcdfc943a262739468bfe079795bd",
     "src/entities/satellitePickup/satellitePickupGlow.ts": "sha256:d2f65deea8024004454313ce1c1bc697dc88dee0ac2d311835aef74397c1313c",
     "src/entities/satellitePickup/satellitePickupRenderer.ts": "sha256:427ff0116adea82f066009f8b98c8e5399095991fb44835b050fa21487e04730",
-    "src/entities/ship/Ship.ts": "sha256:355201ff73ff6025ad9ee91a3af70b7765a425f7e8bc5e55f0eab394b627df8c",
+    "src/entities/ship/Ship.ts": "sha256:e6c30610dea2fc29597382572beeae846101a14a3b16a1cef473df0b7cbb671c",
     "src/entities/ship/cruiseMotion.ts": "sha256:098644690d5029ca6363d4d951e2fbff4ef0c34483afc0fe42e25e050d876f0b",
     "src/entities/ship/harpoonField.ts": "sha256:7ebbb27e4ede9b08eceb6149a006b503b92bc6b190e3027473aa1bccb41d083f",
     "src/entities/ship/haulerUtility.ts": "sha256:2d2e7eeed64a4a53ddb2e35c882c4d0492e98f7f05fbe18f805fdbf712539f2f",
@@ -513,6 +513,7 @@
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:0808cc5c78a0d4df335585469d57b16d2b8f3c65337072e234c260a60c6caa2a",
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:a211f6c8c0c593b809dde90c6f053e37e39963550b6d84d9552ebed8159e01ee",
     "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:88a7a22fe6feb765c078a330f02e175db549bd47bad8a0dce29ad9f2e84fb413",
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:e05382b1eb1fbb5d5482e540c08e305f672a24b7523e3a244b7db0d1a2a85c78",
     "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:f71b82291d9b7cb431b3242fad4854ccf75227c3ef682fde5bab9c8ce84ce9ad",
     "tests/unit/server/contour-riding-rocks-drop-navigation-crystals.test.ts": "sha256:bac294d107876ca053de51802167966eb7f9aa740840adf92723c6b12e1f1086",
@@ -571,8 +572,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
-    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585"
+    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb"
   },
   "reviews": [
     {
@@ -7586,6 +7586,26 @@
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the two Ship fields now private, the two removed SatellitePickup mirror fields and the gate script split: no documented rule, value or illustration changes. Ship keeps the same friction and shot-cooldown behavior with lastShotTime and frictionCoefficient private, since every use of both is inside the class. The removed assetKey and velocity were written and never read anywhere: pickup rendering keys off typeId and motion comes from server position updates. package.json only splits the unused-member check into its own gate stage. Checked with check:ts, check:lint, check:knip, check:ts-prune, check:members and the wiki unit suite; gameplay is unchanged so the terrain and survival demonstrations are unchanged and the wiki-media lane re-verifies them.",
+      "sources": [
+        "package.json",
+        "src/entities/satellitePickup/SatellitePickup.ts",
+        "src/entities/ship/Ship.ts"
+      ],
+      "topics": [
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "satellites",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["survival", "terrain"],
       "owners": {
         "package.json": "field-manual"
       }

@@ -7,7 +7,7 @@
   "scripts": {
     "sounds:generate": "tsx scripts/generate-sounds.ts",
     "worktree:init": "bash scripts/worktree-init.sh && bash scripts/setup-agent-environment.sh",
-    "prune": "npm run check:knip && npm run check:ts-prune",
+    "prune": "npm run check:knip && npm run check:ts-prune && npm run check:members",
     "logs": "tsx scripts/read-game-logs.ts",
     "benchmark": "NODE_ENV=production SERVER_LOG_LEVEL=error tsx benchmarks/run.ts",
     "dev": "./scripts/dev-server.sh",
@@ -36,7 +36,8 @@
     "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit",
     "check:lint-policy": "vitest run --config config/testing/tooling.ts --project lint-policy",
     "check:knip": "JITI_FS_CACHE=false knip --config config/quality/knip.js --treat-config-hints-as-errors --treat-tag-hints-as-errors",
-    "check:ts-prune": "node scripts/check-unused-typescript.mjs && node scripts/check-unused-class-members.mjs",
+    "check:ts-prune": "node scripts/check-unused-typescript.mjs",
+    "check:members": "node scripts/check-unused-class-members.mjs",
     "check:wiki": "tsx scripts/wiki-check.ts",
     "wiki:review": "tsx scripts/wiki-check.ts --accept",
     "wiki:merge": "node scripts/merge-wiki-ledger.mjs --merge",

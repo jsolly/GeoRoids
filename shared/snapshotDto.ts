@@ -194,7 +194,6 @@ const entity = shape<ServerEntityData>({
   utilityFlight: optional((value) => value === null || utilityFlight(value)),
   haulerUtility: optional(isHaulerUtilityId),
   scoutUtility: optional(isScoutUtilityId),
-  deathCause: optional(string),
   playerMotion: optional(motion),
 });
 const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({

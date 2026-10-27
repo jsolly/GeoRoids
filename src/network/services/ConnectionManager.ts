@@ -18,6 +18,7 @@ import type {
   AbilityUsedEvent,
   AsteroidData,
   AsteroidDestroyEvent,
+  AsteroidHitEvent,
   ClientGameplayMessage,
   ClientWireMessage,
   FurnaceDelivery,
@@ -32,7 +33,7 @@ import type {
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
 import { playFeedback } from '../../audio/feedbackSounds';
-import { playLaserSound } from '../../audio/gameSounds';
+import { playHitSound, playLaserSound } from '../../audio/gameSounds';
 import {
   playAbilityActivation,
   playHarpoonRelease,
@@ -795,8 +796,8 @@ export class ConnectionManager {
     }
   }
 
-  updatePlayerState(state: Omit<PlayerUpdate, 'id'>): void {
-    this.sendPlayerState({ id: this.getLocalPlayerId(), ...state });
+  updatePlayerState(state: Omit<PlayerUpdate, 'id'>): boolean {
+    return this.sendPlayerState({ id: this.getLocalPlayerId(), ...state });
   }
 
   // Send player state to server
@@ -1026,6 +1027,9 @@ export class ConnectionManager {
         break;
       case 'asteroidDestroy':
         this.handleAsteroidDestroyed(data as AsteroidDestroyEvent);
+        break;
+      case 'asteroidHit':
+        this.handleAsteroidHit(data as AsteroidHitEvent);
         break;
       case 'satellitePickupCollected':
         this.handleSatellitePickupCollected(data as SatellitePickupCollected);
@@ -1692,6 +1696,14 @@ export class ConnectionManager {
     });
   }
 
+  /** A durable deposit took a chip; its shatter plays a destruction sound instead. */
+  private handleAsteroidHit(data: AsteroidHitEvent): void {
+    if (!data?.asteroidId || !isFinitePosition(data.position)) {
+      return;
+    }
+    playHitSound(data.position);
+  }
+
   private handleSatellitePickupCollected(data: SatellitePickupCollected): void {
     if (!data?.playerId || !data.pickupId) {
       return;
@@ -1760,6 +1772,14 @@ export class ConnectionManager {
       const shouldLogDamage = data.isDestroyed || observedAt - this.lastDamageStateLogAt >= 1000;
       if (shouldLogDamage) {
         this.lastDamageStateLogAt = observedAt;
+        // The server distinguishes a cooperative downing as `player_downed`;
+        // this mirror deliberately does not. The discriminator is on the wire —
+        // `remainingHealth <= 0` with `isDestroyed` false is a downing, and the
+        // record below already carries it as `healthAfter` — but production
+        // forwards only `player_died` and `player_respawned`
+        // (`src/utils/logForwardPolicy.ts`), so a client row for a downing never
+        // ships, and the server record is the authority for damage and death
+        // (`docs/diagnostics.md`). A downing reads as `damage_applied` here.
         logger.info('STATE', data.isDestroyed ? 'player_died' : 'damage_applied', {
           observedAt,
           playerId: data.targetPlayerId,

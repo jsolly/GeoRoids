@@ -374,7 +374,7 @@
     "src/rendering/remainsRenderer.ts": "sha256:f43d3df268dd839054c2214c394930cf559d99714cd8a99117cea399b482ab19",
     "src/rendering/renderQuality.ts": "sha256:91f2cb79a8fe1041302da0fdecedbde68d418c2623e44188cde47533dbb516a3",
     "src/rendering/ricochetCourtRenderer.ts": "sha256:c087819882bc8106c415686ba39d9824278ea5cfe381a0fb072e5f7d1442ee0f",
-    "src/rendering/rolyPolyRenderer.ts": "sha256:be70bfa399633a71396bca885dfddf4d4a37563087d3aed209e17ec13db0f740",
+    "src/rendering/rolyPolyRenderer.ts": "sha256:c05861b41cd0974cf2c8dd576345e871b0dfaf95996c20650d4bf0ce95b5a1d0",
     "src/rendering/routeWaypoints.ts": "sha256:0fee65f107d3c3064803b2dbb3b2cce749d8f0db43274c21447a0b1ad5e0f66b",
     "src/rendering/scanDetailPolicy.ts": "sha256:2b3c60bf266b4d32c9d991dba8ff20e8deeb7b983421fcf1bdb932f421a89bb4",
     "src/rendering/scanSceneryCache.ts": "sha256:9d74511e177f7c481d2bdeb92af12279090dd1e06ba9f5699a7e180858dc51b1",
@@ -7650,6 +7650,13 @@
       "owners": {
         "src/runtime/runtimeMount.ts": "hud-network"
       }
+    },
+    {
+      "note": "Reviewed the roly-poly renderer. The change hoists the prefers-reduced-motion query from once per animal to once per frame and threads the answer in; drawRolyPoly keeps the read for direct callers via an optional parameter. Behavior is identical, including where matchMedia is absent: the optional chain previously yielded undefined, which animated, and the memo now latches false, which also animates. The terrain article's Roly-polys section describes curling when a ship approaches, nudging a curled shell to roll along the contour, and that they are neutral with no reward -- none of which this touches, and the walking/curled/rolling silhouettes are unchanged (the existing silhouette test still asserts 15 lineTo calls walking and 2 arcs curled). No demonstration cites this source (checked src/wiki/media.ts). Ran lint, typecheck, all 250 rendering tests across 51 files, and a new frame-level guard that counts the production matchMedia calls for a 24-animal herd, mutation-checked twice.",
+      "sources": ["src/rendering/rolyPolyRenderer.ts"],
+      "topics": ["terrain"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

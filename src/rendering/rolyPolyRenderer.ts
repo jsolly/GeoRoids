@@ -9,12 +9,15 @@ export function drawRolyPoly(
   animal: RolyPolyState,
   position: Position,
   radius: number,
-  now = performance.now()
+  now = performance.now(),
+  /** Supplied once per frame by `drawRolyPolys`; read here only for direct callers. */
+  reducedMotion?: boolean
 ): void {
-  const reducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const animationTime = reducedMotion ? 0 : now;
+  const reduced =
+    reducedMotion ??
+    (typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  const animationTime = reduced ? 0 : now;
   ctx.save();
   ctx.translate(position.x, position.y);
   ctx.rotate(
@@ -61,6 +64,7 @@ export function drawRolyPolys(viewer: Position): void {
   }
   const viewport = canvasManager.getViewportSize();
   const radius = ROLY_POLY.radius * canvasManager.getPlayfieldScale();
+  let reducedMotion: boolean | undefined;
   for (const animal of getRolyPolys()) {
     const at = canvasManager.worldToScreen(animal.position, viewer);
     if (
@@ -71,6 +75,13 @@ export function drawRolyPolys(viewer: Position): void {
     ) {
       continue;
     }
-    drawRolyPoly(ctx, animal, at, radius);
+    // One CSSOM media query per frame instead of one per animal. `=== true`
+    // makes the memo latch even where `matchMedia` is absent, so a missing
+    // implementation is not re-probed per animal either. `performance.now()`
+    // stays per-animal because the default parameter already called it there.
+    reducedMotion ??=
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    drawRolyPoly(ctx, animal, at, radius, performance.now(), reducedMotion);
   }
 }

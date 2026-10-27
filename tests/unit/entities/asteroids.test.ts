@@ -6,7 +6,7 @@ test('a server-supplied asteroid advances once per client simulation step', () =
   const belt = new RoidBelt();
   const roid = new Roid(asteroidRow({ x: 10, y: 20 }, 10, 'moving-asteroid'));
   roid.velocity = { x: 1, y: -2 };
-  belt.roids.push(roid);
+  belt.add(roid);
 
   belt.moveRoids();
 

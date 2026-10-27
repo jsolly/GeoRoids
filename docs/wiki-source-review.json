@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:05eb50b99d590a0120a10f1f5b103cabcc74bd4b3eb529f0a04b909245768ba1",
-    "server/core/GameEngine.ts": "sha256:b69a985e7e63897a53d7c89dd3a0e3bc50d10173f2e457ef9ca15b3236d743ea",
+    "server/core/GameEngine.ts": "sha256:f69671c18ce397885456ee093051a7f50d1f05c7c7235ca3d529b3aee1c6500d",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -156,7 +156,7 @@
     "shared/eoSatellites.ts": "sha256:198c46704cc1dddeca402c1bfae14d8fa3ad5329d7a7d9d7b413b65d197be9b6",
     "shared/epochField.ts": "sha256:ef83f6258bc1f007c5e5525f0186facd8087b3457ac2304aa3702426f86ee85e",
     "shared/equipment.ts": "sha256:6c1876f3ce3f3c58bb5a391448893eaeb8646e61ae4378c75a6d7823de11bb1f",
-    "shared/exploration.ts": "sha256:7d5c3c0b6673360fc25f4b3f26f605eca1b701540fc5a70e10fb484e553d1e05",
+    "shared/exploration.ts": "sha256:cec0dc7f0f1e52ae486776d2f5937fb108e2511bb85da12393483058db57edfd",
     "shared/frontier.ts": "sha256:e335478d49629e1cd48c8b00a1a4d0cc050891c55ff371b40ae58cf185bfd52a",
     "shared/furnaceField.ts": "sha256:0001eca8e7c86c20d6124be8d4a24c29a97be32d1409a82da058aeaccd1491f8",
     "shared/furnaceTravel.ts": "sha256:aaf873234df6c5ff4e9524edf4f3ed7d42aa3990685e4499662141f75ed09fb7",
@@ -265,7 +265,7 @@
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:4da34f1197361ab858bcb0af1aa5777cfd7af657047fbe99110a04e35627f618",
+    "src/core/gameController.ts": "sha256:2c3a1cb54edbdbece3b773c3cafcea7fe64583ca8a3c98646ce55ed619cbb61a",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:a4775c68fcd740081832385689f432dc68dab693f7ef9ee2300b1a9e4341f26c",
@@ -286,10 +286,10 @@
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
     "src/entities/player/playerNetworkPort.ts": "sha256:246be082754cfbc4da4b6386815029f34b891f32411f76b0132a3b750a73a46a",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
-    "src/entities/roid/Roid.ts": "sha256:30899ebb25280060ba7f85cfbe2d9ea61c747e564a42e0cbee8f6451bcb8ed7f",
+    "src/entities/roid/Roid.ts": "sha256:6ece79416cef7d83527273d650d2d53c477daf622d1ce5b189d4ce6d112a558b",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
-    "src/entities/roid/roidRenderer.ts": "sha256:1719c44c4d9d4cb58132858116350d026870ee40ceab50b54ed68450c1f9eb64",
+    "src/entities/roid/roidRenderer.ts": "sha256:5ac18c94ac605e4c589e65a7a827909bfcd51f9319433d70bd8681468906fe00",
     "src/entities/roid/surveyProbeRenderer.ts": "sha256:5d3c4a0b3b03f712c0d1c16e5acc230d8a6d7c400311c9ea646589512c63c9dc",
     "src/entities/satellite/eoOutlines.ts": "sha256:2d608104c782cfbc85e9d9cc622994d4f07fec9aa60d7e5da0cd62551651c25e",
     "src/entities/satellitePickup/SatellitePickup.ts": "sha256:6106b2d920d7e4944f09513b76d0d4f7c4403d54fe1a8132d36c7a4904484372",
@@ -378,7 +378,7 @@
     "src/rendering/routeWaypoints.ts": "sha256:0fee65f107d3c3064803b2dbb3b2cce749d8f0db43274c21447a0b1ad5e0f66b",
     "src/rendering/scanDetailPolicy.ts": "sha256:2b3c60bf266b4d32c9d991dba8ff20e8deeb7b983421fcf1bdb932f421a89bb4",
     "src/rendering/scanSceneryCache.ts": "sha256:9d74511e177f7c481d2bdeb92af12279090dd1e06ba9f5699a7e180858dc51b1",
-    "src/rendering/shipLighting.ts": "sha256:18382d8b548986d6a1267f02e2b1711d9665736dc65aa1bf8949870e70216eca",
+    "src/rendering/shipLighting.ts": "sha256:c9512e3a31f0fac22a3339723785e5e8d3f66b54f71127e84a93812b7214e5c9",
     "src/rendering/shipSchematicCanvas.ts": "sha256:6bd8bab01d2e1745f9da8d26233d31913f5cebb821bb0c765accbde9923db046",
     "src/rendering/simpleScanNavigation.ts": "sha256:d0f95d73652425d4baf3cee5a94131af6714c7030e13d69cd95b0856ce62d797",
     "src/rendering/simpleScanRenderer.ts": "sha256:83bf8d2f8bcc75f724460d69fead352c06f68ad384670d4e7d1cad535db75ca5",
@@ -444,7 +444,7 @@
     "tests/unit/audio/travel-route-music-requires-moving-through-a-real-passage.test.ts": "sha256:ad5c0bc7221f2ea0d0b8ea5443c15a96bed0b910360e6e28d02d4f8085385c4a",
     "tests/unit/components/debug-controls.test.ts": "sha256:f630bcae8b900129e9d6a1c21453de02d4e9d937af358ebea7b78d0c54811149",
     "tests/unit/diagnostics/debugHudMetrics.test.ts": "sha256:932a9430957b8d172cb80179e347912fbc7fb9078576825005c9b98574d40760",
-    "tests/unit/entities/asteroids.test.ts": "sha256:fd39b80d39f4fa18bb382b54e0671010ac211d2d6c693c574b45371962a7d428",
+    "tests/unit/entities/asteroids.test.ts": "sha256:4fd8d10f2e83cc2dcd0036c9dbd9834afbede779defb1b82fb21f62c5a65b79c",
     "tests/unit/entities/combatDamage.test.ts": "sha256:ea9f152d36b69574381bc2d091207eab311d8eb9b8f6bc673b2ef83273f34a81",
     "tests/unit/entities/eoSatelliteRoster.test.ts": "sha256:8e1ad144bb2a03d19ff52b48f9011e8168fde9f0b5b779530728e94e8ecca9a3",
     "tests/unit/entities/furnace-intake-turns-the-roid-outline-red-and-poofs-smoke.test.ts": "sha256:ff32d551b78dde952936ae727e5ab013b9447cbbedc476c49aaef6cc7f3c763a",
@@ -7657,6 +7657,89 @@
       "topics": ["terrain"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed the ExplorationMap re-encode deferral: reveal marks the encoded tile cache stale and snapshot encodes on demand, rather than rebuilding the whole tile array inside the 60 Hz tick. Revealed cells, tile ids, byte/bit layout and snapshot contents are unchanged, so no player-facing rule moved. Checked all four mapped articles: scout.md pulse range and 'Scout reveals more of the shared chart as it flies than Hauler'; teamwork.md per-pilot crew-map reveal and exploration surviving server restarts; hud-network.md explored-ground pale blue tint versus dark fog hiding uncharted rocks and loot; field-manual.md 'Choose Scout to explore with Mineral Scan' and 'one crew, one chart, and a persistent world'. All four remain accurate and no article text needed changing. Inspected the scout demonstration poster: it shows the Mineral Scan pulse circle, the ice/metal/rubble classification marks and shared crew visibility of those marks, none of which read the exploration tile cache, so the demonstration depicts no changed behavior. Ran wiki:media:check on linux-x64 and all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, so no GIF was regenerated. Ran biome check (957 files, clean) and astro sync plus tsc (clean). Ran 5 gameplay test files, 12 cases: the new revealing-ground-keeps-the-map-re-encode-out-of-the-frame guard, radar-reuses-decoded-exploration-without-changing-membership, scouts-reveal-more-shared-map-than-haulers, explored-world-keeps-the-simulation-frame-off-the-database and crew-maps-revealed-landmarks-beyond-local-snapshots. The guard was mutation-checked by restoring the eager encode, which failed it with five re-encodes across five reveals; the defect was removed before committing.",
+      "sources": ["shared/exploration.ts"],
+      "topics": ["field-manual", "hud-network", "scout", "teamwork"],
+      "media": ["scout"],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the ship-lighting motion-preference hoist: drawShipLighting now reads the reduced-motion preference at most once per frame and passes it to drawEngineLight, instead of each thrusting ship querying matchMedia and allocating a MediaQueryList of its own. Light geometry, colors and the contour-speed boost flag are untouched, and performance.now() is still sampled per ship so flicker phase is unchanged. Checked both mapped articles: asteroids.md 'Shine your headlights or engine light on a hidden phosphorescent crystal' and its charging and afterglow rules, and terrain.md 'Light and wreck shadows' covering headlights illuminating the route, the engine casting blue light that turns violet at contour speed, wrecks interrupting those beams with ghostly shadows, and the light being shared by nearby pilots and charging glowtoys. Both remain accurate and no article text needed changing. Ran wiki:media:check on linux-x64: all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, which covers the demonstrations showing thrusting ships, so no media was regenerated. Ran biome check (958 files, clean) and astro sync plus tsc (clean). Ran 3 rendering test files, 5 cases: the new a-frame-of-thrusting-ships-reads-the-motion-preference-once guard, ship-light-casts-wreck-shadows-and-colors-speed, and ordinary-loot-skips-motion-queries-while-rare-salvage-stays-responsive. The new guard asserts one preference read for four thrusting ships, none when nothing thrusts, a fresh read on the next drawing frame, and that the shared value reaches each light by pinning the flicker to exactly 1 so the reach equals radius times scale times four. It was mutation-checked by restoring the per-ship read, which failed it with four reads instead of one; the defect was removed before committing.",
+      "sources": ["src/rendering/shipLighting.ts"],
+      "topics": ["asteroids", "terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the belt id index: RoidBelt gained getById backed by a Map that rebuilds whenever the public roids array changes identity or length, and gameController's snapshot-apply and destroy handlers now look rocks up through it instead of scanning the array. Which rocks exist, their material, size, fragmentation, rewards, reflection and regrowth are all untouched; the destroy path still plays the same sound and records the same shatter for the same rock object, and the universe map still reads the same array through bindUniverseMapField. Checked all three mapped articles: asteroids.md material and size rules, 'Mining and score', reflective faces and powered rocks; field-manual.md 'Mine rocks, collect loot, and deliver ore to lit furnaces for score; harvested fields slowly regrow'; and hud-network.md minimap and full chart behavior including the explored-ground tint, fog over uncharted rocks and the Survey Probe marker. All three remain accurate and no article text needed changing. Ran wiki:media:check on linux-x64: all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, so no media was regenerated. Ran biome check (958 files, clean) and astro sync plus tsc (clean). Ran 7 test files, 26 cases, covering the new the-belt-finds-rocks-by-id-after-callers-edit-it guard, asteroids, asteroidFieldSync, hotPathAllocations, pilots-simulate-equally-across-display-rates, simplified-scan-keeps-local-navigation-exact and contour-shots-follow-the-current-pilots. The guard covers every way callers edit the array behind the index: direct push, splice, wholesale replacement with a same-length array, id reuse by a fresh object, truncation via length and regrowth after it. It was mutation-checked with a build-once index that never invalidates, which failed it because a spliced-out rock still resolved; the defect was removed before committing.",
+      "sources": ["src/core/gameController.ts", "src/entities/roid/Roid.ts"],
+      "topics": ["asteroids", "field-manual", "hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed the loot-blast broad phase: the detonation loop in handleLootExplode now draws candidates from the asteroid manager's spatial index over a bounded box instead of walking getAllAsteroids, which also stopped allocating a full copy of the awake asteroid set per detonation. All three exact predicates are unchanged: burning-boost rocks are skipped, isSmallRoid still gates on size, and inBlastRadius still decides reach. The box radius is LOOT_BLAST.RADIUS + LOOT_BLAST.SMALL_ROID_MAX, which is the tight bound because a rock qualifies only when size <= SMALL_ROID_MAX and within RADIUS + size, so nothing reachable can fall outside it; note SMALL_ROID_MAX's own comment says 'size < 25' but the predicate isSmallRoid is 'size <= 24', and the bound follows the predicate. The index is documented as the one broad phase shared by lasers, collisions, crawlers, scans and snapshots, stays exact against the manager's rows, and preserves source order, so pushedAsteroidIds ordering is unchanged. Reviewed every mapped article for claims this could move. The canonical ones are loot-growth.md 'Shoot a shard, Tap canister, or silk drop from nearby to detonate it and push small rocks away' with its summary 'shoot a drop to push nearby small rocks', and combat-survival.md 'Ship-to-ship ramming, tow cables, and loot blasts do not hurt crew hulls'. Both still hold: the same rocks are pushed with the same impulse, the drop is still consumed, and no hull interaction changed. Nothing in field-manual, controls, scout, hauler, asteroids, satellites, terrain, teamwork or hud-network describes blast reach or candidate selection, so no article text needed changing. Ran wiki:media:check on linux-x64 and all 10 GIFs and 10 posters verified byte-identical against the committed baseline at seed 1335704609, covering the scout, hauler and cargo demonstrations, so none was regenerated. Ran biome check (959 files, clean) and astro sync plus tsc (clean). Ran 4 test files, 37 cases: destroy-drop-loot, lootBlast, nearby-asteroid-queries-stay-local-as-the-world-grows and loot-manager. Extended the canonical blast scenario with a case asserting the exact edge is still pushed at distance 80 plus size, that one unit beyond is not, and that rocks several cells away are never examined, counted through an instrumented boost getter because reading boost is the loop's first act. It was mutation-checked by restoring the getAllAsteroids scan, which failed it with four distant rocks read instead of none; the defect was removed before committing.",
+      "sources": ["server/core/GameEngine.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Corrective review of the belt id index; supersedes this branch's earlier entry for the same sources, which recorded two claims that were false. The index now cannot disagree with the belt: RoidBelt owns every membership change, `roids` is private, readers take a readonly view through getRoids(), and the Map is maintained by add(), remove() and replaceAll() rather than rebuilt when the array looks different. Nothing watches the array any more, so there is no invalidation heuristic to get wrong.\n\nWhy it changed. The earlier revision rebuilt the index whenever the public array's identity or length stopped matching what was indexed. That cannot see a removal and an addition that net to the same length on the same array object, and both production mutators worked that array in place. The pairing is ordinary traffic rather than a contrived order: applyAsteroidFieldPartition fans created before updated before removed, and every complete snapshot populates removed for rocks leaving WORLD.asteroidInterestRadius, so one rock arriving as one leaves holds the length at the indexed value across both lookups. The index then kept the departed rock and never saw the arrival.\n\nThat was player-visible, which is why the earlier entry is superseded rather than merely extended. applyServerAsteroidUpdated silently applied no kinematics to the arriving rock, so it sat where the snapshot first placed it. removeServerAsteroid returned early for it, so its asteroidDestroy event dropped playDestructionSound and recordAsteroidShatter and left the rock rendered in the belt. A twelve-tick one-in, one-out run reproduced ten missed updates and two missed reconciliations. The earlier entry said \"the destroy path still plays the same sound and records the same shatter for the same rock object\" and \"the guard covers every way callers edit the array behind the index\". Both were false on that path. Its mutation check used a build-once index that never invalidates, which is a strictly weaker defect than the real one -- a never-invalidating index strands a spliced rock immediately, so the weaker mutation failed the old guard while the real defect passed it. The replacement guard is mutation-checked by restoring the identity-and-length heuristic itself, which fails both of its new cases with the arriving rock unfindable.\n\nArticle impact: none needs an edit, and three are accurate again rather than merely still accurate. Checked asteroids.md on material and size rules, Mining and score, reflective faces and powered rocks; field-manual.md on mining rocks, collecting loot and delivering ore to lit furnaces with fields slowly regrowing; and hud-network.md on the minimap and full chart including the explored-ground tint, fog over uncharted rocks and the Survey Probe marker. Every documented rule holds under this fix. Under the previous revision the destruction sound, the shatter record and the chart's contents were intermittently false for any rock that arrived in the same snapshot window as a departure, so those articles described behavior the client did not always deliver.\n\nAlso checked hauler.md and teamwork.md, which roidRenderer.ts maps to. Neither needs an edit and neither rule changes: extraction with E, the tow line and its cues, one Hauler per ordinary rock, towed rocks breaking on contact, colossal deposits needing two Haulers, arming and igniting autonomous delivery, scanning before a tow and the shared base reward all hold. They are in the same position as the three above, though, because the previous revision could fail to render what they describe: a rock that arrived in the same snapshot window as a departure received no kinematics, so a rock under tow could sit still on the client while the server had it moving, and its delivery dropped the destroy event, so the furnace could appear to take a rock that stayed on screen. Both are rendered correctly again under this fix.\n\nWhich rocks exist, their material, size, fragmentation, rewards, reflection and regrowth are untouched. The universe map still reads the same belt through bindUniverseMapField, now as a readonly view. No player-facing string, receipt state, generated reference value or demonstration changes. src/entities/roid/roidRenderer.ts changes by one word -- drawRoidsRelative takes readonly Roid[] -- which is the compiler enforcing what the belt's docblock can only ask for, with no behavior change; drawBeltEncounters and drawSurveyProbes already took a readonly array. tests/unit/entities/asteroids.test.ts changes one push to add().\n\nDeliberately not included: a concurrent-mutation guard on getRoids(). The readonly view stops a caller mutating what it is handed through the type system, and no production caller does, but a determined caller could still cast it away; the belt's own methods are the supported path and the docblock says so.\n\nVerified: astro sync plus tsc clean across src, tests and benchmarks; 183 test files and 949 cases pass across entities, perf, core, network, rendering and scenarios; the new guard rejects the restored identity-and-length heuristic with the file restored byte-identical afterwards. The full pre-commit gate runs on the staged tree before this is pushed.",
+      "sources": [
+        "src/core/gameController.ts",
+        "src/entities/roid/Roid.ts",
+        "src/entities/roid/roidRenderer.ts",
+        "tests/unit/entities/asteroids.test.ts"
+      ],
+      "topics": ["asteroids", "field-manual", "hauler", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/entities/roid/Roid.ts": "asteroids",
+        "src/core/gameController.ts": "asteroids",
+        "src/entities/roid/roidRenderer.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Review of the MERGED content of three sources that npm run wiki:merge reset to pending because both sides re-recorded them: server/core/GameEngine.ts, src/core/gameController.ts and src/entities/roid/Roid.ts. This is a genuine review of the combination rather than a re-accept of either side; the resolver refused to emit a digest it could not prove, and a union would have written digests matching neither side while check:wiki still passed.\n\nWhat the merged state actually is, measured against the merge base c487d041 rather than assumed. From this branch: the loot-blast candidate set in GameEngine.ts (5 insertions), the belt API migration in gameController.ts (8 insertions, 12 deletions) and the belt ownership restructure in Roid.ts (55 insertions, 4 deletions). From main: #878's two whole-belt-walk removals in GameEngine.ts (40 insertions, 10 deletions), #880's boundary-death work in gameController.ts (34 insertions, 11 deletions), and the removal of the dead playHitSound method and its import from Roid.ts (5 deletions).\n\nGameEngine.ts now carries THREE independent removals of a whole-belt walk, and they are complementary rather than overlapping. #878 replaced the walks in tickAbilities with a spatialIndex() query and in processFurnaceDeliveries with the boostedAsteroids() tracked set. This branch replaced the one in the loot blast with a spatialIndex() query. AGENTS.md's loop invariant as #878 rewrote it -- reach a rare case through a tracked set or spatialIndex(), not getAllAsteroids() -- is therefore satisfied by this branch's change too, in the same file, for the third of three sites.\n\nThe load-bearing claim, verified from the constants rather than from the code comment that states it. The blast query is bounded by LOOT_BLAST.RADIUS + LOOT_BLAST.SMALL_ROID_MAX, which shared/lootBlast.ts gives as 80 + 24 = 104. A rock qualifies only if isSmallRoid(size) holds, i.e. size <= SMALL_ROID_MAX = 24, and inBlastRadius uses reach = RADIUS + size, so a qualifying rock's reach is at most 80 + 24 = 104 -- exactly the query bound. The query is therefore a strict over-approximation of the qualifying set, and the loop still applies both the boost-phase check and the isSmallRoid and inBlastRadius filters to every candidate it returns. The set of pushed rocks and the impulse each receives are unchanged, so no documented blast behavior moves: which rocks a loot blast nudges, how far, and that a burning boosted rock is exempt all hold exactly as before.\n\nRoid.ts in the merged state is this branch's belt ownership restructure with main's dead-method removal applied on top. The belt still owns every membership change -- rocks is private, readers take a readonly view through getRoids(), and add(), remove() and replaceAll() maintain the id Map -- and playHitSound is gone along with its gameSounds import. Nothing calls it: astro sync plus tsc is clean across src, tests and benchmarks on the merged tree, which is what proves the removal is safe here rather than only on main.\n\ngameController.ts combines this branch's migration to the belt API with main's boundary-death changes. The two touch different regions and the merged file uses the belt API at every site: getRoids() for the harpoon body list, the universe-map field binding, the asteroid-field read and the roid count via size(), add() on an authoritative create, getById() on an update and on a destroy, and remove() on the destroy path.\n\nArticle impact: none of the five mapped topics needs an edit. Which rocks exist, their material, size, fragmentation, rewards, reflection and regrowth are untouched. The destruction sound and shatter record are restored to correctness by this branch rather than changed -- that is the subject of its own corrective entry earlier on this branch. Loot behavior is unchanged per the bound above. Hauler towing and teamwork delivery rules are unchanged, and the stall and dropped delivery this branch fixed are the reason its earlier entry was superseded. The server-side one-pass belt walking from #878 is invisible to the player and was reviewed with that change.\n\nThe topic map also pulls in controls, scout, satellites, terrain and combat-survival through GameEngine.ts, and the cargo, hauler and scout demonstrations. Checked each: ship control and ability inputs, Scout building and survey results, satellite pickup rules, terrain contour and collision rules, and combat survival and respawn behavior are all untouched by the three changes above -- none of them alters a rule, a value or an input, and the only server-side edit this branch makes to GameEngine.ts is the blast candidate set whose pushed-rock set is proven identical. Rather than assert the demonstrations are unaffected, npm run wiki:media:check was run on the merged tree: 10 GIFs and 10 posters verified byte-identical at seed 1335704609, 640x360, 48 frames, 10 fps, 60 Hz simulation, 6 ticks per frame. A byte-identical result across all three mapped demonstrations is the evidence that no shown behavior moved.\n\nVerified on the merged tree: astro sync plus tsc clean with zero errors; 193 test files and 1285 cases pass across entities, server, network and scenarios, which includes #878's own the-frame-walks-the-asteroid-belt-once guard running against this branch's belt restructure. The full pre-commit gate runs on the merged, staged tree before this is pushed.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "src/core/gameController.ts",
+        "src/entities/roid/Roid.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {
+        "server/core/GameEngine.ts": "asteroids",
+        "src/core/gameController.ts": "asteroids",
+        "src/entities/roid/Roid.ts": "asteroids"
+      }
     }
   ]
 }

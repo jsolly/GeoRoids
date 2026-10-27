@@ -126,6 +126,7 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
     'npm run check:lint',
     'npm run check:knip',
     'npm run check:ts-prune',
+    'npm run check:members',
     'npm run check:md',
     'npm run check:yaml',
     'npm run check:ts',

@@ -1,6 +1,5 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
-import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
@@ -58,7 +57,6 @@ export class MessageHandler {
       [
         'update',
         'shoot',
-        'collisionDamage',
         'useAbility',
         'equipSatellite',
         'setHaulerUtility',
@@ -160,10 +158,6 @@ export class MessageHandler {
         }
         case 'shoot':
           this.handlePlayerShoot(ws, command);
-          break;
-
-        case 'collisionDamage':
-          this.handleCollisionDamage(ws, command);
           break;
 
         case 'ping':
@@ -397,15 +391,24 @@ export class MessageHandler {
       },
       motionNow
     );
-    this.logMotionRejection(
-      ws,
-      'update',
-      outcome,
-      receivedAt,
-      command.motionEpoch,
-      command.motionSequence,
-      motionNow
-    );
+    // A contact that ends a life is ordinary gameplay, already recorded by
+    // `GameEngine.logDamageState` as `player_died`, or as `player_downed` when
+    // the cooperative campaign routes the hull into a rescue window instead.
+    // Both are written unthrottled, so suppressing the rejection warning here
+    // loses nothing: that throttle window belongs to real envelope violations.
+    // A contact the hull survives still logs, being the only record of a pilot
+    // pinned against the wall.
+    if (!this.applyBoundaryContact(socketPlayer.id, outcome)) {
+      this.logMotionRejection(
+        ws,
+        'update',
+        outcome,
+        receivedAt,
+        command.motionEpoch,
+        command.motionSequence,
+        motionNow
+      );
+    }
     if (outcome.ok && beforeMode === 'handoff') {
       this.logMotionTransition(
         ws,
@@ -462,23 +465,24 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
-  private getReporterId(ws: WebSocket): string | undefined {
-    return this.gameEngine.getPlayerBySocket(ws)?.id;
-  }
-
+  /** Returns true when the hit ended the target's life: destroyed outright, or
+   * downed into a cooperative rescue window. `handleShipDamage` reports
+   * `isDestroyed: false` for a cooperative down (`GameEngine.downShip` sets a
+   * positive `downedUntil`), so reading that flag alone would log a wall death
+   * as a movement violation in exactly the mode the game is usually played in. */
   private emitShipDamage(
     targetId: string,
     attackerId: string,
     damage: number,
     healthBefore: number | undefined
-  ): void {
+  ): boolean {
     const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
     if (!outcome.applied || !outcome.entity) {
-      return;
+      return false;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
     if (!outcome.isDestroyed && !healthDropped) {
-      return;
+      return false;
     }
     this.broadcaster.broadcastCombatResult({
       targetId,
@@ -489,26 +493,61 @@ export class MessageHandler {
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
+    return outcome.isDestroyed || outcome.entity.health <= 0;
   }
 
-  private handleCollisionDamage(ws: WebSocket, command: CommandOf<'collisionDamage'>): void {
-    const { targetPlayerId, attackerId } = command;
-    logger.debug('handleCollisionDamage', { targetPlayerId });
-
-    // Asteroid impacts are resolved by the server. Clients report only their boundary hit.
-    if (!isClientOwnedCollisionAttacker(attackerId)) {
-      return;
+  /**
+   * Wall death from the server's own geometry. `failedEnvelopeCheck` runs
+   * `checkBoundaryCollision` on the reported position and returns `'boundary'`
+   * only after that pose passed its speed and reachable-displacement limits, so
+   * a pilot elsewhere in the world cannot claim a contact. The pose itself is
+   * refused, so the authoritative hull never moves outside the wall. Contact
+   * kills regardless of remaining hull health; cargo absorbs it first inside
+   * `handleShipDamage`. Returns true when the contact ended this life, whether
+   * by destroying the hull or by downing it — see `emitShipDamage`.
+   *
+   * What this trusts is that the reported position is truthful, not merely that
+   * a pose arrives. The server owns a position for each player, but never
+   * simulates one: between its own impulses it can only validate and adopt what
+   * the hull reports. So a modified client reporting its real track clamped to
+   * the rim is never killed and still flies normally. That immunity predates
+   * this change: the retired client report was simply never sent.
+   *
+   * The reachability proof is the `displacement` check alone — the reported
+   * position must be within the travel credit of a position the server already
+   * owns. The `velocity` check bounds a number this rule never reads.
+   *
+   * Nor is this the only non-lethal refusal. `failedEnvelopeCheck` returns the
+   * first failing check, so an overlapping pose that also trips `velocity`,
+   * `displacement` or `rail` carries no `'boundary'` and no kill, and neither
+   * does one refused before any envelope runs: a stale epoch or sequence, a
+   * dead or invalid actor, furnace or contour transit, a contour-hop combo, or
+   * a contour rejection, which reports `contour` and carries no envelope.
+   * A pilot a menu holds is unkillable here for a different reason —
+   * `handlePlayerUpdate` substitutes the server's own position for the reported
+   * one before the envelope runs. Every one of those is deliberate: such a pose
+   * is not proven reachable, and killing on one is the on-demand self-destruct
+   * this rule replaced.
+   *
+   * One gap in the proof worth knowing: in `handoff` mode `'boundary'` is still
+   * reached on the displacement credit (about `poseLeadFrames` of travel) even
+   * though the tighter `'anchor'` bound, which is checked after it, would have
+   * refused the pose. The authoritative hull is already at the rim in that
+   * case, so this costs nothing, but the bound is displacement's, not the
+   * anchor's.
+   *
+   * The client does not predict this death — `CollisionManager` only flashes —
+   * so the hull keeps flying outward and re-reports a deepening overlap until
+   * one of its poses is judged here. Predicting it locally is what defeated an
+   * earlier attempt: the frozen hull armed the respawn latch and the next
+   * snapshot overwrote the overlapping position with the server's own.
+   */
+  private applyBoundaryContact(playerId: string, outcome: MotionOutcome): boolean {
+    if (outcome.ok || outcome.envelope?.check !== 'boundary') {
+      return false;
     }
-
-    const reporterId = this.getReporterId(ws);
-    if (reporterId == null || reporterId === '' || reporterId !== targetPlayerId) {
-      return;
-    }
-
-    const before = this.gameEngine.getPlayer(targetPlayerId);
-    if (before) {
-      this.emitShipDamage(targetPlayerId, 'boundary', before.health, before.health);
-    }
+    const struck = this.gameEngine.getPlayer(playerId);
+    return struck ? this.emitShipDamage(playerId, 'boundary', struck.health, struck.health) : false;
   }
 
   private handleSetHaulerUtility(ws: WebSocket, command: CommandOf<'setHaulerUtility'>): void {

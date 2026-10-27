@@ -55,10 +55,6 @@ const clientFrames: { [K in ClientWireMessage['type']]: Extract<ClientWireMessag
       data: { offerId: STORE_OFFERS[0].id },
     },
     travelFurnace: { type: 'travelFurnace', id: 'pilot', data: { destinationId: 'hearth' } },
-    collisionDamage: {
-      type: 'collisionDamage',
-      data: { targetPlayerId: 'pilot', attackerId: 'boundary' },
-    },
     ping: { type: 'ping', probeId: 1 },
   };
 
@@ -324,6 +320,8 @@ test('retired client commands are rejected at the wire boundary', () => {
     'satellitePickupCollected',
     'chat',
     'clientLog',
+    // The wall is the server's own geometry; no client reports a collision.
+    'collisionDamage',
   ]) {
     expect(decodeClientCommand({ type, data: {} })).toEqual({
       ok: false,

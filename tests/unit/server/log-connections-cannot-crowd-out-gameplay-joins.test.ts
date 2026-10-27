@@ -10,8 +10,12 @@ import {
 } from '../../../server/communication/connectionAdmission';
 
 test('production enables connection budgets and test or development runs leave them off', () => {
-  expect(LOG_CONNECTIONS_PER_WINDOW).toBe(6);
-  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(50);
+  // Pinned as literals so a derived budget cannot move both sides of its own
+  // sizing assertion. Both are fleet-sized because the edge charges every pilot
+  // to one bucket; the derivation is asserted in
+  // a-full-server-rejoins-after-a-deploy-through-one-bucket.
+  expect(LOG_CONNECTIONS_PER_WINDOW).toBe(300);
+  expect(GAMEPLAY_CONNECTIONS_PER_WINDOW).toBe(600);
   expect(CONNECTION_ADMISSION_WINDOW_MS).toBe(60_000);
   expect(connectionLimitsDisabled({ nodeEnv: 'production' })).toBe(false);
   expect(connectionLimitsDisabled({ nodeEnv: 'test', vitest: 'true' })).toBe(true);

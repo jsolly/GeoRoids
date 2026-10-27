@@ -305,6 +305,8 @@ jobs:
         if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:ts-prune
         if: steps.verified-tree.outputs.run_full != 'false'
+      - run: npm run check:members
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:md
         if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:yaml

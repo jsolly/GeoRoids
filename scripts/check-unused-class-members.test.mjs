@@ -4,20 +4,43 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vitest';
 import { checkUnusedClassMembers } from './check-unused-class-members.mjs';
+import { STAGES } from './gate-receipt.mjs';
 
 const removeIt = 'no TypeScript references; remove it';
-const coverIt = 'only a component calls it; cover the behavior from a test';
+// A reference the check could not classify is still a reference, so claiming
+// there are none would send the author to delete a member a type position or a
+// doc comment still names -- which does not compile (TS2339).
+const confirmByHand =
+  'named only by a type or doc reference this check cannot classify; confirm by hand';
+const coverIt = 'only a component reaches it; cover the behavior from a test';
 const makePrivate = (count) => `used only inside its class (${count}); make it private`;
+const engine = (members) => `export class Engine {\n${members}\n}`;
+const live = '  step(): number {\n    return 1;\n  }';
+/** The only caller of Engine.step, so the baseline has no finding. */
+const main = 'import {Engine} from "./engine"; console.log(new Engine().step());';
 
-test('public production methods need a caller outside their own class', () => {
-  const root = mkdtempSync(join(tmpdir(), 'georoids-class-member-contract-'));
+/**
+ * A tree the check can be run over, with one class per production directory so
+ * that every directory contributes a file and the baseline is clean.
+ */
+function fixture(name) {
+  const root = mkdtempSync(join(tmpdir(), `georoids-class-member-${name}-`));
   const write = (path, body) => writeFileSync(join(root, path), body);
+  const drop = (path) => rmSync(join(root, path));
   const run = () => checkUnusedClassMembers(root);
   const passes = () => {
     const result = run();
     assert.equal(result.status, 0, result.stdout);
   };
-  /** One reported line must pair this member with this remedy, and report it once. */
+  /** A clean run that still names which relationship kept this member. */
+  const clears = (member, reason) => {
+    const result = run();
+    assert.equal(result.status, 0, result.stdout);
+    const audited = result.stdout.split('\n').filter((line) => line.startsWith(`${member} `));
+    assert.equal(audited.length, 1, result.stdout);
+    assert(audited[0].includes(reason), audited[0]);
+  };
+  /** One reported line pairs this member with this remedy, and nothing else is reported. */
   const fails = (member, remedy, total = 1) => {
     const result = run();
     assert.equal(result.status, 1, result.stdout);
@@ -26,45 +49,51 @@ test('public production methods need a caller outside their own class', () => {
     assert.equal(reported.length, 1, result.stdout);
     assert(reported[0].endsWith(` - ${remedy}`), reported[0]);
   };
-  const engine = (members) => `export class Engine {\n${members}\n}`;
-  const live = '  step(): number {\n    return 1;\n  }';
-  /** The only caller of Engine.step, so the baseline has no finding. */
-  const main = 'import {Engine} from "./engine"; console.log(new Engine().step());';
+  for (const directory of ['src', 'server', 'shared', 'tests']) {
+    mkdirSync(join(root, directory));
+  }
+  mkdirSync(join(root, 'config/typescript'), { recursive: true });
+  write(
+    'config/typescript/base.json',
+    JSON.stringify({
+      compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', strict: true },
+    })
+  );
+  write(
+    'config/typescript/prune.jsonc',
+    JSON.stringify({
+      extends: './base.json',
+      include: [
+        '../../src/**/*.ts',
+        '../../server/**/*.ts',
+        '../../shared/**/*.ts',
+        '../../tests/**/*.ts',
+      ],
+    })
+  );
+  write('server/host.ts', 'export class Host {\n  listen(): number {\n    return 4;\n  }\n}');
+  write('shared/rules.ts', 'export class Rules {\n  apply(): number {\n    return 5;\n  }\n}');
+  write(
+    'tests/world.test.ts',
+    'import {Host} from "../server/host";\nimport {Rules} from "../shared/rules";\nnew Host().listen();\nnew Rules().apply();'
+  );
+  write('src/engine.ts', engine(live));
+  write('src/main.ts', main);
+  // The baseline runs before `root` is handed back, so the caller's `finally`
+  // cannot release it yet.
   try {
-    for (const directory of ['src', 'server', 'shared', 'tests']) {
-      mkdirSync(join(root, directory));
-    }
-    mkdirSync(join(root, 'config/typescript'), { recursive: true });
-    write(
-      'config/typescript/base.json',
-      JSON.stringify({
-        compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', strict: true },
-      })
-    );
-    write(
-      'config/typescript/prune.jsonc',
-      JSON.stringify({
-        extends: './base.json',
-        include: [
-          '../../src/**/*.ts',
-          '../../server/**/*.ts',
-          '../../shared/**/*.ts',
-          '../../tests/**/*.ts',
-        ],
-      })
-    );
-    // Every production directory must contribute a file, so each one carries a
-    // class whose single public method has a caller.
-    write('server/host.ts', 'export class Host {\n  listen(): number {\n    return 4;\n  }\n}');
-    write('shared/rules.ts', 'export class Rules {\n  apply(): number {\n    return 5;\n  }\n}');
-    write(
-      'tests/world.test.ts',
-      'import {Host} from "../server/host";\nimport {Rules} from "../shared/rules";\nnew Host().listen();\nnew Rules().apply();'
-    );
-    write('src/engine.ts', engine(live));
-    write('src/main.ts', main);
     passes();
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+  return { root, write, drop, run, passes, clears, fails };
+}
 
+test('public production methods need a caller outside their own class', () => {
+  const { root, write, drop, passes, clears, fails } = fixture('methods');
+  const reached = `${live}\n  reached(): number {\n    return 3;\n  }`;
+  try {
     // A method nothing reaches at all, and one only its own class reaches.
     write('src/engine.ts', engine(`${live}\n  orphan(): number {\n    return 2;\n  }`));
     fails('Engine.orphan', removeIt);
@@ -77,9 +106,8 @@ test('public production methods need a caller outside their own class', () => {
     // inner reaches it.
     fails('Engine.inner', removeIt, 2);
 
-    // A caller outside the class clears the member, through any of the ways a
-    // caller can reach it without naming the class.
-    write('src/engine.ts', engine(`${live}\n  reached(): number {\n    return 3;\n  }`));
+    // An ordinary caller outside the class clears the member.
+    write('src/engine.ts', engine(reached));
     write(
       'src/main.ts',
       'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.reached());'
@@ -87,122 +115,343 @@ test('public production methods need a caller outside their own class', () => {
     passes();
     write('src/main.ts', main);
     fails('Engine.reached', removeIt);
-    write('src/port.ts', 'export interface Port {\n  reached(): number;\n}');
-    passes();
-    rmSync(join(root, 'src/port.ts'));
-    write('src/probe.ts', 'export const probe = (v: object) => "reached" in v;');
-    passes();
-    rmSync(join(root, 'src/probe.ts'));
-    write('src/spy.ts', 'export const spy = (t: object) => Object.keys(t).includes("reached");');
-    passes();
-    rmSync(join(root, 'src/spy.ts'));
 
-    // A bare string that happens to share the name is not a way to reach it,
-    // so an unrelated literal must not clear the finding.
+    // A structural type the class SATISFIES clears the member, because a caller
+    // holding that port reaches it without naming the class. A type the class
+    // does not satisfy is a coincidence of naming and clears nothing.
+    write(
+      'src/port.ts',
+      'export interface Port {\n  reached(): number;\n}\nexport const hold = (p: Port) => p.reached();'
+    );
+    clears('Engine.reached', 'declared by a type this class satisfies at');
+    drop('src/port.ts');
+    // The port is EXERCISED here on purpose, so only assignability can reject
+    // it. Without the `hold` line the exercised-port rule rejects it first and
+    // the case pins neither condition.
+    write(
+      'src/unrelated.ts',
+      'export interface Unrelated {\n  reached(): number;\n  absent(): string;\n}\nexport const hold = (u: Unrelated) => u.reached();'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/unrelated.ts');
+    // A declared member that cannot be called offers a caller no way to reach
+    // the method, even though a method type is assignable to `unknown`.
+    write(
+      'src/box.ts',
+      'export interface Box {\n  reached: unknown;\n}\nexport const hold = (b: Box) => b.reached;'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/box.ts');
+
+    // A type literal nested inside a signature is how ConnectionManager
+    // .sendSnapshotResync is reached on the real tree, where the event loop
+    // calls it through the port.
+    write(
+      'src/nested.ts',
+      'export interface Outer {\n  inner(): {reached(): number};\n}\nexport const go = (o: Outer) => o.inner().reached();'
+    );
+    clears('Engine.reached', 'declared by a type this class satisfies at');
+    drop('src/nested.ts');
+    // The port has to be exercised. A shape nothing ever touches reaches
+    // nothing, whether it is nested in a signature or declared as an interface,
+    // so writing one is not a way to quiet the check.
+    write(
+      'src/nested.ts',
+      'export interface Outer {\n  inner(): {reached(): number};\n}\nexport const hold = (o: Outer) => o.inner();'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/nested.ts');
+    write('src/lonely.ts', 'export interface Lonely {\n  reached(): number;\n}');
+    fails('Engine.reached', removeIt);
+    drop('src/lonely.ts');
+    // A `Pick` of an exercised interface resolves to the same member, which is
+    // how Ship.tapExtractFrames is reached on the real tree.
+    write(
+      'src/picked.ts',
+      'export interface Host {\n  reached(): number;\n  step(): number;\n}\nexport const go = (h: Pick<Host, "reached">) => h.reached();'
+    );
+    clears('Engine.reached', 'declared by a type this class satisfies at');
+    drop('src/picked.ts');
+
+    // `'name' in object` clears it when the object could be this class, and
+    // not when the probed type is unrelated.
+    write('src/probe.ts', 'export const probe = (v: {step(): number}) => "reached" in v;');
+    clears('Engine.reached', 'probed with `in` at');
+    drop('src/probe.ts');
+    write('src/probe.ts', 'export const probe = (v: {absent(): string}) => "reached" in v;');
+    fails('Engine.reached', removeIt);
+    drop('src/probe.ts');
+    write('src/wide.ts', 'export const guard = (v: object) => "reached" in v;');
+    fails('Engine.reached', removeIt);
+    drop('src/wide.ts');
+    write(
+      'src/loose.ts',
+      'export const loose = (v: unknown) => typeof v === "object" && v !== null && "reached" in v;'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/loose.ts');
+
+    // A string naming a KEY of a related object clears it, as vi.spyOn does.
+    // The same string passed where a plain `string` is expected is data.
+    write(
+      'src/spy.ts',
+      'import {Engine} from "./engine";\ndeclare const spy: {on<T, K extends keyof T>(o: T, k: K): void};\nexport const watch = (e: Engine) => spy.on(e, "reached");'
+    );
+    clears('Engine.reached', 'named as a key of this class at');
+    drop('src/spy.ts');
+    write(
+      'src/label.ts',
+      'import {Engine} from "./engine";\ndeclare const label: (o: object, s: string) => void;\nexport const tag = (e: Engine) => label(e, "reached");'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/label.ts');
+    write(
+      'src/emit.ts',
+      'declare const emit: <T>(o: T, k: "reached" | "other") => void;\nexport const go = (o: {step(): number}) => emit(o, "reached");'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/emit.ts');
+    write(
+      'src/other.ts',
+      'declare const spy: {on<T, K extends keyof T>(o: T, k: K): void};\nexport const watch = (o: {reached(): number; absent(): string}) => spy.on(o, "reached");'
+    );
+    fails('Engine.reached', removeIt);
+    drop('src/other.ts');
+
+    // A bare string that merely shares the name reaches nothing.
     write('src/labels.ts', 'export const label = "reached";');
     fails('Engine.reached', removeIt);
-    rmSync(join(root, 'src/labels.ts'));
+    drop('src/labels.ts');
 
-    // Bracket access needs no allowance; the service resolves it.
+    // Bracket access needs no allowance; the language service resolves it.
     write('src/dynamic.ts', 'import {Engine} from "./engine"; new Engine()["reached"]();');
     passes();
-    rmSync(join(root, 'src/dynamic.ts'));
+    drop('src/dynamic.ts');
 
     // A caller under tests/ is a real TypeScript caller and clears the member.
-    // AGENTS.md sends an author here when only a component calls a method, so
-    // this stays pinned: WikiScrollMemory's public surface relies on it.
     write('tests/engine.test.ts', 'import {Engine} from "../src/engine"; new Engine().reached();');
     passes();
-    rmSync(join(root, 'tests/engine.test.ts'));
+    drop('tests/engine.test.ts');
     fails('Engine.reached', removeIt);
 
     // A component is not in the TypeScript program, so its call cannot clear
-    // the member, but the remedy has to say so rather than claim nothing calls it.
-    write(
-      'src/Panel.svelte',
-      '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().reached();\n</script>\n'
-    );
-    fails('Engine.reached', coverIt);
-    rmSync(join(root, 'src/Panel.svelte'));
-    write(
-      'src/Markup.svelte',
-      '<script lang="ts">\n  import {Engine} from "./engine";\n  const e = new Engine();\n</script>\n<button onclick={() => e.reached()}>go</button>\n'
-    );
-    fails('Engine.reached', coverIt);
-    rmSync(join(root, 'src/Markup.svelte'));
-    write(
-      'src/Page.astro',
-      '---\nimport {Engine} from "./engine";\nnew Engine().reached();\n---\n<div></div>\n'
-    );
-    fails('Engine.reached', coverIt);
-    rmSync(join(root, 'src/Page.astro'));
-    // A component that names the member on something it did not import cannot
-    // speak for this class, or a DOM member of the same name would keep dead
-    // code alive.
+    // the member, but the remedy has to say so rather than claim nothing calls
+    // it. Markup and Astro frontmatter count as call sites too.
+    for (const [path, body] of [
+      [
+        'src/Panel.svelte',
+        '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().reached();\n</script>\n',
+      ],
+      [
+        'src/Markup.svelte',
+        '<script lang="ts">\n  import {Engine} from "./engine";\n  const e = new Engine();\n</script>\n<button onclick={() => e.reached()}>go</button>\n',
+      ],
+      [
+        'src/Page.astro',
+        '---\nimport {Engine} from "./engine";\nnew Engine().reached();\n---\n<div></div>\n',
+      ],
+    ]) {
+      write(path, body);
+      fails('Engine.reached', coverIt);
+      drop(path);
+    }
+    // A component naming the member on something it did not import cannot
+    // speak for this class.
     write(
       'src/Unrelated.svelte',
       '<script lang="ts">\n  const box = { reached: () => 1 };\n  box.reached();\n</script>\n'
     );
     fails('Engine.reached', removeIt);
-    rmSync(join(root, 'src/Unrelated.svelte'));
+    drop('src/Unrelated.svelte');
 
-    // A component call outranks an internal one, because privatizing the member
-    // would break the component's call site.
+    // A subclass's own additions are judged; the member it overrides is cleared
+    // by the reference pass, which links it to the base declaration.
     write(
-      'src/engine.ts',
-      engine(`${live}\n  private wrapped(): number {\n    return this.shared();\n  }\n
-  shared(): number {\n    return this.step();\n  }\n
-  expose(): number {\n    return this.wrapped();\n  }`)
+      'src/sub.ts',
+      'import {Engine} from "./engine";\nexport class Sub extends Engine {\n  reached(): number {\n    return 9;\n  }\n  extra(): number {\n    return 10;\n  }\n}'
     );
     write(
       'src/main.ts',
-      'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.expose());'
+      'import {Sub} from "./sub"; const s = new Sub(); console.log(s.step(), s.reached());'
     );
-    fails('Engine.shared', makePrivate(1));
-    write(
-      'src/Shell.svelte',
-      '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().shared();\n</script>\n'
-    );
-    fails('Engine.shared', coverIt);
-    rmSync(join(root, 'src/Shell.svelte'));
-    write('src/engine.ts', engine(`${live}\n  reached(): number {\n    return 3;\n  }`));
+    fails('Sub.extra', removeIt);
+    drop('src/sub.ts');
     write('src/main.ts', main);
-    fails('Engine.reached', removeIt);
 
-    // Heritage, abstract classes and extended classes answer to their own
-    // contract, so none of their members is judged here. Engine is cleared
-    // first, so each case below can only report its own class.
+    // Engine is cleared from here on, so each case below reports exactly one
+    // finding and that finding can only be its own.
     write(
       'src/main.ts',
       'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.reached());'
     );
-    write('src/sub.ts', 'import {Engine} from "./engine"; export class Sub extends Engine {}');
-    passes();
-    rmSync(join(root, 'src/sub.ts'));
+
+    // A heritage clause answers for nothing on its own. The service returns the
+    // interface's own member DECLARATION among the class member's references,
+    // and counting that as a use would let one `implements` clause retire a
+    // member from the gate silently -- no finding and no audit line.
+    write('src/shape.ts', 'export interface Shape {\n  declared(): number;\n}');
+    const impl =
+      'import type {Shape} from "./shape";\nexport class Impl implements Shape {\n  declared(): number {\n    return 7;\n  }\n  undeclared(): number {\n    return 8;\n  }\n}';
+    write('src/impl.ts', impl);
+    fails('Impl.declared', removeIt, 2);
+    fails('Impl.undeclared', removeIt, 2);
+    // Exercise the port and the implementing member has a genuine reference
+    // through it, so the reference pass clears it and no type rule is needed;
+    // the member the port does not declare is still judged.
+    write(
+      'src/shape.ts',
+      'export interface Shape {\n  declared(): number;\n}\nexport const hold = (s: Shape) => s.declared();'
+    );
+    fails('Impl.undeclared', removeIt);
+    // A second class implementing the port is not a caller either.
+    write('src/shape.ts', 'export interface Shape {\n  declared(): number;\n}');
+    write(
+      'src/other.ts',
+      'import type {Shape} from "./shape";\nexport class Other implements Shape {\n  declared(): number {\n    return 9;\n  }\n}'
+    );
+    fails('Impl.declared', removeIt, 3);
+    drop('src/other.ts');
+    // Nor is a repeated declaration of the port member: an overload signature
+    // declares it twice, and neither declaration reaches anything.
+    write(
+      'src/shape.ts',
+      'export interface Shape {\n  declared(): number;\n  declared(n: number): number;\n}'
+    );
+    fails('Impl.declared', removeIt, 2);
+    drop('src/impl.ts');
+    drop('src/shape.ts');
+
+    // A field is reached the same way, so the same clause cannot retire one.
+    write('src/held.ts', 'export interface Held {\n  stored: number;\n}');
+    write(
+      'src/store.ts',
+      'import type {Held} from "./held";\nexport class Store implements Held {\n  stored = 1;\n}'
+    );
+    fails('Store.stored', removeIt);
+    drop('src/store.ts');
+    drop('src/held.ts');
+
+    // A subclass that redeclares a base member reaches nothing either: before,
+    // each declaration cleared the other and both dead methods passed.
+    write(
+      'src/hierarchy.ts',
+      'export class Base {\n  hook(): number {\n    return 1;\n  }\n}\nexport class Leaf extends Base {\n  hook(): number {\n    return 2;\n  }\n}'
+    );
+    fails('Base.hook', removeIt, 2);
+    fails('Leaf.hook', removeIt, 2);
+    drop('src/hierarchy.ts');
+
+    // An abstract class's concrete members are judged like any other, while an
+    // abstract member defers to whatever implements it. The abstract FIELD is
+    // the discriminating case: an abstract method is already excluded for
+    // having no body.
     write(
       'src/abstract.ts',
-      'export abstract class Base {\n  unused(): number {\n    return 6;\n  }\n}'
+      'export abstract class Base {\n  abstract hook(): void;\n  abstract slot: number;\n  concrete(): number {\n    return 6;\n  }\n}'
     );
-    passes();
-    rmSync(join(root, 'src/abstract.ts'));
-    write('src/shape.ts', 'export interface Shape {\n  other(): number;\n}');
+    fails('Base.concrete', removeIt);
+    drop('src/abstract.ts');
+
+    // An object literal that SATISFIES a port declares the member too, so it
+    // cannot stand in for a caller either. Before, the verdict depended on the
+    // spelling: `{ declared() {} }` parses as a method declaration and was
+    // rejected, while the arrow and field spellings of the same thing retired
+    // the member with no finding and no audit line.
+    write('src/shape.ts', 'export interface Shape {\n  declared(): number;\n}');
     write(
       'src/impl.ts',
-      'import type {Shape} from "./shape";\nexport class Impl implements Shape {\n  unused(): number {\n    return 7;\n  }\n}'
+      'import type {Shape} from "./shape";\nexport class Impl implements Shape {\n  declared(): number {\n    return 1;\n  }\n}'
     );
-    passes();
-    rmSync(join(root, 'src/impl.ts'));
-    rmSync(join(root, 'src/shape.ts'));
-    write('src/lonely.ts', 'export class Lonely {\n  idle(): number {\n    return 11;\n  }\n}');
-    fails('Lonely.idle', removeIt);
+    for (const stub of [
+      'import type {Shape} from "./shape";\nexport const stub: Shape = { declared: () => 9 };',
+      'import type {Shape} from "./shape";\nconst declared = () => 9;\nexport const stub: Shape = { declared };',
+    ]) {
+      write('src/stub.ts', stub);
+      fails('Impl.declared', removeIt);
+    }
+    drop('src/stub.ts');
+    drop('src/impl.ts');
+    drop('src/shape.ts');
+
+    // The same omission let one object-literal line clear a member through a
+    // port the class does not even implement, and that clearance PRINTED an
+    // audit line claiming a relationship something exercises -- a reader
+    // auditing the output was misled rather than informed.
+    write('src/main.ts', main);
+    write('src/relay.ts', 'export interface Relay {\n  relayed(): number;\n}');
     write(
-      'tests/child.test.ts',
-      'import {Lonely} from "../src/lonely"; export class Child extends Lonely {}'
+      'src/stub.ts',
+      'import type {Relay} from "./relay";\nexport const stub: Relay = { relayed: () => 9 };'
     );
-    passes();
-    rmSync(join(root, 'tests/child.test.ts'));
-    fails('Lonely.idle', removeIt);
-    rmSync(join(root, 'src/lonely.ts'));
+    write('src/engine.ts', engine(`${live}\n  relayed(): number {\n    return 2;\n  }`));
+    fails('Engine.relayed', removeIt);
+    // Exercise the port and the clearance becomes honest.
+    write(
+      'src/relay.ts',
+      'export interface Relay {\n  relayed(): number;\n}\nexport const hold = (r: Relay): number => r.relayed();'
+    );
+    clears('Engine.relayed', 'declared by a type this class satisfies');
+    write('src/engine.ts', engine(live));
+    drop('src/stub.ts');
+    drop('src/relay.ts');
+
+    // The same verdict has to hold for a PORT, not only for the member: an
+    // unresolvable touch of a port member is no proof that anything exercises
+    // it. Rejecting it in `reaches` and not in `isExercised` left that
+    // clearance printing an audit line for a relationship nothing uses.
+    write('src/main.ts', main);
+    write('src/engine.ts', engine(`${live}\n  relayed(): number {\n    return 2;\n  }`));
+    for (const port of [
+      'export interface Relay {\n  relayed(): number;\n}\n/** See {@link Relay.relayed} for it. */\nexport type Doc = Relay;',
+      'export interface Relay {\n  relayed(): number;\n}\nexport type Relayed = Relay["relayed"];',
+    ]) {
+      write('src/relay.ts', port);
+      fails('Engine.relayed', removeIt);
+    }
+    // A genuine call through the port still clears it, with its audit line.
+    write(
+      'src/relay.ts',
+      'export interface Relay {\n  relayed(): number;\n}\nexport const hold = (r: Relay): number => r.relayed();'
+    );
+    clears('Engine.relayed', 'declared by a type this class satisfies');
+    write('src/engine.ts', engine(live));
+    drop('src/relay.ts');
+
+    // A reference the classifier cannot resolve to an access is not a use. A
+    // doc comment names a member without calling it, and `forEachChild` does
+    // not descend into JSDoc, so defaulting to `read` let one comment retire a
+    // member permanently.
+    write('src/main.ts', main);
+    write(
+      'src/doc.ts',
+      'import type {Engine} from "./engine";\n/** See {@link Engine.spare} for the value. */\nexport type Doc = Engine;'
+    );
+    write('src/engine.ts', engine(`${live}\n  spare = 0;`));
+    fails('Engine.spare', confirmByHand);
+    drop('src/doc.ts');
+    // An indexed-access TYPE names the member's type and calls nothing, so it
+    // cannot keep an otherwise dead member alive either.
+    write(
+      'src/engine.ts',
+      `${engine(`${live}\n  spare = 0;`)}\nexport type Spare = Engine["spare"];`
+    );
+    fails('Engine.spare', confirmByHand);
+    write('src/engine.ts', engine(live));
+
+    // An `override` member defers to the base declaration, which owns both its
+    // existence and its visibility, so neither remedy this check prints is
+    // sound for one: `private override` is TS2415, and removing an override of
+    // an implicit protocol member such as `toString` compiles while silently
+    // changing behavior. Nothing escapes by being overridden, because the base
+    // member is judged in its own right -- `Base.hook` is the only finding
+    // here, and deleting this exclusion left the whole suite green.
+    write('src/main.ts', main);
+    write(
+      'src/hierarchy.ts',
+      'export class Base {\n  hook(): number {\n    return 1;\n  }\n}\nexport class Leaf extends Base {\n  override hook(): number {\n    return 2;\n  }\n  override toString(): string {\n    return "leaf";\n  }\n}'
+    );
+    fails('Base.hook', removeIt);
+    drop('src/hierarchy.ts');
 
     // A class expression declares members too, so converting a class cannot
     // drop its whole surface out of the gate.
@@ -211,7 +460,12 @@ test('public production methods need a caller outside their own class', () => {
       'export const Widget = class {\n  only(): number {\n    return 8;\n  }\n};'
     );
     fails('(anonymous).only', removeIt);
-    rmSync(join(root, 'src/widget.ts'));
+    write(
+      'src/widget.ts',
+      'export const Widget = class {\n  only(): number {\n    return 8;\n  }\n};\nconst held: {only(): number} = new Widget();\nexport const go = () => held.only();'
+    );
+    passes();
+    drop('src/widget.ts');
 
     // Members used only inside the class are over-exposed, not dead.
     write(
@@ -237,6 +491,26 @@ test('public production methods need a caller outside their own class', () => {
     );
     fails('Engine.over', makePrivate(1));
 
+    // A component call outranks an internal one, because privatizing a member
+    // a component calls would break its call site.
+    write(
+      'src/engine.ts',
+      engine(`${live}\n  private wrapped(): number {\n    return this.shared();\n  }\n
+  shared(): number {\n    return this.step();\n  }\n
+  expose(): number {\n    return this.wrapped();\n  }`)
+    );
+    write(
+      'src/main.ts',
+      'import {Engine} from "./engine"; const e = new Engine(); console.log(e.step(), e.expose());'
+    );
+    fails('Engine.shared', makePrivate(1));
+    write(
+      'src/Shell.svelte',
+      '<script lang="ts">\n  import {Engine} from "./engine";\n  new Engine().shared();\n</script>\n'
+    );
+    fails('Engine.shared', coverIt);
+    drop('src/Shell.svelte');
+
     // Every production directory is judged, not just src/.
     write('src/engine.ts', engine(live));
     write('src/main.ts', main);
@@ -253,12 +527,354 @@ test('public production methods need a caller outside their own class', () => {
     fails('Rules.spare', removeIt);
     write('shared/rules.ts', 'export class Rules {\n  apply(): number {\n    return 5;\n  }\n}');
 
+    // A protected member is out of scope here, so an internal-only one is not
+    // reported as over-exposed.
+    write(
+      'src/guarded.ts',
+      'export class Guarded {\n  protected guard(): number {\n    return 1;\n  }\n  open(): number {\n    return this.guard();\n  }\n}\nexport const use = (g: Guarded) => g.open();'
+    );
+    passes();
+    drop('src/guarded.ts');
+
     // Test doubles and other non-production classes stay out of scope.
     write('tests/double.test.ts', 'export class FakeSocket {\n  send(): void {}\n}');
     passes();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('public fields and accessors are judged like methods', () => {
+  const { root, write, drop, run, passes, clears, fails } = fixture('fields');
+  /** Mirror.total always has an outside caller, so each case reports only its own field. */
+  const mirror = (members) =>
+    `export class Mirror {\n  total(): number {\n    return 0;\n  }\n${members}\n}`;
+  const view = (body) => `import type {Mirror} from "./mirror";\n${body}`;
+  const reads = view('export const show = (m: Mirror) => m.total();');
+  try {
+    write('src/view.ts', view('export const show = (m: Mirror) => m.total() + m.live;'));
+    write('src/mirror.ts', mirror('  live = 1;'));
+    passes();
+
+    // A field nothing names at all, and one only its own class reads.
+    write('src/view.ts', reads);
+    fails('Mirror.live', removeIt);
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  inner = 1;\n  total(): number {\n    return this.inner;\n  }\n}'
+    );
+    fails('Mirror.inner', makePrivate(1));
+
+    // A field nothing reads is dead storage wherever it is written from, so the
+    // remedy is removal rather than a narrowing Biome would then report.
+    const stored =
+      'export class Mirror {\n  stored = 0;\n  total(): number {\n    this.stored += 1;\n    return 0;\n  }\n}';
+    write('src/mirror.ts', stored);
+    fails('Mirror.stored', 'written but never read (1); remove it');
+    // An assignment from outside is a use of the field, so it is not reported.
+    // Nothing here establishes that anything reads it, which is deliberate:
+    // the alternative reports a field whose only reader is a serializer.
+    write('src/view.ts', view('export const set = (m: Mirror) => {\n  m.stored = m.total();\n};'));
+    passes();
+    write('src/view.ts', reads);
+
+    // A spread copies an instance whole, reading every own field without
+    // leaving a reference at any declaration.
+    write('src/copy.ts', view('export const copy = (m: Mirror) => ({...m});'));
+    clears('Mirror.stored', 'read through a spread of this class at');
+    // A spread of something else says nothing about this class.
+    write('src/copy.ts', 'const other = {stored: 1};\nexport const copy = () => ({...other});');
+    fails('Mirror.stored', 'written but never read (1); remove it');
+    // A spread of a subclass instance copies the fields it inherits, so the
+    // base class's own field is read through it too.
+    write(
+      'src/copy.ts',
+      'import {Mirror} from "./mirror";\nclass Wider extends Mirror {}\nexport const copy = () => ({...new Wider()});'
+    );
+    clears('Mirror.stored', 'read through a spread of this class at');
+    // A method lives on the prototype and an accessor is not an own property,
+    // so neither is copied by a spread of an instance.
+    write('src/copy.ts', view('export const copy = (m: Mirror) => ({...m});'));
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  total(): number {\n    return 0;\n  }\n  spare(): number {\n    return 1;\n  }\n}'
+    );
+    fails('Mirror.spare', removeIt);
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  total(): number {\n    return 0;\n  }\n  get spare(): number {\n    return 1;\n  }\n}'
+    );
+    fails('Mirror.spare', 'nothing reads it; remove the getter');
+    drop('src/copy.ts');
+
+    // An accessor is reached by one kind of access, and a get/set pair shares
+    // one symbol, so neither half may speak for the other.
+    const pair =
+      'export class Mirror {\n  private held = 0;\n  total(): number {\n    return this.held;\n  }\n  get value(): number {\n    return this.held;\n  }\n  set value(v: number) {\n    this.held = v;\n  }\n}';
+    write('src/mirror.ts', pair);
+    write('src/view.ts', view('export const show = (m: Mirror) => m.total() + m.value;'));
+    fails('Mirror.value', 'nothing assigns it; remove the setter');
+    write('src/view.ts', view('export const set = (m: Mirror) => {\n  m.value = m.total();\n};'));
+    fails('Mirror.value', 'nothing reads it; remove the getter');
+    write(
+      'src/view.ts',
+      view('export const use = (m: Mirror) => {\n  m.value = m.total();\n  return m.value;\n};')
+    );
+    passes();
+
+    // TypeScript requires the halves of a pair to agree on visibility, so an
+    // internal-only accessor cannot be narrowed on its own.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  private held = 0;\n  get value(): number {\n    return this.held;\n  }\n  set value(v: number) {\n    this.held = v;\n  }\n  total(): number {\n    this.value = 1;\n    return this.value;\n  }\n}'
+    );
+    write('src/view.ts', reads);
+    // Both halves are reported, each naming the access its own kind is missing.
+    const pairResult = run();
+    assert.equal(pairResult.status, 1, pairResult.stdout);
+    assert.match(pairResult.stdout, /^Unused public class members \(2\)\n/u);
+    const reported = pairResult.stdout
+      .split('\n')
+      .filter((line) => line.startsWith('Mirror.value '));
+    assert.equal(reported.length, 2, pairResult.stdout);
+    assert.deepEqual(reported.map((line) => line.slice(line.indexOf(' - ') + 3)).sort(), [
+      'assigned only inside its class (1); make the accessor pair private',
+      'read only inside its class (1); make the accessor pair private',
+    ]);
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  private held = 0;\n  get value(): number {\n    return this.held;\n  }\n  total(): number {\n    return this.value;\n  }\n}'
+    );
+    fails('Mirror.value', 'read only inside its class (1); make it private');
+
+    // A data port needs no call signature: reading or assigning the member
+    // through it is how a holder reaches it, which is how Ship.tapExtractFrames
+    // is reached on the real tree.
+    write('src/mirror.ts', stored);
+    write(
+      'src/host.ts',
+      'export interface Host {\n  stored: number;\n  total(): number;\n}\nexport const bump = (h: Host) => {\n  h.stored += 1;\n};'
+    );
+    clears('Mirror.stored', 'declared by a type this class satisfies at');
+    // The same port, never touched, reaches nothing.
+    write(
+      'src/host.ts',
+      'export interface Host {\n  stored: number;\n  total(): number;\n}\nexport const hold = (h: Host) => h.total();'
+    );
+    fails('Mirror.stored', 'written but never read (1); remove it');
+    drop('src/host.ts');
+
+    // The language service reports one `isWriteAccess` boolean, and it is not
+    // the complement of a read. A compound assignment and an increment both
+    // READ the getter, so reporting it would have the author delete a getter
+    // that `+=` still calls -- and TypeScript raises nothing when they do.
+    write('src/mirror.ts', pair);
+    for (const body of [
+      'export const bump = (m: Mirror) => {\n  m.value += 1;\n};',
+      'export const step = (m: Mirror) => {\n  m.value++;\n};',
+      'export const back = (m: Mirror) => {\n  --m.value;\n};',
+    ]) {
+      write('src/view.ts', view(`${body}\nexport const show = (m: Mirror) => m.total();`));
+      passes();
+    }
+    // A shorthand `{ value }` binds a local, so it reads the member and does
+    // not assign it: the getter is reached and the setter is not.
+    write(
+      'src/view.ts',
+      view(
+        'export const show = (m: Mirror) => {\n  const { value } = m;\n  return value + m.total();\n};'
+      )
+    );
+    fails('Mirror.value', 'nothing assigns it; remove the setter');
+    // A renamed `{ value: v }` reads it too.
+    write(
+      'src/view.ts',
+      view(
+        'export const show = (m: Mirror) => {\n  const { value: v } = m;\n  return v + m.total();\n};'
+      )
+    );
+    fails('Mirror.value', 'nothing assigns it; remove the setter');
+    // The member on the right of a compound assignment is only read.
+    write(
+      'src/view.ts',
+      view(
+        'export const show = (m: Mirror) => {\n  let acc = 0;\n  acc += m.value;\n  return acc + m.total();\n};'
+      )
+    );
+    fails('Mirror.value', 'nothing assigns it; remove the setter');
+
+    // Every one of these ASSIGNS the setter. Recognising only the direct left
+    // operand of a `=` reported each as unassigned, and the remedy does not
+    // even compile: removing one half of a pair is TS2540 and removing a lone
+    // setter is TS7053.
+    for (const body of [
+      'export const set = (m: Mirror) => {\n  m["value"] = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  (m.value) = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  ({ value: m.value } = { value: m.total() });\n};',
+      'export const set = (m: Mirror) => {\n  [m.value] = [m.total()];\n};',
+      'export const set = (m: Mirror) => {\n  for (m.value of [m.total()]) {\n    break;\n  }\n};',
+      // Each wrapper `enclosing` looks through, and each target shape `assigns`
+      // walks. Deleting any one of these recognisers left the whole suite green.
+      'export const set = (m: Mirror) => {\n  m.value! = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  (m.value as number) = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  (m.value satisfies number) = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  (<number>m.value) = m.total();\n};',
+      'export const set = (m: Mirror) => {\n  for (m.value in { 1: m.total() }) {\n    break;\n  }\n};',
+      'export const set = (m: Mirror) => {\n  [, ...[m.value]] = [m.total(), m.total()];\n};',
+    ]) {
+      write('src/view.ts', view(body));
+      fails('Mirror.value', 'nothing reads it; remove the getter');
+    }
+
+    // An object literal that satisfies a port declares the member, but the same
+    // syntax standing where an assignment lands is a destructuring target, and
+    // there the KEY reads it. Discounting the key reported a getter the
+    // destructuring still calls -- and removing a lone getter is TS2339, while
+    // removing one half of a pair COMPILES and then yields `undefined`.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  private held = 0;\n  total(): number {\n    return this.held;\n  }\n  get value(): number {\n    return this.held;\n  }\n}'
+    );
+    write(
+      'src/view.ts',
+      view(
+        'export const take = (m: Mirror) => {\n  let v = 0;\n  ({ value: v } = m);\n  return v + m.total();\n};'
+      )
+    );
+    passes();
+    write(
+      'src/view.ts',
+      view(
+        'export const take = (m: Mirror) => {\n  let value = 0;\n  ({ value } = m);\n  return value + m.total();\n};'
+      )
+    );
+    passes();
+    write('src/mirror.ts', pair);
+    write('src/view.ts', reads);
+
+    // A field destructured off `this` is read, so the remedy is to narrow it
+    // rather than to delete storage something still reads.
+    write('src/view.ts', reads);
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  stored = 0;\n  total(): number {\n    this.stored = 2;\n    const { stored } = this;\n    return stored;\n  }\n}'
+    );
+    fails('Mirror.stored', makePrivate(2));
+
+    // A public field written as a constructor parameter property is the same
+    // field in another spelling, so the gate judges it the same way.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  constructor(public spare: number) {}\n  total(): number {\n    return 0;\n  }\n}'
+    );
+    // Removing the parameter would break every construction site; what is
+    // dead is the field its modifier declares.
+    fails('Mirror.spare', 'nothing reads this parameter property; drop the modifier');
+    write('src/view.ts', view('export const show = (m: Mirror) => m.total() + m.spare;'));
+    passes();
+    write('src/view.ts', reads);
+    // Written inside the class and read nowhere, the dead thing is still the
+    // field the modifier declares, not the parameter every caller passes.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  constructor(public spare: number) {}\n  total(): number {\n    this.spare = 5;\n    return 0;\n  }\n}'
+    );
+    fails('Mirror.spare', 'nothing reads this parameter property; drop the modifier');
+    // An ordinary field in the same shape still says remove: no caller passes it.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  spare = 0;\n  total(): number {\n    this.spare = 5;\n    return 0;\n  }\n}'
+    );
+    fails('Mirror.spare', 'written but never read (1); remove it');
+    // Unless a reference the check cannot classify names it, in which case
+    // removing it would not compile either.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  spare = 0;\n  total(): number {\n    this.spare = 5;\n    return 0;\n  }\n}\nexport type Spare = Mirror["spare"];'
+    );
+    fails(
+      'Mirror.spare',
+      'written but never read (1), and named by a reference this check cannot classify; confirm by hand'
+    );
+    // A `private` one is Biome's, and a plain parameter is nobody's.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  constructor(private spare: number, plain: number) {\n    this.spare = spare + plain;\n  }\n  total(): number {\n    return this.spare;\n  }\n}'
+    );
+    passes();
+
+    // A name that is not an identifier answers to no gate -- Biome's
+    // `useLiteralKeys` is off and governs access rather than declarations -- so
+    // the run says so instead of passing it in silence. Status stays 0: this is
+    // a disclosure, not a finding.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  "quoted" = 1;\n  [Symbol.iterator] = 2;\n  total(): number {\n    return 0;\n  }\n}'
+    );
+    {
+      const result = run();
+      assert.equal(result.status, 0, result.stdout);
+      assert.match(result.stdout, /^Not judged, because the name is not an identifier \(2\)\n/u);
+      assert.match(result.stdout, /Mirror\."quoted" src\/mirror\.ts:2\n/u);
+      assert.match(result.stdout, /Mirror\.\[Symbol\.iterator\] src\/mirror\.ts:3\n/u);
+    }
+    // A `private` or `protected` one is already owned, so it is not listed.
+    // Asserting only `passes()` would miss this: the section does not change
+    // the status, so the output has to be checked for its absence.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  private "quoted" = 1;\n  protected "guarded" = 2;\n  total(): number {\n    return 0;\n  }\n}'
+    );
+    {
+      const result = run();
+      assert.equal(result.status, 0, result.stdout);
+      assert.doesNotMatch(result.stdout, /Not judged/u);
+    }
+
+    // Kinds no gate of ours owns stay out of scope: Biome covers `private` and
+    // `#private`, and a `protected` or `declare` member answers to nothing.
+    write(
+      'src/mirror.ts',
+      'export class Mirror {\n  #hidden = 1;\n  protected guarded = 2;\n  declare ambient: number;\n  private own = 3;\n  total(): number {\n    return this.#hidden + this.own;\n  }\n}'
+    );
+    passes();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('every kind the check judges is one it also recognises as a declaration', () => {
+  // The two lists are maintained by hand, and divergence is silent AND
+  // permissive in one direction: teach `checkableKind` a kind without teaching
+  // `declaresMember`, and every such member's own declaration scores as a read,
+  // so the member looks used and leaves the gate with no finding and no audit
+  // line. The per-kind behavioural negatives above are what caught the
+  // object-literal omission; this test covers the other direction.
+  const source = readFileSync(new URL('./check-unused-class-members.mjs', import.meta.url), 'utf8');
+  const body = (name) => {
+    const start = source.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, `cannot find ${name}`);
+    const end = source.indexOf('\n}\n', start);
+    assert.notEqual(end, -1, `cannot delimit ${name}`);
+    return source.slice(start, end);
+  };
+  const predicates = (name) =>
+    new Set([...body(name).matchAll(/ts\.(is[A-Za-z]+)\(/gu)].map(([, shape]) => shape));
+  const judged = predicates('checkableKind');
+  const declares = predicates('declaresMember');
+  // `isIdentifier` tests the NAME node rather than the member's kind, and
+  // `isParameterPropertyDeclaration` refines `isParameter`, which is listed.
+  const notKinds = new Set(['isIdentifier', 'isParameterPropertyDeclaration']);
+  // Both sides must be non-trivial, or `missing` is empty because the
+  // extraction found nothing rather than because the lists agree.
+  assert.ok(judged.size >= 5, `checkableKind predicates: ${[...judged].join(', ')}`);
+  assert.ok(declares.size >= 7, `declaresMember predicates: ${[...declares].join(', ')}`);
+  const missing = [...judged].filter((shape) => !notKinds.has(shape) && !declares.has(shape));
+  assert.deepEqual(missing, [], `declaresMember is missing: ${missing.join(', ')}`);
+  // The port and object-literal kinds are declarations only, so the reverse
+  // containment must NOT hold -- an empty difference would mean the extraction
+  // silently matched nothing.
+  assert.ok([...declares].some((shape) => !judged.has(shape)));
 });
 
 test('a configuration that cannot be trusted fails instead of reporting nothing', () => {
@@ -302,7 +918,11 @@ test('a configuration that cannot be trusted fails instead of reporting nothing'
   }
 });
 
-test('the gate runs this check alongside the unused-export check', () => {
+test('the gate runs this check as a stage of its own', () => {
   const scripts = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.match(scripts.scripts['check:ts-prune'], /check-unused-class-members\.mjs/u);
+  assert.match(scripts.scripts['check:members'], /check-unused-class-members\.mjs/u);
+  // Chained behind the unused-export check, this one did not run at all when
+  // that check failed, and its failures read as a ts-prune failure.
+  assert.doesNotMatch(scripts.scripts['check:ts-prune'], /check-unused-class-members\.mjs/u);
+  assert.ok(STAGES.some(([, command]) => command === 'check:members'));
 });

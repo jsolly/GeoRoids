@@ -19,7 +19,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { afterAll, test } from 'vitest';
 import { runGate } from './gate.mjs';
-import { candidateMatches, digest, fileRecord, STAGES, sourceRows } from './gate-receipt.mjs';
+import {
+  candidateMatches,
+  digest,
+  fileRecord,
+  GRAPH_COMMANDS,
+  STAGES,
+  sourceRows,
+} from './gate-receipt.mjs';
 import { canonicalEnvironment, lifecycleCommand } from './gate-runtime.mjs';
 import { literalOnlyChange } from './literal-only-change.mjs';
 
@@ -45,6 +52,7 @@ const REQUIRED_COMMANDS = [
   'check:lint',
   'check:knip',
   'check:ts-prune',
+  'check:members',
   'check:md',
   'check:yaml',
   'check:actions',
@@ -390,6 +398,16 @@ test('a newer failed or interrupted code attempt blocks an older pass until fres
   }
 });
 
+test('the receipt validator and the runner agree on which graph checks skip', () => {
+  // `readReusable` compares the skipped and recorded commands IN ORDER, so a
+  // reorder makes every green receipt unreusable while each stage still passes.
+  assert.deepEqual(GRAPH_COMMANDS, ['check:knip', 'check:ts-prune', 'check:members']);
+  assert.deepEqual(
+    STAGES.map(([, command]) => command).filter((command) => GRAPH_COMMANDS.includes(command)),
+    GRAPH_COMMANDS
+  );
+});
+
 test('literal tuning skips only graphs while partial staging never certifies candidate', async () => {
   const f = fixture();
   try {
@@ -400,7 +418,7 @@ test('literal tuning skips only graphs while partial staging never certifies can
     assert.equal(result.candidateCertified, false);
     assert.deepEqual(
       f.calls,
-      STAGES.filter(([, command]) => !['check:knip', 'check:ts-prune'].includes(command)).map(
+      STAGES.filter(([, command]) => !GRAPH_COMMANDS.includes(command)).map(
         ([, command]) => command
       )
     );
@@ -1067,7 +1085,7 @@ test('hostile inherited Git repository, index and config never affect parent sta
   }
 });
 
-test('changed TypeScript symlink plus literal tuning requires both graph checks', async () => {
+test('changed TypeScript symlink plus literal tuning requires every graph check', async () => {
   const f = fixture();
   try {
     writeFileSync(join(f.root, 'a.ts'), 'export const a=1;');
@@ -1082,6 +1100,7 @@ test('changed TypeScript symlink plus literal tuning requires both graph checks'
     await f.gate();
     assert.ok(f.calls.includes('check:knip'));
     assert.ok(f.calls.includes('check:ts-prune'));
+    assert.ok(f.calls.includes('check:members'));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

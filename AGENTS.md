@@ -65,47 +65,153 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   ts-prune owns unused exports for those: `config/typescript/prune.jsonc` sets
   `allowJs` to keep `scripts/**/*.mjs` in its program, and
   `scripts/check-unused-typescript.test.mjs` fails if that drops. Biome's
-  `noUnusedPrivateClassMembers` owns unused private class members, and
-  `scripts/check-unused-class-members.mjs` owns public methods — on class
-  declarations and class expressions alike — that nothing outside the declaring
-  class calls. Remove one with no references, narrow one used only internally to
-  `private` so Biome takes over, or give one a caller.
+  `noUnusedPrivateClassMembers` owns unused `private` and `#private` class
+  members, and `scripts/check-unused-class-members.mjs` — the gate's
+  `check:members` stage, its own stage so that its verdicts do not read as a
+  ts-prune failure — owns public methods, fields and accessors, on class
+  declarations and class expressions alike, that nothing outside the declaring
+  class reaches. Remove one with no references, narrow one used only internally
+  to `private` so Biome takes over, or give one a caller.
 - **What that member check leaves alone.** It judges `src/`, `server/` and
   `shared/` by directory prefix, so `setup/`, `.railway/`, `benchmarks/`,
   `scripts/` whatever the extension, and the repo-root modules (`server.ts`,
   `shared-types.ts`) all sit outside it, as do test doubles and benchmark
-  harnesses that exist to satisfy external shapes. It also skips a class
-  entirely when the class has any `extends` or `implements` clause, when it is
-  abstract, or when its name appears in a heritage clause anywhere, `tests/`
-  included; those answer to their own contract. On this tree that leaves 22
-  public methods across `MapAssets`, `InlineWorldPersistence` and
-  `WorkerWorldPersistence` unjudged. Public class properties and accessors have
-  no owner at all, and neither do properties of plain objects and constants.
-- **A green run is not proof, because two of its tests are name-based.** It
-  treats a member as reached when an interface or object type declares that
-  name, or when a string with that name is an `in` operand or a call argument.
-  On this tree those two clear 197 of 608 judged methods — about a third —
-  before any reference lookup happens. Bracket access needs no allowance,
-  because the language service resolves `object['name']()` itself.
-  `scripts/check-unused-class-members.test.mjs` pins each test, including that
-  an unrelated bare string exempts nothing.
+  harnesses that exist to satisfy external shapes. `protected` members are out
+  of scope too, and Biome's rule covers only private ones, so an unused
+  protected member answers to neither gate. An `abstract`, `declare` or
+  `override` member defers to the declaration that owns it — for an `override`
+  that declaration owns its visibility too, so `private override` is a type
+  error and neither remedy this check prints would be sound; nothing escapes by
+  being overridden, because the base member is judged in its own right. One
+  shape does slip through that pair: an abstract base deferring to an
+  implementation that is itself an `override` leaves neither judged. Properties
+  of plain objects and constants have no owner at all, and nor does a member
+  whose name is not an identifier — a string, computed or numeric one. Those
+  are named in the run's own output rather than passed in silence. So a member
+  is skipped for being `private` or `protected`, `abstract`, `declare` or
+  `override`, for having a name that is not an identifier, for being an
+  overload signature with no body, or for being a plain constructor
+  parameter — and nothing else. Each kind is judged by the access that reaches
+  it: a field by reads and writes, a getter by reads, a setter by writes — a
+  pair shares one symbol, so judging either by every reference would let its
+  partner speak for it. What counts is the shape of the reference, not the
+  language service's one `isWriteAccess` boolean: a compound assignment and an
+  increment read a getter as well as assigning it, and a shorthand `{ value }`
+  pattern binds a local, so it only reads. A write is recognised through the
+  wrappers that do not change where an assignment lands — parentheses, a
+  non-null assertion, `as`, an angle-bracket assertion and `satisfies` — and
+  through a bracket key, an array or object destructuring target, and a
+  `for (m.value of …)` or `for (m.value in …)` initializer. Recognising only
+  the left operand of a bare `=` reported setters that every one of those
+  spellings still assigns, and `tsc` rejects that remedy with TS2540 or
+  TS7053. The key side of a destructuring target is the mirror case: there the
+  object literal reads the member, so discounting its key as a declaration
+  reported a getter the destructuring still calls. A shape the check cannot resolve to an
+  access reaches nothing rather than counting as a read, because a default of
+  read let a `{@link C.m}` doc comment or an indexed-access type retire a
+  member permanently: a gate that cannot tell must report rather than clear. Of the fields the check reports, one
+  nothing reads is dead storage however it is written, so its remedy is removal
+  rather than a narrowing Biome would then report. No class is skipped for its
+  shape, though: one that extends, implements, is extended or is abstract has
+  every member judged that the list above does not except. The language service links a member to the base or
+  interface declaration it implements, and that link is a trap rather than
+  coverage — the declaration comes back among the member's references, so
+  counting it as a use would let one `implements` clause retire a member
+  silently. A reference that is itself a member declaration is therefore not a
+  use, which is also why an overload signature and a get/set partner reach
+  nothing. An object literal that satisfies a port declares the member the same
+  way, so it is not a caller either — while that was missed, the verdict turned
+  on whether the implementation was spelled `{ hook() {} }` or
+  `{ hook: () => 1 }`, and a port touched only by such a literal cleared a
+  member with an audit line claiming a relationship nothing exercises.
+- **A member with no reference of its own is cleared only by a type
+  relationship.** For each one the check asks the type checker whether a
+  structural type the class satisfies declares it and something exercises that
+  port, whether an `in` probe tests an object the class could be, whether a
+  string names a key of an object that carries it the way `vi.spyOn(target,
+  'name')` does, or — for a field only — whether a spread copies an instance of
+  the class whole, which reads every own field without leaving a reference at
+  any declaration (`src/rendering/beltRenderer.ts` spreads a `Roid`; removing
+  such a field would quietly empty the copy — that is the only instance spread
+  on this tree, and no member is currently cleared by this rule). A method is reached only by
+  calling it, so its port must also offer a call signature; a field is reached
+  by reading or assigning it, so an ordinary `number` port reaches one, which is
+  how `Ship.tapExtractFrames` is reached through `shared/shipAbilities.ts`. A
+  spread clears no method or accessor: a method lives on the prototype and an
+  accessor is not an own property, so neither is copied. The check rejects what
+  looks like a relationship but is not: a declaration of the same name the class
+  does not satisfy, a method port typed so loosely it offers no way to invoke
+  anything, an `unknown`, `any` or `object` counterparty that every class is
+  assignable to, and a shape nothing ever touches — writing an interface is no
+  more a way to quiet this check than deleting a component's call site. Bracket
+  access needs no allowance for finding a reference, because the service
+  resolves `object['name']()` itself; classifying one does need the allowance
+  above, since the reference arrives at the key inside the quotes. Each member kept this way is printed with the relationship and the
+  file it was found in, so a run that reports nothing can be audited instead of
+  trusted — that audit line is what exposed a dead `SatellitePickup.velocity`
+  hiding behind a port no pickup is ever passed to — and
+  `scripts/check-unused-class-members.test.mjs` drives each rule from a
+  fixture that fails when the rule is deleted. Do not read that as a guarantee
+  of complete coverage: three times now this note has claimed one, and each
+  time a reviewer found rules whose deletion left the suite green — most
+  recently four write recognisers and the name-shape exclusion, all since
+  pinned. Before trusting that a rule is covered, delete it and watch the
+  suite, because a rule nothing drives fails open silently. Three guards
+  survive that treatment because they are unreachable rather than untested:
+  `namesAKey`'s `undefined` early return, `declaresMember`'s
+  `parent.name === name`, and `isExercised`'s identifier guard, which cannot
+  fire because the index only holds port members whose name is an identifier.
+  The kind list is pinned against `checkableKind` in the other direction,
+  because a kind missing from it is counted as a use.
+- **What that still does not prove.** The evidence may sit anywhere in the prune
+  program — `tests/`, `benchmarks/`, `scripts/`, `setup/`, `.railway/` and
+  `config/` included — even though classes in those directories are not judged;
+  `CanvasManager.getGpuFrameStats` is reached from a benchmark, which is a real
+  consumer. And a relationship is not a caller: the check establishes that the
+  class satisfies a port something declared, not that any value of the class
+  ever flows into it. Asked of every judged member rather than only the ones
+  without a reference, the rules would clear about one method in six but roughly
+  three fields in five, because a field's type is ordinary — a `number`, a
+  shared `Position` — and this codebase deliberately hands entities to `shared/`
+  helpers by shape. So a clean run is good evidence for a method and weaker
+  evidence for a field, and in neither case a proof. Narrowing that further
+  needs to follow values into the positions those types occupy, which risks
+  reporting live code and is deliberately not attempted. A spread is the only
+  whole-object read the check models, and on this tree it is the only one that
+  exists: a serializer, an `Object.values` or an object rest pattern over an
+  instance would read every field just as invisibly, so introducing one means a
+  field reached only that way is reported. The write side is the same and is
+  not modelled at all: `Object.assign(instance, { stored: 1 })` writes the
+  field through a fresh inferred property that is no reference to the member,
+  so a field written only that way looks wholly unreferenced. Two further
+  residuals are known. A
+  field written only from OUTSIDE the class and read nowhere is accepted rather
+  than reported, because the write is a use and nothing here establishes that
+  anything reads it — the alternative reports a field whose only reader is a
+  serializer. And a structural port exercised only from a `.svelte` or `.astro`
+  file is not seen as exercised, because the program holds no component, so a
+  class satisfying it is reported; cover the behavior from a test, as the
+  component bullet below requires, and never delete the member. Letting a
+  component's names exercise a port instead would be worse: the component index
+  attributes every name a component uses to every module it imports, so DOM
+  names like `close`, `filter` and `show` would clear unrelated ports.
 - **A component's call is not a reference the check can find**, since its
   program resolves no `.svelte` or `.astro` file. It therefore reads the
-  components that import a module and reports a method one of them names as
-  "only a component calls it" rather than as dead code; markup counts, because
+  components that import a module and reports a member one of them names as
+  "only a component reaches it" rather than as dead code; markup counts, because
   two of `WikiScrollMemory`'s ten public methods — `noteScroll` and
-  `prepareForTraversal` — are reached only from outside its script block. The
-  answer is a test that proves the behavior; `tests/AGENTS.md` still forbids a
-  call-only test written to clear a gate. That signal is a name match within an
-  importing module, so a component holding an instance it did not import stays
-  invisible: never delete a component's call site, or the method behind it, to
-  quiet this check, and rely on `svelte-check` to catch it if you do.
-  `WikiScrollMemory` shows how little silence proves. Six of its ten public
-  methods are quiet only because
-  `tests/unit/wiki/back-returns-to-the-scrolled-field-manual.test.ts` calls
-  them; `hold`, `capture` and `dispose` are name-exempt as well; and `release`
-  has no TypeScript caller at all, quiet because two name tests both match it —
-  a type declaring `release`, and `'release'` as a call argument elsewhere.
+  `prepareForTraversal` — are reached only from outside its script block. That
+  verdict outranks "make it private", because privatizing a member a component
+  calls would break its call site. The answer is a test that proves the
+  behavior; `tests/AGENTS.md` still forbids a call-only test written to clear a
+  gate. The signal is a name match within an importing module, so a component
+  holding an instance it did not import stays invisible: never delete a
+  component's call site, or the method behind it, to quiet this check, and rely
+  on `svelte-check` to catch it if you do. `WikiScrollMemory.release` is the
+  worked example — no TypeScript caller, one call site in `WikiShell.svelte`, and
+  the behavior test in
+  `tests/unit/wiki/back-returns-to-the-scrolled-field-manual.test.ts` is what
+  clears it.
 - **Two unused-code blind spots genuinely cannot be closed from here:** a module
   reached by a dynamic `import()` has every export counted as used by both tools
   (`scripts/gate-receipt.mjs`), and a hand-written sibling declaration file wins

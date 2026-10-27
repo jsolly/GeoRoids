@@ -21,6 +21,7 @@ export const STAGES = [
   ['lint', 'check:lint'],
   ['knip', 'check:knip'],
   ['ts-prune', 'check:ts-prune'],
+  ['class members', 'check:members'],
   ['markdown lint', 'check:md'],
   ['yaml lint', 'check:yaml'],
   ['actionlint', 'check:actions'],
@@ -34,6 +35,13 @@ export const STAGES = [
   ['build', 'build'],
   ['review', 'test:review'],
 ];
+// The checks whose verdict follows from the type graph. They do read string
+// literals — `'name' in object` probes and `vi.spyOn(target, 'name')` keys —
+// but `literal-only-change.mjs` admits only numeric and boolean literals inside
+// constant data initializers, so a change it classifies cannot move one and the
+// gate may reuse a prior witness. The receipt validator compares this list in
+// order, so the runner has to skip exactly these, in this order.
+export const GRAPH_COMMANDS = ['check:knip', 'check:ts-prune', 'check:members'];
 export const digest = (value) => createHash('sha256').update(value).digest('hex');
 const jsonDigest = (value) => digest(JSON.stringify(value));
 function git(root, args) {
@@ -455,7 +463,6 @@ export function readReusable(path, current, candidate, validateReview, ancestors
         return null;
       }
     }
-    const graphCommands = ['check:knip', 'check:ts-prune'];
     const skipped = receipt.stages.filter((stage) => stage.kind === 'literal-graph');
     if (
       typeof receipt.candidateCertified !== 'boolean' ||
@@ -473,7 +480,7 @@ export function readReusable(path, current, candidate, validateReview, ancestors
       }
     } else {
       if (
-        JSON.stringify(skipped.map((stage) => stage.command)) !== JSON.stringify(graphCommands) ||
+        JSON.stringify(skipped.map((stage) => stage.command)) !== JSON.stringify(GRAPH_COMMANDS) ||
         receipt.classifier?.kind !== 'literal-only' ||
         receipt.classifier.witness !== receipt.graphWitness
       ) {
@@ -482,9 +489,9 @@ export function readReusable(path, current, candidate, validateReview, ancestors
     }
     if (
       !Array.isArray(receipt.graphArtifacts) ||
-      receipt.graphArtifacts.length !== 2 ||
+      receipt.graphArtifacts.length !== GRAPH_COMMANDS.length ||
       JSON.stringify(receipt.graphArtifacts.map((row) => row.command)) !==
-        JSON.stringify(graphCommands) ||
+        JSON.stringify(GRAPH_COMMANDS) ||
       receipt.graphArtifacts.some((row) => row.witness !== receipt.graphWitness) ||
       receipt.graphArtifacts.some((row) => digest(readFileSync(row.artifact)) !== row.digest)
     ) {

@@ -205,6 +205,37 @@ ignores forwarded address headers. Before release, verify that Railway replaces
 client-supplied `X-Real-IP` values. Do not expose this reporting listener through
 an untrusted internal proxy that can choose that header.
 
+Verified against the live production ingress: the header probe on 2026-10-25 at
+release `c487d041`, and the precondition below on 2026-10-26 at `d7d084e`.
+`clientAddress` runs before the method and content-type checks, so a value that
+cannot parse as an address is distinguishable without submitting a report — a
+pass-through answers `503 Reporting ingress address is unavailable`, while `405
+Unsupported report method or path` means no client-chosen value reached the
+resolver.
+
+```sh
+curl -sS -H 'X-Real-IP: not-an-address' \
+  https://georoids-production-2403.up.railway.app/debug-reports
+```
+
+A garbage value, the header sent twice, the header sent empty, and an
+`X-Forwarded-For`-only spoof all answered 405, never the 503. The 503 fires on
+anything that is not a bare valid IP, and Node joins duplicate headers into one
+comma-separated string, so that result excludes pass-through, append, duplicate
+survival and absence alike: the edge set the header itself in every case.
+
+That branch only runs when `railwayIngress` is true, so measure it rather than
+assume it. `GET /status` reports `"nodeEnv": "production"`, and `GET /health`
+carries `debugReports`, which `server/debugReports/configuration.ts` only
+produces when `RAILWAY_ENVIRONMENT_ID` is set. Both conjuncts hold.
+
+Two gaps remain that this procedure cannot close: whether a well-formed
+client-supplied value is overwritten rather than preserved, and the WebSocket
+upgrade route. Distinguishing either needs an oracle revealing which address the
+server resolved, and no public endpoint exposes one — adding such an endpoint
+would publish the quantity a limiter keys on. Re-verify on any ingress or domain
+change.
+
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
 and a 100 MiB or 200-report pending limit. New acceptance reserves at least
 256 MiB free space for the world database. Full or unavailable storage rejects

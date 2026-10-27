@@ -99,3 +99,61 @@ records the older-backup restore caveat. John lifted the stale-tab hold on wire
 Other unverified sweep rows remain planning data on
 [task `6hjWGhqrx6rhMrrv`](https://app.todoist.com/app/task/6hjWGhqrx6rhMrrv),
 not evidence of dead code.
+
+## Per-client upgrade keying rejected; size the shared budget to the fleet, 2026-10-26
+
+The deploy lockout — a full server could not rejoin, because the shared
+connection budget sat below `MAX_PLAYERS` — is fixed by sizing that budget to a
+full fleet's honest demand, not by telling callers apart. Keying upgrades to the
+forwarded client address was attempted across four revisions and is rejected.
+Do not reintroduce it without new evidence; what follows is what any attempt has
+to solve.
+
+**Re-keying destroys an aggregate bound `main` holds by accident.** Behind
+Railway's edge the socket peer is the proxy, so every caller shares one bucket
+and the whole internet is capped at one bucket's budget between them. That cap
+is a side effect of the very bug being fixed, so attributing upgrades to real
+clients removes it, and a replacement aggregate bound becomes mandatory.
+
+**Every replacement bound tried hit one of two horns.** Sized below the sum of
+the per-address budgets a full fleet legitimately holds, it refuses callers who
+are inside their own budget, and spending it becomes the attack: one source
+refused 488 of 600 honest joins. Sized above that, it is a shared resource one
+host can exhaust. Bounding the per-address map instead moves the problem rather
+than solving it — a 1,024-entry cap, filled by single upgrades from distinct
+addresses, refused 100 of 100 honest pilots on fresh addresses and 98.5% of
+honest joins over an hour from one host, and because the map was keyed per lane
+a `/logs` flood closed the next `/ws` join.
+
+**Narrower sub-bounds do not separate honest traffic from abuse either.** A
+per-prefix budget (IPv4 /24, IPv6 /64) needs at least the fleet's worst honest
+demand to spare a fleet that shares one prefix, while the aggregate ceiling is a
+modest multiple of that same demand, so a number of prefixes well inside one
+end-site delegation still fills it. A fair share of the lane reserved for
+callers under an honest retry rate was built and measured: because the
+past-ladder pool is shared, one caller empties it and every other past-ladder
+caller is refused. One /24 took 606 upgrades before the pool refused it, after
+which a pilot that had dropped twice lost 6 of its 12 upgrades and 20 pilots in
+one /24 lost 14 of 20 — figures that are zero on an idle limiter and appear only
+once the pool is full.
+
+All of it fails for one reason: **a fleet sharing a prefix and one host rotating
+inside that prefix are indistinguishable at an upgrade**, before any pilot
+identity exists. That is a property of IP-keyed sub-bounds in general rather
+than of any one implementation, which is why resizing a bound cannot rescue the
+approach.
+
+Address normalization — collapsing `192.0.2.4`, `::ffff:192.0.2.4` and
+compressed IPv6 spellings of one host onto a single key — is the one rewrite
+that costs honest callers nothing, because it only merges spellings of the same
+host. It is unnecessary while the key is the socket peer, whose spelling the
+caller does not choose, and it is the first thing to add if a forwarded address
+ever becomes a budget key: `node:net`'s `isIP` is a format check, not a
+normalizer.
+
+One live path does key on a forwarded address today — the reporting listener's
+status quota and its per-address report scope (`server/debugReports/http.ts`).
+Normalizing there is backlog rather than work, with a precondition: first
+measure whether the edge ever writes more than one spelling for one host. The
+caller cannot influence that value, so the hole needs the edge itself to vary,
+which nobody has observed.

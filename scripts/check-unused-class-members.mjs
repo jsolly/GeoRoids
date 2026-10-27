@@ -120,7 +120,7 @@ function reachableWithoutTheClass(program, checker) {
   const declaringTypes = new Map();
   const inProbes = new Map();
   const keyArguments = new Map();
-  const spreads = [];
+  const spreadClasses = new Map();
   const add = (index, name, node) => {
     const nodes = index.get(name) ?? [];
     nodes.push(node);
@@ -153,53 +153,35 @@ function reachableWithoutTheClass(program, checker) {
         }
       }
       if (ts.isSpreadAssignment(node)) {
-        spreads.push(node);
+        noteSpread(spreadClasses, checker.getTypeAtLocation(node.expression), node, checker);
       }
       ts.forEachChild(node, visit);
     };
     ts.forEachChild(file, visit);
   }
-  let resolved;
-  return {
-    declaringTypes,
-    inProbes,
-    keyArguments,
-    // Resolving the spreads costs one type query each, so it is done once, and
-    // only if a field actually needs adjudicating.
-    spreadClasses: () => {
-      resolved ??= spreadClasses(spreads, checker);
-      return resolved;
-    },
-  };
+  return { declaringTypes, inProbes, keyArguments, spreadClasses };
 }
 
 /**
- * The classes whose instances are copied whole by an object spread, each mapped
- * to one such spread. `{...instance}` reads every own field without leaving a
- * reference at any of their declarations, so a field reached only that way
- * would otherwise be reported — and removing it would quietly empty the copy.
+ * Record the classes whose instances this object spread copies whole.
+ * `{...instance}` reads every own field without leaving a reference at any of
+ * their declarations, so a field reached only that way would otherwise be
+ * reported — and removing it would quietly empty the copy.
  */
-function spreadClasses(spreads, checker) {
-  const found = new Map();
-  const note = (type, node) => {
-    for (const part of type.isUnion() ? type.types : [type]) {
-      for (const declaration of part.getSymbol()?.declarations ?? []) {
-        if (ts.isClassLike(declaration) && !found.has(declaration)) {
-          found.set(declaration, node);
-        }
-      }
-      // A spread of a subclass instance copies the fields it inherits too.
-      if (part.isClassOrInterface()) {
-        for (const base of checker.getBaseTypes(part)) {
-          note(base, node);
-        }
+function noteSpread(found, type, node, checker) {
+  for (const part of type.isUnion() ? type.types : [type]) {
+    for (const declaration of part.getSymbol()?.declarations ?? []) {
+      if (ts.isClassLike(declaration) && !found.has(declaration)) {
+        found.set(declaration, node);
       }
     }
-  };
-  for (const node of spreads) {
-    note(checker.getTypeAtLocation(node.expression), node);
+    // A spread of a subclass instance copies the fields it inherits too.
+    if (part.isClassOrInterface()) {
+      for (const base of checker.getBaseTypes(part)) {
+        noteSpread(found, base, node, checker);
+      }
+    }
   }
-  return found;
 }
 
 /**
@@ -221,11 +203,12 @@ function namesAKey(contextual) {
  * when nothing reaches it. Every answer is a type relationship a caller could
  * actually use, rather than a matching name, and what counts depends on how
  * this kind of member is reached: by a call, by a read, by an assignment, or by
- * a copy of the whole instance. A base class needs no rule here:
- * the language service links a member to the base declaration it overrides, so
- * the reference pass has already cleared it.
+ * a copy of the whole instance. A base class or an implemented interface needs
+ * no rule here, but not because the reference pass cleared it: its declaration
+ * is not a use (see `accessKind`), so such a member arrives here and must earn
+ * its clearance like any other.
  */
-function reachedThroughType(name, kind, declaringClass, checker, service, index) {
+function reachedThroughType(name, kind, declaringClass, checker, service, program, index) {
   const classType = instanceType(declaringClass, checker);
   const where = (node) => {
     const source = node.getSourceFile();
@@ -249,7 +232,7 @@ function reachedThroughType(name, kind, declaringClass, checker, service, index)
     // The port has to be exercised: something must call, read or assign the
     // member through it. A declaration nothing ever touches reaches nothing,
     // which is why an interface written only to quiet this check does not.
-    if (!isExercised(declaredMember, service)) {
+    if (!isExercised(declaredMember, service, program)) {
       continue;
     }
     // A method is reached only by calling it, so a port that accepts one
@@ -282,7 +265,7 @@ function reachedThroughType(name, kind, declaringClass, checker, service, index)
   // a method lives on the prototype and an accessor is not an own property, so
   // neither is copied.
   if (kind === 'property') {
-    const spread = index.spreadClasses().get(declaringClass);
+    const spread = index.spreadClasses.get(declaringClass);
     if (spread !== undefined) {
       return `read through a spread of this class at ${where(spread)}`;
     }
@@ -309,29 +292,22 @@ function reachedThroughType(name, kind, declaringClass, checker, service, index)
   return undefined;
 }
 
-/** Whether anything but its own declaration names this identifier. */
-function isMentionedElsewhere(name, service) {
-  const file = name.getSourceFile().fileName;
-  const declaration = name.getStart();
-  const references = service.getReferencesAtPosition(file, declaration) ?? [];
-  return references.some(
-    (reference) => reference.fileName !== file || reference.textSpan.start !== declaration
-  );
-}
-
 /**
  * Whether anything touches this declared member through the type that declares
- * it. The question is asked of the port's own declaration, so a class that
- * satisfies an untouched shape is not cleared by it — including the shape of a
- * `Pick` or an extended interface, whose members resolve to the same symbol.
+ * it. Only a read, a write or a call counts: another declaration of the same
+ * name is not a caller, so neither an overload signature nor a class that
+ * implements the port can stand in for one. A `Pick` or an extended interface
+ * resolves to the same symbol, so an exercised port still clears through them.
  */
-function isExercised(member, service) {
-  return (member.declarations ?? []).some(
-    (declaration) =>
-      declaration.name !== undefined &&
-      ts.isIdentifier(declaration.name) &&
-      isMentionedElsewhere(declaration.name, service)
-  );
+function isExercised(member, service, program) {
+  return (member.declarations ?? []).some((declaration) => {
+    if (declaration.name === undefined || !ts.isIdentifier(declaration.name)) {
+      return false;
+    }
+    const file = declaration.getSourceFile().fileName;
+    const references = service.getReferencesAtPosition(file, declaration.name.getStart()) ?? [];
+    return references.some((reference) => accessKind(reference, program) !== 'declaration');
+  });
 }
 
 /** The type of an instance of this class, named or not. */
@@ -353,9 +329,9 @@ function declaredTypeOf(name, checker) {
 /**
  * Which kind of member this declaration is, or undefined for one this check
  * leaves alone. A `private` or `protected` member answers to Biome or to
- * nothing at all, and an overload signature, an abstract member and a `declare`
- * field each declare something another declaration implements. A field needs no
- * body, so only the kinds that have one are required to carry it.
+ * nothing at all, and an overload signature, an abstract member, a `declare`
+ * field and an `override` member each declare something another declaration
+ * owns. A field needs no body, so only the kinds that have one must carry one.
  */
 function checkableKind(member) {
   if (member.name === undefined || !ts.isIdentifier(member.name)) {
@@ -370,6 +346,11 @@ function checkableKind(member) {
   if (ts.isPropertyDeclaration(member)) {
     return 'property';
   }
+  // `constructor(public spare: number)` declares a public field outside the
+  // class body, so the gate would otherwise cover one spelling and not the other.
+  if (ts.isParameter(member)) {
+    return ts.isParameterPropertyDeclaration(member, member.parent) ? 'property' : undefined;
+  }
   if (member.body === undefined) {
     return undefined;
   }
@@ -382,44 +363,114 @@ function checkableKind(member) {
   return ts.isSetAccessor(member) ? 'setter' : undefined;
 }
 
+/** The identifier that starts at this position, if the file holds one. */
+function identifierAt(source, position) {
+  let found;
+  const visit = (node) => {
+    if (node.getStart(source) > position || node.getEnd() < position) {
+      return;
+    }
+    if (ts.isIdentifier(node) && node.getStart(source) === position) {
+      found = node;
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(source, visit);
+  return found;
+}
+
+/** The expression a reference reaches the member through, such as `m.value`. */
+function accessExpression(name) {
+  const parent = name.parent;
+  return (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) &&
+    parent.name === name
+    ? parent
+    : name;
+}
+
 /**
- * Whether a reference exercises this kind of member. A getter is reached by a
- * read and a setter by a write, and a get/set pair shares one symbol, so
- * judging either by every reference would let its partner speak for it.
- * Compound assignment reports as a write, which is the honest answer for a
- * field whose only use accumulates into it and nothing reads.
+ * How a reference touches the member. The language service reports a single
+ * `isWriteAccess` boolean, and it is not the complement of a read: a compound
+ * assignment and `++` both read and write, and a shorthand `{ value }` pattern
+ * writes a new local rather than the member, so it only reads. Accessors are
+ * judged by this answer, so collapsing it to a boolean reports a getter that a
+ * `+=` still calls. The shape of the syntax decides it instead.
  */
-function exercises(kind, reference) {
+function accessKind(reference, program) {
+  const source = program.getSourceFile(reference.fileName);
+  const name = source === undefined ? undefined : identifierAt(source, reference.textSpan.start);
+  if (name === undefined) {
+    return reference.isWriteAccess === true ? 'write' : 'read';
+  }
+  // A base class's or an interface's own declaration comes back among a
+  // member's references, and an overload signature repeats one, so counting
+  // those as uses lets a shape stand in for a caller.
+  if (declaresMember(name)) {
+    return 'declaration';
+  }
+  const access = accessExpression(name);
+  const parent = access.parent;
+  if (ts.isBinaryExpression(parent) && parent.left === access) {
+    const operator = parent.operatorToken.kind;
+    if (operator === ts.SyntaxKind.EqualsToken) {
+      return 'write';
+    }
+    if (operator > ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment) {
+      return 'readwrite';
+    }
+  }
+  const increment = ts.SyntaxKind.PlusPlusToken;
+  const decrement = ts.SyntaxKind.MinusMinusToken;
+  if (
+    (ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) &&
+    parent.operand === access &&
+    (parent.operator === increment || parent.operator === decrement)
+  ) {
+    return 'readwrite';
+  }
+  // Everything else reads, including `{ value }` and `{ value: v }`, which bind
+  // a local rather than assigning the member — the one case `isWriteAccess`
+  // reports as a write although nothing is written.
+  return 'read';
+}
+
+/** Whether this identifier is a member declaration's own name. */
+function declaresMember(name) {
+  const parent = name.parent;
+  return (
+    parent.name === name &&
+    (ts.isPropertySignature(parent) ||
+      ts.isMethodSignature(parent) ||
+      ts.isPropertyDeclaration(parent) ||
+      ts.isMethodDeclaration(parent) ||
+      ts.isGetAccessor(parent) ||
+      ts.isSetAccessor(parent) ||
+      ts.isParameter(parent))
+  );
+}
+
+/**
+ * Whether an access of this kind reaches this kind of member. A get/set pair
+ * shares one symbol, so judging either by every reference would let its partner
+ * speak for it: a `+=` reaches both halves, a plain read only the getter, and a
+ * destructure only the getter.
+ */
+function reaches(kind, access) {
+  if (access === 'declaration') {
+    return false;
+  }
   if (kind === 'getter') {
-    return reference.isWriteAccess !== true;
+    return access === 'read' || access === 'readwrite';
   }
   if (kind === 'setter') {
-    return reference.isWriteAccess === true;
+    return access === 'write' || access === 'readwrite';
   }
   return true;
 }
 
-/**
- * Where this class declares each name. Overload signatures declare the same
- * member rather than using it, and the service does not reliably flag a
- * declaration, so every declared position is located once per class.
- */
-function declarationPositions(node, file) {
-  const positions = new Map();
-  for (const member of node.members) {
-    if (member.name === undefined || !ts.isIdentifier(member.name)) {
-      continue;
-    }
-    const declared = positions.get(member.name.text) ?? new Set();
-    declared.add(member.name.getStart(file));
-    positions.set(member.name.text, declared);
-  }
-  return positions;
-}
-
 function remedy({ kind, internal, reads, componentOnly, paired }) {
   if (componentOnly) {
-    return 'only a component calls it; cover the behavior from a test';
+    return 'only a component reaches it; cover the behavior from a test';
   }
   // An accessor is reached by one kind of access, so say which one is missing
   // rather than claiming nothing names it: its partner shares the name.
@@ -478,8 +529,10 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
     const path = relative(root, file.fileName);
     const visit = (node) => {
       if (ts.isClassLike(node)) {
-        const declared = declarationPositions(node, file);
-        for (const member of node.members) {
+        const judged = node.members.flatMap((member) =>
+          ts.isConstructorDeclaration(member) ? [...member.parameters] : [member]
+        );
+        for (const member of judged) {
           const kind = checkableKind(member);
           if (kind === undefined) {
             continue;
@@ -496,22 +549,21 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             ),
             `Cannot resolve references for ${name} in ${path}`
           );
-          const positions = declared.get(name) ?? new Set();
-          // An overload signature and a get/set partner declare this member
-          // rather than reaching it, as does its own declaration.
-          const declares = (reference) =>
-            reference.fileName === file.fileName && positions.has(reference.textSpan.start);
           const inside = (reference) =>
             reference.fileName === file.fileName &&
             reference.textSpan.start >= node.getStart(file) &&
             reference.textSpan.start < node.getEnd();
-          const uses = references.filter(
-            (reference) => !declares(reference) && exercises(kind, reference)
-          );
+          const accesses = references.map((reference) => ({
+            reference,
+            access: accessKind(reference, program),
+          }));
+          const uses = accesses
+            .filter(({ access }) => reaches(kind, access))
+            .map(({ reference }) => reference);
           if (uses.some((reference) => !inside(reference))) {
             continue;
           }
-          const reason = reachedThroughType(name, kind, node, checker, service, index);
+          const reason = reachedThroughType(name, kind, node, checker, service, program, index);
           if (reason !== undefined) {
             cleared.push({
               member: `${node.name?.text ?? '(anonymous)'}.${name}`,
@@ -537,9 +589,10 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
                 (ts.isGetAccessor(other) || ts.isSetAccessor(other))
             ),
             internal: uses.length,
-            reads: references.filter(
-              (reference) => !declares(reference) && reference.isWriteAccess !== true
-            ).length,
+            // A compound assignment is deliberately not a read here: a field
+            // that only accumulates and nothing observes is dead storage, and
+            // narrowing it to `private` would only move the finding to Biome.
+            reads: accesses.filter(({ access }) => access === 'read').length,
             componentOnly: (fromComponents.get(moduleKey(file.fileName)) ?? new Set()).has(name),
           });
         }

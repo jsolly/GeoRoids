@@ -83,12 +83,20 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   constants have no owner at all. Each kind is judged by the access that reaches
   it: a field by reads and writes, a getter by reads, a setter by writes — a
   pair shares one symbol, so judging either by every reference would let its
-  partner speak for it — and a field nothing reads anywhere is dead storage
-  however it is written, so its remedy is removal rather than a narrowing Biome
-  would then report. No class is skipped for its shape, though: one that extends,
-  implements, is extended or is abstract has its own members judged, because the
-  language service resolves a call made through a subclass instance and links a
-  member to the base declaration it overrides.
+  partner speak for it. What counts is the shape of the reference, not the
+  language service's one `isWriteAccess` boolean: a compound assignment and an
+  increment read a getter as well as assigning it, and a shorthand `{ value }`
+  pattern binds a local, so it only reads. Of the fields the check reports, one
+  nothing reads is dead storage however it is written, so its remedy is removal
+  rather than a narrowing Biome would then report. No class is skipped for its shape, though, and no
+  member is either: one that extends, implements, is extended or is abstract has
+  every member judged. The language service links a member to the base or
+  interface declaration it implements, and that link is a trap rather than
+  coverage — the declaration comes back among the member's references, so
+  counting it as a use would let one `implements` clause retire a member
+  silently. A reference that is itself a member declaration is therefore not a
+  use, which is also why an overload signature and a get/set partner reach
+  nothing.
 - **A member with no reference of its own is cleared only by a type
   relationship.** For each one the check asks the type checker whether a
   structural type the class satisfies declares it and something exercises that
@@ -97,7 +105,8 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   'name')` does, or — for a field only — whether a spread copies an instance of
   the class whole, which reads every own field without leaving a reference at
   any declaration (`src/rendering/beltRenderer.ts` spreads a `Roid`; removing
-  such a field would quietly empty the copy). A method is reached only by
+  such a field would quietly empty the copy — that is the only instance spread
+  on this tree, and no member is currently cleared by this rule). A method is reached only by
   calling it, so its port must also offer a call signature; a field is reached
   by reading or assigning it, so an ordinary `number` port reaches one, which is
   how `Ship.tapExtractFrames` is reached through `shared/shipAbilities.ts`. A
@@ -132,11 +141,21 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   whole-object read the check models, and on this tree it is the only one that
   exists: a serializer, an `Object.values` or an object rest pattern over an
   instance would read every field just as invisibly, so introducing one means a
-  field reached only that way is reported.
+  field reached only that way is reported. Two further residuals are known. A
+  field written only from OUTSIDE the class and read nowhere is accepted rather
+  than reported, because the write is a use and nothing here establishes that
+  anything reads it — the alternative reports a field whose only reader is a
+  serializer. And a structural port exercised only from a `.svelte` or `.astro`
+  file is not seen as exercised, because the program holds no component, so a
+  class satisfying it is reported; cover the behavior from a test, as the
+  component bullet below requires, and never delete the member. Letting a
+  component's names exercise a port instead would be worse: the component index
+  attributes every name a component uses to every module it imports, so DOM
+  names like `close`, `filter` and `show` would clear unrelated ports.
 - **A component's call is not a reference the check can find**, since its
   program resolves no `.svelte` or `.astro` file. It therefore reads the
-  components that import a module and reports a method one of them names as
-  "only a component calls it" rather than as dead code; markup counts, because
+  components that import a module and reports a member one of them names as
+  "only a component reaches it" rather than as dead code; markup counts, because
   two of `WikiScrollMemory`'s ten public methods — `noteScroll` and
   `prepareForTraversal` — are reached only from outside its script block. That
   verdict outranks "make it private", because privatizing a member a component
@@ -146,7 +165,7 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   holding an instance it did not import stays invisible: never delete a
   component's call site, or the method behind it, to quiet this check, and rely
   on `svelte-check` to catch it if you do. `WikiScrollMemory.release` is the
-  worked example — no caller in `src/`, one call site in `WikiShell.svelte`, and
+  worked example — no TypeScript caller, one call site in `WikiShell.svelte`, and
   the behavior test in
   `tests/unit/wiki/back-returns-to-the-scrolled-field-manual.test.ts` is what
   clears it.

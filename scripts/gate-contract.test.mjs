@@ -1068,7 +1068,7 @@ test('hostile inherited Git repository, index and config never affect parent sta
   }
 });
 
-test('changed TypeScript symlink plus literal tuning requires both graph checks', async () => {
+test('changed TypeScript symlink plus literal tuning requires every graph check', async () => {
   const f = fixture();
   try {
     writeFileSync(join(f.root, 'a.ts'), 'export const a=1;');

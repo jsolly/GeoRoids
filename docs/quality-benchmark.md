@@ -78,5 +78,6 @@ cd /Users/johnsolly/code/GeoRoids
 npm run prune
 ```
 
-The individual commands are `npm run check:knip` and `npm run check:ts-prune`.
+The individual commands are `npm run check:knip`, `npm run check:ts-prune` and
+`npm run check:members`.
 Both are required by the pre-commit gate and GitHub CI.

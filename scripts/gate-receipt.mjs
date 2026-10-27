@@ -35,9 +35,11 @@ export const STAGES = [
   ['build', 'build'],
   ['review', 'test:review'],
 ];
-// The checks whose verdict follows from the type graph rather than from any
-// literal in it. A literal-only change cannot move one, so the gate may reuse a
-// prior witness for them — and the receipt validator compares this list in
+// The checks whose verdict follows from the type graph. They do read string
+// literals — `'name' in object` probes and `vi.spyOn(target, 'name')` keys —
+// but `literal-only-change.mjs` admits only numeric and boolean literals inside
+// constant data initializers, so a change it classifies cannot move one and the
+// gate may reuse a prior witness. The receipt validator compares this list in
 // order, so the runner has to skip exactly these, in this order.
 export const GRAPH_COMMANDS = ['check:knip', 'check:ts-prune', 'check:members'];
 export const digest = (value) => createHash('sha256').update(value).digest('hex');

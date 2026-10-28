@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { injectSpeedInsights } from '@vercel/speed-insights';
   import { onMount } from 'svelte';
   import type { DebugDiagnosticSnapshot, ShipKitId } from '../../../shared-types';
   import { debugIsOn } from '../../constants/user-preferences';
@@ -171,6 +172,7 @@
   }
 
   onMount(() => {
+    injectSpeedInsights({ framework: 'svelte', route: window.location.pathname });
     let live = true;
     if (debugIsOn()) {
       reports = createDebugReportClient((next) => {

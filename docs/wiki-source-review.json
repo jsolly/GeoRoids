@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:631eacb5a424e0babcaae9fd211132757ed82fa5a06e8164fa44bea52a8cef3e",
+    "package.json": "sha256:77f41c1680e341ed10de36f1703a43089f6e170da51d0e8a2b1e22b87acbfbda",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -225,10 +225,10 @@
     "src/components/game/FieldHints.svelte": "sha256:0e5c04183edf7d65d25b249646dfa4ad9bc18c98831bbb59363f0d004075d609",
     "src/components/game/FurnaceTravelMap.svelte": "sha256:be236cc2753114ec1cf8293d5250cb85ca61a92f1ed821dbb46d2d3fa2fde2aa",
     "src/components/game/GameOverlay.svelte": "sha256:ad2eb07bba13999a7612c37f07d5b20237720c6411b9e41d1aca5874f02ef66b",
-    "src/components/game/GameShell.svelte": "sha256:3882e0297aa9554b8ff93f9dd18f11db938a99fd72e74d5f358a8af953b4711b",
+    "src/components/game/GameShell.svelte": "sha256:b5ee2fdb126a6b081ac10d44cbf327656be82d56537ac32eefa3a0deb23f382a",
     "src/components/game/InventoryPanel.svelte": "sha256:784caec9a55d8f03bffcd63e2890b0133c7088f563d0c35fc76b4f4b7c206fec",
     "src/components/game/PhoneCollector.svelte": "sha256:296e6787bf691061acec4175523e857af29bc6c732fcec0ea911dd591daa4879",
-    "src/components/game/Preferences.svelte": "sha256:df781e7ca2cd79c303154149ccfd20589d8b700057080a7111cc4ba8365c6993",
+    "src/components/game/Preferences.svelte": "sha256:c453ec353720c68006ec02b54a310b7472bc3584d438004f78f0bf95bd9f14ea",
     "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
     "src/components/game/StartScreen.svelte": "sha256:05bd211b6486de548f5ca92a8daab1c11bd53efbfe626437ce1c4a75391e1805",
     "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
@@ -259,7 +259,7 @@
     "src/components/wiki/ShipScorecard.svelte": "sha256:63f578904badaa7007f9da834ed4b934f1f95c3aa1768b246d33de86c10a4412",
     "src/components/wiki/TopicCard.svelte": "sha256:8a9b045b3be8ef1565cb9278c57bc9397a994ae6f5350e6894db578e2653e28e",
     "src/components/wiki/WikiOverview.svelte": "sha256:e855c34875a2ebbc7ea4003be4401ee3ae473fd0515f46520d43c114491d43b5",
-    "src/components/wiki/WikiShell.svelte": "sha256:709595d33ccf48709c70657437d126273cfd95cc514d58118f8162ef84eee286",
+    "src/components/wiki/WikiShell.svelte": "sha256:aef882ea4fe7504d013a09f01a80acabdb9d8933b53dfea557e4b55c997a9903",
     "src/constants/context7.ts": "sha256:3a72e118e92f520684a84ec4c8cd91841f68ca8e83ec7b9a5cc547813ca2a18b",
     "src/constants/index.ts": "sha256:a81cd30fb2cff45b94d779ee0fbd13373d7f803e388d8efe4a511d2965c0a400",
     "src/constants/user-preferences.ts": "sha256:72f374ecb53b0ad9abaacd349620852928c63b6f16ed4c6e33b0f1f374ac361a",
@@ -7777,6 +7777,21 @@
       "media": [],
       "owners": {
         "src/rendering/hud/leaderboard.ts": "teamwork"
+      }
+    },
+    {
+      "note": "Reviewed preference accessible names and Speed Insights initialization in the existing Svelte shells. Player controls, rules and demonstrations are unchanged; no article or media changes needed. Focused preference tests and formatting checks pass.",
+      "sources": [
+        "package.json",
+        "src/components/game/GameShell.svelte",
+        "src/components/game/Preferences.svelte",
+        "src/components/wiki/WikiShell.svelte"
+      ],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "src/components/wiki/WikiShell.svelte": "field-manual"
       }
     }
   ]

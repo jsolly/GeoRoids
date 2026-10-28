@@ -30,6 +30,7 @@
         >
           <Checkbox
             id={`preference-${option.kind}`}
+            aria-label={option.label}
             checked={preferences[option.kind]}
             {disabled}
             onCheckedChange={(enabled) => {

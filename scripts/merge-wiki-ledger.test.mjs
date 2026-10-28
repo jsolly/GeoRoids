@@ -133,11 +133,23 @@ test('malformed input is refused with the side named', () => {
 
 test('the resolver reads a real conflict out of the index and resolves the worktree file', () => {
   const root = mkdtempSync(join(tmpdir(), 'georoids-wiki-ledger-merge-'));
+  const callerIndex = join(root, 'caller-index');
+  const callerIndexContents = 'The caller owns this index.\n';
+  writeFileSync(callerIndex, callerIndexContents);
+  const environment = {
+    ...Object.fromEntries(
+      Object.entries({ ...process.env, GIT_INDEX_FILE: callerIndex }).filter(
+        ([key]) => !key.startsWith('GIT_')
+      )
+    ),
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+  };
   const git = (...args) =>
     execFileSync('git', args, {
       cwd: root,
       encoding: 'utf8',
-      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      env: environment,
     });
   const ledgerPath = join(root, 'docs/wiki-source-review.json');
   const write = (hashes, reviews) =>
@@ -182,7 +194,7 @@ test('the resolver reads a real conflict out of the index and resolves the workt
       {
         cwd: root,
         encoding: 'utf8',
-        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+        env: environment,
       }
     );
 
@@ -194,6 +206,7 @@ test('the resolver reads a real conflict out of the index and resolves the workt
       ['r1', 'theirs', 'ours']
     );
     assert.match(output, /left pending for review \(both sides re-recorded these\): both\.ts/u);
+    assert.equal(readFileSync(callerIndex, 'utf8'), callerIndexContents);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

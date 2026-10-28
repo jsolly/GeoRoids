@@ -61,3 +61,6 @@ production-smoke-artifacts/
 # Python test discovery and assertion caches
 __pycache__/
 .pytest_cache/
+
+# Local axe scan reports
+/accessibility-results.json

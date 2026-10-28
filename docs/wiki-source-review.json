@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:77f41c1680e341ed10de36f1703a43089f6e170da51d0e8a2b1e22b87acbfbda",
+    "package.json": "sha256:c5debe6e5fc7590d92fb7ee1251ceafc1ebbfa2b7a7817bc12b4ea7c8e1545fb",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -230,7 +230,7 @@
     "src/components/game/PhoneCollector.svelte": "sha256:296e6787bf691061acec4175523e857af29bc6c732fcec0ea911dd591daa4879",
     "src/components/game/Preferences.svelte": "sha256:c453ec353720c68006ec02b54a310b7472bc3584d438004f78f0bf95bd9f14ea",
     "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
-    "src/components/game/StartScreen.svelte": "sha256:05bd211b6486de548f5ca92a8daab1c11bd53efbfe626437ce1c4a75391e1805",
+    "src/components/game/StartScreen.svelte": "sha256:ef9db1046a05c73c544c681ebf663e5c3742dce971718f13d7a15a3e4d35854c",
     "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
     "src/components/game/UniverseMap.svelte": "sha256:3345bef54807c88dde95b36965515c2dc7902900370c52e17a922ada27852682",
     "src/components/ui/button/button.svelte": "sha256:9225943b80347ddad9a06c5b00138d271294f5dac05e5d2f01ed436474d63f28",
@@ -7792,6 +7792,15 @@
       "owners": {
         "package.json": "field-manual",
         "src/components/wiki/WikiShell.svelte": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed axe audit tool and the explicit version group after integration with main. Gameplay rules, controls and Wiki demonstrations are unchanged.",
+      "sources": ["package.json", "src/components/game/StartScreen.svelte"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "package.json": "hud-network"
       }
     }
   ]

@@ -49,7 +49,8 @@
     "smoke:production": "node --import tsx scripts/production-smoke-entry.mjs",
     "smoke:scenario-contract": "vitest run --config config/testing/tooling.ts --project smoke",
     "check:frontend": "astro check --config config/app/astro.ts --tsconfig ./tsconfig.frontend.json --minimumFailingSeverity warning && svelte-check --config ./config/app/svelte.js --tsconfig ./tsconfig.frontend.json --fail-on-warnings",
-    "check:format": "prettier --config config/quality/prettier.json --check \"src/**/*.{astro,svelte}\""
+    "check:format": "prettier --config config/quality/prettier.json --check \"src/**/*.{astro,svelte}\"",
+    "check:a11y": "node scripts/check-accessibility.mjs"
   },
   "repository": {
     "type": "git",
@@ -110,7 +111,8 @@
     "tailwind-variants": "3.3.1",
     "ts-prune": "0.10.3",
     "vitest": "^5.0.4",
-    "yaml": "^2.9.1"
+    "yaml": "^2.9.1",
+    "axe-core": "^4.14.0"
   },
   "overrides": {
     "ts-prune": {

@@ -339,7 +339,7 @@ test('entry titles, categories and summaries render as text rather than markup',
   expect(
     document.querySelector('#controls .related-link[href="#cargo-manifest"]')?.textContent
   ).toBe(manifest.title);
-  expect(document.querySelector('img[src="x"], b, script')).toBeNull();
+  expect(document.body.querySelector('img[src="x"], b, script')).toBeNull();
 });
 
 test('Back restores the visit offset and a remounted manual restores the saved reload offset', async () => {

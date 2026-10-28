@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:c7e1617570136cd123e25fa272d9f006dc98a91b925661f03d352d657d314b18",
+    "package.json": "sha256:8d5a6ba1b37c468dd3575e913134a40ccd07aac088ac9661709240252cc7cb89",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -226,10 +226,10 @@
     "src/components/game/FieldHints.svelte": "sha256:0e5c04183edf7d65d25b249646dfa4ad9bc18c98831bbb59363f0d004075d609",
     "src/components/game/FurnaceTravelMap.svelte": "sha256:be236cc2753114ec1cf8293d5250cb85ca61a92f1ed821dbb46d2d3fa2fde2aa",
     "src/components/game/GameOverlay.svelte": "sha256:ad2eb07bba13999a7612c37f07d5b20237720c6411b9e41d1aca5874f02ef66b",
-    "src/components/game/GameShell.svelte": "sha256:3882e0297aa9554b8ff93f9dd18f11db938a99fd72e74d5f358a8af953b4711b",
+    "src/components/game/GameShell.svelte": "sha256:b5ee2fdb126a6b081ac10d44cbf327656be82d56537ac32eefa3a0deb23f382a",
     "src/components/game/InventoryPanel.svelte": "sha256:784caec9a55d8f03bffcd63e2890b0133c7088f563d0c35fc76b4f4b7c206fec",
     "src/components/game/PhoneCollector.svelte": "sha256:296e6787bf691061acec4175523e857af29bc6c732fcec0ea911dd591daa4879",
-    "src/components/game/Preferences.svelte": "sha256:df781e7ca2cd79c303154149ccfd20589d8b700057080a7111cc4ba8365c6993",
+    "src/components/game/Preferences.svelte": "sha256:c453ec353720c68006ec02b54a310b7472bc3584d438004f78f0bf95bd9f14ea",
     "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
     "src/components/game/StartScreen.svelte": "sha256:05bd211b6486de548f5ca92a8daab1c11bd53efbfe626437ce1c4a75391e1805",
     "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
@@ -260,7 +260,7 @@
     "src/components/wiki/ShipScorecard.svelte": "sha256:63f578904badaa7007f9da834ed4b934f1f95c3aa1768b246d33de86c10a4412",
     "src/components/wiki/TopicCard.svelte": "sha256:8a9b045b3be8ef1565cb9278c57bc9397a994ae6f5350e6894db578e2653e28e",
     "src/components/wiki/WikiOverview.svelte": "sha256:e855c34875a2ebbc7ea4003be4401ee3ae473fd0515f46520d43c114491d43b5",
-    "src/components/wiki/WikiShell.svelte": "sha256:709595d33ccf48709c70657437d126273cfd95cc514d58118f8162ef84eee286",
+    "src/components/wiki/WikiShell.svelte": "sha256:aef882ea4fe7504d013a09f01a80acabdb9d8933b53dfea557e4b55c997a9903",
     "src/constants/context7.ts": "sha256:3a72e118e92f520684a84ec4c8cd91841f68ca8e83ec7b9a5cc547813ca2a18b",
     "src/constants/index.ts": "sha256:a81cd30fb2cff45b94d779ee0fbd13373d7f803e388d8efe4a511d2965c0a400",
     "src/constants/user-preferences.ts": "sha256:16869d59950f02e95cf15b57724883bff4b24463e43f82176d0461e2d9e3caff",
@@ -7616,102 +7616,6 @@
       }
     },
     {
-      "note": "Reviewed intentional flight, destination arrival and blockage, contextual approach actions, Fire charging and aiming, and the authoritative timed shield. Updated controls, survival, HUD and first-flight copy; regenerated and inspected the movement poster and deterministic media. Focused input, movement, component and networking suites passed; native phone verification remains pending.",
-      "sources": [
-        "package.json",
-        "public/wiki/media/manifest.json",
-        "public/wiki/media/movement.gif",
-        "public/wiki/media/movement.png",
-        "scripts/wiki-media.ts",
-        "server/communication/MessageHandler.ts",
-        "server/communication/clientCommandDecoder.ts",
-        "server/core/EntityManager.ts",
-        "server/core/GameEngine.ts",
-        "server/world/WorldStore.ts",
-        "shared-types.ts",
-        "shared/playerShield.ts",
-        "shared/snapshotDto.ts",
-        "src/components/game/ActionControls.svelte",
-        "src/constants/user-preferences.ts",
-        "src/entities/player/Player.ts",
-        "src/entities/ship/Ship.ts",
-        "src/entities/ship/navigation.ts",
-        "src/entities/ship/shipCombatNetwork.ts",
-        "src/input/controlSources.ts",
-        "src/input/keybindings.ts",
-        "src/input/objectActions.ts",
-        "src/input/touchControls.ts",
-        "src/network/services/ConnectionManager.ts",
-        "src/rendering/canvas.ts",
-        "src/rendering/canvasSurface.ts",
-        "src/rendering/navigationJourney.ts",
-        "src/ui/furnaceTravelPrompt.ts",
-        "src/wiki/articleSources.json",
-        "src/wiki/media.ts",
-        "tests/unit/entities/input/keyboardControls.test.ts",
-        "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts",
-        "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts",
-        "tests/unit/input/mouseDesktop.test.ts",
-        "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts",
-        "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts"
-      ],
-      "topics": [
-        "asteroids",
-        "combat-survival",
-        "controls",
-        "field-manual",
-        "hauler",
-        "hud-network",
-        "loot-growth",
-        "satellites",
-        "scout",
-        "teamwork",
-        "terrain"
-      ],
-      "media": ["cargo", "hauler", "movement", "scout", "survival", "terrain"],
-      "owners": {
-        "package.json": "controls",
-        "public/wiki/media/manifest.json": "controls",
-        "scripts/wiki-media.ts": "controls",
-        "shared/snapshotDto.ts": "controls",
-        "src/components/game/ActionControls.svelte": "controls",
-        "src/entities/ship/shipCombatNetwork.ts": "controls",
-        "src/wiki/articleSources.json": "controls",
-        "src/wiki/media.ts": "controls",
-        "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "controls",
-        "shared/playerShield.ts": "controls",
-        "src/entities/ship/navigation.ts": "controls",
-        "src/input/objectActions.ts": "controls",
-        "src/rendering/navigationJourney.ts": "controls",
-        "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts": "controls"
-      }
-    },
-    {
-      "note": "Reviewed final gesture precedence, contour flick feedback, touch cancellation, intentional thrust, visible-object action eligibility and approach execution. Updated the field-manual upload to the inspected generated arrival poster, charge and shield reference values, and campaign signal limits. Focused movement, gesture, UI, object and networking checks passed; native phone verification remains pending.",
-      "sources": [
-        "shared/playerShield.ts",
-        "src/components/game/ActionControls.svelte",
-        "src/input/objectActions.ts",
-        "src/input/touchControls.ts",
-        "src/ui/furnaceTravelPrompt.ts",
-        "src/wiki/gameReference.ts",
-        "tests/unit/ui/town-store-opens-beside-town-square.test.ts"
-      ],
-      "topics": ["controls", "scout"],
-      "media": [],
-      "owners": {
-        "src/components/game/ActionControls.svelte": "controls",
-        "src/wiki/gameReference.ts": "controls"
-      }
-    },
-    {
-      "note": "Reviewed final gesture precedence, contour flick feedback, touch cancellation, intentional thrust, visible-object action eligibility and approach execution. Updated the field-manual upload to the inspected generated arrival poster, charge and shield reference values, and campaign signal limits. Focused movement, gesture, UI, object and networking checks passed; native phone verification remains pending.",
-      "sources": ["src/input/keybindings.ts", "tests/unit/entities/input/keyboardControls.test.ts"],
-      "topics": ["controls"],
-      "media": [],
-      "owners": {}
-    },
-    {
       "note": "Reviewed hud-network against fleet-sizing the two connection budgets; no page needs an edit, and the change removes a player-visible failure cause rather than adding one. Behind Railway public HTTP ingress the socket address the limiter keys on is the edge proxy, so every pilot is charged to one bucket and each lane's budget is spent by the whole fleet. A gameplay budget of 50 therefore sat below the 100 pilots the server accepts: a deploy or a stall re-upgrades the fleet at once and the 51st reconnect was refused with 429, so a full server could not come back. The diagnostics lane was worse, 6 sockets a minute for the entire server, when a deploy makes every pilot forward a record. Both are now MAX_PLAYERS times one pilot's honest demand in that lane, 600 each, so a full fleet climbing the client's real retry ladder fits with nothing refused. What this means for the page: hud-network's Can't join section lists nickname in use, server full and outdated tab as the reasons a join fails, and that list becomes more accurate rather than less, because a rate-limited join after a deploy was a real fourth cause that the section never documented and that honest play can no longer reach. No cause is added: the budgets are still enforced, they simply no longer sit below the capacity the server advertises, and a refusal does not extend the window so a retrying fleet still recovers on time. No player-facing string, receipt state, generated reference value or demonstration changes. docs/diagnostics.md is updated in the same change because it is the operator-facing description of these budgets and stated both the old figures and a per-address framing that is misleading behind the edge; it now says the fleet shares each budget, how each is derived, and that per-client fairness is explicitly not provided. Deliberately NOT included: charging each pilot's own forwarded address, which is what would provide per-client fairness. That was attempted in jsolly/GeoRoids#873 across four revisions and independent review confirmed six Critical findings against it -- the forwarded header is caller-supplied, which makes the bucket map attacker-diverse, and every bound added to contain that either refused honest callers or became a shared resource one host could exhaust. This change keeps the single bucket, so it adds no key, no map and no bound. Verified: lint, typecheck, markdown lint, the server unit suite, and six mutation checks each failing a named test with the file restored byte-identical, including both pre-fix budget values, a per-pilot rather than per-fleet sizing, removing enforcement entirely, a refusal extending the window, and the restated ladder length drifting from the client's.",
       "sources": ["docs/diagnostics.md", "server/communication/connectionAdmission.ts"],
       "topics": ["hud-network"],
@@ -7880,6 +7784,117 @@
       }
     },
     {
+      "note": "Reviewed preference accessible names and Speed Insights initialization in the existing Svelte shells. Player controls, rules and demonstrations are unchanged; no article or media changes needed. Focused preference tests and formatting checks pass.",
+      "sources": [
+        "package.json",
+        "src/components/game/GameShell.svelte",
+        "src/components/game/Preferences.svelte",
+        "src/components/wiki/WikiShell.svelte"
+      ],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "src/components/wiki/WikiShell.svelte": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed intentional flight, destination arrival and blockage, contextual approach actions, Fire charging and aiming, and the authoritative timed shield. Updated controls, survival, HUD and first-flight copy; regenerated and inspected the movement poster and deterministic media. Focused input, movement, component and networking suites passed; native phone verification remains pending.",
+      "sources": [
+        "package.json",
+        "public/wiki/media/manifest.json",
+        "public/wiki/media/movement.gif",
+        "public/wiki/media/movement.png",
+        "scripts/wiki-media.ts",
+        "server/communication/MessageHandler.ts",
+        "server/communication/clientCommandDecoder.ts",
+        "server/core/EntityManager.ts",
+        "server/core/GameEngine.ts",
+        "server/world/WorldStore.ts",
+        "shared-types.ts",
+        "shared/playerShield.ts",
+        "shared/snapshotDto.ts",
+        "src/components/game/ActionControls.svelte",
+        "src/constants/user-preferences.ts",
+        "src/entities/player/Player.ts",
+        "src/entities/ship/Ship.ts",
+        "src/entities/ship/navigation.ts",
+        "src/entities/ship/shipCombatNetwork.ts",
+        "src/input/controlSources.ts",
+        "src/input/keybindings.ts",
+        "src/input/objectActions.ts",
+        "src/input/touchControls.ts",
+        "src/network/services/ConnectionManager.ts",
+        "src/rendering/canvas.ts",
+        "src/rendering/canvasSurface.ts",
+        "src/rendering/navigationJourney.ts",
+        "src/ui/furnaceTravelPrompt.ts",
+        "src/wiki/articleSources.json",
+        "src/wiki/media.ts",
+        "tests/unit/entities/input/keyboardControls.test.ts",
+        "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts",
+        "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts",
+        "tests/unit/input/mouseDesktop.test.ts",
+        "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts",
+        "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "movement", "scout", "survival", "terrain"],
+      "owners": {
+        "package.json": "controls",
+        "public/wiki/media/manifest.json": "controls",
+        "scripts/wiki-media.ts": "controls",
+        "shared/snapshotDto.ts": "controls",
+        "src/components/game/ActionControls.svelte": "controls",
+        "src/entities/ship/shipCombatNetwork.ts": "controls",
+        "src/wiki/articleSources.json": "controls",
+        "src/wiki/media.ts": "controls",
+        "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "controls",
+        "shared/playerShield.ts": "controls",
+        "src/entities/ship/navigation.ts": "controls",
+        "src/input/objectActions.ts": "controls",
+        "src/rendering/navigationJourney.ts": "controls",
+        "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts": "controls"
+      }
+    },
+    {
+      "note": "Reviewed final gesture precedence, contour flick feedback, touch cancellation, intentional thrust, visible-object action eligibility and approach execution. Updated the field-manual upload to the inspected generated arrival poster, charge and shield reference values, and campaign signal limits. Focused movement, gesture, UI, object and networking checks passed; native phone verification remains pending.",
+      "sources": [
+        "shared/playerShield.ts",
+        "src/components/game/ActionControls.svelte",
+        "src/input/objectActions.ts",
+        "src/input/touchControls.ts",
+        "src/ui/furnaceTravelPrompt.ts",
+        "src/wiki/gameReference.ts",
+        "tests/unit/ui/town-store-opens-beside-town-square.test.ts"
+      ],
+      "topics": ["controls", "scout"],
+      "media": [],
+      "owners": {
+        "src/components/game/ActionControls.svelte": "controls",
+        "src/wiki/gameReference.ts": "controls"
+      }
+    },
+    {
+      "note": "Reviewed final gesture precedence, contour flick feedback, touch cancellation, intentional thrust, visible-object action eligibility and approach execution. Updated the field-manual upload to the inspected generated arrival poster, charge and shield reference values, and campaign signal limits. Focused movement, gesture, UI, object and networking checks passed; native phone verification remains pending.",
+      "sources": ["src/input/keybindings.ts", "tests/unit/entities/input/keyboardControls.test.ts"],
+      "topics": ["controls"],
+      "media": [],
+      "owners": {}
+    },
+    {
       "note": "Reviewed final gesture precedence, contour flick feedback, touch cancellation, intentional thrust, visible-object action eligibility and approach execution. Updated the field-manual upload to the inspected generated arrival poster, charge and shield reference values, and campaign signal limits. Focused movement, gesture, UI, object and networking checks passed; native phone verification remains pending.",
       "sources": [
         "server/core/GameEngine.ts",
@@ -7916,6 +7931,15 @@
       "media": [],
       "owners": {
         "src/components/game/ActionControls.svelte": "controls"
+      }
+    },
+    {
+      "note": "Reviewed merge of manual-flight scripts with the Speed Insights dependency from main. Game and wiki shells report the current route, including debug. No additional player-facing Wiki or media changes are needed for this merge.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
       }
     }
   ]

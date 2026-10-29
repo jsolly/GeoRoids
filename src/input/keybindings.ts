@@ -144,6 +144,11 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     // Record pressed key for this player
     getPressedKeysForPlayer(player).add(ev.code);
     switch (ev.code) {
+      case 'KeyQ':
+        if (!ev.repeat) {
+          player.ship.activateShield();
+        }
+        break;
       case 'KeyF':
         if (!ev.repeat) {
           player.ship.beginWeaponCharge();

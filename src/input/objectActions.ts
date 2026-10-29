@@ -61,8 +61,9 @@ export function interactionTargets(player: Player): ActionTarget[] {
     .filter((a) => a.kind === 'furnace' || a.kind === 'foundation')
     .map((a) => ({
       ...a,
+      id: a.id.startsWith('furnace:') ? a.id.slice('furnace:'.length) : a.id,
       kind: a.kind === 'furnace' ? 'furnace' : 'foundation',
-      radius: civicLot(a.id)?.radius ?? TOWN_HEARTH.radius,
+      radius: TOWN_HEARTH.radius,
       detail: a.name,
     }));
   if (!assets.some((a) => a.id === TOWN_HEARTH.id)) {
@@ -218,8 +219,13 @@ export function tickObjectApproach(player: Player): void {
   if (!pending) {
     return;
   }
-  const asset = getWorldMapAssets().find((a) => a.id === pending.id);
-  const position = pending.id === TOWN_HEARTH.id ? TOWN_HEARTH.position : asset?.position;
+  const asset = getWorldMapAssets().find(
+    (a) => a.id === pending.id || a.id === `furnace:${pending.id}`
+  );
+  const position =
+    pending.id === TOWN_HEARTH.id
+      ? TOWN_HEARTH.position
+      : (civicLot(pending.id)?.position ?? asset?.position);
   if (
     !position ||
     (pending.action === 'build'

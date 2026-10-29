@@ -19,7 +19,7 @@ The viewport and maps keep north at the top while your ship turns. Point or drag
 
 ## Keyboard
 
-Steer with A/D or Left/Right, hold Space to fire, hold F and release for a charged beam, and press E for your equipped tool. Hold W or Up to thrust; release to brake. There is no automatic thrust; reaching a lit furnace ring with cargo stops either ship to [offload](/wiki/#loot-growth) until the hold empties or you steer away. Shift toggles Contour Lock; [ and ] hop toward lower and higher neighboring contours while settled on a line.
+Steer with A/D or Left/Right, hold Space to fire, hold F and release for a charged beam, and press E for your equipped tool. Q activates Shield. Hold W or Up to thrust; release to brake. There is no automatic thrust; reaching a lit furnace ring with cargo stops either ship to [offload](/wiki/#loot-growth) until the hold empties or you steer away. Shift toggles Contour Lock; [ and ] hop toward lower and higher neighboring contours while settled on a line.
 
 ## Mouse
 
@@ -64,6 +64,8 @@ Town Square's Store offers placeholders purchased with banked points. Higher set
 M or Map opens the shared universe chart centred on your ship. Drag to pan and pinch to zoom; desktop also supports arrow keys, the mouse wheel, and +/− keys. Use Center on you or Home to restore the nearby ship view. M, Escape, or Close returns to flight.
 
 ## Keyboard access and motion
+
+Press O in flight to open visible-object actions. Next visible object cycles the selection; Tab reaches its actions, including Inspect. Escape closes the actions and restores focus.
 
 Tab reaches menu controls and the touch tool and Contour Lock buttons; Enter or Space activates a focused button. Focus the universe chart itself for arrow-key panning and +/− zoom, because a focused button keeps its normal keyboard behavior. On the furnace destination map, Tab selects a lit stop and Enter chooses it.
 

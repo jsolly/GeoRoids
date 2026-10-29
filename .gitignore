@@ -35,7 +35,6 @@ dist/*
 !.cursor/rules/**
 !.cursor/CLOUD.md
 !.cursor/environment.json
-!.cursor/aws-oidc-login.sh
 !.cursor/install-app.sh
 
 
@@ -61,3 +60,6 @@ production-smoke-artifacts/
 # Python test discovery and assertion caches
 __pycache__/
 .pytest_cache/
+
+# Local axe scan reports
+/accessibility-results.json

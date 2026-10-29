@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:8d5a6ba1b37c468dd3575e913134a40ccd07aac088ac9661709240252cc7cb89",
+    "package.json": "sha256:f6b0033ad6c2687a13ed3dd39ceb4c8ebe570e98ee005ec891f70ebe9fbf6455",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -218,7 +218,7 @@
     "src/components/Context7Verification.astro": "sha256:1786a9ca8e2cf86fe7260058b76a3fc314321fb79b3dcc38d6713d1aa2dbda91",
     "src/components/GameDocument.astro": "sha256:67a3fe71ca560db23e5764c6aa87644ddd3af6cc1e1021e61cfe30cb591e42f2",
     "src/components/UpdateNotice.svelte": "sha256:5b84008e476dfc180e1c0afda269f8b208e057cdad614c71f393a2d88a0b3328",
-    "src/components/game/ActionControls.svelte": "sha256:86292785d5173d36e47097530a036c6fbf5f2283f4b288fdc290eed1c685ec1f",
+    "src/components/game/ActionControls.svelte": "sha256:53b1408e5eafd95da6d3cff9b982452f0d6095b0b0ce0ef36a497c620c85e700",
     "src/components/game/CopyControl.svelte": "sha256:f371385a8a0b9b76ad1fa5030e9a5d8f42c15757669525824f1dc7baff1b0c83",
     "src/components/game/CrewControls.svelte": "sha256:88c1d930fe62bacff17f1ff23f78120742ff7f3d8ef0b6932ef029e930768ef1",
     "src/components/game/DebugPanel.svelte": "sha256:f2bbaaf8a62abb1a1f780709ae580a5e157dedb097d43746fd3db53c185a4ab3",
@@ -231,7 +231,7 @@
     "src/components/game/PhoneCollector.svelte": "sha256:296e6787bf691061acec4175523e857af29bc6c732fcec0ea911dd591daa4879",
     "src/components/game/Preferences.svelte": "sha256:c453ec353720c68006ec02b54a310b7472bc3584d438004f78f0bf95bd9f14ea",
     "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
-    "src/components/game/StartScreen.svelte": "sha256:05bd211b6486de548f5ca92a8daab1c11bd53efbfe626437ce1c4a75391e1805",
+    "src/components/game/StartScreen.svelte": "sha256:ef9db1046a05c73c544c681ebf663e5c3742dce971718f13d7a15a3e4d35854c",
     "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
     "src/components/game/UniverseMap.svelte": "sha256:3345bef54807c88dde95b36965515c2dc7902900370c52e17a922ada27852682",
     "src/components/ui/button/button.svelte": "sha256:9225943b80347ddad9a06c5b00138d271294f5dac05e5d2f01ed436474d63f28",
@@ -311,13 +311,13 @@
     "src/fx/furnacePipePulse.ts": "sha256:386a89e1ebe677b72468a2c6af654246e53487d650ce455b78c669f45280b3d1",
     "src/fx/haptics.ts": "sha256:0103890d5445814ec8159706fdcd71ffd9af748d2a152b2f5687817f25975d15",
     "src/input/controlSources.ts": "sha256:4330412b1749268ef6a390fa753e576cfe788ee17b5e7660ee6835faeedc6db4",
-    "src/input/keybindings.ts": "sha256:b6166f4027dd46294d959a9345a151d09d526e2199812a5952fd0c724ad8981b",
+    "src/input/keybindings.ts": "sha256:dd5df87b4be091cfe6d6844fc1393673efa08f3c749593cd10eeb479e1fdf306",
     "src/input/mouse.ts": "sha256:93c92b5f28227ba963a26c65c4975f99f986bbd778b7aa4b4fd9d6a6a86ed65b",
-    "src/input/objectActions.ts": "sha256:0d856cdb156075377ac64df7e82438c416aa3835bc13cc643ae04e9ccc314396",
+    "src/input/objectActions.ts": "sha256:239e96eb572c83cf851644e228447712a60dfbb62f7ec26d0294a90c50f34b23",
     "src/input/playfieldSelection.ts": "sha256:85ec3959e63df0e1730cc518385270ab42ef7a04f1ed8f52723cdc1a25b68ba0",
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
-    "src/input/touchControls.ts": "sha256:1bb727a413dc4b3ce4e37717c1b22bda120a406d903020038a91d6fc27f7bfcd",
+    "src/input/touchControls.ts": "sha256:92da23874d99b5ee851f042f2797ea618fec29137d5c06ef9af80eb3a8849991",
     "src/network/services/ConnectionManager.ts": "sha256:761e5e7dacdbe3758b7c612d04acd684c8c5a5e6cbca2465bc3e698b107043c5",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
@@ -436,8 +436,8 @@
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:5e8cafa46c4acae3478911a5fb05abe164c1ef5162e387ecfcfb91a7aff73bcd",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
-    "src/wiki/gameReference.ts": "sha256:6730bd5838432fe1e81aaf2d82ca3e2fe39123c352ce1e2cc8743f9fcdf7eea4",
-    "src/wiki/media.ts": "sha256:c54cbb688a8e703fa8e0bbc86aa39ef352c9d8b46030a90d11055bad5d8d9c54",
+    "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
+    "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
     "src/wiki/scrollMemory.ts": "sha256:ccbbe47812fc19f4c2048eb3db605d5351e070cab3257269bee95478fcc9df39",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
@@ -455,7 +455,7 @@
     "tests/unit/entities/furnace-intake-turns-the-roid-outline-red-and-poofs-smoke.test.ts": "sha256:ff32d551b78dde952936ae727e5ab013b9447cbbedc476c49aaef6cc7f3c763a",
     "tests/unit/entities/haulerHarpoonLatchSync.test.ts": "sha256:116bff491b193fbf94032ce0801c4ad4fe80b5a056fbc64aff6e13464cc901da",
     "tests/unit/entities/haulerUtility.test.ts": "sha256:42490969780ab310da8b788c2ede90159731f08724e863a3c03325324e6d3479",
-    "tests/unit/entities/input/keyboardControls.test.ts": "sha256:db5459c00324dac41e138c6b75570a7e5d1ebf275f47e43b6676305fe5349a01",
+    "tests/unit/entities/input/keyboardControls.test.ts": "sha256:fdc96b1f99c223eec2ef06dc5de0be9d30bb63633ffefbb55ff582b17fabde8f",
     "tests/unit/entities/launched-tools-hit-or-return.test.ts": "sha256:5246e39a0bbedf8540da40b404d3537438806bc063c5cf405d901ac5316f2cdc",
     "tests/unit/entities/local-ship-haptics.test.ts": "sha256:f8e150e4adf1d03b96bec5cda66918528e75af440f399e9317dfdeaa9594c9ef",
     "tests/unit/entities/menu-stops-flight-and-protects-the-hull.test.ts": "sha256:cf80428c37197ea95aaaf2eaf0dc55dd70ba31bd00c5def3078b91b3c80bce83",
@@ -476,7 +476,7 @@
     "tests/unit/entities/terrain-makes-pilots-choose-their-route.test.ts": "sha256:da59cd70d9d885c63bc750d6b8ba55a9b3536856bc32a8ce073c2b6b9ab7ee57",
     "tests/unit/fx/haptics.test.ts": "sha256:8d63fd67b56313f6d7b55f20c573dbaf29dee0a998d7c556e7609565d2cb3727",
     "tests/unit/input/desktop-pilots-charge-and-release-a-beam.test.ts": "sha256:d682b2b9530fc7826422f6256a3f38be212751bfb6c6b21eee7d93ee095b73da",
-    "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts": "sha256:015498e87786e4c3f12906d00f046c8bc34c1ea20a95e934f149904f9ab7f4f3",
+    "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts": "sha256:13594a318b9ff80f48de267f9386a925c28b6a2d7726d698c92e6d3ad18b8a4f",
     "tests/unit/input/mouseDesktop.test.ts": "sha256:dfeca5eaf62954bf0f129bdbd946264ecd9a8fbe0ea2c4707b013c7a15aa427b",
     "tests/unit/input/playfield-taps-do-not-open-copy-banners.test.ts": "sha256:22a1ac82af28b0dc5960427ddbfea5d538782e30607ba182ac7d6768dbeb7de2",
     "tests/unit/input/touchAbility.test.ts": "sha256:68a7586f1ef877029ed1b5d12ebdbf16cb1a0b41f0f9f83d98cecfa52490e4f4",
@@ -7799,6 +7799,15 @@
       }
     },
     {
+      "note": "Reviewed axe audit tool and the explicit version group after integration with main. Gameplay rules, controls and Wiki demonstrations are unchanged.",
+      "sources": ["package.json", "src/components/game/StartScreen.svelte"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "package.json": "hud-network"
+      }
+    },
+    {
       "note": "Reviewed intentional flight, destination arrival and blockage, contextual approach actions, Fire charging and aiming, and the authoritative timed shield. Updated controls, survival, HUD and first-flight copy; regenerated and inspected the movement poster and deterministic media. Focused input, movement, component and networking suites passed; native phone verification remains pending.",
       "sources": [
         "package.json",
@@ -7940,6 +7949,44 @@
       "media": [],
       "owners": {
         "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed integration of accessibility audit tooling from main with destination-flight verification scripts. Controls and documented gameplay remain as reviewed; no article or media change is needed for this package merge.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed contour-release and canonical furnace ID repairs, Q Shield and O visible-object inspection with focus return, and native button semantics. Corrected obsolete control references, added successful shield transport/snapshot and finger-tolerance boundary evidence, and tracked Ship/navigation as movement demonstration inputs. Focused 106 tests passed; all ten demonstrations regenerated with unchanged image bytes. Full ship gate and CI remain pending.",
+      "sources": [
+        "src/components/game/ActionControls.svelte",
+        "src/input/keybindings.ts",
+        "src/input/objectActions.ts",
+        "src/input/touchControls.ts",
+        "src/wiki/gameReference.ts",
+        "src/wiki/media.ts",
+        "tests/unit/entities/input/keyboardControls.test.ts",
+        "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts"
+      ],
+      "topics": ["combat-survival", "controls"],
+      "media": ["movement"],
+      "owners": {
+        "src/components/game/ActionControls.svelte": "controls",
+        "src/wiki/gameReference.ts": "controls",
+        "src/wiki/media.ts": "controls"
+      }
+    },
+    {
+      "note": "Reviewed a viewport-bounded scroll container for object actions. It preserves the existing menu anchor and focus lifecycle while keeping all actions reachable on short landscape displays. No controls rule or demonstration changes.",
+      "sources": ["src/components/game/ActionControls.svelte"],
+      "topics": ["controls"],
+      "media": [],
+      "owners": {
+        "src/components/game/ActionControls.svelte": "controls"
       }
     }
   ]

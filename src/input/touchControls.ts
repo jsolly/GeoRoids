@@ -9,7 +9,9 @@ import { getOpenGameOverlay, subscribeGameOverlay } from '../runtime/overlayStat
 import { controlSources, resetControlSources } from './controlSources';
 import { reconcilePlayerInput, togglePlayerContourLock } from './keybindings';
 import {
+  actionsForTarget,
   chooseObjectAction,
+  interactionTargets,
   type ObjectAction,
   type ObjectMenu,
   objectMenuAt,
@@ -89,7 +91,7 @@ let contourPressed = false;
 const live = new Set<number>();
 const notify = () => host?.onActionState();
 const player = () => PlayerManager.getInstance().getLocalPlayer();
-function active(): boolean {
+function touchInputActive(): boolean {
   return Boolean(host?.readInPlay() && host.readTouchMode() && getOpenGameOverlay() === null);
 }
 function clearHold(): void {
@@ -166,13 +168,8 @@ export function tickTouchControls(p: Player): void {
     reset();
     return;
   }
-  if (host && (!host.readTouchMode() || !host.readInPlay())) {
-    if (gesture || firing || menu) {
-      reset();
-    }
-    if (p.ship.navigation) {
-      stopNavigation(p.ship);
-    }
+  if (host && (!host.readInPlay() || (!host.readTouchMode() && (gesture || firing)))) {
+    reset();
   }
   reconcilePlayerInput(p);
   if (rotationHeading !== null) {
@@ -213,7 +210,11 @@ export function readActionControls(p: Player | null): ActionControlsView {
   return {
     inPlay: host?.readInPlay() ?? false,
     touchMode: host?.readTouchMode() ?? false,
-    ability: { ...ability, pressed: abilityPressed, disabled: !active() || !ability.ready },
+    ability: {
+      ...ability,
+      pressed: abilityPressed,
+      disabled: !touchInputActive() || !ability.ready,
+    },
     contourLock: {
       label: locked ? 'RELEASE LOCK' : 'CONTOUR LOCK',
       name: locked
@@ -243,7 +244,7 @@ export function readActionControls(p: Player | null): ActionControlsView {
           : (p?.ship.shieldCooldownFrames ?? 0)) / GAME.FPS
       ),
       ratio: (p?.ship.shieldCooldownFrames ?? 0) / PLAYER_SHIELD.cooldownFrames,
-      disabled: !active() || !alive || (p?.ship.shieldCooldownFrames ?? 0) > 0,
+      disabled: !touchInputActive() || !alive || (p?.ship.shieldCooldownFrames ?? 0) > 0,
     },
     menu,
     holding: gesture?.kind === 'pending',
@@ -269,8 +270,37 @@ export function dismissObjectMenu(): void {
   menu = null;
   notify();
 }
+/** Keyboard pilots can inspect and cycle the same visible targets as a long press. */
+export function cycleObjectMenuTarget(): void {
+  const p = player();
+  if (
+    !p ||
+    p.ship.health <= 0 ||
+    p.ship.exploding ||
+    !host?.readInPlay() ||
+    getOpenGameOverlay() !== null
+  ) {
+    return;
+  }
+  const targets = interactionTargets(p);
+  const index = targets.findIndex((candidate) => candidate.id === menu?.target.id);
+  const target = targets[index + 1] ?? targets[0];
+  if (!target) {
+    status = 'No visible objects';
+    menu = null;
+  } else {
+    const rect = host.canvas.getBoundingClientRect();
+    menu = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      target,
+      actions: actionsForTarget(p, target),
+    };
+  }
+  notify();
+}
 function down(ev: PointerEvent): void {
-  if (!active() || ev.pointerType !== 'touch' || ev.target !== host?.canvas) {
+  if (!touchInputActive() || ev.pointerType !== 'touch' || ev.target !== host?.canvas) {
     return;
   }
   const p = player();
@@ -363,7 +393,12 @@ function up(ev: PointerEvent): void {
     if (p) {
       if (f.charging) {
         p.ship.finishWeaponCharge(ev.type === 'pointerup');
-      } else if (ev.type === 'pointerup' && active() && p.ship.health > 0 && !p.ship.exploding) {
+      } else if (
+        ev.type === 'pointerup' &&
+        touchInputActive() &&
+        p.ship.health > 0 &&
+        !p.ship.exploding
+      ) {
         p.ship.shoot();
       }
     }
@@ -387,7 +422,7 @@ function up(ev: PointerEvent): void {
   clearHold();
   gesture = null;
   rotationHeading = null;
-  if (ev.type !== 'pointerup' || !active()) {
+  if (ev.type !== 'pointerup' || !touchInputActive()) {
     menu = null;
     notify();
     return;
@@ -441,6 +476,29 @@ export function initializeTouchControls(input: TouchInputHost): void {
   host = input;
   scope = new AbortController();
   const signal = scope.signal;
+  document.addEventListener(
+    'keydown',
+    (ev) => {
+      if (!host?.readInPlay() || getOpenGameOverlay() !== null) {
+        return;
+      }
+      if (ev.code === 'Escape' && menu) {
+        ev.preventDefault();
+        dismissObjectMenu();
+      } else if (
+        ev.code === 'KeyO' &&
+        !ev.repeat &&
+        !(
+          ev.target instanceof Element &&
+          ev.target.closest('input, textarea, select, button, summary, a[href], [contenteditable]')
+        )
+      ) {
+        ev.preventDefault();
+        cycleObjectMenuTarget();
+      }
+    },
+    { signal }
+  );
   document.addEventListener('pointerdown', down, { capture: true, passive: false, signal });
   document.addEventListener('pointermove', move, { passive: false, signal });
   document.addEventListener('pointerup', up, { signal });
@@ -523,7 +581,7 @@ export function mountTouchActionControls(elements: TouchActionElements): () => v
     element?.addEventListener(
       'pointerdown',
       (ev) => {
-        if (!active() && element !== elements.contourLock) {
+        if (!touchInputActive() && element !== elements.contourLock) {
           return;
         }
         if (element.disabled || element.getAttribute('aria-disabled') === 'true') {
@@ -555,7 +613,7 @@ export function mountTouchActionControls(elements: TouchActionElements): () => v
       'click',
       (ev) => {
         ev.stopPropagation();
-        if (ev.detail === 0 && (active() || element === elements.contourLock)) {
+        if (ev.detail === 0 && (touchInputActive() || element === elements.contourLock)) {
           run();
           notify();
         }
@@ -580,7 +638,6 @@ export function mountTouchActionControls(elements: TouchActionElements): () => v
     () => {
       const p = player();
       if (p && !readActionControls(p).contourLock.disabled) {
-        stopNavigation(p.ship);
         togglePlayerContourLock(p);
       }
     },
@@ -608,7 +665,7 @@ export function mountTouchActionControls(elements: TouchActionElements): () => v
   elements.fire?.addEventListener(
     'pointerdown',
     (ev) => {
-      if (!active() || firing) {
+      if (!touchInputActive() || firing) {
         return;
       }
       ev.preventDefault();
@@ -652,7 +709,7 @@ export function mountTouchActionControls(elements: TouchActionElements): () => v
   elements.fire?.addEventListener(
     'click',
     (ev) => {
-      if (ev.detail === 0 && active()) {
+      if (ev.detail === 0 && touchInputActive()) {
         player()?.ship.shoot();
       }
     },

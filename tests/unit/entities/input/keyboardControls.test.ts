@@ -41,6 +41,15 @@ test('held KeyE repeat does not re-fire the ability', () => {
   expect(activateSpy).not.toHaveBeenCalled();
 });
 
+test('Q activates protection once and its repeat cannot restart the cooldown', () => {
+  press('KeyQ');
+  expect(player.ship.shieldFrames).toBe(120);
+  expect(player.ship.shieldCooldownFrames).toBe(720);
+  player.ship.update();
+  keyDown(new KeyboardEvent('keydown', { code: 'KeyQ', repeat: true }), player);
+  expect(player.ship.shieldCooldownFrames).toBe(719);
+});
+
 test('Shift toggles Contour Lock on and off without holding', () => {
   vi.spyOn(player.ship, 'toggleContourLock').mockImplementation(() => {
     player.ship.contourLock = player.ship.contourLocked ? null : { height: 0.1, direction: 1 };

@@ -51,6 +51,8 @@ export const media: Record<string, WikiMediaEntry> = {
     caption:
       'Overhead movement diagram: the pilot chooses a destination, travels hands-free, and stops on arrival. The viewport stays north-up as the ship turns.',
     sources: [
+      'src/entities/ship/Ship.ts',
+      'src/entities/ship/navigation.ts',
       'src/entities/ship/shipUtils.ts',
       'src/constants/index.ts',
       'shared/constants/gameplay.ts',

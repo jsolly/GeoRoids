@@ -2,7 +2,11 @@
   import { untrack } from 'svelte';
   import { LOCAL_STORAGE_KEYS } from '../../constants/user-preferences';
   import type { ActionControlsView, TouchActionElements } from '../../input/touchControls';
-  import { activateObjectMenuAction, dismissObjectMenu } from '../../input/touchControls';
+  import {
+    activateObjectMenuAction,
+    cycleObjectMenuTarget,
+    dismissObjectMenu,
+  } from '../../input/touchControls';
   import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
   import Button from '../ui/button/button.svelte';
 
@@ -20,6 +24,21 @@
   let fire = $state<HTMLButtonElement | null>(null);
   let stop = $state<HTMLButtonElement | null>(null);
   let shield = $state<HTMLButtonElement | null>(null);
+  let objectMenuElement = $state<HTMLDivElement | null>(null);
+
+  $effect(() => {
+    const element = objectMenuElement;
+    if (!element) {
+      return;
+    }
+    const previous = document.activeElement;
+    element.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) {
+        previous.focus();
+      }
+    };
+  });
 
   $effect(() => {
     const elements =
@@ -114,19 +133,19 @@
       >
     </div>
   {/if}
-  {#if view.touchMode}
-    <p class="travel-status" aria-live="polite">
-      {view.navigation?.status || (view.holding ? 'Hold for actions…' : '')}
-    </p>
-  {/if}
+  <p class="travel-status" aria-live="polite">
+    {view.navigation?.status || (view.holding ? 'Hold for actions…' : '')}
+  </p>
   {#if view.menu}
     <div
+      bind:this={objectMenuElement}
       class="object-menu"
       role="group"
       aria-label={`${view.menu.target.name} actions`}
-      style={`left: clamp(8px, ${view.menu.x + 20}px, calc(100% - 208px)); top: clamp(8px, ${view.menu.y - 80}px, calc(100% - 320px))`}
+      style={`left: clamp(8px, ${view.menu.x + 20}px, calc(100% - 208px)); --object-menu-top: clamp(8px, ${view.menu.y - 80}px, calc(100% - 320px))`}
     >
       <span>{view.menu.target.name}</span>
+      <Button onclick={cycleObjectMenuTarget}>Next visible object</Button>
       {#each view.menu.actions as item}
         <Button
           data-object-action={item.action}
@@ -186,7 +205,10 @@
   }
   .object-menu {
     position: absolute;
+    top: var(--object-menu-top);
     width: 200px;
+    max-height: calc(100% - var(--object-menu-top) - 8px);
+    overflow-y: auto;
     display: grid;
     gap: 4px;
     padding: 8px;

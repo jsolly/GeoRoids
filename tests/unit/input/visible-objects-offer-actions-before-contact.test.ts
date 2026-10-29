@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { civicLot } from '../../../shared/furnaces';
 import { Player } from '../../../src/entities/player/Player';
 import {
   chooseObjectAction,
@@ -6,7 +7,12 @@ import {
   tickObjectApproach,
   worldPoint,
 } from '../../../src/input/objectActions';
-import { resetWorldExploration, setWorldMapAssets } from '../../../src/network/worldExploration';
+import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
+import {
+  resetWorldExploration,
+  setWorldMapAssets,
+  worldFurnaces,
+} from '../../../src/network/worldExploration';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import * as townStore from '../../../src/runtime/townStore';
 
@@ -50,6 +56,12 @@ test('camera conversion uses current zoom and hit targets have finger tolerance'
   expect(worldPoint(pilot, 450, 350)).toEqual({ x: 400, y: 100 });
   const menu = objectMenuAt(pilot, 250, 300);
   expect(menu.target.id).toBe('town-square');
+  const crew = new Player({ id: 'crew', name: 'Crew', type: 'remote' });
+  crew.ship.position = { x: 400, y: 0 };
+  vi.spyOn(ConnectionManager.getInstance(), 'getAllPlayers').mockReturnValue([pilot, crew]);
+  expect(crew.ship.r * 0.5).toBeLessThan(20);
+  expect(objectMenuAt(pilot, 470, 300).target.id).toBe('crew');
+  expect(objectMenuAt(pilot, 473, 300).target.kind).toBe('location');
 });
 
 test('an unlit action target cancels approach', () => {
@@ -68,4 +80,39 @@ test('an unlit action target cancels approach', () => {
   tickObjectApproach(pilot);
   expect(pilot.ship.pendingObjectAction).toBeNull();
   expect(pilot.ship.navigation).toBeNull();
+});
+
+test('a funded Scout can approach a civic foundation from a genuine namespaced map row', () => {
+  const lot = civicLot('street-1-0');
+  if (!lot) {
+    throw new Error('Missing civic fixture');
+  }
+  pilot.ship.position = { x: lot.position.x + 300, y: lot.position.y };
+  pilot.score = lot.cost;
+  setWorldMapAssets([
+    { id: `furnace:${lot.id}`, kind: 'foundation', name: lot.name, position: lot.position },
+  ]);
+  const menu = objectMenuAt(pilot, 100, 300);
+  expect(menu.target.id).toBe(lot.id);
+  expect(menu.actions.find((action) => action.action === 'build')?.disabled).toBe(false);
+  chooseObjectAction(pilot, menu.target, 'build');
+  expect(pilot.ship.pendingObjectAction).toEqual({ id: lot.id, action: 'build' });
+  expect(pilot.ship.navigation?.destination).toEqual(lot.position);
+});
+
+test('a nearby civic prompt reaches its lit furnace using the canonical ID', () => {
+  const lot = civicLot('street-1-0');
+  if (!lot) {
+    throw new Error('Missing civic fixture');
+  }
+  worldFurnaces.replaceLit([{ id: lot.id, builderName: 'Crew' }]);
+  pilot.ship.position = { ...lot.position };
+  setWorldMapAssets([
+    { id: `furnace:${lot.id}`, kind: 'furnace', name: lot.name, position: lot.position },
+  ]);
+  const open = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
+  vi.spyOn(townStore, 'canEnterTownStore').mockReturnValue(true);
+  chooseObjectAction(pilot, { ...lot, kind: 'furnace', detail: lot.name }, 'enter');
+  expect(open).toHaveBeenCalledOnce();
+  expect(pilot.ship.pendingObjectAction).toBeNull();
 });

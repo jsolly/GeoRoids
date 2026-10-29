@@ -153,6 +153,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
       weaponChargeFrames: 60,
       navigationAssistFrames: 1200,
       contourDraftFrames: 120,
+      shieldFrames: 90,
+      shieldCooldownFrames: 690,
     });
     const remote = { ...structuredClone(local), id: 'effect-crew', name: 'Effect crew' };
     active.entities = [local, remote];
@@ -163,36 +165,42 @@ describe('actual ConnectionManager WebSocket message path', () => {
       pilot.ship.weaponChargeFrames,
       pilot.ship.navigationAssistFrames,
       pilot.ship.contourDraftFrames,
+      pilot.ship.shieldFrames,
+      pilot.ship.shieldCooldownFrames,
     ];
     for (const pilot of [player, crew]) {
-      expect(timers(pilot)).toEqual([60, 1200, 120]);
+      expect(timers(pilot)).toEqual([60, 1200, 120, 90, 690]);
       ws.receive('abilityUsed', {
         id: pilot.id,
         kitId: 'scout',
         abilityActiveFrames: 0,
         harpoonTargetId: null,
       });
-      expect(timers(pilot)).toEqual([60, 1200, 120]);
+      expect(timers(pilot)).toEqual([60, 1200, 120, 90, 690]);
     }
     const cleared = structuredClone(active);
     for (const row of cleared.entities) {
       row.weaponChargeFrames = 0;
       row.navigationAssistFrames = 0;
       row.contourDraftFrames = 0;
+      row.shieldFrames = 0;
+      row.shieldCooldownFrames = 0;
     }
     ws.receive('snapshot', new SnapshotEncoder(cleared).encode(2, { sequence: 1, state: active }));
-    expect(timers(player)).toEqual([0, 0, 0]);
-    expect(timers(crew)).toEqual([0, 0, 0]);
+    expect(timers(player)).toEqual([0, 0, 0, 0, 0]);
+    expect(timers(crew)).toEqual([0, 0, 0, 0, 0]);
     ws.receive('snapshot', new SnapshotEncoder(active).encode(3));
     const absent = structuredClone(active);
     for (const row of absent.entities) {
       delete row.weaponChargeFrames;
       delete row.navigationAssistFrames;
       delete row.contourDraftFrames;
+      delete row.shieldFrames;
+      delete row.shieldCooldownFrames;
     }
     ws.receive('snapshot', new SnapshotEncoder(absent).encode(4, { sequence: 3, state: active }));
-    expect(timers(player)).toEqual([0, 0, 0]);
-    expect(timers(crew)).toEqual([0, 0, 0]);
+    expect(timers(player)).toEqual([0, 0, 0, 0, 0]);
+    expect(timers(crew)).toEqual([0, 0, 0, 0, 0]);
   });
 
   test.each(['disconnect', 'sessionExpired'] as const)(

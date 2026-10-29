@@ -27,6 +27,7 @@ let fire: HTMLButtonElement;
 let disposeActions: () => void;
 let touchMode = true;
 const sendCharge = vi.fn<(action: WeaponChargeAction) => boolean>(() => true);
+const sendShield = vi.fn(() => true);
 
 beforeAll(() => {
   const network = ConnectionManager.getInstance();
@@ -37,11 +38,18 @@ beforeEach(() => {
   resetControlSources();
   document.elementFromPoint = vi.fn(() => null);
   sendCharge.mockClear();
+  sendShield.mockClear();
   player = new Player({
     id: 'touch-pilot',
     name: 'Pilot',
     type: 'local',
-    combatNetwork: { isConnected: true, sendShoot: () => {}, sendAbility: () => true, sendCharge },
+    combatNetwork: {
+      isConnected: true,
+      sendShoot: () => {},
+      sendAbility: () => true,
+      sendCharge,
+      sendShield,
+    },
   });
   // Keep ordinary tool scenarios away from contextual furnace actions.
   player.ship.position = { x: 2_000, y: 0 };
@@ -195,6 +203,8 @@ test('two playfield fingers activate one shield, consume both taps, and preserve
   pointer('pointerup', 2, 250);
   pointer('pointerup', 3, 260, 250, 500);
   expect(shield).toHaveBeenCalledTimes(1);
+  expect(shield).toHaveReturnedWith(true);
+  expect(sendShield).toHaveBeenCalledTimes(1);
   expect(player.ship.navigation).toBe(order);
   expect(readActionControls(player).menu).toBeNull();
 });
@@ -244,6 +254,16 @@ test('a contour swipe hops instead of using the equipped ability', () => {
   pointer('pointerup', 1, 100, 140, 300);
   expect(hop).toHaveBeenCalledWith({ x: 80, y: 0 });
   expect(ability).not.toHaveBeenCalled();
+});
+
+test('the active Contour Lock button releases a capturable rail instead of reacquiring it', () => {
+  player.ship.contourLock = { height: 0.1, direction: 1 };
+  vi.spyOn(player.ship, 'toggleContourLock').mockImplementation(() => {
+    player.ship.contourLock = player.ship.contourLocked ? null : { height: 0.1, direction: 1 };
+    return player.ship.contourLocked;
+  });
+  actions.contourLock.click();
+  expect(player.ship.contourLocked).toBe(false);
 });
 
 test.each([

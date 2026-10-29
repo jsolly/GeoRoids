@@ -2,6 +2,7 @@ import { scannedMaterial } from '../shared/surveyScan';
 import type { ShipKitId } from '../shared-types';
 import { drawSatelliteHealth } from '../src/entities/satellitePickup/satelliteHealthRenderer';
 import { drawSatellitePickupGlow } from '../src/entities/satellitePickup/satellitePickupGlow';
+import { beginNavigation } from '../src/entities/ship/navigation';
 import './wiki-media-fonts';
 import './wiki-media-node-shim';
 import { spawnSync } from 'node:child_process';
@@ -880,26 +881,15 @@ function makeHaulerDemo(): Demo {
 }
 
 function makeMovementDemo(): Demo {
-  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
-    position: { x: -500, y: 160 },
-    velocity: { x: 0, y: 0 },
-    angle: 0,
-  };
+  const state = new Ship({ position: { x: -500, y: 160 } });
+  state.angle = 0;
+  beginNavigation(state, { x: -350, y: 90 });
   const positions: Position[] = [copyPosition(state.position)];
   const speeds: number[] = [0];
   const angles: number[] = [0];
   const totalTicks = FRAME_COUNT * SIM_TICKS_PER_FRAME;
   for (let tick = 0; tick < totalTicks; tick++) {
-    if (tick >= 12 * SIM_TICKS_PER_FRAME && tick < 18 * SIM_TICKS_PER_FRAME) {
-      state.angle += steeringTurn(
-        state.angle,
-        Math.PI / 6,
-        (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS)
-      );
-    }
-    advanceCruiseVelocity(state, SHIP.MAX_VELOCITY);
-    state.position.x += state.velocity.x;
-    state.position.y += state.velocity.y;
+    state.update();
     if ((tick + 1) % SIM_TICKS_PER_FRAME === 0) {
       positions.push(copyPosition(state.position));
       speeds.push(Math.hypot(state.velocity.x, state.velocity.y));
@@ -911,15 +901,18 @@ function makeMovementDemo(): Demo {
     posterFrame: 20,
     verify: () => {
       invariant(positions.length === FRAME_COUNT + 1, 'movement frame count changed');
-      invariant((speeds[10] ?? 0) > 0, 'automatic thrust did not accelerate');
+      invariant((speeds[10] ?? 0) > 0, 'destination order did not accelerate');
       invariant((angles[20] ?? 0) > 0, 'steering did not turn the nose');
-      invariant((speeds.at(-1) ?? 0) > 0, 'releasing steering stopped propulsion');
+      invariant(
+        speeds.at(-1) === 0 && state.navigation === null,
+        'destination arrival did not stop'
+      );
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'MOVEMENT · ALWAYS-ON THRUST',
-        'steer → turn · release → keep flying',
+        'MOVEMENT · TAP TO TRAVEL',
+        'tap destination → travel hands-free → stop',
         frame,
         PALETTE.LOCAL
       );
@@ -941,10 +934,12 @@ function makeMovementDemo(): Demo {
       drawTag(
         ctx,
         frame < 12
-          ? 'automatic thrust'
+          ? 'destination chosen'
           : frame < 18
-            ? 'steer · turning'
-            : 'released · still flying',
+            ? 'travelling hands-free'
+            : (speeds[frame + 1] ?? 0) > 0
+              ? 'approaching destination'
+              : 'arrived · holding position',
         350,
         112,
         PALETTE.LOCAL

@@ -54,6 +54,7 @@ import { drawScoreOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawMiniMap } from './hud/minimap';
+import { drawNavigationJourney } from './navigationJourney';
 import { drawWorldRemains } from './remainsRenderer';
 import { drawRicochetCourt } from './ricochetCourtRenderer';
 import { drawRolyPolys } from './rolyPolyRenderer';
@@ -332,6 +333,7 @@ export function drawGame(currPlayer: Player, currRoidBelt: RoidBelt, allPlayers:
     }
   }
 
+  drawNavigationJourney(currPlayer, roids, allPlayers);
   const hudLayout = hudLayoutForCanvas(viewport);
   const otherPlayers = allPlayers.filter((player) => player.id !== localId);
   drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups, otherPlayers);

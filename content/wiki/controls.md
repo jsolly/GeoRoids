@@ -1,8 +1,8 @@
 ---
 title: Controls
 category: Start here
-summary: Automatic thrust on every device, with keyboard or pointer steering,
-  firing, Contour Lock, and kit abilities.
+summary: Tap destinations on mobile or hold W to thrust on desktop. Learn firing,
+  object actions, Shield, Contour Lock, and kit abilities.
 order: 20
 related:
   - content/wiki/field-manual.md
@@ -19,7 +19,7 @@ The viewport and maps keep north at the top while your ship turns. Point or drag
 
 ## Keyboard
 
-Steer with A/D or Left/Right, hold Space to fire, hold F and release for a charged beam, and press E for your equipped tool. Thrust is automatic; reaching a lit furnace ring with cargo stops either ship to [offload](/wiki/#loot-growth) until the hold empties or you steer away. Shift toggles Contour Lock; [ and ] hop toward lower and higher neighboring contours while settled on a line.
+Steer with A/D or Left/Right, hold Space to fire, hold F and release for a charged beam, and press E for your equipped tool. Q activates Shield. Hold W or Up to thrust; release to brake. There is no automatic thrust; reaching a lit furnace ring with cargo stops either ship to [offload](/wiki/#loot-growth) until the hold empties or you steer away. Shift toggles Contour Lock; [ and ] hop toward lower and higher neighboring contours while settled on a line.
 
 ## Mouse
 
@@ -27,7 +27,13 @@ Move the pointer to steer toward it, click to fire (each click is one shot; hold
 
 ## Touch
 
-Hold or drag one finger to steer; release to keep your heading. A quick tap fires once, or hold two fingers on the playfield to charge a large beam while the first keeps steering; lifting either finger releases it. Use the on-screen ability and Contour Lock buttons for tools and contour travel. Leaving the tab or app releases every held control.
+Tap a visible destination to fly there and brake to rest; tap elsewhere to redirect, or use Stop to cancel. A dotted journey line shows your destination and marks its first obstructing asteroid, but does not avoid obstacles. Scrapes preserve the order; sustained blockage cancels it.
+
+Tap Fire for one shot; hold to charge and release for a beam. Drag from Fire to cancel travel, brake, and aim while charging, or drag from your ship to turn without moving. Two fingers on the playfield activate a two-second shield with a twelve-second cooldown; Fire-button touches do not count toward this gesture.
+
+Swipe to use your equipped ability, or tap its cooldown indicator. While contour travelling, swipes switch isolines instead; the indicator still activates your tool. Leaving the tab or app cancels travel and held input.
+
+Hold a visible object to open its actions, then release over an action or tap one; Cancel dismisses the menu. A faint glow identifies objects with actions. Inspect works immediately; Signal crew is available within signalling range on campaign servers. Furnace actions approach into range first and recheck eligibility. Nearby furnaces also offer action pop-ups before your ship overlaps their footprint.
 
 ## Contour Lock
 
@@ -47,7 +53,7 @@ V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-gro
 
 ## Furnace travel and store
 
-Inside a lit furnace's visible footprint, press E or tap the travel prompt to open the destination map (on desktop E opens the menu instead of your tool there; fly off the footprint to use the tool); B also toggles the menu. At Town Square, tap Enter or press E, then choose Store or Fast Travel; Back to Town Square returns to that choice. The mobile ability button keeps your equipped tool available over a furnace.
+On desktop, inside a lit furnace's visible footprint, press E or use the travel prompt to open the destination map (on desktop E opens the menu instead of your tool there; fly off the footprint to use the tool); B also toggles the menu. At Town Square, tap Enter or press E, then choose Store or Fast Travel; Back to Town Square returns to that choice. On mobile, long press any visible furnace or use its nearby pop-up to approach and enter; the tappable ability indicator keeps your equipped tool available.
 
 Pinch the destination map to zoom in or out, and drag to explore. Keyboard users can focus the map and use +/− to zoom. Choose another lit furnace for a free ride along the pipes in your equipped ship; dark foundations are not destinations. Boarding releases your tow or armed coupling, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
 
@@ -58,6 +64,8 @@ Town Square's Store offers placeholders purchased with banked points. Higher set
 M or Map opens the shared universe chart centred on your ship. Drag to pan and pinch to zoom; desktop also supports arrow keys, the mouse wheel, and +/− keys. Use Center on you or Home to restore the nearby ship view. M, Escape, or Close returns to flight.
 
 ## Keyboard access and motion
+
+Press O in flight to open visible-object actions. Next visible object cycles the selection; Tab reaches its actions, including Inspect. Escape closes the actions and restores focus.
 
 Tab reaches menu controls and the touch tool and Contour Lock buttons; Enter or Space activates a focused button. Focus the universe chart itself for arrow-key panning and +/− zoom, because a focused button keeps its normal keyboard behavior. On the furnace destination map, Tab selects a lit stop and Enter chooses it.
 

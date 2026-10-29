@@ -28,7 +28,7 @@ afterEach(() => {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.soundOn);
 });
 
-test('automatic thrust stays silent while firing still plays its sound', () => {
+test('idle propulsion stays silent while firing still plays its sound', () => {
   bindGameAudio({ getListenerPosition: () => listener, getViewport: () => viewport });
   const player = new Player({
     id: 'silent-pilot',
@@ -41,7 +41,7 @@ test('automatic thrust stays silent while firing still plays its sound', () => {
     reconcilePlayerInput(player);
     player.ship.update();
   }
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
   expect(play).not.toHaveBeenCalled();
   player.ship.shoot();
   expect(play).toHaveBeenCalledOnce();

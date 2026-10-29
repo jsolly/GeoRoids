@@ -17,6 +17,7 @@
     "start": "astro dev --config config/app/astro.ts --ignore-lock",
     "preview": "astro preview --config config/app/astro.ts --ignore-lock",
     "test": "node scripts/validation-admission.mjs unit -- vitest run --config config/testing/vitest.ts --project unit --project components",
+    "test:flight": "node scripts/verify-intentional-flight.mjs",
     "test:review": "bash scripts/test-review.sh",
     "test:all": "npm run test && npm run test:integration",
     "test:integration": "./scripts/test-runner.sh --reporter=verbose",

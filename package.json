@@ -85,7 +85,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
-    "@astrojs/compiler-rs": "0.5.1",
+    "@astrojs/compiler-rs": "0.5.2",
     "@biomejs/biome": "2.5.15",
     "@internationalized/date": "^3.12.4",
     "@lucide/svelte": "^1.56.0",

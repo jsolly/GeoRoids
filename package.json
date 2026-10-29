@@ -73,7 +73,7 @@
     "@types/ws": "^8.18.2",
     "@typescript/native": "npm:typescript@7.0.2",
     "@vercel/speed-insights": "^2.0.0",
-    "astro": "7.3.8",
+    "astro": "7.4.2",
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
     "svelte": "5.57.2",

@@ -16,7 +16,7 @@ import process from 'node:process';
 import { test } from 'vitest';
 import { parse } from 'yaml';
 
-test('CI preserves four mandatory lanes and failure propagation', () => {
+test('CI preserves five mandatory lanes and failure propagation', () => {
   const root = new URL('../', import.meta.url);
   const read = (path) => readFileSync(new URL(path, root), 'utf8');
   const ci = parse(read('.github/workflows/ci.yml'));
@@ -25,6 +25,7 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
   assert.deepEqual(required.needs, [
     'static-checks',
     'runner-contracts',
+    'actions-contracts',
     'integration-tests',
     'wiki-media',
   ]);
@@ -137,7 +138,7 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
     'npm run check:dev-server',
     'npm run build',
   ];
-  const commands = ['static-checks', 'runner-contracts'].flatMap((name) =>
+  const commands = ['static-checks', 'runner-contracts', 'actions-contracts'].flatMap((name) =>
     ci.jobs[name].steps.filter((step) => /^npm run /u.test(step.run ?? '')).map((step) => step.run)
   );
   assert.deepEqual([...commands].sort(), [...originalStaticCommands].sort());
@@ -147,7 +148,12 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
       .filter((step) => /^npm run /u.test(step.run ?? ''))
       .map((step) => step.run),
     originalStaticCommands.filter(
-      (command) => !['npm run check:test-runner', 'npm run check:dev-server'].includes(command)
+      (command) =>
+        ![
+          'npm run check:test-runner',
+          'npm run check:dev-server',
+          'npm run check:actions',
+        ].includes(command)
     )
   );
   assert.deepEqual(
@@ -155,6 +161,12 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
       .filter((step) => /^npm run /u.test(step.run ?? ''))
       .map((step) => step.run),
     ['npm run check:test-runner', 'npm run check:dev-server']
+  );
+  assert.deepEqual(
+    ci.jobs['actions-contracts'].steps
+      .filter((step) => /^npm run /u.test(step.run ?? ''))
+      .map((step) => step.run),
+    ['npm run check:actions']
   );
 
   // The replacement lane executes the complete default code inventory and binds
@@ -756,14 +768,15 @@ if (command === 'gh') {
   );
   assert.equal(mediaCandidate[1].with.path, `\${{ runner.temp }}/wiki-media-baseline`);
 
-  // Execute the actual aggregate step for all 256 GitHub dependency outcomes.
+  // Execute the actual aggregate step for all 1024 GitHub dependency outcomes.
   const aggregate = required.steps.find(
-    (step) => step.name === 'Require all four validation lanes to pass'
+    (step) => step.name === 'Require all five validation lanes to pass'
   );
   assert.ok(aggregate);
   const laneResults = {
     STATIC_RESULT: 'static-checks',
     RUNNER_RESULT: 'runner-contracts',
+    ACTIONS_RESULT: 'actions-contracts',
     INTEGRATION_RESULT: 'integration-tests',
     WIKI_MEDIA_RESULT: 'wiki-media',
   };
@@ -776,7 +789,7 @@ if (command === 'gh') {
       rows.flatMap((row) => outcomes.map((outcome) => ({ ...row, [variable]: outcome }))),
     [{}]
   );
-  assert.equal(combinations.length, 256);
+  assert.equal(combinations.length, 1024);
   for (const results of combinations) {
     const result = spawnSync('bash', ['-c', aggregate.run], {
       env: { ...process.env, ...results },
@@ -790,6 +803,6 @@ if (command === 'gh') {
   }
 
   process.stdout.write(
-    'CI contracts passed: four parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
+    'CI contracts passed: five parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
   );
 });

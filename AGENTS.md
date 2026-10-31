@@ -231,8 +231,8 @@ Start `npm run dev`; verify at origin `http://127.0.0.1:5173/` (routes `/`, `/de
 
 ## Verified-tree CI
 
-PRs run static checks, runner contracts, the complete server integration suites, and Wiki media verification concurrently.
-The final `ci` job requires all four lanes to succeed; failed, cancelled, or skipped
+PRs run static checks, runner contracts, Actions contracts, the complete server integration suites, and Wiki media verification concurrently.
+The final `ci` job requires all five lanes to succeed; failed, cancelled, or skipped
 lanes fail the aggregate. Each lane has its own exact-tree proof.
 Full unit and server integration checks run locally in the review gate. Manual performance measurements remain outside it. Post-merge CI reuses each successful PR lane only
 when its recorded checkout tree exactly matches the landed tree, using

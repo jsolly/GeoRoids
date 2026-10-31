@@ -132,6 +132,7 @@ test('a capable touch tablet and a desktop keep full glow', () => {
   expect(resolveGlow(8)).toBe(8);
   canvasManager.destroy();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(navigator, 'deviceMemory');
 
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/155.0.0.0 Safari/537.36'
@@ -141,9 +142,17 @@ test('a capable touch tablet and a desktop keep full glow', () => {
   expect(resolveGlow(8)).toBe(8);
 });
 
+test('a low-end device keeps its low-end preset whatever controls it shows', () => {
+  expect(qualityAudience('low-end', true)).toBe('low-end');
+  expect(qualityAudience('low-end', false)).toBe('low-end');
+  expect(qualityAudience('commodity', true)).toBe('touch');
+  expect(qualityAudience('unknown', false)).toBe('desktop');
+});
+
 test('a low-end touch pilot can still compare full glow in a diagnostic visit', () => {
   window.history.replaceState(null, '', '?performance=collect&renderGlow=full');
   joinOnTouchTablet(fireTablet, 2, 8);
+  expect(canvasManager.getDeviceCategory()).toBe('low-end');
   expect(resolveGlow(8)).toBe(8);
   expect(configureRenderQuality('', qualityAudience('low-end', true))).toEqual({
     maxDpr: 'native',

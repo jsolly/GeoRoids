@@ -417,7 +417,7 @@
     "src/ui/schematicEquipHint.ts": "sha256:fa1e1828e171f8c1094f23a27e9357a195d728cb47bffcb6c1d21e7f735c3bc4",
     "src/ui/spawnFlyIn.ts": "sha256:24a34095fb92d404d658a39a5bf60b7a428a26eb4b070256057f0b59a83880b5",
     "src/ui/uiUtils.ts": "sha256:25528132dfa526865ead56e8075471f9c67d2aaf21593eaa34b5e206fd3f6fdc",
-    "src/ui/universeMap.ts": "sha256:de63c16eb9e4f1842927305312ca012fd2c85c4b74640f226210c70bf2546c44",
+    "src/ui/universeMap.ts": "sha256:176a1097a56dedf721bc98582e1c43299c9c5f82b4cab8359f6cf74570c3fb19",
     "src/ui/universeMapLabels.ts": "sha256:d7eeef12743c6ce0d73c4c894cf4bb5386839f6c52167ce9793b78514e7be6a2",
     "src/ui/viewportChrome.ts": "sha256:582159cb92905d7ea0b7e2d83da2d8dbfa0a17735272321adf11e43bd9f79284",
     "src/utils/Logger.ts": "sha256:93400bbebdf63e6706d74b2dfb563211ae1a08aef2d2713151592978225a6e81",
@@ -573,7 +573,7 @@
     "tests/unit/ui/debugHud.test.ts": "sha256:90bc953c761e7b00d69fd1ca72e019a0165da5a7f9dd523054c095fc1c4c31bd",
     "tests/unit/ui/furnace-names-stay-hidden-until-the-chart-is-zoomed-in.test.ts": "sha256:9b3c8cffc8bf62d8bc7ece3d0319911a78f0a0929eef1581b6d9beac404b8541",
     "tests/unit/ui/schematicEquipHint.test.ts": "sha256:89ba653d324c15783c067180f7a246b4391bb475c673c876e4771cc8d15b8a44",
-    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "sha256:9e8ca84123443f5adb45f880f6fa82cf411475e86ab40898d20016d6d7478d0e",
+    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "sha256:8ffd07b1d249e5fe6c4254d49c0536d5c644eee9d92e9bfd306f6e656c627fe2",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:fb4a56f524c9e9bf52e69d5d8ddfc0a84b92e47a41ea7ee3261704690dbb6871",
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
@@ -8043,6 +8043,25 @@
         "src/rendering/renderQuality.ts": "hud-network",
         "src/rendering/deviceCategory.ts": "hud-network"
       }
+    },
+    {
+      "note": "Reviewed low-end overlay glow: the spawn fly-in chart and universe map now route their shadow blur (map mark glow and furnace fire trail) through resolveGlow, so low-end devices draw them without halo while other devices keep glow. Updated the HUD Graphics option sentence to cover the universe map and loot-growth wording ('bright hardware'). Field manual, Controls, Teamwork, Scout and Hauler copy remain accurate: the map's marks, labels, trails, pan/zoom and signal-help controls are unchanged, and none of those articles describe map glow. New map test fails when either resolveGlow wrapper is removed. Chrome smoke: Fire-emulated tablet drew zero shadow blur through spawn fly-in, flight and the open universe map (M); desktop and phone keep glow; consoles clean; Wiki copy checked at desktop and mobile widths. No media or gameplay rule changed.",
+      "sources": [
+        "src/ui/universeMap.ts",
+        "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts"
+      ],
+      "topics": ["controls", "field-manual", "hauler", "hud-network", "scout", "teamwork"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Strengthened the low-end universe-map glow test after review: the full-quality half now checks the fire-trail strokes and the local pilot's chart hull keep non-zero blur, so zeroing either glow on every device fails, and the low-end half still requires zero blur at every paint. Scout, Hauler, Teamwork and HUD copy unchanged and accurate; no rule or media change.",
+      "sources": [
+        "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts"
+      ],
+      "topics": ["hauler", "hud-network", "scout", "teamwork"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

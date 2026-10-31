@@ -211,11 +211,23 @@ A later request starts one replacement and is itself refused as restarting; the
 player's retry reaches the new thread. The replacement starts only after the old
 thread has exited, because the store holds its database under an exclusive
 SQLite lock until its thread is gone. At most three replacements start in any
-hour, each logged as `Replacing the debug report worker`. Past that, reporting
-stays closed until the hour allows another attempt or the service restarts.
-Queued reports resume delivery once a replacement runs. While the server runs,
-another SQLite client cannot open the report database; copy the file with its
-WAL, or stop the service, before inspecting it.
+rolling hour, each logged as `Replacing the debug report worker`; a spent budget
+is logged once with the time of the next possible attempt, and reporting stays
+closed until then or until the service restarts. If the old thread has not
+exited ten seconds after a replacement was requested, the server logs that
+reporting stays closed until it does, `/health` reports the worker as not
+stopped, and refusals stop promising a restart. No replacement starts while it
+runs, so a thread stuck in a native SQLite call keeps reporting closed until it
+exits or the service restarts. Queued reports resume delivery once a
+replacement runs.
+
+Do not open the live report database with another SQLite client. The exclusive
+lock refuses it, and an open `sqlite3` session also makes a pending replacement
+or a server start fail with `database is locked`, which spends a replacement
+attempt. A copy of the live file can tear mid-checkpoint, and the lock blocks
+SQLite's backup API. Inspect a Railway volume backup restored elsewhere, or stop
+the service first, as for the world database in
+[persistent world operations](persistent-world.md#railway-deployment-and-recovery).
 
 Verified against the live production ingress: the header probe on 2026-10-25 at
 release `c487d041`, and the precondition below on 2026-10-26 at `d7d084e`.

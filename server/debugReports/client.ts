@@ -12,6 +12,18 @@ const REQUEST_DEADLINE_MS = 10_000;
 const CLOSE_DEADLINE_MS = 2_000;
 
 /**
+ * How long a replacement waits for its predecessor's `exit`. A terminated
+ * thread exits once its current SQLite call returns, so a longer wait means a
+ * stuck volume, and the subsystem says so instead of promising a restart.
+ */
+const HANDOVER_DEADLINE_MS = 10_000;
+
+const UNAVAILABLE_MESSAGE = 'Debug report storage is unavailable. Keep your local copy.';
+const RESTARTING_MESSAGE = 'Debug report storage is restarting. Keep your local copy and retry.';
+/** Published on `/health` while a retired thread will not exit; carries no path or cause. */
+const STUCK_MESSAGE = 'Debug report worker has not stopped. Keep your local copy.';
+
+/**
  * At most this many replacement threads start in any `REPLACEMENT_WINDOW_MS`.
  * Enough for a transient stall to recover more than once an hour; few enough
  * that a store that cannot open costs three short-lived threads an hour rather
@@ -132,8 +144,12 @@ interface ReportThread {
   readonly worker: Worker;
   /** Its failure is recorded: its replies, faults and counts are ignored. */
   failed: boolean;
-  /** Settles on the thread's `exit`, which is when its SQLite connection is gone. */
+  /** False from its `exit`, which is when its SQLite connection is gone. */
+  running: boolean;
+  /** Settles on that `exit`. */
   readonly exited: Promise<void>;
+  /** A replacement waited `HANDOVER_DEADLINE_MS` for this thread to exit, and it did not. */
+  overdue: boolean;
 }
 
 /**
@@ -157,7 +173,7 @@ interface ReportThread {
  *   an exclusive lock (`./store`), so a replacement racing its predecessor would
  *   die on arrival; and two live threads would each run a delivery interval
  *   over the same rows. `close()` therefore has exactly one thread to stop.
- * - **The replacement is single-flight.** `recovery` is set in the same
+ * - **The replacement is single-flight.** `recovering` is set in the same
  *   synchronous step that tests it, so concurrent requests -- which the HTTP
  *   layer admits -- start one replacement between them.
  * - **No request waits for a handover.** A request that finds no live thread is
@@ -168,16 +184,26 @@ interface ReportThread {
  *   was posted to.
  * - **The budget refills on the clock only.** See `MAX_REPLACEMENTS`.
  *
+ * - **The handover is bounded.** A retired thread that has not exited after
+ *   `HANDOVER_DEADLINE_MS` is logged and published as stuck, and no
+ *   replacement starts while it runs; once it exits, a later request may try
+ *   again.
+ *
  * A store that keeps failing therefore closes reporting until the window
  * allows another attempt, still fail-closed, rather than until the next deploy.
  */
 export class DebugReportWorker {
-  /** The one thread that exists, live or retiring; undefined once it has exited. */
-  private thread: ReportThread | undefined;
-  /** The replacement in progress. Set and tested in one synchronous step. */
-  private recovery: Promise<void> | undefined;
+  /**
+   * The most recent thread: live, retiring, or gone. Only one is ever
+   * running, because a replacement is built only after this one's `exit`.
+   */
+  private thread: ReportThread;
+  /** A replacement is in progress. Tested and set in one synchronous step. */
+  private recovering = false;
   /** Monotonic start times of the replacements inside the budget window. */
-  private readonly replacements: number[] = [];
+  private replacements: number[] = [];
+  /** The current run of budget refusals has been logged. */
+  private exhaustionLogged = false;
   private readonly pending = new Map<number, PendingOperation>();
   private nextId = 0;
   private closing: Promise<void> | undefined;
@@ -192,22 +218,22 @@ export class DebugReportWorker {
   // Retained, although it carries the Todoist credential, because a
   // replacement thread needs it. It stays on the server and is never logged.
   constructor(private readonly config: DebugReportConfiguration) {
-    this.spawn();
+    this.thread = this.spawn();
   }
 
-  private spawn(): void {
+  private spawn(): ReportThread {
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
       name: 'debug-reports',
       workerData: this.config,
       execArgv: ['--import', 'tsx'],
     });
-    let markExited = (): void => undefined;
+    const exit = Promise.withResolvers<void>();
     const thread: ReportThread = {
       worker,
       failed: false,
-      exited: new Promise((resolve) => {
-        markExited = resolve;
-      }),
+      running: true,
+      exited: exit.promise,
+      overdue: false,
     };
     // A recorded failure outranks anything the thread still sends: a
     // diagnostics message already in flight carries counts measured before the
@@ -226,61 +252,87 @@ export class DebugReportWorker {
       if (this.closing === undefined) {
         this.fail(thread, { kind: 'exit', code });
       }
-      if (this.thread === thread) {
-        this.thread = undefined;
-      }
-      markExited();
+      thread.running = false;
+      exit.resolve();
     });
-    this.thread = thread;
+    return thread;
   }
 
   /**
-   * Starts a replacement unless one is already under way, the service is
-   * closing, or the budget is spent. Returns whether a replacement is under
-   * way, so the refusal can say whether retrying soon is worthwhile.
+   * Starts a replacement unless one is already under way, the budget is
+   * spent, or the retired thread has already outlived a handover. Returns
+   * whether a replacement is under way, so the refusal can say whether
+   * retrying soon is worthwhile. `request()` has already refused a closing
+   * service.
    */
   private recover(): boolean {
-    if (this.recovery !== undefined) {
+    if (this.recovering) {
       return true;
     }
-    if (this.closing !== undefined) {
+    const predecessor = this.thread;
+    if (predecessor.overdue && predecessor.running) {
       return false;
     }
     const now = globalThis.performance.now();
-    while (
-      this.replacements.length > 0 &&
-      now - (this.replacements[0] ?? now) >= REPLACEMENT_WINDOW_MS
-    ) {
-      this.replacements.shift();
-    }
-    if (this.replacements.length >= MAX_REPLACEMENTS) {
+    this.replacements = this.replacements.filter((at) => now - at < REPLACEMENT_WINDOW_MS);
+    const [oldest] = this.replacements;
+    if (oldest !== undefined && this.replacements.length >= MAX_REPLACEMENTS) {
+      if (!this.exhaustionLogged) {
+        this.exhaustionLogged = true;
+        const nextAttemptInMs = Math.ceil(oldest + REPLACEMENT_WINDOW_MS - now);
+        logger.error('DEBUG_REPORTS', 'Debug report worker replacement budget is spent', {
+          replacements: this.replacements.length,
+          windowMs: REPLACEMENT_WINDOW_MS,
+          nextAttemptInMs,
+          nextAttemptAt: new Date(Date.now() + nextAttemptInMs).toISOString(),
+        });
+      }
       return false;
     }
+    this.exhaustionLogged = false;
     this.replacements.push(now);
     logger.warn('DEBUG_REPORTS', 'Replacing the debug report worker', {
       replacement: this.replacements.length,
       of: MAX_REPLACEMENTS,
       windowMs: REPLACEMENT_WINDOW_MS,
     });
-    const predecessor = this.thread;
-    this.recovery = (async () => {
-      if (predecessor !== undefined) {
-        // `fail()` terminated it; its `exit` is when its connection is gone.
-        await predecessor.exited;
-      }
+    this.recovering = true;
+    // `fail()` terminated the predecessor; its `exit` is when its connection
+    // is gone. Waiting is bounded so a thread stuck in a native SQLite call is
+    // reported rather than leaving every refusal promising a restart forever.
+    let settled = false;
+    const deadline = setTimeout(() => {
+      settled = true;
+      this.recovering = false;
       if (this.closing !== undefined) {
         return;
       }
-      this.spawn();
-    })()
-      .catch((error: unknown) => {
-        // `new Worker` can throw. No thread then exists, which is fail-closed,
-        // and a later request may try again within the budget.
+      predecessor.overdue = true;
+      this.stats = { ...this.stats, lastError: STUCK_MESSAGE };
+      logger.error(
+        'DEBUG_REPORTS',
+        'The previous debug report worker has not exited; reporting stays closed until it does',
+        { waitedMs: HANDOVER_DEADLINE_MS }
+      );
+    }, HANDOVER_DEADLINE_MS);
+    deadline.unref();
+    void predecessor.exited.then(() => {
+      if (settled) {
+        return;
+      }
+      clearTimeout(deadline);
+      this.recovering = false;
+      if (this.closing !== undefined) {
+        return;
+      }
+      try {
+        this.thread = this.spawn();
+      } catch (error) {
+        // `new Worker` can throw. The gone predecessor stays current, which
+        // is fail-closed, and a later request may try again within the budget.
         logger.error('DEBUG_REPORTS', 'Debug report worker could not be replaced', { error });
-      })
-      .finally(() => {
-        this.recovery = undefined;
-      });
+      }
+    });
     return true;
   }
 
@@ -302,19 +354,12 @@ export class DebugReportWorker {
   }
   private request(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
     if (this.closing !== undefined) {
-      return Promise.reject(
-        new DebugReportError(503, 'Debug report storage is unavailable. Keep your local copy.')
-      );
+      return Promise.reject(new DebugReportError(503, UNAVAILABLE_MESSAGE));
     }
     const thread = this.thread;
-    if (thread === undefined || thread.failed) {
+    if (thread.failed) {
       return Promise.reject(
-        this.recover()
-          ? new DebugReportError(
-              503,
-              'Debug report storage is restarting. Keep your local copy and retry.'
-            )
-          : new DebugReportError(503, 'Debug report storage is unavailable. Keep your local copy.')
+        new DebugReportError(503, this.recover() ? RESTARTING_MESSAGE : UNAVAILABLE_MESSAGE)
       );
     }
     if (this.pending.size >= 8) {
@@ -500,10 +545,6 @@ export class DebugReportWorker {
     }
     const thread = this.thread;
     this.closing = new Promise((resolve) => {
-      if (thread === undefined) {
-        resolve();
-        return;
-      }
       const deadline = setTimeout(() => {
         void thread.worker.terminate();
         resolve();

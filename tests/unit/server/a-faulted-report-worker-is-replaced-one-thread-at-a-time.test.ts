@@ -24,6 +24,8 @@ const threads = vi.hoisted(() => ({
    * been told to stop but has not yet released the store.
    */
   holdExits: false,
+  /** Constructions still to refuse, as `new Worker` does when it cannot start a thread. */
+  refuseConstructions: 0,
 }));
 const serverLogging = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
 
@@ -49,6 +51,10 @@ vi.mock('node:worker_threads', () => ({
   Worker: class {
     private readonly thread: FakeThread;
     constructor() {
+      if (threads.refuseConstructions > 0) {
+        threads.refuseConstructions -= 1;
+        throw new Error('ERR_WORKER_INIT_FAILED: thread could not start');
+      }
       this.thread = {
         sent: [],
         listeners: new Map(),
@@ -97,8 +103,10 @@ const MEASURED = {
 
 const workers: DebugReportWorker[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   const closing = workers.splice(0).map((worker) => worker.close());
   threads.holdExits = false;
+  threads.refuseConstructions = 0;
   for (const thread of threads.all) {
     exitThread(thread, 0);
   }
@@ -151,6 +159,20 @@ async function outcome(promise: Promise<unknown>): Promise<unknown> {
   await settle();
   return result;
 }
+function budgetSpentLogs(): unknown[] {
+  return serverLogging.error.mock.calls
+    .filter(([, message]) => message === 'Debug report worker replacement budget is spent')
+    .map(([, , context]) => context);
+}
+/** Kills the current thread and asks for a replacement, which must start. */
+async function replaceCurrent(worker: DebugReportWorker): Promise<void> {
+  const before = threads.all.length;
+  exitThread(threadAt(before - 1), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(before + 1);
+}
+const MINUTE = 60_000;
 function replacementsLogged(): number {
   return serverLogging.warn.mock.calls.filter(
     ([, message]) => message === 'Replacing the debug report worker'
@@ -261,7 +283,7 @@ test('a replacement that measures the queue and then dies does not refill the bu
   const worker = start();
 
   for (let replacement = 1; replacement <= 3; replacement += 1) {
-    emit(threadAt(replacement - 1), 'exit', 7);
+    exitThread(threadAt(replacement - 1), 7);
     await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
     await settle();
     expect(threads.all).toHaveLength(replacement + 1);
@@ -271,11 +293,16 @@ test('a replacement that measures the queue and then dies does not refill the bu
     expect(worker.diagnostics()).toEqual(MEASURED);
   }
 
-  emit(threadAt(3), 'exit', 7);
+  exitThread(threadAt(3), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
   await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
   await settle();
   expect(threads.all).toHaveLength(4);
   expect(replacementsLogged()).toBe(3);
+  // Spent once, logged once, with when the next attempt becomes possible.
+  expect(budgetSpentLogs()).toEqual([
+    expect.objectContaining({ replacements: 3, windowMs: 3_600_000, nextAttemptInMs: 3_600_000 }),
+  ]);
 
   // Only the clock refills it: an hour after the first replacement, a later
   // request may start another.
@@ -321,4 +348,130 @@ test('a request that arrives during a handover is refused at once and cannot jud
     receipt: { id: RECEIPT_ID, state: 'pending' },
   });
   await expect(answered).resolves.toEqual({ id: RECEIPT_ID, state: 'pending' });
+});
+
+test('the replacement budget is a rolling hour, not a fixed one', async () => {
+  vi.useFakeTimers();
+  const worker = start();
+
+  await replaceCurrent(worker); // 0 min
+  vi.advanceTimersByTime(30 * MINUTE);
+  await replaceCurrent(worker); // 30 min
+  vi.advanceTimersByTime(29 * MINUTE);
+  await replaceCurrent(worker); // 59 min
+
+  // The 0-minute replacement leaves the window at 60 minutes, so exactly one
+  // more is allowed then.
+  vi.advanceTimersByTime(MINUTE);
+  await replaceCurrent(worker); // 60 min
+  exitThread(threadAt(4), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  expect(budgetSpentLogs()).toEqual([expect.objectContaining({ nextAttemptInMs: 30 * MINUTE })]);
+
+  // The 30-minute one holds the window shut until 90 minutes.
+  vi.advanceTimersByTime(30 * MINUTE - 1);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  await settle();
+  expect(threads.all).toHaveLength(5);
+  expect(budgetSpentLogs()).toHaveLength(1);
+  vi.advanceTimersByTime(1);
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(6);
+});
+
+test('a replacement thread that cannot start is logged and may be tried again', async () => {
+  const worker = start();
+  threads.refuseConstructions = 1;
+  exitThread(threadAt(0), 7);
+
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(1);
+  expect(serverLogging.error).toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    'Debug report worker could not be replaced',
+    { error: expect.objectContaining({ message: expect.stringContaining('ERR_WORKER_INIT') }) }
+  );
+
+  // No thread is running, which is fail-closed, and the budget still has room.
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(2);
+  expect(replacementsLogged()).toBe(2);
+});
+
+test('a retired thread that never exits is reported as stuck, not as restarting', async () => {
+  vi.useFakeTimers();
+  threads.holdExits = true;
+  const worker = start();
+  emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+
+  // Its SQLite call never returns, so `terminate()` never completes. Without a
+  // bound every refusal would promise a restart forever, with nothing logged.
+  vi.advanceTimersByTime(9_999);
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  vi.advanceTimersByTime(1);
+  expect(serverLogging.error).toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    'The previous debug report worker has not exited; reporting stays closed until it does',
+    { waitedMs: 10_000 }
+  );
+  expect(worker.diagnostics()).toMatchObject({
+    pending: null,
+    lastError: 'Debug report worker has not stopped. Keep your local copy.',
+  });
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  await settle();
+  // Still one thread, and no further attempt spent while it holds the store.
+  expect(threads.all).toHaveLength(1);
+  expect(replacementsLogged()).toBe(1);
+
+  // Once it does exit, a later request may replace it.
+  exitThread(threadAt(0), 1);
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(2);
+  expect(threadAt(1).coexisting).toBe(0);
+});
+
+test('closing gives up on a retiring thread that never exits at the close deadline', async () => {
+  vi.useFakeTimers();
+  threads.holdExits = true;
+  const worker = start();
+  emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  expect(threadAt(0).terminated).toBe(1);
+
+  const closed = worker.close();
+  vi.advanceTimersByTime(1_999);
+  expect(await outcome(closed)).toBe('waiting');
+  vi.advanceTimersByTime(1);
+  expect(await outcome(closed)).toEqual({ resolved: undefined });
+  expect(threadAt(0).terminated).toBe(2);
+});
+
+test('closing terminates a live thread that ignores the close message at the deadline', async () => {
+  vi.useFakeTimers();
+  threads.holdExits = true;
+  const worker = start();
+
+  const closed = worker.close();
+  expect(threadAt(0).sent).toContainEqual(expect.objectContaining({ type: 'close' }));
+  vi.advanceTimersByTime(1_999);
+  expect(await outcome(closed)).toBe('waiting');
+  expect(threadAt(0).terminated).toBe(0);
+  vi.advanceTimersByTime(1);
+  expect(await outcome(closed)).toEqual({ resolved: undefined });
+  expect(threadAt(0).terminated).toBe(1);
+});
+
+test('a close that ends on exit leaves no deadline running', async () => {
+  vi.useFakeTimers();
+  const worker = start();
+
+  const closed = worker.close();
+  exitThread(threadAt(0), 0);
+  expect(await outcome(closed)).toEqual({ resolved: undefined });
+  expect(vi.getTimerCount()).toBe(0);
 });

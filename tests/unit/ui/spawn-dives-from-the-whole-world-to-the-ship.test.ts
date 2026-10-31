@@ -8,7 +8,7 @@ let canvas: HTMLCanvasElement;
 let visible: boolean;
 let dispose: () => void;
 let frames: FrameRequestCallback[];
-let localShip: { position: { x: number; y: number } } | null;
+let localShip: { position: { x: number; y: number }; beginHullAssembly: () => void } | null;
 
 beforeAll(() => {
   const network = ConnectionManager.getInstance();
@@ -17,7 +17,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   frames = [];
-  localShip = { position: { x: 30_000, y: -12_000 } };
+  localShip = { position: { x: 30_000, y: -12_000 }, beginHullAssembly: vi.fn() };
   gameArea = document.createElement('div');
   gameArea.id = 'gameArea';
   document.body.append(gameArea);
@@ -48,18 +48,31 @@ function runFrameAt(ms: number): void {
   frame?.(performance.now() + ms);
 }
 
-test('any key skips the dive', () => {
+test('any key skips the dive and the hull still assembles once', () => {
   playSpawnFlyIn();
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
   expect(visible).toBe(false);
   expect(canvas.isConnected).toBe(true);
+  expect(localShip?.beginHullAssembly).toHaveBeenCalledTimes(1);
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+  expect(localShip?.beginHullAssembly).toHaveBeenCalledTimes(1);
 });
 
-test('a tap skips the dive', () => {
+test('a tap skips the dive and the hull still assembles once', () => {
   playSpawnFlyIn();
   window.dispatchEvent(new Event('pointerdown'));
   expect(visible).toBe(false);
   expect(canvas.isConnected).toBe(true);
+  expect(localShip?.beginHullAssembly).toHaveBeenCalledTimes(1);
+  window.dispatchEvent(new Event('pointerdown'));
+  expect(localShip?.beginHullAssembly).toHaveBeenCalledTimes(1);
+});
+
+test('the hull assembles as the finished dive hands over to flight', () => {
+  playSpawnFlyIn();
+  runFrameAt(3050);
+  expect(visible).toBe(false);
+  expect(localShip?.beginHullAssembly).toHaveBeenCalledTimes(1);
 });
 
 test('the dive ends immediately if the pilot has no ship yet', () => {
@@ -76,6 +89,7 @@ test('a second join cancels the first dive and reuses the shell canvas', () => {
   expect(document.querySelectorAll('#spawn-fly-in')).toHaveLength(1);
   expect(window.cancelAnimationFrame).toHaveBeenCalledTimes(1);
   expect(visible).toBe(true);
+  expect(localShip?.beginHullAssembly).not.toHaveBeenCalled();
 });
 
 test('pilots who prefer reduced motion land directly in flight', () => {
@@ -96,4 +110,5 @@ test('unmount cancels the owned frame and detached input cannot restart the pain
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
   expect(frames).toHaveLength(scheduled);
   expect(canvas.isConnected).toBe(true);
+  expect(localShip?.beginHullAssembly).not.toHaveBeenCalled();
 });

@@ -230,7 +230,7 @@
     "src/components/game/InventoryPanel.svelte": "sha256:784caec9a55d8f03bffcd63e2890b0133c7088f563d0c35fc76b4f4b7c206fec",
     "src/components/game/PhoneCollector.svelte": "sha256:296e6787bf691061acec4175523e857af29bc6c732fcec0ea911dd591daa4879",
     "src/components/game/Preferences.svelte": "sha256:c453ec353720c68006ec02b54a310b7472bc3584d438004f78f0bf95bd9f14ea",
-    "src/components/game/ShipPicker.svelte": "sha256:b2ba71669aa83714d541b4a69763160f800e366d26bbf7cf2d4a5a5f2b1c085c",
+    "src/components/game/ShipPicker.svelte": "sha256:29c2db62ea90f64c5dfd97ab45ce6992570973d4c4b2c2b17800cfbd4165199a",
     "src/components/game/StartScreen.svelte": "sha256:ef9db1046a05c73c544c681ebf663e5c3742dce971718f13d7a15a3e4d35854c",
     "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
     "src/components/game/UniverseMap.svelte": "sha256:3345bef54807c88dde95b36965515c2dc7902900370c52e17a922ada27852682",
@@ -358,6 +358,7 @@
     "src/rendering/contourSpeedLines.ts": "sha256:e6172c6ab822a776f890c887af253303f864df9afde32ee93a5148659b058f80",
     "src/rendering/contourTrackRenderer.ts": "sha256:4db7796f076c1a274bfe763775fff8bd25527a5e3095af1f5705b5308dcbe8dc",
     "src/rendering/crewSignalRenderer.ts": "sha256:3dd933457fb43fd631c91441bf4b805fc8d82d6c7813d0fe27006c445f120ab7",
+    "src/rendering/deviceCategory.ts": "sha256:a6e47a1d49263302178e4a19b3a2c1d0e28cb9e7639d26bdbd84aca9fcd9e61b",
     "src/rendering/devicePixelRatioWatcher.ts": "sha256:f5bb015239f43c33ec954e43bf3fa5b6ff0cfb2db1b8e044bf29d1623a2be748",
     "src/rendering/drawingContext.ts": "sha256:e7559e853594a0f04218f6f3f6b56696fc5fdb89cc38df13663c176160dee8c2",
     "src/rendering/furnaceRenderer.ts": "sha256:7044ac774934e4edcd9a1e1f1f8e832075c256af160c288006fbd085c1b29de3",
@@ -414,7 +415,7 @@
     "src/ui/mapCoordinates.ts": "sha256:782466b2b970d6f8dab1f66c7fad5340de6d0d9c9d66da3b759da6ec4e1a4aba",
     "src/ui/networkStatus.ts": "sha256:5a8198723cb044cb736d2d6906dc92bbdc38249e6701e5c4d54fe00d88507495",
     "src/ui/schematicEquipHint.ts": "sha256:fa1e1828e171f8c1094f23a27e9357a195d728cb47bffcb6c1d21e7f735c3bc4",
-    "src/ui/spawnFlyIn.ts": "sha256:15022a2c68c4b325425db05e58b5f28f84e18f59fbffab3d112e30cb77d804d4",
+    "src/ui/spawnFlyIn.ts": "sha256:24a34095fb92d404d658a39a5bf60b7a428a26eb4b070256057f0b59a83880b5",
     "src/ui/uiUtils.ts": "sha256:25528132dfa526865ead56e8075471f9c67d2aaf21593eaa34b5e206fd3f6fdc",
     "src/ui/universeMap.ts": "sha256:de63c16eb9e4f1842927305312ca012fd2c85c4b74640f226210c70bf2546c44",
     "src/ui/universeMapLabels.ts": "sha256:d7eeef12743c6ce0d73c4c894cf4bb5386839f6c52167ce9793b78514e7be6a2",
@@ -577,8 +578,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb",
-    "src/rendering/deviceCategory.ts": "sha256:a6e47a1d49263302178e4a19b3a2c1d0e28cb9e7639d26bdbd84aca9fcd9e61b"
+    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb"
   },
   "reviews": [
     {
@@ -7996,6 +7996,22 @@
       "topics": ["controls"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed field-manual and controls: a skipped camera dive now also starts the hull assembly that combat-survival already describes for deployment; skip keys, tap and reduced-motion behavior and all wording are unchanged, and no demonstration captures the dive.",
+      "sources": ["src/ui/spawnFlyIn.ts"],
+      "topics": ["controls", "field-manual"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed field-manual: the ship cards now carry implication-style flavor lines chosen by John; field-manual still names each kit's function (Scout explores with Mineral Scan, Hauler delivers ore with Tow Cable), so no article or demonstration change is needed.",
+      "sources": ["src/components/game/ShipPicker.svelte"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "src/components/game/ShipPicker.svelte": "field-manual"
+      }
     },
     {
       "note": "Reviewed the low-end flight glow default against the HUD/network Graphics option, Scout simplified-Scan copy and Controls. Low-end devices (measured Fire KFTUWI or coarse pointer with at most 4 GB and four cores, via the shared classifier now in deviceCategory.ts) fly with shadow blur off; desktop and other touch devices keep full glow; ?performance=collect&renderGlow=full restores glow. Updated the HUD Graphics option copy; Scout and Controls copy remain accurate because input, geometry and simplified Scan are unchanged. 40 focused tests pass and the two new Fire cases fail with the preset reverted. Chrome smoke at desktop 1280x900, phone 390x844 and Fire-emulated 800x1094@1.5 joined, steered and fired; the Fire profile counted zero nonzero shadowBlur draws in flight after the spawn fly-in, desktop and phone kept glow, consoles clean; Wiki #hud-network checked at both widths. No demonstration media or gameplay rule changed; no physical-device measurement is claimed.",

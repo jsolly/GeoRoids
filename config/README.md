@@ -65,7 +65,7 @@ Historical root paths remain in the server release classifier when old commit
 diffs require them. Current benchmark and Wiki inventories use the actual owners;
 older review batches and benchmark measurements remain historical evidence.
 Configuration moves cannot bypass source review, the server/client import boundary,
-the complete local gate or any of the four required CI lanes. The Wiki media lane
+the complete local gate or any of the five required CI lanes. The Wiki media lane
 must pass on linux-x64; a macOS run cannot replace it.
 
 Compare effective roots, inputs, formatting, plugins, test scopes and actual build

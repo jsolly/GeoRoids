@@ -94,6 +94,8 @@ const RECEIPT_ID = '00000000-0000-4000-8000-000000000000';
 const RECEIPT_TOKEN = 'a'.repeat(64);
 const RESTARTING = 'Debug report storage is restarting. Keep your local copy and retry.';
 const UNAVAILABLE = 'Debug report storage is unavailable. Keep your local copy.';
+const STUCK = 'Debug report worker has not stopped. Keep your local copy.';
+const STOP_FAILED = 'The debug report worker did not stop and may hold process exit';
 const MEASURED = {
   pending: 0,
   blocked: 0,
@@ -112,7 +114,6 @@ afterEach(async () => {
   }
   await Promise.all(closing);
   threads.all = [];
-  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -401,15 +402,17 @@ test('a replacement thread that cannot start is logged and may be tried again', 
   expect(replacementsLogged()).toBe(2);
 });
 
-test('a retired thread that never exits is reported as stuck, not as restarting', async () => {
+test('a retired thread that exits late is reported as stuck and costs one attempt', async () => {
   vi.useFakeTimers();
   threads.holdExits = true;
   const worker = start();
   emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  const failure = worker.diagnostics().lastError;
   await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
 
-  // Its SQLite call never returns, so `terminate()` never completes. Without a
-  // bound every refusal would promise a restart forever, with nothing logged.
+  // Its SQLite call has not returned, so `terminate()` has not completed.
+  // Without a bound every refusal would promise a restart forever, with
+  // nothing logged.
   vi.advanceTimersByTime(9_999);
   await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
   vi.advanceTimersByTime(1);
@@ -418,22 +421,95 @@ test('a retired thread that never exits is reported as stuck, not as restarting'
     'The previous debug report worker has not exited; reporting stays closed until it does',
     { waitedMs: 10_000 }
   );
-  expect(worker.diagnostics()).toMatchObject({
-    pending: null,
-    lastError: 'Debug report worker has not stopped. Keep your local copy.',
-  });
+  expect(worker.diagnostics()).toMatchObject({ pending: null, lastError: STUCK });
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  vi.advanceTimersByTime(60_000);
   await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
   await settle();
-  // Still one thread, and no further attempt spent while it holds the store.
+  // Still one thread, and no further attempt charged while it holds the store.
   expect(threads.all).toHaveLength(1);
   expect(replacementsLogged()).toBe(1);
 
-  // Once it does exit, a later request may replace it.
-  exitThread(threadAt(0), 1);
-  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  // When it does exit, the replacement it was already charged for starts
+  // without waiting for another request, and the stuck record is withdrawn.
+  exitThread(threadAt(0), 9);
   await settle();
   expect(threads.all).toHaveLength(2);
   expect(threadAt(1).coexisting).toBe(0);
+  expect(serverLogging.warn).toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    'The previous debug report worker exited after the handover deadline',
+    { exitCode: 9 }
+  );
+  expect(worker.diagnostics().lastError).toBe(failure);
+  expect(worker.diagnostics().lastError).not.toBe(STUCK);
+  expect(replacementsLogged()).toBe(1);
+
+  // One incident spent one slot: two more replacements remain in the hour.
+  threads.holdExits = false;
+  await replaceCurrent(worker);
+  await replaceCurrent(worker);
+  exitThread(threadAt(3), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  expect(
+    serverLogging.warn.mock.calls
+      .filter(([, message]) => message === 'Replacing the debug report worker')
+      .map(([, , context]) => (context as { replacement: number }).replacement)
+  ).toEqual([1, 2, 3]);
+});
+
+test('a budget spent twice is logged twice, each with its own next attempt', async () => {
+  vi.useFakeTimers();
+  const worker = start();
+  for (let replacement = 0; replacement < 3; replacement += 1) {
+    await replaceCurrent(worker);
+  }
+  exitThread(threadAt(3), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+
+  // The window reopens, and the budget is spent again at 60, 70 and 80
+  // minutes, so the oldest of those leaves the window 40 minutes later.
+  vi.advanceTimersByTime(60 * MINUTE);
+  await replaceCurrent(worker);
+  vi.advanceTimersByTime(10 * MINUTE);
+  await replaceCurrent(worker);
+  vi.advanceTimersByTime(10 * MINUTE);
+  await replaceCurrent(worker);
+  exitThread(threadAt(6), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+
+  expect(budgetSpentLogs()).toEqual([
+    expect.objectContaining({ nextAttemptInMs: 60 * MINUTE }),
+    expect.objectContaining({ nextAttemptInMs: 40 * MINUTE }),
+  ]);
+});
+
+test('a handover cut short by shutdown neither holds the process nor reports a stuck thread', async () => {
+  vi.useFakeTimers();
+  const scheduled = vi.spyOn(globalThis, 'setTimeout');
+  threads.holdExits = true;
+  const worker = start();
+  emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  const handover = scheduled.mock.calls.findIndex(([, delay]) => delay === 10_000);
+  const handle = scheduled.mock.results[handover]?.value as NodeJS.Timeout | undefined;
+  scheduled.mockRestore();
+
+  const closed = worker.close();
+  vi.advanceTimersByTime(2_000);
+  expect(await outcome(closed)).toEqual({ resolved: undefined });
+  // The handover deadline must not keep a shutting-down process alive...
+  expect(handle?.hasRef()).toBe(false);
+
+  // ...nor, when it fires during shutdown, report a stuck thread.
+  vi.advanceTimersByTime(10_000);
+  expect(serverLogging.error).not.toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    'The previous debug report worker has not exited; reporting stays closed until it does',
+    expect.anything()
+  );
+  expect(worker.diagnostics().lastError).not.toBe(STUCK);
 });
 
 test('closing gives up on a retiring thread that never exits at the close deadline', async () => {
@@ -446,9 +522,18 @@ test('closing gives up on a retiring thread that never exits at the close deadli
   const closed = worker.close();
   vi.advanceTimersByTime(1_999);
   expect(await outcome(closed)).toBe('waiting');
+  expect(serverLogging.error).not.toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    STOP_FAILED,
+    expect.anything()
+  );
   vi.advanceTimersByTime(1);
   expect(await outcome(closed)).toEqual({ resolved: undefined });
   expect(threadAt(0).terminated).toBe(2);
+  // Shutdown goes on, but the record says why process exit may hang.
+  expect(serverLogging.error).toHaveBeenCalledWith('DEBUG_REPORTS', STOP_FAILED, {
+    waitedMs: 2_000,
+  });
 });
 
 test('closing terminates a live thread that ignores the close message at the deadline', async () => {
@@ -464,6 +549,10 @@ test('closing terminates a live thread that ignores the close message at the dea
   vi.advanceTimersByTime(1);
   expect(await outcome(closed)).toEqual({ resolved: undefined });
   expect(threadAt(0).terminated).toBe(1);
+  expect(serverLogging.error).toHaveBeenCalledTimes(1);
+  expect(serverLogging.error).toHaveBeenCalledWith('DEBUG_REPORTS', STOP_FAILED, {
+    waitedMs: 2_000,
+  });
 });
 
 test('a close that ends on exit leaves no deadline running', async () => {
@@ -474,4 +563,5 @@ test('a close that ends on exit leaves no deadline running', async () => {
   exitThread(threadAt(0), 0);
   expect(await outcome(closed)).toEqual({ resolved: undefined });
   expect(vi.getTimerCount()).toBe(0);
+  expect(serverLogging.error).not.toHaveBeenCalled();
 });

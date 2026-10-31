@@ -144,9 +144,7 @@ interface ReportThread {
   readonly worker: Worker;
   /** Its failure is recorded: its replies, faults and counts are ignored. */
   failed: boolean;
-  /** False from its `exit`, which is when its SQLite connection is gone. */
-  running: boolean;
-  /** Settles on that `exit`. */
+  /** Settles on its `exit`, which is when its SQLite connection is gone. */
   readonly exited: Promise<void>;
   /** A replacement waited `HANDOVER_DEADLINE_MS` for this thread to exit, and it did not. */
   overdue: boolean;
@@ -164,7 +162,7 @@ interface ReportThread {
  * the thread is alive and submissions are still accepted, because a store that
  * cannot deliver can usually still take a report and hold it.
  *
- * A retired thread is replaced on a later request, under four rules that each
+ * A retired thread is replaced on a later request, under rules that each
  * answer a way an earlier restart broke:
  *
  * - **One thread exists at a time.** A failed thread is terminated at once, and
@@ -181,13 +179,11 @@ interface ReportThread {
  *   exit and the replacement's start-up inside that request's deadline, which
  *   then either answers the caller after HTTP has given up or judges a healthy
  *   replacement stalled. A request's deadline only ever judges the thread it
- *   was posted to.
+ *   was posted to. The handover itself is not cancelled by any deadline: a
+ *   retired thread still running after `HANDOVER_DEADLINE_MS` is logged and
+ *   published as stuck, refusals stop promising a restart, and the
+ *   replacement already charged to the budget starts when it finally exits.
  * - **The budget refills on the clock only.** See `MAX_REPLACEMENTS`.
- *
- * - **The handover is bounded.** A retired thread that has not exited after
- *   `HANDOVER_DEADLINE_MS` is logged and published as stuck, and no
- *   replacement starts while it runs; once it exits, a later request may try
- *   again.
  *
  * A store that keeps failing therefore closes reporting until the window
  * allows another attempt, still fail-closed, rather than until the next deploy.
@@ -231,7 +227,6 @@ export class DebugReportWorker {
     const thread: ReportThread = {
       worker,
       failed: false,
-      running: true,
       exited: exit.promise,
       overdue: false,
     };
@@ -251,28 +246,35 @@ export class DebugReportWorker {
     worker.on('exit', (code: number) => {
       if (this.closing === undefined) {
         this.fail(thread, { kind: 'exit', code });
+        if (thread.overdue) {
+          // The other half of the stuck record, so an operator can see how
+          // long reporting was closed and that it reopened.
+          logger.warn(
+            'DEBUG_REPORTS',
+            'The previous debug report worker exited after the handover deadline',
+            { exitCode: code }
+          );
+        }
       }
-      thread.running = false;
       exit.resolve();
     });
     return thread;
   }
 
   /**
-   * Starts a replacement unless one is already under way, the budget is
-   * spent, or the retired thread has already outlived a handover. Returns
-   * whether a replacement is under way, so the refusal can say whether
-   * retrying soon is worthwhile. `request()` has already refused a closing
-   * service.
+   * Starts a replacement unless one is already under way or the budget is
+   * spent. Returns whether a restart is worth retrying soon: not when the
+   * budget is spent, and not while the retired thread has outlived its
+   * handover deadline. `request()` has already refused a closing service.
    */
   private recover(): boolean {
     if (this.recovering) {
-      return true;
+      return !this.thread.overdue;
     }
     const predecessor = this.thread;
-    if (predecessor.overdue && predecessor.running) {
-      return false;
-    }
+    // The cause `fail()` published, restored over the stuck record once the
+    // replacement starts.
+    const failure = this.stats.lastError;
     const now = globalThis.performance.now();
     this.replacements = this.replacements.filter((at) => now - at < REPLACEMENT_WINDOW_MS);
     const [oldest] = this.replacements;
@@ -298,12 +300,11 @@ export class DebugReportWorker {
     });
     this.recovering = true;
     // `fail()` terminated the predecessor; its `exit` is when its connection
-    // is gone. Waiting is bounded so a thread stuck in a native SQLite call is
-    // reported rather than leaving every refusal promising a restart forever.
-    let settled = false;
+    // is gone. The deadline reports a thread stuck in a native SQLite call
+    // rather than leaving every refusal promising a restart forever. It does
+    // not cancel the replacement: that stays charged once and starts on the
+    // late exit, so one incident costs one attempt.
     const deadline = setTimeout(() => {
-      settled = true;
-      this.recovering = false;
       if (this.closing !== undefined) {
         return;
       }
@@ -317,14 +318,12 @@ export class DebugReportWorker {
     }, HANDOVER_DEADLINE_MS);
     deadline.unref();
     void predecessor.exited.then(() => {
-      if (settled) {
-        return;
-      }
       clearTimeout(deadline);
       this.recovering = false;
       if (this.closing !== undefined) {
         return;
       }
+      this.stats = { ...this.stats, lastError: failure };
       try {
         this.thread = this.spawn();
       } catch (error) {
@@ -546,6 +545,13 @@ export class DebugReportWorker {
     const thread = this.thread;
     this.closing = new Promise((resolve) => {
       const deadline = setTimeout(() => {
+        // Shutdown goes on without it, but a thread still in a native call is
+        // joined by `process.exit`, so this is the record of why exit hangs.
+        logger.error(
+          'DEBUG_REPORTS',
+          'The debug report worker did not stop and may hold process exit',
+          { waitedMs: CLOSE_DEADLINE_MS }
+        );
         void thread.worker.terminate();
         resolve();
       }, CLOSE_DEADLINE_MS);

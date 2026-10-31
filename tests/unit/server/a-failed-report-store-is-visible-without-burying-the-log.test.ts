@@ -39,9 +39,6 @@ vi.mock('node:worker_threads', () => ({
       attached.push(handler);
       this.thread.listeners.set(event, attached);
     }
-    once(event: string, handler: (value: never) => void): void {
-      this.on(event, handler);
-    }
     postMessage(request: ReportWorkerRequest): void {
       this.thread.sent.push(request);
     }

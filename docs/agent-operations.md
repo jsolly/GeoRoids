@@ -205,30 +205,6 @@ ignores forwarded address headers. Before release, verify that Railway replaces
 client-supplied `X-Real-IP` values. Do not expose this reporting listener through
 an untrusted internal proxy that can choose that header.
 
-A worker failure (an uncaught error, an unexpected exit or a request past its
-deadline) retires that thread with its cause logged, and reporting answers 503.
-A later request starts one replacement and is itself refused as restarting; the
-player's retry reaches the new thread. The replacement starts only after the old
-thread has exited, because the store holds its database under an exclusive
-SQLite lock until its thread is gone. At most three replacements start in any
-rolling hour, each logged as `Replacing the debug report worker`; a spent budget
-is logged once with the time of the next possible attempt, and reporting stays
-closed until then or until the service restarts. If the old thread has not
-exited ten seconds after a replacement was requested, the server logs that
-reporting stays closed until it does, `/health` reports the worker as not
-stopped, and refusals stop promising a restart. No replacement starts while it
-runs, so a thread stuck in a native SQLite call keeps reporting closed until it
-exits or the service restarts. Queued reports resume delivery once a
-replacement runs.
-
-Do not open the live report database with another SQLite client. The exclusive
-lock refuses it, and an open `sqlite3` session also makes a pending replacement
-or a server start fail with `database is locked`, which spends a replacement
-attempt. A copy of the live file can tear mid-checkpoint, and the lock blocks
-SQLite's backup API. Inspect a Railway volume backup restored elsewhere, or stop
-the service first, as for the world database in
-[persistent world operations](persistent-world.md#railway-deployment-and-recovery).
-
 Verified against the live production ingress: the header probe on 2026-10-25 at
 release `c487d041`, and the precondition below on 2026-10-26 at `d7d084e`.
 `clientAddress` runs before the method and content-type checks, so a value that
@@ -259,6 +235,35 @@ upgrade route. Distinguishing either needs an oracle revealing which address the
 server resolved, and no public endpoint exposes one — adding such an endpoint
 would publish the quantity a limiter keys on. Re-verify on any ingress or domain
 change.
+
+A worker failure (an uncaught error, an unexpected exit or a request past its
+deadline) retires that thread with its cause logged, and reporting answers 503.
+A later request starts one replacement and is itself refused as restarting; the
+player's retry reaches the new thread. The replacement starts only after the old
+thread has exited, because the store holds its database under an exclusive
+SQLite lock until its thread is gone. At most three replacements start in any
+rolling hour, each logged as `Replacing the debug report worker`; a spent budget
+is logged once with the time of the next possible attempt, and reporting stays
+closed until then or until the service restarts. If the old thread has not
+exited ten seconds after its replacement was requested, the server logs that
+reporting stays closed until it does, `/health` reports the worker as not
+stopped, and refusals stop promising a restart. A thread stuck in a native
+SQLite call keeps reporting closed until it exits. When it does, the server
+logs the late exit and starts the replacement already charged to the budget,
+with no further request needed. Queued reports resume delivery once a
+replacement runs. If shutdown cannot stop the worker within two seconds, the
+server logs that it may hold process exit.
+
+Do not open the live report database with another SQLite client. The exclusive
+lock refuses it, and an open `sqlite3` session also makes a pending replacement
+fail with `database is locked`, which spends a replacement attempt. A copy of
+the live file can tear mid-checkpoint, and the lock blocks SQLite's backup API.
+Do not restore a Railway volume backup to inspect reports: a restore mounts
+onto the production service and rolls back `world.sqlite` on the same volume.
+Any restore is a human-owned production step. To inspect the report database,
+stop the service, or redeploy with `GEOROIDS_DEBUG_REPORTS_ENABLED=0` so the
+worker never opens the store; see
+[persistent world operations](persistent-world.md#railway-deployment-and-recovery).
 
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
 and a 100 MiB or 200-report pending limit. New acceptance reserves at least

@@ -9,6 +9,7 @@ import { readDebugReport } from '../../../scripts/read-debug-report';
 import type { DebugReportConfiguration } from '../../../server/debugReports/configuration';
 import { DebugReportStore, digest, reportChunks } from '../../../server/debugReports/store';
 import { TodoistDelivery } from '../../../server/debugReports/todoist';
+import { parseDebugReportSubmission } from '../../../shared/debugReports';
 import type { DebugReportSubmission } from '../../../shared-types';
 
 const cleanup: Array<() => void | Promise<void>> = [];
@@ -56,6 +57,10 @@ function submission(): DebugReportSubmission {
       recentLogs: [],
     },
   };
+}
+function unredactableSubmission(): DebugReportSubmission {
+  const report = submission();
+  return { ...report, diagnostics: { ...report.diagnostics, recentLogs: ['not a log record'] } };
 }
 function store(config: DebugReportConfiguration): DebugReportStore {
   const value = new DebugReportStore(config);
@@ -113,6 +118,12 @@ describe('debug report acceptance is durable and bounded', () => {
     db.close();
     const reopened = store(config);
     expect(() => reopened.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
+    expect(reopened.accept(first, 'pilot', {}, now)).toEqual({ id: first.id, state: 'pending' });
+    // Redaction cannot parse this log line, so the error names the stage that ran:
+    // a limited address is refused before its diagnostics are touched.
+    const unredactable = unredactableSubmission();
+    expect(() => reopened.accept(unredactable, 'pilot', {}, now)).toThrow('limit reached');
+    expect(() => reopened.accept(unredactable, 'other-pilot', {}, now)).toThrow(SyntaxError);
     expect(reopened.diagnostics().pending).toBe(3);
     expect(reopened.accept(submission(), 'pilot', {}, now + 3_600_000).state).toBe('pending');
   });
@@ -124,6 +135,9 @@ describe('debug report acceptance is durable and bounded', () => {
       db.accept(submission(), `address-${count}`, {}, now);
     }
     expect(() => db.accept(submission(), 'address-31', {}, now)).toThrow('limit reached');
+    expect(() => db.accept(unredactableSubmission(), 'address-32', {}, now)).toThrow(
+      'limit reached'
+    );
     expect(db.diagnostics().pending).toBe(30);
     const full = store(configuration({ limits: { pendingCount: 1 } }));
     full.accept(submission(), 'pilot', {});
@@ -132,6 +146,35 @@ describe('debug report acceptance is durable and bounded', () => {
     const noSpace = store(configuration({ limits: { minimumFreeBytes: Number.MAX_SAFE_INTEGER } }));
     expect(() => noSpace.accept(submission(), 'pilot', {})).toThrow('Insufficient space');
     expect(noSpace.diagnostics().pending).toBe(0);
+  });
+
+  test('a worst-case upload is parsed, redacted and saved well inside the request deadline', () => {
+    const db = store(configuration());
+    const report = submission();
+    // Slashes were the quadratic case for both redaction passes: one state string
+    // and 80 near-limit log lines once held the worker far past its 10 s deadline.
+    const line = JSON.stringify({
+      version: 1,
+      source: 'client',
+      level: 'error',
+      timestamp: '2026-10-15T12:00:00.000Z',
+      message: '/'.repeat(8_000),
+    });
+    const body = JSON.stringify({
+      ...report,
+      diagnostics: {
+        state: { ...report.diagnostics.state, browser: '/'.repeat(150_000) },
+        recentLogs: Array.from({ length: 80 }, () => line),
+      },
+    });
+    const started = performance.now();
+    const parsed = parseDebugReportSubmission(JSON.parse(body));
+    expect(db.accept(parsed, 'pilot', {}, 1_800_000_000_000).state).toBe('pending');
+    expect(performance.now() - started).toBeLessThan(2_500);
+    const saved: unknown = JSON.parse(db.next(1_800_000_000_001)?.bundle ?? 'null');
+    expect(saved).toMatchObject({
+      diagnostics: { state: { browser: `${'/'.repeat(8180)}…[truncated]` } },
+    });
   });
 
   test('stores reports while credentials are missing and never splits Unicode surrogate pairs', () => {

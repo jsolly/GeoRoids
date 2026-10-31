@@ -5,8 +5,16 @@ import type {
   DebugReportSubmission,
 } from '../shared-types';
 import { LOG_LINE_MAX_BYTES, parseClientLogRecord } from './logRecords';
+import { dropPathQueries } from './queryRedaction';
 
 export const MAX_DEBUG_REPORT_BYTES = 2 * 1024 * 1024;
+/**
+ * Longest diagnostic string a report keeps, in UTF-16 code units. Real state
+ * strings are a user agent or a short reason, far below this; the cap exists so
+ * one string cannot carry a whole upload into redaction.
+ */
+const MAX_DIAGNOSTIC_TEXT = 8192;
+const TRUNCATED = '…[truncated]';
 const STATE_KEYS = new Set([
   'version',
   'capturedAt',
@@ -50,11 +58,31 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Clips rather than rejects: the rest of the report is still evidence, and the
+ * marker says what was cut. The result is never longer than the cap, so parsing
+ * a clipped report again leaves it unchanged and its identity stays stable.
+ */
+function boundedText(value: string): string {
+  if (value.length <= MAX_DIAGNOSTIC_TEXT) {
+    return value;
+  }
+  let kept = MAX_DIAGNOSTIC_TEXT - TRUNCATED.length;
+  const last = value.charCodeAt(kept - 1);
+  if (last >= 0xd800 && last <= 0xdbff) {
+    kept--;
+  }
+  return `${value.slice(0, kept)}${TRUNCATED}`;
+}
+
 function jsonValue(value: unknown, depth = 0): DebugJsonValue {
   if (depth > 12) {
     throw new Error('Diagnostic nesting exceeds the report limit');
   }
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+  if (typeof value === 'string') {
+    return boundedText(value);
+  }
+  if (value === null || typeof value === 'boolean') {
     return value;
   }
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -146,8 +174,8 @@ export function parseDebugReportSubmission(input: unknown): DebugReportSubmissio
 
 function safeText(value: string, secrets: readonly string[]): string {
   // Scrub patterns first: a pilot named "http" or "Bearer" must not hide their labels.
-  let text = value
-    .replace(/\b(?:https?|wss?):\/\/[^\s"'<>]+/giu, (match) => {
+  let text = dropPathQueries(
+    value.replace(/\b(?:https?|wss?):\/\/[^\s"'<>]+/giu, (match) => {
       try {
         const url = new URL(match);
         url.username = '';
@@ -159,7 +187,7 @@ function safeText(value: string, secrets: readonly string[]): string {
         return '[redacted-url]';
       }
     })
-    .replace(/(\/[a-z0-9._~!$&'()*+,;=:@%/-]+)[?#][^\s"'<>]*/giu, '$1')
+  )
     .replace(/\bBearer\s+\S+/giu, 'Bearer [redacted]')
     .replace(
       /\b(?:authorization|cookie|password|resumeToken|secret|token)\s*[:=]\s*[^\s,;&]+/giu,

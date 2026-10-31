@@ -243,8 +243,8 @@ player's retry reaches the new thread. The replacement starts only after the old
 thread has exited, because the store holds its database under an exclusive
 SQLite lock until its thread is gone. At most three replacement threads start
 in any rolling hour. Each is logged as `Replacing the debug report worker` when
-requested, holds its slot from then, and is counted from the moment its thread
-actually starts, so a late handover cannot fit a fourth start into the hour. A
+requested and counted from the moment its thread actually starts, so a late
+handover cannot fit a fourth start into the hour. A
 spent budget is logged once with the time of the next possible attempt, and
 reporting stays closed until then or until the service restarts. If the old
 thread has not exited ten seconds after its replacement was requested, the
@@ -265,7 +265,8 @@ onto the production service and rolls back `world.sqlite` on the same volume.
 The ways to reach the report database safely are to stop the service, or to
 redeploy with `GEOROIDS_DEBUG_REPORTS_ENABLED=0` so the worker never opens the
 store. Once the store is closed, `railway volume files download` can copy the
-file. Restoring, stopping and redeploying are all human-owned production
+file, together with its `-wal` file when one is present: a stop that was not
+clean leaves committed reports there. Restoring, stopping and redeploying are all human-owned production
 steps that agents do not perform; see
 [persistent world operations](persistent-world.md#railway-deployment-and-recovery).
 

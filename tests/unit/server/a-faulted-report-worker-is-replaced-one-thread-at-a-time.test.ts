@@ -406,7 +406,12 @@ test('a replacement thread that cannot start is logged and may be tried again', 
   await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
   await settle();
   expect(threads.all).toHaveLength(2);
-  expect(replacementsLogged()).toBe(2);
+  // The construction that threw still spent its slot.
+  expect(
+    serverLogging.warn.mock.calls
+      .filter(([, message]) => message === 'Replacing the debug report worker')
+      .map(([, , context]) => (context as { replacement: number }).replacement)
+  ).toEqual([1, 2]);
 });
 
 test('a retired thread that exits late is reported as stuck and costs one attempt', async () => {
@@ -510,6 +515,28 @@ test('a handover cut short by shutdown neither holds the process nor reports a s
   expect(serverLogging.error).not.toHaveBeenCalledWith(
     'DEBUG_REPORTS',
     'The previous debug report worker has not exited; reporting stays closed until it does',
+    expect.anything()
+  );
+  expect(worker.diagnostics().lastError).not.toBe(STUCK);
+});
+
+test('a stuck thread that exits during shutdown starts nothing and clears the stuck record', async () => {
+  vi.useFakeTimers();
+  threads.holdExits = true;
+  const worker = start();
+  emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  vi.advanceTimersByTime(10_000);
+  expect(worker.diagnostics().lastError).toBe(STUCK);
+
+  const closed = worker.close();
+  exitThread(threadAt(0), 9);
+  await settle();
+  expect(await outcome(closed)).toEqual({ resolved: undefined });
+  expect(threads.all).toHaveLength(1);
+  expect(serverLogging.warn).not.toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    LATE_EXIT,
     expect.anything()
   );
   expect(worker.diagnostics().lastError).not.toBe(STUCK);

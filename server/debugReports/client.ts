@@ -182,9 +182,10 @@ interface ReportThread {
  *   published as stuck, refusals stop promising a restart, and the
  *   replacement already charged to the budget starts when it finally exits.
  * - **The budget refills on the clock only.** See `MAX_REPLACEMENTS`. A
- *   slot is reserved when a replacement is requested and stamped when the
- *   thread is actually constructed, so a late handover cannot let more than
- *   `MAX_REPLACEMENTS` starts land in one window.
+ *   replacement is counted when its thread is constructed; the single-flight
+ *   `handover` already stops a second request claiming a slot meanwhile, so a
+ *   late handover cannot let more than `MAX_REPLACEMENTS` starts land in one
+ *   window.
  *
  * A store that keeps failing therefore closes reporting until the window
  * allows another attempt, still fail-closed, rather than until the next deploy.
@@ -202,11 +203,7 @@ export class DebugReportWorker {
    * on that `exit`.
    */
   private handover: 'waiting' | 'overdue' | undefined;
-  /**
-   * Monotonic start times of the replacements inside the budget window. The
-   * last entry is a reservation while a handover is in progress; it is
-   * re-stamped when the replacement is constructed.
-   */
+  /** Monotonic start times of the replacements inside the budget window. */
   private replacements: number[] = [];
   /** The current run of budget refusals has been logged. */
   private exhaustionLogged = false;
@@ -287,10 +284,8 @@ export class DebugReportWorker {
       return false;
     }
     this.exhaustionLogged = false;
-    // Reserved now, so the slot cannot be taken twice; stamped at the start.
-    this.replacements.push(now);
     logger.warn('DEBUG_REPORTS', 'Replacing the debug report worker', {
-      replacement: this.replacements.length,
+      replacement: this.replacements.length + 1,
       of: MAX_REPLACEMENTS,
       windowMs: REPLACEMENT_WINDOW_MS,
     });
@@ -328,10 +323,10 @@ export class DebugReportWorker {
           { exitCode }
         );
       }
-      // During a handover nothing else pushes or prunes, so the reservation
-      // is still the last entry. A start up to an hour after its request is
-      // counted at the start, or it would leave the window early.
-      this.replacements[this.replacements.length - 1] = globalThis.performance.now();
+      // Counted when it starts, so a start up to an hour after its request
+      // does not leave the window early. A construction that throws still
+      // spends its slot.
+      this.replacements.push(globalThis.performance.now());
       try {
         this.thread = this.spawn();
       } catch (error) {

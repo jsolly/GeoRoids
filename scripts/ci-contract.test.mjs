@@ -46,7 +46,7 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
       undefined,
       `${name} must start without waiting for another lane`
     );
-    assert.equal(ci.jobs[name]['timeout-minutes'], name === 'static-checks' ? 6 : 4);
+    assert.equal(ci.jobs[name]['timeout-minutes'], name === 'actions-contracts' ? 6 : 4);
     // The committed Wiki media baseline belongs to linux-x64; every other lane runs on arm64.
     assert.equal(
       ci.jobs[name]['runs-on'],
@@ -141,6 +141,16 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
   const commands = ['static-checks', 'runner-contracts', 'actions-contracts'].flatMap((name) =>
     ci.jobs[name].steps.filter((step) => /^npm run /u.test(step.run ?? '')).map((step) => step.run)
   );
+  // A moved check must still run on every full validation: none may skip through its own `if`.
+  for (const name of ['static-checks', 'runner-contracts', 'actions-contracts']) {
+    for (const command of ci.jobs[name].steps.filter((step) => /^npm run /u.test(step.run ?? ''))) {
+      assert.equal(
+        command.if,
+        "steps.verified-tree.outputs.run_full != 'false'",
+        `${name}: ${command.run}`
+      );
+    }
+  }
   assert.deepEqual([...commands].sort(), [...originalStaticCommands].sort());
   assert.equal(new Set(commands).size, originalStaticCommands.length);
   assert.deepEqual(

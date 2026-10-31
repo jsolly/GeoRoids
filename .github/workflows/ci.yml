@@ -189,8 +189,7 @@ jobs:
       (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
       (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
     runs-on: ubuntu-24.04-arm
-    # Allow setup, the contract suite, build and action cleanup to finish.
-    timeout-minutes: 6
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v7
         with:
@@ -464,7 +463,10 @@ jobs:
       (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
       (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
+    # Allow setup, the contract suite and action cleanup to finish. The gate contract suite bounds
+    # its slowest nested run at 220s so a hang reports with the child's output; 4 minutes would
+    # cancel the job first.
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v7
         with:

@@ -12,9 +12,9 @@ publication; PR CI independently validates the integration inventory.
 Static checks cover lint policy, formatting, unused code, Markdown, YAML,
 TypeScript, benchmark types, Wiki source review and the production build.
 Runner contracts exercise owned process startup, admission, ports and cleanup.
-Actions contracts run `check:actions`: the CI, gate, review-receipt and smoke
-contract suites plus actionlint. Its gate contract suite is the longest single
-check, so it runs beside static checks instead of inside them.
+Actions contracts run `npm run check:actions`. Its gate contract suite is the
+longest single check, so it runs beside static checks instead of inside them,
+with a 6-minute budget that fits the suite's own nested-run bounds.
 Integration runs every test in `tests/integration/server/` through the repository runner. Wiki media verifies
 the committed demonstration baseline on `ubuntu-24.04`, the x64 platform that owns
 it, and uploads a regenerated candidate when it is stale; the other lanes run on

@@ -1,14 +1,11 @@
 ---
 name: CI
-run-name: >-
-  ${{ (github.event_name != 'pull_request' ||
-  (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-  (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && format('{0} validation', github.workflow) || 'Deferred validation' }}
+run-name: ${{ format('{0} validation', github.workflow) }}
 
 'on':
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
 
@@ -19,21 +16,12 @@ permissions:
 
 concurrency:
   group: >-
-    ${{ (github.event_name != 'pull_request' ||
-    (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-    (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && format('ci-{0}-{1}-{2}', github.workflow, github.event.pull_request.number || github.ref, github.event_name) || format('deferred-{0}', github.run_id) }}
+    ${{ format('ci-{0}-{1}-{2}', github.workflow, github.event.pull_request.number || github.ref, github.event_name) }}
   cancel-in-progress: true
 
 jobs:
   integration-tests:
-    name: >-
-      ${{ (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'integration-tests' || 'integration-tests-deferred' }}
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
+    name: integration-tests
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
@@ -180,14 +168,7 @@ jobs:
           retention-days: 7
 
   static-checks:
-    name: >-
-      ${{ (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'static-checks' || 'static-checks-deferred' }}
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
+    name: static-checks
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
@@ -330,14 +311,7 @@ jobs:
           retention-days: 7
 
   runner-contracts:
-    name: >-
-      ${{ (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'runner-contracts' || 'runner-contracts-deferred' }}
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
+    name: runner-contracts
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
@@ -454,14 +428,7 @@ jobs:
 
 
   actions-contracts:
-    name: >-
-      ${{ (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'actions-contracts' || 'actions-contracts-deferred' }}
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
+    name: actions-contracts
     runs-on: ubuntu-24.04-arm
     # Allow setup, the contract suite and action cleanup to finish. The gate contract suite bounds
     # its slowest nested run at 220s so a hang reports with the child's output; 4 minutes would
@@ -582,14 +549,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   wiki-media:
-    name: >-
-      ${{ (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'wiki-media' || 'wiki-media-deferred' }}
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')
+    name: wiki-media
     # The committed Wiki media baseline belongs to linux-x64; arm64 rasterizes a few pixels differently.
     runs-on: ubuntu-24.04
     timeout-minutes: 4
@@ -721,19 +681,10 @@ jobs:
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
           if-no-files-found: error
           retention-days: 7
-  # Dependabot PRs skip until a provenanced optimize-workspaces drain applies
-  # `ow-ci`. Only that `labeled` event runs CI, so a later Dependabot push
-  # defers again until the drain re-kicks the new head. Deferred jobs use
-  # name `ci-deferred` so a skipped required `ci` check cannot look green.
+  # Every PR, Dependabot's included, runs every job; labels start no runs.
   ci:
-    name: >-
-      ${{ (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci')) && 'ci' || 'ci-deferred' }}
-    if: >-
-      always() && (github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ow-ci'))
+    name: ci
+    if: always()
     needs: [static-checks, runner-contracts, actions-contracts, integration-tests, wiki-media]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4

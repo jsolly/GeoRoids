@@ -29,10 +29,11 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
     'integration-tests',
     'wiki-media',
   ]);
-  // The required check runs whenever its lanes run, keeps the deferred name otherwise, and fails
-  // when any of its steps fails.
-  assert.equal(required.if, `always() && (${ci.jobs['static-checks'].if})`);
-  assert.equal(required.name, ci.jobs['static-checks'].name.replaceAll('static-checks', 'ci'));
+  // The required check runs whenever its lanes run, Dependabot PRs included, and fails when any
+  // of its steps fails. Labels start no runs.
+  assert.equal(ci.on.pull_request.types.includes('labeled'), false);
+  assert.equal(required.if, 'always()');
+  assert.equal(required.name, 'ci');
   assert.equal(required['continue-on-error'], undefined, 'ci must fail when it fails');
   assert.deepEqual(
     required.steps
@@ -52,11 +53,8 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
       ci.jobs[name]['runs-on'],
       name === 'wiki-media' ? 'ubuntu-24.04' : 'ubuntu-24.04-arm'
     );
-    assert.equal(ci.jobs[name].if, ci.jobs['static-checks'].if);
-    assert.equal(
-      ci.jobs[name].name,
-      ci.jobs['static-checks'].name.replaceAll('static-checks', name)
-    );
+    assert.equal(ci.jobs[name].if, undefined);
+    assert.equal(ci.jobs[name].name, name);
     // Only the reusable-tree lookup may fail without failing its lane.
     assert.equal(ci.jobs[name]['continue-on-error'], undefined, `${name} must fail when it fails`);
     assert.deepEqual(

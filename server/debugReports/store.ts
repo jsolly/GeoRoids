@@ -218,10 +218,12 @@ export class DebugReportStore {
         }
       }
     };
-    // Refuse a limited caller before redaction, so repeated uploads cannot buy
-    // worker time. A counter only grows within its bucket, so a refusal here
-    // would also happen inside the transaction; a pass here may be stale, so the
-    // transaction checks again before it counts the report.
+    // Refuse a limited caller before the report sanitizer runs, so repeated
+    // uploads cannot buy worker time. A counter only grows within its bucket, so
+    // a refusal here would also happen inside the transaction. A pass here can go
+    // stale, because anything that counts a report while this one is redacted
+    // (another accept on this connection or another connection) moves the
+    // counter, so the transaction checks again before it counts this report.
     rejectIfLimited();
     const receivedAt = new Date(now).toISOString();
     const diagnostics = sanitizeDebugDiagnostics(

@@ -15,6 +15,14 @@ export const MAX_DEBUG_REPORT_BYTES = 2 * 1024 * 1024;
  */
 const MAX_DIAGNOSTIC_TEXT = 8192;
 const TRUNCATED = '…[truncated]';
+/** A clip that splits a word drops at most this much of it, so no token keeps a long prefix. */
+const CLIPPED_WORD_REACH = 128;
+/**
+ * URL parses one sanitizer call may spend; later URLs are redacted whole. Real
+ * reports hold far fewer, mostly stack frames, while text built to make
+ * `new URL` throw every few bytes would otherwise cost about a second per MiB.
+ */
+const MAX_URL_PARSES = 2048;
 const STATE_KEYS = new Set([
   'version',
   'capturedAt',
@@ -58,16 +66,35 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function isWordCharacter(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 95
+  );
+}
+
 /**
  * Clips rather than rejects: the rest of the report is still evidence, and the
  * marker says what was cut. The result is never longer than the cap, so parsing
  * a clipped report again leaves it unchanged and its identity stays stable.
+ *
+ * Clipping runs before redaction, so a cut through a token would leave a prefix
+ * that no longer matches its redaction rule, such as 63 characters of a 64-hex
+ * secret. The clip therefore drops the kept part of a word the cut splits.
  */
 function boundedText(value: string): string {
   if (value.length <= MAX_DIAGNOSTIC_TEXT) {
     return value;
   }
   let kept = MAX_DIAGNOSTIC_TEXT - TRUNCATED.length;
+  if (isWordCharacter(value.charCodeAt(kept))) {
+    const reach = kept - CLIPPED_WORD_REACH;
+    while (kept > reach && isWordCharacter(value.charCodeAt(kept - 1))) {
+      kept--;
+    }
+  }
   const last = value.charCodeAt(kept - 1);
   if (last >= 0xd800 && last <= 0xdbff) {
     kept--;
@@ -172,10 +199,25 @@ export function parseDebugReportSubmission(input: unknown): DebugReportSubmissio
   return report;
 }
 
-function safeText(value: string, secrets: readonly string[]): string {
+interface UrlBudget {
+  remaining: number;
+}
+
+/** A clip marker is not evidence: redact the text before it, so no rule can swallow it. */
+function safeText(value: string, secrets: readonly string[], urls: UrlBudget): string {
+  return value.endsWith(TRUNCATED)
+    ? `${redactText(value.slice(0, -TRUNCATED.length), secrets, urls)}${TRUNCATED}`
+    : redactText(value, secrets, urls);
+}
+
+function redactText(value: string, secrets: readonly string[], urls: UrlBudget): string {
   // Scrub patterns first: a pilot named "http" or "Bearer" must not hide their labels.
   let text = dropPathQueries(
     value.replace(/\b(?:https?|wss?):\/\/[^\s"'<>]+/giu, (match) => {
+      if (urls.remaining <= 0) {
+        return '[redacted-url]';
+      }
+      urls.remaining--;
       try {
         const url = new URL(match);
         url.username = '';
@@ -206,13 +248,14 @@ function safeText(value: string, secrets: readonly string[]): string {
 function sanitize(
   value: DebugJsonValue,
   secrets: readonly string[],
+  urls: UrlBudget,
   envelope = false
 ): DebugJsonValue {
   if (typeof value === 'string') {
-    return safeText(value, secrets);
+    return safeText(value, secrets, urls);
   }
   if (Array.isArray(value)) {
-    return value.map((item) => sanitize(item, secrets));
+    return value.map((item) => sanitize(item, secrets, urls));
   }
   if (value !== null && typeof value === 'object') {
     const result: { [key: string]: DebugJsonValue } = {};
@@ -220,7 +263,7 @@ function sanitize(
       result[key] =
         PRIVATE_KEY.test(key) || key.toLowerCase() === 'name'
           ? '[redacted]'
-          : sanitize(child, envelope && STRUCTURAL_FIELDS.has(key) ? [] : secrets);
+          : sanitize(child, envelope && STRUCTURAL_FIELDS.has(key) ? [] : secrets, urls);
     }
     return result;
   }
@@ -232,15 +275,16 @@ export function sanitizeDebugDiagnostics(
   snapshot: DebugDiagnosticSnapshot,
   secrets: readonly string[] = []
 ): DebugDiagnosticSnapshot {
+  const urls: UrlBudget = { remaining: MAX_URL_PARSES };
   const state: { [key: string]: DebugJsonValue } = {};
   for (const [key, value] of Object.entries(snapshot.state)) {
-    state[key] = sanitize(value, STRUCTURAL_FIELDS.has(key) ? [] : secrets);
+    state[key] = sanitize(value, STRUCTURAL_FIELDS.has(key) ? [] : secrets, urls);
   }
   return {
     state,
     recentLogs: snapshot.recentLogs.map((line) => {
       const parsed: unknown = JSON.parse(line);
-      return JSON.stringify(sanitize(jsonValue(parsed), secrets, true));
+      return JSON.stringify(sanitize(jsonValue(parsed), secrets, urls, true));
     }),
   };
 }

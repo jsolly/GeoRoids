@@ -139,20 +139,24 @@ describe('debug report acceptance is durable and bounded', () => {
       'limit reached'
     );
     expect(db.diagnostics().pending).toBe(30);
-    const full = store(configuration({ limits: { pendingCount: 1 } }));
-    full.accept(submission(), 'pilot', {});
-    expect(() => full.accept(submission(), 'other', {})).toThrow('storage is full');
-    expect(full.diagnostics().pending).toBe(1);
+    const full = store(configuration({ limits: { pendingCount: 3 } }));
+    for (let count = 0; count < 3; count++) {
+      full.accept(submission(), 'pilot', {}, now);
+    }
+    expect(() => full.accept(submission(), 'other', {}, now)).toThrow('storage is full');
+    // A limited address is told it is limited, not that storage is full.
+    expect(() => full.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
+    expect(full.diagnostics().pending).toBe(3);
     const noSpace = store(configuration({ limits: { minimumFreeBytes: Number.MAX_SAFE_INTEGER } }));
     expect(() => noSpace.accept(submission(), 'pilot', {})).toThrow('Insufficient space');
     expect(noSpace.diagnostics().pending).toBe(0);
   });
 
-  test('a worst-case upload is parsed, redacted and saved well inside the request deadline', () => {
+  test('a slash-heavy upload at the size limits is saved with its long string clipped', () => {
     const db = store(configuration());
     const report = submission();
-    // Slashes were the quadratic case for both redaction passes: one state string
-    // and 80 near-limit log lines once held the worker far past its 10 s deadline.
+    // Slashes were the quadratic case for both former query patterns. The cost
+    // of this shape is bounded in debug-reports-redact-text-and-preserve-evidence.
     const line = JSON.stringify({
       version: 1,
       source: 'client',
@@ -167,10 +171,8 @@ describe('debug report acceptance is durable and bounded', () => {
         recentLogs: Array.from({ length: 80 }, () => line),
       },
     });
-    const started = performance.now();
     const parsed = parseDebugReportSubmission(JSON.parse(body));
     expect(db.accept(parsed, 'pilot', {}, 1_800_000_000_000).state).toBe('pending');
-    expect(performance.now() - started).toBeLessThan(2_500);
     const saved: unknown = JSON.parse(db.next(1_800_000_000_001)?.bundle ?? 'null');
     expect(saved).toMatchObject({
       diagnostics: { state: { browser: `${'/'.repeat(8180)}…[truncated]` } },

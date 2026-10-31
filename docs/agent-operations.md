@@ -199,11 +199,15 @@ Only the report worker parses, redacts and persists report bodies or contacts
 Todoist. The main server accepts at most two concurrent uploads and eight
 worker requests, with a ten-second request deadline. New reports are limited
 to 2 MiB, three per client address per hour and 30 globally per UTC day.
-The worker refuses a limited address before redacting its report, then checks
-again inside the transaction that counts it. A diagnostic state string longer
-than 8,192 characters is clipped to that length and ends in `…[truncated]`,
-while a client log record over 8 KiB still rejects the report. Redaction runs in
-time linear in the report's size.
+The worker refuses a limited address before the report sanitizer runs
+(parsing, which cleans each log record, still runs first), then checks again
+inside the transaction that counts it. A diagnostic state string longer than
+8,192 characters is clipped to that length and ends in `…[truncated]`; a word
+the cut splits loses its kept part, up to 128 characters, so a clipped secret
+keeps no prefix, and redaction never removes the marker. A client log record
+over 8 KiB still rejects the report. One sanitizer pass parses at most 2,048
+URLs and redacts later ones whole. Redaction runs in time linear in the
+report's size.
 These limits are independent of gameplay admission. Railway public HTTP
 ingress supplies `X-Real-IP`; local development uses the socket address and
 ignores forwarded address headers. Before release, verify that Railway replaces

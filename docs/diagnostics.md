@@ -17,7 +17,9 @@ The report includes the current diagnostic snapshot and up to 80 recent client
 log records, plus aggregate server health at receipt. It excludes resume tokens,
 player names, chat and browser storage. Diagnostic strings also redact known
 credentials and strip URL credentials, query strings and fragments. A diagnostic
-state string longer than 8,192 characters is clipped and ends in `…[truncated]`. The description
+state string longer than 8,192 characters is clipped and ends in `…[truncated]`,
+without the partial word at the cut. URLs beyond the first 2,048 in a report are
+redacted whole. The description
 is intentionally submitted free text: do not enter passwords or secrets. Members
 of the shared `jsolly/GeoRoids` Todoist project can read the report.
 

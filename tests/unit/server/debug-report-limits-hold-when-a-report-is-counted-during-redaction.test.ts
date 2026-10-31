@@ -8,7 +8,8 @@ import { DebugReportStore } from '../../../server/debugReports/store';
 import type { DebugReportSubmission } from '../../../shared-types';
 
 // Redaction runs between the early limit check and the counting transaction.
-// Hooking it lets a second connection commit a report in exactly that gap.
+// Hooking it lets the same store count another report in exactly that gap,
+// which needs no second connection to the database.
 const gap = vi.hoisted(() => ({ during: null as (() => void) | null }));
 vi.mock('../../../shared/debugReports', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../shared/debugReports')>();
@@ -45,28 +46,25 @@ function submission(): DebugReportSubmission {
   };
 }
 
-test('a report another connection counts after the early check is still refused at the limit', () => {
+test('a report counted while another is being redacted is still refused at the limit', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-debug-limits-'));
   cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
-  const config = {
+  const store = new DebugReportStore({
     path: join(directory, 'reports.sqlite'),
     token: 'server-credential',
     projectId: 'project-one',
     sectionId: 'section-one',
-  };
-  const first = new DebugReportStore(config);
-  cleanup.push(() => first.close());
-  const second = new DebugReportStore(config);
-  cleanup.push(() => second.close());
+  });
+  cleanup.push(() => store.close());
   const now = 1_800_000_000_000;
-  first.accept(submission(), 'pilot', {}, now);
-  first.accept(submission(), 'pilot', {}, now);
+  store.accept(submission(), 'pilot', {}, now);
+  store.accept(submission(), 'pilot', {}, now);
   gap.during = () => {
-    expect(second.accept(submission(), 'pilot', {}, now).state).toBe('pending');
+    expect(store.accept(submission(), 'pilot', {}, now).state).toBe('pending');
   };
   // Two of three were counted when this upload passed its early check; the third
-  // arrived during redaction, so only the transaction can still see the limit.
-  expect(() => first.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
+  // was counted during its redaction, so only the transaction can see the limit.
+  expect(() => store.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
   expect(gap.during).toBeNull();
-  expect(first.diagnostics().pending).toBe(3);
+  expect(store.diagnostics().pending).toBe(3);
 });

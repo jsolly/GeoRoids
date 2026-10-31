@@ -26,6 +26,41 @@ function isQueryMarker(character: string | undefined): boolean {
   return character === '?' || character === '#';
 }
 
+/** Whether `run` holds a `/` at or after `from` with at least one character after it. */
+function slashBeforeEnd(run: string, from: number): boolean {
+  const slash = run.indexOf('/', from);
+  return slash !== -1 && slash < run.length - 1;
+}
+
+/**
+ * The scan both exports share. `runs` finds maximal runs; a run followed by `?`
+ * or `#` that `ownsQuery` accepts keeps its text and loses the query, which
+ * `query` measures from the marker. The next run starts where the query ended:
+ * a quote ends a path query yet is a path character, so a run may start there.
+ */
+function dropQueries(
+  text: string,
+  runs: RegExp,
+  ownsQuery: (run: string) => boolean,
+  query: RegExp
+): string {
+  let result = '';
+  let copied = 0;
+  runs.lastIndex = 0;
+  for (let run = runs.exec(text); run; run = runs.exec(text)) {
+    const end = runs.lastIndex;
+    if (!isQueryMarker(text[end]) || !ownsQuery(run[0])) {
+      continue;
+    }
+    query.lastIndex = end;
+    query.exec(text);
+    result += text.slice(copied, end);
+    copied = query.lastIndex;
+    runs.lastIndex = copied;
+  }
+  return result + text.slice(copied);
+}
+
 /**
  * Same output as replacing global, case-insensitive Unicode matches of
  * `(\/[a-z0-9._~!$&'()*+,;=:@%/-]+)[?#][^\s"'<>]*` with `$1`.
@@ -35,23 +70,7 @@ function isQueryMarker(character: string | undefined): boolean {
  * bracket, is dropped.
  */
 export function dropPathQueries(text: string): string {
-  let result = '';
-  let copied = 0;
-  PATH_RUN.lastIndex = 0;
-  for (let run = PATH_RUN.exec(text); run; run = PATH_RUN.exec(text)) {
-    const end = PATH_RUN.lastIndex;
-    const slash = run[0].indexOf('/');
-    if (slash === -1 || slash === run[0].length - 1 || !isQueryMarker(text[end])) {
-      continue;
-    }
-    PATH_QUERY.lastIndex = end + 1;
-    PATH_QUERY.exec(text);
-    result += text.slice(copied, end);
-    copied = PATH_QUERY.lastIndex;
-    // A quote ends the query yet is a path character, so a new run may start there.
-    PATH_RUN.lastIndex = copied;
-  }
-  return result + text.slice(copied);
+  return dropQueries(text, PATH_RUN, (run) => slashBeforeEnd(run, 0), PATH_QUERY);
 }
 
 /**
@@ -65,24 +84,10 @@ export function dropPathQueries(text: string): string {
  * whitespace, is dropped.
  */
 export function dropLinkQueries(text: string): string {
-  let result = '';
-  let copied = 0;
-  LINK_WORD.lastIndex = 0;
-  for (let word = LINK_WORD.exec(text); word; word = LINK_WORD.exec(text)) {
-    const end = LINK_WORD.lastIndex;
-    if (!isQueryMarker(text[end]) || !ownsQuery(word[0])) {
-      continue;
-    }
-    LINK_QUERY.lastIndex = end;
-    LINK_QUERY.exec(text);
-    result += text.slice(copied, end);
-    copied = LINK_QUERY.lastIndex;
-    LINK_WORD.lastIndex = copied;
-  }
-  return result + text.slice(copied);
+  return dropQueries(text, LINK_WORD, linkOwnsQuery, LINK_QUERY);
 }
 
-function ownsQuery(word: string): boolean {
+function linkOwnsQuery(word: string): boolean {
   if (LINK_WITH_HOST.test(word)) {
     return true;
   }
@@ -90,6 +95,5 @@ function ownsQuery(word: string): boolean {
   while (suffix > 0 && PATH_CHARACTER.test(word.charAt(suffix - 1))) {
     suffix--;
   }
-  const slash = word.indexOf('/', suffix);
-  return slash !== -1 && slash < word.length - 1;
+  return slashBeforeEnd(word, suffix);
 }

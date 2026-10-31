@@ -5,6 +5,7 @@ import { suspendTerrainPrefetch } from '../physics/terrain/terrainSession';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { paintOpaqueBackground } from './canvasBackground';
+import { classifyDevice, type DeviceCategory } from './deviceCategory';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 import { type GpuContourLayer, GpuRearRenderer } from './gpuRearRenderer';
 import {
@@ -18,8 +19,8 @@ import {
   type PlayfieldSize,
   projectWorldToScreenInto,
 } from './playfieldCamera';
-import { configureRenderQuality } from './renderQuality';
-import { classifyScanDevice, resolveScanDetail } from './scanDetailPolicy';
+import { configureRenderQuality, qualityAudience } from './renderQuality';
+import { resolveScanDetail } from './scanDetailPolicy';
 import { SCAN_SCENERY_MAX_PIXELS, ScanSceneryCache, scanSceneryMode } from './scanSceneryCache';
 import { SimpleScanRenderer, type SimpleScanScene } from './simpleScanRenderer';
 
@@ -93,7 +94,7 @@ class CanvasManager {
       hardwareConcurrency: 'unknown',
     };
   private simpleScanActive = false;
-  private deviceCategory: ReturnType<typeof classifyScanDevice> = 'unknown';
+  private deviceCategory: DeviceCategory = 'unknown';
   private readonly simpleScanRenderer = new SimpleScanRenderer();
   private simpleScanLastStats: ReturnType<SimpleScanRenderer['draw']> | null = null;
 
@@ -125,7 +126,7 @@ class CanvasManager {
       deviceMemory: memory,
       hardwareConcurrency: cores,
     };
-    this.deviceCategory = classifyScanDevice(deviceHints);
+    this.deviceCategory = classifyDevice(deviceHints);
     this.scanDetail = resolveScanDetail(window.location.search, deviceHints);
     const gpuRequested = new URLSearchParams(window.location.search).get('renderer') === 'webgl2';
     this.gpuRequested = gpuRequested;
@@ -205,7 +206,10 @@ class CanvasManager {
     const { width, height } = this.viewportSize();
     const deviceDpr = this.currentDevicePixelRatio();
     const touchControls = shouldUseTouchControls();
-    const quality = configureRenderQuality(window.location.search, touchControls);
+    const quality = configureRenderQuality(
+      window.location.search,
+      qualityAudience(this.deviceCategory, touchControls)
+    );
     const flightDpr = quality.maxDpr === 'native' ? deviceDpr : Math.min(deviceDpr, quality.maxDpr);
     const dpr = this.simpleScanActive
       ? Math.min(
@@ -365,7 +369,7 @@ class CanvasManager {
     this.worldLayersZoomed = false;
     this.scanDetail = { mode: 'full', reason: 'default-full' };
     this.deviceCategory = 'unknown';
-    configureRenderQuality('', false);
+    configureRenderQuality('', 'desktop');
     clearHudLayoutCache();
   }
 
@@ -571,7 +575,7 @@ class CanvasManager {
     return this.simpleScanActive;
   }
 
-  getDeviceCategory(): ReturnType<typeof classifyScanDevice> {
+  getDeviceCategory(): DeviceCategory {
     return this.deviceCategory;
   }
 

@@ -1,7 +1,12 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import { configureRenderQuality } from '../../../src/rendering/renderQuality';
+import {
+  configureRenderQuality,
+  qualityAudience,
+  resolveGlow,
+} from '../../../src/rendering/renderQuality';
 import { strokePhosphorPolyline } from '../../../src/rendering/vectorJuice';
+import { shouldUseTouchControls } from '../../../src/ui/viewportChrome';
 
 const originalUrl = window.location.href;
 const originalDpr = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
@@ -13,6 +18,7 @@ afterEach(() => {
     Object.defineProperty(window, 'devicePixelRatio', originalDpr);
   }
   vi.restoreAllMocks();
+  Reflect.deleteProperty(navigator, 'deviceMemory');
 });
 
 test('a DPR-three pilot keeps the same view and aiming coordinates at lower rendering resolution', () => {
@@ -72,15 +78,83 @@ test.each([
 );
 
 test('ordinary touch play keeps full quality and rejects invalid experiments only in diagnostic mode', () => {
-  expect(configureRenderQuality('?renderDpr=1.5&renderGlow=off', true)).toEqual({
+  expect(configureRenderQuality('?renderDpr=1.5&renderGlow=off', 'touch')).toEqual({
     maxDpr: 'native',
     glow: 'full',
     source: 'touch-default',
   });
-  expect(() => configureRenderQuality('?performance=collect&renderDpr=0', true)).toThrow(
+  expect(() => configureRenderQuality('?performance=collect&renderDpr=0', 'touch')).toThrow(
     'renderDpr'
   );
-  expect(() => configureRenderQuality('?performance=1&renderGlow=dim', true)).toThrow('renderGlow');
+  expect(() => configureRenderQuality('?performance=1&renderGlow=dim', 'touch')).toThrow(
+    'renderGlow'
+  );
+});
+
+const fireTablet =
+  'Mozilla/5.0 (Linux; Android 11; KFTUWI) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.158 Safari/537.36';
+const androidTablet =
+  'Mozilla/5.0 (Linux; Android 12; Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36';
+
+/** A touch tablet: coarse pointer, so the game shows touch controls, with the given hardware hints. */
+function joinOnTouchTablet(userAgent: string, deviceMemory: number, cores: number): void {
+  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
+  vi.spyOn(navigator, 'hardwareConcurrency', 'get').mockReturnValue(cores);
+  Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: deviceMemory });
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query) =>
+      Object.assign(new window.EventTarget(), {
+        matches: query === '(pointer: coarse)' || query === '(hover: none)',
+        media: query,
+        onchange: null,
+        addListener() {},
+        removeListener() {},
+      }) as unknown as MediaQueryList
+  );
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
+  expect(shouldUseTouchControls()).toBe(true);
+}
+
+test.each([
+  ['the measured Fire tablet', fireTablet, 2, 8],
+  ['a 4 GB four-core touch tablet', androidTablet, 4, 4],
+])('%s flies its touch controls without glow by default', (_device, userAgent, memory, cores) => {
+  window.history.replaceState(null, '', '/');
+  joinOnTouchTablet(userAgent, memory, cores);
+  expect(canvasManager.getDeviceCategory()).toBe('low-end');
+  expect(resolveGlow(8)).toBe(0);
+});
+
+test('a capable touch tablet and a desktop keep full glow', () => {
+  window.history.replaceState(null, '', '/');
+  joinOnTouchTablet(androidTablet, 8, 8);
+  expect(canvasManager.getDeviceCategory()).not.toBe('low-end');
+  expect(resolveGlow(8)).toBe(8);
+  canvasManager.destroy();
+  vi.restoreAllMocks();
+
+  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/155.0.0.0 Safari/537.36'
+  );
+  canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
+  expect(shouldUseTouchControls()).toBe(false);
+  expect(resolveGlow(8)).toBe(8);
+});
+
+test('a low-end touch pilot can still compare full glow in a diagnostic visit', () => {
+  window.history.replaceState(null, '', '?performance=collect&renderGlow=full');
+  joinOnTouchTablet(fireTablet, 2, 8);
+  expect(resolveGlow(8)).toBe(8);
+  expect(configureRenderQuality('', qualityAudience('low-end', true))).toEqual({
+    maxDpr: 'native',
+    glow: 'off',
+    source: 'low-end-default',
+  });
+  expect(configureRenderQuality('?performance=1&renderGlow=full', 'low-end')).toEqual({
+    maxDpr: 'native',
+    glow: 'full',
+    source: 'diagnostic',
+  });
 });
 
 test('turning off glow retains every phosphor hull stroke and vertex', () => {
@@ -101,7 +175,7 @@ test('turning off glow retains every phosphor hull stroke and vertex', () => {
   });
   const move = vi.spyOn(ctx, 'moveTo');
   const line = vi.spyOn(ctx, 'lineTo');
-  configureRenderQuality('?performance=collect&renderGlow=full', true);
+  configureRenderQuality('?performance=collect&renderGlow=full', 'touch');
   strokePhosphorPolyline(ctx, points, '#ffffff', 2, 8, true);
   const full = { moves: [...move.mock.calls], lines: [...line.mock.calls] };
   expect(blurAtStroke).toEqual([8, 0]);
@@ -109,7 +183,7 @@ test('turning off glow retains every phosphor hull stroke and vertex', () => {
   line.mockClear();
   blurAtStroke.length = 0;
 
-  configureRenderQuality('?performance=collect&renderGlow=off', true);
+  configureRenderQuality('?performance=collect&renderGlow=off', 'touch');
   strokePhosphorPolyline(ctx, points, '#ffffff', 2, 8, true);
   expect(blurAtStroke).toEqual([0, 0]);
   expect({ moves: move.mock.calls, lines: line.mock.calls }).toEqual(full);

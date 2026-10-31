@@ -343,12 +343,12 @@
     "src/physics/terrain/terrainSession.ts": "sha256:c136832fb8f942d5343f46da5feeca26d14d5a6c2dcd3199d7668bb6deb5008a",
     "src/release/clientReleaseEntry.ts": "sha256:74417e3658fbbc62a5928dcb481242830eea21898845dd78c837bbc9ced02c1f",
     "src/release/clientReleaseWatcher.ts": "sha256:d38808673a021c49999d808da39e04fe2c199d376408e2e1e1ed00ff0de96034",
-    "src/rendering/beltRenderer.ts": "sha256:bed1d7c58b3014a93ca9435e9770ede9dd7d7342ff7bdea5eb975de03b3d7f68",
+    "src/rendering/beltRenderer.ts": "sha256:3d4544091bb5c8ae694e8e432027ee1075be718d274a4cf14993a11133c30544",
     "src/rendering/boundaryRenderer.ts": "sha256:5d3208fc26a8352f8292664504956a1c1757a16ab03845d816ee5de50496819b",
     "src/rendering/campaignRenderer.ts": "sha256:e1337a231b46068872f8ede65f815fe5f514417fc77b110511765086ff8d540f",
     "src/rendering/canvas.ts": "sha256:dca66b48925ee9c8a939b7fe4978ec502ec9681835dfb43b4d914a7c53227715",
     "src/rendering/canvasBackground.ts": "sha256:aa0fcb20a82cd5c7e9bf65c8661bb2da121a346a08f16dff223095546636ef75",
-    "src/rendering/canvasSurface.ts": "sha256:6b09019bff981e7d7c98998a420e748a8d498cb4d6ea978e9b6048bd21bc65c0",
+    "src/rendering/canvasSurface.ts": "sha256:415195e520797dbacc83637a7810ce8ff9fe3a970c01e73880f3b76d2a951448",
     "src/rendering/cargoHoldRenderer.ts": "sha256:9d9fa3eb3da559c7d0c05fc2997460742e2ad3fb4e0c55841c0304408e435f5c",
     "src/rendering/cargoOffloadRenderer.ts": "sha256:c4b2f3a0bda19a35fc03b6016d8c77ef81cd2aa02519610cf020f574569e826d",
     "src/rendering/contourBridgeRenderer.ts": "sha256:7a9431bc0fce2d22f57fdd550ccb0e82d79b812a6f6b9af11c104e43e81fea22",
@@ -358,6 +358,7 @@
     "src/rendering/contourSpeedLines.ts": "sha256:e6172c6ab822a776f890c887af253303f864df9afde32ee93a5148659b058f80",
     "src/rendering/contourTrackRenderer.ts": "sha256:4db7796f076c1a274bfe763775fff8bd25527a5e3095af1f5705b5308dcbe8dc",
     "src/rendering/crewSignalRenderer.ts": "sha256:3dd933457fb43fd631c91441bf4b805fc8d82d6c7813d0fe27006c445f120ab7",
+    "src/rendering/deviceCategory.ts": "sha256:a6e47a1d49263302178e4a19b3a2c1d0e28cb9e7639d26bdbd84aca9fcd9e61b",
     "src/rendering/devicePixelRatioWatcher.ts": "sha256:f5bb015239f43c33ec954e43bf3fa5b6ff0cfb2db1b8e044bf29d1623a2be748",
     "src/rendering/drawingContext.ts": "sha256:e7559e853594a0f04218f6f3f6b56696fc5fdb89cc38df13663c176160dee8c2",
     "src/rendering/furnaceRenderer.ts": "sha256:7044ac774934e4edcd9a1e1f1f8e832075c256af160c288006fbd085c1b29de3",
@@ -376,11 +377,11 @@
     "src/rendering/playfieldCamera.ts": "sha256:be7436b3f86acb7aabd3e120759f83747e6f2e72b06a84760953517ec265fd81",
     "src/rendering/rasterSurface.ts": "sha256:4f0f4b38fa398df8c0facdbf2eab75ddd49d1d3b52a43e8f74632731208e3953",
     "src/rendering/remainsRenderer.ts": "sha256:f43d3df268dd839054c2214c394930cf559d99714cd8a99117cea399b482ab19",
-    "src/rendering/renderQuality.ts": "sha256:91f2cb79a8fe1041302da0fdecedbde68d418c2623e44188cde47533dbb516a3",
+    "src/rendering/renderQuality.ts": "sha256:8ef74c6a4b4e0d9badaeb073f1246f90a8fd2dfb69ac4333e5f97e304d031dec",
     "src/rendering/ricochetCourtRenderer.ts": "sha256:c087819882bc8106c415686ba39d9824278ea5cfe381a0fb072e5f7d1442ee0f",
     "src/rendering/rolyPolyRenderer.ts": "sha256:c05861b41cd0974cf2c8dd576345e871b0dfaf95996c20650d4bf0ce95b5a1d0",
     "src/rendering/routeWaypoints.ts": "sha256:0fee65f107d3c3064803b2dbb3b2cce749d8f0db43274c21447a0b1ad5e0f66b",
-    "src/rendering/scanDetailPolicy.ts": "sha256:2b3c60bf266b4d32c9d991dba8ff20e8deeb7b983421fcf1bdb932f421a89bb4",
+    "src/rendering/scanDetailPolicy.ts": "sha256:225df4b9c3cf7a98bd982fef5eea48293775ecae8e1978210931929fa562acbc",
     "src/rendering/scanSceneryCache.ts": "sha256:9d74511e177f7c481d2bdeb92af12279090dd1e06ba9f5699a7e180858dc51b1",
     "src/rendering/shipLighting.ts": "sha256:c9512e3a31f0fac22a3339723785e5e8d3f66b54f71127e84a93812b7214e5c9",
     "src/rendering/shipSchematicCanvas.ts": "sha256:6bd8bab01d2e1745f9da8d26233d31913f5cebb821bb0c765accbde9923db046",
@@ -8010,6 +8011,37 @@
       "media": [],
       "owners": {
         "src/components/game/ShipPicker.svelte": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the low-end flight glow default against the HUD/network Graphics option, Scout simplified-Scan copy and Controls. Low-end devices (measured Fire KFTUWI or coarse pointer with at most 4 GB and four cores, via the shared classifier now in deviceCategory.ts) fly with shadow blur off; desktop and other touch devices keep full glow; ?performance=collect&renderGlow=full restores glow. Updated the HUD Graphics option copy; Scout and Controls copy remain accurate because input, geometry and simplified Scan are unchanged. 40 focused tests pass and the two new Fire cases fail with the preset reverted. Chrome smoke at desktop 1280x900, phone 390x844 and Fire-emulated 800x1094@1.5 joined, steered and fired; the Fire profile counted zero nonzero shadowBlur draws in flight after the spawn fly-in, desktop and phone kept glow, consoles clean; Wiki #hud-network checked at both widths. No demonstration media or gameplay rule changed; no physical-device measurement is claimed.",
+      "sources": [
+        "src/rendering/canvasSurface.ts",
+        "src/rendering/deviceCategory.ts",
+        "src/rendering/renderQuality.ts",
+        "src/rendering/scanDetailPolicy.ts"
+      ],
+      "topics": ["controls", "hud-network", "scout"],
+      "media": [],
+      "owners": {
+        "src/rendering/deviceCategory.ts": "hud-network",
+        "src/rendering/renderQuality.ts": "hud-network",
+        "src/rendering/scanDetailPolicy.ts": "scout"
+      }
+    },
+    {
+      "note": "Review fixes for the low-end flight glow default: audience precedence (low-end over touch) now lives in renderQuality.qualityAudience, and spider eye blur in beltRenderer goes through resolveGlow so low-end flight drops it too. HUD Graphics option, Scout, Controls, Asteroids and Terrain copy remain accurate: no article describes spider eye glow, and spider shapes, colors and behavior are unchanged. 42 focused tests pass; touch-tablet cases fail under touch-first precedence, UA-only wiring and a reverted preset. Chrome smoke repeated at desktop, phone and Fire-emulated tablet with clean consoles and zero flight shadow blur on the Fire profile after the spawn fly-in; Wiki copy checked at both widths. No media or gameplay rule changed.",
+      "sources": [
+        "src/rendering/beltRenderer.ts",
+        "src/rendering/canvasSurface.ts",
+        "src/rendering/deviceCategory.ts",
+        "src/rendering/renderQuality.ts"
+      ],
+      "topics": ["asteroids", "controls", "hud-network", "scout", "terrain"],
+      "media": [],
+      "owners": {
+        "src/rendering/renderQuality.ts": "hud-network",
+        "src/rendering/deviceCategory.ts": "hud-network"
       }
     }
   ]

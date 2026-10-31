@@ -96,6 +96,7 @@ const RESTARTING = 'Debug report storage is restarting. Keep your local copy and
 const UNAVAILABLE = 'Debug report storage is unavailable. Keep your local copy.';
 const STUCK = 'Debug report worker has not stopped. Keep your local copy.';
 const STOP_FAILED = 'The debug report worker did not stop and may hold process exit';
+const LATE_EXIT = 'The previous debug report worker exited after the handover deadline';
 const MEASURED = {
   pending: 0,
   blocked: 0,
@@ -240,6 +241,12 @@ test('a replacement is constructed only after its predecessor has exited', async
   await settle();
   expect(threads.all).toHaveLength(3);
   expect(threadAt(2).coexisting).toBe(0);
+  // Both handovers ended within their deadline, so neither is a late exit.
+  expect(serverLogging.warn).not.toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    LATE_EXIT,
+    expect.anything()
+  );
 });
 
 test('closing during a handover waits for the retiring thread and starts no replacement', async () => {
@@ -436,11 +443,7 @@ test('a retired thread that exits late is reported as stuck and costs one attemp
   await settle();
   expect(threads.all).toHaveLength(2);
   expect(threadAt(1).coexisting).toBe(0);
-  expect(serverLogging.warn).toHaveBeenCalledWith(
-    'DEBUG_REPORTS',
-    'The previous debug report worker exited after the handover deadline',
-    { exitCode: 9 }
-  );
+  expect(serverLogging.warn).toHaveBeenCalledWith('DEBUG_REPORTS', LATE_EXIT, { exitCode: 9 });
   expect(worker.diagnostics().lastError).toBe(failure);
   expect(worker.diagnostics().lastError).not.toBe(STUCK);
   expect(replacementsLogged()).toBe(1);
@@ -564,4 +567,70 @@ test('a close that ends on exit leaves no deadline running', async () => {
   expect(await outcome(closed)).toEqual({ resolved: undefined });
   expect(vi.getTimerCount()).toBe(0);
   expect(serverLogging.error).not.toHaveBeenCalled();
+});
+
+test('a late exit whose replacement cannot start leaves the next requests one restart between them', async () => {
+  vi.useFakeTimers();
+  threads.holdExits = true;
+  const worker = start();
+  emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  vi.advanceTimersByTime(10_000);
+  expect(worker.diagnostics().lastError).toBe(STUCK);
+
+  // The stuck thread exits at last, but its replacement cannot start.
+  threads.refuseConstructions = 1;
+  exitThread(threadAt(0), 9);
+  await settle();
+  expect(threads.all).toHaveLength(1);
+  expect(serverLogging.error).toHaveBeenCalledWith(
+    'DEBUG_REPORTS',
+    'Debug report worker could not be replaced',
+    expect.anything()
+  );
+  // The handover is over, so nothing is published as stuck any more.
+  expect(worker.diagnostics().lastError).not.toBe(STUCK);
+
+  // Two requests in the same tick: the first starts the next replacement and
+  // the second joins it. Neither may be told the service is unavailable --
+  // state left over from the stuck handover once told the second so -- and
+  // exactly one thread starts.
+  const first = status(worker);
+  const second = status(worker);
+  await expect(first).rejects.toMatchObject({ message: RESTARTING });
+  await expect(second).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(2);
+  expect(replacementsLogged()).toBe(2);
+});
+
+test('a replacement that starts late is counted when it starts, not when it was requested', async () => {
+  vi.useFakeTimers();
+  threads.holdExits = true;
+  const worker = start();
+  emit(threadAt(0), 'error', new Error('SQLITE_IOERR: disk I/O error'));
+  // Requested at 0 minutes; the old thread holds the store until 59.
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  vi.advanceTimersByTime(59 * MINUTE);
+  exitThread(threadAt(0), 1);
+  await settle();
+  expect(threads.all).toHaveLength(2);
+  threads.holdExits = false;
+  await replaceCurrent(worker); // 59 min
+  await replaceCurrent(worker); // 59 min
+
+  // Starts at 59, 59 and 59 minutes. Counting the first at its request would
+  // let it leave the window at 60 and admit a fourth start in the same hour.
+  vi.advanceTimersByTime(MINUTE);
+  exitThread(threadAt(3), 7);
+  await expect(status(worker)).rejects.toMatchObject({ message: UNAVAILABLE });
+  await settle();
+  expect(threads.all).toHaveLength(4);
+  expect(budgetSpentLogs()).toEqual([expect.objectContaining({ nextAttemptInMs: 59 * MINUTE })]);
+
+  // An hour after those starts, the next is allowed.
+  vi.advanceTimersByTime(59 * MINUTE);
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  await settle();
+  expect(threads.all).toHaveLength(5);
 });

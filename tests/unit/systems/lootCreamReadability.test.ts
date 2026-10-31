@@ -63,7 +63,7 @@ afterEach(() => {
   LootField.getInstance().clear();
   drawLootRelative(new Ship(), []);
   vi.restoreAllMocks();
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
 });
 
 test('loot geometry rejects invalid radii and keeps tiny valid drops visible', () => {
@@ -169,7 +169,7 @@ test('ordinary loot reuses artwork, keeps edge halos and rebuilds for display qu
     throw new Error('DPR change did not rebuild loot artwork');
   }
   expect(denser.getContext('2d')?.getTransform().a).toBe(2);
-  configureRenderQuality('?performance=1&renderGlow=off', false);
+  configureRenderQuality('?performance=1&renderGlow=off', 'desktop');
   const denserWidth = denser.width;
   drawLootRelative(ship, drops);
   const noGlow = images.mock.calls[6]?.[0];

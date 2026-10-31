@@ -13,7 +13,7 @@ afterEach(() => {
   drawLootRelative(new Ship(), []);
   clearAsteroidShatters();
   canvasManager.destroy();
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
   vi.restoreAllMocks();
   window.history.replaceState(null, '', '/');
 });
@@ -118,7 +118,7 @@ test('a real DPR change, changed asteroid geometry and glow changes still repain
   expect(view.frame(48).rebuilt).toEqual([]);
   view.rock.offsets = view.rock.offsets.map((offset) => offset * 0.9);
   expect(view.frame(64).rebuilt).toEqual(['Asteroid silhouette canvas context unavailable']);
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
   expect(view.frame(80).rebuilt).toHaveLength(3);
 });
 

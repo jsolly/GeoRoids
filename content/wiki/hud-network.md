@@ -62,11 +62,11 @@ For a device performance check, open `/debug?performance=collect`, enter the gam
 
 ## Graphics option
 
-Live diagnostics include a Device label: Low-end, Commodity, High-end, or Unknown. Unknown means the browser did not supply enough hardware information to classify it.
+Live diagnostics include a Device label: Low-end, Commodity, High-end, or Unknown. Unknown means the browser did not supply enough hardware information to classify it. Low-end devices fly without glow, so hulls, shots and effects lose their halo but keep their shapes and colors.
 
 Try the [experimental WebGL version](https://www.georoids.com/?renderer=webgl2) to compare graphics performance on your device. It uses the same scene and controls and falls back automatically if the renderer is unavailable. Reload the [standard version](https://www.georoids.com/) to return to the default renderer.
 
-For a flight-resolution comparison, open `/debug?performance=collect&renderDpr=1`; test `&renderGlow=off` separately at the original resolution. Lower resolution softens canvas details; these diagnostic choices apply only to that visit. Low-end [Mineral Scan](/wiki/#scout) keeps its separate resolution limit.
+For a flight-resolution comparison, open `/debug?performance=collect&renderDpr=1`; test `&renderGlow=off` separately at the original resolution, or `&renderGlow=full` on a low-end device. Lower resolution softens canvas details; these diagnostic choices apply only to that visit. Low-end [Mineral Scan](/wiki/#scout) keeps its separate resolution limit.
 
 ## Campaign status
 

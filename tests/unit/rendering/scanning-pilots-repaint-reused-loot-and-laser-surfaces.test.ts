@@ -8,7 +8,7 @@ import { configureRenderQuality } from '../../../src/rendering/renderQuality';
 
 afterEach(() => {
   drawLootRelative(new Ship(), []);
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
   vi.restoreAllMocks();
 });
 
@@ -152,7 +152,7 @@ test('a scanning pilot repaints both friendly and bounced laser colors without r
   draw('#21CDAB');
   expect(view.created).toHaveLength(2);
   expect(view.pixels()).not.toEqual(baseline);
-  configureRenderQuality('?performance=collect&renderGlow=off', false);
+  configureRenderQuality('?performance=collect&renderGlow=off', 'desktop');
   const widths = view.sources().map((canvas) => canvas.width);
   view.clear(1);
   draw('#21CDAB');

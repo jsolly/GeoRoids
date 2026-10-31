@@ -236,6 +236,40 @@ server resolved, and no public endpoint exposes one — adding such an endpoint
 would publish the quantity a limiter keys on. Re-verify on any ingress or domain
 change.
 
+A worker failure (an uncaught error, an unexpected exit or a request past its
+deadline) retires that thread with its cause logged, and reporting answers 503.
+A later request starts one replacement and is itself refused as restarting; the
+player's retry reaches the new thread. The replacement starts only after the old
+thread has exited, because the store holds its database under an exclusive
+SQLite lock until its thread is gone. At most three replacement threads start
+in any rolling hour. Each is logged as `Replacing the debug report worker` when
+requested and counted from the moment its thread actually starts, so a late
+handover cannot fit a fourth start into the hour. A
+spent budget is logged once with the time of the next possible attempt, and
+reporting stays closed until then or until the service restarts. If the old
+thread has not exited ten seconds after its replacement was requested, the
+server logs that reporting stays closed until it does, `/health` reports the
+worker as not stopped, and refusals stop promising a restart. A thread stuck
+in a native SQLite call keeps reporting closed until it exits. When it does,
+the server logs the late exit and starts the replacement already charged to the
+budget, with no further request needed. Queued reports resume delivery once a
+replacement runs. If shutdown cannot stop the worker within two seconds, the
+server logs that it may hold process exit.
+
+Do not open the live report database with another SQLite client. The exclusive
+lock refuses it, and an open `sqlite3` session also makes a pending replacement
+fail with `database is locked`, which spends a replacement attempt. A copy of
+the live file can tear mid-checkpoint, and the lock blocks SQLite's backup API.
+Do not restore a Railway volume backup to inspect reports: a restore mounts
+onto the production service and rolls back `world.sqlite` on the same volume.
+The ways to reach the report database safely are to stop the service, or to
+redeploy with `GEOROIDS_DEBUG_REPORTS_ENABLED=0` so the worker never opens the
+store. Once the store is closed, `railway volume files download` can copy the
+file, together with its `-wal` file when one is present: a stop that was not
+clean leaves committed reports there. Restoring, stopping and redeploying are all human-owned production
+steps that agents do not perform; see
+[persistent world operations](persistent-world.md#railway-deployment-and-recovery).
+
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
 and a 100 MiB or 200-report pending limit. New acceptance reserves at least
 256 MiB free space for the world database. Full or unavailable storage rejects

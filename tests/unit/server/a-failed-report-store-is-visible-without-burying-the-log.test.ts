@@ -13,10 +13,10 @@ interface FakeThread {
   terminated: number;
 }
 
-// One thread, because the class under test constructs exactly one and never
-// replaces it. An earlier revision of this branch had a worker restart and this
-// fake held a list of generations to match; keeping that shape would let a test
-// express a handover the shipped class cannot perform.
+// One thread, because no case here sends a request after a failure, which is
+// the only thing that summons a replacement. Replacement, and the handover
+// between threads, is covered with a fake that tracks every thread in
+// `a-faulted-report-worker-is-replaced-one-thread-at-a-time.test.ts`.
 const threads = vi.hoisted(() => ({ live: undefined as FakeThread | undefined }));
 const serverLogging = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
 
@@ -39,17 +39,14 @@ vi.mock('node:worker_threads', () => ({
       attached.push(handler);
       this.thread.listeners.set(event, attached);
     }
-    once(event: string, handler: (value: never) => void): void {
-      this.on(event, handler);
-    }
     postMessage(request: ReportWorkerRequest): void {
       this.thread.sent.push(request);
     }
     terminate(): Promise<number> {
       this.thread.terminated += 1;
       // Node raises `exit` once a terminated thread is gone, and that is the
-      // signal the restart handover waits for. A fake that never emitted it
-      // would let a missing handover pass.
+      // signal a replacement waits for. A fake that never emitted it would let
+      // a missing handover pass.
       queueMicrotask(() => {
         for (const handler of this.thread.listeners.get('exit') ?? []) {
           (handler as (code: unknown) => void)(1);
@@ -190,7 +187,7 @@ test('a request that outlives its deadline reports the timeout once, not two oth
     vi.advanceTimersByTime(10_000);
 
     // The deadline terminates the thread, and a real `terminate()` raises
-    // `exit` on this same generation. That used to come back through `fail()`
+    // `exit` on this same thread. That used to come back through `fail()`
     // and emit a second, contradictory record, so one stalled queue handed an
     // operator two disagreeing lines, neither of them naming a timeout.
     expect(thread().terminated).toBe(1);

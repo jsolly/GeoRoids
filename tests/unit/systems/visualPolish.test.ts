@@ -367,7 +367,7 @@ test('moving pilots reuse both bolt colors and rebuild artwork when display qual
   expect(denser).not.toBe(first);
   expect(denser?.getContext('2d')?.getTransform().a).toBe(2);
 
-  configureRenderQuality('?performance=1&renderGlow=off', false);
+  configureRenderQuality('?performance=1&renderGlow=off', 'desktop');
   drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
   const noGlow = images[8];
   expect(noGlow).not.toBe(denser);
@@ -377,7 +377,7 @@ test('moving pilots reuse both bolt colors and rebuild artwork when display qual
   expect(rasterSizes[8]?.width).toBeLessThan(rasterSizes[6]?.width ?? 0);
   expect(rasterSizes[8]?.height).toBeLessThan(rasterSizes[6]?.height ?? 0);
   expect(images[8]).not.toBe(images[9]);
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
   drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
   expect(images[10]).not.toBe(noGlow);
   expect(rasterSizes[10]).toEqual(rasterSizes[6]);
@@ -555,7 +555,7 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
   const { ctx, strokes } = recordingContext();
   const prior = getTerrainField();
   try {
-    configureRenderQuality('', false);
+    configureRenderQuality('', 'desktop');
     ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: 3100 });
     drawIsoContours(
       ctx,

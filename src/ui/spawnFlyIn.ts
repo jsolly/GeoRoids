@@ -53,8 +53,14 @@ export function stopSpawnFlyIn(): void {
     frameRequest = null;
   }
   visibilityChanged?.(false);
-  window.removeEventListener('keydown', stopSpawnFlyIn, true);
-  window.removeEventListener('pointerdown', stopSpawnFlyIn, true);
+  window.removeEventListener('keydown', skipSpawnFlyIn, true);
+  window.removeEventListener('pointerdown', skipSpawnFlyIn, true);
+}
+
+/** A skipped dive still lands in flight the way a finished one does: the hull assembles. */
+function skipSpawnFlyIn(): void {
+  PlayerManager.getInstance().getLocalPlayer()?.ship.beginHullAssembly();
+  stopSpawnFlyIn();
 }
 
 /** Isonzo-style deploy camera: whole world → local ship. Any key or tap skips it. */
@@ -69,8 +75,8 @@ export function playSpawnFlyIn(): void {
     return;
   }
   visibilityChanged?.(true);
-  window.addEventListener('keydown', stopSpawnFlyIn, true);
-  window.addEventListener('pointerdown', stopSpawnFlyIn, true);
+  window.addEventListener('keydown', skipSpawnFlyIn, true);
+  window.addEventListener('pointerdown', skipSpawnFlyIn, true);
   const started = performance.now();
   const ticket = generation;
 

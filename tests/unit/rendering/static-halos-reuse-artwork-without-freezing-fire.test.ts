@@ -252,7 +252,7 @@ test('DPR and quality changes release old surfaces before constructing their rep
   ] satisfies [number, string][]) {
     const previous = [...surfaces];
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    configureRenderQuality(`?performance=collect&renderGlow=${glow}`, true);
+    configureRenderQuality(`?performance=collect&renderGlow=${glow}`, 'touch');
     drawFurnacesRelative(TOWN_HEARTH.position);
     drawRicochetCourt(RICOCHET_COURT.center);
     expect(previous.every((c) => c.width === 0 && c.height === 0)).toBe(true);

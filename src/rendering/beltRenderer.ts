@@ -4,6 +4,7 @@ import type { Position, TerrainSpider } from '../../shared-types';
 import type { Roid } from '../entities/roid/Roid';
 import { getSpiderField } from '../physics/terrain/spiderSession';
 import { canvasManager } from './canvasSurface';
+import { resolveGlow } from './renderQuality';
 
 let recovery: readonly BeltRecoveryWarning[] = [];
 
@@ -101,7 +102,7 @@ function drawCrawler(
   ctx.stroke();
   ctx.fillStyle = hidden ? ink : '#e34b5e';
   ctx.shadowColor = '#c91e39';
-  ctx.shadowBlur = hidden ? 0 : 5 / scale;
+  ctx.shadowBlur = hidden ? 0 : resolveGlow(5 / scale);
   ctx.fillRect(11, -4, 3, 2);
   ctx.fillRect(11, 2, 3, 2);
   ctx.shadowBlur = 0;

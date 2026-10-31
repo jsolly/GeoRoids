@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { civicLot } from '../../../shared/furnaces';
 import { Player } from '../../../src/entities/player/Player';
+import { Roid } from '../../../src/entities/roid/Roid';
 import {
   chooseObjectAction,
   objectMenuAt,
   tickObjectApproach,
   worldPoint,
 } from '../../../src/input/objectActions';
+import {
+  bindAsteroidFieldApply,
+  unbindAsteroidFieldApply,
+} from '../../../src/network/services/asteroidFieldSync';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 import {
   resetWorldExploration,
@@ -29,6 +34,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   resetWorldExploration();
+  unbindAsteroidFieldApply();
   vi.restoreAllMocks();
 });
 
@@ -60,7 +66,11 @@ test('camera conversion uses current zoom and hit targets have finger tolerance'
   crew.ship.position = { x: 400, y: 0 };
   vi.spyOn(ConnectionManager.getInstance(), 'getAllPlayers').mockReturnValue([pilot, crew]);
   expect(crew.ship.r * 0.5).toBeLessThan(20);
-  expect(objectMenuAt(pilot, 470, 300).target.id).toBe('crew');
+  const crewMenu = objectMenuAt(pilot, 470, 300);
+  expect(crewMenu.target.id).toBe('crew');
+  expect(chooseObjectAction(pilot, crewMenu.target, 'inspect')).toBe(
+    `Crew: Crew · ${Math.ceil(crew.ship.health)} hull`
+  );
   expect(objectMenuAt(pilot, 473, 300).target.kind).toBe('location');
 });
 
@@ -115,4 +125,35 @@ test('a nearby civic prompt reaches its lit furnace using the canonical ID', () 
   chooseObjectAction(pilot, { ...lot, kind: 'furnace', detail: lot.name }, 'enter');
   expect(open).toHaveBeenCalledOnce();
   expect(pilot.ship.pendingObjectAction).toBeNull();
+});
+
+test('an unlit glowtoy is not a visible object, as on the playfield and maps', () => {
+  const crystal = new Roid({
+    id: 'dark-crystal',
+    position: { x: 600, y: 0 },
+    velocity: { x: 0, y: 0 },
+    size: 30,
+    rotation: 0,
+    angularVelocity: 0,
+    health: 30,
+    maxHealth: 30,
+    vertices: 6,
+    offsets: [1, 1, 1, 1, 1, 1],
+    jaggedness: 0,
+    material: 'crystal',
+    ore: 'crystal',
+    glowtoy: { charge: 0, cachePosition: { x: 0, y: 0 }, cacheRevealed: false },
+  });
+  bindAsteroidFieldApply({
+    readBelt: () => [crystal],
+    onCreated: () => undefined,
+    onUpdated: () => undefined,
+    onDestroyed: () => undefined,
+    onReconciled: () => undefined,
+  });
+  const dark = objectMenuAt(pilot, 700, 300);
+  expect(dark.target.kind).toBe('location');
+  expect(dark.actions.map((item) => item.action)).not.toContain('inspect');
+  crystal.glowtoy = { charge: 0.5, cachePosition: { x: 0, y: 0 }, cacheRevealed: false };
+  expect(objectMenuAt(pilot, 700, 300).target.id).toBe('dark-crystal');
 });

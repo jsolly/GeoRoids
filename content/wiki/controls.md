@@ -33,7 +33,7 @@ Tap Fire for one shot; hold to charge and release for a beam. Drag from Fire to 
 
 Swipe to use your equipped ability, or tap its cooldown indicator. While contour travelling, swipes switch isolines instead; the indicator still activates your tool. Leaving the tab or app cancels travel and held input.
 
-Hold a visible object to open its actions, then release over an action or tap one; Cancel dismisses the menu. A faint glow identifies objects with actions. Inspect works immediately; Signal crew is available within signalling range on campaign servers. Furnace actions approach into range first and recheck eligibility. Nearby furnaces also offer action pop-ups before your ship overlaps their footprint.
+Hold a visible object to open its actions, then release over an action or tap one; Cancel dismisses the menu. A faint glow identifies objects with actions. Inspect works immediately and reports an asteroid's hull, crew-surveyed deposit and visible anomalies, including empty readings. Signal crew is available within signalling range on campaign servers. Furnace actions approach into range first and recheck eligibility. Nearby furnaces also offer action pop-ups before your ship overlaps their footprint.
 
 ## Contour Lock
 

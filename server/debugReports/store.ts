@@ -135,7 +135,16 @@ function parseCommands(json: string): DeliveryCommand[] {
   });
 }
 
-/** Only the report worker opens this SQLite connection. */
+/**
+ * Only the report worker opens this SQLite connection, and the connection
+ * enforces it: `locking_mode=EXCLUSIVE` holds the database lock from the first
+ * access until `close()`, so a second connection -- an orphaned or overlapping
+ * worker thread -- cannot read, claim or deliver a row; it fails to open with
+ * `database is locked`. Nothing waits for the lock (no busy timeout), because
+ * a second connection is a defect to surface, not a condition to survive.
+ * `DebugReportWorker` constructs a replacement only after its predecessor's
+ * `exit`, which is when Node has closed the predecessor's connection.
+ */
 export class DebugReportStore {
   private readonly db: DatabaseSync;
   private lastError: string | null = null;
@@ -145,6 +154,8 @@ export class DebugReportStore {
     this.databaseBytes = config.limits?.databaseBytes ?? 128 * 1024 * 1024;
     this.db = new DatabaseSync(config.path);
     try {
+      // First, before anything reads the file, so the lock covers every access.
+      this.db.exec('PRAGMA locking_mode=EXCLUSIVE');
       const pageRow = this.db.prepare('PRAGMA page_size').get();
       const pageSize = pageRow ? rowNumber(pageRow, 'page_size') : 4096;
       this.db.exec(`PRAGMA auto_vacuum=INCREMENTAL; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;

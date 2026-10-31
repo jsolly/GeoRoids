@@ -1,11 +1,14 @@
 // @vitest-environment node
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { once } from 'node:events';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { afterEach, expect, it as test, vi } from 'vitest';
 import { DebugReportWorker } from '../../../server/debugReports/client';
 import { readDebugReportConfiguration } from '../../../server/debugReports/configuration';
+import { DebugReportStore } from '../../../server/debugReports/store';
 import { logger } from '../../../setup/serverLogger';
 import type { DebugReportSubmission } from '../../../shared-types';
 
@@ -284,4 +287,103 @@ test('a store that fails after opening publishes an unknown depth and names the 
   } finally {
     faults.mockRestore();
   }
+});
+
+test('a report store that could not open serves reports again once a later request replaces its worker', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-report-recovery-'));
+  directories.push(directory);
+  const path = join(directory, 'inbox.sqlite');
+  // A directory where the database belongs: the thread's store cannot open,
+  // which is a real thread-level failure on a real thread. Removing it below
+  // is the transient condition clearing, as a remounted volume would.
+  mkdirSync(path);
+  const worker = new DebugReportWorker({
+    path,
+    token: '',
+    projectId: 'project-recovery',
+    sectionId: 'section-recovery',
+  });
+  workers.push(worker);
+  await vi.waitFor(
+    () => {
+      expect(worker.diagnostics().lastError).toBe(
+        'Debug report worker is unavailable. Keep your local copy.'
+      );
+    },
+    { timeout: 10_000 }
+  );
+  rmSync(path, { recursive: true });
+
+  // Before, this failure closed reporting until the next deploy. Now the next
+  // request summons one replacement and is itself refused, because a request
+  // never waits for a handover; the player's retry reaches the new thread.
+  const report: DebugReportSubmission = {
+    version: 1,
+    id: randomUUID(),
+    receiptToken: randomBytes(32).toString('hex'),
+    description: 'The report storage came back.',
+    submittedAt: '2026-10-31T12:00:00.000Z',
+    diagnostics: {
+      state: {
+        version: 1,
+        capturedAt: '2026-10-31T12:00:00.000Z',
+        sessionId: 'recovered-worker-session',
+        connected: false,
+      },
+      recentLogs: [],
+    },
+  };
+  await expect(worker.enqueue(JSON.stringify(report), 'address', {})).rejects.toMatchObject({
+    status: 503,
+    message: 'Debug report storage is restarting. Keep your local copy and retry.',
+  });
+  await vi.waitFor(
+    () => {
+      expect(worker.diagnostics()).toMatchObject({ pending: 0, blocked: 0, lastError: null });
+    },
+    { timeout: 10_000 }
+  );
+  await expect(worker.enqueue(JSON.stringify(report), 'address', {})).resolves.toEqual({
+    id: report.id,
+    state: 'blocked',
+  });
+  await expect(worker.status(report.id, report.receiptToken)).resolves.toEqual({
+    id: report.id,
+    state: 'blocked',
+  });
+});
+
+test('a report thread holds its store exclusively until it exits', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-report-claim-'));
+  directories.push(directory);
+  const config = {
+    path: join(directory, 'inbox.sqlite'),
+    token: '',
+    projectId: 'project-claim',
+    sectionId: 'section-claim',
+  };
+  // The production thread module on a real thread, driven directly so this
+  // case can terminate it the way a failed request deadline does, without the
+  // graceful close that would release the store on its own.
+  const thread = new Worker(new URL('../../../server/debugReports/worker.ts', import.meta.url), {
+    workerData: config,
+    execArgv: ['--import', 'tsx'],
+  });
+  const exited = once(thread, 'exit');
+  try {
+    // Its first diagnostics reply means the store is open and has been read.
+    await once(thread, 'message');
+    // A second connection -- an orphaned or overlapping thread -- cannot claim
+    // or deliver a row while this one lives: it cannot even open the store.
+    expect(() => new DebugReportStore(config)).toThrow(/database is locked/u);
+  } finally {
+    await thread.terminate();
+    await exited;
+  }
+  // `exit` is the handover signal `DebugReportWorker` waits for before it
+  // constructs a replacement. Termination skipped `close()`, so this proves
+  // Node itself released the connection by then.
+  const successor = new DebugReportStore(config);
+  expect(successor.diagnostics()).toMatchObject({ pending: 0, blocked: 0 });
+  successor.close();
 });

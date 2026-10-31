@@ -199,6 +199,32 @@ export class DebugReportStore {
       return { id: submission.id, state: stateOf(duplicate['state']) };
     }
     this.checkCapacity();
+    const hour = Math.floor(now / 3_600_000);
+    const day = Math.floor(now / 86_400_000);
+    const limits = [
+      [`address:${digest(address)}`, hour, 3],
+      ['global', day, 30],
+    ] satisfies [string, number, number][];
+    const rejectIfLimited = (): void => {
+      for (const [scope, bucket, maximum] of limits) {
+        const counter = this.db
+          .prepare('SELECT count FROM rate_counters WHERE scope=? AND bucket=?')
+          .get(scope, bucket);
+        if (counter && rowNumber(counter, 'count') >= maximum) {
+          throw new ReportStoreError(
+            429,
+            'Debug report submission limit reached. Keep your local copy and try later.'
+          );
+        }
+      }
+    };
+    // Refuse a limited caller before the report sanitizer runs, so repeated
+    // uploads cannot buy worker time. A counter only grows within its bucket, so
+    // a refusal here would also happen inside the transaction. A pass here can go
+    // stale, because anything that counts a report while this one is redacted
+    // (another accept on this connection or another connection) moves the
+    // counter, so the transaction checks again before it counts this report.
+    rejectIfLimited();
     const receivedAt = new Date(now).toISOString();
     const diagnostics = sanitizeDebugDiagnostics(
       submission.diagnostics,
@@ -276,24 +302,10 @@ export class DebugReportStore {
         'Debug report storage is full. Keep your local copy and try later.'
       );
     }
-    const hour = Math.floor(now / 3_600_000);
-    const day = Math.floor(now / 86_400_000);
-    const addressScope = `address:${digest(address)}`;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      for (const [scope, bucket, maximum] of [
-        [addressScope, hour, 3],
-        ['global', day, 30],
-      ] satisfies [string, number, number][]) {
-        const counter = this.db
-          .prepare('SELECT count FROM rate_counters WHERE scope=? AND bucket=?')
-          .get(scope, bucket);
-        if (counter && rowNumber(counter, 'count') >= maximum) {
-          throw new ReportStoreError(
-            429,
-            'Debug report submission limit reached. Keep your local copy and try later.'
-          );
-        }
+      rejectIfLimited();
+      for (const [scope, bucket] of limits) {
         this.db
           .prepare(
             'INSERT INTO rate_counters(scope,bucket,count) VALUES(?,?,1) ON CONFLICT(scope,bucket) DO UPDATE SET count=count+1'

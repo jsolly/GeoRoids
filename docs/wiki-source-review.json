@@ -313,7 +313,7 @@
     "src/input/controlSources.ts": "sha256:4330412b1749268ef6a390fa753e576cfe788ee17b5e7660ee6835faeedc6db4",
     "src/input/keybindings.ts": "sha256:dd5df87b4be091cfe6d6844fc1393673efa08f3c749593cd10eeb479e1fdf306",
     "src/input/mouse.ts": "sha256:93c92b5f28227ba963a26c65c4975f99f986bbd778b7aa4b4fd9d6a6a86ed65b",
-    "src/input/objectActions.ts": "sha256:239e96eb572c83cf851644e228447712a60dfbb62f7ec26d0294a90c50f34b23",
+    "src/input/objectActions.ts": "sha256:e7a4f11a9b8ad969d00b45aa4a912338e41b0a3071ade22376cfebd083e4e82e",
     "src/input/playfieldSelection.ts": "sha256:85ec3959e63df0e1730cc518385270ab42ef7a04f1ed8f52723cdc1a25b68ba0",
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
@@ -7988,6 +7988,13 @@
       "owners": {
         "src/components/game/ActionControls.svelte": "controls"
       }
+    },
+    {
+      "note": "Inspect on an asteroid now reports hull, the crew-surveyed deposit and visible anomalies, including empty readings; unlit glowtoys are not targets, and a rock that dims, is destroyed or leaves the screen while its menu is open reads as out of sight, matching the playfield and maps. Controls article updated to describe the readout. Checked: biome, tsc, markdownlint and wiki-check, the input and rendering unit suites, and the full pre-commit gate (unit tests and build). No Wiki demonstration uses this source, so media is unchanged. A desktop and mobile browser check of the Controls article was not possible in this environment.",
+      "sources": ["src/input/objectActions.ts"],
+      "topics": ["controls"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

@@ -1,5 +1,7 @@
 import { COOPERATIVE } from '../../shared/cooperativeRules';
+import { oreResource } from '../../shared/economy';
 import { CIVIC_LOTS, civicLot, TOWN_HEARTH } from '../../shared/furnaces';
+import { isAsteroidLit } from '../../shared/glowtoy';
 import { WORLD } from '../../shared/world';
 import type { Position } from '../../shared-types';
 import type { Player } from '../entities/player/Player';
@@ -56,6 +58,35 @@ export function nearbyFurnaceTarget(player: Player): ActionTarget | undefined {
     : undefined;
 }
 
+function hullReading(rock: Roid): string {
+  return `Hull ${Math.ceil(rock.health)} / ${rock.maxHealth}`;
+}
+
+/**
+ * Inspect lists the readings a pilot could already see as well as the ones that came back
+ * empty, so an ordinary rock reads as surveyed rather than unexamined. Deposits follow the
+ * lasting crew survey the maps use, not a pilot's temporary Mineral Scan, and only visible lit
+ * rocks are read, so nothing here reveals what the radar has not.
+ */
+function asteroidReadout(rock: Roid): string {
+  const readings = [hullReading(rock)];
+  if (rock.surveyedBy && rock.surveyedBy.length > 0) {
+    const ore = oreResource(rock);
+    readings.push(ore ? `${ore.charAt(0).toUpperCase()}${ore.slice(1)} ore` : 'No ore');
+  } else {
+    readings.push('Deposit unsurveyed');
+  }
+  const anomalies = [
+    rock.phenomenon?.kind === 'reflective' && 'Reflective faces',
+    rock.glowtoy && 'Phosphorescent',
+    rock.contourRider && 'Riding a contour',
+    rock.boost && 'Boost Coupling attached',
+    rock.probe && rock.probe.health > 0 && 'Survey Probe attached',
+  ].filter((anomaly): anomaly is string => typeof anomaly === 'string');
+  readings.push(...(anomalies.length > 0 ? anomalies : ['No anomalies']));
+  return readings.join(' · ');
+}
+
 export function interactionTargets(player: Player): ActionTarget[] {
   const assets: ActionTarget[] = getWorldMapAssets()
     .filter((a) => a.kind === 'furnace' || a.kind === 'foundation')
@@ -69,14 +100,17 @@ export function interactionTargets(player: Player): ActionTarget[] {
   if (!assets.some((a) => a.id === TOWN_HEARTH.id)) {
     assets.push({ ...TOWN_HEARTH, kind: 'furnace', detail: 'Store and furnace travel' });
   }
-  for (const r of readAsteroidBelt().filter((rock) => rock instanceof Roid)) {
+  // An unlit glowtoy is hidden on the playfield and both maps, so it is not a visible object.
+  for (const r of readAsteroidBelt().filter(
+    (rock): rock is Roid => rock instanceof Roid && isAsteroidLit(rock)
+  )) {
     assets.push({
       id: r.id,
       name: 'Asteroid',
       kind: 'asteroid',
       position: r.position,
       radius: r.r,
-      detail: `Hull ${Math.ceil(r.health)} / ${r.maxHealth}`,
+      detail: hullReading(r),
     });
   }
   for (const p of ConnectionManager.getInstance().getAllPlayers()) {
@@ -191,7 +225,19 @@ export function chooseObjectAction(
     return offered?.label ?? 'Action unavailable';
   }
   if (action === 'inspect') {
-    return `${target.name}: ${target.detail}`;
+    if (target.kind !== 'asteroid') {
+      return `${target.name}: ${target.detail}`;
+    }
+    // Targets are rebuilt every frame, so the full readout is read only when chosen. A menu can
+    // outlive its target: the rock may be destroyed, dim, or leave the screen while it is open,
+    // so visibility is checked again by the same rule that built the menu.
+    const visible = interactionTargets(player).some(
+      (candidate) => candidate.kind === 'asteroid' && candidate.id === target.id
+    );
+    const rock = visible
+      ? readAsteroidBelt().find((candidate) => candidate.id === target.id)
+      : undefined;
+    return `${target.name}: ${rock instanceof Roid ? asteroidReadout(rock) : 'Out of sight'}`;
   }
   if (action === 'signal') {
     ConnectionManager.getInstance().sendMessage({

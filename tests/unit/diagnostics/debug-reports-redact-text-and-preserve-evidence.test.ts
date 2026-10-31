@@ -220,19 +220,18 @@ function harmlessText(length: number): string {
   return 'lorem ipsum dolor '.repeat(Math.ceil(length / 18)).slice(0, length);
 }
 
-/** Fastest of a few runs; a run far past `ceiling` already answers the question. */
-function fastest(work: () => void, ceiling = Number.POSITIVE_INFINITY): number {
-  let best = Number.POSITIVE_INFINITY;
-  for (let round = 0; round < 6; round++) {
-    const started = performance.now();
+/** Milliseconds per run over `times` runs, stopping once `limit` has passed. */
+function perRun(work: () => void, times: number, limit = Number.POSITIVE_INFINITY): number {
+  const started = performance.now();
+  let runs = 0;
+  while (runs < times) {
     work();
-    const elapsed = performance.now() - started;
-    if (elapsed > ceiling) {
-      return elapsed;
+    runs++;
+    if (performance.now() - started > limit) {
+      break;
     }
-    best = Math.min(best, elapsed);
   }
-  return best;
+  return (performance.now() - started) / runs;
 }
 
 // Linear work costs about as much as harmless text of the same size; the
@@ -240,10 +239,30 @@ function fastest(work: () => void, ceiling = Number.POSITIVE_INFINITY): number {
 // unbounded URL parsing about twenty times more.
 const RATIO_LIMIT = 10;
 
-/** How many times harmless input's cost the shape costs, measured in the same run. */
+/**
+ * How many times harmless input's cost the shape costs. Both sides repeat
+ * until a harmless sample spans several scheduler slices, because on a loaded
+ * machine a run shorter than one slice often escapes preemption while a longer
+ * one never does. Rounds alternate, so load lands on both sides, and each keeps
+ * its fastest round. A shape past both a second and a thousand baselines is
+ * already far beyond the limit, so measuring stops there.
+ */
 function workRatio(shape: () => void, harmless: () => void): number {
-  const baseline = fastest(harmless);
-  return fastest(shape, baseline * RATIO_LIMIT * 4) / baseline;
+  // The fastest of a few single runs: a preempted one would undercount repeats.
+  const once = Math.min(...Array.from({ length: 5 }, () => perRun(harmless, 1)));
+  const times = Math.ceil(20 / Math.max(once, 0.01));
+  let shapeBest = Number.POSITIVE_INFINITY;
+  let harmlessBest = Number.POSITIVE_INFINITY;
+  for (let round = 0; round < 5; round++) {
+    harmlessBest = Math.min(harmlessBest, perRun(harmless, times));
+    const watchdog = Math.max(harmlessBest * 1_000, 1_000);
+    const cost = perRun(shape, times, watchdog);
+    shapeBest = Math.min(shapeBest, cost);
+    if (cost > watchdog) {
+      break;
+    }
+  }
+  return shapeBest / harmlessBest;
 }
 
 function logRecordFor(message: string) {
@@ -332,6 +351,31 @@ test.each([
     expect(workRatio(twoUploads(body), twoUploads(harmless))).toBeLessThan(RATIO_LIMIT);
   }
 );
+
+test('one sanitizer pass parses 2,048 URLs across state and logs, then redacts the rest whole', () => {
+  const link = (index: number) => `https://pilot:hunter2@example.com/frame${index}?session=1#top`;
+  const links = (from: number, count: number) =>
+    Array.from({ length: count }, (_, offset) => link(from + offset)).join(' ');
+  const { state, recentLogs } = sanitizeDebugDiagnostics({
+    state: { browser: links(0, 1_020), audio: links(1_020, 1_020) },
+    recentLogs: [
+      JSON.stringify({ message: links(2_040, 5) }),
+      JSON.stringify({ message: links(2_045, 5) }),
+    ],
+  });
+  const texts = [
+    state['browser'] as string,
+    state['audio'] as string,
+    ...recentLogs.map((line) => (JSON.parse(line) as { message: string }).message),
+  ];
+  const words = texts.flatMap((text) => text.split(' '));
+  expect(words).toHaveLength(2_050);
+  expect(words.slice(0, 2_048)).toEqual(
+    Array.from({ length: 2_048 }, (_, index) => `https://example.com/frame${index}`)
+  );
+  expect(words.slice(2_048)).toEqual(['[redacted-url]', '[redacted-url]']);
+  expect(texts.join(' ')).not.toContain('hunter2');
+});
 
 function clippedState(state: Record<string, string>) {
   return parseDebugReportSubmission({

@@ -7,7 +7,7 @@
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
-    "docs/diagnostics.md": "sha256:d7bd48090ef24fa22a1a044c7dc098d08ba0ced7d4172cf3692ec6e260fa971b",
+    "docs/diagnostics.md": "sha256:98dd5d29cc95ee3b784fef19b6e1c366fbbcde08d1b455bf6ed4003e88abebba",
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
@@ -151,7 +151,7 @@
     "shared/contourLock.ts": "sha256:8bb4ed4b2c74bf6fea4d5836ef48ac096f1dd6f125133018004d43fbb91d367e",
     "shared/cooperativeRules.ts": "sha256:be4525cd642746f148cc5d538ebdb9fb7ea14692f652bc0f9eca37ebc50349f4",
     "shared/cooperativeWorld.ts": "sha256:dbed5f7a5ae9295687d3f5030f90c65347aab21ea4d9081ab0e6b945128fe3a6",
-    "shared/debugReports.ts": "sha256:18361ef763d8deb776023942bbe320da2f46ad0573d942276512607bcf1485db",
+    "shared/debugReports.ts": "sha256:6142c7f221e90af5bf92af919dbf95b0c6f69a8b100e553abcc4c602d534ca5c",
     "shared/economy.ts": "sha256:2d4525f8a11a6bd967d347753fe8837b4b4c6a4c8ff9adefb1c00da55dc7e2fc",
     "shared/eoSatellites.ts": "sha256:198c46704cc1dddeca402c1bfae14d8fa3ad5329d7a7d9d7b413b65d197be9b6",
     "shared/epochField.ts": "sha256:ef83f6258bc1f007c5e5525f0186facd8087b3457ac2304aa3702426f86ee85e",
@@ -165,13 +165,14 @@
     "shared/glowtoy.ts": "sha256:68fe1b551d6c608e652fd56f3fab4b816bddd288f6f9bf34cc838bdcd466a167",
     "shared/heightfield.ts": "sha256:30c64a9298980efa122dbd4a32b18fd3b480b76775b57744af3f645dfb6d40ae",
     "shared/laserSurface.ts": "sha256:23684fda0e4c25ee08a28a7c3f7e79cf11892a296c0ba2c64bf3c25c287c83c4",
-    "shared/logRecords.ts": "sha256:031e51cc1bd00bed5bf062074b91bdfe68a2ea26c07eb8081e62c67dc542fa97",
+    "shared/logRecords.ts": "sha256:caed0be6d7e2046b54d3c6d11fa49a8d166dcda2b801e52daa0e21b71c88fd73",
     "shared/lootBlast.ts": "sha256:b00e8cc4b12642f2ab3132a3fd7fade797a20714598e279a4a24b7efe643c193",
     "shared/navigationSalvage.ts": "sha256:9df1c8bac1be8ee5b92840fb94ccd0cfe26c0457164ac1e23c0944081dc704dc",
     "shared/passages.ts": "sha256:681c1117dca8b8086c8a494830f75376d1850d03969f41e6be81ef8586ae3cb4",
     "shared/player.ts": "sha256:c40c18c6e37e6f67e3dde550deea80f88a4449580d8d1aa55a1209136cdf8118",
     "shared/playerMotion.ts": "sha256:dfdbb62c8d095e10265b3c806ba9c06c8208bab57be143ada268e112e9f7bc84",
     "shared/playerShield.ts": "sha256:c718f47b5532ce83d74fac1ce0ba28f836a96b1ece8dd66ecf165ba0b30b9859",
+    "shared/queryRedaction.ts": "sha256:7fe5f52cf3ce74487e8f41cbc89c57db2c07b635caed6a4a1e47cdf71e40ccbb",
     "shared/releaseId.ts": "sha256:aa62d5ac7bc58ab82a723fdceefc471dec9d3fa75ccbcdd7f8b64abc22c93a26",
     "shared/ricochetCourt.ts": "sha256:37d79178d40c2a15f9e96ce8d86f48cfd316031d9840758d5ed87e75f74223f5",
     "shared/rolyPoly.ts": "sha256:9832d2ea3f173f824fb5c1ed3f98d46533d4efee6007644005b6b1ae5efea4f6",
@@ -8062,6 +8063,30 @@
       "topics": ["hauler", "hud-network", "scout", "teamwork"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed hud-network Diagnostics and Report a problem against this change; no Wiki page needed an edit. Query and fragment stripping in report redaction (shared/debugReports.ts) and log-record cleaning (shared/logRecords.ts) moved from two backtracking regexes to linear scans in the new shared/queryRedaction.ts with identical output, pinned by a characterization table and a seeded comparison against the former patterns. Report parsing now clips a diagnostic state string over 8,192 characters to that length ending in an ellipsis-truncated marker; real state strings (user agent, short reasons, a 32 KiB-bounded performance summary) never approach it, and client log records keep their 8 KiB per-line rejection. The server also refuses a rate-limited address before the report sanitizer runs (parsing, which cleans each log record, still runs first). The page says only to describe the issue, keep secrets out and keep a copy until storage is confirmed, all still accurate; no player-facing control, string, receipt state or demonstration changes. docs/diagnostics.md now states the clip for report reviewers.",
+      "sources": [
+        "docs/diagnostics.md",
+        "shared/debugReports.ts",
+        "shared/logRecords.ts",
+        "shared/queryRedaction.ts"
+      ],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "shared/queryRedaction.ts": "hud-network",
+        "shared/logRecords.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed hud-network Diagnostics and Report a problem again for the follow-up fix; no Wiki page needed an edit. One sanitizer pass now parses at most 2,048 URLs and redacts later ones whole, so text built to make new URL throw every few bytes no longer costs about a second per MiB; real reports hold far fewer URLs, so their output is unchanged. A clip that splits a word drops the kept part of that word, up to 128 characters, so a clipped secret keeps no prefix, and redaction now keeps the clip marker instead of letting a query or token rule consume it. The two query scans in shared/queryRedaction.ts now share one loop with unchanged output. docs/diagnostics.md states the clip and the URL bound for report reviewers. No player-facing control, string, receipt state or demonstration changes; the page's advice to keep secrets out and keep a copy until storage is confirmed stays accurate.",
+      "sources": ["docs/diagnostics.md", "shared/debugReports.ts", "shared/queryRedaction.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "shared/queryRedaction.ts": "hud-network"
+      }
     },
     {
       "note": "A benign ResizeObserver loop notice is now logged as a warning instead of an uncaught page error; diagnostics only, so player rules, HUD copy and demonstrations are unchanged. Checked: biome, tsc and the global-error unit test.",

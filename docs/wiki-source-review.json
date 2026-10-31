@@ -424,7 +424,7 @@
     "src/utils/clientLogContext.ts": "sha256:af42b479255409d5a37c1e4d01da4c9b45dca86e94aa187b8f7dc63127d70c9c",
     "src/utils/colorUtils.ts": "sha256:b71943b98a819ae1bc881ec8642b850fc0971aee34c3339cf30666bbb280d6bb",
     "src/utils/formatPoints.ts": "sha256:a752bfdf9ef65eb936b725b993753591057de7170442e509ef8bac0f4204665c",
-    "src/utils/globalErrorLogging.ts": "sha256:92f69fe910c3058bda0122c7ee4d831fb0933654ee4eebcfe508697bb6182a08",
+    "src/utils/globalErrorLogging.ts": "sha256:45ccaf0f8022deca01a8c0ee162251f39890dfcf1faab31b4b901ffae34b2e6f",
     "src/utils/logForwardPolicy.ts": "sha256:a43283cb6f407c1c73022a83bfed26b7fb7a1102bf8912488592b58145f51b6a",
     "src/utils/logForwarder.ts": "sha256:4786a5f03e93f4ec12cbaf12621a804ccc892f6cad52770c46648be33c753dc3",
     "src/utils/logLevel.ts": "sha256:7fee2d1f18de529d2297e37d9c1609043bdcce18bd5e91d311e9553f70f017ef",
@@ -7987,6 +7987,15 @@
       "media": [],
       "owners": {
         "src/components/game/ActionControls.svelte": "controls"
+      }
+    },
+    {
+      "note": "A benign ResizeObserver loop notice is now logged as a warning instead of an uncaught page error; diagnostics only, so player rules, HUD copy and demonstrations are unchanged. Checked: biome, tsc and the global-error unit test.",
+      "sources": ["src/utils/globalErrorLogging.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "src/utils/globalErrorLogging.ts": "hud-network"
       }
     }
   ]

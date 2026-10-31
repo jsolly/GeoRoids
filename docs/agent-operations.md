@@ -205,6 +205,18 @@ ignores forwarded address headers. Before release, verify that Railway replaces
 client-supplied `X-Real-IP` values. Do not expose this reporting listener through
 an untrusted internal proxy that can choose that header.
 
+A worker failure (an uncaught error, an unexpected exit or a request past its
+deadline) retires that thread with its cause logged, and reporting answers 503.
+A later request starts one replacement and is itself refused as restarting; the
+player's retry reaches the new thread. The replacement starts only after the old
+thread has exited, because the store holds its database under an exclusive
+SQLite lock until its thread is gone. At most three replacements start in any
+hour, each logged as `Replacing the debug report worker`. Past that, reporting
+stays closed until the hour allows another attempt or the service restarts.
+Queued reports resume delivery once a replacement runs. While the server runs,
+another SQLite client cannot open the report database; copy the file with its
+WAL, or stop the service, before inspecting it.
+
 Verified against the live production ingress: the header probe on 2026-10-25 at
 release `c487d041`, and the precondition below on 2026-10-26 at `d7d084e`.
 `clientAddress` runs before the method and content-type checks, so a value that

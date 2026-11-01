@@ -17,7 +17,7 @@
     "start": "astro dev --config config/app/astro.ts --ignore-lock",
     "preview": "astro preview --config config/app/astro.ts --ignore-lock",
     "test": "node scripts/validation-admission.mjs unit -- vitest run --config config/testing/vitest.ts --project unit --project components",
-    "test:flight": "node scripts/verify-intentional-flight.mjs",
+    "test:flight": "node scripts/verify-intentional-flight.ts",
     "test:review": "bash scripts/test-review.sh",
     "test:all": "npm run test && npm run test:integration",
     "test:integration": "./scripts/test-runner.sh --reporter=verbose",
@@ -51,7 +51,7 @@
     "smoke:scenario-contract": "vitest run --config config/testing/tooling.ts --project smoke",
     "check:frontend": "astro check --config config/app/astro.ts --tsconfig ./tsconfig.frontend.json --minimumFailingSeverity warning && svelte-check --config ./config/app/svelte.ts --tsconfig ./tsconfig.frontend.json --fail-on-warnings",
     "check:format": "prettier --config config/quality/prettier.json --check \"src/**/*.{astro,svelte}\"",
-    "check:a11y": "node scripts/check-accessibility.mjs"
+    "check:a11y": "node scripts/check-accessibility.ts"
   },
   "repository": {
     "type": "git",

@@ -1,3 +1,5 @@
+import type { KnipConfig } from 'knip';
+
 const config = {
   $schema: '../../node_modules/knip/schema.json',
   // These files are invoked by Railway/Vite/Vitest or discovered dynamically by
@@ -40,10 +42,10 @@ const config = {
   ignoreBinaries: ['uvx', 'afconvert'],
   ignoreDependencies: ['concurrently', 'markdownlint-cli2', 'jsonc-parser', 'shadcn-svelte'],
   astro: { config: ['config/app/astro.ts'] },
-  svelte: { entry: ['config/app/svelte.js', 'vite.config.{js,mjs,ts,cjs,mts,cts}'] },
+  svelte: { entry: ['config/app/svelte.ts', 'vite.config.{js,mjs,ts,cjs,mts,cts}'] },
   vitest: { config: ['config/testing/vitest.ts', 'config/testing/tooling.ts'] },
   biome: { config: ['config/quality/biome.settings.jsonc'] },
   prettier: { config: ['config/quality/prettier.json'] },
-};
+} satisfies KnipConfig;
 
 export default config;

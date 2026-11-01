@@ -148,7 +148,7 @@ export async function checkWiki({
     'components.json',
     'config/quality/prettier.json',
     'config/app/astro.ts',
-    'config/app/svelte.js',
+    'config/app/svelte.ts',
     'config/typescript/frontend.json',
     'config/typescript/tsconfig.json',
     'tsconfig.json',

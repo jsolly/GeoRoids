@@ -2,8 +2,8 @@
   "note": "Scoped PR 5 review of exactly 35 changed sources: 31 Node-only browser test annotations, controlled spatial-audio admission/evidence, test log-path isolation, sharded test commands, and test Vite cache isolation. Reviewed the 11 linked topics and unchanged demonstration rules/assets; desktop and touch Wiki browser scenario passed on main 26dec1c9. Gameplay controls and rules are unchanged. All other accepted source hashes are retained. Subsequent scoped review of only the tow-bite browser fixture: finite admission protection and atomic live placement/release retain keyboard/touch latching, lethal bites and peer broadcasts. Hauler, terrain and combat-survival text and unchanged illustrations match actual current-health lethal damage; all four browser scenarios and 32 unit cases pass. The prior desktop/touch Wiki evidence remains applicable because no Wiki UI or asset changed. Final tow-preservation correction supersedes the earlier insufficient owner-bite proof: exactly two reviewed source hashes cover explicit test-only current-session/unique-owner validation and preserved captive placement. Normal motion, controls, terrain, HUD/network, Scout, teamwork, Hauler and survival rules and illustrations are unchanged. Final 35 unit cases and all four keyboard/touch browser scenarios pass with exact captive release receipts; prior desktop/touch Wiki UI proof remains applicable. No other hashes are accepted. Subsequent scoped review accepts only the regeneration server test hash after a Node environment directive; its test body and gameplay rule are unchanged. The entire server category passed 10 files/26 cases. Survival recovery text and illustrations remain accurate; all 466 other hashes are retained. Subsequent scoped knip 6.35.1 to 6.38.0 dev-tool review: only package.json source hash changes; no gameplay rules, wiki content, runtime imports, demonstration generators, GIFs or posters change. Existing unused-code gates remain strict.",
   "hashes": {
     "components.json": "sha256:d0937034ab85db4f61325c777c23bbc891a79126f09c5f13beb5187a0ff99c79",
-    "config/app/astro.ts": "sha256:dc520ac45e54a1d1f1835fb3bdf5faedcb1c11aa52b6d83cc0d1d989002bf260",
-    "config/app/svelte.js": "sha256:9f2f3ce97f92d71c67e146ef4f859f1675ef3a536fbcd82b597481b35263d2dd",
+    "config/app/astro.ts": "sha256:963edcd49f93340ceeabcdd77714eb89b329208a551093da083e221613fac1d3",
+    "config/app/svelte.ts": "sha256:4d25a2f4932eaaee1e03aed44defdf3fdd33359a551139daa95e6c75d9d69f8e",
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:770584eb85c666e8688d01cc6ad315edfe15790ef0e3d1efa5d2c0b43fd3b2c6",
+    "package.json": "sha256:d3eb0b54469ad8ff172509f9146f9f56658d0dfb30abfdd3831f9fe1ca76d37a",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -70,7 +70,7 @@
     "scripts/client-build.ts": "sha256:abe7ea029d9606ce316a76b6cef432aa7002420783f8dc739622af74a90e5892",
     "scripts/client-release-sha.ts": "sha256:e4d51752d83d1324cd254fbc9720a8f10970e323ad245b3541226a3463aee9ba",
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
-    "scripts/wiki-check.ts": "sha256:83a1b4263d6cd5a698384556b75e78e0ab62d845182736c782c968263fa1bea9",
+    "scripts/wiki-check.ts": "sha256:5cb40a6d454e8e75ba6df9a551a7999ac478ce44bc7cc3edb2adf6dab804c853",
     "scripts/wiki-content.ts": "sha256:190a89be185ac685e37e7ae3d962d1fabb059a2a39fc3eee2f9cc09567e8a162",
     "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
     "scripts/wiki-media-fonts.ts": "sha256:6f2554c263f3812b7734f721adb197d559b2838a4ce7b34f74731768878c9509",
@@ -579,7 +579,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:1d3be74b9a82eac608077229d85ae81baa5fca7983b0e0813d2ff45bfd95ffdb"
+    "tsconfig.json": "sha256:c9d1b85ad4199de57f927af4debc64662986ebf8bf45157426baa613970ba322"
   },
   "reviews": [
     {
@@ -8099,6 +8099,36 @@
     },
     {
       "note": "Reviewed the build-script path migration to the typed publication checker. Player rules, field-manual content, public asset paths and demonstrations are unchanged. Strict TypeScript and the 23 existing checker/archive scenarios passed.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Scoped TypeScript config migration independently reviewed: the Svelte preprocess configuration and Knip policy retain their runtime values, with typed config validation, current loader paths and strict project membership. Historical Svelte JavaScript deployment-input classification is retained. Reviewed the field manual; gameplay, controls, Wiki text and demonstration assets are unchanged. Dedicated TypeScript 7 config compilation, changed-file Biome and native Node 24 typed-config import pass. Full framework, reload, build and gate validation remain pending; this note claims none of them.",
+      "sources": [
+        "config/app/astro.ts",
+        "config/app/svelte.js",
+        "config/app/svelte.ts",
+        "package.json",
+        "scripts/wiki-check.ts",
+        "tsconfig.json"
+      ],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "config/app/astro.ts": "field-manual",
+        "config/app/svelte.js": "field-manual",
+        "config/app/svelte.ts": "field-manual",
+        "package.json": "field-manual",
+        "scripts/wiki-check.ts": "field-manual",
+        "tsconfig.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the composed package commands: the build retains the typed publication checker from main and Knip selects the typed configuration. Player rules, Wiki text, media, and public asset URLs are unchanged. The complete gate passed on these same executable sources before this scoped ledger acceptance.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],

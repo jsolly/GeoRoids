@@ -6,6 +6,8 @@
     "scripts",
     "config/testing/vitest.ts",
     "config/app/astro.ts",
+    "config/app/svelte.ts",
+    "config/quality/knip.ts",
     "setup",
     "server",
     "server.ts",

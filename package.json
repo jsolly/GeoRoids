@@ -5,6 +5,7 @@
   "description": "",
   "type": "module",
   "scripts": {
+    "assets": "node --use-env-proxy --import tsx scripts/assets/cli.ts",
     "sounds:generate": "tsx scripts/generate-sounds.ts",
     "worktree:init": "bash scripts/worktree-init.sh && bash scripts/setup-agent-environment.sh",
     "prune": "npm run check:knip && npm run check:ts-prune && npm run check:members",

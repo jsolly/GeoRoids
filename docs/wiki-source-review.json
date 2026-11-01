@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:f6b0033ad6c2687a13ed3dd39ceb4c8ebe570e98ee005ec891f70ebe9fbf6455",
+    "package.json": "sha256:b5b72677866788b75b1aa0627537eb75f922cbbd8d123035b088c17dee93bdc0",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -8095,6 +8095,15 @@
       "media": [],
       "owners": {
         "src/utils/globalErrorLogging.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed AWS media preparation command only. Media remain tracked and all existing URLs, playback, player rules and demonstrations are unchanged; no Wiki article change is needed.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
       }
     }
   ]

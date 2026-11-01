@@ -34,7 +34,7 @@ export default defineConfig({
             'scripts/check-built-client.test.ts',
             'scripts/check-unused-typescript.test.ts',
             'scripts/check-unused-class-members.test.ts',
-            'scripts/merge-wiki-ledger.test.mjs',
+            'scripts/merge-wiki-ledger.test.ts',
             'scripts/typescript-toolchain.test.mjs',
           ],
         },

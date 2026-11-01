@@ -13,6 +13,7 @@ const artifacts = [
   { file: 'build-vercel-output.mjs', source: 'build-vercel-output.mts' },
   { file: 'verify-retained-assets.mjs', source: 'verify-retained-assets.mts' },
   { file: 'benchmark-build-receipt.mjs', source: 'benchmark-build-receipt.mts' },
+  { file: 'merge-wiki-ledger.mjs', source: 'merge-wiki-ledger.mts' },
   { file: 'client-asset-graph.js', source: 'client-asset-graph.ts' },
 ];
 
@@ -40,6 +41,9 @@ try {
   );
   const output = artifacts.map(({ file, source }) => {
     const banner = `// Generated from ${source} by generate-asset-boundaries.ts; do not edit.\n`;
+    const compiled = readFileSync(join(temporary, file), 'utf8');
+    const hashbang = compiled.match(/^#![^\n]*\n/u)?.[0] ?? '';
+    const generated = hashbang + banner + compiled.slice(hashbang.length);
     const result = spawnSync(
       join(root, 'node_modules/.bin/biome'),
       [
@@ -49,7 +53,7 @@ try {
         '--config-path=config/quality/biome.settings.jsonc',
         `--stdin-file-path=scripts/${file}`,
       ],
-      { cwd: root, input: banner + readFileSync(join(temporary, file), 'utf8'), encoding: 'utf8' }
+      { cwd: root, input: generated, encoding: 'utf8' }
     );
     if (result.error) {
       throw result.error;

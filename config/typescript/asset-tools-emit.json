@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "sourceMap": false,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "../../scripts"
+  },
+  "include": [
+    "../../scripts/build-vercel-output.mts",
+    "../../scripts/verify-retained-assets.mts",
+    "../../scripts/benchmark-build-receipt.mts"
+  ]
+}

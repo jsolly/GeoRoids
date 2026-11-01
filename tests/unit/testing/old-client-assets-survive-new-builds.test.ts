@@ -1,16 +1,33 @@
 /* @vitest-environment node */
+import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
+import type { FetchAsset } from '../../../scripts/build-vercel-output.mts';
 import {
   buildVercelOutput,
   contentHash,
   legacyAssetBytes,
-} from '../../../scripts/build-vercel-output.mjs';
+} from '../../../scripts/build-vercel-output.mts';
 import { clientAssetGraph, clientDocumentAssets } from '../../../scripts/client-asset-graph.ts';
 
-const roots = [];
+const roots: string[] = [];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function record(value: unknown): Record<string, unknown> {
+  assert(isRecord(value));
+  return value;
+}
+
+function matches(route: Record<string, unknown>, pathname: string): boolean {
+  const source = route['src'];
+  return typeof source === 'string' && source.length > 0 && new RegExp(source, 'u').test(pathname);
+}
+
 const body = 'export const audio = true;';
 const asset = {
   path: '_astro/howler.old.js',
@@ -42,7 +59,7 @@ async function fixture() {
 test('a production build seeds missing old audio bytes and emits exact aliases and current static routes', async () => {
   const root = await fixture();
   const fetchAsset = vi
-    .fn()
+    .fn<FetchAsset>()
     .mockResolvedValueOnce(new Response(null, { status: 404 }))
     .mockResolvedValueOnce(new Response(body));
   expect(await buildVercelOutput({ root, production: true, fetchAsset })).toEqual({
@@ -56,37 +73,53 @@ test('a production build seeds missing old audio bytes and emits exact aliases a
   const output = join(root, '.vercel/output');
   const migrated = await readFile(join(output, 'static/_vercel/immutable/legacy/howler.old.js'));
   expect(contentHash(migrated)).toBe(asset.sha256);
-  const manifest = JSON.parse(await readFile(join(output, 'immutable.json'), 'utf8'));
+  const manifest = record(JSON.parse(await readFile(join(output, 'immutable.json'), 'utf8')));
+  const hashes = record(manifest['hashes']);
   expect(await readFile(join(output, 'static/immutable-assets.json'), 'utf8')).toBe(
     await readFile(join(output, 'immutable.json'), 'utf8')
   );
-  expect(manifest.hashes['/_vercel/immutable/legacy/howler.old.js']).toBe(asset.sha256);
-  const config = JSON.parse(await readFile(join(output, 'config.json'), 'utf8'));
-  const alias = config.routes.find((route) => route.dest?.includes('/legacy/'));
-  expect(new RegExp(alias.src, 'u').test('/_astro/howler.old.js')).toBe(true);
-  expect(new RegExp(alias.src, 'u').test('/_astro/howlerXoldXjs')).toBe(false);
-  expect(alias.dest).toBe('/_vercel/immutable/legacy/howler.old.js');
-  expect(config.routes).toContainEqual({ src: '^/(debug|wiki)/?$', dest: '/$1/index.html' });
-  expect(config.routes[0].headers['Cache-Control']).toBe('no-store');
+  expect(hashes['/_vercel/immutable/legacy/howler.old.js']).toBe(asset.sha256);
+  const config = record(JSON.parse(await readFile(join(output, 'config.json'), 'utf8')));
+  const configuredRoutes = config['routes'];
+  assert(Array.isArray(configuredRoutes));
+  const routes = configuredRoutes.map((value: unknown) => record(value));
+  const alias = routes.find((route) => {
+    const destination = route['dest'];
+    return typeof destination === 'string' && destination.includes('/legacy/');
+  });
+  assert(alias);
+  const aliasSource = alias['src'];
+  assert(typeof aliasSource === 'string');
+  expect(new RegExp(aliasSource, 'u').test('/_astro/howler.old.js')).toBe(true);
+  expect(new RegExp(aliasSource, 'u').test('/_astro/howlerXoldXjs')).toBe(false);
+  expect(alias['dest']).toBe('/_vercel/immutable/legacy/howler.old.js');
+  expect(routes).toContainEqual({ src: '^/(debug|wiki)/?$', dest: '/$1/index.html' });
+  const first = routes[0];
+  assert(first);
+  expect(record(first['headers'])['Cache-Control']).toBe('no-store');
   for (const path of ['/debug', '/debug/', '/debug/?incident=test', '/debug/index.html']) {
     const pathname = new URL(path, 'https://www.georoids.com').pathname;
-    const matched = config.routes.find(
-      (route) => route.src && new RegExp(route.src, 'u').test(pathname)
-    );
-    expect(matched?.headers?.['X-Robots-Tag']).toBe('noindex, nofollow');
-    expect(matched?.continue).toBe(true);
+    const matched = routes.find((route) => matches(route, pathname));
+    assert(matched);
+    expect(record(matched['headers'])['X-Robots-Tag']).toBe('noindex, nofollow');
+    expect(matched['continue']).toBe(true);
   }
   expect(
-    config.routes.some(
-      (route) => route.headers?.['X-Robots-Tag'] && new RegExp(route.src, 'u').test('/wiki/')
-    )
+    routes.some((route) => {
+      const headers = route['headers'];
+      return (
+        headers !== undefined &&
+        Boolean(record(headers)['X-Robots-Tag']) &&
+        matches(route, '/wiki/')
+      );
+    })
   ).toBe(false);
   expect(await readFile(join(output, 'static/index.html'), 'utf8')).toContain('Current flight');
 });
 
 test('later builds omit registered legacy bytes and never depend on the prior deployment', async () => {
   const root = await fixture();
-  const fetchAsset = vi.fn().mockResolvedValue(new Response(body));
+  const fetchAsset = vi.fn<FetchAsset>().mockResolvedValue(new Response(body));
   expect(await buildVercelOutput({ root, production: true, fetchAsset })).toEqual({
     immutableFiles: 2,
     legacyAliases: 1,
@@ -96,14 +129,16 @@ test('later builds omit registered legacy bytes and never depend on the prior de
     readFile(join(root, '.vercel/output/static/_vercel/immutable/legacy/howler.old.js'))
   ).rejects.toThrow();
   expect(
-    JSON.parse(await readFile(join(root, '.vercel/output/immutable.json'), 'utf8')).hashes[
-      '/_vercel/immutable/legacy/howler.old.js'
-    ]
+    record(
+      record(JSON.parse(await readFile(join(root, '.vercel/output/immutable.json'), 'utf8')))[
+        'hashes'
+      ]
+    )['/_vercel/immutable/legacy/howler.old.js']
   ).toBeUndefined();
 });
 
 test.each([403, 500])('registry status %i fails closed without source fallback', async (status) => {
-  const fetchAsset = vi.fn().mockResolvedValue(new Response(null, { status }));
+  const fetchAsset = vi.fn<FetchAsset>().mockResolvedValue(new Response(null, { status }));
   await expect(legacyAssetBytes(asset, fetchAsset)).rejects.toThrow('Legacy asset unavailable');
   expect(fetchAsset).toHaveBeenCalledTimes(1);
 });
@@ -112,14 +147,14 @@ test.each(['export const audio = false;', body.replace('true', 'evil')])(
   'corrupt legacy bytes reject instead of publishing a broken alias: %s',
   async (corrupt) => {
     await expect(
-      legacyAssetBytes(asset, vi.fn().mockResolvedValue(new Response(corrupt)))
+      legacyAssetBytes(asset, vi.fn<FetchAsset>().mockResolvedValue(new Response(corrupt)))
     ).rejects.toThrow(/Legacy asset (exceeds pinned size|checksum changed)/u);
   }
 );
 
 test('local and CI builds emit native artifacts without contacting production', async () => {
   const root = await fixture();
-  const fetchAsset = vi.fn();
+  const fetchAsset = vi.fn<FetchAsset>();
   await buildVercelOutput({ root, production: false, fetchAsset });
   expect(fetchAsset).not.toHaveBeenCalled();
 });

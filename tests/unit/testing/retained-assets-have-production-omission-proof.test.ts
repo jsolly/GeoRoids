@@ -1,10 +1,12 @@
 /* @vitest-environment node */
+import assert from 'node:assert/strict';
 import { expect, test, vi } from 'vitest';
-import { contentHash } from '../../../scripts/build-vercel-output.mjs';
+import type { FetchAsset } from '../../../scripts/build-vercel-output.mts';
+import { contentHash } from '../../../scripts/build-vercel-output.mts';
 import {
   captureRetainedAssets,
   verifyRetainedAssets,
-} from '../../../scripts/verify-retained-assets.mjs';
+} from '../../../scripts/verify-retained-assets.mts';
 
 const prefix = '/_vercel/immutable/0123456789abcdef01234567/';
 const oldPath = `${prefix}game.old.js`;
@@ -17,13 +19,22 @@ const snapshot = {
   assets: [{ path: oldPath, bytes: Buffer.byteLength(oldBody), sha256: contentHash(oldBody) }],
 };
 
-function transport({ retained = oldBody, emitted = [newPath], changed = false } = {}) {
+function transport({
+  retained = oldBody,
+  emitted = [newPath],
+  changed = false,
+}: {
+  retained?: string;
+  emitted?: string[];
+  changed?: boolean;
+} = {}) {
+  const changeInventory = Boolean(changed);
   let inventoryReads = 0;
-  const fetchAsset = vi.fn((url) => {
+  const fetchAsset = vi.fn<FetchAsset>((url) => {
     const path = new URL(url).pathname;
     if (path === '/immutable-assets.json') {
       inventoryReads++;
-      const paths = changed && inventoryReads > 1 ? [oldPath, newPath] : emitted;
+      const paths = changeInventory && inventoryReads > 1 ? [oldPath, newPath] : emitted;
       return Response.json({
         version: 1,
         hashes: Object.fromEntries(paths.map((name) => [name, 'a'.repeat(64)])),
@@ -52,12 +63,36 @@ test('a later output omits the old game while its original uncached URL still re
     omitted: [oldPath],
   });
   const assetRequest = fetchAsset.mock.calls.find(([url]) => new URL(url).pathname === oldPath);
+  assert(assetRequest);
   expect(assetRequest[1]).toMatchObject({
     cache: 'no-store',
     redirect: 'error',
     headers: { 'Cache-Control': 'no-cache' },
   });
 });
+
+test.each([
+  { label: 'missing', metadata: undefined },
+  { label: 'opaque', metadata: { legacyClock: [4, 2] } },
+])(
+  '$label capture metadata passes through without tightening the version-1 receipt',
+  async ({ metadata }) => {
+    const legacy = { version: snapshot.version, origin: snapshot.origin, assets: snapshot.assets };
+    const input = metadata === undefined ? legacy : { ...legacy, capturedAt: metadata };
+    const receipt = await verifyRetainedAssets(input, transport());
+    expect(Object.hasOwn(receipt, 'capturedAt')).toBe(true);
+    expect(receipt.capturedAt).toBe(metadata);
+    const serialized: unknown = JSON.parse(JSON.stringify(receipt));
+    expect(serialized).toEqual({
+      version: 1,
+      origin: snapshot.origin,
+      ...(metadata === undefined ? {} : { capturedAt: metadata }),
+      verifiedAt: expect.any(String),
+      checkedAssets: 1,
+      omitted: [oldPath],
+    });
+  }
+);
 
 test('an unreferenced old file still present in deployment output cannot falsely prove retention', async () => {
   await expect(

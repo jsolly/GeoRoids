@@ -41,6 +41,7 @@ function fixture(t) {
     'test-ports.mjs',
     'validation-admission.mjs',
     'benchmark-build-receipt.mjs',
+    'client-asset-graph.js',
   ]) {
     cpSync(join(source, name), join(scripts, name));
   }

@@ -48,7 +48,13 @@ imports its runtime immediately on mount; the Wiki's chart code is in its initia
 module graph. Audio (`howler`) and client log forwarding still import chunks on
 demand. Generated JS/CSS now uses `/_vercel/immutable/<salt-digest>/` URLs.
 `scripts/build-vercel-output.mjs` emits Vercel's Build Output API static tree and
-full SHA-256 immutable manifest. The provider serves these files across deployments
+full SHA-256 immutable manifest. This CLI, `verify-retained-assets.mjs` and
+`benchmark-build-receipt.mjs` are generated from their `.mts` sources with the pinned
+TypeScript 7 CLI. After editing those sources or their typed graph dependency, run
+`node scripts/generate-asset-boundaries.ts --write`; `check:ts` checks their freshness.
+The existing CLI paths and retained asset URLs stay stable.
+
+The provider serves these files across deployments
 even when the current build omits them, including overlapping builds. No service
 worker or previous-build cache is required; documents and release metadata stay current.
 

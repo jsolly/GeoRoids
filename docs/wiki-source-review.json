@@ -3,6 +3,7 @@
   "hashes": {
     "components.json": "sha256:d0937034ab85db4f61325c777c23bbc891a79126f09c5f13beb5187a0ff99c79",
     "config/app/astro.ts": "sha256:963edcd49f93340ceeabcdd77714eb89b329208a551093da083e221613fac1d3",
+    "config/app/svelte.ts": "sha256:4d25a2f4932eaaee1e03aed44defdf3fdd33359a551139daa95e6c75d9d69f8e",
     "config/quality/prettier.json": "sha256:d3fba49b5ca2805dbf4273dfc63273b3c1fdae87f98a8dbea3cd94fd3bdda0b6",
     "config/typescript/frontend.json": "sha256:f9e833a50ba954e61d8e8c326857d5c0c67498c4de31b9ec0608b1a0f4f29cd2",
     "config/typescript/tsconfig.json": "sha256:bcfd4a8c97fd1c4c0a49e85badf4f98457895b76698b50b0cdc688ce2403f01d",
@@ -578,8 +579,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:c9d1b85ad4199de57f927af4debc64662986ebf8bf45157426baa613970ba322",
-    "config/app/svelte.ts": "sha256:4d25a2f4932eaaee1e03aed44defdf3fdd33359a551139daa95e6c75d9d69f8e"
+    "tsconfig.json": "sha256:c9d1b85ad4199de57f927af4debc64662986ebf8bf45157426baa613970ba322"
   },
   "reviews": [
     {
@@ -8125,6 +8125,15 @@
         "package.json": "field-manual",
         "scripts/wiki-check.ts": "field-manual",
         "tsconfig.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the composed package commands: the build retains the typed publication checker from main and Knip selects the typed configuration. Player rules, Wiki text, media, and public asset URLs are unchanged. The complete gate passed on these same executable sources before this scoped ledger acceptance.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
       }
     }
   ]

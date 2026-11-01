@@ -2,13 +2,26 @@ import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import process from 'node:process';
-import axe from 'axe-core';
-import { chromium } from 'playwright';
+import axe, { type AxeResults } from 'axe-core';
+import { type Browser, chromium } from 'playwright';
+
+declare global {
+  interface Window {
+    axe?: typeof axe;
+  }
+}
+
+interface AccessibilityResult {
+  path: string;
+  width: number;
+  violations: AxeResults['violations'];
+  incomplete: AxeResults['incomplete'];
+}
 
 // Scan every built HTML document. Optional arguments restrict the route inventory.
 const INDEX_HTML = /index\.html$/u;
 const root = resolve('dist');
-async function inventory(dir) {
+async function inventory(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
     entries
@@ -27,7 +40,7 @@ const pages = routes.length
 if (!pages.length) {
   throw new Error('No HTML pages found. Run npm run build first.');
 }
-const mime = {
+const mime: Readonly<Record<string, string>> = {
   '.html': 'text/html',
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -38,6 +51,9 @@ const mime = {
 };
 const server = createServer(async (req, res) => {
   try {
+    if (req.url === undefined) {
+      throw new Error('Missing request URL');
+    }
     let path = resolve(
       root,
       `.${decodeURIComponent(new URL(req.url, 'http://localhost').pathname)}`
@@ -48,21 +64,26 @@ const server = createServer(async (req, res) => {
     if ((await stat(path)).isDirectory()) {
       path = join(path, 'index.html');
     }
-    res.setHeader('Content-Type', mime[extname(path)] || 'application/octet-stream');
+    res.setHeader('Content-Type', mime[extname(path)] ?? 'application/octet-stream');
     res.end(await readFile(path));
   } catch {
     res.writeHead(404).end();
   }
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const origin = `http://127.0.0.1:${server.address().port}`;
-let browser;
-const results = [];
+await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+const address = server.address();
+if (address === null || typeof address === 'string') {
+  throw new Error('Accessibility server has no TCP address');
+}
+const origin = `http://127.0.0.1:${address.port}`;
+let browser: Browser | undefined;
+const results: AccessibilityResult[] = [];
 try {
-  browser = await chromium.launch({ headless: true });
+  const auditBrowser = await chromium.launch({ headless: true });
+  browser = auditBrowser;
   await Promise.all(
     [1280, 390].map(async (width) => {
-      const context = await browser.newContext({
+      const context = await auditBrowser.newContext({
         viewport: { width, height: 900 },
         bypassCSP: true,
       });
@@ -74,11 +95,14 @@ try {
       await Promise.all(
         Array.from({ length: 4 }, async () => {
           const page = await context.newPage();
-          async function nextPage() {
+          async function nextPage(): Promise<void> {
             if (!queue.length) {
               return;
             }
             const path = queue.shift();
+            if (path === undefined) {
+              return;
+            }
             const response = await page.goto(origin + path, { waitUntil: 'load' });
             if (!response?.ok()) {
               throw new Error(`Failed to load ${path}: ${response?.status()}`);
@@ -86,7 +110,8 @@ try {
             await page.waitForFunction(() => !document.querySelector('astro-island[ssr]'));
             await page.waitForFunction(() => {
               const start = document.querySelector('#start-game');
-              return !start?.disabled || document.querySelector('[role="alert"]');
+              const disabled = start !== null && 'disabled' in start && Boolean(start.disabled);
+              return !disabled || document.querySelector('[role="alert"]') !== null;
             });
             await page.evaluate(() => document.fonts.ready);
             await page.evaluate(async () => {
@@ -100,7 +125,12 @@ try {
               );
             });
             await page.evaluate(axe.source);
-            const { violations, incomplete } = await page.evaluate(() => window.axe.run());
+            const { violations, incomplete } = await page.evaluate(() => {
+              if (!window.axe) {
+                throw new Error('Axe did not initialize');
+              }
+              return window.axe.run();
+            });
             results.push({ path, width, violations, incomplete });
             process.stdout.write(
               `${width} ${path}: ${violations.length} violations, ${incomplete.length} need review\n`
@@ -116,7 +146,7 @@ try {
   );
 } finally {
   await browser?.close();
-  await new Promise((r) => server.close(r));
+  await new Promise<void>((r) => server.close(() => r()));
   await writeFile('accessibility-results.json', JSON.stringify(results, null, 2));
 }
 if (results.some((r) => r.violations.length)) {

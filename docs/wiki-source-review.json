@@ -10,7 +10,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:d3eb0b54469ad8ff172509f9146f9f56658d0dfb30abfdd3831f9fe1ca76d37a",
+    "package.json": "sha256:3a598a5434967ceb9450ce9328a4e5022c7de7c0baeafb355c342711bee88665",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -8125,6 +8125,15 @@
         "package.json": "field-manual",
         "scripts/wiki-check.ts": "field-manual",
         "tsconfig.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the two verification-helper command paths and strict HTTP, DOM, browser and axe SDK boundaries. Dedicated strict TypeScript and Biome checks passed. Player behavior, Wiki content and demonstration assets are unchanged. Browser verification, flight cases and the complete gate remain pending.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
       }
     }
   ]

@@ -15,7 +15,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { clientAssetGraph } from './client-asset-graph.mjs';
+import { clientAssetGraph } from './client-asset-graph.ts';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const receiptPath = (root) => join(root, '.performance/benchmark-client-build.json');

@@ -3,8 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vitest';
-import { checkUnusedClassMembers } from './check-unused-class-members.mjs';
-import { STAGES } from './gate-receipt.mjs';
+import { checkUnusedClassMembers } from './check-unused-class-members.ts';
 
 const removeIt = 'no TypeScript references; remove it';
 // A reference the check could not classify is still a reference, so claiming
@@ -13,8 +12,8 @@ const removeIt = 'no TypeScript references; remove it';
 const confirmByHand =
   'named only by a type or doc reference this check cannot classify; confirm by hand';
 const coverIt = 'only a component reaches it; cover the behavior from a test';
-const makePrivate = (count) => `used only inside its class (${count}); make it private`;
-const engine = (members) => `export class Engine {\n${members}\n}`;
+const makePrivate = (count: number) => `used only inside its class (${count}); make it private`;
+const engine = (members: string) => `export class Engine {\n${members}\n}`;
 const live = '  step(): number {\n    return 1;\n  }';
 /** The only caller of Engine.step, so the baseline has no finding. */
 const main = 'import {Engine} from "./engine"; console.log(new Engine().step());';
@@ -23,31 +22,35 @@ const main = 'import {Engine} from "./engine"; console.log(new Engine().step());
  * A tree the check can be run over, with one class per production directory so
  * that every directory contributes a file and the baseline is clean.
  */
-function fixture(name) {
+function fixture(name: string) {
   const root = mkdtempSync(join(tmpdir(), `georoids-class-member-${name}-`));
-  const write = (path, body) => writeFileSync(join(root, path), body);
-  const drop = (path) => rmSync(join(root, path));
+  const write = (path: string, body: string) => writeFileSync(join(root, path), body);
+  const drop = (path: string) => rmSync(join(root, path));
   const run = () => checkUnusedClassMembers(root);
   const passes = () => {
     const result = run();
     assert.equal(result.status, 0, result.stdout);
   };
   /** A clean run that still names which relationship kept this member. */
-  const clears = (member, reason) => {
+  const clears = (member: string, reason: string) => {
     const result = run();
     assert.equal(result.status, 0, result.stdout);
     const audited = result.stdout.split('\n').filter((line) => line.startsWith(`${member} `));
     assert.equal(audited.length, 1, result.stdout);
-    assert(audited[0].includes(reason), audited[0]);
+    const auditedLine = audited[0];
+    assert(auditedLine !== undefined, result.stdout);
+    assert(auditedLine.includes(reason), auditedLine);
   };
   /** One reported line pairs this member with this remedy, and nothing else is reported. */
-  const fails = (member, remedy, total = 1) => {
+  const fails = (member: string, remedy: string, total = 1) => {
     const result = run();
     assert.equal(result.status, 1, result.stdout);
     assert.match(result.stdout, new RegExp(`^Unused public class members \\(${total}\\)\n`, 'u'));
     const reported = result.stdout.split('\n').filter((line) => line.startsWith(`${member} `));
     assert.equal(reported.length, 1, result.stdout);
-    assert(reported[0].endsWith(` - ${remedy}`), reported[0]);
+    const reportedLine = reported[0];
+    assert(reportedLine !== undefined, result.stdout);
+    assert(reportedLine.endsWith(` - ${remedy}`), reportedLine);
   };
   for (const directory of ['src', 'server', 'shared', 'tests']) {
     mkdirSync(join(root, directory));
@@ -250,7 +253,7 @@ test('public production methods need a caller outside their own class', () => {
         'src/Page.astro',
         '---\nimport {Engine} from "./engine";\nnew Engine().reached();\n---\n<div></div>\n',
       ],
-    ]) {
+    ] satisfies [string, string][]) {
       write(path, body);
       fails('Engine.reached', coverIt);
       drop(path);
@@ -547,9 +550,9 @@ test('public production methods need a caller outside their own class', () => {
 test('public fields and accessors are judged like methods', () => {
   const { root, write, drop, run, passes, clears, fails } = fixture('fields');
   /** Mirror.total always has an outside caller, so each case reports only its own field. */
-  const mirror = (members) =>
+  const mirror = (members: string) =>
     `export class Mirror {\n  total(): number {\n    return 0;\n  }\n${members}\n}`;
-  const view = (body) => `import type {Mirror} from "./mirror";\n${body}`;
+  const view = (body: string) => `import type {Mirror} from "./mirror";\n${body}`;
   const reads = view('export const show = (m: Mirror) => m.total();');
   try {
     write('src/view.ts', view('export const show = (m: Mirror) => m.total() + m.live;'));
@@ -850,16 +853,22 @@ test('every kind the check judges is one it also recognises as a declaration', (
   // so the member looks used and leaves the gate with no finding and no audit
   // line. The per-kind behavioural negatives above are what caught the
   // object-literal omission; this test covers the other direction.
-  const source = readFileSync(new URL('./check-unused-class-members.mjs', import.meta.url), 'utf8');
-  const body = (name) => {
+  const source = readFileSync(new URL('./check-unused-class-members.ts', import.meta.url), 'utf8');
+  const body = (name: string) => {
     const start = source.indexOf(`function ${name}(`);
     assert.notEqual(start, -1, `cannot find ${name}`);
     const end = source.indexOf('\n}\n', start);
     assert.notEqual(end, -1, `cannot delimit ${name}`);
     return source.slice(start, end);
   };
-  const predicates = (name) =>
-    new Set([...body(name).matchAll(/ts\.(is[A-Za-z]+)\(/gu)].map(([, shape]) => shape));
+  const predicates = (name: string) =>
+    new Set(
+      [...body(name).matchAll(/ts\.(is[A-Za-z]+)\(/gu)].map((match) => {
+        const shape = match[1];
+        assert(shape !== undefined, `Missing predicate capture in ${name}`);
+        return shape;
+      })
+    );
   const judged = predicates('checkableKind');
   const declares = predicates('declaresMember');
   // `isIdentifier` tests the NAME node rather than the member's kind, and
@@ -879,8 +888,8 @@ test('every kind the check judges is one it also recognises as a declaration', (
 
 test('a configuration that cannot be trusted fails instead of reporting nothing', () => {
   const root = mkdtempSync(join(tmpdir(), 'georoids-class-member-scope-'));
-  const write = (path, body) => writeFileSync(join(root, path), body);
-  const config = (include) =>
+  const write = (path: string, body: string) => writeFileSync(join(root, path), body);
+  const config = (include: string[]) =>
     write('config/typescript/prune.jsonc', JSON.stringify({ extends: './base.json', include }));
   try {
     for (const directory of ['src', 'server', 'shared', 'tests']) {
@@ -918,11 +927,38 @@ test('a configuration that cannot be trusted fails instead of reporting nothing'
   }
 });
 
-test('the gate runs this check as a stage of its own', () => {
-  const scripts = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.match(scripts.scripts['check:members'], /check-unused-class-members\.mjs/u);
+test('the gate runs this check as a stage of its own', async () => {
+  const parsed: unknown = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  );
+  assert(parsed !== null && typeof parsed === 'object' && 'scripts' in parsed);
+  const scripts = parsed.scripts;
+  assert(
+    scripts !== null &&
+      typeof scripts === 'object' &&
+      'check:members' in scripts &&
+      typeof scripts['check:members'] === 'string'
+  );
+  assert('check:ts-prune' in scripts && typeof scripts['check:ts-prune'] === 'string');
+  assert.match(scripts['check:members'], /check-unused-class-members\.ts/u);
   // Chained behind the unused-export check, this one did not run at all when
   // that check failed, and its failures read as a ts-prune failure.
-  assert.doesNotMatch(scripts.scripts['check:ts-prune'], /check-unused-class-members\.mjs/u);
-  assert.ok(STAGES.some(([, command]) => command === 'check:members'));
+  assert.doesNotMatch(scripts['check:ts-prune'], /check-unused-class-members\.ts/u);
+  // This held JavaScript module stays unmodified; check the foreign export at its boundary.
+  const receipt: unknown = await import(new URL('./gate-receipt.mjs', import.meta.url).href);
+  assert(
+    receipt !== null &&
+      typeof receipt === 'object' &&
+      'STAGES' in receipt &&
+      Array.isArray(receipt.STAGES)
+  );
+  const stages: readonly unknown[] = receipt.STAGES;
+  assert.ok(
+    stages.some((entry) => {
+      assert(Array.isArray(entry), 'Malformed gate stage');
+      const command: unknown = entry[1];
+      assert(typeof command === 'string', 'Malformed gate command');
+      return command === 'check:members';
+    })
+  );
 });

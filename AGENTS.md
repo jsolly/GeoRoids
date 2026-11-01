@@ -64,9 +64,9 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   a dynamic `import('./x.mjs')`), which covers most runners under `scripts/`. So
   ts-prune owns unused exports for those: `config/typescript/prune.jsonc` sets
   `allowJs` to keep `scripts/**/*.mjs` in its program, and
-  `scripts/check-unused-typescript.test.mjs` fails if that drops. Biome's
+  `scripts/check-unused-typescript.test.ts` fails if that drops. Biome's
   `noUnusedPrivateClassMembers` owns unused `private` and `#private` class
-  members, and `scripts/check-unused-class-members.mjs` — the gate's
+  members, and `scripts/check-unused-class-members.ts` — the gate's
   `check:members` stage, its own stage so that its verdicts do not read as a
   ts-prune failure — owns public methods, fields and accessors, on class
   declarations and class expressions alike, that nothing outside the declaring
@@ -150,7 +150,7 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   file it was found in, so a run that reports nothing can be audited instead of
   trusted — that audit line is what exposed a dead `SatellitePickup.velocity`
   hiding behind a port no pickup is ever passed to — and
-  `scripts/check-unused-class-members.test.mjs` drives each rule from a
+  `scripts/check-unused-class-members.test.ts` drives each rule from a
   fixture that fails when the rule is deleted. Do not read that as a guarantee
   of complete coverage: three times now this note has claimed one, and each
   time a reviewer found rules whose deletion left the suite green — most

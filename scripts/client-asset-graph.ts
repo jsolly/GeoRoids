@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-function assetPath(value, javascript = false) {
+function assetPath(value: unknown, javascript = false): string {
   assert(
     typeof value === 'string' &&
       /^(?:assets|_astro|_vercel\/immutable\/[a-f0-9]{24})\/[a-zA-Z0-9_.-]+\.(?:js|css)$/u.test(
@@ -14,17 +14,20 @@ function assetPath(value, javascript = false) {
 }
 
 /** Validate the emitted module graph, then prove gameplay is reachable from the page. */
-export function clientAssetGraph(manifest, entries) {
+export function clientAssetGraph(manifest: unknown, entries: readonly string[]): string[] {
   assert(
-    manifest &&
+    manifest !== null &&
+      typeof manifest === 'object' &&
+      'gameplay' in manifest &&
+      'modules' in manifest &&
       Array.isArray(manifest.gameplay) &&
       manifest.gameplay.length > 0 &&
-      manifest.modules &&
+      manifest.modules !== null &&
       typeof manifest.modules === 'object' &&
       !Array.isArray(manifest.modules),
     'Published client asset manifest is malformed'
   );
-  const graph = new Map();
+  const graph = new Map<string, string[]>();
   for (const [module, imports] of Object.entries(manifest.modules)) {
     assetPath(module, true);
     assert(Array.isArray(imports), 'Client module imports are malformed');
@@ -43,15 +46,17 @@ export function clientAssetGraph(manifest, entries) {
   assert(new Set(gameplay).size === gameplay.length, 'Duplicate gameplay attribution');
   const pending = entries.map((path) => assetPath(path, true));
   assert(pending.length > 0, 'Client module entry is missing');
-  const reachable = new Set();
+  const reachable = new Set<string>();
   while (pending.length > 0) {
     const path = pending.pop();
+    assert(path !== undefined);
     if (reachable.has(path)) {
       continue;
     }
-    assert(graph.has(path), 'Client entry is absent from the module graph');
+    const imports = graph.get(path);
+    assert(imports, 'Client entry is absent from the module graph');
     reachable.add(path);
-    pending.push(...graph.get(path));
+    pending.push(...imports);
   }
   assert(
     gameplay.every((path) => reachable.has(path)),
@@ -61,12 +66,12 @@ export function clientAssetGraph(manifest, entries) {
 }
 
 /** Astro hydration loads island entries from attributes, alongside ordinary scripts. */
-export function clientDocumentAssets(html) {
+export function clientDocumentAssets(html: string): { modules: string[]; assets: string[] } {
   const require = createRequire(import.meta.url);
-  const { JSDOM } = require('jsdom');
+  const { JSDOM }: typeof import('jsdom') = require('jsdom');
   const dom = new JSDOM(html);
   try {
-    const elements = (selector) =>
+    const elements = (selector: string) =>
       [...dom.window.document.querySelectorAll(selector)].filter(
         (element) => !element.closest('noscript')
       );
@@ -80,11 +85,13 @@ export function clientDocumentAssets(html) {
       return [component, renderer];
     });
     const links = elements('link')
-      .filter((element) => ['modulepreload', 'stylesheet'].includes(element.getAttribute('rel')))
+      .filter((element) =>
+        ['modulepreload', 'stylesheet'].includes(element.getAttribute('rel') ?? '')
+      )
       .map((element) => element.getAttribute('href'));
     const modules = [...new Set([...scripts, ...islands])];
     assert(modules.length > 0, 'Client module entry is missing');
-    const path = (value, javascript = false) => {
+    const path = (value: unknown, javascript = false) => {
       assert(
         typeof value === 'string' && value.startsWith('/') && !value.startsWith('//'),
         'Client bundle asset is not first-party'

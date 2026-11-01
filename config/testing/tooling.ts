@@ -31,7 +31,7 @@ export default defineConfig({
             'scripts/benchmark-build-receipt.test.mjs',
             'scripts/test-ports.test.mjs',
             'scripts/validation-admission.test.mjs',
-            'scripts/check-built-client.test.mjs',
+            'scripts/check-built-client.test.ts',
             'scripts/check-unused-typescript.test.mjs',
             'scripts/check-unused-class-members.test.mjs',
             'scripts/merge-wiki-ledger.test.mjs',

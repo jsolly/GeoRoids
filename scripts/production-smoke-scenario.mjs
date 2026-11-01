@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import WebSocket from 'ws';
-import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.mjs';
+import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.ts';
 import {
   requireEvidence,
   SmokeFailure,

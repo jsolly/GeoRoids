@@ -8,7 +8,7 @@ import {
   contentHash,
   legacyAssetBytes,
 } from '../../../scripts/build-vercel-output.mjs';
-import { clientAssetGraph, clientDocumentAssets } from '../../../scripts/client-asset-graph.mjs';
+import { clientAssetGraph, clientDocumentAssets } from '../../../scripts/client-asset-graph.ts';
 
 const roots = [];
 const body = 'export const audio = true;';

@@ -27,7 +27,7 @@ copy selects the pinned gitleaks archive for its runner architecture, because th
 media lane runs on x64; the `ci` job keeps the canonical arm64 step.
 Post-merge CI reuses successful PR evidence only for the identical Git tree and
 matching lane. Missing proof reruns that lane; manual dispatch validates normally.
-Dependabot keeps its explicit manual-drain invocation gate.
+Dependabot PRs run the same lanes and `ci`; labels start no runs.
 
 ## Local review
 

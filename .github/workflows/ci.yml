@@ -1,6 +1,5 @@
 ---
 name: CI
-run-name: ${{ format('{0} validation', github.workflow) }}
 
 'on':
   workflow_dispatch:

@@ -36,7 +36,7 @@
     "check:actions": "vitest run --config config/testing/tooling.ts --project actions --project smoke && bash scripts/check-actions.sh",
     "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit",
     "check:lint-policy": "vitest run --config config/testing/tooling.ts --project lint-policy",
-    "check:knip": "JITI_FS_CACHE=false knip --config config/quality/knip.js --treat-config-hints-as-errors --treat-tag-hints-as-errors",
+    "check:knip": "JITI_FS_CACHE=false knip --config config/quality/knip.ts --treat-config-hints-as-errors --treat-tag-hints-as-errors",
     "check:ts-prune": "node scripts/check-unused-typescript.mjs",
     "check:members": "node scripts/check-unused-class-members.mjs",
     "check:wiki": "tsx scripts/wiki-check.ts",
@@ -49,7 +49,7 @@
     "benchmark:load": "./scripts/test-runner.sh --benchmark-load",
     "smoke:production": "node --import tsx scripts/production-smoke-entry.mjs",
     "smoke:scenario-contract": "vitest run --config config/testing/tooling.ts --project smoke",
-    "check:frontend": "astro check --config config/app/astro.ts --tsconfig ./tsconfig.frontend.json --minimumFailingSeverity warning && svelte-check --config ./config/app/svelte.js --tsconfig ./tsconfig.frontend.json --fail-on-warnings",
+    "check:frontend": "astro check --config config/app/astro.ts --tsconfig ./tsconfig.frontend.json --minimumFailingSeverity warning && svelte-check --config ./config/app/svelte.ts --tsconfig ./tsconfig.frontend.json --fail-on-warnings",
     "check:format": "prettier --config config/quality/prettier.json --check \"src/**/*.{astro,svelte}\"",
     "check:a11y": "node scripts/check-accessibility.mjs"
   },

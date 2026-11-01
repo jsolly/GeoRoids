@@ -6,7 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import ts from 'typescript';
 import { test } from 'vitest';
-import unusedConfig from '../config/quality/knip.js';
+import unusedConfig from '../config/quality/knip.ts';
 import { checkUnusedTypescript, frontendEntry } from './check-unused-typescript.mjs';
 
 test('frontend imports and inherited tool entries preserve exact TypeScript export usage', () => {

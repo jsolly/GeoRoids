@@ -22,7 +22,7 @@ export default defineConfig({
   },
   server: { host: '127.0.0.1', port: vite.server.port },
   integrations: [
-    svelte({ configFile: fileURLToPath(new URL('./svelte.js', import.meta.url)) }),
+    svelte({ configFile: fileURLToPath(new URL('./svelte.ts', import.meta.url)) }),
     {
       name: 'georoids-config-watch',
       hooks: {

@@ -6,15 +6,21 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'vitest';
 
 const selector = fileURLToPath(new URL('./test-ports.mjs', import.meta.url));
-function select(ports) {
-  return new Promise((accept, reject) => {
+interface SelectionResult {
+  code: number | null;
+  output: string;
+  diagnostic: string;
+}
+
+function select(ports: readonly string[]): Promise<SelectionResult> {
+  return new Promise<SelectionResult>((accept, reject) => {
     const child = spawn(process.execPath, [selector, ...ports]);
     let output = '';
     let diagnostic = '';
-    child.stdout.on('data', (chunk) => {
+    child.stdout.on('data', (chunk: Buffer) => {
       output += chunk;
     });
-    child.stderr.on('data', (chunk) => {
+    child.stderr.on('data', (chunk: Buffer) => {
       diagnostic += chunk;
     });
     child.once('error', reject);
@@ -24,7 +30,7 @@ function select(ports) {
 
 test('a standalone harness chooses three distinct ports while defaults belong to another service', async () => {
   const occupied = createServer();
-  await new Promise((accept, reject) => {
+  await new Promise<void>((accept, reject) => {
     occupied.once('error', reject);
     occupied.listen(0, '127.0.0.1', accept);
   });
@@ -39,7 +45,7 @@ test('a standalone harness chooses three distinct ports while defaults belong to
     assert(!ports.includes(address.port));
     assert(occupied.listening);
   } finally {
-    await new Promise((accept, reject) =>
+    await new Promise<void>((accept, reject) =>
       occupied.close((error) => (error ? reject(error) : accept()))
     );
   }
@@ -51,7 +57,9 @@ test('explicit diagnostic selections survive automatic selection of remaining po
   const ports = result.output.trim().split('\n');
   assert.equal(ports[0], '59991');
   assert.equal(ports[2], '59993');
-  assert(!['59991', '59993'].includes(ports[1]));
+  const automatic = ports[1];
+  assert(automatic !== undefined);
+  assert(!['59991', '59993'].includes(automatic));
 });
 
 test('duplicate or invalid explicit selections fail before any harness starts', async () => {

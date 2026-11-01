@@ -1,3 +1,4 @@
+// Generated from client-asset-graph.ts by generate-asset-boundaries.ts; do not edit.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
@@ -12,14 +13,16 @@ function assetPath(value, javascript = false) {
   );
   return value;
 }
-
 /** Validate the emitted module graph, then prove gameplay is reachable from the page. */
 export function clientAssetGraph(manifest, entries) {
   assert(
-    manifest &&
+    manifest !== null &&
+      typeof manifest === 'object' &&
+      'gameplay' in manifest &&
+      'modules' in manifest &&
       Array.isArray(manifest.gameplay) &&
       manifest.gameplay.length > 0 &&
-      manifest.modules &&
+      manifest.modules !== null &&
       typeof manifest.modules === 'object' &&
       !Array.isArray(manifest.modules),
     'Published client asset manifest is malformed'
@@ -46,12 +49,14 @@ export function clientAssetGraph(manifest, entries) {
   const reachable = new Set();
   while (pending.length > 0) {
     const path = pending.pop();
+    assert(path !== undefined);
     if (reachable.has(path)) {
       continue;
     }
-    assert(graph.has(path), 'Client entry is absent from the module graph');
+    const imports = graph.get(path);
+    assert(imports, 'Client entry is absent from the module graph');
     reachable.add(path);
-    pending.push(...graph.get(path));
+    pending.push(...imports);
   }
   assert(
     gameplay.every((path) => reachable.has(path)),
@@ -59,7 +64,6 @@ export function clientAssetGraph(manifest, entries) {
   );
   return [...reachable].sort();
 }
-
 /** Astro hydration loads island entries from attributes, alongside ordinary scripts. */
 export function clientDocumentAssets(html) {
   const require = createRequire(import.meta.url);
@@ -80,7 +84,9 @@ export function clientDocumentAssets(html) {
       return [component, renderer];
     });
     const links = elements('link')
-      .filter((element) => ['modulepreload', 'stylesheet'].includes(element.getAttribute('rel')))
+      .filter((element) =>
+        ['modulepreload', 'stylesheet'].includes(element.getAttribute('rel') ?? '')
+      )
       .map((element) => element.getAttribute('href'));
     const modules = [...new Set([...scripts, ...islands])];
     assert(modules.length > 0, 'Client module entry is missing');

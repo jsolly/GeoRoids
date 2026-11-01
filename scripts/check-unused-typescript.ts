@@ -21,7 +21,7 @@ const componentExtension = /\.(?:svelte|astro)$/u;
 const nonTypescriptExtension = /\.(?:svelte|astro|css)$/u;
 
 /** Component files, enumerated once for both unused-code gates. */
-export function components(directory) {
+export function components(directory: string): string[] {
   if (!existsSync(directory)) {
     return [];
   }
@@ -30,7 +30,7 @@ export function components(directory) {
     return entry.isDirectory() ? components(path) : componentExtension.test(path) ? [path] : [];
   });
 }
-function declarations(path) {
+function declarations(path: string): unknown[] {
   const source = readFileSync(path, 'utf8');
   if (path.endsWith('.svelte')) {
     const ast = parseSvelte(source, { modern: true });
@@ -41,12 +41,12 @@ function declarations(path) {
     !parsed.diagnostics.some((diagnostic) => diagnostic.severity === 'error'),
     `Cannot parse ${path}`
   );
-  const imports = [];
-  const visit = (node) => {
-    if (!node || typeof node !== 'object') {
+  const imports: unknown[] = [];
+  const visit = (node: unknown): void => {
+    if (node === null || typeof node !== 'object') {
       return;
     }
-    if (node.type === 'ImportDeclaration') {
+    if ('type' in node && node.type === 'ImportDeclaration') {
       imports.push(node);
       return;
     }
@@ -62,39 +62,62 @@ function declarations(path) {
   return imports;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Entry imports are compiler-parsed; strict frontend diagnostics enforce their use. */
-export function frontendEntry(root) {
-  const lines = [];
+export function frontendEntry(root: string): string {
+  const lines: string[] = [];
   let serial = 0;
   for (const component of components(join(root, 'src'))) {
     for (const declaration of declarations(component)) {
-      if (declaration.type !== 'ImportDeclaration' || !declaration.source.value.startsWith('.')) {
+      if (!isRecord(declaration) || declaration['type'] !== 'ImportDeclaration') {
         continue;
       }
-      const module = resolve(dirname(component), declaration.source.value);
+      const source = declaration['source'];
+      assert(
+        isRecord(source) && typeof source['value'] === 'string',
+        `Unsupported frontend import in ${component}`
+      );
+      const moduleName = source['value'];
+      if (!moduleName.startsWith('.')) {
+        continue;
+      }
+      const module = resolve(dirname(component), moduleName);
       if (nonTypescriptExtension.test(module)) {
         continue;
       }
       const resolvedModule = ts.resolveModuleName(
-        declaration.source.value,
+        moduleName,
         component,
         { moduleResolution: ts.ModuleResolutionKind.Bundler },
         ts.sys
       ).resolvedModule?.resolvedFileName;
       assert(
         resolvedModule,
-        `Cannot resolve frontend TypeScript import in ${component}: ${declaration.source.value}`
+        `Cannot resolve frontend TypeScript import in ${component}: ${moduleName}`
       );
-      for (const specifier of declaration.specifiers) {
+      const rawSpecifiers = declaration['specifiers'];
+      assert(Array.isArray(rawSpecifiers), `Unsupported frontend import in ${component}`);
+      const specifiers: readonly unknown[] = rawSpecifiers;
+      for (const specifier of specifiers) {
+        assert(isRecord(specifier), `Unsupported frontend import in ${component}`);
         assert(
-          specifier.type !== 'ImportNamespaceSpecifier',
+          specifier['type'] !== 'ImportNamespaceSpecifier',
           `Use named imports for frontend TypeScript exports: ${component}`
         );
         const alias = `frontendImport${serial++}`;
-        const imported =
-          specifier.type === 'ImportDefaultSpecifier' ? 'default' : specifier.imported.name;
+        let imported: unknown;
+        if (specifier['type'] === 'ImportDefaultSpecifier') {
+          imported = 'default';
+        } else {
+          const identifier = specifier['imported'];
+          assert(isRecord(identifier), `Unsupported frontend import in ${component}`);
+          imported = identifier['name'];
+        }
         assert(typeof imported === 'string', `Unsupported frontend import in ${component}`);
-        const type = declaration.importKind === 'type' || specifier.importKind === 'type';
+        const type = declaration['importKind'] === 'type' || specifier['importKind'] === 'type';
         lines.push(
           `import ${type ? 'type ' : ''}{ ${imported} as ${alias} } from ${JSON.stringify(resolvedModule)};`
         );
@@ -135,21 +158,26 @@ export function checkUnusedTypescript(
   const configPath = resolve(root, configName);
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   assert(!config.error, 'Cannot read ts-prune configuration');
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath));
+  const rawConfig: unknown = config.config;
+  assert(isRecord(rawConfig), 'Cannot read ts-prune configuration');
+  const parsed = ts.parseJsonConfigFileContent(rawConfig, ts.sys, dirname(configPath));
   assert(parsed.options.noUnusedLocals, 'Frontend unused import proof requires noUnusedLocals');
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'georoids-frontend-prune-')));
   try {
     const entry = join(temporary, 'frontend-entry.ts');
     writeFileSync(entry, frontendEntry(root));
     const project = join(temporary, 'tsconfig.json');
+    const configuredFiles = rawConfig['files'] ?? [];
+    assert(Array.isArray(configuredFiles), 'Invalid ts-prune files list');
     writeFileSync(
       project,
       JSON.stringify({
         extends: configPath,
         files: [
-          ...(config.config.files ?? []).map((path) =>
-            relative(temporary, resolve(dirname(configPath), path))
-          ),
+          ...configuredFiles.map((path: unknown) => {
+            assert(typeof path === 'string', 'Invalid ts-prune file path');
+            return relative(temporary, resolve(dirname(configPath), path));
+          }),
           'frontend-entry.ts',
         ],
       })

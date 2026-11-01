@@ -4,21 +4,72 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inspect } from 'node:util';
-import { tsImport } from 'tsx/esm/api';
 import { test } from 'vitest';
 import WebSocket from 'ws';
+import { decodeClientCommand } from '../server/communication/clientCommandDecoder.ts';
+import { type SnapshotBaseline, SnapshotEncoder } from '../shared/snapshotProtocol.ts';
+import type { Position, ServerEntityData } from '../shared-types.ts';
+import { snapshotFixture } from '../tests/unit/network/snapshotFixture.ts';
 import { runNetworkSmoke, SmokeFailure } from './production-smoke-network.mjs';
+import type { SmokeSocket, SmokeSocketEvents } from './production-smoke-network.mts';
 import { productionUrl, smoke, waitForClientAssets } from './production-smoke-scenario.mjs';
 
-const { decodeClientCommand } = await tsImport(
-  '../server/communication/clientCommandDecoder.ts',
-  import.meta.url
-);
-const { SnapshotEncoder } = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
-const { snapshotFixture } = await tsImport(
-  '../tests/unit/network/snapshotFixture.ts',
-  import.meta.url
-);
+type NetworkOptions = Parameters<typeof runNetworkSmoke>[0];
+type ScenarioContext = Parameters<NetworkOptions['scenario']['smoke']>[0];
+type Timer = ReturnType<NonNullable<NetworkOptions['clock']>['setTimeout']>;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function record(value: unknown): Record<string, unknown> {
+  assert(isRecord(value));
+  return value;
+}
+function text(value: unknown): string {
+  assert(typeof value === 'string');
+  return value;
+}
+function number(value: unknown): number {
+  assert(typeof value === 'number');
+  return value;
+}
+function isPosition(value: unknown): value is Position {
+  return isRecord(value) && typeof value['x'] === 'number' && typeof value['y'] === 'number';
+}
+function vector(value: unknown): Position {
+  assert(isPosition(value));
+  return value;
+}
+function errorAt(errors: Error[], index: number): Error {
+  const error = errors[index];
+  assert(error);
+  return error;
+}
+function cause(error: Error): Error {
+  assert(error.cause instanceof Error);
+  return error.cause;
+}
+function parseJson(raw: string): unknown {
+  return JSON.parse(raw);
+}
+function parseRecord(raw: string): Record<string, unknown> {
+  const value = parseJson(raw);
+  return record(value);
+}
+class ControlledSocket
+  extends EventEmitter<SmokeSocketEvents & { 'close-requested': [] }>
+  implements SmokeSocket
+{
+  readyState: number = WebSocket.CONNECTING;
+  send: (text: string) => void;
+  close: (code?: number, reason?: string) => void;
+  terminate: () => void;
+  constructor(send: (text: string) => void, close: (code?: number) => void, terminate: () => void) {
+    super();
+    this.send = send;
+    this.close = close;
+    this.terminate = terminate;
+  }
+}
 const release = 'a'.repeat(40),
   oldRelease = 'b'.repeat(40);
 const healthy = {
@@ -33,8 +84,8 @@ const env = {
 function controlledClock() {
   let now = 0,
     next = 0;
-  const timers = new Map();
-  const advance = (ms) => {
+  const timers = new Map<Timer | undefined, { at: number; callback: () => void }>();
+  const advance = (ms: number) => {
     now += ms;
     for (const [id, timer] of [...timers]) {
       if (timer.at <= now) {
@@ -45,29 +96,40 @@ function controlledClock() {
   };
   return {
     now: () => now,
-    sleep: async (ms, signal) => {
+    sleep: async (ms: number, signal?: AbortSignal | undefined) => {
       signal?.throwIfAborted();
       advance(ms);
       await Promise.resolve();
       signal?.throwIfAborted();
     },
-    setTimeout: (callback, ms) => {
+    setTimeout: (callback: () => void, ms: number) => {
       const id = ++next;
       timers.set(id, { at: now + ms, callback });
       return id;
     },
-    clearTimeout: (id) => timers.delete(id),
+    clearTimeout: (id: Timer | undefined) => timers.delete(id),
     advance,
     pending: () => timers.size,
   };
 }
-function response(url, body, type = 'application/json', status = 200) {
+function response(url: string, body: unknown, type = 'application/json', status = 200): Response {
   const result = new Response(typeof body === 'string' ? body : JSON.stringify(body), {
     status,
     headers: { 'content-type': type },
   });
   Object.defineProperty(result, 'url', { value: url });
   return result;
+}
+interface HttpFixtureOptions {
+  manifest?: string;
+  bundle?: string;
+  bundleSource?: string;
+  world?: unknown;
+  status?: number;
+  assetType?: string;
+  html?: string;
+  redirect?: string;
+  assetsManifest?: unknown;
 }
 function clientHttp({
   manifest = release,
@@ -79,9 +141,9 @@ function clientHttp({
   html,
   redirect,
   assetsManifest,
-} = {}) {
-  return (url) => {
-    let result;
+}: HttpFixtureOptions = {}) {
+  return (url: string): Promise<Response> => {
+    let result: Response;
     if (url.endsWith('/release.json')) {
       result = response(url, { releaseSha: manifest });
     } else if (url.endsWith('/client-assets.json')) {
@@ -107,56 +169,60 @@ function clientHttp({
         'text/html'
       );
     }
-    if (redirect) {
+    const redirected = Boolean(redirect);
+    if (redirected) {
       Object.defineProperty(result, 'url', { value: redirect });
     }
     return Promise.resolve(result);
   };
 }
 function codedSocket(outcome = 'accepted') {
-  let socket,
-    sent = [];
+  let socket: ControlledSocket | undefined;
+  const sent: Record<string, unknown>[] = [];
   const transportFailure = new Error('Controlled socket transport failure');
-  const createSocket = (url, options) => {
+  const createSocket = (url: string, options: WebSocket.ClientOptions) => {
     assert.equal(
       url,
       'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=3&asteroidInteractions=1'
     );
     assert.equal(options.origin, new URL(productionUrl).origin);
     assert.equal(options.handshakeTimeout, 15000);
-    socket = new EventEmitter();
-    socket.readyState = WebSocket.CONNECTING;
-    let id,
-      sequence = 0,
-      baseline,
-      player;
-    const receive = (type, data) =>
-      socket.emit('message', Buffer.from(JSON.stringify({ type, data })));
+    let owned: ControlledSocket;
+    let id: string | undefined;
+    let sequence = 0;
+    let baseline: SnapshotBaseline | undefined;
+    let player: ServerEntityData | undefined;
+    const receive = (type: string, data: unknown) =>
+      owned.emit('message', Buffer.from(JSON.stringify({ type, data })));
     const snapshot = () => {
       const state = snapshotFixture();
+      assert(player);
       state.entities = [player];
       const encoder = new SnapshotEncoder(state),
         frame = encoder.encode(++sequence, baseline);
       baseline = { sequence, state: encoder.state };
       receive('snapshot', frame);
     };
-    socket.send = (text) => {
-      const message = JSON.parse(text);
+    const send = (body: string): void => {
+      const message = parseRecord(body);
       assert.equal(
         decodeClientCommand(message).ok,
         true,
         'Smoke requests must satisfy the current server command decoder'
       );
       sent.push(message);
-      if (message.type === 'join') {
-        id = message.id;
-        assert.equal(message.data.snapshotVersion, 3);
-        assert.equal(message.data.asteroidInteractions, 1);
-        assert.equal(message.data.cooperativeVersion, 1);
-        assert.equal(message.data.clientReleaseId, release);
-        assert.equal(message.data.resumeToken, undefined);
+      if (message['type'] === 'join') {
+        const data = record(message['data']);
+        id = text(message['id']);
+        assert.equal(data['snapshotVersion'], 3);
+        assert.equal(data['asteroidInteractions'], 1);
+        assert.equal(data['cooperativeVersion'], 1);
+        assert.equal(data['clientReleaseId'], release);
+        assert.equal(data['resumeToken'], undefined);
+        const base = snapshotFixture().entities[0];
+        assert(base);
         player = {
-          ...snapshotFixture().entities[0],
+          ...base,
           id,
           position: { x: 0, y: 0 },
           velocity: { x: 0, y: 0 },
@@ -175,7 +241,7 @@ function codedSocket(outcome = 'accepted') {
           serverReleaseId: outcome === 'stale-server' ? oldRelease : release,
         });
         if (outcome === 'malformed-json') {
-          socket.emit('message', Buffer.from('socketSecret'));
+          owned.emit('message', Buffer.from('socketSecret'));
           return;
         }
         if (outcome === 'malformed-snapshot') {
@@ -186,18 +252,19 @@ function codedSocket(outcome = 'accepted') {
         if (outcome !== 'missing-second-snapshot') {
           snapshot();
         }
-      } else if (message.type === 'update') {
-        const data = message.data;
-        assert.equal(data.motionEpoch, 1);
-        assert.equal(data.motionSequence, 1);
+      } else if (message['type'] === 'update') {
+        const data = record(message['data']);
+        assert(player);
+        assert.equal(data['motionEpoch'], 1);
+        assert.equal(data['motionSequence'], 1);
         player = {
           ...player,
-          position: data.position,
-          velocity: data.velocity,
-          angle: data.angle,
+          position: vector(data['position']),
+          velocity: vector(data['velocity']),
+          angle: number(data['angle']),
           playerMotion: {
             epoch: outcome === 'wrong-motion-epoch' ? 2 : 1,
-            ack: outcome === 'missing-motion-ack' ? 0 : data.motionSequence,
+            ack: outcome === 'missing-motion-ack' ? 0 : number(data['motionSequence']),
             mode: 'free',
           },
         };
@@ -205,15 +272,16 @@ function codedSocket(outcome = 'accepted') {
           player.position = { x: 0, y: 0 };
         }
         snapshot();
-      } else if (message.type === 'shoot') {
-        assert.equal(message.id, id);
-        assert.equal(typeof message.data.requestId, 'string');
-        assert.ok(message.data.laserDirection.x > 0);
+      } else if (message['type'] === 'shoot') {
+        const data = record(message['data']);
+        assert.equal(message['id'], id);
+        assert.equal(typeof data['requestId'], 'string');
+        assert.ok(number(record(data['laserDirection'])['x']) > 0);
         if (outcome === 'missing-shot-ack') {
           return;
         }
         receive('shotAcknowledged', {
-          requestId: outcome === 'wrong-shot-request' ? 'other-request' : message.data.requestId,
+          requestId: outcome === 'wrong-shot-request' ? 'other-request' : data['requestId'],
           projectileId:
             outcome === 'rejected-shot'
               ? null
@@ -223,38 +291,48 @@ function codedSocket(outcome = 'accepted') {
         });
       }
     };
-    socket.close = (code) => {
+    const close = (code?: number): void => {
       assert.equal(code, 1000);
       if (outcome === 'close-timeout') {
-        socket.emit('close-requested');
+        owned.emit('close-requested');
         return;
       }
       if (outcome === 'error-on-close') {
-        socket.emit('error', transportFailure);
+        owned.emit('error', transportFailure);
       }
-      socket.readyState = WebSocket.CLOSED;
-      socket.emit(
+      owned.readyState = WebSocket.CLOSED;
+      owned.emit(
         'close',
         outcome === 'close-only-1006' ? 1006 : outcome === 'close-only-1011' ? 1011 : 1000,
         Buffer.from('private-resume-token')
       );
     };
-    socket.terminate = () => {
-      socket.readyState = WebSocket.CLOSED;
-      socket.emit('close', 1006);
+    const terminate = (): void => {
+      owned.readyState = WebSocket.CLOSED;
+      owned.emit('close', 1006);
     };
+    owned = new ControlledSocket(send, close, terminate);
+    socket = owned;
     queueMicrotask(() => {
-      socket.readyState = WebSocket.OPEN;
-      socket.emit('open');
+      owned.readyState = WebSocket.OPEN;
+      owned.emit('open');
       if (outcome === 'transport-failure') {
-        socket.emit('error', transportFailure);
+        owned.emit('error', transportFailure);
       }
     });
-    return socket;
+    return owned;
   };
-  return { createSocket, socket: () => socket, sent: () => sent, failure: transportFailure };
+  return {
+    createSocket,
+    socket: () => {
+      assert(socket);
+      return socket;
+    },
+    sent: () => sent,
+    failure: transportFailure,
+  };
 }
-async function fixture(run) {
+async function fixture(run: (artifacts: string, reports: Error[]) => Promise<void>): Promise<void> {
   const artifacts = await mkdtemp(join(tmpdir(), 'georoids-coded-smoke-'));
   try {
     await run(artifacts, []);
@@ -282,23 +360,23 @@ test('the deployed HTTP assets and genuine current-protocol gameplay produce a c
     assert.equal(receipt.releaseSha, release);
     assert.equal(clock.pending(), 0);
     assert.equal(transport.socket().readyState, WebSocket.CLOSED);
-    assert.ok(transport.sent().filter((message) => message.type === 'snapshotAck').length >= 3);
-    assert.equal(transport.sent().at(-1).type, 'leave');
-    const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-    assert.equal(evidence.acceptedSnapshots, 3);
-    assert.equal(evidence.admission.snapshotVersion, 3);
-    assert.match(evidence.admission.playerId, /^smoke-/u);
-    assert.equal(evidence.movement.acknowledged, 1);
-    assert.equal(evidence.movement.displacement, 6);
-    assert.equal(evidence.shot.projectileId, 'accepted-bolt');
-    assert.equal(evidence.socketClosed, true);
-    assert.equal(evidence.closeCode, 1000);
+    assert.ok(transport.sent().filter((message) => message['type'] === 'snapshotAck').length >= 3);
+    assert.equal(record(transport.sent().at(-1))['type'], 'leave');
+    const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+    assert.equal(evidence['acceptedSnapshots'], 3);
+    assert.equal(record(evidence['admission'])['snapshotVersion'], 3);
+    assert.match(text(record(evidence['admission'])['playerId']), /^smoke-/u);
+    assert.equal(record(evidence['movement'])['acknowledged'], 1);
+    assert.equal(record(evidence['movement'])['displacement'], 6);
+    assert.equal(record(evidence['shot'])['projectileId'], 'accepted-bolt');
+    assert.equal(evidence['socketClosed'], true);
+    assert.equal(evidence['closeCode'], 1000);
     const retained = JSON.stringify(receipt) + JSON.stringify(evidence);
     assert.doesNotMatch(
       retained,
       /private-resume-token|private-github-token|resumeToken|authorization/u
     );
-    assert.deepEqual(JSON.parse(await readFile(join(artifacts, 'receipt.json'), 'utf8')), receipt);
+    assert.deepEqual(parseJson(await readFile(join(artifacts, 'receipt.json'), 'utf8')), receipt);
   });
 });
 
@@ -336,17 +414,17 @@ for (const outcome of [
       assert.equal(transport.socket().readyState, WebSocket.CLOSED);
       assert.equal(clock.pending(), 0);
       assert.doesNotMatch(JSON.stringify(receipt), /private-resume-token|private-github-token/u);
-      const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-      assert.equal(evidence.socketClosed, true);
-      assert.ok(evidence.error);
+      const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+      assert.equal(evidence['socketClosed'], true);
+      assert.ok(evidence['error']);
       if (outcome === 'transport-failure') {
         assert.equal(reports.length, 1);
-        assert.equal(reports[0].cause, transport.failure);
+        assert.equal(errorAt(reports, 0).cause, transport.failure);
       }
       if (outcome === 'malformed-json') {
         assert.deepEqual(receipt.errors, ['Malformed gameplay protocol message']);
         assert.equal(reports.length, 1);
-        assert.equal(reports[0].cause.message, 'Gameplay JSON parsing failed');
+        assert.equal(cause(errorAt(reports, 0)).message, 'Gameplay JSON parsing failed');
         assert.doesNotMatch(
           inspect(reports, { depth: 10 }) +
             JSON.stringify(receipt) +
@@ -421,7 +499,7 @@ for (const options of [
 }
 
 test('Astro entry reaches a dynamically imported gameplay chunk', async () => {
-  const requests = [];
+  const requests: string[] = [];
   const assetsManifest = {
     releaseSha: release,
     gameplay: ['_astro/engine.hash.js'],
@@ -432,7 +510,7 @@ test('Astro entry reaches a dynamically imported gameplay chunk', async () => {
     html: '<html><canvas id="gameCanvas"></canvas><script type="module" src="/_astro/page.hash.js"></script></html>',
   });
   const observed = await waitForClientAssets({
-    verifyHttp: (url) => {
+    verifyHttp: (url: string) => {
       requests.push(url);
       return url.endsWith('/page.hash.js')
         ? response(url, 'import("./engine.hash.js");', 'application/javascript')
@@ -449,7 +527,7 @@ test('client assets poll within the original deadline when the graph is not yet 
   let attempts = 0;
   const clock = controlledClock();
   const http = clientHttp();
-  const verifyHttp = (url) => {
+  const verifyHttp = (url: string) => {
     if (url.endsWith('/client-assets.json') && ++attempts < 3) {
       throw new SmokeFailure('Client assets not available');
     }
@@ -463,8 +541,8 @@ test('client assets poll within the original deadline when the graph is not yet 
 test('HTTP and behavior deadline races abort owned work and retain failed canonical receipts', async () => {
   await fixture(async (artifacts, reports) => {
     const clock = controlledClock();
-    let started;
-    const active = new Promise((resolveStarted) => {
+    let started: () => void;
+    const active = new Promise<void>((resolveStarted) => {
       started = resolveStarted;
     });
     let aborted = false;
@@ -473,7 +551,7 @@ test('HTTP and behavior deadline races abort owned work and retain failed canoni
         productionUrl,
         smoke: ({ signal }) => {
           started();
-          return new Promise((_, reject) =>
+          return new Promise<never>((_, reject) =>
             signal.addEventListener(
               'abort',
               () => {
@@ -503,8 +581,8 @@ test('HTTP and behavior deadline races abort owned work and retain failed canoni
   });
   await fixture(async (artifacts, reports) => {
     const clock = controlledClock();
-    let started;
-    const active = new Promise((resolveStarted) => {
+    let started: () => void;
+    const active = new Promise<void>((resolveStarted) => {
       started = resolveStarted;
     });
     let aborted = false;
@@ -513,8 +591,9 @@ test('HTTP and behavior deadline races abort owned work and retain failed canoni
       env,
       readinessMs: 0,
       fetcher: (_url, { signal }) => {
+        assert(signal);
         started();
-        return new Promise((_, reject) =>
+        return new Promise<never>((_, reject) =>
           signal.addEventListener(
             'abort',
             () => {
@@ -535,7 +614,7 @@ test('HTTP and behavior deadline races abort owned work and retain failed canoni
     assert.equal(receipt.success, false);
     assert.deepEqual(receipt.errors, ['Readiness deadline exceeded']);
     assert.equal(reports.length, 1);
-    assert.equal(reports[0].cause.message, 'Production HTTP request deadline exceeded');
+    assert.equal(cause(errorAt(reports, 0)).message, 'Production HTTP request deadline exceeded');
     assert.doesNotMatch(inspect(reports, { depth: 10 }), /private-github-token/u);
     assert.equal(aborted, true);
     assert.equal(clock.pending(), 0);
@@ -553,7 +632,7 @@ test('verified HTTP rejects missing assets and noncanonical redirects before ope
       const fetcher = clientHttp(options);
       const scenario = {
         productionUrl,
-        smoke: (input) => smoke({ ...input, clientReadinessMs: 0 }),
+        smoke: (input: ScenarioContext) => smoke({ ...input, clientReadinessMs: 0 }),
       };
       const receipt = await runNetworkSmoke({
         scenario,
@@ -565,6 +644,7 @@ test('verified HTTP rejects missing assets and noncanonical redirects before ope
         report: (error) => reports.push(error),
         createSocket: () => {
           opened = true;
+          throw new Error('Must not launch');
         },
       });
       assert.equal(receipt.success, false);
@@ -581,7 +661,7 @@ test('healthy persistence must survive the accepted shot', async () => {
     await fixture(async (artifacts, reports) => {
       let healthChecks = 0;
       const transport = codedSocket();
-      const fetcher = (url) =>
+      const fetcher = (url: string) =>
         clientHttp({ world: url.endsWith('/health') && ++healthChecks > 1 ? changed : healthy })(
           url
         );
@@ -596,9 +676,9 @@ test('healthy persistence must survive the accepted shot', async () => {
       });
       assert.equal(receipt.success, false);
       assert.equal(healthChecks, 2);
-      const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-      assert.equal(evidence.shot.acknowledged, true);
-      assert.equal(evidence.socketClosed, true);
+      const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+      assert.equal(record(evidence['shot'])['acknowledged'], true);
+      assert.equal(evidence['socketClosed'], true);
     });
   }
 });
@@ -620,9 +700,9 @@ test('an aborted gameplay behavior closes its current socket and awaits cleanup 
     assert.equal(receipt.success, false);
     assert.deepEqual(receipt.errors, ['Behavior deadline exceeded']);
     assert.equal(transport.socket().readyState, WebSocket.CLOSED);
-    const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-    assert.equal(evidence.socketClosed, true);
-    assert.equal(evidence.shot, null);
+    const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+    assert.equal(evidence['socketClosed'], true);
+    assert.equal(evidence['shot'], null);
     assert.equal(clock.pending(), 0);
   });
 });
@@ -631,11 +711,11 @@ test('forced socket termination is retained as failed cleanup even after a succe
   await fixture(async (artifacts, reports) => {
     const clock = controlledClock(),
       transport = codedSocket('close-timeout');
-    let started;
-    const closing = new Promise((resolveClosing) => {
+    let started: () => void;
+    const closing = new Promise<void>((resolveClosing) => {
       started = resolveClosing;
     });
-    const createSocket = (...args) => {
+    const createSocket = (...args: Parameters<ReturnType<typeof codedSocket>['createSocket']>) => {
       const socket = transport.createSocket(...args);
       socket.once('close-requested', started);
       return socket;
@@ -654,10 +734,10 @@ test('forced socket termination is retained as failed cleanup even after a succe
     const receipt = await run;
     assert.equal(receipt.success, false);
     assert.ok(receipt.errors.includes('Owned gameplay socket required forced termination'));
-    const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-    assert.equal(evidence.socketClosed, true);
-    assert.equal(evidence.shot.acknowledged, true);
-    assert.equal(evidence.cleanupError, 'Owned gameplay socket required forced termination');
+    const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+    assert.equal(evidence['socketClosed'], true);
+    assert.equal(record(evidence['shot'])['acknowledged'], true);
+    assert.equal(evidence['cleanupError'], 'Owned gameplay socket required forced termination');
     assert.equal(clock.pending(), 0);
   });
 });
@@ -680,10 +760,10 @@ for (const metadata of [
       });
       assert.equal(receipt.success, true);
       assert.deepEqual(receipt.errors, []);
-      const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-      assert.equal(evidence.serverReleaseId, oldRelease);
-      assert.equal(evidence.shot.acknowledged, true);
-      assert.equal(evidence.socketClosed, true);
+      const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+      assert.equal(evidence['serverReleaseId'], oldRelease);
+      assert.equal(record(evidence['shot'])['acknowledged'], true);
+      assert.equal(evidence['socketClosed'], true);
     });
   });
 }
@@ -703,7 +783,7 @@ test('a transport error during owned close cannot turn into a successful receipt
     assert.equal(receipt.success, false);
     assert.ok(receipt.errors.includes('Gameplay socket transport failed'));
     assert.equal(reports.length, 1);
-    assert.equal(reports[0].cause, transport.failure);
+    assert.equal(errorAt(reports, 0).cause, transport.failure);
     assert.equal(transport.socket().readyState, WebSocket.CLOSED);
     assert.doesNotMatch(JSON.stringify(receipt), /private-resume-token/u);
   });
@@ -725,11 +805,11 @@ for (const closeCode of [1006, 1011]) {
       });
       assert.equal(receipt.success, false);
       assert.deepEqual(receipt.errors, ['Owned gameplay socket closed abnormally']);
-      const evidence = JSON.parse(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
-      assert.equal(evidence.shot.acknowledged, true);
-      assert.equal(evidence.socketClosed, true);
-      assert.equal(evidence.closeCode, closeCode);
-      assert.equal(evidence.cleanupError, 'Owned gameplay socket closed abnormally');
+      const evidence = parseRecord(await readFile(join(artifacts, 'gameplay-server.json'), 'utf8'));
+      assert.equal(record(evidence['shot'])['acknowledged'], true);
+      assert.equal(evidence['socketClosed'], true);
+      assert.equal(evidence['closeCode'], closeCode);
+      assert.equal(evidence['cleanupError'], 'Owned gameplay socket closed abnormally');
       assert.equal(clock.pending(), 0);
       assert.equal(transport.socket().readyState, WebSocket.CLOSED);
       assert.doesNotMatch(
@@ -757,7 +837,7 @@ test('an unexpected application error is reported once and leaves the public rec
     assert.equal(receipt.success, false);
     assert.deepEqual(receipt.errors, ['Production verification failed']);
     assert.deepEqual(reports, [failure]);
-    assert.deepEqual(JSON.parse(await readFile(join(artifacts, 'receipt.json'), 'utf8')), receipt);
+    assert.deepEqual(parseJson(await readFile(join(artifacts, 'receipt.json'), 'utf8')), receipt);
   });
 });
 
@@ -777,8 +857,8 @@ test('a non-Error throw is reported without exposing its arbitrary fields', asyn
     assert.equal(receipt.success, false);
     assert.deepEqual(receipt.errors, ['Production verification failed']);
     assert.equal(reports.length, 1);
-    assert.equal(reports[0] instanceof Error, true);
-    assert.equal(reports[0].message, 'Unexpected non-Error smoke failure');
+    assert.equal(errorAt(reports, 0) instanceof Error, true);
+    assert.equal(errorAt(reports, 0).message, 'Unexpected non-Error smoke failure');
     assert.doesNotMatch(
       inspect(reports, { depth: 10 }) + JSON.stringify(receipt),
       /nonErrorSecret/u
@@ -801,8 +881,8 @@ test('readiness retains a safe immediate transport cause through the deadline bo
     assert.equal(receipt.success, false);
     assert.deepEqual(receipt.errors, ['Readiness deadline exceeded']);
     assert.equal(reports.length, 1);
-    assert.equal(reports[0].cause.message, 'Production HTTP request failed');
-    assert.equal(reports[0].cause.cause, failure);
+    assert.equal(cause(errorAt(reports, 0)).message, 'Production HTTP request failed');
+    assert.equal(cause(errorAt(reports, 0)).cause, failure);
     assert.doesNotMatch(await readFile(join(artifacts, 'receipt.json'), 'utf8'), /ECONNRESET/u);
   });
 });
@@ -823,7 +903,7 @@ test('malformed HTTP JSON never exposes its body through reports or retained art
     assert.equal(receipt.success, false);
     assert.deepEqual(receipt.errors, ['Production HTTP body failed or timed out']);
     assert.equal(reports.length, 1);
-    assert.equal(reports[0].cause.message, 'Production HTTP JSON parsing failed');
+    assert.equal(cause(errorAt(reports, 0)).message, 'Production HTTP JSON parsing failed');
     assert.doesNotMatch(
       inspect(reports, { depth: 10 }) +
         (await readFile(join(artifacts, 'receipt.json'), 'utf8')) +
@@ -841,8 +921,8 @@ for (const expectedAbort of [false, true]) {
       const failure = expectedAbort
         ? new DOMException('Owned behavior cancelled', 'AbortError')
         : new Error('Controlled late cleanup failure');
-      let started;
-      const active = new Promise((resolveStarted) => {
+      let started: () => void;
+      const active = new Promise<void>((resolveStarted) => {
         started = resolveStarted;
       });
       const run = runNetworkSmoke({
@@ -850,7 +930,7 @@ for (const expectedAbort of [false, true]) {
           productionUrl,
           smoke: ({ signal }) => {
             started();
-            return new Promise((_, reject) =>
+            return new Promise<never>((_, reject) =>
               signal.addEventListener('abort', () => reject(failure), { once: true })
             );
           },

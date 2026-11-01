@@ -10,6 +10,10 @@ import { test } from 'vitest';
 const helper = fileURLToPath(new URL('./benchmark-build-receipt.mjs', import.meta.url));
 const websocketUrl = 'ws://localhost:59995/ws';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 test('repeated owned sessions reuse only the exact successfully built client', () => {
   const root = mkdtempSync(join(tmpdir(), 'georoids-frozen-build-'));
   const prepared = join(root, '.performance/prepared.json');
@@ -25,13 +29,13 @@ test('repeated owned sessions reuse only the exact successfully built client', (
     GIT_COMMITTER_NAME: 'Fixture',
     GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
   });
-  const git = (...args) =>
+  const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'maintenance.auto=false', '-c', 'commit.gpgsign=false', ...args], {
       cwd: root,
       env,
       stdio: 'pipe',
     });
-  const run = (action, url = websocketUrl, extraEnvironment = {}) =>
+  const run = (action: string, url = websocketUrl, extraEnvironment: Record<string, string> = {}) =>
     spawnSync(
       process.execPath,
       [helper, action, root, ...(action === 'ports' ? [] : [url, prepared])],
@@ -47,8 +51,8 @@ test('repeated owned sessions reuse only the exact successfully built client', (
         timeout: 10_000,
       }
     );
-  const passes = (result) => assert.equal(result.status, 0, result.stderr);
-  const rejects = (result, message) => {
+  const passes = (result: ReturnType<typeof run>) => assert.equal(result.status, 0, result.stderr);
+  const rejects = (result: ReturnType<typeof run>, message: RegExp) => {
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stderr, message);
   };
@@ -94,28 +98,27 @@ test('repeated owned sessions reuse only the exact successfully built client', (
     passes(run('prepare'));
     passes(run('record'));
     const originalReceipt = readFileSync(receipt, 'utf8');
+    const original: unknown = JSON.parse(originalReceipt);
+    assert(isRecord(original));
+    const originalFields = original;
+    const originalInputs = originalFields['inputs'];
+    assert(isRecord(originalInputs));
+    const inputFields = originalInputs;
     const recovered = run('ports');
     passes(recovered);
     assert.equal(recovered.stdout, '59993\n59994\n59995\n');
-    for (const [field, value, diagnostic] of [
+    const invalidReceipts: [string, unknown, RegExp][] = [
       ['schemaVersion', 1, /Unsupported benchmark build receipt/u],
+      ['inputs', { ...inputFields, ports: [0, 59994, 59995] }, /valid, distinct benchmark ports/u],
       [
         'inputs',
-        { ...JSON.parse(originalReceipt).inputs, ports: [0, 59994, 59995] },
+        { ...inputFields, ports: [59993, 59993, 59995] },
         /valid, distinct benchmark ports/u,
       ],
-      [
-        'inputs',
-        { ...JSON.parse(originalReceipt).inputs, ports: [59993, 59993, 59995] },
-        /valid, distinct benchmark ports/u,
-      ],
-      [
-        'inputs',
-        { ...JSON.parse(originalReceipt).inputs, worktree: '/another/worktree' },
-        /another worktree/u,
-      ],
-    ]) {
-      writeFileSync(receipt, JSON.stringify({ ...JSON.parse(originalReceipt), [field]: value }));
+      ['inputs', { ...inputFields, worktree: '/another/worktree' }, /another worktree/u],
+    ];
+    for (const [field, value, diagnostic] of invalidReceipts) {
+      writeFileSync(receipt, JSON.stringify({ ...originalFields, [field]: value }));
       rejects(run('ports'), diagnostic);
       rejects(run('verify'), diagnostic);
     }
@@ -124,18 +127,20 @@ test('repeated owned sessions reuse only the exact successfully built client', (
       passes(run('verify'));
       assert.equal(readFileSync(receipt, 'utf8'), originalReceipt);
     }
-    for (const path of [
+    const inputPaths: (keyof typeof files)[] = [
       'src/game.ts',
       'benchmarks/scene.ts',
       'public/wiki/index.html',
       'package-lock.json',
       '.env.production.local',
-    ]) {
+    ];
+    for (const path of inputPaths) {
       writeFileSync(join(root, path), 'changed');
       rejects(run('verify'), /Reusable build inputs differ/u);
       writeFileSync(join(root, path), files[path]);
     }
-    for (const path of ['dist/assets/game.js', 'dist/index.html']) {
+    const outputPaths: (keyof typeof files)[] = ['dist/assets/game.js', 'dist/index.html'];
+    for (const path of outputPaths) {
       writeFileSync(join(root, path), 'changed');
       rejects(
         run('verify'),

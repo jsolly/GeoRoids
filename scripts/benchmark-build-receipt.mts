@@ -1,0 +1,231 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+import { clientAssetGraph } from './client-asset-graph.ts';
+
+const digest = (value: string | NodeJS.ArrayBufferView): string =>
+  createHash('sha256').update(value).digest('hex');
+const receiptPath = (root: string): string =>
+  join(root, '.performance/benchmark-client-build.json');
+const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
+
+type Ports = [number, number, number];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function validPort(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 65535;
+}
+function selectedPorts(value: unknown): Ports {
+  const diagnostic = 'Expected three valid, distinct benchmark ports';
+  assert(Array.isArray(value) && value.length === 3, diagnostic);
+  const [vite, server, proxy]: unknown[] = value;
+  assert(
+    validPort(vite) && validPort(server) && validPort(proxy) && new Set(value).size === 3,
+    diagnostic
+  );
+  return [vite, server, proxy];
+}
+
+function successfulReceipt(root: string): {
+  inputs: Record<string, unknown>;
+  assets: unknown;
+  ports: Ports;
+} {
+  assert(existsSync(receiptPath(root)), 'Missing successful benchmark-client build receipt');
+  const receipt = readJson(receiptPath(root));
+  assert(isRecord(receipt), 'Malformed benchmark build receipt');
+  assert.equal(receipt['schemaVersion'], 2, 'Unsupported benchmark build receipt');
+  assert.equal(receipt['kind'], 'benchmark-client-production-build');
+  const prepared = receipt['inputs'];
+  assert(isRecord(prepared), 'Malformed benchmark build inputs');
+  assert.equal(prepared['worktree'], root, 'Reusable build belongs to another worktree');
+  const ports = selectedPorts(prepared['ports']);
+  assert.equal(prepared['websocketUrl'], `ws://localhost:${ports[2]}/ws`);
+  // Keep raw receipt sections, including extra fields, for the exact-input/output comparisons.
+  return { inputs: prepared, assets: receipt['assets'], ports };
+}
+
+function git(root: string, args: readonly string[]): string {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))
+  );
+  return execFileSync('git', args, {
+    cwd: root,
+    env,
+    encoding: 'utf8',
+    timeout: 10_000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+type FileRow = { file: string; deleted: true } | { file: string; mode: number; sha256: string };
+
+function fileRows(root: string, paths: readonly string[]): FileRow[] {
+  return [...new Set(paths)].sort().map((file): FileRow => {
+    const path = join(root, file);
+    if (!existsSync(path)) {
+      return { file, deleted: true };
+    }
+    const info = lstatSync(path);
+    assert(info.isFile(), `Build receipt refuses non-file input: ${file}`);
+    return { file, mode: info.mode & 0o777, sha256: digest(readFileSync(path)) };
+  });
+}
+
+function inputs(root: string, websocketUrl: string) {
+  assert(/^ws:\/\/localhost:[0-9]+\/ws$/u.test(websocketUrl), 'Expected owned benchmark WS URL');
+  // URL parsing also rejects a malformed/out-of-range TCP port.
+  assert.equal(new URL(websocketUrl).protocol, 'ws:');
+  assert.equal(realpathSync(git(root, ['rev-parse', '--show-toplevel']).trim()), root);
+  assert(existsSync(join(root, 'package-lock.json')), 'Missing build lockfile');
+  const sourcePaths = git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z'])
+    .split('\0')
+    .filter((file) => file && !/^(?:\.performance|logs|dist|node_modules|coverage)\//u.test(file));
+  // Vite reads ignored environment files as well as Git-visible source/assets.
+  const environmentFiles = readdirSync(root).filter((name) => /^\.env(?:\..*)?$/u.test(name));
+  const rows = fileRows(root, [...sourcePaths, ...environmentFiles]);
+  const environment = Object.fromEntries(
+    Object.entries(process.env)
+      .filter(([name]) =>
+        /^(?:VITE_|VERCEL_|RAILWAY_|NODE_OPTIONS$|NODE_ENV$|GEOROIDS_TEST_(?:VITE_PORT|SERVER_PORT|SESSION_DIR)$)/u.test(
+          name
+        )
+      )
+      .sort(([a], [b]) => a.localeCompare(b))
+  );
+  // The runner supplies this value to npm build, overriding the ambient value.
+  environment['VITE_WEBSOCKET_URL'] = websocketUrl;
+  return {
+    worktree: root,
+    commit: git(root, ['rev-parse', 'HEAD']).trim(),
+    nodeVersion: process.version,
+    websocketUrl,
+    ports: selectedPorts([
+      Number(process.env['GEOROIDS_TEST_VITE_PORT']),
+      Number(process.env['GEOROIDS_TEST_SERVER_PORT']),
+      Number(process.env['GEOROIDS_TEST_PROXY_PORT']),
+    ]),
+    sourceSha256: digest(JSON.stringify(rows)),
+    environmentSha256: digest(
+      JSON.stringify(Object.entries(environment).sort(([a], [b]) => a.localeCompare(b)))
+    ),
+    lockfileSha256: digest(readFileSync(join(root, 'package-lock.json'))),
+  };
+}
+
+function build(root: string) {
+  assert(existsSync(join(root, 'dist/index.html')), 'Missing production dist/index.html');
+  const html = readFileSync(join(root, 'dist/index.html'), 'utf8');
+  const entries = [...html.matchAll(/<script\b[^>]*>/giu)]
+    .map(([tag]) =>
+      /\btype=["']module["']/iu.test(tag) ? /\bsrc=["']\/([^"']+)["']/iu.exec(tag)?.[1] : undefined
+    )
+    .filter((entry): entry is string => entry !== undefined);
+  const modules = clientAssetGraph(readJson(join(root, 'dist/client-assets.json')), entries);
+  for (const path of modules) {
+    assert(existsSync(join(root, 'dist', path)), 'Attributed gameplay asset is missing');
+    assert(readFileSync(join(root, 'dist', path)).length > 0, 'Attributed gameplay asset is empty');
+  }
+  const paths: string[] = [];
+  function visit(directory: string): void {
+    for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+      const path = `${directory}/${entry.name}`;
+      assert(!entry.isSymbolicLink(), `Build receipt refuses symlink: ${path}`);
+      if (entry.isDirectory()) {
+        visit(path);
+      } else {
+        assert(entry.isFile(), `Build receipt refuses non-file asset: ${path}`);
+        paths.push(path);
+      }
+    }
+  }
+  visit('dist');
+  const files = fileRows(root, paths);
+  return { sha256: digest(JSON.stringify(files)), files };
+}
+
+function atomicJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' });
+    renameSync(temporary, path);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
+function benchmarkBuildReceipt(
+  action: string | undefined,
+  directory: string,
+  websocketUrl: string | undefined,
+  preparedPath: string | undefined
+): Ports | undefined {
+  const root = realpathSync(directory);
+  if (action === 'ports') {
+    // These are candidates, never permission to attach to or stop a listener.
+    // The runner still checks availability, ownership and the full build proof.
+    return successfulReceipt(root).ports;
+  }
+  assert(websocketUrl, 'Expected owned benchmark WS URL');
+  if (action === 'prepare') {
+    assert(preparedPath, 'Missing prepared input receipt path');
+    // A failed new build must never leave an older successful receipt reusable.
+    rmSync(receiptPath(root), { force: true });
+    atomicJson(preparedPath, inputs(root, websocketUrl));
+  } else if (action === 'record') {
+    assert(preparedPath, 'Missing prepared input receipt path');
+    const prepared = readJson(preparedPath);
+    assert.deepEqual(inputs(root, websocketUrl), prepared, 'Build inputs changed during build');
+    const assets = build(root);
+    atomicJson(receiptPath(root), {
+      schemaVersion: 2,
+      kind: 'benchmark-client-production-build',
+      completedAt: new Date().toISOString(),
+      inputs: prepared,
+      assets,
+    });
+  } else if (action === 'verify') {
+    const receipt = successfulReceipt(root);
+    assert.deepEqual(inputs(root, websocketUrl), receipt.inputs, 'Reusable build inputs differ');
+    assert.deepEqual(build(root), receipt.assets, 'Reusable production assets differ');
+  } else {
+    throw new Error('Expected ports, prepare, record or verify');
+  }
+  return undefined;
+}
+
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  try {
+    const [action, root, websocketUrl, preparedPath] = process.argv.slice(2);
+    assert(
+      root && (action === 'ports' || websocketUrl),
+      'Expected action, worktree and owned WS URL'
+    );
+    const result = benchmarkBuildReceipt(action, root, websocketUrl, preparedPath);
+    if (action === 'ports') {
+      assert(result !== undefined);
+      process.stdout.write(`${result.join('\n')}\n`);
+    }
+  } catch (error) {
+    process.stderr.write(
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+    );
+    process.exitCode = 1;
+  }
+}

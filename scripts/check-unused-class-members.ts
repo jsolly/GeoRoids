@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { parse as parseAstro } from '@astrojs/compiler-rs';
 import { parse as parseSvelte } from 'svelte/compiler';
 import ts from 'typescript';
-import { components } from './check-unused-typescript.mjs';
+import { components } from './check-unused-typescript.ts';
 
 // Knip reports unused module exports and Biome reports unused private members,
 // so a public member that nothing outside its own class reaches belongs to
@@ -15,19 +15,62 @@ import { components } from './check-unused-typescript.mjs';
 // external shapes such as WebSocket, so their members stay out of scope.
 const productionDirectories = ['src', 'server', 'shared'];
 
-const owned = (file) => !file.isDeclarationFile && !file.fileName.includes('node_modules');
+type MemberKind = 'property' | 'method' | 'getter' | 'setter';
+type AccessKind = 'unresolved' | 'declaration' | 'read' | 'write' | 'readwrite';
+type CheckMember = ts.ClassElement | ts.ParameterDeclaration;
+type NamedCheckMember = CheckMember & { name: NonNullable<CheckMember['name']> };
+type ReferenceName = ts.Identifier | ts.StringLiteralLike;
+type DeclaringType = ts.InterfaceDeclaration | ts.TypeLiteralNode;
 
-const moduleKey = (path) => path.replace(/\.[^./\\]+$/u, '');
+interface ReachabilityIndex {
+  declaringTypes: Map<string, DeclaringType[]>;
+  inProbes: Map<string, ts.BinaryExpression[]>;
+  keyArguments: Map<string, ts.StringLiteralLike[]>;
+  spreadClasses: Map<ts.ClassLikeDeclaration, ts.SpreadAssignment>;
+}
 
-function isProduction(path) {
+interface MemberLocation {
+  member: string;
+  path: string;
+  line: number;
+}
+
+interface MemberFinding extends MemberLocation {
+  kind: MemberKind;
+  parameter: boolean;
+  unresolved: number;
+  paired: boolean;
+  internal: number;
+  reads: number;
+  componentOnly: boolean;
+}
+
+interface MemberAnalysis {
+  findings: MemberFinding[];
+  cleared: (MemberLocation & { reason: string })[];
+  unjudged: MemberLocation[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+const owned = (file: ts.SourceFile) =>
+  !file.isDeclarationFile && !file.fileName.includes('node_modules');
+
+const moduleKey = (path: string) => path.replace(/\.[^./\\]+$/u, '');
+
+function isProduction(path: string) {
   return productionDirectories.some((directory) => path.startsWith(`${directory}${sep}`));
 }
 
-function languageService(root, configName) {
+function languageService(root: string, configName: string): ts.LanguageService {
   const configPath = resolve(root, configName);
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   assert(!config.error, 'Cannot read the unused-member configuration');
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath));
+  const rawConfig: unknown = config.config;
+  assert(isRecord(rawConfig), 'Cannot read the unused-member configuration');
+  const parsed = ts.parseJsonConfigFileContent(rawConfig, ts.sys, dirname(configPath));
   // A rejected glob or compiler option would otherwise yield a small program and
   // a clean report, so a configuration that did not parse fails the check here.
   assert.deepEqual(
@@ -35,8 +78,8 @@ function languageService(root, configName) {
     [],
     'The unused-member configuration did not parse'
   );
-  const snapshots = new Map();
-  const host = {
+  const snapshots = new Map<string, ts.IScriptSnapshot | undefined>();
+  const host: ts.LanguageServiceHost = {
     getScriptFileNames: () => parsed.fileNames,
     getScriptVersion: () => '1',
     getScriptSnapshot: (name) => {
@@ -68,25 +111,37 @@ function languageService(root, configName) {
  * Markup counts, because two of `WikiScrollMemory`'s ten public methods are
  * reached only from outside its script block.
  */
-function componentMembers(root) {
-  const reached = new Map();
+function componentMembers(root: string): Map<string, Set<string>> {
+  const reached = new Map<string, Set<string>>();
   for (const path of components(join(root, 'src'))) {
     const source = readFileSync(path, 'utf8');
-    const names = new Set();
-    const imported = new Set();
-    const visit = (node) => {
-      if (node === null || typeof node !== 'object') {
+    const names = new Set<string>();
+    const imported = new Set<string>();
+    const visit = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(visit);
         return;
       }
-      if (node.type === 'MemberExpression' && node.property?.type === 'Identifier') {
-        names.add(node.property.name);
+      if (!isRecord(node)) {
+        return;
       }
+      const property = node['property'];
       if (
-        node.type === 'ImportDeclaration' &&
-        typeof node.source?.value === 'string' &&
-        node.source.value.startsWith('.')
+        node['type'] === 'MemberExpression' &&
+        isRecord(property) &&
+        property['type'] === 'Identifier'
       ) {
-        imported.add(moduleKey(resolve(dirname(path), node.source.value)));
+        assert(typeof property['name'] === 'string', `Malformed component member in ${path}`);
+        names.add(property['name']);
+      }
+      const importedSource = node['source'];
+      if (
+        node['type'] === 'ImportDeclaration' &&
+        isRecord(importedSource) &&
+        typeof importedSource['value'] === 'string' &&
+        importedSource['value'].startsWith('.')
+      ) {
+        imported.add(moduleKey(resolve(dirname(path), importedSource['value'])));
       }
       for (const value of Object.values(node)) {
         if (Array.isArray(value)) {
@@ -100,7 +155,7 @@ function componentMembers(root) {
       path.endsWith('.svelte') ? parseSvelte(source, { modern: true }) : parseAstro(source).ast
     );
     for (const module of imported) {
-      const already = reached.get(module) ?? new Set();
+      const already = reached.get(module) ?? new Set<string>();
       for (const name of names) {
         already.add(name);
       }
@@ -119,12 +174,12 @@ function componentMembers(root) {
  * and the reason this takes a `checker` — a spread names no member, so it is
  * keyed by the class declaration it copies and already holds the answer.
  */
-function reachableWithoutTheClass(program, checker) {
-  const declaringTypes = new Map();
-  const inProbes = new Map();
-  const keyArguments = new Map();
-  const spreadClasses = new Map();
-  const add = (index, name, node) => {
+function reachableWithoutTheClass(program: ts.Program, checker: ts.TypeChecker): ReachabilityIndex {
+  const declaringTypes = new Map<string, DeclaringType[]>();
+  const inProbes = new Map<string, ts.BinaryExpression[]>();
+  const keyArguments = new Map<string, ts.StringLiteralLike[]>();
+  const spreadClasses = new Map<ts.ClassLikeDeclaration, ts.SpreadAssignment>();
+  const add = <N extends ts.Node>(index: Map<string, N[]>, name: string, node: N) => {
     const nodes = index.get(name) ?? [];
     nodes.push(node);
     index.set(name, nodes);
@@ -133,7 +188,7 @@ function reachableWithoutTheClass(program, checker) {
     if (!owned(file)) {
       continue;
     }
-    const visit = (node) => {
+    const visit = (node: ts.Node): void => {
       if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
         for (const member of node.members) {
           if (member.name && ts.isIdentifier(member.name)) {
@@ -171,7 +226,12 @@ function reachableWithoutTheClass(program, checker) {
  * their declarations, so a field reached only that way would otherwise be
  * reported — and removing it would quietly empty the copy.
  */
-function noteSpread(found, type, node, checker) {
+function noteSpread(
+  found: Map<ts.ClassLikeDeclaration, ts.SpreadAssignment>,
+  type: ts.Type,
+  node: ts.SpreadAssignment,
+  checker: ts.TypeChecker
+): void {
   for (const part of type.isUnion() ? type.types : [type]) {
     for (const declaration of part.getSymbol()?.declarations ?? []) {
       if (ts.isClassLike(declaration) && !found.has(declaration)) {
@@ -193,7 +253,7 @@ function noteSpread(found, type, node, checker) {
  * which is how `vi.spyOn(target, 'name')` reaches a member the service cannot
  * see; a plain `string` parameter is data and reaches nothing.
  */
-function namesAKey(contextual) {
+function namesAKey(contextual: ts.Type | undefined): boolean {
   if (contextual === undefined) {
     return false;
   }
@@ -211,9 +271,17 @@ function namesAKey(contextual) {
  * is not a use (see `accessKind`), so such a member arrives here and must earn
  * its clearance like any other.
  */
-function reachedThroughType(name, kind, declaringClass, checker, service, program, index) {
+function reachedThroughType(
+  name: string,
+  kind: MemberKind,
+  declaringClass: ts.ClassLikeDeclaration,
+  checker: ts.TypeChecker,
+  service: ts.LanguageService,
+  program: ts.Program,
+  index: ReachabilityIndex
+): string | undefined {
   const classType = instanceType(declaringClass, checker);
-  const where = (node) => {
+  const where = (node: ts.Node) => {
     const source = node.getSourceFile();
     const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
     return `${source.fileName}:${line}`;
@@ -302,13 +370,19 @@ function reachedThroughType(name, kind, declaringClass, checker, service, progra
  * implements the port can stand in for one. A `Pick` or an extended interface
  * resolves to the same symbol, so an exercised port still clears through them.
  */
-function isExercised(member, service, program) {
+function isExercised(member: ts.Symbol, service: ts.LanguageService, program: ts.Program): boolean {
   return (member.declarations ?? []).some((declaration) => {
-    if (declaration.name === undefined || !ts.isIdentifier(declaration.name)) {
+    const name = ts.getNameOfDeclaration(declaration);
+    if (
+      !('name' in declaration) ||
+      declaration.name !== name ||
+      name === undefined ||
+      !ts.isIdentifier(name)
+    ) {
       return false;
     }
     const file = declaration.getSourceFile().fileName;
-    const references = service.getReferencesAtPosition(file, declaration.name.getStart()) ?? [];
+    const references = service.getReferencesAtPosition(file, name.getStart()) ?? [];
     // An access must actually touch the member. `!== 'declaration'` also admitted
     // `'unresolved'`, so a port named only by a doc comment or an indexed-access
     // type counted as exercised and cleared a member with an audit line claiming
@@ -321,17 +395,18 @@ function isExercised(member, service, program) {
 }
 
 /** The type of an instance of this class, named or not. */
-function instanceType(node, checker) {
+function instanceType(node: ts.ClassLikeDeclaration, checker: ts.TypeChecker): ts.Type {
   const declared = node.name === undefined ? undefined : declaredTypeOf(node.name, checker);
   if (declared !== undefined) {
     return declared;
   }
   const constructed = checker.getTypeAtLocation(node);
   const signatures = constructed.getConstructSignatures();
-  return signatures.length > 0 ? signatures[0].getReturnType() : constructed;
+  const signature = signatures[0];
+  return signature === undefined ? constructed : signature.getReturnType();
 }
 
-function declaredTypeOf(name, checker) {
+function declaredTypeOf(name: ts.Node, checker: ts.TypeChecker): ts.Type | undefined {
   const symbol = checker.getSymbolAtLocation(name);
   return symbol === undefined ? undefined : checker.getDeclaredTypeOfSymbol(symbol);
 }
@@ -343,7 +418,7 @@ function declaredTypeOf(name, checker) {
  * field and an `override` member each declare something another declaration
  * owns. A field needs no body, so only the kinds that have one must carry one.
  */
-function checkableKind(member) {
+function checkableKind(member: CheckMember): MemberKind | undefined {
   if (member.name === undefined || !ts.isIdentifier(member.name)) {
     return undefined;
   }
@@ -361,7 +436,7 @@ function checkableKind(member) {
   if (ts.isParameter(member)) {
     return ts.isParameterPropertyDeclaration(member, member.parent) ? 'property' : undefined;
   }
-  if (member.body === undefined) {
+  if (!('body' in member) || member.body === undefined) {
     return undefined;
   }
   if (ts.isMethodDeclaration(member)) {
@@ -380,9 +455,9 @@ function checkableKind(member) {
  * not descend into JSDoc, and an unresolved reference is deliberately not
  * treated as a use.
  */
-function nameAt(source, position) {
-  let found;
-  const visit = (node) => {
+function nameAt(source: ts.SourceFile, position: number): ReferenceName | undefined {
+  let found: ReferenceName | undefined;
+  const visit = (node: ts.Node): void => {
     if (node.getStart(source) > position || node.getEnd() < position) {
       return;
     }
@@ -401,7 +476,7 @@ function nameAt(source, position) {
 }
 
 /** The expression a reference reaches the member through, such as `m.value`. */
-function accessExpression(name) {
+function accessExpression(name: ReferenceName): ts.Expression {
   const parent = name.parent;
   if (ts.isPropertyAccessExpression(parent) && parent.name === name) {
     return parent;
@@ -417,7 +492,7 @@ function accessExpression(name) {
  * wrappers that do not change that: `(m.value) = 1` assigns through
  * parentheses, and `m.value! = 1` through a non-null assertion.
  */
-function enclosing(access) {
+function enclosing(access: ts.Node): ts.Node {
   let node = access;
   while (
     ts.isParenthesizedExpression(node.parent) ||
@@ -438,7 +513,7 @@ function enclosing(access) {
  * through the loop's own initializer. Missing any of those spellings reports a
  * setter that is in fact assigned, and the remedy would not compile.
  */
-function assigns(access) {
+function assigns(access: ts.Node): boolean {
   const node = enclosing(access);
   const parent = node.parent;
   if (ts.isBinaryExpression(parent)) {
@@ -457,7 +532,7 @@ function assigns(access) {
 }
 
 /** Whether a compound assignment both reads and writes this access. */
-function updates(access) {
+function updates(access: ts.Node): boolean {
   const node = enclosing(access);
   const parent = node.parent;
   if (ts.isBinaryExpression(parent) && parent.left === node) {
@@ -478,7 +553,7 @@ function updates(access) {
  * `ReturnType<RoidBelt['getRoids']>` depends on the member's type and calls
  * nothing, so it cannot keep an otherwise dead member alive.
  */
-function namesAType(name) {
+function namesAType(name: ReferenceName): boolean {
   return ts.isLiteralTypeNode(name.parent) && ts.isIndexedAccessTypeNode(name.parent.parent);
 }
 
@@ -493,7 +568,7 @@ function namesAType(name) {
  * `read` would let a doc comment or a type alias retire a member silently, and
  * a gate that cannot tell must report rather than clear.
  */
-function accessKind(reference, program) {
+function accessKind(reference: ts.ReferenceEntry, program: ts.Program): AccessKind {
   const source = program.getSourceFile(reference.fileName);
   const name = source === undefined ? undefined : nameAt(source, reference.textSpan.start);
   if (name === undefined) {
@@ -527,7 +602,7 @@ function accessKind(reference, program) {
  * an identifier. A `#private` name is Biome's. A string, computed or numeric
  * one has no owner, so the run names it instead of passing it in silence.
  */
-function unjudgedName(member) {
+function unjudgedName(member: CheckMember): member is NamedCheckMember {
   if (
     member.name === undefined ||
     ts.isIdentifier(member.name) ||
@@ -548,14 +623,14 @@ function unjudgedName(member) {
  * Whether this identifier is a member declaration's own name. Every kind
  * `checkableKind` judges belongs here, plus the signature kinds a port is
  * written with and the object-literal kinds a port is satisfied with;
- * `scripts/check-unused-class-members.test.mjs` pins that parity, because a
+ * `scripts/check-unused-class-members.test.ts` pins that parity, because a
  * kind missing from this list is counted as a use and retires its member
  * silently. A `BindingElement` is deliberately absent: `const { value } = m`
  * declares a local and reads the member.
  */
-function declaresMember(name) {
+function declaresMember(name: ReferenceName): boolean {
   const parent = name.parent;
-  if (parent.name !== name) {
+  if (!('name' in parent) || parent.name !== name) {
     return false;
   }
   // An object literal that satisfies a port declares the member, but the same
@@ -581,7 +656,7 @@ function declaresMember(name) {
  * speak for it: a `+=` reaches both halves, a plain read only the getter, and a
  * destructure only the getter.
  */
-function reaches(kind, access) {
+function reaches(kind: MemberKind, access: AccessKind): boolean {
   if (access === 'declaration' || access === 'unresolved') {
     return false;
   }
@@ -594,7 +669,15 @@ function reaches(kind, access) {
   return true;
 }
 
-function remedy({ kind, internal, reads, componentOnly, paired, parameter, unresolved }) {
+function remedy({
+  kind,
+  internal,
+  reads,
+  componentOnly,
+  paired,
+  parameter,
+  unresolved,
+}: MemberFinding): string {
   if (componentOnly) {
     return 'only a component reaches it; cover the behavior from a test';
   }
@@ -628,14 +711,17 @@ function remedy({ kind, internal, reads, componentOnly, paired, parameter, unres
       ? `written but never read (${internal}), and named by a reference this check cannot classify; confirm by hand`
       : `written but never read (${internal}); remove it`;
   }
-  const naming = { getter: 'read', setter: 'assigned' }[kind] ?? 'used';
+  const naming = kind === 'getter' ? 'read' : kind === 'setter' ? 'assigned' : 'used';
   // TypeScript requires the two halves of a pair to agree on visibility.
   const how = paired ? 'make the accessor pair private' : 'make it private';
   return `${naming} only inside its class (${internal}); ${how}`;
 }
 
 /** Public production members no caller outside the declaring class reaches. */
-function unusedClassMembers(root = process.cwd(), configName = 'config/typescript/prune.jsonc') {
+function unusedClassMembers(
+  root = process.cwd(),
+  configName = 'config/typescript/prune.jsonc'
+): MemberAnalysis {
   const service = languageService(root, configName);
   const program = service.getProgram();
   assert(program, 'Cannot build the unused-member program');
@@ -663,14 +749,14 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
     [],
     'The unused-member program resolved no production files under these directories'
   );
-  const findings = [];
-  const cleared = [];
-  const unjudged = [];
+  const findings: MemberFinding[] = [];
+  const cleared: MemberAnalysis['cleared'] = [];
+  const unjudged: MemberLocation[] = [];
   for (const file of scanned) {
     const path = relative(root, file.fileName);
-    const visit = (node) => {
+    const visit = (node: ts.Node): void => {
       if (ts.isClassLike(node)) {
-        const judged = node.members.flatMap((member) =>
+        const judged = node.members.flatMap((member): CheckMember[] =>
           ts.isConstructorDeclaration(member) ? [...member.parameters] : [member]
         );
         for (const member of judged) {
@@ -685,6 +771,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             }
             continue;
           }
+          assert(member.name !== undefined && ts.isIdentifier(member.name));
           const name = member.name.text;
           const declaration = member.name.getStart(file);
           const references = service.getReferencesAtPosition(file.fileName, declaration) ?? [];
@@ -697,7 +784,7 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             ),
             `Cannot resolve references for ${name} in ${path}`
           );
-          const inside = (reference) =>
+          const inside = (reference: ts.ReferenceEntry) =>
             reference.fileName === file.fileName &&
             reference.textSpan.start >= node.getStart(file) &&
             reference.textSpan.start < node.getEnd();
@@ -743,7 +830,9 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
             // that only accumulates and nothing observes is dead storage, and
             // narrowing it to `private` would only move the finding to Biome.
             reads: accesses.filter(({ access }) => access === 'read').length,
-            componentOnly: (fromComponents.get(moduleKey(file.fileName)) ?? new Set()).has(name),
+            componentOnly: (fromComponents.get(moduleKey(file.fileName)) ?? new Set<string>()).has(
+              name
+            ),
           });
         }
       }
@@ -754,7 +843,10 @@ function unusedClassMembers(root = process.cwd(), configName = 'config/typescrip
   return { findings, cleared, unjudged };
 }
 
-export function checkUnusedClassMembers(root = process.cwd(), configName) {
+export function checkUnusedClassMembers(
+  root = process.cwd(),
+  configName?: string
+): { status: 0 | 1; stdout: string } {
   const { findings, cleared, unjudged } = unusedClassMembers(root, configName);
   const report = findings.map(
     (finding) => `${finding.member} ${finding.path}:${finding.line} - ${remedy(finding)}\n`

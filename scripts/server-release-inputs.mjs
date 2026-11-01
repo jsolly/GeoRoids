@@ -22,7 +22,8 @@ const deploymentFiles = new Set([
   'config/typescript/build.json',
   'config/typescript/strict-tsc.json',
   'config/app/astro.ts',
-  'config/app/svelte.js',
+  'config/app/svelte.js', // Retained for historical release diffs.
+  'config/app/svelte.ts',
   'config/server/debug-reports.json',
   'astro.config.ts',
   'astro.config.mjs',

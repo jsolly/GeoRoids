@@ -4,12 +4,14 @@ import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
-import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.mjs';
+import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.ts';
 
 export function checkBuiltClient(root = process.cwd()) {
-  const read = (path) => readFileSync(join(root, 'dist', path), 'utf8');
-  const manifest = JSON.parse(read('client-assets.json'));
-  const gameDocuments = [];
+  const read = (path: string) => readFileSync(join(root, 'dist', path), 'utf8');
+  const manifest: unknown = JSON.parse(read('client-assets.json'));
+  assert(manifest !== null && typeof manifest === 'object' && 'modules' in manifest);
+  assert(manifest.modules !== null && typeof manifest.modules === 'object');
+  const gameDocuments: string[][] = [];
   for (const path of ['index.html', 'debug/index.html', 'wiki/index.html']) {
     const html = read(path);
     assert.match(html, /<!doctype html>/iu, `Missing static document: ${path}`);
@@ -36,7 +38,10 @@ export function checkBuiltClient(root = process.cwd()) {
           const panel = [...document.querySelectorAll('[data-panel="article"]')].find(
             (element) => element.id === id
           );
-          assert(panel?.matches('[data-panel="article"]'), `Static Wiki article is missing: ${id}`);
+          assert(
+            panel?.matches('[data-panel="article"]') === true,
+            `Static Wiki article is missing: ${id}`
+          );
           assert(panel.querySelector('h1,h2'), `Static Wiki article heading is missing: ${id}`);
           assert(panel.textContent.trim(), `Static Wiki article is empty: ${id}`);
         }

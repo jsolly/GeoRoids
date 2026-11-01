@@ -2,8 +2,10 @@
 
 Status: **prepared, not applied or migrated**. This repository owns its own
 CloudFormation stack, immutable manifest and upload/verification tooling. All
-current media stay tracked. No AWS stack, upload, access grant, DNS record,
-certificate, production deployment or Railway configuration has changed.
+current media stay tracked. The asset stack, uploads, access grants, DNS,
+certificates and Railway configuration remain unapplied. Normal main CI and
+the configured Vercel/Railway Git releases still run when this code is merged;
+those code releases do not establish asset migration or cutover.
 
 ## Published scope and source exceptions
 

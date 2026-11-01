@@ -1,3 +1,4 @@
+// Generated from benchmark-build-receipt.mts by generate-asset-boundaries.ts; do not edit.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -15,33 +16,41 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { clientAssetGraph } from './client-asset-graph.mjs';
+import { clientAssetGraph } from './client-asset-graph.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const receiptPath = (root) => join(root, '.performance/benchmark-client-build.json');
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
-
-function selectedPorts(ports) {
-  assert(
-    ports.length === 3 &&
-      ports.every((port) => Number.isInteger(port) && port > 0 && port <= 65535) &&
-      new Set(ports).size === 3,
-    'Expected three valid, distinct benchmark ports'
-  );
-  return ports;
+function isRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
+function validPort(value) {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 65535;
+}
+function selectedPorts(value) {
+  const diagnostic = 'Expected three valid, distinct benchmark ports';
+  assert(Array.isArray(value) && value.length === 3, diagnostic);
+  const [vite, server, proxy] = value;
+  assert(
+    validPort(vite) && validPort(server) && validPort(proxy) && new Set(value).size === 3,
+    diagnostic
+  );
+  return [vite, server, proxy];
+}
 function successfulReceipt(root) {
   assert(existsSync(receiptPath(root)), 'Missing successful benchmark-client build receipt');
   const receipt = readJson(receiptPath(root));
-  assert.equal(receipt.schemaVersion, 2, 'Unsupported benchmark build receipt');
-  assert.equal(receipt.kind, 'benchmark-client-production-build');
-  assert.equal(receipt.inputs.worktree, root, 'Reusable build belongs to another worktree');
-  const ports = selectedPorts(receipt.inputs.ports);
-  assert.equal(receipt.inputs.websocketUrl, `ws://localhost:${ports[2]}/ws`);
-  return receipt;
+  assert(isRecord(receipt), 'Malformed benchmark build receipt');
+  assert.equal(receipt['schemaVersion'], 2, 'Unsupported benchmark build receipt');
+  assert.equal(receipt['kind'], 'benchmark-client-production-build');
+  const prepared = receipt['inputs'];
+  assert(isRecord(prepared), 'Malformed benchmark build inputs');
+  assert.equal(prepared['worktree'], root, 'Reusable build belongs to another worktree');
+  const ports = selectedPorts(prepared['ports']);
+  assert.equal(prepared['websocketUrl'], `ws://localhost:${ports[2]}/ws`);
+  // Keep raw receipt sections, including extra fields, for the exact-input/output comparisons.
+  return { inputs: prepared, assets: receipt['assets'], ports };
 }
-
 function git(root, args) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))
@@ -54,7 +63,6 @@ function git(root, args) {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
-
 function fileRows(root, paths) {
   return [...new Set(paths)].sort().map((file) => {
     const path = join(root, file);
@@ -66,7 +74,6 @@ function fileRows(root, paths) {
     return { file, mode: info.mode & 0o777, sha256: digest(readFileSync(path)) };
   });
 }
-
 function inputs(root, websocketUrl) {
   assert(/^ws:\/\/localhost:[0-9]+\/ws$/u.test(websocketUrl), 'Expected owned benchmark WS URL');
   // URL parsing also rejects a malformed/out-of-range TCP port.
@@ -89,16 +96,16 @@ function inputs(root, websocketUrl) {
       .sort(([a], [b]) => a.localeCompare(b))
   );
   // The runner supplies this value to npm build, overriding the ambient value.
-  environment.VITE_WEBSOCKET_URL = websocketUrl;
+  environment['VITE_WEBSOCKET_URL'] = websocketUrl;
   return {
     worktree: root,
     commit: git(root, ['rev-parse', 'HEAD']).trim(),
     nodeVersion: process.version,
     websocketUrl,
     ports: selectedPorts([
-      Number(process.env.GEOROIDS_TEST_VITE_PORT),
-      Number(process.env.GEOROIDS_TEST_SERVER_PORT),
-      Number(process.env.GEOROIDS_TEST_PROXY_PORT),
+      Number(process.env['GEOROIDS_TEST_VITE_PORT']),
+      Number(process.env['GEOROIDS_TEST_SERVER_PORT']),
+      Number(process.env['GEOROIDS_TEST_PROXY_PORT']),
     ]),
     sourceSha256: digest(JSON.stringify(rows)),
     environmentSha256: digest(
@@ -107,7 +114,6 @@ function inputs(root, websocketUrl) {
     lockfileSha256: digest(readFileSync(join(root, 'package-lock.json'))),
   };
 }
-
 function build(root) {
   assert(existsSync(join(root, 'dist/index.html')), 'Missing production dist/index.html');
   const html = readFileSync(join(root, 'dist/index.html'), 'utf8');
@@ -115,7 +121,7 @@ function build(root) {
     .map(([tag]) =>
       /\btype=["']module["']/iu.test(tag) ? /\bsrc=["']\/([^"']+)["']/iu.exec(tag)?.[1] : undefined
     )
-    .filter(Boolean);
+    .filter((entry) => entry !== undefined);
   const modules = clientAssetGraph(readJson(join(root, 'dist/client-assets.json')), entries);
   for (const path of modules) {
     assert(existsSync(join(root, 'dist', path)), 'Attributed gameplay asset is missing');
@@ -138,7 +144,6 @@ function build(root) {
   const files = fileRows(root, paths);
   return { sha256: digest(JSON.stringify(files)), files };
 }
-
 function atomicJson(path, value) {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${randomUUID()}.tmp`;
@@ -149,14 +154,15 @@ function atomicJson(path, value) {
     rmSync(temporary, { force: true });
   }
 }
-
 function benchmarkBuildReceipt(action, directory, websocketUrl, preparedPath) {
   const root = realpathSync(directory);
   if (action === 'ports') {
     // These are candidates, never permission to attach to or stop a listener.
     // The runner still checks availability, ownership and the full build proof.
-    return successfulReceipt(root).inputs.ports;
-  } else if (action === 'prepare') {
+    return successfulReceipt(root).ports;
+  }
+  assert(websocketUrl, 'Expected owned benchmark WS URL');
+  if (action === 'prepare') {
     assert(preparedPath, 'Missing prepared input receipt path');
     // A failed new build must never leave an older successful receipt reusable.
     rmSync(receiptPath(root), { force: true });
@@ -180,8 +186,8 @@ function benchmarkBuildReceipt(action, directory, websocketUrl, preparedPath) {
   } else {
     throw new Error('Expected ports, prepare, record or verify');
   }
+  return undefined;
 }
-
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   try {
     const [action, root, websocketUrl, preparedPath] = process.argv.slice(2);
@@ -191,10 +197,13 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
     );
     const result = benchmarkBuildReceipt(action, root, websocketUrl, preparedPath);
     if (action === 'ports') {
+      assert(result !== undefined);
       process.stdout.write(`${result.join('\n')}\n`);
     }
   } catch (error) {
-    process.stderr.write(`${error.stack ?? error}\n`);
+    process.stderr.write(
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+    );
     process.exitCode = 1;
   }
 }

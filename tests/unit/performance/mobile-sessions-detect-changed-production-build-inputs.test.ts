@@ -32,7 +32,7 @@ test('mobile sessions detect changed Wiki, build scripts and inherited compiler 
     { path: 'config/typescript/tsconfig.json', scope: 'harnessSha256' },
     { path: 'config/typescript/build.json', scope: 'harnessSha256' },
     { path: 'config/app/astro.ts', scope: 'harnessSha256' },
-    { path: 'config/app/svelte.js', scope: 'harnessSha256' },
+    { path: 'config/app/svelte.ts', scope: 'harnessSha256' },
     { path: 'config/server/debug-reports.json', scope: 'productSha256' },
   ] as const;
   try {

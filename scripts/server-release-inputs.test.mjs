@@ -64,6 +64,7 @@ test('shared modules and manifests require a server release; client sources do n
     write('config/typescript/build.json', '{"extends":"./project.json"}');
     write('config/app/astro.ts', 'export default {};');
     write('config/app/svelte.js', 'export default {};');
+    write('config/app/svelte.ts', 'export default {};');
     write('config/server/debug-reports.json', '{}');
     write('config/quality/prettier.json', '{}');
     write('server.ts', "import { factor } from './shared/state'; console.log(factor);");
@@ -103,6 +104,7 @@ test('shared modules and manifests require a server release; client sources do n
       'config/typescript/strict-tsc.json',
       'config/app/astro.ts',
       'config/app/svelte.js',
+      'config/app/svelte.ts',
       'config/server/debug-reports.json',
     ]) {
       assert.ok(serverReleaseInputs(cwd).includes(path), path);

@@ -3,13 +3,18 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vitest';
-import { checkBuiltClient } from './check-built-client.mjs';
-import { clientDocumentAssets } from './client-asset-graph.mjs';
+import { checkBuiltClient } from './check-built-client.ts';
+import { clientDocumentAssets } from './client-asset-graph.ts';
 
 const sha = 'a'.repeat(40);
-function fixture(run) {
+interface Fixture {
+  root: string;
+  write: (path: string, body: string) => void;
+}
+
+function fixture(run: (state: Fixture) => void) {
   const root = mkdtempSync(join(tmpdir(), 'georoids-built-routes-'));
-  const write = (path, body) => writeFileSync(join(root, path), body);
+  const write = (path: string, body: string) => writeFileSync(join(root, path), body);
   for (const directory of ['dist/debug', 'dist/wiki', 'dist/_astro', 'content/wiki']) {
     mkdirSync(join(root, directory), { recursive: true });
   }
@@ -46,7 +51,7 @@ function fixture(run) {
 test('the build publishes distinct static routes with readable Wiki articles and reachable gameplay', () => {
   fixture(({ root }) => assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 2 }));
 });
-for (const [name, mutate, error] of [
+const invalidBuilds: [string, (state: Fixture) => void, RegExp][] = [
   ['missing debug route', ({ root }) => rmSync(join(root, 'dist/debug/index.html')), /ENOENT/u],
   [
     'missing editorial fallback',
@@ -79,7 +84,8 @@ for (const [name, mutate, error] of [
       ),
     /Gameplay bundle is unreachable/u,
   ],
-]) {
+];
+for (const [name, mutate, error] of invalidBuilds) {
   test(`a build with ${name} fails publication validation`, () =>
     fixture((state) => {
       mutate(state);
@@ -108,8 +114,15 @@ test('Astro island component and renderer entries prove the dynamic gameplay gra
       'dist/debug/index.html',
       html.replace('</head>', '<meta name="robots" content="noindex, nofollow"></head>')
     );
-    const manifest = JSON.parse(readFileSync(join(root, 'dist/client-assets.json'), 'utf8'));
-    manifest.modules['_astro/renderer.js'] = [];
+    const manifest = {
+      releaseSha: sha,
+      gameplay: ['_astro/engine.js'],
+      modules: {
+        '_astro/page.js': ['_astro/engine.js'],
+        '_astro/engine.js': [],
+        '_astro/renderer.js': [],
+      },
+    };
     write('dist/client-assets.json', JSON.stringify(manifest));
     write('dist/_astro/renderer.js', 'export const hydrate = true;');
     assert.deepEqual(checkBuiltClient(root), { routes: 3, modules: 3 });
@@ -122,11 +135,12 @@ test('Astro island component and renderer entries prove the dynamic gameplay gra
 });
 
 const moduleEntry = '<script type="module" src="/_astro/page.js"></script>';
-for (const [name, html] of [
+const inactiveEntries: [string, string][] = [
   ['comment', `<!--${moduleEntry}-->`],
   ['template', `<template>${moduleEntry}</template>`],
   ['noscript', `<html><body><noscript>${moduleEntry}</noscript></body></html>`],
-]) {
+];
+for (const [name, html] of inactiveEntries) {
   test(`an entry inside ${name} does not prove active client gameplay`, () => {
     assert.throws(() => clientDocumentAssets(html), /Client module entry is missing/u);
   });

@@ -976,7 +976,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
       'package-lock.json',
       'config/testing/vitest.ts',
       'config/testing/tooling.ts',
-      'config/app/svelte.js',
+      'config/app/svelte.ts',
       'tests/viteSetup.ts',
       'tests/support/canvas.html',
       'src/utils/logLevel.ts',
@@ -1047,14 +1047,14 @@ test('every gate stage writes generated caches in its issued artifact session', 
     }
     // Execute the tooling configuration too: its caches must preserve the
     // installed tree just as the game projects do during an admitted gate.
-    for (const name of [
-      'code-integration-runner',
-      'ci-contract',
-      'server-release-inputs',
-      'dev-server',
-      'lint-policy',
+    for (const [name, extension] of [
+      ['code-integration-runner', 'mjs'],
+      ['ci-contract', 'mjs'],
+      ['server-release-inputs', 'mjs'],
+      ['dev-server', 'ts'],
+      ['lint-policy', 'ts'],
     ]) {
-      const target = join(consumer, 'scripts', `${name}.test.mjs`);
+      const target = join(consumer, 'scripts', `${name}.test.${extension}`);
       mkdirSync(resolve(target, '..'), { recursive: true });
       writeFileSync(
         target,

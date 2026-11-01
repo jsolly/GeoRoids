@@ -24,7 +24,7 @@
     "test:integration:server": "./scripts/test-runner.sh tests/integration/server/",
     "check:test-runner": "node scripts/validation-admission.mjs contracts -- bash scripts/test-runner-contract.sh",
     "check:dev-server": "vitest run --config config/testing/tooling.ts --project dev-server",
-    "check:ts": "astro sync --config config/app/astro.ts && node scripts/typescript-cli.mjs --noEmit",
+    "check:ts": "astro sync --config config/app/astro.ts && node scripts/typescript-cli.mjs --noEmit && node scripts/generate-asset-boundaries.ts --check",
     "check:benchmarks": "node scripts/typescript-cli.mjs -p config/typescript/benchmarks.json",
     "check:md": "bash scripts/lint-md.sh",
     "check:yaml": "uvx yamllint@1.38.0 -c config/quality/yamllint.yaml --strict .",

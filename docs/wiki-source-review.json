@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:3a598a5434967ceb9450ce9328a4e5022c7de7c0baeafb355c342711bee88665",
+    "package.json": "sha256:0556da8305011569624d47483c8ea3929b7c188ffcfeb56216135336191d90c4",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -66,7 +66,7 @@
     "public/wiki/media/survival.png": "sha256:cb90006f39af1cdbe46ec2de2455722049fbf19fb64fc412a0cdd7f40de3dda6",
     "public/wiki/media/terrain.gif": "sha256:7472aa49b2c6b860d7b790e3c2bc9d83c986a04c2604b85c48e62aee1642579e",
     "public/wiki/media/terrain.png": "sha256:45e89a0f083c9c619b195543040ffabf80f4427a04e38e9a92c95fe4807d8133",
-    "scripts/build-vercel-output.mjs": "sha256:883d4ef2393e4a4d6385e8743ab96ae3b26e9d19d52116e38c2aef8cfb22c084",
+    "scripts/build-vercel-output.mjs": "sha256:11821f40472a2830fbb3ed49b084b6e6eefd2558d2f779a46f78870b1fa8be1a",
     "scripts/client-build.ts": "sha256:abe7ea029d9606ce316a76b6cef432aa7002420783f8dc739622af74a90e5892",
     "scripts/client-release-sha.ts": "sha256:e4d51752d83d1324cd254fbc9720a8f10970e323ad245b3541226a3463aee9ba",
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
@@ -8147,6 +8147,25 @@
     },
     {
       "note": "Reviewed the composed command paths for the typed accessibility helper and focused flight launcher, preserving the typed configuration and publication checker already on main. Player controls, Wiki text, demonstrations and asset URLs are unchanged. This scoped review records package source acceptance; full integration validation is recorded separately.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Scoped asset-tool TypeScript source migration independently reviewed. The existing build-output CLI is generated from checked TypeScript while preserving its runtime path, emitted URLs, routing, immutable manifests and legacy-byte handling. The package typecheck additionally verifies generated-boundary freshness with the pinned TypeScript 7 CLI. Receipt parsing preserves raw comparison evidence and optional opaque capture metadata. Reviewed the field manual and HUD/network update-retention guidance; gameplay, controls, Wiki text and demonstration assets remain unchanged. This batch records semantic source review only; complete gate and CI validation remain pending.",
+      "sources": ["package.json", "scripts/build-vercel-output.mjs"],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "scripts/build-vercel-output.mjs": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed the typed asset-boundary freshness check added to the existing TypeScript command. The generated CLI consumer paths, retained assets, player rules, Wiki text and demonstrations preserve their contracts. All executable, configuration and test bytes match the frozen asset-tooling source after composing main; complete validation is recorded separately.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],

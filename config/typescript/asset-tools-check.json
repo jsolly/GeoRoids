@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "../../scripts/build-vercel-output.mts",
+    "../../scripts/verify-retained-assets.mts",
+    "../../scripts/benchmark-build-receipt.mts",
+    "../../scripts/generate-asset-boundaries.ts",
+    "../../scripts/benchmark-build-receipt.test.ts",
+    "../../tests/unit/testing/old-client-assets-survive-new-builds.test.ts",
+    "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts"
+  ]
+}

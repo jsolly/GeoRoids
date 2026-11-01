@@ -10,6 +10,8 @@ const config = {
     'server/debugReports/worker.ts',
     '.railway/**/*.ts',
     'scripts/**/*.ts',
+    'scripts/**/*.mts',
+    'scripts/verify-retained-assets.mjs',
     // A shell runner launches this listener through dev-server-contract.sh, which
     // Knip cannot follow from the spawning test. It exports nothing, so entry
     // placement forfeits no unused-export coverage.
@@ -31,7 +33,7 @@ const config = {
     'shared-types.ts',
     'setup/**/*.ts',
     '.railway/**/*.ts',
-    'scripts/**/*.{ts,mjs}',
+    'scripts/**/*.{ts,mts,mjs}',
     'tests/**/*.ts',
     'config/app/**/*.ts',
     'config/testing/**/*.ts',

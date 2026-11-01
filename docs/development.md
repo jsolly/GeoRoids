@@ -46,6 +46,14 @@ Use the repository's README and AGENTS.md for its build, test and deployment
 commands. A missing prerequisite is a failed setup; report it rather than claiming
 that the gate ran. No setup command deploys the application or infrastructure.
 
+The Wiki check runs `check:python`, using pinned mypy 2.4.1 in strict mode
+with implicit `Any` expressions rejected. It checks the complete Wiki GIF
+encoder with Pillow 12.3.0's inline types and targets Python 3.11. The typed
+argument namespace describes the same parser conversions and defaults. The
+three hook implementation/test/legacy Python files remain outside this slice
+while the separately owned hook rollout is in progress; this is not complete
+repository Python coverage. No Wiki behavior or media baseline changes.
+
 ## Hook trust
 
 The dispatcher lives in this clone's Git common directory, shared only by its

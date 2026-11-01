@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:f6b0033ad6c2687a13ed3dd39ceb4c8ebe570e98ee005ec891f70ebe9fbf6455",
+    "package.json": "sha256:50e3cf863c7e3bfee782095ea5a348cb66fdf2ab57b631d6b44ce483ab9160f5",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -72,7 +72,7 @@
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
     "scripts/wiki-check.ts": "sha256:83a1b4263d6cd5a698384556b75e78e0ab62d845182736c782c968263fa1bea9",
     "scripts/wiki-content.ts": "sha256:190a89be185ac685e37e7ae3d962d1fabb059a2a39fc3eee2f9cc09567e8a162",
-    "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
+    "scripts/wiki-media-encode.py": "sha256:2f26d0853381c7d0f39f2db13fd1442623ac287e10d66e76872e0481f413befc",
     "scripts/wiki-media-fonts.ts": "sha256:6f2554c263f3812b7734f721adb197d559b2838a4ce7b34f74731768878c9509",
     "scripts/wiki-media-fonts/LiberationSans-Bold.ttf": "sha256:3973aa5054fb467dd5627245d3dc82e37bf16fe075756156a570455871351582",
     "scripts/wiki-media-fonts/LiberationSans-Regular.ttf": "sha256:4659bc0c58c5028dd488ec928d41d9265db43d9b669fc14ca8b0832daca7b144",
@@ -8095,6 +8095,27 @@
       "media": [],
       "owners": {
         "src/utils/globalErrorLogging.ts": "hud-network"
+      }
+    },
+    {
+      "note": "Reviewed the typed argparse namespace and strict Python validation command. All 2464 unit tests passed, mypy checked the complete encoder, and wiki:media:check regenerated all 10 GIFs and 10 posters reproducibly with Pillow 12.3.0 and matched the committed bytes. Player rules, Wiki pages and illustrations are unchanged; no article edit is needed. Only these two source hashes are accepted.",
+      "sources": ["package.json", "scripts/wiki-media-encode.py"],
+      "topics": ["field-manual"],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "package.json": "field-manual",
+        "scripts/wiki-media-encode.py": "field-manual"
       }
     }
   ]

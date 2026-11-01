@@ -1,3 +1,4 @@
+// Generated from production-smoke-network.mts by generate-asset-boundaries.ts; do not edit.
 // GeoRoids-specific code-only production verification. Receipt fields retain
 // the contract consumed by dotagents' production-smoke follower.
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -5,7 +6,6 @@ import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
-
 export class SmokeFailure extends Error {}
 export function smokeCause(error) {
   return error instanceof Error ? error : new Error('Unexpected non-Error smoke failure');
@@ -17,7 +17,8 @@ export const smokeClock = {
   clearTimeout: (timer) => clearTimeout(timer),
 };
 export function requireEvidence(condition, message) {
-  if (!condition) {
+  const satisfied = Boolean(condition);
+  if (!satisfied) {
     throw new SmokeFailure(message);
   }
 }
@@ -35,8 +36,8 @@ export async function runNetworkSmoke({
 }) {
   await mkdir(artifacts, { recursive: true });
   const receipt = {
-    requestId: env.PRODUCTION_SMOKE_REQUEST_ID,
-    releaseSha: env.PRODUCTION_SMOKE_RELEASE_SHA,
+    requestId: env['PRODUCTION_SMOKE_REQUEST_ID'],
+    releaseSha: env['PRODUCTION_SMOKE_RELEASE_SHA'],
     observations: [],
     errors: [],
     success: false,
@@ -55,7 +56,8 @@ export async function runNetworkSmoke({
     reported.add(error);
     report(smokeCause(error));
   };
-  let timer, behavior;
+  let timer;
+  let behavior;
   const verifyHttp = async (url) => {
     const request = new AbortController();
     let requestTimer;
@@ -92,9 +94,9 @@ export async function runNetworkSmoke({
         'Production HTTP response was unsuccessful or noncanonical'
       );
       receipt.observations.push({ url: requested.href, status: response.status });
-      const readBody = async (method) => {
+      const readBody = async (read, method) => {
         try {
-          return await Promise.race([response[method](), expired]);
+          return await Promise.race([read(), expired]);
         } catch (error) {
           // biome-ignore lint/style/useErrorCause: JSON parser causes can expose response bodies; normalize before public reporting.
           throw new SmokeFailure('Production HTTP body failed or timed out', {
@@ -113,9 +115,9 @@ export async function runNetworkSmoke({
         url: requested.href,
         status: response.status,
         headers: response.headers,
-        text: () => readBody('text'),
-        json: () => readBody('json'),
-        arrayBuffer: () => readBody('arrayBuffer'),
+        text: () => readBody(() => response.text(), 'text'),
+        json: () => readBody(() => response.json(), 'json'),
+        arrayBuffer: () => readBody(() => response.arrayBuffer(), 'arrayBuffer'),
       };
     } catch (error) {
       clock.clearTimeout(requestTimer);
@@ -177,7 +179,7 @@ export async function runNetworkSmoke({
     controller.abort();
     // The scenario owns its socket. Await its abort/close before retaining success
     // or returning a timed-out receipt, so work cannot continue after publication.
-    if (behavior) {
+    if (behavior !== undefined) {
       await behavior.catch((error) => {
         reportFailure(error);
         if (error instanceof SmokeFailure && !receipt.errors.includes(error.message)) {

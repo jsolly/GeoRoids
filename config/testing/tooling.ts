@@ -57,7 +57,7 @@ export default defineConfig({
           name: 'smoke',
           include: [
             'scripts/server-release-inputs.test.mjs',
-            'scripts/production-smoke-scenario.test.mjs',
+            'scripts/production-smoke-scenario.test.ts',
           ],
         },
       },

@@ -1,3 +1,4 @@
+// Generated from production-smoke-entry.mts by generate-asset-boundaries.ts; do not edit.
 // Client and server deploy independently. Preserve the HTTP readiness and
 // behavior budgets while verifying the deployed HTTP and gameplay protocols.
 import process from 'node:process';

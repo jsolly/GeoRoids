@@ -52,7 +52,10 @@ full SHA-256 immutable manifest. This CLI, `verify-retained-assets.mjs` and
 `benchmark-build-receipt.mjs` are generated from their `.mts` sources with the pinned
 TypeScript 7 CLI. After editing those sources or their typed graph dependency, run
 `node scripts/generate-asset-boundaries.ts --write`; `check:ts` checks their freshness.
-The existing CLI paths and retained asset URLs stay stable.
+The existing CLI paths and retained asset URLs stay stable. The same generator owns
+`production-smoke-entry.mjs`, `production-smoke-network.mjs` and
+`production-smoke-scenario.mjs` from their typed sources. The deployed smoke command,
+scenario paths and dynamic loading of shared protocol code stay unchanged.
 
 The provider serves these files across deployments
 even when the current build omits them, including overlapping builds. No service

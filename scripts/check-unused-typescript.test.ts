@@ -7,17 +7,17 @@ import process from 'node:process';
 import ts from 'typescript';
 import { test } from 'vitest';
 import unusedConfig from '../config/quality/knip.ts';
-import { checkUnusedTypescript, frontendEntry } from './check-unused-typescript.mjs';
+import { checkUnusedTypescript, frontendEntry } from './check-unused-typescript.ts';
 
 test('frontend imports and inherited tool entries preserve exact TypeScript export usage', () => {
   const root = mkdtempSync(join(tmpdir(), 'georoids-frontend-prune-contract-'));
-  const write = (path, body) => writeFileSync(join(root, path), body);
+  const write = (path: string, body: string) => writeFileSync(join(root, path), body);
   const run = () => checkUnusedTypescript(root);
   const passes = () => {
     const result = run();
     assert.equal(result.status, 0, result.stdout + result.stderr);
   };
-  const fails = (name) => {
+  const fails = (name: string) => {
     const result = run();
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.match(result.stdout, new RegExp(name, 'u'));
@@ -154,7 +154,7 @@ test('the committed prune program keeps the scripts/ .mjs runners in scope', () 
 
 test('the unused-file gate rejects an orphaned Svelte component and follows its Astro consumer', () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'georoids-svelte-prune-contract-')));
-  const write = (path, body) => writeFileSync(join(root, path), body);
+  const write = (path: string, body: string) => writeFileSync(join(root, path), body);
   const config = unusedConfig;
   assert.ok(config, 'Cannot read the committed unused-file configuration');
   const run = () =>

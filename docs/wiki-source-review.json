@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:0556da8305011569624d47483c8ea3929b7c188ffcfeb56216135336191d90c4",
+    "package.json": "sha256:8cafd044df69c4a732b94f1d0b957a652a97bd5beee3e9f36c86b720df4dc630",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -8166,6 +8166,24 @@
     },
     {
       "note": "Reviewed the typed asset-boundary freshness check added to the existing TypeScript command. The generated CLI consumer paths, retained assets, player rules, Wiki text and demonstrations preserve their contracts. All executable, configuration and test bytes match the frozen asset-tooling source after composing main; complete validation is recorded separately.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the integrated typed quality checkers and their existing tooling tests, preserving the TypeScript compiler API split, detection policy, shell/port fixtures and assertions. Independent source reviews, dedicated strict TypeScript, Biome and generated asset-boundary freshness checks passed. Only the two quality command paths change in package.json. Player behavior, Wiki content and media are unchanged. Focused tests and the complete gate remain pending.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the merged tooling script paths and strict checker commands. Gameplay rules, player controls, Wiki articles and demonstration media are unchanged; source bytes preserve the frozen quality-tooling slice.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],

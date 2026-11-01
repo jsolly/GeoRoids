@@ -143,7 +143,7 @@ printf 'docs/wiki-source-review.json merge=wiki-ledger\n' >> .git/info/exclude.g
 git config core.attributesFile "$(git rev-parse --git-dir)/info/exclude.gitattributes"
 ```
 
-`scripts/merge-wiki-ledger.test.mjs` pins each rule above, including that a
+`scripts/merge-wiki-ledger.test.ts` pins each rule above, including that a
 union of two-sided digests fails and that a real conflicted merge resolves.
 
 ## Live CMS acceptance

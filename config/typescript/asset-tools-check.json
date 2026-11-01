@@ -1,6 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "include": [
+    "../../scripts/merge-wiki-ledger.mts",
+    "../../scripts/merge-wiki-ledger.test.ts",
     "../../scripts/build-vercel-output.mts",
     "../../scripts/verify-retained-assets.mts",
     "../../scripts/benchmark-build-receipt.mts",

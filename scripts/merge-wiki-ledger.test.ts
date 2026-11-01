@@ -5,13 +5,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { test } from 'vitest';
-import { mergeLedger } from './merge-wiki-ledger.mjs';
+import { mergeLedger } from './merge-wiki-ledger.mts';
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function object(value: unknown): Record<string, unknown> {
+  assert.ok(isObject(value));
+  return value;
+}
 
 const BASE_DIGEST = 'a'.repeat(64);
 const OUR_DIGEST = 'b'.repeat(64);
 const THEIR_DIGEST = 'c'.repeat(64);
-const batch = (note) => ({ note, sources: [], topics: ['terrain'], media: [], owners: {} });
-const ledger = (hashes, reviews) => JSON.stringify({ note: 'n', hashes, reviews });
+const batch = (note: string) => ({ note, sources: [], topics: ['terrain'], media: [], owners: {} });
+const ledger = (hashes: Record<string, string>, reviews: ReturnType<typeof batch>[]) =>
+  JSON.stringify({ note: 'n', hashes, reviews });
 
 test('a source only one side re-recorded keeps that side’s digest', () => {
   // Independent pins: the three digests differ from each other, so an assertion
@@ -88,7 +98,11 @@ test('review batches union by content, so interleaved entries are not lost', () 
     ledger({}, [batch('r1'), batch('m1'), batch('m2')])
   );
   assert.deepEqual(
-    merged.reviews.map((entry) => entry.note),
+    merged.reviews.map((entry) =>
+      entry !== null && typeof entry === 'object' && !Array.isArray(entry)
+        ? entry['note']
+        : undefined
+    ),
     ['r1', 'm1', 'm2', 'x1']
   );
   assert.equal(report.baseReviews, 1);
@@ -109,7 +123,7 @@ test('dropping a base review batch is refused rather than resolved', () => {
 });
 
 test('a two-sided note edit is refused rather than picked', () => {
-  const side = (note) => JSON.stringify({ note, hashes: {}, reviews: [] });
+  const side = (note: string) => JSON.stringify({ note, hashes: {}, reviews: [] });
   assert.throws(() => mergeLedger(side('base'), side('ours'), side('theirs')), /note/u);
   // One-sided edits still resolve.
   assert.equal(mergeLedger(side('base'), side('ours'), side('base')).ledger.note, 'ours');
@@ -145,14 +159,14 @@ test('the resolver reads a real conflict out of the index and resolves the workt
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_SYSTEM: '/dev/null',
   };
-  const git = (...args) =>
+  const git = (...args: string[]) =>
     execFileSync('git', args, {
       cwd: root,
       encoding: 'utf8',
       env: environment,
     });
   const ledgerPath = join(root, 'docs/wiki-source-review.json');
-  const write = (hashes, reviews) =>
+  const write = (hashes: Record<string, string>, reviews: ReturnType<typeof batch>[]) =>
     writeFileSync(ledgerPath, `${JSON.stringify({ note: 'n', hashes, reviews }, null, 2)}\n`);
   try {
     git('init', '-q');
@@ -198,11 +212,15 @@ test('the resolver reads a real conflict out of the index and resolves the workt
       }
     );
 
-    const resolved = JSON.parse(readFileSync(ledgerPath, 'utf8'));
-    assert.equal(resolved.hashes['both.ts'], BASE_DIGEST);
-    assert.equal(resolved.hashes['ours.ts'], OUR_DIGEST);
+    const decoded: unknown = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const resolved = object(decoded);
+    const resolvedHashes = object(resolved['hashes']);
+    const resolvedReviews = resolved['reviews'];
+    assert.ok(Array.isArray(resolvedReviews));
+    assert.equal(resolvedHashes['both.ts'], BASE_DIGEST);
+    assert.equal(resolvedHashes['ours.ts'], OUR_DIGEST);
     assert.deepEqual(
-      resolved.reviews.map((entry) => entry.note),
+      resolvedReviews.map((entry: unknown) => object(entry)['note']),
       ['r1', 'theirs', 'ours']
     );
     assert.match(output, /left pending for review \(both sides re-recorded these\): both\.ts/u);
@@ -210,4 +228,42 @@ test('the resolver reads a real conflict out of the index and resolves the workt
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('review content canonicalizes nested JSON keys without changing base/theirs/ours ordering', () => {
+  const base = JSON.stringify({
+    hashes: {},
+    reviews: [{ nested: { alpha: 1, beta: [null, false] } }],
+  });
+  const ours = JSON.stringify({
+    hashes: {},
+    reviews: [{ nested: { beta: [null, false], alpha: 1 } }, 0],
+  });
+  const theirs = JSON.stringify({
+    hashes: {},
+    reviews: [{ nested: { alpha: 1, beta: [null, false] } }, ['added']],
+  });
+  const { ledger: merged } = mergeLedger(base, ours, theirs);
+  assert.deepEqual(merged.reviews, [{ nested: { alpha: 1, beta: [null, false] } }, ['added'], 0]);
+  assert.equal(Object.hasOwn(merged, 'note'), false);
+});
+
+test('legacy non-string JSON hash values and a missing note keep their existing merge semantics', () => {
+  const base = JSON.stringify({ note: 'base', hashes: { 'a.ts': null, 'b.ts': 1 }, reviews: [] });
+  const ours = JSON.stringify({ hashes: { 'a.ts': true, 'b.ts': 1 }, reviews: [] });
+  const theirs = JSON.stringify({ note: 'base', hashes: { 'a.ts': null, 'b.ts': 2 }, reviews: [] });
+  const { ledger: merged } = mergeLedger(base, ours, theirs);
+  assert.deepEqual(merged.hashes, { 'a.ts': true, 'b.ts': 2 });
+  assert.equal(Object.hasOwn(merged, 'note'), true);
+  assert.equal(merged.note, undefined);
+  assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(merged)), 'note'), false);
+});
+
+test('deep ignored metadata does not affect a ledger merge', () => {
+  const ignored = `${'['.repeat(20000)}0${']'.repeat(20000)}`;
+  const side = `{"hashes":{},"reviews":[],"ignored":${ignored}}`;
+  const { ledger: merged, report } = mergeLedger(side, side, side);
+  assert.deepEqual(merged, { hashes: {}, reviews: [] });
+  assert.equal(report.digests, 0);
+  assert.equal(report.reviews, 0);
 });

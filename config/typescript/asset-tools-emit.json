@@ -8,6 +8,7 @@
     "rootDir": "../../scripts"
   },
   "include": [
+    "../../scripts/merge-wiki-ledger.mts",
     "../../scripts/build-vercel-output.mts",
     "../../scripts/verify-retained-assets.mts",
     "../../scripts/benchmark-build-receipt.mts"

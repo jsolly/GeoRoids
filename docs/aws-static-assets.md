@@ -113,8 +113,11 @@ for CloudFront deployment. Review deterministic conditional upload commands:
 npm run --silent assets -- plan BUCKET_NAME
 ```
 
-The plan prints one AWS CLI PUT per manifest object and executes none. John can
-run the reviewed commands with approved write access. An existing-key
+The plan verifies all local manifest bytes before printing one AWS CLI PUT per
+object and executes none. Each command supplies the manifest's base64 SHA-256
+checksum, so S3 rejects a body changed after plan generation as well
+([PUT checksum contract](https://docs.aws.amazon.com/cli/latest/reference/s3api/put-object.html#options)).
+John can run the reviewed commands with approved write access. An existing-key
 precondition failure calls for verification, never an overwrite or `sync --delete`.
 Alternatively, an approved operator can provide an external JSON object mapping
 each exact immutable key to a short-lived regional S3 presigned PUT URL. Sign for

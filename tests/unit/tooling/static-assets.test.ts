@@ -1,6 +1,7 @@
 // @vitest-environment node
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -53,9 +54,13 @@ function fake(
     get() {
       return Promise.resolve(state.value);
     },
-    put() {
+    put(target: Asset, payload: Uint8Array) {
       state.writes++;
-      state.value = object();
+      state.value = {
+        bytes: payload.slice(),
+        contentType: target.contentType,
+        cacheControl: CACHE_CONTROL,
+      };
       return Promise.resolve();
     },
   };
@@ -234,6 +239,116 @@ test('the real CLI verifies the repository manifest without AWS credentials or a
       .version,
     1
   );
+});
+
+test('manual plans reject changed, missing and symlinked bytes and pin the checksum for later execution', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'georoids-plan-'));
+  const cli = fileURLToPath(new URL('../../../scripts/assets/cli.ts', import.meta.url));
+  const local = join(root, `public${path}`);
+  const tsx = fileURLToPath(new URL('../../../node_modules/tsx/dist/loader.mjs', import.meta.url));
+  const run = () =>
+    spawnSync(process.execPath, ['--import', tsx, cli, 'plan', 'reviewed-georoids-assets'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+  try {
+    await mkdir(join(root, 'config/aws/static-assets'), { recursive: true });
+    await mkdir(join(root, 'public/music'), { recursive: true });
+    await writeFile(join(root, 'config/aws/static-assets/manifest.json'), JSON.stringify(manifest));
+    await writeFile(local, bytes);
+    const good = run();
+    assert.equal(good.status, 0, good.stderr);
+    const checksum = createHash('sha256').update(bytes).digest('base64');
+    assert.ok(good.stdout.includes(`--checksum-algorithm SHA256 --checksum-sha256 ${checksum}`));
+    assert.ok(good.stdout.includes(`--key ${asset.key}`));
+    assert.ok(good.stdout.includes("--if-none-match '*'"));
+    // The printed checksum remains the original digest if the body changes later.
+    await writeFile(local, new Uint8Array([2]));
+    assert.notEqual(
+      createHash('sha256')
+        .update(await readFile(local))
+        .digest('base64'),
+      checksum
+    );
+    const corrupt = run();
+    assert.equal(corrupt.status, 1);
+    assert.equal(corrupt.stdout, '');
+    assert.match(corrupt.stderr, /Manifest differs from local source bytes/u);
+    await rm(local);
+    const missing = run();
+    assert.equal(missing.status, 1);
+    assert.equal(missing.stdout, '');
+    await writeFile(join(root, 'private.ogg'), bytes);
+    await symlink(join(root, 'private.ogg'), local);
+    const linked = run();
+    assert.equal(linked.status, 1);
+    assert.equal(linked.stdout, '');
+    assert.match(linked.stderr, /Symlink/u);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('the real upload CLI sends actual source bytes and conditional headers then verifies readback', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'georoids-upload-'));
+  const cli = fileURLToPath(new URL('../../../scripts/assets/cli.ts', import.meta.url));
+  const tsx = fileURLToPath(new URL('../../../node_modules/tsx/dist/loader.mjs', import.meta.url));
+  const authorization = join(root, 'authorization.json');
+  const mock = join(root, 'fetch.mjs');
+  const calls = join(root, 'calls.json');
+  const origin = 'https://d123.cloudfront.net';
+  const bucket = 'reviewed-georoids-assets';
+  const signed = `https://${bucket}.s3.us-east-1.amazonaws.com/${asset.key}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=fake`;
+  try {
+    await mkdir(join(root, 'config/aws/static-assets'), { recursive: true });
+    await mkdir(join(root, 'public/music'), { recursive: true });
+    await writeFile(join(root, 'config/aws/static-assets/manifest.json'), JSON.stringify(manifest));
+    await writeFile(join(root, `public${path}`), bytes);
+    await writeFile(authorization, JSON.stringify({ [asset.key]: signed }));
+    await writeFile(
+      mock,
+      `import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
+const calls = [];
+let uploaded;
+globalThis.fetch = async (url, options) => {
+  assert.equal(options.redirect, 'error');
+  assert.ok(options.signal instanceof AbortSignal);
+  if (options.method === 'PUT') {
+    assert.equal(url, ${JSON.stringify(signed)});
+    assert.equal(options.headers['if-none-match'], '*');
+    assert.equal(options.headers['content-type'], 'audio/ogg');
+    assert.equal(options.headers['cache-control'], ${JSON.stringify(CACHE_CONTROL)});
+    uploaded = new Uint8Array(options.body);
+    assert.deepEqual([...uploaded], ${JSON.stringify([...bytes])});
+    calls.push('PUT');
+    writeFileSync(${JSON.stringify(calls)}, JSON.stringify(calls));
+    return new Response(null, { status: 200 });
+  }
+  assert.equal(url, ${JSON.stringify(`${origin}/${asset.key}`)});
+  calls.push(uploaded ? 'GET verified bytes' : 'GET missing');
+  writeFileSync(${JSON.stringify(calls)}, JSON.stringify(calls));
+  return uploaded
+    ? new Response(uploaded, { headers: { 'content-type': 'audio/ogg', 'cache-control': ${JSON.stringify(CACHE_CONTROL)} } })
+    : new Response(null, { status: 403 });
+};`
+    );
+    const result = spawnSync(
+      process.execPath,
+      ['--import', tsx, '--import', mock, cli, 'upload', origin, bucket, authorization],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Verified every byte and delivery header for 1 media files/u);
+    assert.deepEqual(JSON.parse(await readFile(calls, 'utf8')), [
+      'GET missing',
+      'PUT',
+      'GET verified bytes',
+      'GET verified bytes',
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('the stack retains private versioned encrypted storage restricted to its signed distribution', () => {

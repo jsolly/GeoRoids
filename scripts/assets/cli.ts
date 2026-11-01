@@ -46,12 +46,17 @@ if (command === 'inventory') {
     if (!originInput || !/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/u.test(originInput)) {
       throw new Error('Supply the reviewed stack BucketName');
     }
+    const current = await createManifest(root, new Set(manifest.assets.map((asset) => asset.path)));
+    if (JSON.stringify(current) !== JSON.stringify(manifest)) {
+      throw new Error('Manifest differs from local source bytes; no upload plan was emitted');
+    }
     process.stdout.write(
       `${manifest.assets
         .map((asset) =>
           [
             'aws s3api put-object --region us-east-1',
             `--bucket ${originInput} --key ${asset.key} --body public${asset.path}`,
+            `--checksum-algorithm SHA256 --checksum-sha256 ${Buffer.from(asset.sha256, 'hex').toString('base64')}`,
             `--content-type ${asset.contentType} --cache-control '${CACHE_CONTROL}' --if-none-match '*'`,
           ].join(' ')
         )

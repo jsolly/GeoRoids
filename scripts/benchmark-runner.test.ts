@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import {
   cpSync,
   existsSync,
@@ -14,10 +14,39 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { test } from 'vitest';
+import { type TestContext, test } from 'vitest';
 
 const source = dirname(fileURLToPath(import.meta.url));
-function fixture(t) {
+interface EventRow extends Record<string, unknown> {
+  kind: string;
+}
+interface Fixture {
+  root: string;
+  run: (args: readonly string[], extras?: NodeJS.ProcessEnv) => SpawnSyncReturns<string>;
+  records: () => EventRow[];
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function isEventRow(value: unknown): value is EventRow {
+  return isRecord(value) && typeof value['kind'] === 'string';
+}
+function argumentsOf(row: EventRow | undefined): readonly string[] {
+  assert(row !== undefined);
+  const args = row['args'];
+  assert(
+    Array.isArray(args) &&
+      args.every((value: unknown): value is string => typeof value === 'string')
+  );
+  return args;
+}
+function receiptAt(root: string): Record<string, unknown> {
+  const receipt: unknown = JSON.parse(readFileSync(join(root, 'runner.json'), 'utf8'));
+  assert(isRecord(receipt));
+  return receipt;
+}
+
+function fixture(t: TestContext): Fixture {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'manual-benchmark-contract-')));
   t.onTestFinished(() => {
     if (
@@ -47,12 +76,13 @@ function fixture(t) {
   }
   writeFileSync(
     join(scripts, 'review-receipt.mjs'),
-    `import {writeFileSync,existsSync} from 'node:fs'; const [kind,directory,destination,mode,worktree,pid,started,code,cleaned,timedOut,held,session]=process.argv.slice(2); writeFileSync(destination,JSON.stringify({kind:'georoids-runner-final',mode,worktree,ownerPid:Number(pid),exitCode:Number(code),cleanupSucceeded:cleaned==='true',lockReleased:held==='false',sessionRemoved:!session||!existsSync(session),timedOut:timedOut==='true'}));`
+    readFileSync(join(source, 'benchmark-runner-fixture-receipt.mjs'))
   );
   mkdirSync(join(root, 'config/app'), { recursive: true });
   writeFileSync(join(root, 'config/app/.env.example'), '');
   writeFileSync(join(root, 'package-lock.json'), '{"lockfileVersion":3}');
-  const env = Object.fromEntries(
+  const recordsPath = join(root, 'records');
+  const env: NodeJS.ProcessEnv = Object.fromEntries(
     Object.entries(process.env).filter(
       ([key]) => !key.startsWith('GIT_') && !key.startsWith('GEOROIDS_')
     )
@@ -60,12 +90,12 @@ function fixture(t) {
   Object.assign(env, {
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
-    PATH: `${bin}:${env.PATH}`,
-    BENCHMARK_RECORDS: join(root, 'records'),
+    PATH: `${bin}:${env['PATH']}`,
+    BENCHMARK_RECORDS: recordsPath,
     GEOROIDS_TEST_MAX_DURATION_SECONDS: '10',
     GEOROIDS_TEST_RUNNER_RECEIPT: join(root, 'runner.json'),
   });
-  const git = (...args) => {
+  const git = (...args: string[]): void => {
     const result = spawnSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
   };
@@ -82,7 +112,7 @@ function fixture(t) {
     '-qm',
     'fixture'
   );
-  function executable(name, contents) {
+  function executable(name: string, contents: string | Uint8Array): void {
     writeFileSync(join(bin, name), contents, { mode: 0o755 });
   }
   executable('curl', '#!/bin/sh\nexit 0\n');
@@ -90,15 +120,9 @@ function fixture(t) {
     'lsof',
     '#!/bin/sh\nif [ -s "$BENCHMARK_RECORDS.pid" ]; then cat "$BENCHMARK_RECORDS.pid"; else exit 1; fi\n'
   );
-  executable(
-    'npm',
-    `#!/usr/bin/env node\nconst fs=require('node:fs');fs.appendFileSync(process.env.BENCHMARK_RECORDS,JSON.stringify({kind:'build',args:process.argv.slice(2)})+'\\n');process.exit(process.env.FAIL_BUILD==='1'?23:0);\n`
-  );
-  executable(
-    'npx',
-    `#!/usr/bin/env node\nconst fs=require('node:fs'); const args=process.argv.slice(2); const services=args.includes('concurrently'); fs.appendFileSync(process.env.BENCHMARK_RECORDS,JSON.stringify({kind:services?'services':'measurement',pid:process.pid,args})+'\\n'); if(services){fs.writeFileSync(process.env.BENCHMARK_RECORDS+'.pid',String(process.pid));process.on('SIGTERM',()=>{fs.appendFileSync(process.env.BENCHMARK_RECORDS,JSON.stringify({kind:'services-closed',pid:process.pid})+'\\n');process.exit(0)});setInterval(()=>{},1000);}else process.exit(0);\n`
-  );
-  function run(args, extras = {}) {
+  executable('npm', readFileSync(join(source, 'benchmark-runner-fixture-npm.cjs')));
+  executable('npx', readFileSync(join(source, 'benchmark-runner-fixture-npx.cjs')));
+  function run(args: readonly string[], extras: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
     return spawnSync('bash', [join(scripts, 'test-runner.sh'), ...args], {
       cwd: root,
       env: { ...env, ...extras },
@@ -106,13 +130,17 @@ function fixture(t) {
       timeout: 20000,
     });
   }
-  function records() {
-    return existsSync(env.BENCHMARK_RECORDS)
-      ? readFileSync(env.BENCHMARK_RECORDS, 'utf8')
+  function records(): EventRow[] {
+    return existsSync(recordsPath)
+      ? readFileSync(recordsPath, 'utf8')
           .trim()
           .split('\n')
           .filter(Boolean)
-          .map((line) => JSON.parse(line))
+          .map((line) => {
+            const row: unknown = JSON.parse(line);
+            assert(isEventRow(row));
+            return row;
+          })
       : [];
   }
   return { root, run, records };
@@ -127,12 +155,12 @@ test('manual load measurements retain their services until the owned measurement
     records.map((row) => row.kind),
     ['build', 'services', 'measurement', 'services-closed']
   );
-  assert(records[1].args.some((arg) => arg.includes('benchmarks/realtime-server.ts')));
-  assert(records[2].args.includes('benchmarks/load.ts'));
-  const receipt = JSON.parse(readFileSync(join(f.root, 'runner.json'), 'utf8'));
-  assert.equal(receipt.cleanupSucceeded, true);
-  assert.equal(receipt.lockReleased, true);
-  assert.equal(receipt.sessionRemoved, true);
+  assert(argumentsOf(records[1]).some((arg) => arg.includes('benchmarks/realtime-server.ts')));
+  assert(argumentsOf(records[2]).includes('benchmarks/load.ts'));
+  const receipt = receiptAt(f.root);
+  assert.equal(receipt['cleanupSucceeded'], true);
+  assert.equal(receipt['lockReleased'], true);
+  assert.equal(receipt['sessionRemoved'], true);
   assert.equal(existsSync(join(f.root, '.git/georoids-test-runner.lock')), false);
   assert.equal(existsSync(join(f.root, '.git/georoids-validation-checkout.lock')), false);
 });
@@ -144,10 +172,7 @@ test('a failed production build starts no manual service or measurement and rele
     f.records().map((row) => row.kind),
     ['build']
   );
-  assert.equal(
-    JSON.parse(readFileSync(join(f.root, 'runner.json'), 'utf8')).cleanupSucceeded,
-    true
-  );
+  assert.equal(receiptAt(f.root)['cleanupSucceeded'], true);
   assert.equal(existsSync(join(f.root, '.git/georoids-validation-checkout.lock')), false);
 });
 test('frozen client reuse without a valid build receipt starts no services and performs no replacement build', (t) => {

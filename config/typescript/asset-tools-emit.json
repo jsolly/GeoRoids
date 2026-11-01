@@ -5,7 +5,8 @@
     "noEmitOnError": true,
     "sourceMap": false,
     "rewriteRelativeImportExtensions": true,
-    "rootDir": "../../scripts"
+    "rootDir": "../../scripts",
+    "module": "preserve"
   },
   "include": [
     "../../scripts/merge-wiki-ledger.mts",
@@ -14,6 +15,9 @@
     "../../scripts/production-smoke-scenario.mts",
     "../../scripts/production-smoke-entry.mts",
     "../../scripts/verify-retained-assets.mts",
-    "../../scripts/benchmark-build-receipt.mts"
+    "../../scripts/benchmark-build-receipt.mts",
+    "../../scripts/benchmark-runner-fixture-receipt.mts",
+    "../../scripts/benchmark-runner-fixture-npm.cts",
+    "../../scripts/benchmark-runner-fixture-npx.cts"
   ]
 }

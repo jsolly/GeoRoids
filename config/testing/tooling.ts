@@ -27,7 +27,7 @@ export default defineConfig({
           name: 'runner',
           include: [
             'scripts/code-integration-runner.test.mjs',
-            'scripts/benchmark-runner.test.mjs',
+            'scripts/benchmark-runner.test.ts',
             'scripts/benchmark-build-receipt.test.ts',
             'scripts/test-ports.test.ts',
             'scripts/validation-admission.test.mjs',

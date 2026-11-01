@@ -18,6 +18,9 @@ const artifacts = [
   { file: 'benchmark-build-receipt.mjs', source: 'benchmark-build-receipt.mts' },
   { file: 'merge-wiki-ledger.mjs', source: 'merge-wiki-ledger.mts' },
   { file: 'client-asset-graph.js', source: 'client-asset-graph.ts' },
+  { file: 'benchmark-runner-fixture-receipt.mjs', source: 'benchmark-runner-fixture-receipt.mts' },
+  { file: 'benchmark-runner-fixture-npm.cjs', source: 'benchmark-runner-fixture-npm.cts' },
+  { file: 'benchmark-runner-fixture-npx.cjs', source: 'benchmark-runner-fixture-npx.cts' },
 ];
 
 function compile(args: readonly string[]): void {

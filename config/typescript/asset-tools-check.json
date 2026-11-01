@@ -13,6 +13,10 @@
     "../../scripts/generate-asset-boundaries.ts",
     "../../scripts/benchmark-build-receipt.test.ts",
     "../../tests/unit/testing/old-client-assets-survive-new-builds.test.ts",
-    "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts"
+    "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts",
+    "../../scripts/benchmark-runner-fixture-receipt.mts",
+    "../../scripts/benchmark-runner-fixture-npm.cts",
+    "../../scripts/benchmark-runner-fixture-npx.cts",
+    "../../scripts/benchmark-runner.test.ts"
   ]
 }

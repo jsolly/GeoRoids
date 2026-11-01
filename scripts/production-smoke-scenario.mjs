@@ -1,25 +1,83 @@
+// Generated from production-smoke-scenario.mts by generate-asset-boundaries.ts; do not edit.
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import WebSocket from 'ws';
-import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.ts';
+import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.js';
 import {
   requireEvidence,
   SmokeFailure,
   smokeCause,
   smokeClock,
 } from './production-smoke-network.mjs';
-
 export const productionUrl = 'https://www.georoids.com/';
 const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
-const { ASTEROID_INTERACTIONS_CAPABILITY, SNAPSHOT_VERSION, SnapshotDecoder } = await tsImport(
-  '../shared/snapshotProtocol.ts',
-  import.meta.url
+// tsImport retains the existing runtime loader without emitting the shared game graph.
+// Its return value enters as unknown; validate only the capabilities consumed here.
+function isRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+const protocol = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
+requireEvidence(isRecord(protocol), 'Local snapshot protocol module is malformed');
+const capability = protocol['ASTEROID_INTERACTIONS_CAPABILITY'];
+const snapshotVersion = protocol['SNAPSHOT_VERSION'];
+const Decoder = protocol['SnapshotDecoder'];
+requireEvidence(
+  typeof capability === 'number' &&
+    typeof snapshotVersion === 'number' &&
+    typeof Decoder === 'function',
+  'Local snapshot protocol capabilities are unavailable'
 );
+const ASTEROID_INTERACTIONS_CAPABILITY = capability;
+const SNAPSHOT_VERSION = snapshotVersion;
+const DecoderClass = Decoder;
 const socketUrl = `wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}`;
-const { GAME, LASER } = await tsImport('../shared/constants/gameplay.ts', import.meta.url);
-
+const gameplay = await tsImport('../shared/constants/gameplay.ts', import.meta.url);
+requireEvidence(isRecord(gameplay), 'Local gameplay constants are malformed');
+const game = gameplay['GAME'];
+const laser = gameplay['LASER'];
+requireEvidence(isRecord(game) && isRecord(laser), 'Local gameplay constants are unavailable');
+function hasNumericProperty(value, key) {
+  return typeof value[key] === 'number';
+}
+requireEvidence(
+  hasNumericProperty(game, 'FPS') && hasNumericProperty(laser, 'SPEED'),
+  'Local gameplay motion constants are unavailable'
+);
+// Preserve the original live constant objects rather than copying their numeric values.
+const GAME = game;
+const LASER = laser;
+function motionPilot(value) {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const position = value['position'];
+  const motion = value['playerMotion'];
+  return (
+    typeof value['id'] === 'string' &&
+    typeof value['health'] === 'number' &&
+    typeof value['angle'] === 'number' &&
+    isRecord(position) &&
+    typeof position['x'] === 'number' &&
+    typeof position['y'] === 'number' &&
+    isRecord(motion) &&
+    typeof motion['epoch'] === 'number' &&
+    typeof motion['ack'] === 'number'
+  );
+}
+function createDecoder() {
+  const decoder = Reflect.construct(DecoderClass, []);
+  requireEvidence(isRecord(decoder), 'Local snapshot decoder is malformed');
+  const read = decoder['readMessage'];
+  requireEvidence(typeof read === 'function', 'Local snapshot decoder cannot read messages');
+  return {
+    readMessage(text, admission) {
+      const decoded = Reflect.apply(read, decoder, [text, admission]);
+      return decoded;
+    },
+  };
+}
 function documentAssets(html) {
   requireEvidence(
     /<html\b/iu.test(html) && /<canvas\b[^>]*\bid=["']gameCanvas["']/iu.test(html),
@@ -31,7 +89,6 @@ function documentAssets(html) {
     assets: assets.map((path) => new URL(`/${path}`, productionUrl).href),
   };
 }
-
 export async function waitForClientAssets({
   verifyHttp,
   clock = smokeClock,
@@ -91,16 +148,15 @@ export async function waitForClientAssets({
     }
   }
 }
-
 async function waitForEvidence(predicate, description, { clock, signal }) {
   const deadline = clock.now() + 10000;
-  while (!predicate()) {
+  const ready = () => Boolean(predicate());
+  while (!ready()) {
     signal?.throwIfAborted();
     requireEvidence(clock.now() < deadline, `Missing authoritative ${description}`);
     await clock.sleep(Math.min(50, deadline - clock.now()), signal);
   }
 }
-
 export async function smoke({
   expectedSha,
   verifyHttp,
@@ -130,30 +186,38 @@ export async function smoke({
     closeCode: null,
   };
   let outcomeFailure;
-  let socket,
-    closing = false,
-    admitted = false,
-    state,
-    wireFailure;
+  let socket;
+  let closing = false;
+  let admitted = false;
+  let state;
+  let wireFailure;
   let closeResolve;
   const closed = new Promise((resolveClosed) => {
     closeResolve = resolveClosed;
   });
   const pilotId = `smoke-${randomUUID()}`,
     shotRequestId = randomUUID();
-  const decoder = new SnapshotDecoder();
-  let movementSequence, movementEpoch;
+  const decoder = createDecoder();
+  let movementSequence;
+  let movementEpoch;
   const checkHealth = async () => {
     const health = await (await verifyHttp(healthUrl)).json();
+    if (health === null || health === undefined) {
+      throw new TypeError('Malformed production health data');
+    }
+    const healthFields = isRecord(health) ? health : undefined;
+    const world = healthFields?.['world'];
+    const persistence = isRecord(world) ? world['persistence'] : undefined;
+    const loop = isRecord(world) ? world['loop'] : undefined;
     requireEvidence(
-      health.world?.persistence?.mode === 'worker',
+      isRecord(persistence) && persistence['mode'] === 'worker',
       'Persistent world worker is required'
     );
-    requireEvidence(health.world?.persistence?.failed === false, 'Persistent world worker failed');
-    requireEvidence(health.world?.loop?.stalls === 0, 'Game loop has stalled');
+    requireEvidence(persistence['failed'] === false, 'Persistent world worker failed');
+    requireEvidence(isRecord(loop) && loop['stalls'] === 0, 'Game loop has stalled');
     observations.push({
       source: 'server-health',
-      releaseSha: health.releaseId,
+      releaseSha: healthFields?.['releaseId'],
       persistenceMode: 'worker',
       persistenceFailed: false,
       stalls: 0,
@@ -167,10 +231,14 @@ export async function smoke({
   };
   const send = (message) => {
     checkWire();
-    requireEvidence(socket.readyState === WebSocket.OPEN, 'Gameplay socket is not open');
+    requireEvidence(
+      socket !== undefined && socket.readyState === WebSocket.OPEN,
+      'Gameplay socket is not open'
+    );
     socket.send(JSON.stringify(message));
   };
-  const player = () => state?.entities.find((entity) => entity.id === pilotId);
+  const player = () =>
+    state?.entities.find((entity) => isRecord(entity) && entity['id'] === pilotId);
   const abort = () => {
     if (socket && socket.readyState !== WebSocket.CLOSED) {
       closing = true;
@@ -224,55 +292,74 @@ export async function smoke({
       }
       try {
         const decoded = decoder.readMessage(
-          typeof payload === 'string' ? payload : payload.toString('utf8'),
+          typeof payload === 'string'
+            ? payload
+            : Buffer.isBuffer(payload)
+              ? payload.toString('utf8')
+              : payload.toString(),
           { acceptSnapshots: admitted }
         );
-        if (decoded.kind === 'snapshot-rejected') {
+        requireEvidence(isRecord(decoded), 'Malformed gameplay protocol message');
+        if (decoded['kind'] === 'snapshot-rejected') {
           throw new SmokeFailure('Gameplay snapshot failed current protocol validation', {
-            cause: decoded.error,
+            cause: decoded['error'],
           });
         }
-        if (decoded.kind === 'snapshot') {
-          state = decoded.state;
+        if (decoded['kind'] === 'snapshot') {
+          const snapshot = decoded['state'];
+          const metadata = decoded['metadata'];
+          requireEvidence(
+            isRecord(snapshot) &&
+              Array.isArray(snapshot['entities']) &&
+              isRecord(metadata) &&
+              typeof metadata['sequence'] === 'number',
+            'Malformed gameplay protocol message'
+          );
+          state = { entities: snapshot['entities'] };
           evidence.acceptedSnapshots++;
-          send({ type: 'snapshotAck', data: { sequence: decoded.metadata.sequence } });
+          send({ type: 'snapshotAck', data: { sequence: metadata['sequence'] } });
           return;
         }
-        const message = decoded.message;
-        if (message?.type === 'joined') {
+        const message = decoded['message'];
+        if (!isRecord(message)) {
+          return;
+        }
+        const data = message['data'];
+        if (message['type'] === 'joined') {
           requireEvidence(
             !admitted &&
-              message.data?.id === pilotId &&
-              message.data?.snapshotVersion === SNAPSHOT_VERSION &&
-              message.data?.asteroidInteractions === ASTEROID_INTERACTIONS_CAPABILITY &&
-              typeof message.data?.resumeToken === 'string' &&
-              message.data.resumeToken.length > 0,
+              isRecord(data) &&
+              data['id'] === pilotId &&
+              data['snapshotVersion'] === SNAPSHOT_VERSION &&
+              data['asteroidInteractions'] === ASTEROID_INTERACTIONS_CAPABILITY &&
+              typeof data['resumeToken'] === 'string' &&
+              data['resumeToken'].length > 0,
             'Gameplay join admission is incomplete or mismatched'
           );
-          evidence.serverReleaseId = message.data.serverReleaseId ?? null;
+          evidence.serverReleaseId = data['serverReleaseId'] ?? null;
           admitted = true;
           evidence.admission = {
             playerId: pilotId,
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
           };
-        } else if (message?.type === 'shotAcknowledged') {
+        } else if (message['type'] === 'shotAcknowledged') {
           requireEvidence(
-            typeof message.data?.requestId === 'string' &&
-              (message.data.projectileId === null ||
-                (typeof message.data.projectileId === 'string' &&
-                  message.data.projectileId.length > 0)),
+            isRecord(data) &&
+              typeof data['requestId'] === 'string' &&
+              (data['projectileId'] === null ||
+                (typeof data['projectileId'] === 'string' && data['projectileId'].length > 0)),
             'Malformed authoritative shot acknowledgement'
           );
-          if (evidence.shot != null && message.data.requestId === shotRequestId) {
+          if (evidence.shot != null && data['requestId'] === shotRequestId) {
             requireEvidence(
-              message.data.projectileId !== null,
+              data['projectileId'] !== null,
               'Authoritative server rejected the smoke shot'
             );
-            evidence.shot.projectileId = message.data.projectileId;
+            evidence.shot.projectileId = data['projectileId'];
             evidence.shot.acknowledged = true;
           }
-        } else if (message?.type === 'error' || message?.type === 'sessionExpired') {
+        } else if (message['type'] === 'error' || message['type'] === 'sessionExpired') {
           throw new SmokeFailure('Authoritative server rejected gameplay admission or command');
         }
       } catch (error) {
@@ -302,9 +389,11 @@ export async function smoke({
     await clock.sleep(250, signal);
     checkWire();
     const initial = player();
+    const exploding = Boolean(initial?.['exploding']);
     requireEvidence(
-      initial?.health > 0 &&
-        !initial.exploding &&
+      motionPilot(initial) &&
+        initial.health > 0 &&
+        !exploding &&
         Number.isSafeInteger(initial.playerMotion?.epoch) &&
         Number.isSafeInteger(initial.playerMotion?.ack),
       'Current pilot motion admission is missing'
@@ -337,8 +426,11 @@ export async function smoke({
       () => {
         checkWire();
         const current = player();
+        if (!motionPilot(current)) {
+          return false;
+        }
         return (
-          current?.playerMotion?.epoch === movementEpoch &&
+          current.playerMotion.epoch === movementEpoch &&
           current.playerMotion.ack >= movementSequence &&
           Math.hypot(current.position.x - origin.x, current.position.y - origin.y) > 5 &&
           Math.hypot(current.position.x - position.x, current.position.y - position.y) < 0.2 &&
@@ -353,27 +445,29 @@ export async function smoke({
       'acknowledged ship movement',
       { clock, signal }
     );
+    const accepted = player();
+    requireEvidence(motionPilot(accepted), 'Current pilot motion admission is missing');
     evidence.movement = {
       epoch: movementEpoch,
       sequence: movementSequence,
-      acknowledged: player().playerMotion.ack,
-      displacement: Math.hypot(player().position.x - origin.x, player().position.y - origin.y),
+      acknowledged: accepted.playerMotion.ack,
+      displacement: Math.hypot(accepted.position.x - origin.x, accepted.position.y - origin.y),
     };
-    const current = player();
+    const current = accepted;
     evidence.shot = { requestId: shotRequestId, projectileId: null, acknowledged: false };
     send({
       type: 'shoot',
       id: pilotId,
       data: {
         laserStart: { ...current.position },
-        laserDirection: { x: LASER.SPEED / GAME.FPS, y: 0 },
+        laserDirection: { x: LASER['SPEED'] / GAME['FPS'], y: 0 },
         requestId: shotRequestId,
       },
     });
     await waitForEvidence(
       () => {
         checkWire();
-        return evidence.shot.acknowledged;
+        return evidence.shot?.acknowledged;
       },
       'accepted shot acknowledgement',
       { clock, signal }
@@ -397,14 +491,15 @@ export async function smoke({
       signal?.removeEventListener('abort', abort);
       if (socket && socket.readyState !== WebSocket.CLOSED) {
         closing = true;
-        let graceTimer, closeTimer;
+        let graceTimer;
+        let closeTimer;
         const timeout = new Promise((_, reject) => {
           closeTimer = clock.setTimeout(() => {
             reject(new SmokeFailure('Owned gameplay socket close was not observed'));
           }, 10000);
           graceTimer = clock.setTimeout(() => {
             cleanupFailure = new SmokeFailure('Owned gameplay socket required forced termination');
-            socket.terminate();
+            socket?.terminate();
           }, 9000);
         });
         try {
@@ -413,13 +508,13 @@ export async function smoke({
               socket.send(JSON.stringify({ type: 'leave' }));
               socket.close(1000, 'Smoke complete');
             } else {
-              socket.terminate();
+              socket?.terminate();
             }
           } catch (error) {
             cleanupFailure = new SmokeFailure('Owned gameplay socket cleanup failed', {
               cause: smokeCause(error),
             });
-            socket.terminate();
+            socket?.terminate();
           }
           await Promise.race([closed, timeout]);
         } finally {
@@ -444,18 +539,22 @@ export async function smoke({
       evidence.cleanupError = cleanupFailure.message;
     }
     outcomeFailure ??= wireFailure;
-    if (wireFailure && !evidence.error) {
+    const errorRecorded = Boolean(evidence.error);
+    if (wireFailure && !errorRecorded) {
       evidence.error = wireFailure.message;
     }
-    if (artifacts) {
+    const artifactDirectory = artifacts ?? '';
+    const retainArtifacts = Boolean(artifactDirectory);
+    if (retainArtifacts) {
       await writeFile(
-        join(artifacts, 'gameplay-server.json'),
+        join(artifactDirectory, 'gameplay-server.json'),
         `${JSON.stringify(evidence, null, 2)}\n`
       );
     }
     outcomeFailure ??= cleanupFailure;
   }
-  if (outcomeFailure) {
+  const failed = Boolean(outcomeFailure);
+  if (failed) {
     throw outcomeFailure;
   }
 }

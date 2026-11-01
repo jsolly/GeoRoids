@@ -10,6 +10,9 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const mode = process.argv[2];
 assert(mode === '--check' || mode === '--write', 'Expected --check or --write');
 const artifacts = [
+  { file: 'production-smoke-scenario.mjs', source: 'production-smoke-scenario.mts' },
+  { file: 'production-smoke-entry.mjs', source: 'production-smoke-entry.mts' },
+  { file: 'production-smoke-network.mjs', source: 'production-smoke-network.mts' },
   { file: 'build-vercel-output.mjs', source: 'build-vercel-output.mts' },
   { file: 'verify-retained-assets.mjs', source: 'verify-retained-assets.mts' },
   { file: 'benchmark-build-receipt.mjs', source: 'benchmark-build-receipt.mts' },

@@ -120,6 +120,7 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
   // Moving a check between lanes must neither remove nor duplicate a validation.
   const originalStaticCommands = [
     'npm run check:repo-hooks',
+    'npm run check:python',
     'npm run check:actions',
     'npm run check:lint-policy',
     'npm run check:lint',
@@ -266,6 +267,10 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
     manifest.scripts['check:repo-hooks'],
     'uvx --from pytest==9.0.2 pytest -c config/testing/pytest.ini --rootdir=.'
   );
+  // Deployment builders provide Node; Python analysis belongs to provisioned CI/gates.
+  assert.equal(manifest.scripts['check:wiki'], 'tsx scripts/wiki-check.ts');
+  assert.equal(manifest.scripts['check:python'], 'bash scripts/check-python-types.sh');
+  assert.doesNotMatch(manifest.scripts.build, /\bcheck:python\b/u);
   assert.ok(
     manifest.devDependencies.playwright,
     'Manual browser benchmarks and frame measurements still need Playwright'

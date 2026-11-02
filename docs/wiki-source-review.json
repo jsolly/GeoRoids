@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:56d7326be779a33905268858707e6bcab5ec48b6fe1e9d3fe35b35fb84515401",
+    "package.json": "sha256:22fa8c5399caa65a579ba5f2cffd7e929772b1fda26ac85847769fc477e8f55b",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -8232,6 +8232,15 @@
     },
     {
       "note": "Reviewed the Python strict-check command on current typed and asset-preparation main. The complete encoder passes pinned mypy strict checking and all 10 GIFs plus 10 posters regenerate byte-identically with Pillow 12.3.0. Existing TypeScript and asset commands, player rules, Wiki articles and media URLs are preserved. Full current-main gate validation follows separately.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the production-build prerequisite correction: check:wiki retains its Node-only command, while Python analysis is an explicit required local-gate and provisioned static-CI step. Encoder types, the Pillow pin, player rules, Wiki articles, asset commands and media bytes are unchanged. Production-builder compatibility and complete validation are recorded separately.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],

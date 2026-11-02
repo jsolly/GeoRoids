@@ -274,6 +274,8 @@ jobs:
         if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:repo-hooks
         if: steps.verified-tree.outputs.run_full != 'false'
+      - run: npm run check:python
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:lint-policy
         if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:lint

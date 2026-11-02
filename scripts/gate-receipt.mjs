@@ -17,6 +17,7 @@ import { receiptEnvironment } from './validation-admission.mjs';
 export const RECEIPT_VERSION = 2;
 export const STAGES = [
   ['repository hook trust', 'check:repo-hooks'],
+  ['Python types', 'check:python'],
   ['lint policy', 'check:lint-policy'],
   ['lint', 'check:lint'],
   ['knip', 'check:knip'],

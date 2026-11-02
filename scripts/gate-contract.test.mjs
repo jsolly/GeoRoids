@@ -48,6 +48,7 @@ afterAll(() => rmSync(fixtureHome, { recursive: true, force: true }));
 // Independent acceptance contract: never derive this battery from STAGES.
 const REQUIRED_COMMANDS = [
   'check:repo-hooks',
+  'check:python',
   'check:lint-policy',
   'check:lint',
   'check:knip',

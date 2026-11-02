@@ -17,12 +17,18 @@ from PIL import Image
 EXPECTED_PILLOW = "12.3.0"
 
 
+class EncoderArguments(argparse.Namespace):
+    frames: Path
+    output: Path
+    fps: int
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("frames", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--fps", type=int, default=10)
-    args = parser.parse_args()
+    args = parser.parse_args(namespace=EncoderArguments())
 
     if PIL.__version__ != EXPECTED_PILLOW:
         raise SystemExit(

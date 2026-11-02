@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:a88e571738060a2210d039d9b7956a1476078eae4bccafdf50d185ca3e8b3ef4",
+    "package.json": "sha256:22fa8c5399caa65a579ba5f2cffd7e929772b1fda26ac85847769fc477e8f55b",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -72,7 +72,7 @@
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
     "scripts/wiki-check.ts": "sha256:5cb40a6d454e8e75ba6df9a551a7999ac478ce44bc7cc3edb2adf6dab804c853",
     "scripts/wiki-content.ts": "sha256:190a89be185ac685e37e7ae3d962d1fabb059a2a39fc3eee2f9cc09567e8a162",
-    "scripts/wiki-media-encode.py": "sha256:78f7034494f83ad6ddee39305c95577aef5d17c5779ff9a5504212c09879d475",
+    "scripts/wiki-media-encode.py": "sha256:2f26d0853381c7d0f39f2db13fd1442623ac287e10d66e76872e0481f413befc",
     "scripts/wiki-media-fonts.ts": "sha256:6f2554c263f3812b7734f721adb197d559b2838a4ce7b34f74731768878c9509",
     "scripts/wiki-media-fonts/LiberationSans-Bold.ttf": "sha256:3973aa5054fb467dd5627245d3dc82e37bf16fe075756156a570455871351582",
     "scripts/wiki-media-fonts/LiberationSans-Regular.ttf": "sha256:4659bc0c58c5028dd488ec928d41d9265db43d9b669fc14ca8b0832daca7b144",
@@ -8098,6 +8098,27 @@
       }
     },
     {
+      "note": "Reviewed the typed argparse namespace and strict Python validation command. All 2464 unit tests passed, mypy checked the complete encoder, and wiki:media:check regenerated all 10 GIFs and 10 posters reproducibly with Pillow 12.3.0 and matched the committed bytes. Player rules, Wiki pages and illustrations are unchanged; no article edit is needed. Only these two source hashes are accepted.",
+      "sources": ["package.json", "scripts/wiki-media-encode.py"],
+      "topics": ["field-manual"],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "package.json": "field-manual",
+        "scripts/wiki-media-encode.py": "field-manual"
+      }
+    },
+    {
       "note": "Reviewed the build-script path migration to the typed publication checker. Player rules, field-manual content, public asset paths and demonstrations are unchanged. Strict TypeScript and the 23 existing checker/archive scenarios passed.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
@@ -8202,6 +8223,24 @@
     },
     {
       "note": "Reviewed the added offline asset-preparation command against the typed main commands. All published media, same-origin URLs, gameplay rules, controls, Wiki articles and demonstrations remain unchanged; normal Git code releases do not apply asset storage.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the Python strict-check command on current typed and asset-preparation main. The complete encoder passes pinned mypy strict checking and all 10 GIFs plus 10 posters regenerate byte-identically with Pillow 12.3.0. Existing TypeScript and asset commands, player rules, Wiki articles and media URLs are preserved. Full current-main gate validation follows separately.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the production-build prerequisite correction: check:wiki retains its Node-only command, while Python analysis is an explicit required local-gate and provisioned static-CI step. Encoder types, the Pillow pin, player rules, Wiki articles, asset commands and media bytes are unchanged. Production-builder compatibility and complete validation are recorded separately.",
       "sources": ["package.json"],
       "topics": ["field-manual"],
       "media": [],

@@ -52,7 +52,8 @@
     "smoke:scenario-contract": "vitest run --config config/testing/tooling.ts --project smoke",
     "check:frontend": "astro check --config config/app/astro.ts --tsconfig ./tsconfig.frontend.json --minimumFailingSeverity warning && svelte-check --config ./config/app/svelte.ts --tsconfig ./tsconfig.frontend.json --fail-on-warnings",
     "check:format": "prettier --config config/quality/prettier.json --check \"src/**/*.{astro,svelte}\"",
-    "check:a11y": "node scripts/check-accessibility.ts"
+    "check:a11y": "node scripts/check-accessibility.ts",
+    "check:python": "bash scripts/check-python-types.sh"
   },
   "repository": {
     "type": "git",

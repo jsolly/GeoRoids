@@ -106,7 +106,7 @@ test('dependency version bumps skip the Wiki review while other manifest changes
         manifest.scripts['check:wiki'] = 'true';
       },
       (manifest: Manifest) => {
-        manifest['engines'] = { node: '^26.0.0' };
+        manifest['engines'] = { node: '^28.0.0' };
       },
       (manifest: Manifest) => {
         manifest['name'] = 'renamed-georoids';

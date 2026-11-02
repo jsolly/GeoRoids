@@ -167,11 +167,11 @@ jobs:
       HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
       HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
     steps:
-      # Node comes from the default branch's pin, before the PR tree exists, with no cache
-      # lookup that would read PR configuration.
+      # Node comes from the default branch's pin (.nvmrc major 26), before the PR tree
+      # exists, with no cache lookup that would read PR configuration.
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
           package-manager-cache: false
 
       - uses: actions/checkout@v7

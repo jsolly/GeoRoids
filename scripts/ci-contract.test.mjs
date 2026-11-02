@@ -376,7 +376,7 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
     ]
   );
   const [previewNode, previewCheckout, previewDeploy, previewReport] = previewJob.steps;
-  assert.deepEqual(previewNode.with, { 'node-version': 24, 'package-manager-cache': false });
+  assert.deepEqual(previewNode.with, { 'node-version': 26, 'package-manager-cache': false });
   assert.deepEqual(previewCheckout.with, {
     ref: `\${{ needs.resolve.outputs.head_sha }}`,
     'persist-credentials': false,

@@ -94,7 +94,7 @@
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",
-    "@vitest/coverage-v8": "5.0.4",
+    "@vitest/coverage-v8": "5.0.5",
     "bits-ui": "^2.19.5",
     "canvas": "^3.2.3",
     "cn": "0.4.0",
@@ -113,7 +113,7 @@
     "svelte-check": "4.7.6",
     "tailwind-variants": "3.3.1",
     "ts-prune": "0.10.3",
-    "vitest": "^5.0.4",
+    "vitest": "^5.0.5",
     "yaml": "^2.9.1",
     "axe-core": "^4.14.0"
   },

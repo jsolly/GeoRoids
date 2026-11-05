@@ -14,7 +14,7 @@ Before deployment operations, read [agent operations](docs/agent-operations.md).
 
 ## Project
 
-GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Astro static pages with Svelte 5 and shadcn-svelte interfaces plus a TypeScript canvas engine (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
+GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Astro static pages with Svelte 5 and shadcn-svelte interfaces plus a TypeScript canvas engine (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^26.0.0`.
 
 `AGENTS.md` (plus `tests/AGENTS.md`) is the only agent instruction file. Claude Code 2.1.277+ reads it natively; do not add a `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md`, because any of them makes Claude Code ignore `AGENTS.md`.
 
@@ -223,7 +223,7 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
 
 ## Local development
 
-Node24 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development). Before `npm run gate` or `npm run dev` in a Claude Code cloud session, run `bash .cursor/install-app.sh` ([cloud sessions](docs/agent-operations.md#cloud-sessions)).
+Node 26 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development). Before `npm run gate` or `npm run dev` in a Claude Code cloud session, run `bash .cursor/install-app.sh` ([cloud sessions](docs/agent-operations.md#cloud-sessions)).
 
 ## Local UI verification
 

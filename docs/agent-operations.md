@@ -421,7 +421,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - **Validation admission:** testing concurrency, ownership and cleanup rules live in [tests/AGENTS.md](../tests/AGENTS.md#run-and-report).
 - **Manual measurement queue:** browser benchmark runner modes and direct frame measurements use one heavyweight FIFO slot in the common Git directory. Queue waits are visible and cancellable and precede execution deadlines. Failed ownership inspection preserves evidence; never delete a live allocator's lock.
 - **Ports:** manual benchmark harnesses select distinct Astro client, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
-- **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
+- **Node:** `package.json` requires `^26.0.0` (jsdom accepts Node 26 from 26.0.0); `.nvmrc` is `26`.
 - **TypeScript:** code checks and server release classification use `scripts/typescript-cli.mjs` to select the TypeScript 7 native CLI. Astro, Svelte and unused-export tooling import the supported TypeScript 6 API through the `typescript` compatibility alias. Use the package scripts: both compiler packages expose `tsc`, so `node_modules/.bin/tsc` does not identify which compiler runs.
 - **Environment:** `npm run dev` copies `config/app/.env.example` to `.env.local` when missing; the server loads it with `--env-file=.env.local`. A missing or unreadable example fails startup.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
@@ -434,7 +434,7 @@ Claude Code cloud containers start on an image Node and without dependencies. Wh
 
 ```shell
 bash .cursor/install-app.sh        # native libraries, pinned mise tools, npm ci, .env
-mise exec -- node --version        # v24.x
+mise exec -- node --version        # v26.x
 mise exec -- npm run gate
 ```
 

@@ -13,8 +13,11 @@ import {
   initializeTouchControls,
   mountTouchActionControls,
   readActionControls,
+  tickTouchControls,
 } from '../../../src/input/touchControls';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
+import { resetWorldExploration, setWorldMapAssets } from '../../../src/network/worldExploration';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { setPlayView } from '../../../src/ui/uiUtils';
 
 let panel: ReturnType<typeof mount> | undefined;
@@ -29,6 +32,7 @@ afterEach(async () => {
   }
   panel = undefined;
   disposeTouchControls();
+  resetWorldExploration();
   target?.remove();
   vi.restoreAllMocks();
   document.body.classList.remove('in-play', 'touch-play');
@@ -94,6 +98,55 @@ function contour(): HTMLButtonElement {
   return button;
 }
 
+test('O opens visible-object actions on desktop, cycles targets and returns keyboard focus', () => {
+  const { player } = start(false);
+  const canvas = target.querySelector('canvas');
+  if (!canvas) {
+    throw new Error('Missing playfield');
+  }
+  canvas.tabIndex = 0;
+  canvas.focus();
+  player.ship.position = { x: 300, y: 0 };
+  vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+  vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 800, height: 600 });
+  vi.spyOn(canvasManager, 'readInputScale').mockReturnValue(1);
+  setWorldMapAssets([
+    {
+      id: 'furnace:street-1-0',
+      kind: 'foundation',
+      name: 'Test foundation',
+      position: { x: 320, y: 0 },
+    },
+  ]);
+  const open = () => {
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyO', bubbles: true }));
+    tickTouchControls(player);
+    flushSync();
+  };
+  open();
+  const menu = target.querySelector('.object-menu');
+  expect(menu).not.toBeNull();
+  expect(menu?.contains(document.activeElement)).toBe(true);
+  const initial = menu?.getAttribute('aria-label');
+  const next = menu?.querySelector('button');
+  next?.click();
+  flushSync();
+  expect(menu?.getAttribute('aria-label')).not.toBe(initial);
+  const inspect = target.querySelector<HTMLButtonElement>('[data-object-action="inspect"]');
+  expect(inspect).not.toBeNull();
+  inspect?.click();
+  flushSync();
+  expect(target.querySelector('.travel-status')?.textContent).toContain('Town Square');
+  expect(document.activeElement).toBe(canvas);
+  open();
+  document.activeElement?.dispatchEvent(
+    new KeyboardEvent('keydown', { code: 'Escape', bubbles: true })
+  );
+  flushSync();
+  expect(target.querySelector('.object-menu')).toBeNull();
+  expect(document.activeElement).toBe(canvas);
+});
+
 test('setPlayView announces play chrome so the overlay can appear', () => {
   const on = vi.fn();
   const off = vi.fn();
@@ -118,10 +171,10 @@ test.each([true, false])(
     expect(ability().getAttribute('aria-label')).toBeTruthy();
     expect(contour().tagName).toBe('BUTTON');
     expect(contour().textContent).toBe('CONTOUR LOCK');
-    expect(target.querySelector('#touch-shield')).toBeNull();
+    expect(target.querySelector<HTMLButtonElement>('.touch-shield')?.hidden).toBe(!touchMode);
     expect(contour().hidden).toBe(false);
     expect(target.querySelector('#touch-stick')).toBeNull();
-    expect(target.querySelector('#touch-fire')).toBeNull();
+    expect(target.querySelector<HTMLButtonElement>('.touch-fire')?.hidden).toBe(!touchMode);
     leave();
     expect(target.querySelector<HTMLElement>('#touch-controls')?.hidden).toBe(true);
   }

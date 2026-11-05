@@ -580,7 +580,7 @@ test.each(['alive', 'dead', 'exploding'])(
     expect(shoot).toHaveBeenCalledOnce();
     expect(ship.lasers).toHaveLength(1);
     expect(ship.canShoot).toBe(false);
-    expect(ship.thrusting).toBe(true);
+    expect(ship.thrusting).toBe(false);
 
     ship.beginWeaponCharge();
     const startedAt = ship.weaponChargeStartedAt;
@@ -595,7 +595,7 @@ test.each(['alive', 'dead', 'exploding'])(
     expect(ship.contourLock).toBe(contourLock);
     expect(shoot).toHaveBeenCalledOnce();
     expect(ship.lasers).toHaveLength(1);
-    expect(ship.thrusting).toBe(true);
+    expect(ship.thrusting).toBe(false);
     expect(ship.canShoot).toBe(false);
     expect(ship.weaponChargeStartedAt).toBe(startedAt);
     expect(ship.weaponChargeFrames).toBe(20);
@@ -615,7 +615,7 @@ test.each(['alive', 'dead', 'exploding'])(
     expect(shoot).toHaveBeenCalledOnce();
     expect(ship.lasers).toHaveLength(1);
     if (state === 'alive') {
-      expect(ship.thrusting).toBe(true);
+      expect(ship.thrusting).toBe(false);
       hosts.canvas.dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
       expect(shoot).toHaveBeenCalledTimes(2);
       expect(ship.lasers).toHaveLength(2);

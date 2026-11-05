@@ -16,7 +16,7 @@ import process from 'node:process';
 import { test } from 'vitest';
 import { parse } from 'yaml';
 
-test('CI preserves four mandatory lanes and failure propagation', () => {
+test('CI preserves five mandatory lanes and failure propagation', () => {
   const root = new URL('../', import.meta.url);
   const read = (path) => readFileSync(new URL(path, root), 'utf8');
   const ci = parse(read('.github/workflows/ci.yml'));
@@ -25,13 +25,15 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
   assert.deepEqual(required.needs, [
     'static-checks',
     'runner-contracts',
+    'actions-contracts',
     'integration-tests',
     'wiki-media',
   ]);
-  // The required check runs whenever its lanes run, keeps the deferred name otherwise, and fails
-  // when any of its steps fails.
-  assert.equal(required.if, `always() && (${ci.jobs['static-checks'].if})`);
-  assert.equal(required.name, ci.jobs['static-checks'].name.replaceAll('static-checks', 'ci'));
+  // The required check runs whenever its lanes run, Dependabot PRs included, and fails when any
+  // of its steps fails. Labels start no runs.
+  assert.equal(ci.on.pull_request.types.includes('labeled'), false);
+  assert.equal(required.if, 'always()');
+  assert.equal(required.name, 'ci');
   assert.equal(required['continue-on-error'], undefined, 'ci must fail when it fails');
   assert.deepEqual(
     required.steps
@@ -45,17 +47,14 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
       undefined,
       `${name} must start without waiting for another lane`
     );
-    assert.equal(ci.jobs[name]['timeout-minutes'], name === 'static-checks' ? 6 : 4);
+    assert.equal(ci.jobs[name]['timeout-minutes'], name === 'actions-contracts' ? 6 : 4);
     // The committed Wiki media baseline belongs to linux-x64; every other lane runs on arm64.
     assert.equal(
       ci.jobs[name]['runs-on'],
       name === 'wiki-media' ? 'ubuntu-24.04' : 'ubuntu-24.04-arm'
     );
-    assert.equal(ci.jobs[name].if, ci.jobs['static-checks'].if);
-    assert.equal(
-      ci.jobs[name].name,
-      ci.jobs['static-checks'].name.replaceAll('static-checks', name)
-    );
+    assert.equal(ci.jobs[name].if, undefined);
+    assert.equal(ci.jobs[name].name, name);
     // Only the reusable-tree lookup may fail without failing its lane.
     assert.equal(ci.jobs[name]['continue-on-error'], undefined, `${name} must fail when it fails`);
     assert.deepEqual(
@@ -121,6 +120,7 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
   // Moving a check between lanes must neither remove nor duplicate a validation.
   const originalStaticCommands = [
     'npm run check:repo-hooks',
+    'npm run check:python',
     'npm run check:actions',
     'npm run check:lint-policy',
     'npm run check:lint',
@@ -137,9 +137,19 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
     'npm run check:dev-server',
     'npm run build',
   ];
-  const commands = ['static-checks', 'runner-contracts'].flatMap((name) =>
+  const commands = ['static-checks', 'runner-contracts', 'actions-contracts'].flatMap((name) =>
     ci.jobs[name].steps.filter((step) => /^npm run /u.test(step.run ?? '')).map((step) => step.run)
   );
+  // A moved check must still run on every full validation: none may skip through its own `if`.
+  for (const name of ['static-checks', 'runner-contracts', 'actions-contracts']) {
+    for (const command of ci.jobs[name].steps.filter((step) => /^npm run /u.test(step.run ?? ''))) {
+      assert.equal(
+        command.if,
+        "steps.verified-tree.outputs.run_full != 'false'",
+        `${name}: ${command.run}`
+      );
+    }
+  }
   assert.deepEqual([...commands].sort(), [...originalStaticCommands].sort());
   assert.equal(new Set(commands).size, originalStaticCommands.length);
   assert.deepEqual(
@@ -147,7 +157,12 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
       .filter((step) => /^npm run /u.test(step.run ?? ''))
       .map((step) => step.run),
     originalStaticCommands.filter(
-      (command) => !['npm run check:test-runner', 'npm run check:dev-server'].includes(command)
+      (command) =>
+        ![
+          'npm run check:test-runner',
+          'npm run check:dev-server',
+          'npm run check:actions',
+        ].includes(command)
     )
   );
   assert.deepEqual(
@@ -155,6 +170,12 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
       .filter((step) => /^npm run /u.test(step.run ?? ''))
       .map((step) => step.run),
     ['npm run check:test-runner', 'npm run check:dev-server']
+  );
+  assert.deepEqual(
+    ci.jobs['actions-contracts'].steps
+      .filter((step) => /^npm run /u.test(step.run ?? ''))
+      .map((step) => step.run),
+    ['npm run check:actions']
   );
 
   // The replacement lane executes the complete default code inventory and binds
@@ -246,6 +267,10 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
     manifest.scripts['check:repo-hooks'],
     'uvx --from pytest==9.0.2 pytest -c config/testing/pytest.ini --rootdir=.'
   );
+  // Deployment builders provide Node; Python analysis belongs to provisioned CI/gates.
+  assert.equal(manifest.scripts['check:wiki'], 'tsx scripts/wiki-check.ts');
+  assert.equal(manifest.scripts['check:python'], 'bash scripts/check-python-types.sh');
+  assert.doesNotMatch(manifest.scripts.build, /\bcheck:python\b/u);
   assert.ok(
     manifest.devDependencies.playwright,
     'Manual browser benchmarks and frame measurements still need Playwright'
@@ -351,7 +376,7 @@ test('CI preserves four mandatory lanes and failure propagation', () => {
     ]
   );
   const [previewNode, previewCheckout, previewDeploy, previewReport] = previewJob.steps;
-  assert.deepEqual(previewNode.with, { 'node-version': 24, 'package-manager-cache': false });
+  assert.deepEqual(previewNode.with, { 'node-version': 26, 'package-manager-cache': false });
   assert.deepEqual(previewCheckout.with, {
     ref: `\${{ needs.resolve.outputs.head_sha }}`,
     'persist-credentials': false,
@@ -756,14 +781,15 @@ if (command === 'gh') {
   );
   assert.equal(mediaCandidate[1].with.path, `\${{ runner.temp }}/wiki-media-baseline`);
 
-  // Execute the actual aggregate step for all 256 GitHub dependency outcomes.
+  // Execute the actual aggregate step for all 1024 GitHub dependency outcomes.
   const aggregate = required.steps.find(
-    (step) => step.name === 'Require all four validation lanes to pass'
+    (step) => step.name === 'Require all five validation lanes to pass'
   );
   assert.ok(aggregate);
   const laneResults = {
     STATIC_RESULT: 'static-checks',
     RUNNER_RESULT: 'runner-contracts',
+    ACTIONS_RESULT: 'actions-contracts',
     INTEGRATION_RESULT: 'integration-tests',
     WIKI_MEDIA_RESULT: 'wiki-media',
   };
@@ -776,7 +802,7 @@ if (command === 'gh') {
       rows.flatMap((row) => outcomes.map((outcome) => ({ ...row, [variable]: outcome }))),
     [{}]
   );
-  assert.equal(combinations.length, 256);
+  assert.equal(combinations.length, 1024);
   for (const results of combinations) {
     const result = spawnSync('bash', ['-c', aggregate.run], {
       env: { ...process.env, ...results },
@@ -790,6 +816,6 @@ if (command === 'gh') {
   }
 
   process.stdout.write(
-    'CI contracts passed: four parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
+    'CI contracts passed: five parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
   );
 });

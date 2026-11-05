@@ -324,3 +324,37 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(retired.messages.some((message) => message.type === 'joined')).toBe(false);
   });
 });
+
+test('shield commands require the owning socket and cooldown survives a real reconnect', async () => {
+  const { pilot, observer, joined, engine } = await world();
+  observer.send('activateShield', { id: 'pilot' });
+  await observer.barrier();
+  expect(entity(await pilot.state(), 'pilot').shieldFrames).toBe(0);
+  pilot.send('activateShield', { id: 'pilot' });
+  const active = entity(await pilot.state(), 'pilot');
+  expect(active.shieldFrames).toBe(120);
+  expect(active.shieldCooldownFrames).toBe(720);
+  const actor = engine.getPlayer('pilot');
+  if (!actor) {
+    throw new Error('Missing shield pilot');
+  }
+  actor.cargo = 100;
+  delete actor.spawnProtectionTimer;
+  const protectedHealth = actor.health;
+  expect(engine.handleShipDamage('pilot', 'asteroid', 30).applied).toBe(false);
+  expect(actor.cargo).toBe(100);
+  expect(actor.health).toBe(protectedHealth);
+  pilot.send('activateShield', { id: 'pilot' });
+  expect(entity(await pilot.state(), 'pilot').shieldCooldownFrames).toBe(720);
+  pilot.send('leave');
+  await pilot.barrier();
+  await pilot.close();
+  const replacement = await connect();
+  await replacement.join('pilot', 100, String(joined['resumeToken']));
+  const recovered = entity(await replacement.state(), 'pilot');
+  expect(recovered.shieldCooldownFrames).toBeGreaterThan(0);
+  expect(recovered.shieldCooldownFrames).toBeLessThanOrEqual(720);
+  replacement.send('activateShield', { id: 'pilot' });
+  await replacement.barrier();
+  expect(engine.getPlayer('pilot')?.shieldCooldownFrames).toBe(recovered.shieldCooldownFrames);
+});

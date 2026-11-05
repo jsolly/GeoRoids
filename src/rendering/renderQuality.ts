@@ -1,17 +1,24 @@
+import type { DeviceCategory } from './deviceCategory';
+
 type DprLimit = 'native' | 0.75 | 1 | 1.5 | 2;
 type Glow = 'full' | 'off';
+type QualityAudience = 'desktop' | 'touch' | 'low-end';
 
 type RenderQuality = Readonly<{
   maxDpr: DprLimit;
   glow: Glow;
-  source: 'desktop-default' | 'touch-default' | 'diagnostic';
+  source: `${QualityAudience}-default` | 'diagnostic';
 }>;
 
-// Flight remains native/full; low-end Scan has its own bounded presentation policy.
+// Desktop and touch flight stay native/full. Low-end devices fly without cosmetic glow, an
+// owner-approved exception; low-end Scan has its own bounded presentation policy.
 // See docs/performance/mobile-quality-decisions.md for measured scope and tradeoffs.
-const FULL_QUALITY = Object.freeze({ maxDpr: 'native', glow: 'full' } as const);
-const TOUCH_PRESET = FULL_QUALITY;
-let activeQuality: RenderQuality = { ...FULL_QUALITY, source: 'desktop-default' };
+const PRESETS = Object.freeze({
+  desktop: { maxDpr: 'native', glow: 'full' },
+  touch: { maxDpr: 'native', glow: 'full' },
+  'low-end': { maxDpr: 'native', glow: 'off' },
+} as const satisfies Record<QualityAudience, { maxDpr: DprLimit; glow: Glow }>);
+let activeQuality: RenderQuality = { ...PRESETS.desktop, source: 'desktop-default' };
 
 /** Shared by the client and manual benchmark so a requested cap cannot silently differ. */
 export function parseRenderDprLimit(value: string): DprLimit {
@@ -31,11 +38,22 @@ export function parseRenderDprLimit(value: string): DprLimit {
   }
 }
 
+/** Low-end wins over touch: the measured low-end constraint applies whatever the controls. */
+export function qualityAudience(
+  deviceCategory: DeviceCategory,
+  touchControls: boolean
+): QualityAudience {
+  if (deviceCategory === 'low-end') {
+    return 'low-end';
+  }
+  return touchControls ? 'touch' : 'desktop';
+}
+
 /** Resolve once at the canvas resize/session boundary, never inside a drawing loop. */
-export function configureRenderQuality(search: string, touchControls: boolean): RenderQuality {
+export function configureRenderQuality(search: string, audience: QualityAudience): RenderQuality {
   const params = new URLSearchParams(search);
   const diagnostic = ['1', 'collect'].includes(params.get('performance') ?? '');
-  const defaults = touchControls ? TOUCH_PRESET : FULL_QUALITY;
+  const defaults = PRESETS[audience];
   let maxDpr: DprLimit = defaults.maxDpr;
   let glow: Glow = defaults.glow;
   const dprOverride = diagnostic ? params.get('renderDpr') : null;
@@ -52,12 +70,7 @@ export function configureRenderQuality(search: string, touchControls: boolean): 
   activeQuality = Object.freeze({
     maxDpr,
     glow,
-    source:
-      dprOverride !== null || glowOverride !== null
-        ? 'diagnostic'
-        : touchControls
-          ? 'touch-default'
-          : 'desktop-default',
+    source: dprOverride !== null || glowOverride !== null ? 'diagnostic' : `${audience}-default`,
   });
   return activeQuality;
 }

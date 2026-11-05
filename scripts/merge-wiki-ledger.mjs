@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Generated from merge-wiki-ledger.mts by generate-asset-boundaries.ts; do not edit.
 /**
  * Deterministic resolver for `docs/wiki-source-review.json`.
  *
@@ -33,8 +34,22 @@ import { resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function isJsonObject(value) {
+  return isRecord(value) && Object.values(value).every(isJsonValue);
+}
+function isJsonValue(value) {
+  return (
+    value === null ||
+    typeof value === 'boolean' ||
+    typeof value === 'number' ||
+    typeof value === 'string' ||
+    (Array.isArray(value) ? value.every(isJsonValue) : isJsonObject(value))
+  );
+}
 const LEDGER = 'docs/wiki-source-review.json';
-
 /** Total order on names, so a resolution is byte-identical on every platform. */
 function byName(a, b) {
   if (a < b) {
@@ -42,7 +57,6 @@ function byName(a, b) {
   }
   return a > b ? 1 : 0;
 }
-
 /** Recursively key-sorted JSON, so two equal entries serialize identically. */
 function canonical(value) {
   if (Array.isArray(value)) {
@@ -56,26 +70,35 @@ function canonical(value) {
   }
   return JSON.stringify(value);
 }
-
 function parse(text, label) {
   let data;
   try {
     data = JSON.parse(text);
   } catch (error) {
-    throw new Error(`${label} is not valid JSON: ${error.message}`, { cause: error });
+    throw new Error(
+      `${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
   }
-  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+  if (!isRecord(data)) {
     throw new Error(`${label} is not a ledger object`);
   }
-  if (typeof data.hashes !== 'object' || data.hashes === null || Array.isArray(data.hashes)) {
+  if (!isJsonObject(data['hashes'])) {
     throw new Error(`${label} has no hashes map`);
   }
-  if (!Array.isArray(data.reviews)) {
+  if (!Array.isArray(data['reviews']) || !data['reviews'].every(isJsonValue)) {
     throw new Error(`${label} has no reviews array`);
   }
-  return data;
+  const note = data['note'];
+  if (note !== undefined && !isJsonValue(note)) {
+    throw new Error(`${label} has an invalid note`);
+  }
+  return {
+    ...('note' in data ? { note } : {}),
+    hashes: data['hashes'],
+    reviews: data['reviews'],
+  };
 }
-
 /** Pick a scalar field three ways, refusing a genuine two-sided edit. */
 function pickScalar(field, base, ours, theirs) {
   const b = canonical(base);
@@ -92,12 +115,10 @@ function pickScalar(field, base, ours, theirs) {
   }
   throw new Error(`Both sides changed \`${field}\`; resolve that field by hand`);
 }
-
 export function mergeLedger(baseText, oursText, theirsText) {
   const base = parse(baseText, 'merge base');
   const ours = parse(oursText, 'ours');
   const theirs = parse(theirsText, 'theirs');
-
   // reviews: union by content, base order first, then each side's additions.
   const baseKeys = base.reviews.map(canonical);
   const baseSet = new Set(baseKeys);
@@ -136,7 +157,6 @@ export function mergeLedger(baseText, oursText, theirsText) {
       }
     }
   }
-
   // hashes: proven values only.
   const paths = [
     ...new Set([
@@ -166,33 +186,32 @@ export function mergeLedger(baseText, oursText, theirsText) {
     const ourChange = inOurs && o !== b;
     const theirChange = inTheirs && t !== b;
     if (ourChange && theirChange) {
-      if (o === t) {
+      if (o === t && o !== undefined) {
         hashes[path] = o;
         continue;
       }
       // Both re-recorded it: the merged bytes match neither. Reset to the base
       // value so the source reports as pending; omit it when there is no base.
       pending.push(path);
-      if (inBase) {
+      if (inBase && b !== undefined) {
         hashes[path] = b;
       }
       continue;
     }
-    if (ourChange) {
+    if (ourChange && o !== undefined) {
       hashes[path] = o;
       fromOurs += 1;
       continue;
     }
-    if (theirChange) {
+    if (theirChange && t !== undefined) {
       hashes[path] = t;
       fromTheirs += 1;
       continue;
     }
-    if (inOurs) {
+    if (inOurs && o !== undefined) {
       hashes[path] = o;
     }
   }
-
   const ledger = {
     ...('note' in base || 'note' in ours || 'note' in theirs
       ? { note: pickScalar('note', base.note, ours.note, theirs.note) }
@@ -215,7 +234,6 @@ export function mergeLedger(baseText, oursText, theirsText) {
     },
   };
 }
-
 function format(root, text) {
   try {
     return execFileSync(
@@ -244,7 +262,6 @@ function format(root, text) {
     return text;
   }
 }
-
 function writeAtomically(target, text) {
   const temporary = `${target}.${process.pid}.tmp`;
   try {
@@ -254,7 +271,6 @@ function writeAtomically(target, text) {
     rmSync(temporary, { force: true });
   }
 }
-
 function summarize(report) {
   const lines = [
     `reviews: ${report.baseReviews} base + ${report.addedTheirs} theirs + ${report.addedOurs} ours = ${report.reviews}`,
@@ -273,7 +289,6 @@ function summarize(report) {
   }
   return lines.join('\n');
 }
-
 function main(argv) {
   const root = process.cwd();
   const flags = argv.filter((a) => a.startsWith('--'));
@@ -282,7 +297,6 @@ function main(argv) {
   let oursPath;
   let theirsPath;
   let out;
-
   if (flags.includes('--merge') || positional.length === 0) {
     // Read the conflict stages git already holds for the ledger.
     const stage = (n) => {
@@ -309,7 +323,6 @@ function main(argv) {
     process.stdout.write('Inspect the result, then stage it with git add.\n');
     return;
   }
-
   if (positional.length >= 3) {
     // Merge-driver positional form: %O %A %B, resolution written back to %A.
     [basePath, oursPath, theirsPath] = positional;
@@ -327,14 +340,28 @@ function main(argv) {
     oursPath = value('ours');
     theirsPath = value('theirs');
     out = value('out') ?? oursPath;
-    if (!basePath || !oursPath || !theirsPath) {
+    if (
+      basePath === undefined ||
+      basePath === '' ||
+      oursPath === undefined ||
+      oursPath === '' ||
+      theirsPath === undefined ||
+      theirsPath === ''
+    ) {
       throw new Error(
         'Usage: merge-wiki-ledger.mjs [--merge] | <base> <ours> <theirs> | ' +
           '--base F --ours F --theirs F [--out F]'
       );
     }
   }
-
+  if (
+    basePath === undefined ||
+    oursPath === undefined ||
+    theirsPath === undefined ||
+    out === undefined
+  ) {
+    throw new Error('Expected base, ours, theirs and output paths');
+  }
   const { ledger, report } = mergeLedger(
     readFileSync(basePath, 'utf8'),
     readFileSync(oursPath, 'utf8'),
@@ -343,12 +370,13 @@ function main(argv) {
   writeAtomically(resolve(root, out), format(root, `${JSON.stringify(ledger, null, 2)}\n`));
   process.stderr.write(`${summarize(report)}\n`);
 }
-
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     main(process.argv.slice(2));
   } catch (error) {
-    process.stderr.write(`merge-wiki-ledger: ${error.message}\n`);
+    process.stderr.write(
+      `merge-wiki-ledger: ${error instanceof Error ? error.message : String(error)}\n`
+    );
     process.exit(1);
   }
 }

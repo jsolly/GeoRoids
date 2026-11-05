@@ -38,7 +38,7 @@ describe('player motion recovery', () => {
         ship,
         17
       );
-      ship.thrusting = false;
+      ship.thrusting = true;
       ship.update();
       expect(ship.position.x).toBeGreaterThan(20);
       expect(ship.velocity.x).toBeGreaterThan(SHIP.MAX_VELOCITY * 2);

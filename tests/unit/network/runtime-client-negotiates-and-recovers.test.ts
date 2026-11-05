@@ -153,6 +153,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
       weaponChargeFrames: 60,
       navigationAssistFrames: 1200,
       contourDraftFrames: 120,
+      shieldFrames: 90,
+      shieldCooldownFrames: 690,
     });
     const remote = { ...structuredClone(local), id: 'effect-crew', name: 'Effect crew' };
     active.entities = [local, remote];
@@ -163,36 +165,42 @@ describe('actual ConnectionManager WebSocket message path', () => {
       pilot.ship.weaponChargeFrames,
       pilot.ship.navigationAssistFrames,
       pilot.ship.contourDraftFrames,
+      pilot.ship.shieldFrames,
+      pilot.ship.shieldCooldownFrames,
     ];
     for (const pilot of [player, crew]) {
-      expect(timers(pilot)).toEqual([60, 1200, 120]);
+      expect(timers(pilot)).toEqual([60, 1200, 120, 90, 690]);
       ws.receive('abilityUsed', {
         id: pilot.id,
         kitId: 'scout',
         abilityActiveFrames: 0,
         harpoonTargetId: null,
       });
-      expect(timers(pilot)).toEqual([60, 1200, 120]);
+      expect(timers(pilot)).toEqual([60, 1200, 120, 90, 690]);
     }
     const cleared = structuredClone(active);
     for (const row of cleared.entities) {
       row.weaponChargeFrames = 0;
       row.navigationAssistFrames = 0;
       row.contourDraftFrames = 0;
+      row.shieldFrames = 0;
+      row.shieldCooldownFrames = 0;
     }
     ws.receive('snapshot', new SnapshotEncoder(cleared).encode(2, { sequence: 1, state: active }));
-    expect(timers(player)).toEqual([0, 0, 0]);
-    expect(timers(crew)).toEqual([0, 0, 0]);
+    expect(timers(player)).toEqual([0, 0, 0, 0, 0]);
+    expect(timers(crew)).toEqual([0, 0, 0, 0, 0]);
     ws.receive('snapshot', new SnapshotEncoder(active).encode(3));
     const absent = structuredClone(active);
     for (const row of absent.entities) {
       delete row.weaponChargeFrames;
       delete row.navigationAssistFrames;
       delete row.contourDraftFrames;
+      delete row.shieldFrames;
+      delete row.shieldCooldownFrames;
     }
     ws.receive('snapshot', new SnapshotEncoder(absent).encode(4, { sequence: 3, state: active }));
-    expect(timers(player)).toEqual([0, 0, 0]);
-    expect(timers(crew)).toEqual([0, 0, 0]);
+    expect(timers(player)).toEqual([0, 0, 0, 0, 0]);
+    expect(timers(crew)).toEqual([0, 0, 0, 0, 0]);
   });
 
   test.each(['disconnect', 'sessionExpired'] as const)(
@@ -1207,22 +1215,25 @@ describe('actual ConnectionManager WebSocket message path', () => {
   test.each([
     {
       source: 'keyboard',
+      expectedThrust: true,
       press: (player: Player) => keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player),
       release: (player: Player) => keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player),
     },
     {
       source: 'right mouse',
+      expectedThrust: false,
       press: (player: Player) =>
         handleMouseDown(new MouseEvent('mousedown', { button: 2 }), player),
     },
     {
       source: 'touch steering',
+      expectedThrust: false,
       press: (player: Player) => setTouchHeading(player, 0),
       release: (player: Player) => setTouchHeading(player, null),
     },
   ])(
-    'late Hauler snapshots preserve cruise through $source input until authoritative death',
-    async ({ press, release }) => {
+    'late Hauler snapshots preserve intentional thrust through $source input until authoritative death',
+    async ({ press, release, expectedThrust }) => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
       const player = createPlayer({
         name: 'Runtime pilot',
@@ -1258,13 +1269,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
       state.loot = [];
       ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
       press(player);
-      expect(player.ship.thrusting).toBe(true);
+      expect(player.ship.thrusting).toBe(expectedThrust);
       // An older echo arrives before the newly held input has been sent.
       clock.mockReturnValue(10_017);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
       manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
-        thrusting: true,
+        thrusting: expectedThrust,
       });
 
       release?.(player);
@@ -1273,7 +1284,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
       manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
-        thrusting: true,
+        thrusting: false,
       });
 
       press(player);
@@ -1340,7 +1351,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
     keyUp(new KeyboardEvent('keyup', { code: 'KeyA' }), player);
     receive(4);
-    expect(player.ship.thrusting).toBe(true);
+    expect(player.ship.thrusting).toBe(false);
     expect(player.ship.angularVelocity).toBe(0);
   });
 

@@ -555,6 +555,7 @@ test.each(['scout', 'hauler'] as const)(
     const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
     ship.angle = Math.atan2(-gradient.x, -gradient.y);
     const now = world.engine.getServerTime();
+    ship.thrusting = true;
     let fastest = 0;
     for (let frame = 1; frame <= 480; frame++) {
       if (frame % 120 === 0) {

@@ -70,6 +70,7 @@ import {
 } from '../../shared/lootBlast';
 import { NAVIGATION_SALVAGE } from '../../shared/navigationSalvage';
 import { chooseCrewSpawn, sanitizePlayerName } from '../../shared/player';
+import { activatePlayerShield } from '../../shared/playerShield';
 import { readReleaseId, releaseField } from '../../shared/releaseId';
 import {
   activateAbilityOnHost,
@@ -1063,6 +1064,8 @@ export class GameEngine {
       mass: actor.mass,
       health: actor.health,
       healthRegenTimer: actor.healthRegenTimer,
+      shieldFrames: actor.shieldFrames ?? 0,
+      shieldCooldownFrames: actor.shieldCooldownFrames ?? 0,
       ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
@@ -1309,6 +1312,11 @@ export class GameEngine {
     flight: RestorableFlight,
     requestedKit: ShipKitId | undefined
   ): void {
+    const shieldElapsed = Math.floor(
+      (Math.max(0, this.getServerTime() - flight.lastSeenAt) * GAME.FPS) / 1000
+    );
+    actor.shieldFrames = Math.max(0, (flight.shieldFrames ?? 0) - shieldElapsed);
+    actor.shieldCooldownFrames = Math.max(0, (flight.shieldCooldownFrames ?? 0) - shieldElapsed);
     actor.angle = flight.angle;
     if (!requestedKit || requestedKit === flight.kitId) {
       actor.mass = flight.mass;
@@ -2102,7 +2110,11 @@ export class GameEngine {
       return { applied: false, isDestroyed: false };
     }
     this.playerMotion.releaseContourLock(existing.id, this.getServerTime());
-    if (existing.furnaceTransit || isCombatantImmune(existing)) {
+    if (
+      existing.furnaceTransit ||
+      (existing.shieldFrames ?? 0) > 0 ||
+      isCombatantImmune(existing)
+    ) {
       return { applied: false, isDestroyed: false };
     }
 
@@ -2810,7 +2822,20 @@ export class GameEngine {
     return laser;
   }
 
-  /** Start and release use the server clock and authoritative muzzle. Repeated starts cannot reset it. */
+  /** The owning socket requests protection; the server owns activation and cooldown. */
+  public activateShield(ownerId: string): boolean {
+    const pilot = this.entityManager.getEntity(ownerId);
+    return Boolean(
+      pilot &&
+        pilot.health > 0 &&
+        !pilot.exploding &&
+        !pilot.furnaceTransit &&
+        pilot.overlayHold !== true &&
+        (pilot.downedUntil ?? 0) <= 0 &&
+        activatePlayerShield(pilot)
+    );
+  }
+
   public chargeWeapon(ownerId: string, action: 'start' | 'release' | 'cancel'): ServerLaser | null {
     const pilot = this.getPlayer(ownerId);
     if (!pilot) {
@@ -3383,6 +3408,8 @@ export class GameEngine {
             bankedCargo: entity.bankedCargo ?? 0,
             contourDraftFrames: entity.contourDraftFrames ?? 0,
             navigationAssistFrames: entity.navigationAssistFrames ?? 0,
+            shieldFrames: entity.shieldFrames ?? 0,
+            shieldCooldownFrames: entity.shieldCooldownFrames ?? 0,
             weaponChargeFrames: this.weaponChargeFrames(entity),
             purchases: [...entity.purchases],
             silk: entity.silk ?? 0,

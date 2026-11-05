@@ -2,6 +2,7 @@ import { GAME, SHIP } from '../../shared/constants/gameplay';
 import { sampleGradient } from '../../shared/heightfield';
 import { getTerrainField } from '../../shared/terrainField';
 import type { Player } from '../entities/player/Player';
+import { stopNavigation } from '../entities/ship/navigation';
 import { worldFurnaces } from '../network/worldExploration';
 import { getOpenGameOverlay } from '../runtime/overlayState';
 import { controlSources } from './controlSources';
@@ -25,6 +26,10 @@ const TURN_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD']);
 export function togglePlayerContourLock(player: Player): boolean {
   const wasLocked = player.ship.contourLocked;
   const active = player.ship.toggleContourLock();
+  if (active) {
+    player.ship.navigation = null;
+    player.ship.pendingObjectAction = null;
+  }
   if (wasLocked !== active) {
     controlSources.pointerHeading = null;
     controlSources.steeringEpoch++;
@@ -60,6 +65,9 @@ function updateCruise(player: Player): void {
       player.ship.angularVelocity = 0;
     }
     const steering =
+      getPressedKeysForPlayer(player).has('KeyW') ||
+      getPressedKeysForPlayer(player).has('ArrowUp') ||
+      player.ship.navigation !== null ||
       player.ship.angularVelocity !== 0 ||
       [...getPressedKeysForPlayer(player)].some((code) => TURN_KEYS.has(code));
     if (steering) {
@@ -67,7 +75,15 @@ function updateCruise(player: Player): void {
     }
     player.ship.cargoHover = !visit.released;
   }
-  player.ship.thrusting = alive && !player.ship.movementLocked && !player.ship.cargoHover;
+  const pressed = getPressedKeysForPlayer(player);
+  player.ship.thrusting =
+    alive &&
+    !player.ship.movementLocked &&
+    !player.ship.cargoHover &&
+    (pressed.has('KeyW') || pressed.has('ArrowUp') || player.ship.navigation !== null);
+  if (player.ship.navigation) {
+    player.ship.cargoHover = false;
+  }
   if (!alive) {
     player.ship.releaseContourLock();
   }
@@ -128,6 +144,11 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     // Record pressed key for this player
     getPressedKeysForPlayer(player).add(ev.code);
     switch (ev.code) {
+      case 'KeyQ':
+        if (!ev.repeat) {
+          player.ship.activateShield();
+        }
+        break;
       case 'KeyF':
         if (!ev.repeat) {
           player.ship.beginWeaponCharge();
@@ -147,7 +168,7 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
         break;
       }
       case 'Space':
-        // Space fires while automatic cruise continues.
+        // Space fires independently of propulsion.
         player.ship.shoot();
         break;
       case 'KeyE':
@@ -160,6 +181,13 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
         if (!ev.repeat) {
           togglePlayerContourLock(player);
         }
+        break;
+      case 'KeyW':
+      case 'ArrowUp':
+        if (!ev.repeat) {
+          stopNavigation(player.ship);
+        }
+        reconcilePlayerInput(player);
         break;
       case 'ArrowLeft':
       case 'KeyA':
@@ -195,6 +223,8 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
   // thrusting or spinning. Both arrows and WASD funnel through the same
   // aggregate helpers.
   switch (ev.code) {
+    case 'KeyW':
+    case 'ArrowUp':
     case 'ArrowLeft':
     case 'KeyA':
     case 'ArrowRight':

@@ -6,6 +6,7 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
 import { townSquareSpawn } from '../../shared/furnaces';
+import { tickPlayerShield } from '../../shared/playerShield';
 import { tickAbilityHost } from '../../shared/shipAbilities';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../shared/shipKits';
@@ -32,6 +33,8 @@ export interface GameEntity {
   downedUntil?: number | null;
   rescue?: RescueState | null;
   crewSignal?: CrewSignal | null;
+  shieldFrames?: number;
+  shieldCooldownFrames?: number;
   navigationAssistFrames?: number;
   contourDraftFrames?: number;
   contourTransit?: {
@@ -240,7 +243,7 @@ export class EntityManager {
       return null;
     }
 
-    if (entity.overlayHold === true) {
+    if ((entity.shieldFrames ?? 0) > 0 || entity.overlayHold === true) {
       return null;
     }
 
@@ -323,6 +326,7 @@ export class EntityManager {
         }
       }
 
+      tickPlayerShield(entity);
       if (entity.spawnProtectionTimer !== undefined) {
         if (entity.spawnProtectionTimer > 0) {
           entity.spawnProtectionTimer--;

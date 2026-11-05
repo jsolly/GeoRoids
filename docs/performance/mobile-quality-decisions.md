@@ -2,10 +2,20 @@
 
 ## Current production policy
 
-Native device resolution and full glow remain enabled during ordinary desktop
-and touch flight. `src/rendering/renderQuality.ts` owns those settings;
+Native device resolution remains enabled during ordinary desktop and touch
+flight, and full glow remains enabled on every device except low-end ones.
+`src/rendering/renderQuality.ts` owns those settings;
 `src/rendering/canvasSurface.ts` applies their backing resolution. No global
 flight-resolution or glow reduction has been accepted.
+
+Low-end devices fly, and draw the spawn fly-in and universe map, without cosmetic
+glow by default. `src/rendering/deviceCategory.ts`
+classifies the device once per session, using the same rule that selects
+simplified Scan below; `renderQuality.ts` then chooses the `low-end` preset,
+reported as graphics source `low-end-default`. Hull, projectile and effect
+geometry, colours and core strokes are unchanged; only shadow blur is removed.
+`/debug?performance=collect&renderGlow=full` remains the higher-quality control.
+See [Low-end flight glow](#low-end-flight-glow) for the evidence and its limits.
 
 Low-end Mineral Scan uses a separate simplified view, selected by
 `src/rendering/scanDetailPolicy.ts` for the known Fire model `KFTUWI` or a coarse
@@ -55,7 +65,7 @@ limits, so a flight cap of 1 does not reduce it further. See the
 | DPR cap 1.5 | Greater softness, particularly distant projectiles and text | Experiment only; compare DPR 2 and native |
 | Flight DPR cap 1 | Softer canvas text and thin lines on DPR-1.5 tablets | Experiment only; compare native flight at the same glow |
 | Flight DPR cap 0.75 | Noticeable softness below CSS-pixel resolution | Experiment only; compare cap 1 and inspect distant hazards |
-| Glow off | Less luminous hulls, projectiles, scan pulses and effects | Experiment only; compare full glow at the same DPR |
+| Glow off | Less luminous hulls, projectiles, scan pulses, effects and map marks | Default on low-end devices ([Low-end flight glow](#low-end-flight-glow)); elsewhere experiment only, compare full glow at the same DPR |
 
 No measured performance improvement is claimed by the presence of these controls.
 The numerical target is sustained 60 Hz presentation on supported physical devices,
@@ -93,6 +103,69 @@ the higher-quality version passes the same paired and sustained checks on both
 supported cohorts. A faster new phone alone does not retire protection for an
 older phone that remains supported. Delete obsolete branches, migrate tests,
 update the Wiki and source review, and record the retirement evidence here.
+
+## Low-end flight glow
+
+- **Accepted release:** [PR #896](https://github.com/jsolly/GeoRoids/pull/896),
+  merge commit `0f1582bc61d1c933af0b13b5f6b08cae30a7ebdf`, with a passing
+  [production smoke](https://github.com/jsolly/GeoRoids/actions/runs/41200237760),
+  for flight. The spawn fly-in chart and universe map joined the preset in the
+  next change to `src/ui/universeMap.ts`, which routed their blur through
+  `resolveGlow`; `git log -- src/ui/universeMap.ts` identifies its release.
+- **Setting and rule:** glow off for flight, the spawn fly-in chart and the
+  universe map on devices `classifyDevice` reports as `low-end` — the measured
+  Fire model `KFTUWI`, or a coarse pointer with valid hints of at most 4 GB memory
+  and four logical cores. Owned by `src/rendering/renderQuality.ts`, wired in
+  `src/rendering/canvasSurface.ts`; the overlays' blur sites in
+  `src/ui/universeMap.ts` read the same setting. Ship-picker and inventory
+  schematics keep their glow.
+- **Approval:** John chose this owner-approved exception on 2026-10-31 to resolve
+  two Fire tablet debug reports, in place of the paired five-minute and
+  fifteen-minute qualification this document otherwise requires. As with the
+  Scan policy, that exception is recorded here separately from measurement.
+  On the same day John asked for the spawn fly-in chart and universe map to
+  follow it too, after review found they still drew glow on the Fire profile;
+  no separate measurement covers those overlays.
+- **Evidence:** on one Fire HD 10 (KFTUWI, Android 11, Chrome 152, Canvas,
+  native DPR 1.5, 800×1094 CSS, 1200×1641 backing, Scout, sound and music on),
+  a 61.7-second full-glow recording ran at 32.36 FPS with 81.8% of intervals over
+  25 ms, and a 62.9-second glow-off recording ran at 59.95 FPS with 0.11% over
+  25 ms. Full glow is report `5a024452-20b2-473c-b53d-3f80d6c6105c` (13,696 bytes,
+  SHA-256 `cca333f7d80ab4cd1678ae14a2d7c47b82a8e63f577cd6e14238a8d9d36c79ba`);
+  glow off is its paired report on Todoist task `6hpJRq5cXxPVQhMv` (12,520 bytes,
+  SHA-256 `18bc7868fd72574846e7f5ce45da973293eb70d81dfead093ee92cfa814d1d2e`).
+  Both carry client runtime release `4e6ecee18ba8b200c0d6ecbd5b99160da35f9e51`, a
+  token with no matching Git revision, against a `dev` server. Both reconstructed
+  through `scripts/read-debug-report.ts` on 2026-10-23. Scenes differed and only
+  summaries were uploaded, so this is strong directional evidence, not a
+  controlled effect estimate. A later report,
+  `2e0f42bd-4d5b-4314-9b84-39290eed2b38` (16,703 bytes, SHA-256
+  `32fe57aaf6bc14b89ecea0798e37cc69928eb204d8d3d8c12ee57f7b9e92d063`), came on
+  2026-10-23 from client and server release
+  `967415b4a2c04cbe7fa1ec3b9985cbacbe893917`, after the static halo cache in
+  [PR #865](https://github.com/jsolly/GeoRoids/pull/865), with touch-default full
+  glow and an instantaneous 4 FPS during combat. Its manifest carries the
+  delivery worker's verified-ready marker; it was not separately reconstructed
+  for this record. No performance collection accompanied it, so it shows the
+  halo cache did not settle Fire flight but does not measure by how much.
+- **Not recorded:** refresh mode, power-saving, charging and thermal state,
+  per-session A/A variation, raw interval series, visual captures from the
+  tablet, and baseline/candidate source and harness hashes. No other Fire runs,
+  failed or incomplete, are known for this comparison. The owner exception
+  accepts the change without them; desktop and emulated-tablet captures of the
+  shipped default exist only as review evidence.
+- **Visible loss:** on low-end devices, hulls, shots, scan pulses, furnaces and
+  effects in flight, the landmarks and furnace fire trails on the spawn fly-in
+  chart and universe map, and the universe map's ship marks lose their luminous
+  halo. Shapes, colours and positions are unchanged.
+- **Not qualified:** sustained, thermal and battery behaviour, and any device
+  other than the one Fire tablet. The low-capacity rule extends the decision to
+  devices that were never measured, on the same reasoning as simplified Scan.
+- **Removal test:** retire this preset under
+  [Accepting and retiring a reduction](#accepting-and-retiring-a-reduction): when
+  `?performance=collect&renderGlow=full` passes the same paired and sustained
+  checks against glow off on the Fire tablet. The owner exception lowers the
+  bar for adopting this preset, not for removing it.
 
 ## Current minimap policy
 

@@ -122,6 +122,8 @@ export class Player {
     angle?: number;
     cargo?: number;
     bankedCargo?: number;
+    shieldFrames?: number;
+    shieldCooldownFrames?: number;
     weaponChargeFrames?: number;
     navigationAssistFrames?: number;
     contourDraftFrames?: number;
@@ -246,6 +248,12 @@ export class Player {
 
     if (data.score !== undefined) {
       this.score = data.score;
+    }
+    if (data.shieldFrames !== undefined) {
+      this.ship.shieldFrames = data.shieldFrames;
+    }
+    if (data.shieldCooldownFrames !== undefined) {
+      this.ship.shieldCooldownFrames = data.shieldCooldownFrames;
     }
     if (data.weaponChargeFrames !== undefined) {
       this.ship.weaponChargeFrames = data.weaponChargeFrames;

@@ -240,7 +240,7 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
       'src/pages/review-fixture.astro',
       'src/styles/review-fixture.css',
       'config/app/astro.ts',
-      'config/app/svelte.js',
+      'config/app/svelte.ts',
       'config/quality/prettier.json',
       'config/typescript/frontend.json',
       'config/typescript/tsconfig.json',

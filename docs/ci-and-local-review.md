@@ -7,23 +7,27 @@ publication; PR CI independently validates the integration inventory.
 
 ## Required PR checks
 
-`static-checks`, `runner-contracts`, `integration-tests` and `wiki-media` start concurrently.
-Static checks cover lint policy, formatting, unused code, Markdown, YAML, Actions,
+`static-checks`, `runner-contracts`, `actions-contracts`, `integration-tests` and
+`wiki-media` start concurrently.
+Static checks cover lint policy, formatting, unused code, Markdown, YAML,
 TypeScript, benchmark types, Wiki source review and the production build.
 Runner contracts exercise owned process startup, admission, ports and cleanup.
+Actions contracts run `npm run check:actions`. Its gate contract suite is the
+longest single check, so it runs beside static checks instead of inside them,
+with a 6-minute budget that fits the suite's own nested-run bounds.
 Integration runs every test in `tests/integration/server/` through the repository runner. Wiki media verifies
 the committed demonstration baseline on `ubuntu-24.04`, the x64 platform that owns
 it, and uploads a regenerated candidate when it is stale; the other lanes run on
 arm64 ([Wiki maintenance](wiki-maintenance.md#generate-or-verify-gifs)).
 
-The required `ci` aggregate succeeds only when all four lanes succeed. Failed,
+The required `ci` aggregate succeeds only when all five lanes succeed. Failed,
 cancelled, skipped or absent required evidence cannot pass. Each lane performs
 the range secrets scan before considering reusable exact-tree proof. The lanes'
 copy selects the pinned gitleaks archive for its runner architecture, because the
 media lane runs on x64; the `ci` job keeps the canonical arm64 step.
 Post-merge CI reuses successful PR evidence only for the identical Git tree and
 matching lane. Missing proof reruns that lane; manual dispatch validates normally.
-Dependabot keeps its explicit manual-drain invocation gate.
+Dependabot PRs run the same lanes and `ci`; labels start no runs.
 
 ## Local review
 

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "../../scripts/merge-wiki-ledger.mts",
+    "../../scripts/merge-wiki-ledger.test.ts",
+    "../../scripts/build-vercel-output.mts",
+    "../../scripts/production-smoke-network.mts",
+    "../../scripts/production-smoke-scenario.mts",
+    "../../scripts/production-smoke-scenario.test.ts",
+    "../../scripts/production-smoke-entry.mts",
+    "../../scripts/verify-retained-assets.mts",
+    "../../scripts/benchmark-build-receipt.mts",
+    "../../scripts/generate-asset-boundaries.ts",
+    "../../scripts/benchmark-build-receipt.test.ts",
+    "../../tests/unit/testing/old-client-assets-survive-new-builds.test.ts",
+    "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts"
+  ]
+}

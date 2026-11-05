@@ -10,7 +10,7 @@ import { asteroidRow } from '../../support/asteroid-row';
 
 afterEach(() => {
   clearAsteroidShatters();
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
   vi.restoreAllMocks();
 });
 
@@ -166,7 +166,7 @@ test('DPR, playfield scale and glow changes regenerate full-resolution asteroid 
   const zoomed = view.draw(roid);
   expect(zoomed).toBe(retina);
   expect(zoomed.width).toBeGreaterThan(retinaWidth);
-  configureRenderQuality('?performance=collect&renderGlow=off', false);
+  configureRenderQuality('?performance=collect&renderGlow=off', 'desktop');
   const zoomedWidth = zoomed.width;
   const unblurred = view.draw(roid);
   expect(unblurred).toBe(zoomed);

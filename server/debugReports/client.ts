@@ -8,6 +8,35 @@ import type { QueueDiagnostics } from './store';
 /** The request deadline docs/agent-operations.md documents for this worker. */
 const REQUEST_DEADLINE_MS = 10_000;
 
+/** How long `close()` waits for a thread to exit before it stops waiting. */
+const CLOSE_DEADLINE_MS = 2_000;
+
+/**
+ * How long a replacement waits for its predecessor's `exit`. A terminated
+ * thread exits once its current SQLite call returns, so a longer wait means a
+ * stuck volume, and the subsystem says so instead of promising a restart.
+ */
+const HANDOVER_DEADLINE_MS = 10_000;
+
+const UNAVAILABLE_MESSAGE = 'Debug report storage is unavailable. Keep your local copy.';
+const RESTARTING_MESSAGE = 'Debug report storage is restarting. Keep your local copy and retry.';
+/** Published on `/health` while a retired thread will not exit; carries no path or cause. */
+const STUCK_MESSAGE = 'Debug report worker has not stopped. Keep your local copy.';
+
+/**
+ * At most this many replacement threads start in any `REPLACEMENT_WINDOW_MS`.
+ * Enough for a transient stall to recover more than once an hour; few enough
+ * that a store that cannot open costs three short-lived threads an hour rather
+ * than one per request.
+ *
+ * A replacement is counted when it starts and leaves the count only when the
+ * window has passed. Nothing a thread does -- answering, measuring the queue,
+ * dying -- touches the count, so a thread that measures once and dies cannot
+ * refill it.
+ */
+const MAX_REPLACEMENTS = 3;
+const REPLACEMENT_WINDOW_MS = 3_600_000;
+
 /**
  * How long one fault episode may go unrecorded. The worker delivers on a 1 Hz
  * interval (`./worker` `setInterval`) and replies `fault` once per failing
@@ -110,32 +139,76 @@ interface PendingOperation {
   timer: NodeJS.Timeout;
 }
 
+/** One spawned thread. Its events describe live state only until it fails. */
+interface ReportThread {
+  readonly worker: Worker;
+  /** Its failure is recorded: its replies, faults and counts are ignored. */
+  failed: boolean;
+  /** Settles with its exit code on `exit`, which is when its SQLite connection is gone. */
+  readonly exited: Promise<number>;
+}
+
 /**
  * No SQLite, credential-bearing HTTP, parsing, or diagnostic redaction runs on
  * the game thread.
  *
- * One thread for the life of the process.
- *
  * Two different failures, deliberately: a thread-level failure -- an uncaught
- * error, an unexpected exit, or a request past its deadline -- closes reporting
- * until the next deploy, fail-closed and with its cause logged, so
- * `/debug-reports` answers 503 and the player keeps a local copy. A `fault`
- * reply is the weaker one: the store failed to answer a delivery tick, which is
- * recorded and publishes an unknown depth, but the thread is alive and
- * submissions are still accepted, because a store that cannot deliver can
- * usually still take a report and hold it.
+ * error, an unexpected exit, or a request past its deadline -- retires that
+ * thread, with its cause logged, so `/debug-reports` answers 503 and the player
+ * keeps a local copy. A `fault` reply is the weaker one: the store failed to
+ * answer a delivery tick, which is recorded and publishes an unknown depth, but
+ * the thread is alive and submissions are still accepted, because a store that
+ * cannot deliver can usually still take a report and hold it.
  *
- * Replacing a faulted thread
- * needs more than a respawn -- the store is single-connection and the HTTP
- * layer admits concurrent requests, so a replacement has to be single-flight,
- * own the thread it supersedes through shutdown, and sit outside the request
- * deadline. That belongs in its own change.
+ * A retired thread is replaced on a later request, under rules that each
+ * answer a way an earlier restart broke:
+ *
+ * - **One thread exists at a time.** A failed thread is terminated at once, and
+ *   its replacement is constructed only after its `exit`, which is when Node
+ *   has closed its SQLite connection. The store is single-connection and takes
+ *   an exclusive lock (`./store`), so a replacement racing its predecessor would
+ *   die on arrival; and two live threads would each run a delivery interval
+ *   over the same rows. `close()` therefore has exactly one thread to stop.
+ * - **The replacement is single-flight.** `handover` is set in the same
+ *   synchronous step that tests it, so concurrent requests -- which the HTTP
+ *   layer admits -- start one replacement between them.
+ * - **No request waits for a handover.** A request that finds no live thread is
+ *   refused at once and the client retries. Waiting would put the predecessor's
+ *   exit and the replacement's start-up inside that request's deadline, which
+ *   then either answers the caller after HTTP has given up or judges a healthy
+ *   replacement stalled. A request's deadline only ever judges the thread it
+ *   was posted to. The handover itself is not cancelled by any deadline: a
+ *   retired thread still running after `HANDOVER_DEADLINE_MS` is logged and
+ *   published as stuck, refusals stop promising a restart, and the
+ *   replacement already charged to the budget starts when it finally exits.
+ * - **The budget refills on the clock only.** See `MAX_REPLACEMENTS`. A
+ *   replacement is counted when its thread is constructed; the single-flight
+ *   `handover` already stops a second request claiming a slot meanwhile, so a
+ *   late handover cannot let more than `MAX_REPLACEMENTS` starts land in one
+ *   window.
+ *
+ * A store that keeps failing therefore closes reporting until the window
+ * allows another attempt, still fail-closed, rather than until the next deploy.
  */
 export class DebugReportWorker {
-  private readonly worker: Worker;
+  /**
+   * The most recent thread: live, retiring, or gone. Only one is ever
+   * running, because a replacement is built only after this one's `exit`.
+   */
+  private thread: ReportThread;
+  /**
+   * The replacement in progress, tested and set in one synchronous step:
+   * `waiting` for the predecessor's `exit`, `overdue` once that wait has
+   * outlived `HANDOVER_DEADLINE_MS`. Cleared exactly where the handover ends,
+   * on that `exit`.
+   */
+  private handover: 'waiting' | 'overdue' | undefined;
+  /** Monotonic start times of the replacements inside the budget window. */
+  private replacements: number[] = [];
+  /** The current run of budget refusals has been logged. */
+  private exhaustionLogged = false;
   private readonly pending = new Map<number, PendingOperation>();
   private nextId = 0;
-  private failed = false;
   private closing: Promise<void> | undefined;
   /** The fault being suppressed, so a broken store logs once rather than hourly. */
   private faultEpisode:
@@ -145,26 +218,124 @@ export class DebugReportWorker {
   // but sharing the module constant makes one future in-place write corrupt
   // the value every other reset reads from.
   private stats: QueueDiagnostics = { ...UNMEASURED_QUEUE };
-  // The configuration is handed to the thread and not retained: it carries the
-  // Todoist credential, and nothing here needs it again now that one thread
-  // runs for the life of the process.
-  constructor(config: DebugReportConfiguration) {
+  // Retained, although it carries the Todoist credential, because a
+  // replacement thread needs it. It stays on the server and is never logged.
+  constructor(private readonly config: DebugReportConfiguration) {
+    this.thread = this.spawn();
+  }
+
+  private spawn(): ReportThread {
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
       name: 'debug-reports',
-      workerData: config,
+      workerData: this.config,
       execArgv: ['--import', 'tsx'],
     });
-    worker.on('message', (reply: ReportWorkerReply) => this.receive(reply));
+    const exit = Promise.withResolvers<number>();
+    const thread: ReportThread = { worker, failed: false, exited: exit.promise };
+    // A recorded failure outranks anything the thread still sends: a
+    // diagnostics message already in flight carries counts measured before the
+    // failure, and letting it through would leave `/health` reading clean while
+    // every submission answers 503.
+    worker.on('message', (reply: ReportWorkerReply) => {
+      if (!thread.failed) {
+        this.receive(reply);
+      }
+    });
     // The errno is the whole diagnostic for this worker: it loads `tsx` and
     // opens SQLite on the mounted volume, so SQLITE_CANTOPEN or EACCES is what
     // an operator needs. Discarding the argument threw exactly that away.
-    worker.on('error', (error: Error) => this.fail({ kind: 'uncaught', error }));
+    worker.on('error', (error: Error) => this.fail(thread, { kind: 'uncaught', error }));
     worker.on('exit', (code: number) => {
-      if (!this.closing) {
-        this.fail({ kind: 'exit', code });
+      if (this.closing === undefined) {
+        this.fail(thread, { kind: 'exit', code });
+      }
+      exit.resolve(code);
+    });
+    return thread;
+  }
+
+  /**
+   * Starts a replacement unless one is already under way or the budget is
+   * spent. Returns whether a restart is worth retrying soon: not when the
+   * budget is spent, and not while the retired thread has outlived its
+   * handover deadline. `request()` has already refused a closing service.
+   *
+   * All handover state lives here, in `handover`, and ends on the
+   * predecessor's `exit`.
+   */
+  private recover(): boolean {
+    if (this.handover !== undefined) {
+      return this.handover === 'waiting';
+    }
+    const now = globalThis.performance.now();
+    this.replacements = this.replacements.filter((at) => now - at < REPLACEMENT_WINDOW_MS);
+    const [oldest] = this.replacements;
+    if (oldest !== undefined && this.replacements.length >= MAX_REPLACEMENTS) {
+      if (!this.exhaustionLogged) {
+        this.exhaustionLogged = true;
+        const nextAttemptInMs = Math.ceil(oldest + REPLACEMENT_WINDOW_MS - now);
+        logger.error('DEBUG_REPORTS', 'Debug report worker replacement budget is spent', {
+          replacements: this.replacements.length,
+          windowMs: REPLACEMENT_WINDOW_MS,
+          nextAttemptInMs,
+          nextAttemptAt: new Date(Date.now() + nextAttemptInMs).toISOString(),
+        });
+      }
+      return false;
+    }
+    this.exhaustionLogged = false;
+    logger.warn('DEBUG_REPORTS', 'Replacing the debug report worker', {
+      replacement: this.replacements.length + 1,
+      of: MAX_REPLACEMENTS,
+      windowMs: REPLACEMENT_WINDOW_MS,
+    });
+    this.handover = 'waiting';
+    const predecessor = this.thread;
+    // `fail()` terminated the predecessor; its `exit` is when its connection
+    // is gone. The deadline reports a thread stuck in a native SQLite call
+    // rather than leaving every refusal promising a restart forever. It does
+    // not cancel the replacement: that stays charged once and starts on the
+    // late exit, so one incident costs one attempt.
+    const deadline = setTimeout(() => {
+      if (this.closing === undefined) {
+        this.handover = 'overdue';
+        logger.error(
+          'DEBUG_REPORTS',
+          'The previous debug report worker has not exited; reporting stays closed until it does',
+          { waitedMs: HANDOVER_DEADLINE_MS }
+        );
+      }
+    }, HANDOVER_DEADLINE_MS);
+    deadline.unref();
+    void predecessor.exited.then((exitCode) => {
+      clearTimeout(deadline);
+      const late = this.handover === 'overdue';
+      this.handover = undefined;
+      if (this.closing !== undefined) {
+        return;
+      }
+      if (late) {
+        // The other half of the stuck record, so an operator can see how long
+        // reporting was closed and that it reopened.
+        logger.warn(
+          'DEBUG_REPORTS',
+          'The previous debug report worker exited after the handover deadline',
+          { exitCode }
+        );
+      }
+      // Counted when it starts, so a start up to an hour after its request
+      // does not leave the window early. A construction that throws still
+      // spends its slot.
+      this.replacements.push(globalThis.performance.now());
+      try {
+        this.thread = this.spawn();
+      } catch (error) {
+        // `new Worker` can throw. The gone predecessor stays current, which
+        // is fail-closed, and a later request may try again within the budget.
+        logger.error('DEBUG_REPORTS', 'Debug report worker could not be replaced', { error });
       }
     });
-    this.worker = worker;
+    return true;
   }
 
   enqueue(body: string, address: string, health: DebugJsonValue): Promise<DebugReportReceipt> {
@@ -181,12 +352,20 @@ export class DebugReportWorker {
     return this.request({ type: 'status', requestId: ++this.nextId, id, receiptToken });
   }
   diagnostics(): QueueDiagnostics {
-    return { ...this.stats };
+    // Derived rather than stored, so the stuck record ends with the handover
+    // and never overwrites the cause `fail()` published.
+    return this.handover === 'overdue'
+      ? { ...this.stats, lastError: STUCK_MESSAGE }
+      : { ...this.stats };
   }
   private request(request: ReportWorkerRequest): Promise<DebugReportReceipt | null> {
-    if (this.failed || this.closing !== undefined) {
+    if (this.closing !== undefined) {
+      return Promise.reject(new DebugReportError(503, UNAVAILABLE_MESSAGE));
+    }
+    const thread = this.thread;
+    if (thread.failed) {
       return Promise.reject(
-        new DebugReportError(503, 'Debug report storage is unavailable. Keep your local copy.')
+        new DebugReportError(503, this.recover() ? RESTARTING_MESSAGE : UNAVAILABLE_MESSAGE)
       );
     }
     if (this.pending.size >= 8) {
@@ -195,25 +374,18 @@ export class DebugReportWorker {
       );
     }
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.fail({ kind: 'timeout' });
-        void this.worker.terminate();
-      }, REQUEST_DEADLINE_MS);
+      const timer = setTimeout(() => this.fail(thread, { kind: 'timeout' }), REQUEST_DEADLINE_MS);
       timer.unref();
       this.pending.set(request.requestId, { resolve, reject, timer });
-      this.worker.postMessage(request);
+      thread.worker.postMessage(request);
     });
   }
   private receive(reply: ReportWorkerReply): void {
     if (reply.type === 'diagnostics') {
-      // A recorded failure outranks the worker's own counts. `fail()` owns
-      // `lastError`, and for a fault it has already marked the depth unknown;
-      // a diagnostics reply still in flight carries counts measured before
-      // that failure, so letting it through would erase the record and leave
-      // `/health` reading clean while every submission answers 503.
-      if (!this.failed) {
-        this.stats = reply.diagnostics;
-      }
+      // Only a live thread's replies reach here (see `spawn()`), so a
+      // measured depth from a thread that has since failed cannot erase the
+      // failure `fail()` recorded.
+      this.stats = reply.diagnostics;
       // A measured depth proves the store answered, but not that an episode is
       // over: a store alternating between failing and answering produces one
       // of these between every two faults, and closing the episode on the
@@ -326,21 +498,26 @@ export class DebugReportWorker {
    * One failure, one record. The cause is typed because the message follows
    * from it, so a deadline cannot report itself as something else.
    *
-   * The re-entry guard is load-bearing, not defensive. The timeout path calls
-   * `terminate()`, and that raises `exit` on the same thread, which comes back
-   * through here; without the guard one stall emits two records that disagree,
-   * and the second overwrites the `lastError` naming the timeout.
+   * The re-entry guard is load-bearing, not defensive. Terminating a thread
+   * raises its `exit`, which comes back through here; without the guard one
+   * stall emits two records that disagree, and the second overwrites the
+   * `lastError` naming the timeout. It is per thread, because only one thread
+   * exists at a time and each fails once.
+   *
+   * Every pending request belongs to this thread -- requests are posted only
+   * to a live thread, and this rejects them all -- so a request's deadline can
+   * never reach a successor.
    *
    * `close()` also routes through here, and only a real fault discards the last
    * measured depth, because a clean stop is not a failure and its count is
    * still true.
    */
-  private fail(cause: FailureCause): void {
-    const message = FAILURE_MESSAGE[cause.kind];
-    if (this.failed) {
+  private fail(thread: ReportThread, cause: FailureCause): void {
+    if (thread.failed) {
       return;
     }
-    this.failed = true;
+    thread.failed = true;
+    const message = FAILURE_MESSAGE[cause.kind];
     // Flushed before the failure record, so the count reads in order ahead of
     // the cause rather than being abandoned with the episode.
     this.endFaultEpisode(cause.kind);
@@ -352,6 +529,9 @@ export class DebugReportWorker {
       // back into it.
       this.stats = { ...UNMEASURED_QUEUE, lastError: message };
       logger.error('DEBUG_REPORTS', message, failureContext(cause));
+      // Retired now, not when a replacement is wanted: a stalled thread still
+      // holds the store and still runs its one-second delivery interval.
+      void thread.worker.terminate();
     }
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -359,30 +539,40 @@ export class DebugReportWorker {
     }
     this.pending.clear();
   }
+
+  /**
+   * Stops the one thread that exists. A live thread is asked to close, which
+   * runs its WAL checkpoint; a retiring one was terminated when it failed. Both
+   * are waited for, bounded, and no replacement starts once this has begun.
+   */
   close(): Promise<void> {
     if (this.closing !== undefined) {
       return this.closing;
     }
+    const thread = this.thread;
     this.closing = new Promise((resolve) => {
-      this.fail({ kind: 'close' });
-      let settled = false;
-      const finish = (): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
+      const deadline = setTimeout(() => {
+        // Shutdown goes on without it, but a thread still in a native call is
+        // joined by `process.exit`, so this is the record of why exit hangs.
+        logger.error(
+          'DEBUG_REPORTS',
+          'The debug report worker did not stop and may hold process exit',
+          { waitedMs: CLOSE_DEADLINE_MS }
+        );
+        void thread.worker.terminate();
+        resolve();
+      }, CLOSE_DEADLINE_MS);
+      void thread.exited.then(() => {
         clearTimeout(deadline);
         resolve();
-      };
-      const deadline = setTimeout(() => {
-        void this.worker.terminate();
-        finish();
-      }, 2_000);
-      this.worker.once('exit', finish);
-      this.worker.postMessage({
-        type: 'close',
-        requestId: ++this.nextId,
-      } satisfies ReportWorkerRequest);
+      });
+      if (!thread.failed) {
+        this.fail(thread, { kind: 'close' });
+        thread.worker.postMessage({
+          type: 'close',
+          requestId: ++this.nextId,
+        } satisfies ReportWorkerRequest);
+      }
     });
     return this.closing;
   }

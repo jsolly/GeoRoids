@@ -14,7 +14,7 @@ media: []
 
 ## Read the HUD
 
-Gold crates fill the cargo bay inside local and crew hulls as they collect points; a full hold pulses with Cargo Full, and [offloading](/wiki/#loot-growth) shows a stream, countdown and completion flash. The HUD shows your bank, cargo capacity, kit, shared settlement progress and resource requirements, and the crew leaderboard, ranked by bank (top ten on desktop, top three on touch, so you may not appear). The settlement percentage averages its five requirements. A thin health bar always appears above living crew ships and above your own damaged ship, and the Contour Lock button shows whether a contour is available or locked. On mobile, two compact lines show bank and cargo, then kit and settlement level progress; the detailed points and resource requirements remain in the desktop HUD. On touch, the ability button names your tool and a ring shows its cooldown; desktop has no cooldown indicator. One line at the top briefly shows satellite pickups, Delivery +N or Team delivery +N each, and Scout build results; no message appears on death.
+Gold crates fill the cargo bay inside local and crew hulls as they collect points; a full hold pulses with Cargo Full, and [offloading](/wiki/#loot-growth) shows a stream, countdown and completion flash. The HUD shows your bank, cargo capacity, kit, shared settlement progress and resource requirements, and the crew leaderboard, ranked by bank (top ten on desktop, top three on touch, so you may not appear). The settlement percentage averages its five requirements. A thin health bar always appears above living crew ships and above your own damaged ship, and the Contour Lock button shows whether a contour is available or locked. On mobile, two compact lines show bank and cargo, then kit and settlement level progress; the detailed points and resource requirements remain in the desktop HUD. On touch, the tappable tool indicator names your ability and shows its cooldown; Shield shows protection time and cooldown; desktop has no cooldown indicator. One line at the top briefly shows satellite pickups, Delivery +N or Team delivery +N each, and Scout build results; no message appears on death.
 
 ## Travel prompt
 
@@ -62,11 +62,11 @@ For a device performance check, open `/debug?performance=collect`, enter the gam
 
 ## Graphics option
 
-Live diagnostics include a Device label: Low-end, Commodity, High-end, or Unknown. Unknown means the browser did not supply enough hardware information to classify it.
+Live diagnostics include a Device label: Low-end, Commodity, High-end, or Unknown. Unknown means the browser did not supply enough hardware information to classify it. Low-end devices draw flight and the universe map without glow, so hulls, shots, effects and map marks lose their halo but keep their shapes and colors.
 
 Try the [experimental WebGL version](https://www.georoids.com/?renderer=webgl2) to compare graphics performance on your device. It uses the same scene and controls and falls back automatically if the renderer is unavailable. Reload the [standard version](https://www.georoids.com/) to return to the default renderer.
 
-For a flight-resolution comparison, open `/debug?performance=collect&renderDpr=1`; test `&renderGlow=off` separately at the original resolution. Lower resolution softens canvas details; these diagnostic choices apply only to that visit. Low-end [Mineral Scan](/wiki/#scout) keeps its separate resolution limit.
+For a flight-resolution comparison, open `/debug?performance=collect&renderDpr=1`; test `&renderGlow=off` separately at the original resolution, or `&renderGlow=full` on a low-end device. Lower resolution softens canvas details; these diagnostic choices apply only to that visit. Low-end [Mineral Scan](/wiki/#scout) keeps its separate resolution limit.
 
 ## Campaign status
 

@@ -6,7 +6,7 @@ Ship profile: `vercel-static`.
 
 **Integration: branch → reviewed PR → merge on green `CI / ci`.** Follow [local release instructions](docs/development.md). Agents never push to `main`, change rulesets, or admin-merge.
 
-Local gate: `npm run gate`; static checks, hook trust/bootstrap fixtures, runner contracts, the complete unit suite, build, and all server integration tests are mandatory. CI runs independent static, runner-contract, complete code-integration and Wiki media lanes; all must pass. Browser tests and automatic frame-work/constrained-client gates are retired.
+Local gate: `npm run gate`; static checks, hook trust/bootstrap fixtures, runner contracts, the complete unit suite, build, and all server integration tests are mandatory. CI runs independent static, runner-contract, Actions-contract, complete code-integration and Wiki media lanes; all must pass. Browser tests and automatic frame-work/constrained-client gates are retired.
 
 Deploy: Vercel Git at <https://www.georoids.com> plus Railway Git at <https://georoids-production-2403.up.railway.app>. Classify server inputs with `scripts/server-release-inputs.mjs` from the merged checkout; its server/shared/setup/manifest inputs determine which Railway release needs verification, and it fails if server code imports `src/`. A successful client deployment cannot prove the server deployed. Successful production Git deployments establish the release. Do not gate builds or production smoke on served release metadata, bundle SHA searches or server SHA ancestry. Follow the canonical smoke receipt through asset availability, genuine join, snapshots, movement, accepted firing and healthy persistence. Production smoke uses HTTP/assets and WebSocket protocol evidence; it does not certify browser rendering, keyboard/touch controls, graphics or audio. Skipped, cancelled, failed or missing smoke is unverified.
 
@@ -14,7 +14,7 @@ Before deployment operations, read [agent operations](docs/agent-operations.md).
 
 ## Project
 
-GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Astro static pages with Svelte 5 and shadcn-svelte interfaces plus a TypeScript canvas engine (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
+GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Astro static pages with Svelte 5 and shadcn-svelte interfaces plus a TypeScript canvas engine (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^26.0.0`.
 
 `AGENTS.md` (plus `tests/AGENTS.md`) is the only agent instruction file. Claude Code 2.1.277+ reads it natively; do not add a `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md`, because any of them makes Claude Code ignore `AGENTS.md`.
 
@@ -64,9 +64,9 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   a dynamic `import('./x.mjs')`), which covers most runners under `scripts/`. So
   ts-prune owns unused exports for those: `config/typescript/prune.jsonc` sets
   `allowJs` to keep `scripts/**/*.mjs` in its program, and
-  `scripts/check-unused-typescript.test.mjs` fails if that drops. Biome's
+  `scripts/check-unused-typescript.test.ts` fails if that drops. Biome's
   `noUnusedPrivateClassMembers` owns unused `private` and `#private` class
-  members, and `scripts/check-unused-class-members.mjs` — the gate's
+  members, and `scripts/check-unused-class-members.ts` — the gate's
   `check:members` stage, its own stage so that its verdicts do not read as a
   ts-prune failure — owns public methods, fields and accessors, on class
   declarations and class expressions alike, that nothing outside the declaring
@@ -150,7 +150,7 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
   file it was found in, so a run that reports nothing can be audited instead of
   trusted — that audit line is what exposed a dead `SatellitePickup.velocity`
   hiding behind a port no pickup is ever passed to — and
-  `scripts/check-unused-class-members.test.mjs` drives each rule from a
+  `scripts/check-unused-class-members.test.ts` drives each rule from a
   fixture that fails when the rule is deleted. Do not read that as a guarantee
   of complete coverage: three times now this note has claimed one, and each
   time a reviewer found rules whose deletion left the suite green — most
@@ -223,7 +223,7 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
 
 ## Local development
 
-Node24 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development). Before `npm run gate` or `npm run dev` in a Claude Code cloud session, run `bash .cursor/install-app.sh` ([cloud sessions](docs/agent-operations.md#cloud-sessions)).
+Node 26 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development). Before `npm run gate` or `npm run dev` in a Claude Code cloud session, run `bash .cursor/install-app.sh` ([cloud sessions](docs/agent-operations.md#cloud-sessions)).
 
 ## Local UI verification
 
@@ -231,8 +231,8 @@ Start `npm run dev`; verify at origin `http://127.0.0.1:5173/` (routes `/`, `/de
 
 ## Verified-tree CI
 
-PRs run static checks, runner contracts, the complete server integration suites, and Wiki media verification concurrently.
-The final `ci` job requires all four lanes to succeed; failed, cancelled, or skipped
+PRs run static checks, runner contracts, Actions contracts, the complete server integration suites, and Wiki media verification concurrently.
+The final `ci` job requires all five lanes to succeed; failed, cancelled, or skipped
 lanes fail the aggregate. Each lane has its own exact-tree proof.
 Full unit and server integration checks run locally in the review gate. Manual performance measurements remain outside it. Post-merge CI reuses each successful PR lane only
 when its recorded checkout tree exactly matches the landed tree, using
@@ -242,16 +242,11 @@ Canonical contract: [local CI helper](scripts/ci-verified-tree.sh).
 
 ## Dependabot CI
 
-Ordinary Dependabot PR events allocate no validation runners. Only an explicitly
-authorized manual maintenance run may apply `ow-ci`, after reviewing the current
-same-repository PR head and recording the invocation and head as evidence. Apply
-the label after the last push: only that `labeled` event runs real CI. A later
-Dependabot push defers again; verify the new head and remove/re-add the label to
-validate it. Scheduled or automatic maintenance grants no permission to approve,
-rebase, rerun, label or merge dependency PRs. Personal maintenance skills are optional.
-Deferred names ending in `-deferred`, skipped checks and absent checks cannot
-satisfy required `ci`. Merge only the reviewed current head with successful real
-CI. See the repository workflow and [release instructions](docs/development.md).
+Dependabot PRs run the same `ci` check as every other PR; labels start no runs.
+Agents never approve, rebase, arm or merge a Dependabot PR unless John asks.
+Skipped and absent checks cannot satisfy required `ci`. Merge only the reviewed
+current head with successful real CI. See the repository workflow and
+[release instructions](docs/development.md).
 
 ## Configuration
 

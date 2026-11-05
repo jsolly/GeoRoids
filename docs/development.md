@@ -46,6 +46,16 @@ Use the repository's README and AGENTS.md for its build, test and deployment
 commands. A missing prerequisite is a failed setup; report it rather than claiming
 that the gate ran. No setup command deploys the application or infrastructure.
 
+The complete gate and static CI lane run `check:python` as an explicit step,
+using pinned mypy 2.4.1 in strict mode
+with implicit `Any` expressions rejected. It checks the complete Wiki GIF
+encoder with Pillow 12.3.0's inline types and targets Python 3.11. The typed
+argument namespace describes the same parser conversions and defaults. The
+three hook implementation/test/legacy Python files remain outside this slice
+while the separately owned hook rollout is in progress; this is not complete
+repository Python coverage. Production builds and `check:wiki` do not require
+uv or mypy. No Wiki behavior or media baseline changes.
+
 ## Hook trust
 
 The dispatcher lives in this clone's Git common directory, shared only by its
@@ -100,8 +110,19 @@ intended deployment and exact-release smoke when the repository requires them.
 
 ## Infrastructure and access
 
-Use existing scoped identities. Agents do not recover credentials, broaden grants
-or run destructive infrastructure/database operations. Review Railway's complete
+Setup, build and checks use public tools and need no AWS login. Separately
+authorized AWS reads use exactly one native production `aws_mcp` connection for
+`agent@jsolly.com`, authorized as `AgentMcp` in account `730335616323`. Do not
+export its OAuth credentials, install an agent AWS profile or credential-process
+helper, add a second MCP connection, or bridge it into local CLI calls. Preserve
+AWS Core for skills and public knowledge, and preserve named human administrator,
+application, Vercel and workload credentials.
+
+Removing the repository bootstrap does not remove installed helpers, cached
+sessions, saved provider settings or live IAM trust. Provider isolation and
+legacy credential retirement require their separate acceptance evidence.
+Agents do not recover credentials, broaden grants or run destructive
+infrastructure/database operations. Review Railway's complete
 redacted live configuration and plan before any production configuration apply;
 preserve unrelated staged dashboard changes. Follow the repository's
 [deployment operations](agent-operations.md#deploy) and

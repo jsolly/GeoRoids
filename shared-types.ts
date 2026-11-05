@@ -447,6 +447,8 @@ export interface ServerEntityData {
   /** Session cumulative accepted cargo deposits; independent of bank spending. */
   bankedCargo?: number;
   weaponChargeFrames?: number;
+  shieldFrames?: number;
+  shieldCooldownFrames?: number;
   navigationAssistFrames?: number;
   contourDraftFrames?: number;
   purchases: string[];
@@ -510,6 +512,7 @@ export type ClientWireMessage =
   | { type: 'leave'; data: EmptyData }
   | { type: 'crewAction'; id: string; data: CrewAction }
   | { type: 'useAbility'; id: string; data: EmptyData }
+  | { type: 'activateShield'; id: string; data: Record<string, never> }
   | { type: 'chargeWeapon'; id: string; data: { action: WeaponChargeAction } }
   | { type: 'setHaulerUtility'; id: string; data: { utilityId: HaulerUtilityId } }
   | { type: 'setScoutUtility'; id: string; data: { utilityId: ScoutUtilityId } }
@@ -525,6 +528,7 @@ export type ClientGameplayMessage = Extract<
     type:
       | 'crewAction'
       | 'useAbility'
+      | 'activateShield'
       | 'chargeWeapon'
       | 'setHaulerUtility'
       | 'setScoutUtility'

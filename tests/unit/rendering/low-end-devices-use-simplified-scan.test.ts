@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { classifyScanDevice, resolveScanDetail } from '../../../src/rendering/scanDetailPolicy';
+import { classifyDevice } from '../../../src/rendering/deviceCategory';
+import { resolveScanDetail } from '../../../src/rendering/scanDetailPolicy';
 
 const desktop = {
   userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/141.0.0.0 Safari/537.36',
@@ -22,7 +23,7 @@ test('the measured Fire model selects simple detail even when capacity hints are
     deviceMemory: null,
     hardwareConcurrency: null,
   };
-  expect(classifyScanDevice(fire)).toBe('low-end');
+  expect(classifyDevice(fire)).toBe('low-end');
   expect(resolveScanDetail('', fire)).toEqual({ mode: 'simple', reason: 'known-fire-model' });
   expect(
     resolveScanDetail('', { ...desktop, userAgent: 'Android 9; kftuwi Build/PS7326' })
@@ -35,7 +36,7 @@ test('the measured Fire model selects simple detail even when capacity hints are
 test.each(['NotKFTUWI', 'KFTUWIX', 'KFTUWI2', 'unknown_KFTUWI', 'KFTUWI_unknown'])(
   'a model substring in %s does not classify an unrelated device as the measured Fire',
   (userAgent) => {
-    expect(classifyScanDevice({ ...desktop, userAgent })).toBe('high-end');
+    expect(classifyDevice({ ...desktop, userAgent })).toBe('high-end');
     expect(resolveScanDetail('', { ...desktop, userAgent })).toEqual({
       mode: 'full',
       reason: 'default-full',
@@ -44,7 +45,7 @@ test.each(['NotKFTUWI', 'KFTUWIX', 'KFTUWI2', 'unknown_KFTUWI', 'KFTUWI_unknown'
 );
 
 test('simple automatic detail needs coarse input and both low-capacity hints', () => {
-  expect(classifyScanDevice(lowCapacityTouch)).toBe('low-end');
+  expect(classifyDevice(lowCapacityTouch)).toBe('low-end');
   expect(resolveScanDetail('', lowCapacityTouch)).toEqual({
     mode: 'simple',
     reason: 'low-capacity-coarse-pointer',
@@ -80,7 +81,7 @@ test('capable touch devices, iPhones without memory hints and desktops keep full
 test.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
   'missing or invalid memory hint %s preserves full detail',
   (deviceMemory) => {
-    expect(classifyScanDevice({ ...lowCapacityTouch, deviceMemory })).toBe('unknown');
+    expect(classifyDevice({ ...lowCapacityTouch, deviceMemory })).toBe('unknown');
     expect(resolveScanDetail('', { ...lowCapacityTouch, deviceMemory })).toEqual({
       mode: 'full',
       reason: 'default-full',
@@ -91,7 +92,7 @@ test.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_IN
 test.each([null, 0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
   'missing or invalid core hint %s preserves full detail',
   (hardwareConcurrency) => {
-    expect(classifyScanDevice({ ...lowCapacityTouch, hardwareConcurrency })).toBe('unknown');
+    expect(classifyDevice({ ...lowCapacityTouch, hardwareConcurrency })).toBe('unknown');
     expect(resolveScanDetail('', { ...lowCapacityTouch, hardwareConcurrency })).toEqual({
       mode: 'full',
       reason: 'default-full',
@@ -100,8 +101,8 @@ test.each([null, 0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATI
 );
 
 test('high-end requires both capacity hints and all other valid combinations are commodity', () => {
-  expect(classifyScanDevice(desktop)).toBe('high-end');
-  expect(classifyScanDevice({ ...lowCapacityTouch, deviceMemory: 8, hardwareConcurrency: 8 })).toBe(
+  expect(classifyDevice(desktop)).toBe('high-end');
+  expect(classifyDevice({ ...lowCapacityTouch, deviceMemory: 8, hardwareConcurrency: 8 })).toBe(
     'high-end'
   );
   for (const hints of [
@@ -111,7 +112,7 @@ test('high-end requires both capacity hints and all other valid combinations are
     { ...lowCapacityTouch, deviceMemory: 8, hardwareConcurrency: 7 },
     { ...lowCapacityTouch, coarsePointer: false },
   ]) {
-    expect(classifyScanDevice(hints)).toBe('commodity');
+    expect(classifyDevice(hints)).toBe('commodity');
   }
 });
 
@@ -142,7 +143,7 @@ test.each(['1', 'collect'])(
       mode: 'simple',
       reason: 'forced-simple',
     });
-    expect(classifyScanDevice(desktop)).toBe('high-end');
+    expect(classifyDevice(desktop)).toBe('high-end');
     expect(resolveScanDetail(`${prefix}&scanDetail=full`, desktop)).toEqual({
       mode: 'full',
       reason: 'forced-full',
@@ -151,7 +152,7 @@ test.each(['1', 'collect'])(
       mode: 'full',
       reason: 'forced-full',
     });
-    expect(classifyScanDevice(lowCapacityTouch)).toBe('low-end');
+    expect(classifyDevice(lowCapacityTouch)).toBe('low-end');
     expect(resolveScanDetail(`${prefix}&scanDetail=auto`, lowCapacityTouch)).toEqual({
       mode: 'simple',
       reason: 'low-capacity-coarse-pointer',

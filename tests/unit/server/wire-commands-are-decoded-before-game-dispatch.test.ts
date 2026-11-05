@@ -43,6 +43,7 @@ const clientFrames: { [K in ClientWireMessage['type']]: Extract<ClientWireMessag
     snapshotResync: { type: 'snapshotResync', data: {} },
     leave: { type: 'leave', data: {} },
     crewAction: { type: 'crewAction', id: 'pilot', data: { kind: 'release' } },
+    activateShield: { type: 'activateShield', id: 'pilot', data: {} },
     chargeWeapon: { type: 'chargeWeapon', id: 'pilot', data: { action: 'start' } },
 
     useAbility: { type: 'useAbility', id: 'pilot', data: {} },

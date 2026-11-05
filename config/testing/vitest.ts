@@ -8,7 +8,7 @@ const testSessionDirectory = process.env['GEOROIDS_TEST_SESSION_DIR'];
 
 export default defineConfig({
   root: repositoryRoot,
-  plugins: [svelte({ configFile: fileURLToPath(new URL('../app/svelte.js', import.meta.url)) })],
+  plugins: [svelte({ configFile: fileURLToPath(new URL('../app/svelte.ts', import.meta.url)) })],
   ...(testSessionDirectory ? { cacheDir: `${testSessionDirectory}/cache/vitest` } : {}),
   test: {
     root: repositoryRoot,

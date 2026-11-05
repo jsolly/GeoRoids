@@ -9,7 +9,7 @@ import { afterEach, expect, test } from 'vitest';
 
 const roots: string[] = [];
 const sha = 'a'.repeat(40);
-const checker = fileURLToPath(new URL('../../../scripts/check-built-client.mjs', import.meta.url));
+const checker = fileURLToPath(new URL('../../../scripts/check-built-client.ts', import.meta.url));
 
 function checkArchive(root: string, metadata: Record<string, string>) {
   return spawnSync(process.execPath, [checker], {

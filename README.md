@@ -6,7 +6,7 @@ Astro produces the static pages, and Svelte 5 with shadcn-svelte owns the interf
 
 ## Local development
 
-Use Node 24.15 or newer within major 24 (`nvm use`). The jsdom test environment requires this patch-level floor. On macOS, the native `canvas` dependency requires Cairo, Pango, libjpeg, giflib and librsvg.
+Use Node 26 (`nvm use`). `package.json` requires `^26.0.0`; jsdom accepts that major from 26.0.0. On macOS, the native `canvas` dependency requires Cairo, Pango, libjpeg, giflib and librsvg.
 
 ```sh
 git clone git@github.com:jsolly/GeoRoids.git

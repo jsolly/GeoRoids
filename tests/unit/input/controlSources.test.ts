@@ -33,14 +33,14 @@ function release(code: string): void {
   keyUp(new KeyboardEvent('keyup', { code }), player);
 }
 
-test('keyboard steering takes over from the pointer and release keeps cruising on the new heading', () => {
+test('keyboard steering takes over from the pointer and release keeps the heading without thrust', () => {
   setTouchHeading(player, 0);
   press('ArrowLeft');
   expect(player.ship.angularVelocity).toBeCloseTo(TURN);
   player.ship.update();
   release('ArrowLeft');
   expect(player.ship.angularVelocity).toBe(0);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
   expect(controlSources.pointerHeading).toBeNull();
 });
 
@@ -55,8 +55,8 @@ test('touch turns toward the finger at the kit limit and release keeps the attai
   const angle = player.ship.angle;
   player.ship.update();
   expect(player.ship.angle).toBe(angle);
-  expect(player.ship.thrusting).toBe(true);
-  expect(Math.hypot(player.ship.velocity.x, player.ship.velocity.y)).toBeGreaterThan(0);
+  expect(player.ship.thrusting).toBe(false);
+  expect(Math.hypot(player.ship.velocity.x, player.ship.velocity.y)).toBe(0);
 });
 
 test('touch takes the short route across the angle wrap and settles without overshoot', () => {
@@ -84,10 +84,10 @@ test('dead player cannot fire from touch input', () => {
   expect(shoot).not.toHaveBeenCalled();
 });
 
-test('hold-to-fire keeps calling shoot while the firing finger is down', () => {
+test('legacy fire source cannot repeat shots during navigation ticks', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
   setTouchFire(player, true);
   tickTouchControls(player);
   tickTouchControls(player);
-  expect(shoot.mock.calls.length).toBeGreaterThanOrEqual(3);
+  expect(shoot).toHaveBeenCalledTimes(1);
 });

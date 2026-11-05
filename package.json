@@ -90,7 +90,7 @@
     "@astrojs/compiler-rs": "0.5.2",
     "@biomejs/biome": "2.5.15",
     "@internationalized/date": "^3.12.4",
-    "@lucide/svelte": "^1.56.0",
+    "@lucide/svelte": "^1.66.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",

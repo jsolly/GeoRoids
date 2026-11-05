@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { CIVIC_LOTS, FURNACES } from '../../../shared/furnaces';
@@ -22,7 +22,10 @@ beforeEach(() => {
     player.spawnProtectionTimer = 0;
   }
 });
-afterEach(() => engine.stopGameLoop());
+afterEach(() => {
+  engine.stopGameLoop();
+  vi.restoreAllMocks();
+});
 
 function deposit(id = 'ore', position = { x: 200, y: 0 }): AsteroidData {
   return {
@@ -46,6 +49,64 @@ function actor(id: string) {
   assert(value);
   return value;
 }
+
+test.each(['mineral_scan', 'survey_probe'] as const)(
+  '%s active frames reveal each pilot once while retaining nearby survey attribution',
+  (utility) => {
+    const scout = actor('scout');
+    scout.position = { x: 10_000, y: 10_000 };
+    scout.scoutUtility = utility;
+    scout.abilityActiveFrames = 10;
+    const hauler = actor('hauler');
+    hauler.position = { x: 16_000, y: 10_000 };
+    const near = deposit('near', { x: 10_900, y: 10_000 });
+    const far = deposit('far', { x: 11_300, y: 10_000 });
+    engine.addAsteroid(near);
+    engine.addAsteroid(far);
+    const reveal = vi.spyOn(engine, 'revealArea');
+
+    engine.tickAbilities();
+
+    expect(reveal.mock.calls).toEqual([
+      [scout.position, 1_200],
+      [hauler.position, 260],
+    ]);
+    expect(near.surveyedBy).toEqual([scout.id]);
+    expect(far.surveyedBy).toBeUndefined();
+    const cell = explorationCellAt(near.position);
+    assert(cell !== null);
+    expect(isCellExplored(engine.getGameState().exploration, cell)).toBe(true);
+  }
+);
+
+test('a satellite widens Hauler exploration with one reveal and base Scout discovery stays intact', () => {
+  const scout = actor('scout');
+  const hauler = actor('hauler');
+  const pickup = engine.getAllSatellitePickups()[0];
+  assert(pickup);
+  hauler.position = { ...pickup.position };
+  engine.tickSatellitePickups();
+  expect(engine.equipSatellite(hauler.id, pickup.id)).toBe(true);
+  scout.position = { x: 10_000, y: 10_000 };
+  hauler.position = { x: 16_000, y: 10_000 };
+  const near = deposit('satellite-survey', { x: 16_450, y: 10_000 });
+  const far = deposit('satellite-far', { x: 16_700, y: 10_000 });
+  engine.addAsteroid(near);
+  engine.addAsteroid(far);
+  const reveal = vi.spyOn(engine, 'revealArea');
+
+  engine.tickAbilities();
+
+  expect(reveal.mock.calls).toEqual([
+    [scout.position, 650],
+    [hauler.position, 600],
+  ]);
+  expect(near.surveyedBy).toEqual([hauler.id]);
+  expect(far.surveyedBy).toBeUndefined();
+  const cell = explorationCellAt(near.position);
+  assert(cell !== null);
+  expect(isCellExplored(engine.getGameState().exploration, cell)).toBe(true);
+});
 
 test('a Scout identifies cargo and both pilots receive the full furnace reward exactly once', () => {
   const rock = deposit();

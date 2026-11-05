@@ -1,18 +1,15 @@
-import { GAME } from '../../../shared/constants/gameplay';
-import { cargoCapacity } from '../../../shared/economy';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { thrustScaleFromMass } from '../../../shared/shipGrowth';
+import { GAME, SHIP } from '../../../shared/constants/gameplay';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { terrainCruiseVelocity } from '../../../shared/terrainTravel';
 import type { Ship } from './Ship';
 
 /** Cruise follows the nose with a bidirectional bonus for following contours. */
 export function advanceCruiseVelocity(
-  ship: Pick<Ship, 'position' | 'velocity' | 'angle' | 'mass' | 'thrust'>,
+  ship: Pick<Ship, 'position' | 'velocity' | 'angle'>,
   speedLimit: number
 ): void {
   const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
-  const acceleration = (ship.thrust * thrustScaleFromMass(ship.mass)) / GAME.FPS;
+  const acceleration = SHIP.THRUST / GAME.FPS;
   const target = terrainCruiseVelocity(ship.position, ship.angle, speedLimit);
   const targetSpeed = Math.hypot(target.x, target.y);
   const propelledSpeed =
@@ -30,12 +27,9 @@ export function advanceCruiseVelocity(
 
 /** Actual terrain speed, excluding collision impulses. */
 export function contourSpeedStrength(
-  ship: Pick<
-    Ship,
-    'mass' | 'maxVelocity' | 'velocity' | 'knockbackVelocityLimit' | 'cargo' | 'kitId'
-  >
+  ship: Pick<Ship, 'velocity' | 'knockbackVelocityLimit'>
 ): number {
-  const baseline = cruiseSpeed(ship.mass, ship.maxVelocity, ship.cargo, cargoCapacity(ship.kitId));
+  const baseline = SHIP.MAX_VELOCITY;
   if (ship.knockbackVelocityLimit > baseline) {
     return 0;
   }

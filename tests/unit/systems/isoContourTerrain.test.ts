@@ -140,7 +140,7 @@ describe('muted contour chrome', () => {
       strokes.push(ctx.strokeStyle);
     });
     const labels = vi.spyOn(ctx, 'fillText');
-    drawIsoContours({ x: 0, y: 0 });
+    drawIsoContours(ctx, { x: 0, y: 0 }, { width: 800, height: 600 }, 1);
     expect(strokes.length).toBeGreaterThan(0);
     for (const color of strokes) {
       expect(String(color)).toMatch(/^rgba\(104, 104, 104, /u);

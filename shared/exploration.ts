@@ -186,6 +186,8 @@ export function validExploration(value: unknown): value is ExplorationTile[] {
 export class ExplorationMap {
   private tiles = new Map<string, string>();
   private encoded: ExplorationTile[] = [];
+  /** Set by `reveal`, cleared by the next `snapshot`: the re-encode is O(explored world). */
+  private encodedStale = false;
 
   reveal(position: Position, range: number): number[] {
     const changed: number[] = [];
@@ -212,12 +214,16 @@ export class ExplorationMap {
       changed.push(cell);
     }
     if (changed.length > 0) {
-      this.encoded = Array.from(this.tiles, ([id, bits]) => ({ id, bits }));
+      this.encodedStale = true;
     }
     return changed;
   }
 
   snapshot(): ExplorationTile[] {
+    if (this.encodedStale) {
+      this.encoded = Array.from(this.tiles, ([id, bits]) => ({ id, bits }));
+      this.encodedStale = false;
+    }
     return this.encoded;
   }
   restore(tiles: ExplorationTile[]): void {
@@ -226,9 +232,11 @@ export class ExplorationMap {
     }
     this.tiles = new Map(tiles.map((tile) => [tile.id, tile.bits]));
     this.encoded = tiles.map((tile) => ({ ...tile }));
+    this.encodedStale = false;
   }
   reset(): void {
     this.tiles.clear();
     this.encoded = [];
+    this.encodedStale = false;
   }
 }

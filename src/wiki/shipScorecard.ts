@@ -1,7 +1,7 @@
 import { RadarChart } from 'echarts/charts';
 import { init, use } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
-import { GAME } from '../../shared/constants/gameplay';
+import { GAME, SHIP } from '../../shared/constants/gameplay';
 import { getShipKit, listShipKits, SHIP_ABILITY } from '../../shared/shipKits';
 import type { ShipKitId } from '../../shared-types';
 
@@ -11,18 +11,18 @@ type Kit = ReturnType<typeof getShipKit>;
 const stats = [
   { label: 'Hull', axis: 'Hull', value: (kit: Kit) => kit.maxHealth, unit: '', lower: false },
   { label: 'Size', axis: 'Compact', value: (kit: Kit) => kit.size, unit: '', lower: true },
-  { label: 'Thrust', axis: 'Thrust', value: (kit: Kit) => kit.thrust, unit: '', lower: false },
+  { label: 'Thrust', axis: 'Thrust', value: () => SHIP.THRUST, unit: '', lower: false },
   {
     label: 'Speed cap',
     axis: 'Speed',
-    value: (kit: Kit) => kit.maxVelocity,
+    value: () => SHIP.MAX_VELOCITY,
     unit: '',
     lower: false,
   },
   {
     label: 'Turn rate',
     axis: 'Turning',
-    value: (kit: Kit) => kit.turnSpeed,
+    value: () => SHIP.TURN_SPEED,
     unit: '°/s',
     lower: false,
   },

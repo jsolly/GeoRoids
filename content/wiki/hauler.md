@@ -17,7 +17,7 @@ media:
 
 ## Utility slot
 
-Hauler is the larger, slower-turning cargo ship with stronger mining lasers and Tow Cable as its starter tool. Find Resource Tap and Boost Coupling as [rare equipment drops](/wiki/#loot-growth), usually in spider nests, then choose them in Inventory with V or its button. E uses the selected tool.
+Hauler is the larger cargo ship with stronger mining lasers and Tow Cable as its starter tool. Find Resource Tap and Boost Coupling as [rare equipment drops](/wiki/#loot-growth), usually in spider nests, then choose them in Inventory with V or its button. E uses the selected tool.
 
 ## Resource Tap E
 
@@ -53,4 +53,4 @@ Hauler hits metal and colossal deposits harder. Direct shots are safe for crew h
 
 ## Loaded flight
 
-A full hold reduces cruise speed to 70% of its empty speed. Spiders choose the most loaded eligible pilot first, so an escort can clear the route while the carrier heads for a furnace.
+Both ships share acceleration, cruise speed, and turn rate. Cargo and saved hull mass do not change movement. Spiders choose the most loaded eligible pilot first, so an escort can clear the route while the carrier heads for a furnace.

@@ -11,6 +11,7 @@ import {
   worldFurnaces,
 } from '../../../src/network/worldExploration';
 import { setSpiderField } from '../../../src/physics/terrain/spiderSession';
+import { configureRenderQuality } from '../../../src/rendering/renderQuality';
 import { setPlayView } from '../../../src/ui/uiUtils';
 import {
   bindUniverseMapField,
@@ -39,6 +40,7 @@ afterEach(() => {
   setPlayView(false);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  configureRenderQuality('', 'desktop');
 });
 
 function mountUniverseMap() {
@@ -212,6 +214,66 @@ test('the universe map draws a fire trail only for a lit furnace', () => {
   expect(fireTrail()).toBe(0);
   worldFurnaces.light(furnace.id, 'Ada');
   expect(fireTrail()).toBe(1);
+});
+
+test('a low-end pilot sees their ship, landmarks and fire trail on the universe map without glow', () => {
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing furnace lot');
+  }
+  const { open, ctx } = mountUniverseMap();
+  setWorldMapAssets([
+    {
+      id: `furnace:${TOWN_HEARTH.id}`,
+      kind: 'furnace',
+      name: TOWN_HEARTH.name,
+      position: { ...TOWN_HEARTH.position },
+    },
+  ]);
+  worldFurnaces.light(furnace.id, 'Ada');
+  const pilot = new Player({ id: 'low-end-pilot', name: 'Ada', type: 'local' });
+  pilot.ship.position = { ...TOWN_HEARTH.position };
+  vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(pilot);
+  type Paint = { blur: number; trail: boolean; hull: boolean };
+  const paintsAt = (audience: 'desktop' | 'low-end'): Paint[] => {
+    configureRenderQuality('', audience);
+    const paints: Paint[] = [];
+    const stroke = ctx.stroke;
+    const fill = ctx.fill;
+    vi.spyOn(ctx, 'stroke').mockImplementation(function (this: CanvasRenderingContext2D, ...args) {
+      // The fire trail's outer stroke is the danger red the trail test above keys on.
+      const trail = String(this.strokeStyle).includes('244, 63, 94');
+      paints.push({ blur: this.shadowBlur, trail, hull: false });
+      Reflect.apply(stroke, this, args);
+    });
+    vi.spyOn(ctx, 'fill').mockImplementation(function (this: CanvasRenderingContext2D, ...args) {
+      // The local pilot's chart hull is the only fill whose shadow takes the ship colour.
+      const hull = String(this.shadowColor) === String(pilotShadow);
+      paints.push({ blur: this.shadowBlur, trail: false, hull });
+      Reflect.apply(fill, this, args);
+    });
+    open();
+    vi.mocked(ctx.stroke).mockRestore();
+    vi.mocked(ctx.fill).mockRestore();
+    closeMap();
+    return paints;
+  };
+  const probe = document.createElement('canvas').getContext('2d');
+  if (!probe) {
+    throw new Error('Expected a probe canvas');
+  }
+  probe.shadowColor = pilot.ship.color;
+  const pilotShadow = probe.shadowColor;
+  const full = paintsAt('desktop');
+  const fullTrail = full.filter((paint) => paint.trail);
+  const fullHull = full.filter((paint) => paint.hull);
+  expect(fullTrail.length).toBeGreaterThan(0);
+  expect(fullHull.length).toBeGreaterThan(0);
+  expect(Math.min(...fullTrail.map((paint) => paint.blur))).toBeGreaterThan(0);
+  expect(Math.min(...fullHull.map((paint) => paint.blur))).toBeGreaterThan(0);
+  const lowEnd = paintsAt('low-end');
+  expect(lowEnd.length).toBe(full.length);
+  expect(Math.max(...lowEnd.map((paint) => paint.blur))).toBe(0);
 });
 
 test('the universe map marks furnace lots before that ground is explored', () => {

@@ -35,6 +35,7 @@ import { cooperativeActive, getWorldCampaign } from '../../../src/network/worldC
 import { worldFurnaces } from '../../../src/network/worldExploration';
 import { getContourBridges } from '../../../src/physics/terrain/contourBridgeSession';
 import { getRolyPolys } from '../../../src/physics/terrain/rolyPolySession';
+import { scanCameraZoom } from '../../../src/rendering/canvas';
 import { sendCrewAction } from '../../../src/runtime/crewRescue';
 import { setSelectedShipKitId } from '../../../src/runtime/shipSelection';
 import { logger } from '../../../src/utils/Logger';
@@ -44,6 +45,7 @@ const LASER_SOUND_PATH_PATTERN = /sounds\/laser\.m4a$/u;
 const LOOT_PICKUP_SOUND_PATH_PATTERN = /sounds\/loot-pickup\.m4a$/u;
 const SURVEY_SCAN_SOUND_PATH_PATTERN = /survey-scan\.m4a$/u;
 const ORBITAL_PICKUP_SOUND_PATH_PATTERN = /orbital-pickup\.m4a$/u;
+const HIT_SOUND_PATH_PATTERN = /sounds\/hit\.m4a$/u;
 const CLIENT_RELEASE_ID_PATTERN = /^(dev|[a-f0-9]{40})$/u;
 const RESUME_TOKEN_PATTERN = /^[a-z0-9]{64}$/u;
 const JOIN_ACK_ORDER_ERROR_PATTERN = /before.*join ack/u;
@@ -151,6 +153,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
       weaponChargeFrames: 60,
       navigationAssistFrames: 1200,
       contourDraftFrames: 120,
+      shieldFrames: 90,
+      shieldCooldownFrames: 690,
     });
     const remote = { ...structuredClone(local), id: 'effect-crew', name: 'Effect crew' };
     active.entities = [local, remote];
@@ -161,36 +165,42 @@ describe('actual ConnectionManager WebSocket message path', () => {
       pilot.ship.weaponChargeFrames,
       pilot.ship.navigationAssistFrames,
       pilot.ship.contourDraftFrames,
+      pilot.ship.shieldFrames,
+      pilot.ship.shieldCooldownFrames,
     ];
     for (const pilot of [player, crew]) {
-      expect(timers(pilot)).toEqual([60, 1200, 120]);
+      expect(timers(pilot)).toEqual([60, 1200, 120, 90, 690]);
       ws.receive('abilityUsed', {
         id: pilot.id,
         kitId: 'scout',
         abilityActiveFrames: 0,
         harpoonTargetId: null,
       });
-      expect(timers(pilot)).toEqual([60, 1200, 120]);
+      expect(timers(pilot)).toEqual([60, 1200, 120, 90, 690]);
     }
     const cleared = structuredClone(active);
     for (const row of cleared.entities) {
       row.weaponChargeFrames = 0;
       row.navigationAssistFrames = 0;
       row.contourDraftFrames = 0;
+      row.shieldFrames = 0;
+      row.shieldCooldownFrames = 0;
     }
     ws.receive('snapshot', new SnapshotEncoder(cleared).encode(2, { sequence: 1, state: active }));
-    expect(timers(player)).toEqual([0, 0, 0]);
-    expect(timers(crew)).toEqual([0, 0, 0]);
+    expect(timers(player)).toEqual([0, 0, 0, 0, 0]);
+    expect(timers(crew)).toEqual([0, 0, 0, 0, 0]);
     ws.receive('snapshot', new SnapshotEncoder(active).encode(3));
     const absent = structuredClone(active);
     for (const row of absent.entities) {
       delete row.weaponChargeFrames;
       delete row.navigationAssistFrames;
       delete row.contourDraftFrames;
+      delete row.shieldFrames;
+      delete row.shieldCooldownFrames;
     }
     ws.receive('snapshot', new SnapshotEncoder(absent).encode(4, { sequence: 3, state: active }));
-    expect(timers(player)).toEqual([0, 0, 0]);
-    expect(timers(crew)).toEqual([0, 0, 0]);
+    expect(timers(player)).toEqual([0, 0, 0, 0, 0]);
+    expect(timers(crew)).toEqual([0, 0, 0, 0, 0]);
   });
 
   test.each(['disconnect', 'sessionExpired'] as const)(
@@ -1070,6 +1080,50 @@ describe('actual ConnectionManager WebSocket message path', () => {
     }
   });
 
+  test('a chipped deposit plays one directional hit cue and malformed events stay silent', async () => {
+    const player = createPlayer({
+      name: 'Mining pilot',
+      type: 'local',
+      position: { x: 0, y: 0 },
+      kitId: 'scout',
+      ...(manager.combatNetwork !== undefined ? { combatNetwork: manager.combatNetwork } : {}),
+    });
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(emptySnapshotFixture())).encode(1));
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const paths: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      paths.push(this.src);
+      return Promise.resolve();
+    });
+    try {
+      // An event without a rock, or without a usable position, never sounds.
+      // The position-less shape is the one the guard exists for: without it the
+      // cue would play centred at full volume instead of being culled.
+      ws.receive('asteroidHit', { asteroidId: '', position: { x: 30, y: 0 } });
+      ws.receive('asteroidHit', { asteroidId: 'ore' });
+      ws.receive('asteroidHit', { asteroidId: 'ore', position: { x: Number.NaN, y: 0 } });
+      expect(paths).toEqual([]);
+
+      // The cue is directional, so a chip beyond the viewport stays silent.
+      ws.receive('asteroidHit', { asteroidId: 'ore', position: { x: 10000, y: 0 } });
+      expect(paths).toEqual([]);
+
+      ws.receive('asteroidHit', { asteroidId: 'ore', position: { x: 30, y: 0 } });
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toMatch(HIT_SOUND_PATH_PATTERN);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
   test('intentional disconnect clears movement recovery after retiring the socket', async () => {
     const player = createPlayer({
       name: 'Departing pilot',
@@ -1161,22 +1215,25 @@ describe('actual ConnectionManager WebSocket message path', () => {
   test.each([
     {
       source: 'keyboard',
+      expectedThrust: true,
       press: (player: Player) => keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player),
       release: (player: Player) => keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player),
     },
     {
       source: 'right mouse',
+      expectedThrust: false,
       press: (player: Player) =>
         handleMouseDown(new MouseEvent('mousedown', { button: 2 }), player),
     },
     {
       source: 'touch steering',
+      expectedThrust: false,
       press: (player: Player) => setTouchHeading(player, 0),
       release: (player: Player) => setTouchHeading(player, null),
     },
   ])(
-    'late Hauler snapshots preserve cruise through $source input until authoritative death',
-    async ({ press, release }) => {
+    'late Hauler snapshots preserve intentional thrust through $source input until authoritative death',
+    async ({ press, release, expectedThrust }) => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
       const player = createPlayer({
         name: 'Runtime pilot',
@@ -1212,13 +1269,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
       state.loot = [];
       ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
       press(player);
-      expect(player.ship.thrusting).toBe(true);
+      expect(player.ship.thrusting).toBe(expectedThrust);
       // An older echo arrives before the newly held input has been sent.
       clock.mockReturnValue(10_017);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
       manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
-        thrusting: true,
+        thrusting: expectedThrust,
       });
 
       release?.(player);
@@ -1227,7 +1284,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
       manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
-        thrusting: true,
+        thrusting: false,
       });
 
       press(player);
@@ -1294,7 +1351,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
     keyUp(new KeyboardEvent('keyup', { code: 'KeyA' }), player);
     receive(4);
-    expect(player.ship.thrusting).toBe(true);
+    expect(player.ship.thrusting).toBe(false);
     expect(player.ship.angularVelocity).toBe(0);
   });
 
@@ -1847,12 +1904,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(player.ship.abilityActiveFrames).toBe(0);
   });
 
-  test('a stale snapshot does not clear a predicted Mineral Scan cooldown', async () => {
+  test('a stale snapshot preserves predicted Mineral Scan until the server echo, then accepts its end', async () => {
     const player = createPlayer({
       name: 'Runtime pilot',
       type: 'local',
       position: { x: 500, y: 100 },
       kitId: 'scout',
+      combatNetwork: manager.combatNetwork,
     });
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
@@ -1865,20 +1923,95 @@ describe('actual ConnectionManager WebSocket message path', () => {
     zeroEntity.abilityCooldownFrames = 0;
     ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
     player.ship.scoutUtility = 'mineral_scan';
-    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout;
+    expect(player.ship.activateAbility()).toBe(true);
+    expect(ws.sent.at(-1)?.type).toBe('useAbility');
+    expect(player.ship.abilityActiveFrames).toBe(SHIP_ABILITY.SCAN_FRAMES);
     const stale = captureSnapshot(zero);
     const staleEntity = stale.entities[0];
     assert.ok(staleEntity, 'stale snapshot entity');
     staleEntity.abilityCooldownFrames = 0;
     ws.receive('snapshot', new SnapshotEncoder(stale).encode(2));
     expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout);
+    expect(player.ship.abilityActiveFrames).toBe(SHIP_ABILITY.SCAN_FRAMES);
     const echoed = captureSnapshot(stale);
     const echoedEntity = echoed.entities[0];
     assert.ok(echoedEntity, 'echoed snapshot entity');
     echoedEntity.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.scout - 4;
+    echoedEntity.abilityActiveFrames = SHIP_ABILITY.SCAN_FRAMES - 4;
     ws.receive('snapshot', new SnapshotEncoder(echoed).encode(3));
     expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.scout - 4);
+    expect(player.ship.abilityActiveFrames).toBe(SHIP_ABILITY.SCAN_FRAMES - 4);
+    const ended = captureSnapshot(echoed);
+    const endedEntity = ended.entities[0];
+    assert.ok(endedEntity, 'ended snapshot entity');
+    endedEntity.abilityCooldownFrames =
+      SHIP_ABILITY.COOLDOWN_FRAMES.scout - SHIP_ABILITY.SCAN_FRAMES;
+    endedEntity.abilityActiveFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(ended).encode(4));
+    expect(player.ship.abilityActiveFrames).toBe(0);
   });
+
+  test.each(['downed', 'exploding', 'locally predicted death'])(
+    'a Scan rejected during %s stays cancelled through respawn',
+    async (death) => {
+      vi.spyOn(Date, 'now').mockReturnValue(123_000);
+      const player = createPlayer({
+        name: 'Runtime pilot',
+        type: 'local',
+        position: { x: 500, y: 100 },
+        kitId: 'scout',
+        combatNetwork: manager.combatNetwork,
+      });
+      vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+      const ws = await connect();
+      acknowledge(ws);
+      const ready = captureSnapshot(snapshotFixture());
+      const readyEntity = ready.entities[0];
+      assert.ok(readyEntity, 'ready snapshot entity');
+      readyEntity.id = manager.getClientId();
+      readyEntity.kitId = 'scout';
+      ws.receive('snapshot', new SnapshotEncoder(ready).encode(1));
+      player.ship.scoutUtility = 'mineral_scan';
+      expect(player.ship.activateAbility()).toBe(true);
+      expect(ws.sent.at(-1)?.type).toBe('useAbility');
+      expect(scanCameraZoom(player.ship, 800, 1094)).toBeLessThan(1);
+
+      if (death === 'locally predicted death') {
+        // Death and respawn may happen between received snapshots.
+        player.ship.takeDamage(player.ship.maxHealth);
+      } else {
+        // The server rejects the in-flight request after the pilot dies,
+        // so it never starts either authoritative ability timer.
+        const rejected = captureSnapshot(ready);
+        const rejectedEntity = rejected.entities[0];
+        assert.ok(rejectedEntity, 'rejected snapshot entity');
+        rejectedEntity.health = 0;
+        rejectedEntity.exploding = death === 'exploding';
+        rejectedEntity.downedUntil = death === 'downed' ? 183_000 : null;
+        ws.receive('snapshot', new SnapshotEncoder(rejected).encode(2));
+        expect(player.ship.abilityActiveFrames).toBe(0);
+        expect(player.ship.abilityCooldownFrames).toBe(0);
+      }
+      expect(player.ship.health).toBe(0);
+      expect(scanCameraZoom(player.ship, 800, 1094)).toBe(1);
+      for (let frame = 0; frame < SHIP_ABILITY.SCAN_FRAMES; frame++) {
+        player.ship.updateLifecycle();
+      }
+
+      const revived = captureSnapshot(ready);
+      const revivedEntity = revived.entities[0];
+      assert.ok(revivedEntity, 'respawn snapshot entity');
+      revivedEntity.spawnProtectionTimer = 60;
+      ws.receive('snapshot', new SnapshotEncoder(revived).encode(3));
+      expect(player.ship.health).toBe(player.ship.maxHealth);
+      expect(player.ship.exploding).toBe(false);
+      expect(player.ship.abilityActiveFrames).toBe(0);
+      expect(player.ship.abilityCooldownFrames).toBe(0);
+      expect(scanCameraZoom(player.ship, 800, 1094)).toBe(1);
+      expect(player.ship.activateAbility()).toBe(true);
+      expect(player.ship.abilityActiveFrames).toBe(SHIP_ABILITY.SCAN_FRAMES);
+    }
+  );
 
   test('a probe miss snapshot keeps the Scout ability ready', async () => {
     const player = createPlayer({

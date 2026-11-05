@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { SatellitePickupManager } from '../../../server/core/SatellitePickupManager';
 import { SATELLITE_PICKUP } from '../../../shared/constants/gameplay';
 import { ECONOMY } from '../../../shared/economy';
 import { orbitRadiusForOwner } from '../../../shared/satellitePickupMath';
@@ -28,6 +29,7 @@ describe('Satellite pickups', () => {
 
   afterEach(() => {
     gameEngine.stopGameLoop();
+    vi.restoreAllMocks();
   });
 
   function addPilot(id = 'pilot', position = { x: 0, y: 0 }, kitId: 'scout' | 'hauler' = 'scout') {
@@ -43,6 +45,40 @@ describe('Satellite pickups', () => {
       position: { x: pickup.position.x + distance, y: pickup.position.y },
     });
   }
+
+  test('ticks project hardware only for collection and never while the world is paused', () => {
+    addPilot('departed');
+    gameEngine.removePlayer('departed');
+    const project = vi.spyOn(SatellitePickupManager.prototype, 'getAllPickups');
+    gameEngine.tickSatellitePickups();
+    expect(project).not.toHaveBeenCalled();
+
+    const pilot = addPilot();
+    const pickup = gameEngine.getAllSatellitePickups()[0];
+    assert.ok(pickup);
+    moveNearPickup(pilot.id, pickup.id);
+    project.mockClear();
+
+    gameEngine.tickSatellitePickups();
+
+    expect(project).toHaveBeenCalledTimes(1);
+    expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
+      state: 'stored',
+      ownerId: pilot.id,
+      health: SATELLITE_PICKUP.HEALTH,
+    });
+    expect(gameEngine.drainSatellitePickupCollections()).toContainEqual(
+      expect.objectContaining({ pickupId: pickup.id, playerId: pilot.id })
+    );
+    expect(gameEngine.equipSatellite(pilot.id, pickup.id)).toBe(true);
+    project.mockClear();
+    gameEngine.tickSatellitePickups();
+    expect(project).toHaveBeenCalledTimes(1);
+    expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBeCloseTo(
+      SATELLITE_PICKUP.HEALTH - SATELLITE_PICKUP.HEALTH / SATELLITE_PICKUP.LIFETIME_FRAMES
+    );
+    expect(gameEngine.drainSatellitePickupCollections()).toEqual([]);
+  });
 
   function collectNearest(playerId = 'pilot', distance = 110, equip = true) {
     const pickup = gameEngine.getAllSatellitePickups()[0];

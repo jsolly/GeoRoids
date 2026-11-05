@@ -1,3 +1,4 @@
+import { sanitizeDebugDiagnostics } from '../../shared/debugReports';
 import { sanitizePlayerName } from '../../shared/player';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import { activateAudio, disposeAudioRuntime } from '../audio/audioRuntime';
@@ -20,7 +21,7 @@ import {
 } from '../input/touchControls';
 import { ConnectionManager } from '../network/services/ConnectionManager';
 
-import { readStoredResumeName } from '../network/services/resumeCredential';
+import { readStoredResumeName, readStoredResumeToken } from '../network/services/resumeCredential';
 import { canvasManager, type PlayfieldGeometry } from '../rendering/canvasSurface';
 import { mountShipSchematicCanvases } from '../rendering/shipSchematicCanvas';
 import { initTitleTerrain } from '../rendering/titleTerrain';
@@ -207,7 +208,10 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
         pilots: Object.freeze(
           ConnectionManager.getInstance()
             .getAllPlayers()
-            .filter((pilot) => pilot.ship.health > 0 && !pilot.ship.exploding)
+            .filter(
+              (pilot) =>
+                pilot.botRole === undefined && pilot.ship.health > 0 && !pilot.ship.exploding
+            )
             .map((pilot) =>
               Object.freeze({
                 id: pilot.id,
@@ -470,7 +474,24 @@ export function createGameRuntime(hosts: GameRuntimeHosts, signal: AbortSignal):
         return disposed ? '' : debug.diagnostics();
       },
       captureDiagnostics() {
-        return debug.captureDiagnostics();
+        const snapshot = debug.captureDiagnostics();
+        if (!phone) {
+          return snapshot;
+        }
+        const metrics = snapshot.state['metrics'];
+        const performance = sanitizeDebugDiagnostics(
+          { state: phone.readDiagnostics(), recentLogs: [] },
+          [readStoredResumeName(), readStoredResumeToken()].filter((value): value is string =>
+            Boolean(value)
+          )
+        ).state;
+        snapshot.state['metrics'] = {
+          ...(metrics !== null && typeof metrics === 'object' && !Array.isArray(metrics)
+            ? metrics
+            : {}),
+          performance,
+        };
+        return snapshot;
       },
       startPhoneCollection(device, conditions) {
         if (!disposed) {

@@ -3,6 +3,7 @@ import { EntityManager, type GameEntity } from '../../../server/core/EntityManag
 import { GameEngine } from '../../../server/core/GameEngine';
 import { type LootCatalogObserver, LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
+import { ServerClock } from '../../../server/core/ServerClock';
 import { EQUIPMENT_DROPS } from '../../../shared/equipment';
 import { cellWorldBounds, explorationCellAt } from '../../../shared/exploration';
 import { GROWTH, lootOverlap } from '../../../shared/shipGrowth';
@@ -18,7 +19,7 @@ function collectorAt(position: { x: number; y: number }): GameEntity {
 
 describe('LootManager destroy-drop shards', () => {
   test('spawnShard drops a shard at the break site', () => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const shard = manager.spawnShard({ x: 40, y: -10 }, 12);
 
     expect(shard.kind).toBe('shard');
@@ -30,7 +31,7 @@ describe('LootManager destroy-drop shards', () => {
   });
 
   test('remove is first-wins', () => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const shard = manager.spawnShard({ x: 0, y: 0 }, 0);
     expect(manager.remove(shard.id)?.id).toBe(shard.id);
     expect(manager.remove(shard.id)).toBeUndefined();
@@ -38,7 +39,7 @@ describe('LootManager destroy-drop shards', () => {
   });
 
   test('nearby loot flies toward a living ship', () => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const shard = manager.spawnShard({ x: 64, y: 0 }, 20);
     manager.expire(1, [collectorAt({ x: 0, y: 0 })]);
     const after = manager.get(shard.id);
@@ -47,7 +48,7 @@ describe('LootManager destroy-drop shards', () => {
   });
 
   test('loot magnet accumulates velocity across consecutive frames', () => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const shard = manager.spawnShard({ x: 80, y: 0 }, 20);
     manager.expire(20, [collectorAt({ x: 0, y: 0 })]);
     manager.expire(21, [collectorAt({ x: 0, y: 0 })]);
@@ -56,7 +57,7 @@ describe('LootManager destroy-drop shards', () => {
   });
 
   test('a Hauler collects a shard that a same-mass Scout still misses', () => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const engine = new GameEngine(7);
     try {
       const scout = engine.addPlayer(
@@ -85,7 +86,7 @@ describe('LootManager destroy-drop shards', () => {
   });
 
   test('a mass-grown Scout still misses a shard just past the kit hull', () => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const engine = new GameEngine(7);
     try {
       const scout = engine.addPlayer(
@@ -110,7 +111,7 @@ describe('LootManager destroy-drop shards', () => {
 test.each(['tap', 'silk'] as const)(
   '%s visibly ejects before an overlapping ship can collect it',
   (kind) => {
-    const manager = new LootManager(new RNGService(7));
+    const manager = new LootManager(new RNGService(7), () => Date.now());
     const drop =
       kind === 'tap'
         ? manager.spawnTap({ x: 0, y: 0 }, 0, { x: 3, y: 0 })
@@ -167,7 +168,7 @@ function savedPoint(id: string, x: number, y: number, expiresAt = 10000): SavedP
 
 test('restoring distant points does not expand local collection, discovery or stationary motion work', () => {
   vi.spyOn(Date, 'now').mockReturnValue(1000);
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const instrumentation = observeLoot(manager);
   manager.restorePoints([savedPoint('near', 0, 0)]);
   const ship = pilot('pilot', { x: 0, y: 0 });
@@ -209,9 +210,58 @@ test('restoring distant points does not expand local collection, discovery or st
   expect(manager.getCount()).toBe(10000);
 });
 
+test('point lifetime stays in elapsed milliseconds while other loot expires in frames', () => {
+  let elapsed = 0;
+  let wall = 10_000;
+  const clock = new ServerClock({ wallNow: () => wall, monotonicNow: () => elapsed });
+  const manager = new LootManager(new RNGService(7), () => clock.now());
+  manager.spawnPoints({ x: 30000, y: 0 }, 23);
+  const shard = manager.spawnShard({ x: 30000, y: 0 }, 0);
+  const original = manager.savedPoints()[0];
+  expect(original).toMatchObject({ points: 23, expiresAt: 130_000 });
+
+  wall = 1_000_000;
+  elapsed = 119_999;
+  manager.expire(GROWTH.LOOT_TTL_FRAMES);
+  expect(manager.get(shard.id)).toBeUndefined();
+  expect(manager.savedPoints()).toEqual([original]);
+
+  // Restart anchors a new process to a later epoch, without extending saved deadlines.
+  const restartedClock = new ServerClock({ wallNow: () => 129_999, monotonicNow: () => 0 });
+  const beforeDeadline = new LootManager(new RNGService(7), () => restartedClock.now());
+  beforeDeadline.restorePoints(manager.savedPoints());
+  expect(beforeDeadline.savedPoints()).toEqual([original]);
+  const atDeadline = new LootManager(new RNGService(7), () => 130_000);
+  atDeadline.restorePoints(manager.savedPoints());
+  expect(atDeadline.getCount()).toBe(0);
+
+  wall = 1;
+  elapsed = 120_000;
+  manager.expire(GROWTH.LOOT_TTL_FRAMES + 1);
+  expect(manager.savedPoints()).toEqual([]);
+});
+
+test('point save and restore capture their clock once for a whole batch', () => {
+  const now = vi.fn(() => 1000);
+  const manager = new LootManager(new RNGService(7), now);
+  manager.spawnPoints({ x: 0, y: 0 }, 1);
+  expect(now).toHaveBeenCalledOnce();
+  now.mockClear();
+  now.mockReturnValueOnce(1100).mockReturnValue(1200);
+  manager.restorePoints([savedPoint('at-boundary', 0, 0, 1100), savedPoint('next-ms', 0, 0, 1101)]);
+  expect(now).toHaveBeenCalledOnce();
+  expect(manager.get('at-boundary')).toBeUndefined();
+  expect(manager.get('next-ms')).toBeDefined();
+
+  now.mockClear();
+  now.mockReturnValueOnce(1100).mockReturnValue(1200);
+  expect(manager.savedPoints().map((drop) => drop.id)).toContain('next-ms');
+  expect(now).toHaveBeenCalledOnce();
+});
+
 test('point deadlines use one wall-clock boundary and direct collection removes due distant rows', () => {
   const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const instrumentation = observeLoot(manager);
   manager.restorePoints([savedPoint('due', 30000, 0, 1100), savedPoint('later', 30000, 0, 1101)]);
   const revision = manager.pointRevision;
@@ -256,7 +306,7 @@ test('point deadlines use one wall-clock boundary and direct collection removes 
 
 test('replacing and removing far-future point IDs leaves one deadline per live row across clock domains', () => {
   const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const instrumentation = observeLoot(manager);
   const shard = manager.spawnShard({ x: 0, y: 0 }, 0);
   manager.restorePoints([savedPoint(shard.id, 0, 0, 1e12)]);
@@ -318,7 +368,7 @@ test('replacing and removing far-future point IDs leaves one deadline per live r
 });
 
 test('guarded cache lifetime replaces ordinary deadlines and its rewards cannot seed another nest', () => {
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const instrumentation = observeLoot(manager);
   manager.spawnNestCache({ x: 0, y: 0 }, 0);
   const count = manager.getCount();
@@ -335,7 +385,7 @@ test('guarded cache lifetime replaces ordinary deadlines and its rewards cannot 
 });
 
 test('distant ejections and exact tiny velocities keep moving through cell seams without duplicate memberships', () => {
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const instrumentation = observeLoot(manager);
   const tap = manager.spawnTap({ x: 255, y: 30000 }, 0, { x: 3, y: 0 });
   const tiny = manager.spawnSilk({ x: 0, y: 30000 }, 0, { x: Number.MIN_VALUE, y: 0 });
@@ -358,7 +408,7 @@ test('distant ejections and exact tiny velocities keep moving through cell seams
 
 test('indexed candidates retain original rounded magnet, nest, hull, snapshot and exploration predicates', () => {
   vi.spyOn(Date, 'now').mockReturnValue(1000);
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   manager.restorePoints([
     savedPoint('cancellation', 1e-13, 0),
     savedPoint('hypot', 4199.999867352518, 1.0555751204935209),
@@ -419,7 +469,7 @@ test('indexed candidates retain original rounded magnet, nest, hull, snapshot an
 
 test('locale-equal loot IDs retain insertion order while locale-equal collectors retain supplied order', () => {
   vi.spyOn(Date, 'now').mockReturnValue(1000);
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const firstId = 'é';
   const secondId = 'e\u0301';
   expect(firstId.localeCompare(secondId)).toBe(0);
@@ -443,7 +493,7 @@ test('equipment stays available per eligible pilot and catalog hooks preserve au
     removed: vi.fn<LootCatalogObserver['removed']>(),
     cleared: vi.fn<LootCatalogObserver['cleared']>(),
   } satisfies LootCatalogObserver;
-  const manager = new LootManager(new RNGService(7), observer);
+  const manager = new LootManager(new RNGService(7), () => Date.now(), observer);
   const instrumentation = observeLoot(manager);
   const equipment = manager.spawnEquipment({ x: 0, y: 0 }, 0, 'resource_tap');
   const a = pilot('a', { x: 0, y: 0 }, 'hauler');
@@ -466,7 +516,7 @@ test('equipment stays available per eligible pilot and catalog hooks preserve au
 
 test('disposable eviction keeps insertion priority without counting restored points or equipment against its cap', () => {
   vi.spyOn(Date, 'now').mockReturnValue(1000);
-  const manager = new LootManager(new RNGService(7));
+  const manager = new LootManager(new RNGService(7), () => Date.now());
   const instrumentation = observeLoot(manager);
   manager.restorePoints(
     Array.from({ length: 1000 }, (_, index) => savedPoint(`saved-${index}`, 30000, 30000))

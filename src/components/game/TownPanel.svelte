@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import type { TownStoreView, TownView } from '../../runtime/townStore';
   import type { FurnaceTravelView } from '../../ui/furnaceTravelMap';
+  import { formatPoints } from '../../utils/formatPoints';
   import Button from '../ui/button/button.svelte';
   import FurnaceTravelMap from './FurnaceTravelMap.svelte';
 
@@ -44,7 +45,7 @@
 <div class="town-panel grid gap-5">
   <div class="flex flex-wrap justify-between gap-2 text-sm text-muted-foreground">
     <p>{view.sourceName}</p>
-    <p>Bank {view.bank.toLocaleString()} · Settlement level {view.level}</p>
+    <p>Bank {formatPoints(view.bank)} · Settlement level {view.level}</p>
   </div>
 
   {#if view.mode === 'entry'}
@@ -66,7 +67,7 @@
           <div class="min-w-0">
             <p class="text-sm font-medium">{offer.name}</p>
             <p id={`town-price-${offer.id}`} class="text-xs leading-relaxed text-muted-foreground">
-              {offer.cost.toLocaleString()} banked points · Level {offer.level}
+              {formatPoints(offer.cost)} banked points · Level {offer.level}
             </p>
           </div>
           <Button

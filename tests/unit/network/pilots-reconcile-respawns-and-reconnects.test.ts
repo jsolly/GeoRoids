@@ -1,4 +1,6 @@
 import { describe, expect, it as test } from 'vitest';
+import { SHIP } from '../../../shared/constants/gameplay';
+import { ensureTerrain, getTerrainField } from '../../../shared/terrainField';
 import type { ServerEntityData } from '../../../shared-types';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
@@ -22,24 +24,33 @@ function fixture() {
 
 describe('player motion recovery', () => {
   test('a server blast survives the flight cap and then decays back to normal control speed', () => {
-    const { ship, prediction } = fixture();
-    prediction.rebase(
-      row({
-        position: { x: 0, y: 0 },
-        velocity: { x: 24, y: 0 },
-        playerMotion: { epoch: 3, mode: 'free', ack: 0 },
-      }),
-      ship,
-      17
-    );
-    ship.thrusting = false;
-    ship.update();
-    expect(ship.position.x).toBeGreaterThan(20);
-    expect(ship.velocity.x).toBeGreaterThan(ship.maxVelocity * 2);
-    for (let frame = 0; frame < 90; frame++) {
+    const prior = getTerrainField();
+    // Gradient samples lie outside this small field, so the entire flight stays flat.
+    ensureTerrain(prior.seed, { cx: 0, cy: 0, radius: 1 });
+    try {
+      const { ship, prediction } = fixture();
+      prediction.rebase(
+        row({
+          position: { x: 0, y: 0 },
+          velocity: { x: 24, y: 0 },
+          playerMotion: { epoch: 3, mode: 'free', ack: 0 },
+        }),
+        ship,
+        17
+      );
+      ship.thrusting = true;
       ship.update();
+      expect(ship.position.x).toBeGreaterThan(20);
+      expect(ship.velocity.x).toBeGreaterThan(SHIP.MAX_VELOCITY * 2);
+      for (let frame = 0; frame < 90; frame++) {
+        const before = ship.position.x;
+        ship.update();
+        expect(ship.position.x).toBeGreaterThan(before);
+      }
+      expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeCloseTo(SHIP.MAX_VELOCITY, 10);
+    } finally {
+      ensureTerrain(prior.seed, { cx: prior.cx, cy: prior.cy, radius: prior.radius });
     }
-    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(ship.maxVelocity);
   });
 
   test('keeps handoff movement suppressed until a free-mode snapshot confirms the anchored acknowledgment', () => {

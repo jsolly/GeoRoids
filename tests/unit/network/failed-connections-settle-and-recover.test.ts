@@ -1,11 +1,13 @@
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { readDebugHudMetrics } from '../../../src/diagnostics/debugHudMetrics';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { createPlayer } from '../../../src/entities/player/createPlayer';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 import {
   CONNECTION_HANDSHAKE_TIMEOUT_MS,
+  HEARTBEAT_INTERVAL_MS,
   JOIN_COMPLETION_TIMEOUT_MS,
 } from '../../../src/network/services/connectionHealth';
 import { logger } from '../../../src/utils/Logger';
@@ -75,6 +77,58 @@ async function open(): Promise<Transport> {
   await connected;
   return socket;
 }
+
+test('heartbeat identities keep HUD latency correct without optional performance collection', async () => {
+  expect(clientPerformance.enabled).toBe(false);
+  const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+  const socket = await open();
+  const latestProbe = (transport: Transport): number => {
+    for (const [text] of transport.send.mock.calls.toReversed()) {
+      const message: unknown = JSON.parse(text);
+      if (
+        message !== null &&
+        typeof message === 'object' &&
+        'type' in message &&
+        message.type === 'ping' &&
+        'probeId' in message &&
+        typeof message.probeId === 'number'
+      ) {
+        return message.probeId;
+      }
+    }
+    throw new Error('Expected a sent heartbeat with its probe identity');
+  };
+  const pong = (transport: Transport, probeId: number) => {
+    transport.onmessage?.({ data: JSON.stringify({ type: 'pong', probeId }) });
+  };
+
+  await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+  const first = latestProbe(socket);
+  now.mockReturnValue(3000);
+  await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+  const second = latestProbe(socket);
+  expect(second).toBeGreaterThan(first);
+  now.mockReturnValue(3100);
+  pong(socket, first);
+  expect(readDebugHudMetrics(3100).rttMs).toBeUndefined();
+  now.mockReturnValue(3120);
+  pong(socket, second);
+  expect(readDebugHudMetrics(3120).rttMs).toBe(120);
+
+  manager.disconnect();
+  expect(readDebugHudMetrics(3120).rttMs).toBeUndefined();
+  const nextSession = await open();
+  now.mockReturnValue(5000);
+  await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+  const current = latestProbe(nextSession);
+  expect(current).toBeGreaterThan(second);
+  now.mockReturnValue(5010);
+  pong(nextSession, second);
+  expect(readDebugHudMetrics(5010).rttMs).toBeUndefined();
+  now.mockReturnValue(5020);
+  pong(nextSession, current);
+  expect(readDebugHudMetrics(5020).rttMs).toBe(20);
+});
 
 test('an unanswered initial handshake times out and permits an explicit retry', async () => {
   const failure = expect(manager.connect()).rejects.toThrow('timed out');

@@ -13,11 +13,17 @@ Use the repeatable benchmark framework in [`benchmarks/README.md`](../benchmarks
 
 The current framework produces separate client, server, codec and transport measurements with workload counts and outcome witnesses. The broader plan still calls for an automated report connecting frame pacing, client update/render/decode time, server tick deadlines, and transport pressure to the same workload and release. Follow it with small changes to terrain traversal, HUD work, clock recovery, and collision candidate selection where traces show material cost. Every optimization must preserve authoritative combat, touch controls, readable projectiles, and reconnect behavior.
 
-This is an implementation plan, not a claim that the app already meets the proposed targets. The benchmark work in this change makes no optimization or supported-capacity claim. Physical Android/iPhone measurements, Railway capacity tests, and production performance distributions remain unmeasured. Complete those measurements in the phases below before declaring a supported capacity or a mobile frame-rate guarantee.
+This is an implementation plan, not a claim that the app already meets the proposed targets. The benchmark work in this change makes no optimization or supported-capacity claim. A later [short Fire tablet recording](performance/fire-tablet-experiments.md) measured about 59 FPS in Canvas play with glow off. Sustained and full-glow device acceptance, iPhone measurements, Railway capacity tests, and production performance distributions remain unqualified. Complete the relevant measurements before declaring a supported capacity or a mobile frame-rate guarantee.
 
 ## Evidence and current architecture
 
 The historical repository baseline is [`54d8c18d4ce25b3ea6af731582bd615666761a85`](https://github.com/jsolly/GeoRoids/tree/54d8c18d4ce25b3ea6af731582bd615666761a85). Repository observations below refer to that archived revision; links use local paths for navigation. Public documentation was checked on September 8, 2026. Recheck the current implementation branch before editing because rendering and protocol work is active.
+
+Current flight rendering multiplies CSS dimensions by effective device DPR.
+Low-end Mineral Scan uses a separate bounded visible canvas and returns to flight
+resolution afterward. Use the [current quality policy](performance/mobile-quality-decisions.md)
+and [Fire tablet record](performance/fire-tablet-experiments.md) for later measurements;
+the table below describes the archived baseline.
 
 | Area | Existing behavior and evidence | Consequence for the plan |
 | --- | --- | --- |
@@ -30,7 +36,7 @@ The historical repository baseline is [`54d8c18d4ce25b3ea6af731582bd615666761a85
 | Protocol | [snapshot-v3.md](protocol/snapshot-v3.md) documents negotiated deltas, keyframes, atomic validation, unsupported-client rejection, resync, and required capabilities. | Extend the existing codec and compatibility tests. Do not propose delta snapshots as new work. |
 | Collision | [CollisionAuthority.ts](../server/core/CollisionAuthority.ts) maps entities into collision rows; [combat.ts](../shared/combat.ts) checks ship/asteroid combinations and ship pairs with nested loops. | Candidate growth and temporary allocations are plausible scaling costs, not measured bottlenecks yet. |
 | Mobile interaction | [touchControls.ts](../src/input/touchControls.ts) supports steering, firing, and ability input with stateful pointer handling and cached button state. | Test sustained multitouch and lifecycle transitions, beyond button visibility. |
-| Test enforcement | [ci.yml](../.github/workflows/ci.yml) runs static checks, runner contracts, unit tests, and build. It does not run gameplay browser or server integration suites. | Add bounded behavioral integration coverage to CI without weakening the existing gate. Superseded: current CI runs static, runner-contract, complete server integration and Wiki media lanes; units run in the local gate. |
+| Test enforcement | [ci.yml](../.github/workflows/ci.yml) runs static checks, runner contracts, unit tests, and build. It does not run gameplay browser or server integration suites. | Add bounded behavioral integration coverage to CI without weakening the existing gate. Superseded: current CI runs static, runner-contract, Actions-contract, complete server integration and Wiki media lanes; units run in the local gate. |
 | Diagnostics | [diagnostics.md](diagnostics.md) describes correlated bounded logs, release IDs, queue loss, and explicitly copied state. | Reuse these mechanisms; add aggregate timing metrics rather than per-frame logs. |
 
 ### What existing numbers establish
@@ -228,7 +234,7 @@ Keep one authoritative process per world initially. Choose region from observed 
 
 Build a load driver with the existing Node `ws` dependency first so it can reuse the real protocol decoder and commands. Run it in a separate process or host from the measured server and prove the generator is not CPU-bound. k6's current `k6/websockets` module is an alternative when distributed generation and standard load reporting become useful; its documentation recommends that API for new tests.[^16]
 
-Drive actual joins, input at realistic cadence, shots, periodic resync, and disconnects. Distinguish offered load from accepted active pilots and finished scenarios. The production connection limiter is 50 attempts per minute per IP at this revision; phase admissions accordingly, or use explicitly controlled staging configuration and report it. Do not globally disable production protection to make a capacity graph look better.
+Drive actual joins, input at realistic cadence, shots, periodic resync, and disconnects. Distinguish offered load from accepted active pilots and finished scenarios. The production connection limiter is one shared budget rather than a per-pilot one: behind Railway's public HTTP ingress every caller is charged to the edge proxy's address, so at this revision a single bucket holds 600 gameplay and 300 log upgrades per busy window (`server/communication/connectionAdmission.ts`), and the window rolls only after a full minute with no accepted upgrade in that lane. A driver that generates load from one host therefore spends the whole fleet's budget by itself; phase admissions accordingly, or use explicitly controlled staging configuration and report it. Do not globally disable production protection to make a capacity graph look better.
 
 Use 30 seconds of warmup and at least three minutes per staircase level, then 30 minutes at the last passing level. Repeat the boundary level. Stop escalation on sustained backlog, unbounded memory, protocol errors, or health failure; label that level failed. Publish the last passing configuration with headroom, initially a 30% admission reserve, rather than extrapolating from a no-I/O loop benchmark.
 

@@ -316,6 +316,15 @@ export interface AsteroidDestroyEvent {
   consumedBy?: 'furnace';
 }
 
+/**
+ * A laser hit a durable deposit that survived it. Ordinary rocks report
+ * `asteroidDestroy` instead, so a chip and a shatter never sound together.
+ */
+export interface AsteroidHitEvent {
+  asteroidId: string;
+  position: Position;
+}
+
 /** A furnace a Scout lit with their own score. */
 export interface CivicModule {
   id: string;
@@ -410,7 +419,11 @@ export interface RescueState {
   completesAt: number;
 }
 
+export type BotRole = 'worker' | 'raider';
+
 export interface ServerEntityData {
+  /** Server-controlled hull; omitted for human pilots. */
+  botRole?: BotRole;
   downedUntil?: number | null;
   rescue?: RescueState | null;
   crewSignal?: CrewSignal | null;
@@ -434,6 +447,8 @@ export interface ServerEntityData {
   /** Session cumulative accepted cargo deposits; independent of bank spending. */
   bankedCargo?: number;
   weaponChargeFrames?: number;
+  shieldFrames?: number;
+  shieldCooldownFrames?: number;
   navigationAssistFrames?: number;
   contourDraftFrames?: number;
   purchases: string[];
@@ -455,8 +470,6 @@ export interface ServerEntityData {
   haulerUtility?: HaulerUtilityId;
   /** Equipped Scout utility. Omitted on other kits. Missing means mineral scan. */
   scoutUtility?: ScoutUtilityId;
-  /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
-  deathCause?: string;
   playerMotion?: PlayerMotionState;
 }
 
@@ -499,13 +512,13 @@ export type ClientWireMessage =
   | { type: 'leave'; data: EmptyData }
   | { type: 'crewAction'; id: string; data: CrewAction }
   | { type: 'useAbility'; id: string; data: EmptyData }
+  | { type: 'activateShield'; id: string; data: Record<string, never> }
   | { type: 'chargeWeapon'; id: string; data: { action: WeaponChargeAction } }
   | { type: 'setHaulerUtility'; id: string; data: { utilityId: HaulerUtilityId } }
   | { type: 'setScoutUtility'; id: string; data: { utilityId: ScoutUtilityId } }
   | { type: 'equipSatellite'; id: string; data: { pickupId: string } }
   | { type: 'buyStoreItem'; id: string; data: { offerId: string } }
   | { type: 'travelFurnace'; id: string; data: { destinationId: string } }
-  | { type: 'collisionDamage'; data: { targetPlayerId: string; attackerId: 'boundary' } }
   | PingMessage;
 
 /** Commands a pilot may send only after the server acknowledged its join. */
@@ -515,13 +528,13 @@ export type ClientGameplayMessage = Extract<
     type:
       | 'crewAction'
       | 'useAbility'
+      | 'activateShield'
       | 'chargeWeapon'
       | 'setHaulerUtility'
       | 'setScoutUtility'
       | 'equipSatellite'
       | 'buyStoreItem'
       | 'travelFurnace'
-      | 'collisionDamage'
       | 'snapshotResync';
   }
 >;

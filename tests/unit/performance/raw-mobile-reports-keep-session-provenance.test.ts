@@ -17,13 +17,18 @@ const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(valu
 const fixtureManifest = { seed: 42, scenario: 'combat' };
 const fixtureHash = hash(fixtureManifest);
 const quality = { maxDpr: 'native', glow: 'full' };
-async function fixture(directory: string, kind: 'quality' | 'product' | 'renderer' = 'quality') {
+async function fixture(
+  directory: string,
+  kind: 'quality' | 'product' | 'renderer' = 'quality',
+  candidateDpr = 2
+) {
   const aa: string[][] = [];
   const ab: string[][] = [];
   for (let index = 0; index < 12; index++) {
     const candidate = index >= 6 && index % 2 === 1;
     const arm = candidate && kind === 'product' ? 'candidate' : 'baseline';
-    const graphics = candidate && kind === 'quality' ? { ...quality, maxDpr: 2 } : quality;
+    const graphics =
+      candidate && kind === 'quality' ? { ...quality, maxDpr: candidateDpr } : quality;
     const renderer = candidate && kind === 'renderer' ? 'webgl2' : 'canvas';
     const frames = Array.from({ length: 18750 }, (_, frame) =>
       frame < (candidate ? 94 : 375) ? 31 : 16
@@ -187,7 +192,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' | 'rendere
         candidate: {
           sourceSha256: hash(kind === 'product' ? 'candidate' : 'baseline'),
           productSha256: hash(kind === 'product' ? 'product-candidate' : 'product-baseline'),
-          quality: kind === 'quality' ? { ...quality, maxDpr: 2 } : quality,
+          quality: kind === 'quality' ? { ...quality, maxDpr: candidateDpr } : quality,
           ...(kind === 'renderer' ? { renderer: 'webgl2' } : {}),
         },
       },
@@ -299,6 +304,20 @@ test.each(['quality', 'product', 'renderer'] as const)(
     }
   }
 );
+
+test.each([1, 0.75])('raw comparisons preserve numeric DPR cap %s', async (maxDpr) => {
+  const directory = await mkdtemp(join(tmpdir(), 'mobile-low-dpr-'));
+  try {
+    const manifest = await fixture(directory, 'quality', maxDpr);
+    const output = join(directory, 'comparison.json');
+    expect(run(manifest, output)).toContain('improved');
+    const result = JSON.parse(await readFile(output, 'utf8'));
+    expect(result.experiment.candidate.quality.maxDpr).toBe(maxDpr);
+    expect(result.sources).toHaveLength(12);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test('a GPU session cannot hide a Canvas fallback that recovered before collection', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'renderer-comparison-'));

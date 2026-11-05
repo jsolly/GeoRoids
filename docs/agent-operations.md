@@ -48,7 +48,16 @@ imports its runtime immediately on mount; the Wiki's chart code is in its initia
 module graph. Audio (`howler`) and client log forwarding still import chunks on
 demand. Generated JS/CSS now uses `/_vercel/immutable/<salt-digest>/` URLs.
 `scripts/build-vercel-output.mjs` emits Vercel's Build Output API static tree and
-full SHA-256 immutable manifest. The provider serves these files across deployments
+full SHA-256 immutable manifest. This CLI, `verify-retained-assets.mjs` and
+`benchmark-build-receipt.mjs` are generated from their `.mts` sources with the pinned
+TypeScript 7 CLI. After editing those sources or their typed graph dependency, run
+`node scripts/generate-asset-boundaries.ts --write`; `check:ts` checks their freshness.
+The existing CLI paths and retained asset URLs stay stable. The same generator owns
+`production-smoke-entry.mjs`, `production-smoke-network.mjs` and
+`production-smoke-scenario.mjs` from their typed sources. The deployed smoke command,
+scenario paths and dynamic loading of shared protocol code stay unchanged.
+
+The provider serves these files across deployments
 even when the current build omits them, including overlapping builds. No service
 worker or previous-build cache is required; documents and release metadata stay current.
 
@@ -199,11 +208,85 @@ Only the report worker parses, redacts and persists report bodies or contacts
 Todoist. The main server accepts at most two concurrent uploads and eight
 worker requests, with a ten-second request deadline. New reports are limited
 to 2 MiB, three per client address per hour and 30 globally per UTC day.
+The worker refuses a limited address before the report sanitizer runs
+(parsing, which cleans each log record, still runs first), then checks again
+inside the transaction that counts it. A diagnostic state string longer than
+8,192 characters is clipped to that length and ends in `…[truncated]`; a word
+the cut splits loses its kept part, up to 128 characters, so a clipped secret
+keeps no prefix, and redaction never removes the marker. A client log record
+over 8 KiB still rejects the report. One sanitizer pass parses at most 2,048
+URLs and redacts later ones whole. Redaction runs in time linear in the
+report's size.
 These limits are independent of gameplay admission. Railway public HTTP
 ingress supplies `X-Real-IP`; local development uses the socket address and
 ignores forwarded address headers. Before release, verify that Railway replaces
 client-supplied `X-Real-IP` values. Do not expose this reporting listener through
 an untrusted internal proxy that can choose that header.
+
+Verified against the live production ingress: the header probe on 2026-10-25 at
+release `c487d041`, and the precondition below on 2026-10-26 at `d7d084e`.
+`clientAddress` runs before the method and content-type checks, so a value that
+cannot parse as an address is distinguishable without submitting a report — a
+pass-through answers `503 Reporting ingress address is unavailable`, while `405
+Unsupported report method or path` means no client-chosen value reached the
+resolver.
+
+```sh
+curl -sS -H 'X-Real-IP: not-an-address' \
+  https://georoids-production-2403.up.railway.app/debug-reports
+```
+
+A garbage value, the header sent twice, the header sent empty, and an
+`X-Forwarded-For`-only spoof all answered 405, never the 503. The 503 fires on
+anything that is not a bare valid IP, and Node joins duplicate headers into one
+comma-separated string, so that result excludes pass-through, append, duplicate
+survival and absence alike: the edge set the header itself in every case.
+
+That branch only runs when `railwayIngress` is true, so measure it rather than
+assume it. `GET /status` reports `"nodeEnv": "production"`, and `GET /health`
+carries `debugReports`, which `server/debugReports/configuration.ts` only
+produces when `RAILWAY_ENVIRONMENT_ID` is set. Both conjuncts hold.
+
+Two gaps remain that this procedure cannot close: whether a well-formed
+client-supplied value is overwritten rather than preserved, and the WebSocket
+upgrade route. Distinguishing either needs an oracle revealing which address the
+server resolved, and no public endpoint exposes one — adding such an endpoint
+would publish the quantity a limiter keys on. Re-verify on any ingress or domain
+change.
+
+A worker failure (an uncaught error, an unexpected exit or a request past its
+deadline) retires that thread with its cause logged, and reporting answers 503.
+A later request starts one replacement and is itself refused as restarting; the
+player's retry reaches the new thread. The replacement starts only after the old
+thread has exited, because the store holds its database under an exclusive
+SQLite lock until its thread is gone. At most three replacement threads start
+in any rolling hour. Each is logged as `Replacing the debug report worker` when
+requested and counted from the moment its thread actually starts, so a late
+handover cannot fit a fourth start into the hour. A
+spent budget is logged once with the time of the next possible attempt, and
+reporting stays closed until then or until the service restarts. If the old
+thread has not exited ten seconds after its replacement was requested, the
+server logs that reporting stays closed until it does, `/health` reports the
+worker as not stopped, and refusals stop promising a restart. A thread stuck
+in a native SQLite call keeps reporting closed until it exits. When it does,
+the server logs the late exit and starts the replacement already charged to the
+budget, with no further request needed. Queued reports resume delivery once a
+replacement runs. If shutdown cannot stop the worker within two seconds, the
+server logs that it may hold process exit.
+
+Do not open the live report database with another SQLite client. The exclusive
+lock refuses it, and an open `sqlite3` session also makes a pending replacement
+fail with `database is locked`, which spends a replacement attempt. A copy of
+the live file can tear mid-checkpoint, and the lock blocks SQLite's backup API.
+Do not restore a Railway volume backup to inspect reports: a restore mounts
+onto the production service and rolls back `world.sqlite` on the same volume.
+The ways to reach the report database safely are to stop the service, or to
+redeploy with `GEOROIDS_DEBUG_REPORTS_ENABLED=0` so the worker never opens the
+store. Once the store is closed, `railway volume files download` can copy the
+file, together with its `-wal` file when one is present: a stop that was not
+clean leaves committed reports there. Restoring, stopping and redeploying are all human-owned production
+steps that agents do not perform; see
+[persistent world operations](persistent-world.md#railway-deployment-and-recovery).
 
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
 and a 100 MiB or 200-report pending limit. New acceptance reserves at least
@@ -212,7 +295,15 @@ new reports explicitly. Delivered payloads are reclaimed; minimal duplicate
 and receipt records persist. Pending reports are never evicted.
 
 `GET /health` includes aggregate `debugReports` counts, the oldest pending
-timestamp and a safe delivery error. Reporting failure does not make gameplay
+timestamp and a safe delivery error. `pending` and `blocked` are null when the
+depth is unknown rather than zero: before the worker's first report on a fresh
+process, after a storage fault, and after a worker failure, which discards the
+last measured depth because it can no longer be trusted. For those two counts,
+null means unmeasured rather than drained, and only a number says the queue was
+counted. `oldestPendingAt` is different: it is null when no undelivered report
+is queued, which is the healthy steady state, and also null whenever the counts
+are null, so it cannot be read as a depth signal on its own. Read the two counts
+first, and the delivery error beside them when it is set. Reporting failure does not make gameplay
 unhealthy. Credential, permission and Todoist project-capacity failures keep
 reports blocked. Repair the credential or capacity and let the worker retry;
 configuration changes require a service restart. Transient failures retry with
@@ -248,6 +339,7 @@ npm run check:lint         # Biome with config/quality/biome.settings.jsonc
 npm run check:lint-policy  # reject inherited warn/info Biome severities
 npm run check:knip         # fail on unused files/exports/dependencies and config hints
 npm run check:ts-prune     # fail on unconsumed TypeScript exports
+npm run check:members      # fail on public methods, fields and accessors nothing outside the declaring class reaches
 npm run check:md           # markdownlint-cli2
 npm run check:yaml         # yamllint --strict
 npm run check:actions      # actionlint + ShellCheck
@@ -290,7 +382,7 @@ Asteroids live on the server; clients render snapshots. Clients still simulate t
 
 `shared/` holds the gameplay rules both sides must agree on (ship flight, combat, asteroid materials/reflection, furnaces, economy, exploration, world interest radii in `shared/world.ts`). Client prediction and the server simulation import the same module, so change a rule there once rather than mirroring it in `src/` and `server/`.
 
-The injected slice covers EventLoop lifecycle, collision messaging, PlayerManager's
+The injected slice covers EventLoop lifecycle, PlayerManager's
 network port, and each Ship's combat capability. GameController creates the
 production PlayerManager with ConnectionManager's capabilities;
 authoritative snapshot creation passes that same connection's capability through
@@ -329,7 +421,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - **Validation admission:** testing concurrency, ownership and cleanup rules live in [tests/AGENTS.md](../tests/AGENTS.md#run-and-report).
 - **Manual measurement queue:** browser benchmark runner modes and direct frame measurements use one heavyweight FIFO slot in the common Git directory. Queue waits are visible and cancellable and precede execution deadlines. Failed ownership inspection preserves evidence; never delete a live allocator's lock.
 - **Ports:** manual benchmark harnesses select distinct Astro client, server and proxy ports and support diagnostic `GEOROIDS_TEST_VITE_PORT`, `GEOROIDS_TEST_SERVER_PORT` and `GEOROIDS_TEST_PROXY_PORT` overrides. Their startup checks listener ownership and refuses occupied ports. Interactive development retains its defaults.
-- **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
+- **Node:** `package.json` requires `^26.0.0` (jsdom accepts Node 26 from 26.0.0); `.nvmrc` is `26`.
 - **TypeScript:** code checks and server release classification use `scripts/typescript-cli.mjs` to select the TypeScript 7 native CLI. Astro, Svelte and unused-export tooling import the supported TypeScript 6 API through the `typescript` compatibility alias. Use the package scripts: both compiler packages expose `tsc`, so `node_modules/.bin/tsc` does not identify which compiler runs.
 - **Environment:** `npm run dev` copies `config/app/.env.example` to `.env.local` when missing; the server loads it with `--env-file=.env.local`. A missing or unreadable example fails startup.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
@@ -342,7 +434,7 @@ Claude Code cloud containers start on an image Node and without dependencies. Wh
 
 ```shell
 bash .cursor/install-app.sh        # native libraries, pinned mise tools, npm ci, .env
-mise exec -- node --version        # v24.x
+mise exec -- node --version        # v26.x
 mise exec -- npm run gate
 ```
 

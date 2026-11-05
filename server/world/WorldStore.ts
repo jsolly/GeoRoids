@@ -9,6 +9,7 @@ import { validEquipment } from '../../shared/equipment';
 import { validExploration } from '../../shared/exploration';
 import { validCivicModules } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
+import { PLAYER_SHIELD } from '../../shared/playerShield';
 import { releaseField } from '../../shared/releaseId';
 import { isShipKitId } from '../../shared/shipKits';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
@@ -69,6 +70,8 @@ export interface PersistentPilot {
   health?: number;
   /** Remaining recovery wait at lastSeenAt, in simulation frames. */
   healthRegenTimer?: number;
+  shieldFrames?: number;
+  shieldCooldownFrames?: number;
   /** Server release that issued the current token digest. */
   credentialReleaseId?: string;
   /** Client release present when the current token digest was issued. */
@@ -168,6 +171,18 @@ function readOptionalFlight(
     mass,
     health,
     ...(typeof healthRegenTimer === 'number' ? { healthRegenTimer } : {}),
+    ...(typeof pilot['shieldFrames'] === 'number' &&
+    Number.isSafeInteger(pilot['shieldFrames']) &&
+    pilot['shieldFrames'] >= 0 &&
+    pilot['shieldFrames'] <= PLAYER_SHIELD.durationFrames
+      ? { shieldFrames: pilot['shieldFrames'] }
+      : {}),
+    ...(typeof pilot['shieldCooldownFrames'] === 'number' &&
+    Number.isSafeInteger(pilot['shieldCooldownFrames']) &&
+    pilot['shieldCooldownFrames'] >= 0 &&
+    pilot['shieldCooldownFrames'] <= PLAYER_SHIELD.cooldownFrames
+      ? { shieldCooldownFrames: pilot['shieldCooldownFrames'] }
+      : {}),
     ...(velocity && finiteMotionVector(velocity) ? { velocity } : {}),
   };
 }

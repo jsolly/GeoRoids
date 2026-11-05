@@ -1,6 +1,7 @@
 import { PALETTE } from '../../constants';
 import type { Player } from '../../entities/player/Player';
 import { hexToRgba } from '../../utils/colorUtils';
+import { formatPoints } from '../../utils/formatPoints';
 import type { HudLayout } from './hudLayout';
 
 const LEADERBOARD_FONT = '11px Arial';
@@ -56,7 +57,9 @@ export function drawLeaderboard(
     return;
   }
 
-  const entries = players.toSorted((a, b) => b.score - a.score);
+  const entries = players
+    .filter((player) => player.botRole === undefined)
+    .toSorted((a, b) => b.score - a.score);
 
   const { x: boardX, y: boardY, width: boardWidth, rowHeight, maxRows } = layout.leaderboard;
   const visible = entries.slice(0, maxRows);
@@ -74,7 +77,7 @@ export function drawLeaderboard(
     const rankText = `${index + 1}.`;
     const rankX = boardX + LEADERBOARD_RANK_X_OFFSET;
     const nameX = boardX + LEADERBOARD_NAME_X_OFFSET;
-    const scoreText = entry.score.toString();
+    const scoreText = formatPoints(entry.score);
     const scoreX = boardX + boardWidth - LEADERBOARD_SCORE_X_INSET;
     const scoreWidth = ctx.measureText(scoreText).width;
     const nameMaxWidth = Math.max(0, scoreX - scoreWidth - LEADERBOARD_NAME_SCORE_GAP - nameX);

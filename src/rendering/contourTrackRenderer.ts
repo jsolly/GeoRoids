@@ -3,7 +3,6 @@ import { type Heightfield, sampleGradient, sampleHeight } from '../../shared/hei
 import { getTerrainField } from '../../shared/terrainField';
 import type { ContourLockState, Position } from '../../shared-types';
 import { PALETTE } from '../constants';
-import { findContourCapture } from '../physics/terrain/contourCapture';
 import { canvasManager } from './canvasSurface';
 
 let cached: { field: Heightfield; height: number; x: number; y: number; path: Path2D } | null =
@@ -12,11 +11,10 @@ let cached: { field: Heightfield; height: number; x: number; y: number; path: Pa
 /** Preview the catchable track and keep its exact level visible across render patches. */
 export function drawContourTrack(
   position: Position,
-  angle: number,
-  lock: ContourLockState | null
+  target: ContourLockState | null,
+  locked: boolean
 ): void {
   const ctx = canvasManager.getContext();
-  const target = lock ?? findContourCapture(position, angle);
   if (!ctx || !target) {
     return;
   }
@@ -60,9 +58,9 @@ export function drawContourTrack(
   }
   ctx.save();
   canvasManager.applyWorldTransform(ctx, position);
-  ctx.strokeStyle = lock ? PALETTE.LOCAL : PALETTE.CONTOUR;
-  ctx.globalAlpha = lock ? 0.5 : 0.3;
-  ctx.lineWidth = (lock ? 1.5 : 1) / canvasManager.getPlayfieldScale();
+  ctx.strokeStyle = locked ? PALETTE.LOCAL : PALETTE.CONTOUR;
+  ctx.globalAlpha = locked ? 0.5 : 0.3;
+  ctx.lineWidth = (locked ? 1.5 : 1) / canvasManager.getPlayfieldScale();
   ctx.stroke(cached.path);
   ctx.restore();
 }

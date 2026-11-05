@@ -4,8 +4,11 @@ Move optional top-level tracked settings into `config/<domain>/` or their owner;
 keep existing nested configuration with its component. Test configuration may live
 under `tests/`. Give each setting one repository-owned home.
 
-- `app/astro.ts` and `app/svelte.js` own framework/build settings. Package,
+- `app/astro.ts` and `app/svelte.ts` own framework/build settings. Package,
   development, integration and benchmark commands select the owners explicitly.
+  Node 24 imports the typed Svelte config through the pinned plugin loader; Knip
+  loads its typed config through its existing loader. Both are included in the root
+  strict TypeScript project.
   Astro and Vitest select the same Svelte configuration by an absolute module-relative
   path. Astro's watch registration reloads its full container when the config changes
   or the Wiki refresh watcher signals that owner.
@@ -35,7 +38,7 @@ under `tests/`. Give each setting one repository-owned home.
 - `quality/biome.settings.jsonc` owns the full root-scoped Biome policy. CLI checks,
   the severity inventory and atomic Wiki review formatting select that same file.
 - `quality/prettier.json` owns Astro/Svelte plugins and basename formatting
-  overrides. The formatting command selects it explicitly. `quality/knip.js`
+  overrides. The formatting command selects it explicitly. `quality/knip.ts`
   selects the actual framework/testing/quality owners and retains Svelte's Vite globs.
 - `quality/yamllint.yaml` and `quality/.markdownlint-cli2.jsonc` are selected by
   the existing YAML command and root-anchored Markdown helper.
@@ -65,7 +68,7 @@ Historical root paths remain in the server release classifier when old commit
 diffs require them. Current benchmark and Wiki inventories use the actual owners;
 older review batches and benchmark measurements remain historical evidence.
 Configuration moves cannot bypass source review, the server/client import boundary,
-the complete local gate or any of the four required CI lanes. The Wiki media lane
+the complete local gate or any of the five required CI lanes. The Wiki media lane
 must pass on linux-x64; a macOS run cannot replace it.
 
 Compare effective roots, inputs, formatting, plugins, test scopes and actual build

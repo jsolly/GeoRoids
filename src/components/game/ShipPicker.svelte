@@ -15,8 +15,8 @@
   } = $props();
 
   const ships = [
-    { id: 'scout', name: 'Scout', description: 'Explore with Mineral Scan.' },
-    { id: 'hauler', name: 'Hauler', description: 'Bring asteroids home with Tow Cable.' },
+    { id: 'scout', name: 'Scout', description: 'Sees the ore first. Hauls none of it.' },
+    { id: 'hauler', name: 'Hauler', description: 'Brings the rock home. Someone else finds it.' },
   ] satisfies { id: ShipKitId; name: string; description: string }[];
 
   function select(value: string) {

@@ -159,7 +159,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           offsets: [1, 1, 1, 1, 1, 1, 1, 1],
         });
         roid.velocity = { x: 0.005, y: -0.003 };
-        belt.roids.push(roid);
+        belt.add(roid);
       }
       const loot = LootField.getInstance();
       loot.applySnapshot(
@@ -229,8 +229,14 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         throw new Error('Canvas visibility, dimensions, or touch capability do not match fixture');
       }
 
-      // The fixed harness also runs against revisions predating the GPU API.
-      const surface: object = canvasManager;
+      // The fixed harness also runs against revisions predating the GPU API, so
+      // both members are optional: the assignment then holds whether or not the
+      // revision under test declares them, and the capability the harness
+      // depends on is visible to the type system rather than erased to `object`.
+      const surface: {
+        getRendererBackend?: () => unknown;
+        getGpuFrameStats?: () => unknown;
+      } = canvasManager;
       function rendererBackend(): 'canvas' | 'webgl2' {
         if ('getRendererBackend' in surface && typeof surface.getRendererBackend === 'function') {
           const backend: unknown = surface.getRendererBackend();
@@ -258,7 +264,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             purchases: local.purchases,
             exploding: local.ship.exploding,
           },
-          asteroids: belt.roids.map((roid) => ({
+          asteroids: belt.getRoids().map((roid) => ({
             id: roid.id,
             position: { ...roid.position },
             health: roid.health,
@@ -340,7 +346,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       if (options.observe) {
         for (const [kind, actors] of [
           ['localShip', [local.ship]],
-          ['asteroid', belt.roids],
+          ['asteroid', belt.getRoids()],
           ['loot', loot.getAll()],
           ['pickup', pickups.getAll()],
           ['spider', spiders],

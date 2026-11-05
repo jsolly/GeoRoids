@@ -17,13 +17,13 @@ media:
 
 ## Collecting loot
 
-Mined rocks leave point drops, the main source of cargo; they pull toward any ship and expire after two minutes. Shards and metal Tap canisters add smaller amounts; other [Tap salvage](/wiki/#hauler) repairs damage or supplies materials and navigation help. Tap canisters and silk pull toward Haulers while one is flying, and collecting loot keeps Contour Lock engaged.
+Mined rocks leave point drops, the main source of cargo; they pull toward human pilots and AI Workers and expire after two minutes. Shards and metal Tap canisters add smaller amounts; other [Tap salvage](/wiki/#hauler) repairs damage or supplies materials and navigation help. Tap canisters and silk pull toward Haulers while one is flying, and collecting loot keeps Contour Lock engaged.
 
 Shards, Tap canisters, and silk normally expire quickly; nest caches last longer, with lifetimes in the reference below. A Scout can collect Tap canisters and silk by touching them even when their attraction favors a nearby Hauler.
 
 ## Salvaged equipment
 
-Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, glowing hardware in spider nests, which have a 65% chance to contain a tool, or among rocks destroyed by an ordinary laser kill, with a 1.5% chance; ramming and tough-rock chip breaks never roll one. Each ship sees only tools its kit can use and does not already own, and every eligible pilot can take their own copy from the same drop.
+Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, bright hardware in spider nests, which have a 65% chance to contain a tool, or among rocks destroyed by an ordinary laser kill, with a 1.5% chance; ramming and tough-rock chip breaks never roll one. Each ship sees only tools its kit can use and does not already own, and every eligible pilot can take their own copy from the same drop.
 
 Tools add no score and survive ordinary deaths, reconnects, and server restarts. Duplicates stay for teammates, and shooting cannot destroy equipment.
 
@@ -53,4 +53,4 @@ Cargo protects your hull by spilling recoverable points when a hazard hits; hull
 
 Store purchases spend your bank, never carried cargo. See [Town Square](/wiki/#controls) for the store and [survival](/wiki/#combat-survival) for damage and respawns.
 
-A full hold slows cruise to 70%; half a hold slows it to 85%.
+Cargo and saved hull mass do not change acceleration or ship speed.

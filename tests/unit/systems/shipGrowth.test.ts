@@ -2,20 +2,17 @@ import { describe, expect, test } from 'vitest';
 import { SHIP } from '../../../shared/constants/gameplay';
 import {
   addLootMagnetPull,
+  applyShipMass,
   canCollectLoot,
   GROWTH,
   lootOverlap,
   maxHealthFromMass,
-  maxVelocityFromMass,
-  thrustScaleFromMass,
 } from '../../../shared/shipGrowth';
 import { hullRadiusForKit } from '../../../shared/shipKits';
 
 describe('saved ship mass and salvage rules', () => {
-  test('base mass matches the stock HP and handling', () => {
+  test('base mass matches the stock HP and hull', () => {
     expect(maxHealthFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_HEALTH);
-    expect(thrustScaleFromMass(GROWTH.BASE_MASS)).toBe(1);
-    expect(maxVelocityFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_VELOCITY);
     expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
   });
 
@@ -64,4 +61,10 @@ describe('saved ship mass and salvage rules', () => {
     expect(drop.velocity.x).toBeCloseTo(4 - GROWTH.LOOT_MAGNET_ACCEL);
     expect(drop.velocity.y).toBeCloseTo(1);
   });
+});
+
+test('restoring high saved mass retains hull health and cargo data', () => {
+  const saved = { mass: 1, maxHealth: 100, health: 80, cargo: 400 };
+  applyShipMass(saved, 8);
+  expect(saved).toEqual({ mass: 8, maxHealth: 220, health: 200, cargo: 400 });
 });

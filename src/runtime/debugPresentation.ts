@@ -2,6 +2,7 @@ import { debugIsOn, LOCAL_STORAGE_KEYS } from '../constants/user-preferences';
 import { GameController } from '../core/gameController';
 import { buildClientDiagnostics, captureClientDiagnostics } from '../diagnostics/clientDiagnostics';
 import { readDebugHudMetrics } from '../diagnostics/debugHudMetrics';
+import { canvasManager } from '../rendering/canvasSurface';
 import {
   formatDebugFps,
   formatDebugMotion,
@@ -16,6 +17,7 @@ import { logger } from '../utils/Logger';
 import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
 export interface DebugView {
+  readonly device: string;
   readonly playerId: string;
   readonly sessionId: string;
   readonly hudHidden: boolean;
@@ -33,9 +35,17 @@ export function createDebugPresentation(changed: () => void) {
   const lifetime = new AbortController();
   let disposed = false;
   let playerId = '';
-  let hidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) === 'true';
+  let hidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) !== 'false';
   let nextSampleAt = 0;
-  let metrics = { fps: '—', rtt: '—', snapshot: '—', motion: '—', world: '—', releases: '—' };
+  let metrics = {
+    device: 'Unknown',
+    fps: '—',
+    rtt: '—',
+    snapshot: '—',
+    motion: '—',
+    world: '—',
+    releases: '—',
+  };
   logger.applyConfiguredLogLevel();
   window.addEventListener(
     'playerIdentityChanged',
@@ -58,6 +68,12 @@ export function createDebugPresentation(changed: () => void) {
         const current = readDebugHudMetrics(now);
         const game = GameController.getInstance();
         metrics = {
+          device: {
+            'low-end': 'Low-end',
+            commodity: 'Commodity',
+            'high-end': 'High-end',
+            unknown: 'Unknown',
+          }[canvasManager.getDeviceCategory()],
           fps: formatDebugFps(current.fps),
           rtt: formatDebugRtt(current.rttMs),
           snapshot: formatDebugSnapshot(current.snapshotSequence, current.snapshotAgeMs),

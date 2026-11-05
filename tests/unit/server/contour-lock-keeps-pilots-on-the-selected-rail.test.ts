@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { decodeClientCommand } from '../../../server/communication/clientCommandDecoder';
 import { CooperativeContourBridges } from '../../../server/core/CooperativeContourBridges';
+import { SHIP } from '../../../shared/constants/gameplay';
 import { CONTOUR_BRIDGE } from '../../../shared/contourBridge';
 import {
   CONTOUR_LOCK,
@@ -9,14 +10,12 @@ import {
 } from '../../../shared/contourLock';
 import { cargoCapacity } from '../../../shared/economy';
 import { sampleGradient, sampleHeight } from '../../../shared/heightfield';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { getShipKit } from '../../../shared/shipKits';
 import { validateSnapshotDto } from '../../../shared/snapshotDto';
 import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { getTerrainField } from '../../../shared/terrainField';
 import { terrainCruiseVelocity } from '../../../shared/terrainTravel';
-import type { ContourLockState, Position } from '../../../shared-types';
+import type { ContourLockState, Position, ShipKitId } from '../../../shared-types';
 import { Player } from '../../../src/entities/player/Player';
 import { Ship } from '../../../src/entities/ship/Ship';
 
@@ -34,8 +33,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function railPilot() {
-  const pilot = world.join('Rail pilot', { x: 2250, y: 0 });
+function railPilot(kitId: ShipKitId = 'scout') {
+  const pilot = world.join('Rail pilot', { x: 2250, y: 0 }, { kitId });
   const actor = world.entity(pilot);
   world.clearAsteroids();
   const state: ContourLockState = {
@@ -62,7 +61,7 @@ function railPilot() {
     actor.position,
     world.engine.getServerTime()
   );
-  const cruise = cruiseSpeed(actor.mass, getShipKit(actor.kitId).maxVelocity, 0, 1);
+  const cruise = SHIP.MAX_VELOCITY;
   const now = world.engine.getServerTime();
   let sequence = 0;
   const pose = (
@@ -101,6 +100,142 @@ test('a pilot follows curved contour guidance continuously with no charge or tim
   }
   expect(actor.contourLock).toEqual(state);
 });
+
+test.each([
+  { kitId: 'scout', mass: 1 },
+  { kitId: 'scout', mass: 8 },
+  { kitId: 'hauler', mass: 1 },
+  { kitId: 'hauler', mass: 8 },
+] as const)(
+  'a $kitId at saved mass $mass keeps a buffered legal pose when loot adds cargo',
+  ({ kitId, mass }) => {
+    const { pilot, actor, state, cruise, now, pose } = railPilot(kitId);
+    actor.mass = mass;
+    actor.spawnProtectionTimer = 0;
+    const firstVelocity = contourLockVelocity(actor.position, state, cruise);
+    if (!firstVelocity) {
+      throw new Error('Expected fixture contour velocity');
+    }
+    expect(
+      pose(
+        1000 / 60,
+        state,
+        {
+          x: actor.position.x + firstVelocity.x,
+          y: actor.position.y + firstVelocity.y,
+        },
+        firstVelocity
+      ).ok
+    ).toBe(true);
+    const epoch = actor.playerMotion?.epoch;
+    const velocity = contourLockVelocity(actor.position, state, cruise);
+    if (epoch === undefined || !velocity) {
+      throw new Error('Expected active contour flight');
+    }
+    // Capture an honest pose before the pickup; its delivery precedes the cargo snapshot.
+    const buffered = {
+      epoch,
+      sequence: 2,
+      position: { x: actor.position.x + velocity.x, y: actor.position.y + velocity.y },
+      velocity,
+      angle: actor.angle,
+      thrusting: true,
+      contourLock: { ...state },
+    };
+    world.engine.addAsteroid({
+      id: 'pickup-race-rock',
+      position: { ...actor.position },
+      velocity: { x: 0, y: 0 },
+      size: 10,
+      jaggedness: 0.5,
+      rotation: 0,
+      angularVelocity: 0,
+      health: 1,
+      maxHealth: 1,
+      vertices: 8,
+      offsets: [1, 1, 1, 1, 1, 1, 1, 1],
+    });
+    expect(world.engine.handleAsteroidHit('pickup-race-rock', actor.id, 'laser').outcome).toBe(
+      'destroyed'
+    );
+    const points = world.engine.getLoot().find((drop) => drop.kind === 'points');
+    expect(points).toBeDefined();
+    world.engine.collectLoot();
+    expect(world.engine.drainLootCollections()).toContainEqual(
+      expect.objectContaining({ collectorId: actor.id, lootId: points?.id, kind: 'points' })
+    );
+    expect(actor.cargo).toBeGreaterThan(0);
+    const outcome = world.engine.playerMotion.acceptFreePose(
+      pilot.socket,
+      buffered,
+      now + 2000 / 60
+    );
+    expect(outcome, JSON.stringify(outcome)).toEqual({ ok: true, blockedMs: 0 });
+    expect(actor.playerMotion).toMatchObject({ mode: 'free', epoch, ack: buffered.sequence });
+    expect(actor.position).toEqual(buffered.position);
+    expect(actor.contourLock).toEqual(state);
+    // Replaying the delivered pose still fails without changing the accepted epoch.
+    expect(
+      world.engine.playerMotion.acceptFreePose(pilot.socket, buffered, now + 2000 / 60)
+    ).toMatchObject({
+      ok: false,
+      error: 'Invalid or stale enhanced movement pose',
+    });
+    expect(actor.playerMotion).toMatchObject({ mode: 'free', epoch, ack: buffered.sequence });
+    world.broadcastGameState();
+    const row = world.snapshot(pilot).entities.find((entity) => entity.id === actor.id);
+    if (!row) {
+      throw new Error('Expected collected cargo in pilot snapshot');
+    }
+    const client = new Player({ id: actor.id, name: pilot.name, type: 'local', kitId });
+    const prediction = new PlayerMotionReconciliation();
+    client.updateFromServer(row);
+    expect(prediction.rebase(row, client.ship, now + 2000 / 60)).toBe(true);
+    client.ship.serverOwnsMotion = prediction.shouldSuppressShipMove();
+    expect(client.cargo).toBe(actor.cargo);
+    expect(client.ship.mass).toBe(mass);
+    expect(client.ship.serverOwnsMotion).toBe(false);
+    client.ship.thrusting = true;
+    const before = { ...client.ship.position };
+    client.ship.update();
+    expect(client.ship.position).not.toEqual(before);
+    expect(client.ship.contourLock).toEqual(state);
+  }
+);
+
+test.each(['scout', 'hauler'] as const)(
+  'the server keeps %s flight limits independent of cargo and still rejects overspeed',
+  (kitId) => {
+    const { pilot, actor, state, cruise, now, pose } = railPilot(kitId);
+    const emptySpeed = world.engine.playerMotion.legalSpeed(actor, now, true);
+    const emptyTravelSpeed = world.engine.playerMotion.maximumTravelSpeed(actor, now, true);
+    const states = [1, 8].flatMap((mass) => [0, 0.5, 1].map((load) => ({ mass, load })));
+    for (const [index, { mass, load }] of states.entries()) {
+      actor.mass = mass;
+      actor.cargo = cargoCapacity(kitId) * load;
+      const at = ((index + 1) * 1000) / 60;
+      expect(world.engine.playerMotion.legalSpeed(actor, now + at, true)).toBe(emptySpeed);
+      expect(world.engine.playerMotion.maximumTravelSpeed(actor, now + at, true)).toBe(
+        emptyTravelSpeed
+      );
+      const velocity = contourLockVelocity(actor.position, state, cruise);
+      if (!velocity) {
+        throw new Error('Expected fixture contour velocity');
+      }
+      const position = { x: actor.position.x + velocity.x, y: actor.position.y + velocity.y };
+      expect(pose(at, state, position, velocity).ok).toBe(true);
+    }
+    const acceptedPosition = { ...actor.position };
+    const epoch = actor.playerMotion?.epoch;
+    const forbiddenSpeed =
+      world.engine.playerMotion.maximumTravelSpeed(actor, now + 200, false) * 2;
+    const rejected = pose(200, null, actor.position, { x: forbiddenSpeed, y: 0 });
+    expect(rejected).toMatchObject({ ok: false, envelope: { check: 'velocity' } });
+    expect(actor.position).toEqual(acceptedPosition);
+    expect(actor.playerMotion).toMatchObject({ mode: 'handoff', epoch: (epoch ?? 0) + 1 });
+    expect(world.engine.getPlayerBySocket(pilot.socket)).toBe(actor);
+  }
+);
 
 test('a ship accelerates into a nearby contour within the acquisition deadline', () => {
   const { actor, state, pose } = railPilot();
@@ -242,11 +377,7 @@ test.each([1, 3])(
       const ship = new Ship({ position: { x: 2200, y }, kitId: actor.kitId });
       const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
       ship.angle = Math.atan2(-gradient.x, -gradient.y);
-      ship.velocity = terrainCruiseVelocity(
-        ship.position,
-        ship.angle,
-        cruiseSpeed(ship.mass, ship.maxVelocity, 0, 1)
-      );
+      ship.velocity = terrainCruiseVelocity(ship.position, ship.angle, SHIP.MAX_VELOCITY);
       world.engine.playerMotion.placeActorForTesting(actor.id, ship.position, now);
       actor.velocity = { ...ship.velocity };
       for (let frame = 0; frame < ticks; frame++) {
@@ -291,8 +422,12 @@ test('equipment loot preserves the contour lock and current motion epoch', () =>
   expect(pose(0).ok).toBe(true);
   const epoch = actor.playerMotion?.epoch;
   const mass = actor.mass;
-  world.engine.dropEquipmentAt(actor.position, 'survey_probe');
-  expect(world.engine.collectLoot()).toHaveLength(1);
+  const drop = world.engine.dropEquipmentAt(actor.position, 'survey_probe');
+  world.engine.collectLoot();
+  expect(world.engine.drainLootCollections()).toEqual([
+    expect.objectContaining({ collectorId: actor.id, lootId: drop.id, kind: 'survey_probe' }),
+  ]);
+  expect(actor.equipment).toContain('survey_probe');
   expect(actor.mass).toBe(mass);
   expect(actor.contourLock).toEqual(state);
   expect(actor.playerMotion?.epoch).toBe(epoch);
@@ -420,6 +555,7 @@ test.each(['scout', 'hauler'] as const)(
     const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
     ship.angle = Math.atan2(-gradient.x, -gradient.y);
     const now = world.engine.getServerTime();
+    ship.thrusting = true;
     let fastest = 0;
     for (let frame = 1; frame <= 480; frame++) {
       if (frame % 120 === 0) {
@@ -453,7 +589,7 @@ test.each(['scout', 'hauler'] as const)(
         ).not.toBeNull();
       }
     }
-    expect(fastest).toBeGreaterThan(getShipKit(kitId).maxVelocity * 1.1);
+    expect(fastest).toBeGreaterThan(SHIP.MAX_VELOCITY * 1.1);
   }
 );
 
@@ -931,7 +1067,7 @@ test('crew bridges cap population, refuse their owner, refresh for different fol
   expect(bridges.snapshot(1200)).toEqual([]);
 });
 
-test('a loaded follower leaves a crew bridge inside the cargo-adjusted draft envelope', () => {
+test('a loaded follower leaves a crew bridge at the same draft speed as an empty hold', () => {
   const { now, charged } = crewBridge();
   const follower = world.join('Loaded follower', { x: 0, y: 0 }, { kitId: 'hauler' });
   const actor = world.entity(follower);
@@ -943,12 +1079,7 @@ test('a loaded follower leaves a crew bridge inside the cargo-adjusted draft env
   }
   expect(actor.contourTransit).toBeUndefined();
   expect(actor.contourLock).toEqual(charged.target);
-  const speed = cruiseSpeed(
-    actor.mass,
-    getShipKit(actor.kitId).maxVelocity,
-    actor.cargo,
-    cargoCapacity(actor.kitId)
-  );
+  const speed = SHIP.MAX_VELOCITY;
   const expected = contourLockVelocity(
     actor.position,
     charged.target,

@@ -32,6 +32,7 @@ test('hiding a pilot with held movement releases the controls and resumes withou
     throw new Error('Input fixture requires its canvas');
   }
   InputManager.getInstance().initializeListeners(inputCanvas);
+  document.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
   document.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true }));
   expect(player.ship.thrusting).toBe(true);
   expect(player.ship.angularVelocity).not.toBe(0);
@@ -64,7 +65,7 @@ test('hiding a pilot with held movement releases the controls and resumes withou
   frames.shift()?.(initial);
   visible.mockReturnValue(true);
   document.dispatchEvent(new Event('visibilitychange'));
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
   expect(player.ship.angularVelocity).toBe(0);
   expect(getPressedKeysForPlayer(player).size).toBe(0);
   expect(controlSources.pointerHeading).toBeNull();

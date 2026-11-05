@@ -5,11 +5,11 @@ import {
   canReachContour,
   contourLockVelocity,
 } from '../../../shared/contourLock';
-import { cargoCapacity } from '../../../shared/economy';
 import { onDarkFurnaceFootprint } from '../../../shared/furnaceField';
 import { furnaceTravelPose } from '../../../shared/furnaceTravel';
 import { navigationCaptureRadius } from '../../../shared/navigationSalvage';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
+import { activatePlayerShield, tickPlayerShield } from '../../../shared/playerShield';
 import {
   type AbilityWorld,
   abilityCooldownFramesFor,
@@ -19,12 +19,10 @@ import {
   tickAbilityHost,
   tickTowLine,
 } from '../../../shared/shipAbilities';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { GROWTH, thrustScaleFromMass } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
 import {
   applyShipKitToShip,
   DEFAULT_SHIP_KIT_ID,
-  getShipKit,
   hullRadiusForKit,
   SHIP_ABILITY,
 } from '../../../shared/shipKits';
@@ -56,6 +54,7 @@ import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
 import { getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
+import { type NavigationOrder, steerNavigation, stopNavigation } from './navigation';
 import type { ShipCombatNetwork } from './shipCombatNetwork';
 import {
   applyShipSpawnProtection,
@@ -75,7 +74,31 @@ class Ship {
   angle: number = (90 / 180) * Math.PI;
   weaponChargeStartedAt: number | null = null;
   weaponChargeFrames = 0;
+  shieldFrames = 0;
+  shieldCooldownFrames = 0;
+  navigation: NavigationOrder | null = null;
+  pendingObjectAction: { id: string; action: 'enter' | 'unload' | 'build' } | null = null;
+  navigationStatus = '';
+  arrivalFrames = 0;
   navigationAssistFrames = 0;
+
+  activateShield(): boolean {
+    if (
+      this.health <= 0 ||
+      this.exploding ||
+      this.furnaceTransit ||
+      this.movementLocked ||
+      (this.downedUntil ?? 0) > 0 ||
+      this.shieldCooldownFrames > 0
+    ) {
+      return false;
+    }
+    if (this.combatNetwork?.isConnected === true) {
+      return this.combatNetwork.sendShield?.() ?? false;
+    }
+    return activatePlayerShield(this);
+  }
+
   contourDraftFrames = 0;
   private contourHopCount = 0;
   private contourHopAt = -Infinity;
@@ -151,10 +174,10 @@ class Ship {
 
   impactFlashFrames: number = 0;
   blinkOn: boolean; // Will be set in constructor based on blinkCount
-  lastShotTime: number = 0;
+  private lastShotTime: number = 0;
   shotCooldown: number = 250;
   color: string = PALETTE.LOCAL;
-  frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
+  private frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
   /** In-flight menus stop navigation without pausing combat or lifecycle timers. */
   movementLocked = false;
   /** Automatic cargo stop, released by steering; grants no damage immunity. */
@@ -165,9 +188,6 @@ class Ship {
   crewSignal: CrewSignal | null = null;
   isLocalPlayer: boolean = false; // Track if this is the local player
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID;
-  thrust: number = SHIP.THRUST;
-  maxVelocity: number = SHIP.MAX_VELOCITY;
-  turnSpeed: number = getShipKit(DEFAULT_SHIP_KIT_ID).turnSpeed;
   abilityCooldownFrames: number = 0;
   abilityActiveFrames: number = 0;
 
@@ -230,6 +250,7 @@ class Ship {
   }
 
   explode(): void {
+    stopNavigation(this);
     this.finishWeaponCharge(false);
 
     this.utilityFlight = null;
@@ -246,7 +267,7 @@ class Ship {
     playLocalHaptic(this.isLocalPlayer, 'boom');
   }
 
-  canShootAgain(): boolean {
+  private canShootAgain(): boolean {
     this.updateShootCooldown();
     if (this.canShoot && this.lasers.length < SHIP.MAX_LASERS) {
       return true;
@@ -294,7 +315,7 @@ class Ship {
     }
     this.contourLock = null;
     this.contourLockInputVersion++;
-    const speed = cruiseSpeed(this.mass, this.maxVelocity, this.cargo, cargoCapacity(this.kitId));
+    const speed = SHIP.MAX_VELOCITY;
     if (this.knockbackVelocityLimit <= speed) {
       const target = terrainCruiseVelocity(this.position, this.angle, speed);
       this.capVelocity(Math.hypot(target.x, target.y));
@@ -308,8 +329,7 @@ class Ship {
       !this.exploding &&
       this.health > 0 &&
       !this.movementLocked &&
-      this.knockbackVelocityLimit <=
-        cruiseSpeed(this.mass, this.maxVelocity, this.cargo, cargoCapacity(this.kitId)) &&
+      this.knockbackVelocityLimit <= SHIP.MAX_VELOCITY &&
       findContourCapture(
         this.position,
         this.angle,
@@ -350,9 +370,9 @@ class Ship {
     ) {
       return false;
     }
-    const cruise = cruiseSpeed(this.mass, this.maxVelocity, this.cargo, cargoCapacity(this.kitId));
+    const cruise = SHIP.MAX_VELOCITY;
 
-    const acceleration = (this.thrust * thrustScaleFromMass(this.mass)) / GAME.FPS;
+    const acceleration = SHIP.THRUST / GAME.FPS;
     if (
       !capture ||
       !canReachContour(
@@ -376,11 +396,7 @@ class Ship {
   }
 
   private acquireContour(capture: ContourLockState): boolean {
-    const target = contourLockVelocity(
-      this.position,
-      capture,
-      cruiseSpeed(this.mass, this.maxVelocity, this.cargo, cargoCapacity(this.kitId))
-    );
+    const target = contourLockVelocity(this.position, capture, SHIP.MAX_VELOCITY);
     if (!target) {
       return false;
     }
@@ -469,7 +485,7 @@ class Ship {
 
   takeDamage(amount: number): void {
     this.releaseContourLock();
-    if (this.exploding || this.movementLocked) {
+    if (this.exploding || this.movementLocked || this.shieldFrames > 0) {
       return;
     }
 
@@ -481,7 +497,7 @@ class Ship {
     }
   }
 
-  updateExplosion(): void {
+  private updateExplosion(): void {
     if (this.exploding && this.explodeTime > 0) {
       this.explodeTime--;
       // Stay exploding at t=0 so a late exploding=true snapshot cannot
@@ -489,7 +505,7 @@ class Ship {
     }
   }
 
-  updateInvincibility(): void {
+  private updateInvincibility(): void {
     if (this.blinkCount > 0) {
       this.spawnProtectionTimer--;
       if (this.spawnProtectionTimer <= 0) {
@@ -519,6 +535,8 @@ class Ship {
     }
 
     for (let i = 0; i < steps; i++) {
+      tickPlayerShield(this);
+      this.arrivalFrames = Math.max(0, this.arrivalFrames - 1);
       this.updateInvincibility();
       tickShipImpactFlash(this);
       tickAbilityHost(this);
@@ -540,6 +558,7 @@ class Ship {
       return;
     }
     if (this.furnaceTransit) {
+      stopNavigation(this);
       this.releaseContourLock();
       const pose = furnaceTravelPose(this.furnaceTransit, Date.now() + this.furnaceClockOffsetMs);
       this.position = { ...pose.position };
@@ -555,7 +574,7 @@ class Ship {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
     }
     if (this.furnaceTransit || this.exploding || this.health <= 0 || this.movementLocked) {
-      this.releaseContourLock();
+      stopNavigation(this);
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
@@ -571,7 +590,7 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
-    if (this.cargoHover && !this.movementLocked) {
+    if (this.cargoHover && !this.movementLocked && !this.navigation) {
       this.releaseContourLock();
       this.velocity = { x: 0, y: 0 };
       this.thrusting = false;
@@ -586,8 +605,9 @@ class Ship {
     }
     this.navigationAssistFrames = Math.max(0, this.navigationAssistFrames - 1);
     this.contourDraftFrames = Math.max(0, this.contourDraftFrames - 1);
+    const navigationLimit = steerNavigation(this);
     this.angle += this.angularVelocity;
-    const speed = cruiseSpeed(this.mass, this.maxVelocity, this.cargo, cargoCapacity(this.kitId));
+    const speed = SHIP.MAX_VELOCITY;
     if (this.knockbackVelocityLimit > speed) {
       this.releaseContourLock();
     }
@@ -597,7 +617,7 @@ class Ship {
         this.contourLock,
         speed * contourDraftMultiplier(this.contourDraftFrames),
         Math.hypot(this.velocity.x, this.velocity.y),
-        (this.thrust * thrustScaleFromMass(this.mass)) / GAME.FPS
+        SHIP.THRUST / GAME.FPS
       );
       if (target) {
         this.velocity = target;
@@ -611,20 +631,29 @@ class Ship {
       terrainSpeedLimit(this.position, speed),
       this.knockbackVelocityLimit
     );
-    if (this.knockbackVelocityLimit <= speed) {
+    if (this.thrusting && this.knockbackVelocityLimit <= speed) {
       // Contour alignment adds speed while cruise continues to follow the nose.
       // A server-granted blast keeps its motion until the excess speed decays.
       advanceCruiseVelocity(this, speed);
+      if (navigationLimit !== null) {
+        this.capVelocity(navigationLimit);
+      }
     } else {
       this.velocity = applyThrustOrFriction(
         this.velocity,
         this.angle,
         this.thrusting,
         this.frictionCoefficient,
-        this.thrust,
-        this.mass,
         velocityLimit
       );
+    }
+    if (!this.thrusting && this.knockbackVelocityLimit <= speed) {
+      const current = Math.hypot(this.velocity.x, this.velocity.y);
+      const next = Math.max(0, current - SHIP.THRUST / GAME.FPS);
+      this.velocity =
+        current > 0
+          ? { x: (this.velocity.x * next) / current, y: (this.velocity.y * next) / current }
+          : { x: 0, y: 0 };
     }
     this.capVelocity(velocityLimit);
     this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;

@@ -57,11 +57,14 @@ export function drawEngineLight(
   angle: number,
   radius: number,
   boosting: boolean,
-  now = performance.now()
+  now = performance.now(),
+  /** Supplied once per frame by `drawShipLighting`; read here only for direct callers. */
+  reducedMotion?: boolean
 ): void {
   const reduced =
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    reducedMotion ??
+    (typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const flicker = reduced ? 1 : 0.95 + Math.sin(now / 47) * 0.05;
   const length = radius * (boosting ? 6 : 4) * flicker;
   ctx.save();
@@ -87,6 +90,9 @@ export function drawShipLighting(viewer: Position, ships: readonly Ship[]): void
   const ghosts = getWorldRemains()
     .filter((asset: MapAsset) => asset.kind === 'ship-remains')
     .map((asset) => canvasManager.worldToScreen(asset.position, viewer));
+  // One preference read per frame, shared by every thrusting ship. Querying it per
+  // ship parses the media query and allocates a MediaQueryList each time.
+  let reducedMotion: boolean | undefined;
   for (const ship of ships) {
     if (ship.exploding || ship.health <= 0 || ship.furnaceTransit) {
       continue;
@@ -104,7 +110,18 @@ export function drawShipLighting(viewer: Position, ships: readonly Ship[]): void
     const angle = ship.angle;
     drawHeadlight(ctx, at, angle, scale, ghosts);
     if (ship.thrusting) {
-      drawEngineLight(ctx, at, angle, ship.r * scale, contourSpeedStrength(ship) > 0.25);
+      reducedMotion ??=
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+      drawEngineLight(
+        ctx,
+        at,
+        angle,
+        ship.r * scale,
+        contourSpeedStrength(ship) > 0.25,
+        performance.now(),
+        reducedMotion
+      );
     }
   }
 }

@@ -16,6 +16,7 @@ import {
   atomicReceipt,
   candidateMatches,
   digest,
+  GRAPH_COMMANDS,
   identity,
   RECEIPT_VERSION,
   readReusable,
@@ -227,7 +228,7 @@ export async function runGate({
       continue;
     }
     const artifact = join(directory, `${stages.length}-${command.replaceAll(':', '-')}.log`);
-    const skipped = skipGraphs && ['check:knip', 'check:ts-prune'].includes(command);
+    const skipped = skipGraphs && GRAPH_COMMANDS.includes(command);
     if (skipped) {
       writeFileSync(artifact, `Literal-only graph witness: ${prior.graphWitness}\n`);
     } else {
@@ -243,9 +244,6 @@ export async function runGate({
           ...environment,
           GEOROIDS_REVIEW_RECEIPT: reviewReceipt,
           GEOROIDS_TEST_SESSION_DIR: sessionDirectory,
-          ...(command === 'check:test-runner'
-            ? { GEOROIDS_CONTRACT_EVIDENCE_DIR: join(sessionDirectory, 'contracts') }
-            : {}),
         },
       });
       if (result.status !== 0 || result.signal || result.error) {
@@ -317,7 +315,7 @@ export async function runGate({
     graphArtifacts: skipGraphs
       ? prior.graphArtifacts
       : stages
-          .filter(({ command }) => ['check:knip', 'check:ts-prune'].includes(command))
+          .filter(({ command }) => GRAPH_COMMANDS.includes(command))
           .map(({ command, artifact, digest: hash }) => ({
             command,
             artifact,

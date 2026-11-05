@@ -192,6 +192,7 @@ export class LootManager {
 
   constructor(
     rngService: RNGService,
+    private readonly now: () => number,
     private readonly catalog?: LootCatalogObserver
   ) {
     this.rng = rngService;
@@ -233,7 +234,7 @@ export class LootManager {
       mass: 0,
       radius: GROWTH.LOOT_RADIUS + 2,
       kind: 'points',
-      expiresAt: Date.now() + (ECONOMY.pointLootFrames / 60) * 1000,
+      expiresAt: this.now() + ECONOMY.pointLootMs,
       velocity: motion ? { ...motion.velocity } : { x: 0, y: 0 },
       ...(motion ? { ejectFramesLeft: motion.ejectFramesLeft } : {}),
     };
@@ -244,8 +245,9 @@ export class LootManager {
   }
 
   public savedPoints(): SavedPointLoot[] {
+    const now = this.now();
     return this.inInsertionOrder(this.points)
-      .filter((drop) => drop.expiresAt > Date.now())
+      .filter((drop) => drop.expiresAt > now)
       .map((drop) => ({
         id: drop.id,
         position: { ...drop.position },
@@ -257,8 +259,9 @@ export class LootManager {
   }
 
   public restorePoints(drops: SavedPointLoot[]): void {
+    const now = this.now();
     for (const drop of drops) {
-      if (drop.expiresAt <= Date.now()) {
+      if (drop.expiresAt <= now) {
         continue;
       }
       this.insert({
@@ -380,7 +383,7 @@ export class LootManager {
   }
 
   public collectOverlaps(entities: GameEntity[]): Array<{ collector: GameEntity; loot: LootData }> {
-    const wallNow = Date.now();
+    const wallNow = this.now();
     const collected: Array<{ collector: GameEntity; loot: LootData }> = [];
     const collectors = entities
       .filter((entity) => canCollectLoot(entity))
@@ -411,7 +414,11 @@ export class LootManager {
       }
       const winner = collectors.find((entity) => {
         // Prior drops in this same collection pass may have filled this pilot.
-        if (!canCollectLoot(entity)) {
+        if (
+          !canCollectLoot(entity) ||
+          entity.botRole === 'raider' ||
+          (entity.botRole === 'worker' && drop.kind !== 'points')
+        ) {
           return false;
         }
         if (
@@ -468,10 +475,11 @@ export class LootManager {
   }
 
   public expire(gameTime: number, collectors: readonly GameEntity[] = []): void {
-    const wallNow = Date.now();
+    const wallNow = this.now();
     const liveCollectors = collectors.filter((entity) => canCollectLoot(entity));
-    const magnetPositions = liveCollectors.map((entity) => entity.position);
-    const haulerPositions = liveCollectors
+    const humanCollectors = liveCollectors.filter((entity) => entity.botRole === undefined);
+    const magnetPositions = humanCollectors.map((entity) => entity.position);
+    const haulerPositions = humanCollectors
       .filter((entity) => entity.kitId === 'hauler')
       .map((entity) => entity.position);
 
@@ -509,12 +517,19 @@ export class LootManager {
         const equipment = drop.kind;
         addLootMagnetPull(
           drop,
-          liveCollectors
+          humanCollectors
             .filter((entity) => canCollectEquipment(entity, equipment))
             .map((entity) => entity.position)
         );
       } else {
-        addLootMagnetPull(drop, magnetPositions);
+        addLootMagnetPull(
+          drop,
+          drop.kind === 'points'
+            ? liveCollectors
+                .filter((entity) => entity.botRole !== 'raider')
+                .map((entity) => entity.position)
+            : magnetPositions
+        );
       }
       drop.position.x += drop.velocity.x;
       drop.position.y += drop.velocity.y;

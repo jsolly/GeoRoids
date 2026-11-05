@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { GAME, LASER, SHIP } from '../../../shared/constants/gameplay';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { getShipKit } from '../../../shared/shipKits';
+import { cargoCapacity } from '../../../shared/economy';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { createLaser } from '../../../src/entities/laser/laserUtils';
 import { Ship } from '../../../src/entities/ship/Ship';
@@ -15,7 +14,7 @@ afterEach(() => {
 });
 
 describe('shared ship motion helper', () => {
-  test('automatic thrust accelerates at the existing pace and shots keep their speed', () => {
+  test('requested thrust accelerates at the existing pace and shots keep their speed', () => {
     expect(GAME.MOTION_SCALE).toBe(0.5625);
     expect(GAME.PLAYER_SPEED_SCALE).toBe(1.25);
     expect(LASER.SPEED).toBe(300 * GAME.MOTION_SCALE);
@@ -100,13 +99,12 @@ describe('shared ship motion helper', () => {
     const capped = applyThrustOrFriction({ x: 20, y: 0 }, 0, true, GAME.FRICTION);
     const speed = Math.hypot(capped.x, capped.y);
     expect(SHIP.THRUST).toBe(5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
-    expect(getShipKit('hauler').thrust).toBe(4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(SHIP.MAX_VELOCITY).toBe(2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });
 
-  test.each(['scout', 'hauler'] as const)('%s cruises at its kit velocity cap', (kitId) => {
-    const cap = getShipKit(kitId).maxVelocity;
+  test.each(['scout', 'hauler'] as const)('%s cruises at the shared velocity cap', (kitId) => {
+    const cap = SHIP.MAX_VELOCITY;
     const ship = new Ship({ kitId, position: { x: 0, y: 0 }, isLocalPlayer: true });
     ship.angle = 0;
     ship.angularVelocity = 0;
@@ -128,6 +126,7 @@ describe('shared ship motion helper', () => {
     ship.position = { x: 0, y: 0 };
     ship.angle = 0;
     ship.velocity = { x: 0, y: 0.5 };
+    ship.thrusting = true;
     ship.update();
     expect(ship.velocity.x).toBeCloseTo(0.5 + SHIP.THRUST / GAME.FPS);
     expect(ship.velocity.y).toBeCloseTo(0);
@@ -137,13 +136,14 @@ describe('shared ship motion helper', () => {
     expect(ship.position.y).toBeCloseTo(-(0.5 + (2 * SHIP.THRUST) / GAME.FPS));
   });
 
-  test('grown ships cruise at the existing mass-adjusted speed', () => {
+  test('saved high-mass ships retain the shared cruise speed', () => {
     const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
     ship.mass = 8;
     ship.velocity = { x: 10, y: 0 };
     ship.angle = 0;
+    ship.thrusting = true;
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(cruiseSpeed(8, getShipKit('hauler').maxVelocity, 0, 1));
+    expect(ship.velocity.x).toBeCloseTo(SHIP.MAX_VELOCITY);
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
@@ -179,21 +179,28 @@ describe('shared ship motion helper', () => {
   });
 });
 
-test.each([0, 0.5, 1])(
-  'cargo load %s scales predicted cruise without changing the empty hull',
-  (load) => {
-    const ship = new Ship({ position: { x: 0, y: 0 }, isLocalPlayer: true, kitId: 'hauler' });
-    ship.cargo = 1500 * load;
-    ship.angle = 0;
-    ship.velocity = { x: 0, y: 0 };
-    ship.thrusting = true;
-    ship.spawnProtectionTimer = 0;
-    for (let frame = 0; frame < 600; frame++) {
-      ship.position = { x: 0, y: 0 };
-      ship.update();
+test.each(['scout', 'hauler'] as const)(
+  'a %s accelerates at Scout pace for every saved mass and cargo load',
+  (kitId) => {
+    for (const mass of [1, 8]) {
+      for (const load of [0, 0.5, 1]) {
+        const ship = new Ship({ kitId, isLocalPlayer: true });
+        ship.mass = mass;
+        ship.cargo = cargoCapacity(kitId) * load;
+        ship.angle = 0;
+        ship.velocity = { x: 0, y: 0 };
+        ship.thrusting = true;
+        ship.update();
+        expect(ship.velocity.x).toBeCloseTo((5 * 0.5625 * 1.25) / 60, 10);
+        expect(ship.velocity.y).toBeCloseTo(0, 10);
+        for (let frame = 0; frame < 60; frame++) {
+          ship.position = { x: 0, y: 0 };
+          ship.update();
+        }
+        expect(ship.velocity.x).toBeCloseTo(2 * 0.5625 * 1.25, 10);
+        expect(ship.mass).toBe(mass);
+        expect(ship.cargo).toBe(cargoCapacity(kitId) * load);
+      }
     }
-    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeCloseTo(
-      cruiseSpeed(ship.mass, ship.maxVelocity, 0, 1) * (1 - 0.3 * load)
-    );
   }
 );

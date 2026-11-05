@@ -8,7 +8,7 @@ export const ECONOMY = {
   cargoSpillSpeed: 9,
   offloadIntervalFrames: 12,
   offloadPoints: 25,
-  pointLootFrames: 120 * 60,
+  pointLootMs: 120_000,
 } as const;
 export const RESOURCES = ['ice', 'metal', 'rubble', 'crystal'] as const;
 export function cargoCapacity(kit?: ShipKitId) {

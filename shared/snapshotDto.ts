@@ -141,6 +141,7 @@ const transit = shape<FurnaceTransit>({
     value <= FURNACE_TRAVEL.MAX_DURATION_MS,
 });
 const entity = shape<ServerEntityData>({
+  botRole: optional(choice('worker', 'raider')),
   downedUntil: optional((value) => value === null || counter(value)),
   rescue: optional(
     (value) => value === null || shape({ targetId: string, completesAt: counter })(value)
@@ -173,6 +174,8 @@ const entity = shape<ServerEntityData>({
   color: string,
   cargo: counter,
   bankedCargo: optional(counter),
+  shieldFrames: optional(counter),
+  shieldCooldownFrames: optional(counter),
   weaponChargeFrames: optional(counter),
   navigationAssistFrames: optional(counter),
   contourDraftFrames: optional(counter),
@@ -193,7 +196,6 @@ const entity = shape<ServerEntityData>({
   utilityFlight: optional((value) => value === null || utilityFlight(value)),
   haulerUtility: optional(isHaulerUtilityId),
   scoutUtility: optional(isScoutUtilityId),
-  deathCause: optional(string),
   playerMotion: optional(motion),
 });
 const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({

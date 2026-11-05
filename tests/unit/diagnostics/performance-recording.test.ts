@@ -185,6 +185,113 @@ test('input latency retains the earliest event and separates hidden recovery fro
   });
 });
 
+test('scan entry, steady view and return retain their preceding work across a recording drain', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  recorder.setPhase('play');
+  recorder.recordFrameInterval(10, 10);
+  recorder.setScanScene('enter');
+  recorder.setSceneryFrame({ kind: 'built', cause: 'cold' });
+  recorder.recordVisibleSpiders(2);
+  recorder.recordFrameWork(1, 8, 9);
+  recorder.record('deltaDecodeMs', 2);
+  recorder.recordFrameInterval(40, 50);
+  recorder.setScanScene('wide');
+  recorder.setSceneryFrame({ kind: 'cached' });
+  recorder.recordVisibleSpiders(3);
+  recorder.recordFrameWork(1, 4, 5);
+
+  const first = recorder.read(true);
+  expect(first.metrics['play.frameIntervalMs']?.values).toEqual([10, 40]);
+  expect(first.metrics['play.unclassifiedFrameIntervalMs']?.values).toEqual([10]);
+  expect(first.metrics['play.scanEnterFrameIntervalMs']).toMatchObject({ count: 1, sum: 40 });
+  expect(first.metrics['play.scanDeltaDecodeMs']?.values).toEqual([2]);
+  expect(first.metrics['play.scanRenderMs']?.values).toEqual([8, 4]);
+  expect(first.slowFrames).toMatchObject({
+    observedCount: 1,
+    values: [
+      {
+        atMs: 50,
+        intervalMs: 40,
+        previousFrame: {
+          stage: 'enter',
+          scenery: { kind: 'built', cause: 'cold' },
+          visibleSpiders: 2,
+          updateMs: 1,
+          renderMs: 8,
+          frameCpuMs: 9,
+        },
+      },
+    ],
+  });
+
+  recorder.recordFrameInterval(30, 80);
+  recorder.setScanScene('return');
+  recorder.setSceneryFrame({ kind: 'built', cause: 'pan' });
+  recorder.recordVisibleSpiders(1);
+  recorder.recordFrameWork(2, 10, 12);
+  recorder.recordFrameInterval(50, 130);
+  recorder.setScanScene('flight');
+  recorder.recordFrameWork(1, 3, 4);
+  recorder.recordFrameInterval(16, 146);
+  recorder.setPhase('hidden');
+  recorder.setPhase('play');
+  recorder.recordFrameInterval(20, 166);
+
+  const second = recorder.read();
+  expect(second.metrics['play.frameIntervalMs']).toMatchObject({ count: 4, sum: 116 });
+  expect(second.metrics['play.scanFrameIntervalMs']?.values).toEqual([30, 50]);
+  expect(second.metrics['play.scanWideFrameIntervalMs']).toMatchObject({ count: 1, sum: 30 });
+  expect(second.metrics['play.scanReturnFrameIntervalMs']).toMatchObject({ count: 1, sum: 50 });
+  expect(second.metrics['play.flightFrameIntervalMs']?.values).toEqual([16]);
+  expect(second.metrics['play.unclassifiedFrameIntervalMs']?.values).toEqual([20]);
+  expect(second.metrics['play.scanRenderMs']?.values).toEqual([10]);
+  expect(second.slowFrames.values).toMatchObject([
+    {
+      intervalMs: 50,
+      previousFrame: {
+        stage: 'return',
+        scenery: { kind: 'built', cause: 'pan' },
+        visibleSpiders: 1,
+      },
+    },
+    {
+      intervalMs: 30,
+      previousFrame: { stage: 'wide', scenery: { kind: 'cached' }, visibleSpiders: 3 },
+    },
+  ]);
+  expect(first.slowFrames.values[0]?.previousFrame?.stage).toBe('enter');
+
+  const witness = second.slowFrames.values[0];
+  if (!witness?.previousFrame) {
+    throw new Error('Expected the recorded pan-build witness');
+  }
+  witness.previousFrame.visibleSpiders = 100;
+  expect(recorder.read().slowFrames.values[0]?.previousFrame?.visibleSpiders).toBe(1);
+});
+
+test('long recordings keep only the sixteen largest slow-frame witnesses and count every slow interval', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  recorder.setPhase('play');
+  let now = 0;
+  for (let index = 0; index < 50; index++) {
+    recorder.setScanScene(index % 2 === 0 ? 'enter' : 'return');
+    recorder.setSceneryFrame({ kind: 'built', cause: index === 0 ? 'cold' : 'pan' });
+    recorder.recordFrameWork(1, 2, 3);
+    now += 26 + index;
+    recorder.recordFrameInterval(26 + index, now);
+  }
+  const result = recorder.read(true);
+  expect(result.metrics['play.frameIntervalMs']).toMatchObject({ count: 50, sum: 2525 });
+  expect(result.metrics['play.scanEnterFrameIntervalMs']?.count).toBe(25);
+  expect(result.metrics['play.scanReturnFrameIntervalMs']?.count).toBe(25);
+  expect(result.slowFrames.observedCount).toBe(50);
+  expect(result.slowFrames.values).toHaveLength(16);
+  expect(result.slowFrames.values.map((frame) => frame.intervalMs)).toEqual(
+    Array.from({ length: 16 }, (_, index) => 75 - index)
+  );
+  expect(recorder.read().slowFrames).toMatchObject({ observedCount: 0, values: [] });
+});
+
 test('ordinary sessions collect no performance observations', () => {
   const recorder = new ClientPerformanceMetrics(false);
   recorder.setPhase('play');
@@ -194,7 +301,13 @@ test('ordinary sessions collect no performance observations', () => {
   recorder.record('frameCpuMs', 3);
   recorder.count('messageFailures');
   recorder.recordRendererFrame('webgl2');
+  recorder.setScanScene('enter');
+  recorder.setSceneryFrame({ kind: 'built', cause: 'cold' });
+  recorder.recordVisibleSpiders(4);
+  recorder.recordFrameWork(1, 2, 3);
+  recorder.recordFrameInterval(40, 40);
   expect(recorder.read()).toMatchObject({ metrics: {}, counters: {}, pendingJoin: false });
+  expect(recorder.read().slowFrames).toMatchObject({ observedCount: 0, values: [] });
   expect(recorder.read().renderer.frames).toEqual({ canvas: 0, webgl2: 0 });
 });
 

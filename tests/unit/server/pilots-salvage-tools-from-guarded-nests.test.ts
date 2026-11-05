@@ -32,7 +32,16 @@ test('fresh pilots can use their starter tool but cannot equip rare tools before
     const actor = equipment === 'survey_probe' ? scout : hauler;
     const mass = actor.mass;
     const drop = engine.dropEquipmentAt(actor.position, equipment);
-    expect(engine.collectLoot()).toContainEqual({ collectorId: actor.id, lootId: drop.id, mass });
+    engine.collectLoot();
+    expect(engine.drainLootCollections()).toEqual([
+      {
+        eventId: expect.any(String),
+        collectorId: actor.id,
+        lootId: drop.id,
+        kind: equipment,
+        position: { ...drop.position },
+      },
+    ]);
     expect(actor.equipment).toContain(equipment);
     expect(actor.mass).toBe(mass);
   }
@@ -46,14 +55,21 @@ test('fresh pilots can use their starter tool but cannot equip rare tools before
 test('a duplicate tool stays available for a different pilot', () => {
   const engine = new GameEngine(82);
   const alice = engine.addPlayer('alice', 'Alice', new RecordingSocket(), undefined, 'hauler');
-  engine.dropEquipmentAt(alice.position, 'resource_tap');
+  const original = engine.dropEquipmentAt(alice.position, 'resource_tap');
   engine.collectLoot();
+  expect(engine.drainLootCollections()).toEqual([
+    expect.objectContaining({ collectorId: alice.id, lootId: original.id, kind: 'resource_tap' }),
+  ]);
   const duplicate = engine.dropEquipmentAt(alice.position, 'resource_tap');
-  expect(engine.collectLoot()).toEqual([]);
+  engine.collectLoot();
+  expect(engine.drainLootCollections()).toEqual([]);
   expect(engine.getLoot()).toContainEqual(duplicate);
   const bob = engine.addPlayer('bob', 'Bob', new RecordingSocket(), undefined, 'hauler');
   bob.position = { ...alice.position };
-  expect(engine.collectLoot()[0]?.collectorId).toBe(bob.id);
+  engine.collectLoot();
+  expect(engine.drainLootCollections()).toEqual([
+    expect.objectContaining({ collectorId: bob.id, lootId: original.id, kind: 'resource_tap' }),
+  ]);
   expect(alice.equipment).toEqual(['resource_tap']);
   expect(bob.equipment).toEqual(['resource_tap']);
 });
@@ -61,9 +77,12 @@ test('a duplicate tool stays available for a different pilot', () => {
 test('two identical tools collected in the same frame unlock once and leave both for others', () => {
   const engine = new GameEngine(82);
   const actor = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), undefined, 'hauler');
+  const first = engine.dropEquipmentAt(actor.position, 'resource_tap');
   engine.dropEquipmentAt(actor.position, 'resource_tap');
-  engine.dropEquipmentAt(actor.position, 'resource_tap');
-  expect(engine.collectLoot()).toHaveLength(1);
+  engine.collectLoot();
+  expect(engine.drainLootCollections()).toEqual([
+    expect.objectContaining({ collectorId: actor.id, lootId: first.id, kind: 'resource_tap' }),
+  ]);
   expect(actor.equipment).toEqual(['resource_tap']);
   expect(engine.getLoot().filter((loot) => loot.kind === 'resource_tap')).toHaveLength(2);
 });
@@ -168,7 +187,7 @@ test('saved pilots from before salvage unlocks return with no rare equipment', (
 
 test('guarded caches contain mixed salvage and occasionally one tool from every equipment type', () => {
   const cacheKinds = (seed: number) => {
-    const manager = new LootManager(new RNGService(seed));
+    const manager = new LootManager(new RNGService(seed), () => 0);
     manager.spawnNestCache({ x: 5000, y: 5000 }, 100);
     return manager.getAll().map((drop) => drop.kind);
   };
@@ -193,7 +212,7 @@ test('guarded caches contain mixed salvage and occasionally one tool from every 
 });
 
 test('nest salvage remains for exploration but expires after its thirty-minute lifetime', () => {
-  const manager = new LootManager(new RNGService(82));
+  const manager = new LootManager(new RNGService(82), () => 0);
   const createdAt = 100;
   manager.spawnNestCache({ x: 5000, y: 5000 }, createdAt);
   const count = manager.getCount();
@@ -210,7 +229,7 @@ test('nest salvage remains for exploration but expires after its thirty-minute l
 });
 
 test('nest rewards never seed further nests while ordinary salvage remains eligible', () => {
-  const loot = new LootManager(new RNGService(82));
+  const loot = new LootManager(new RNGService(82), () => 0);
   const ordinaryShard = loot.spawnShard({ x: 5000, y: 5000 }, 0);
   loot.spawnNestCache({ x: 5000, y: 5000 }, 0);
   expect(loot.getAll().length).toBeGreaterThan(1);
@@ -327,7 +346,7 @@ test('a dead saved flight retains bank, equipment, paint, and silk', () => {
 });
 
 test('a tool left behind for other pilots still expires with the nest lifetime', () => {
-  const loot = new LootManager(new RNGService(82));
+  const loot = new LootManager(new RNGService(82), () => 0);
   const drop = loot.spawnEquipment({ x: 400, y: 300 }, 1_000, 'boost_coupling');
   loot.expire(1_000 + EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES - 1);
   expect(loot.getAll().map((item) => item.id)).toContain(drop.id);

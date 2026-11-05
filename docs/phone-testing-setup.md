@@ -91,8 +91,10 @@ not establish that Samsung is unsuitable.
 
 ### Verified account and inventory
 
-Read-only AWS CLI calls succeeded using the existing `agent-readonly` profile in
-`us-west-2`. The account reported **1,000 total and 1,000 remaining trial minutes**,
+On September 12, 2026, read-only AWS CLI calls succeeded using the then-existing
+`agent-readonly` profile in `us-west-2`. This is historical evidence, not a current
+access instruction or native AgentMcp acceptance. The account reported
+**1,000 total and 1,000 remaining trial minutes**,
 zero unlimited Android/iOS slots and no Device Farm projects. This is an actual
 account readback, not an assumption from the advertised trial. Recheck before
 starting a session because other work can consume that balance.
@@ -116,15 +118,15 @@ Do not interpret the inventory's `memory` value as measured available RAM.
 
 Raw read-only receipts are in the implementation worktree's gitignored
 `.performance/aws-android-inventory.json` and `aws-devicefarm-allowance.json`.
-To refresh them from `/Users/johnsolly/code/GeoRoids`, run these read-only commands:
-
-```sh
-aws devicefarm get-account-settings --profile agent-readonly \
-  --region us-west-2 --query accountSettings.trialMinutes --no-cli-pager
-aws devicefarm list-devices --profile agent-readonly --region us-west-2 \
-  --query 'devices[?name==`Samsung A51`].{arn:arn,os:os,remote:remoteAccessEnabled,availability:availability}' \
-  --no-cli-pager
-```
+To refresh this evidence, use the separately authorized native production
+`aws_mcp` connection described in [development access](development.md#infrastructure-and-access).
+Request Device Farm `GetAccountSettings` and `ListDevices` in `us-west-2`;
+record the trial minutes and Samsung A51 device ARN, OS, remote-access capability
+and availability. Read all returned inventory pages before reporting coverage.
+If the native connection cannot perform either read, report the missing
+capability. Do not recreate the legacy agent profile or export OAuth credentials
+to a local CLI. These reads do not authorize a project, device booking or billable
+session.
 
 ### Price and automation path
 

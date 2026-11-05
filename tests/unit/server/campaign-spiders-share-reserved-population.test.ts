@@ -42,20 +42,20 @@ test('activating a crowded belt sleeps excess bodies without killing their persi
   const rocks = hosts();
   const index = new AsteroidSpatialIndex(rocks);
   const crawlers = new BeltCrawlerManager();
-  crawlers.advance({ index, players: [], nowFrame: 1 });
+  crawlers.advance({ index, hosts: rocks, players: [], nowFrame: 1 });
   expect(crawlers.snapshot()).toHaveLength(96);
   const saved = rocks.map((rock) => ({
     ids: [...(rock.beltCrawlerIds ?? [])],
     health: [...(rock.beltCrawlerHealth ?? [])],
   }));
   crawlers.setPopulationLimit(36);
-  crawlers.advance({ index, players: [], nowFrame: 2 });
+  crawlers.advance({ index, hosts: rocks, players: [], nowFrame: 2 });
   expect(crawlers.snapshot()).toHaveLength(36);
   expect(
     rocks.map((rock) => ({ ids: rock.beltCrawlerIds, health: rock.beltCrawlerHealth }))
   ).toEqual(saved);
   crawlers.setPopulationLimit(96);
-  crawlers.advance({ index, players: [], nowFrame: 3 });
+  crawlers.advance({ index, hosts: rocks, players: [], nowFrame: 3 });
   expect(crawlers.snapshot()).toHaveLength(96);
   expect(crawlers.snapshot().every((body) => body.health === 17)).toBe(true);
 });

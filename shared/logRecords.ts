@@ -1,4 +1,5 @@
 import type { DiagnosticLogRecord } from '../shared-types';
+import { dropLinkQueries } from './queryRedaction';
 
 const LOG_ENVELOPE_VERSION = 1 as const;
 export const LOG_LINE_MAX_BYTES = 8192;
@@ -40,8 +41,7 @@ function cleanText(value: unknown, max = MAX_TEXT): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
-  const redacted = value
-    .replace(/((?:https?:\/\/[^\s?#]+|\/[a-z0-9._~!$&'()*+,;=:@%/-]+))[?#][^\s]*/giu, '$1')
+  const redacted = dropLinkQueries(value)
     .replace(/\b(Bearer)\s+\S+/giu, '$1 [redacted]')
     .replace(
       /\b(authorization|cookie|password|resumeToken|secret|token)\s*[:=]\s*[^\s,;&]+/giu,

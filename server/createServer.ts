@@ -73,6 +73,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const reportWorker =
     reportConfiguration !== undefined ? new DebugReportWorker(reportConfiguration) : undefined;
   const reportHttp = createDebugReportHttp(reportWorker, {
+    sameOriginClient: Boolean(options.serveClientFrom),
     allowedOrigins: [
       'https://www.georoids.com',
       ...(NODE_ENV !== 'production' ? ['http://127.0.0.1:5173', 'http://localhost:5173'] : []),

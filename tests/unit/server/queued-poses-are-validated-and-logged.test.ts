@@ -1,3 +1,4 @@
+import { SHIP } from '../../../shared/constants/gameplay';
 /* @vitest-environment node */
 
 import { performance as nodePerformance } from 'node:perf_hooks';
@@ -7,8 +8,6 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { getShipKit } from '../../../shared/shipKits';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -134,7 +133,7 @@ test('a pose credited a blocked server second lands where the pilot flew and is 
   const speed = engine.playerMotion.legalSpeed(pilot, engine.getServerTime());
   // Reported velocity stays at flat cruise. A town-ring departure can be on a
   // descent, and the next pose is rejected if it keeps that bonus onto flatter ground.
-  const flat = cruiseSpeed(pilot.mass, getShipKit(pilot.kitId).maxVelocity, 0, 1);
+  const flat = SHIP.MAX_VELOCITY;
   const start = { ...pilot.position };
   const cruise = (sequence: number, frames: number) => ({
     type: 'update',

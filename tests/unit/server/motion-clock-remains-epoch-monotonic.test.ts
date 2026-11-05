@@ -5,6 +5,7 @@ import type { WebSocket } from 'ws';
 import { GameEngine, PLAYER_LASER_MAX_LIFETIME_MS } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('server motion clock', () => {
   let engine: GameEngine;
@@ -70,6 +71,35 @@ describe('server motion clock', () => {
     vi.setSystemTime(9_999);
     expect(engine.advanceLasersAndResolveHits()).toEqual([]);
     expect(engine.getServerLasers()).toHaveLength(0);
+  });
+
+  test('point cargo keeps its elapsed lifetime through a paused world and wall-clock jumps', () => {
+    const actor = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 1000, y: 1000 });
+    actor.spawnProtectionTimer = 0;
+    actor.cargo = 10;
+    expect(engine.handleShipDamage(actor.id, 'asteroid', 1).applied).toBe(true);
+    const original = engine.getLoot().filter((drop) => drop.kind === 'points');
+    expect(original).toHaveLength(1);
+    const pointId = original[0]?.id;
+    engine.removePlayer(actor.id);
+    expect(engine.isGamePaused()).toBe(true);
+
+    advanceElapsed(119_999);
+    vi.setSystemTime(5_000_000);
+    const returning = engine.addPlayer('returning', 'Returning', new RecordingSocket(), {
+      x: -10000,
+      y: 0,
+    });
+    engine.advanceOneFrame();
+    expect(engine.getLoot().map((drop) => drop.id)).toContain(pointId);
+
+    engine.removePlayer(returning.id);
+    expect(engine.isGamePaused()).toBe(true);
+    advanceElapsed(1);
+    vi.setSystemTime(1);
+    engine.addPlayer('last', 'Last', new RecordingSocket(), { x: -10000, y: 0 });
+    engine.advanceOneFrame();
+    expect(engine.getLoot().map((drop) => drop.id)).not.toContain(pointId);
   });
 
   test('explicit simulation times reject invalid or backwards values while allowing repeats', () => {

@@ -416,9 +416,8 @@ function prepareLaserBoltSprites(
   baseColor: string,
   scale: number
 ): LaserBoltSprites {
-  const transform = ctx.getTransform();
-  const dpr = Math.hypot(transform.a, transform.b);
   const glow = resolveGlow(VISUAL.LASER_GLOW);
+  const dpr = canvasManager.getRasterPixelRatio(ctx, glow);
   if (
     !laserBoltSprites ||
     laserBoltSprites.dpr !== dpr ||

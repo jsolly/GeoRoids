@@ -1,5 +1,21 @@
 import { describe, expect, test, vi } from 'vitest';
 import { mountRuntime, type RuntimeMountState } from '../../../src/runtime/runtimeMount';
+import { logger } from '../../../src/utils/Logger';
+
+interface DiagnosticRecord {
+  category?: string;
+  message?: string;
+  context?: { error?: { message?: string; stack?: string } | string };
+}
+
+/** The newest record the in-page diagnostics trail holds, as a report would carry it. */
+function lastDiagnostic(): DiagnosticRecord {
+  const line = logger.getRecentDiagnostics().at(-1);
+  if (line === undefined) {
+    throw new Error('Expected a diagnostic record, but the trail was empty.');
+  }
+  return JSON.parse(line) as DiagnosticRecord;
+}
 
 function deferred<Value>() {
   let resolve: (value: Value) => void = () => {
@@ -57,6 +73,22 @@ describe('shell runtime startup', () => {
     await settle();
     expect(initialize).toHaveBeenCalledTimes(1);
     expect(states).toEqual([{ kind: 'loading' }, { kind: 'error', message: 'GPU unavailable' }]);
+
+    // The panel shows only `message`, so the stack used to go nowhere at all.
+    // Nothing held the record that replaced that in place: dropping the cause
+    // argument, swapping the two context arguments, or deleting the call
+    // outright all left this suite green. It is more than a console line --
+    // ERROR records enter the in-page diagnostics trail, which
+    // `clientDiagnostics` ships as `recentLogs` in every submitted report, so
+    // this is both what an operator reads and part of what a player sends.
+    const failed = lastDiagnostic();
+    expect(failed.category).toBe('RUNTIME');
+    expect(failed.message).toBe('Game runtime failed to initialize');
+    expect(failed.context?.error).toMatchObject({
+      message: 'GPU unavailable',
+      stack: expect.stringContaining('GPU unavailable'),
+    });
+
     mount.retry();
     mount.retry();
     await settle();
@@ -67,6 +99,30 @@ describe('shell runtime startup', () => {
     mount.retry();
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(initialize).toHaveBeenCalledTimes(2);
+  });
+
+  test('a startup failure that is not an Error still records its value and a readable panel message', async () => {
+    const states: RuntimeMountState<{ dispose(): void }>[] = [];
+    // A rejected dynamic import does not always carry an Error -- a stale chunk
+    // URL served to a cached index can reject with a plain value -- and that
+    // path takes the other half of the call, which nothing exercised.
+    const mount = mountRuntime(
+      () => Promise.reject('chunk 4f21a9 is no longer served'),
+      (state) => states.push(state)
+    );
+    await settle();
+
+    expect(states).toEqual([
+      { kind: 'loading' },
+      { kind: 'error', message: 'The game could not initialize.' },
+    ]);
+    const failed = lastDiagnostic();
+    expect(failed.category).toBe('RUNTIME');
+    expect(failed.message).toBe('Game runtime failed to initialize');
+    // No Error to carry, so the raw value travels as context instead, where it
+    // is still recoverable from a submitted report.
+    expect(JSON.stringify(failed.context)).toContain('chunk 4f21a9 is no longer served');
+    mount.dispose();
   });
 
   test('never invokes initialization if the shell unmounts before import begins', async () => {

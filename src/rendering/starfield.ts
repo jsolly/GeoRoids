@@ -2,8 +2,8 @@ import { WORLD_BOUNDARY } from '../../shared/boundary';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvasSurface';
 import { drawStarLayers, type StarPoint } from './nativeStarPainter';
+import type { PlayfieldSize } from './playfieldCamera';
 
 interface Star extends StarPoint {
   fillStyle: string;
@@ -113,12 +113,14 @@ function getStarTile(tileX: number, tileY: number): readonly Star[] {
 }
 
 /** Both backends retain only the deterministic tiles intersecting the current view. */
-export function visibleStarTiles(shipPosition: Position): readonly (readonly Star[])[] {
-  const viewport = canvasManager.getViewportSize();
+export function visibleStarTiles(
+  shipPosition: Position,
+  viewport: Readonly<PlayfieldSize>,
+  scale: number
+): readonly (readonly Star[])[] {
   const size = VISUAL.STAR_SIZE;
 
   const boundary = WORLD_BOUNDARY;
-  const scale = canvasManager.getPlayfieldScale();
   const bounds = viewport;
   const halfWidth = bounds.width / (2 * scale);
   const halfHeight = bounds.height / (2 * scale);
@@ -152,16 +154,17 @@ export function visibleStarTiles(shipPosition: Position): readonly (readonly Sta
   return tiles;
 }
 
-export function drawStarfield(shipPosition: Position): void {
-  const ctx = canvasManager.getContext();
-  if (!ctx || !canvasManager.getCanvas()) {
-    return;
-  }
+export function drawStarfield(
+  ctx: CanvasRenderingContext2D,
+  shipPosition: Position,
+  viewport: Readonly<PlayfieldSize>,
+  scale: number
+): void {
   drawStarLayers(
     ctx,
-    visibleStarTiles(shipPosition),
+    visibleStarTiles(shipPosition, viewport, scale),
     shipPosition,
-    canvasManager.getViewportSize(),
-    canvasManager.getPlayfieldScale()
+    viewport,
+    scale
   );
 }

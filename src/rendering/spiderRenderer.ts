@@ -1,24 +1,37 @@
 import { probePosition } from '../../shared/surveyProbe';
 import { SPIDER, spiderHash, spiderScale } from '../../shared/terrainSpider';
-import type { Position, TerrainSpider } from '../../shared-types';
+import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-types';
 import { updateSpiderScore } from '../audio/spiderScore';
+import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { drawSurveyProbe } from '../entities/roid/surveyProbeRenderer';
 import type { ContourLevel } from '../physics/terrain/contours';
 import { getSpiderField, spiderDanger } from '../physics/terrain/spiderSession';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { canvasManager } from './canvasSurface';
 import { createContourQuery } from './contourSpatialIndex';
+import type { PlayfieldSize } from './playfieldCamera';
 import { spiderFootContacts } from './spiderFootContacts';
 
-const healthHistory = new Map<string, { health: number; flashUntil: number }>();
-const infestationCandidates = createContourQuery();
+interface SpiderRenderState {
+  health: number;
+  flashUntil: number;
+  infestationCandidates: ReturnType<typeof createContourQuery>;
+  footCandidates: ReturnType<typeof createContourQuery>;
+  pathSegments: ReadonlyArray<readonly ContourLevel['segments'][number][]>;
+  path: Path2D | null;
+}
+
+// One pair of queries and one current path per live spider; departed IDs are
+// pruned every frame. Different guards must not replace each other's rectangle.
+const renderStates = new Map<string, SpiderRenderState>();
 
 function drawInfestedContours(
   ctx: CanvasRenderingContext2D,
   spider: TerrainSpider,
   time: number,
   scale: number,
-  levels: readonly ContourLevel[]
+  levels: readonly ContourLevel[],
+  state: SpiderRenderState
 ): void {
   const { x, y } = spider.position;
   const radius = SPIDER.INFLUENCE_RADIUS;
@@ -28,22 +41,34 @@ function drawInfestedContours(
   ctx.clip();
   ctx.lineWidth = 1.4 / scale;
   ctx.strokeStyle = `rgba(236,58,83,${0.7 + 0.15 * Math.sin(time * 3)})`;
-  ctx.beginPath();
-  for (const [ordinal] of levels.entries()) {
-    const segments = infestationCandidates(levels, ordinal, {
+  const candidates = levels.map((_, ordinal) =>
+    state.infestationCandidates(levels, ordinal, {
       x,
       y,
       width: radius * 2,
       height: radius * 2,
       scale: 1,
       pad: 0,
-    });
-    for (const segment of segments) {
-      ctx.moveTo(segment.ax, segment.ay);
-      ctx.lineTo(segment.bx, segment.by);
+    })
+  );
+  if (
+    !state.path ||
+    candidates.length !== state.pathSegments.length ||
+    candidates.some((segments, ordinal) => segments !== state.pathSegments[ordinal])
+  ) {
+    const path = new Path2D();
+    for (const segments of candidates) {
+      for (const segment of segments) {
+        path.moveTo(segment.ax, segment.ay);
+        path.lineTo(segment.bx, segment.by);
+      }
     }
+    state.path = path;
+    state.pathSegments = candidates;
   }
-  ctx.stroke();
+  // Keep the moving clip, pulse and per-spider overlap order live; only geometry
+  // submission is retained. Feet continue to project onto these same contours.
+  ctx.stroke(state.path);
   ctx.restore();
 }
 
@@ -111,7 +136,8 @@ function drawSpider(
   spider: TerrainSpider,
   time: number,
   scale: number,
-  levels: readonly ContourLevel[]
+  levels: readonly ContourLevel[],
+  state: SpiderRenderState
 ): void {
   ctx.save();
   ctx.translate(spider.position.x, spider.position.y);
@@ -126,7 +152,13 @@ function drawSpider(
   const speed = spider.phase === 'hunting' ? 24 : 12;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const feet = spiderFootContacts(spider, levels, time, variant.scale * variant.legSpan);
+  const feet = spiderFootContacts(
+    spider,
+    levels,
+    time,
+    variant.scale * variant.legSpan,
+    state.footCandidates
+  );
   const cosine = Math.cos(spider.angle);
   const sine = Math.sin(spider.angle);
   // The toes slide along existing isolines; only the knees flex above them.
@@ -156,10 +188,9 @@ function drawSpider(
       ctx.stroke();
     }
   }
-  const previous = healthHistory.get(spider.id);
-  const flashUntil =
-    previous && spider.health < previous.health ? time + 0.18 : (previous?.flashUntil ?? 0);
-  healthHistory.set(spider.id, { health: spider.health, flashUntil });
+  const flashUntil = spider.health < state.health ? time + 0.18 : state.flashUntil;
+  state.health = spider.health;
+  state.flashUntil = flashUntil;
   ctx.fillStyle = time < flashUntil ? '#fff0da' : shudder > 0 ? '#8c254e' : '#200e20';
   ctx.strokeStyle = '#d04c66';
   ctx.lineWidth = (1.5 * stroke) / scale;
@@ -197,15 +228,16 @@ export function drawTerrainSpiders(position: Position, playerId: string, alive: 
   const field = getSpiderField();
   const time = performance.now() / 1000;
   const liveIds = new Set(field.spiders.map((spider) => spider.id));
-  for (const id of healthHistory.keys()) {
+  for (const id of renderStates.keys()) {
     if (!liveIds.has(id)) {
-      healthHistory.delete(id);
+      renderStates.delete(id);
     }
   }
   const radius = Math.hypot(viewport.width, viewport.height) / (2 * scale);
   const levels = getTerrainContours(position, radius + 32 / scale);
   ctx.save();
   canvasManager.applyWorldTransform(ctx, position);
+  let visibleSpiders = 0;
   for (const spider of field.spiders) {
     if (
       Math.hypot(position.x - spider.position.x, position.y - spider.position.y) <
@@ -214,17 +246,43 @@ export function drawTerrainSpiders(position: Position, playerId: string, alive: 
       if (spider.crawler) {
         continue;
       }
-      drawInfestedContours(ctx, spider, time, scale, levels);
-      drawSpider(ctx, spider, time, scale, levels);
+      visibleSpiders++;
+      let state = renderStates.get(spider.id);
+      if (!state) {
+        state = {
+          health: spider.health,
+          flashUntil: 0,
+          infestationCandidates: createContourQuery(),
+          footCandidates: createContourQuery(),
+          pathSegments: [],
+          path: null,
+        };
+        renderStates.set(spider.id, state);
+      }
+      drawInfestedContours(ctx, spider, time, scale, levels, state);
+      drawSpider(ctx, spider, time, scale, levels, state);
     }
   }
   ctx.restore();
+  clientPerformance.recordVisibleSpiders(visibleSpiders);
   for (const spider of field.spiders) {
     if (spider.probe) {
       const screen = canvasManager.worldToScreen(probePosition(spider, spider.probe), position);
       drawSurveyProbe(ctx, spider.probe, screen, scale, Date.now());
     }
   }
+  drawSpiderDanger(ctx, viewport, position, field, playerId, alive);
+}
+
+/** Audio and the hunted border follow live danger in either world renderer. */
+export function drawSpiderDanger(
+  ctx: CanvasRenderingContext2D,
+  viewport: Readonly<PlayfieldSize>,
+  position: Position,
+  field: SpiderFieldState,
+  playerId: string,
+  alive: boolean
+): void {
   const danger = alive ? spiderDanger(position, field, playerId) : 'quiet';
   updateSpiderScore(danger);
   if (danger === 'hunted') {

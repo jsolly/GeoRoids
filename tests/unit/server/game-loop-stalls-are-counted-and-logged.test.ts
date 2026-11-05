@@ -1,6 +1,7 @@
 /* @vitest-environment node */
 import { afterEach, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { GameLoopHealth } from '../../../server/core/GameLoopHealth';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { logger } from '../../../setup/serverLogger';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
@@ -8,6 +9,33 @@ import { RecordingSocket } from '../../support/recordingSocket';
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+test('stall context is collected once per emitted log without suppressing health counters', () => {
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  const context = vi.fn(() => ({ players: 2, persistence: undefined }));
+  const health = new GameLoopHealth(context);
+  const step = { blockedMs: 20, catchupTicks: 1, discardedMs: 0, now: 100, gameTime: 1 };
+
+  health.observe(step);
+  expect(context).not.toHaveBeenCalled();
+  health.observe({ ...step, blockedMs: 250, now: 1_000, discardedMs: 3 });
+  expect(context).toHaveBeenCalledTimes(1);
+  expect(warn).toHaveBeenCalledTimes(1);
+  expect(warn).toHaveBeenLastCalledWith(
+    'STATE',
+    'game_loop_stalled',
+    expect.objectContaining({ players: 2, blockedMs: 250, discardedMs: 3 })
+  );
+
+  health.observe({ ...step, blockedMs: 400, now: 5_999, discardedMs: 5 });
+  expect(context).toHaveBeenCalledTimes(1);
+  expect(health.snapshot()).toEqual({ discardedDebtMs: 8, longestStallMs: 400, stalls: 2 });
+
+  health.observe({ ...step, blockedMs: 300, now: 6_000 });
+  expect(context).toHaveBeenCalledTimes(2);
+  expect(warn).toHaveBeenCalledTimes(2);
+  expect(health.snapshot()).toEqual({ discardedDebtMs: 8, longestStallMs: 400, stalls: 3 });
 });
 
 test('a clock step that arrives seconds late is counted on /health and logged once per window', () => {

@@ -480,7 +480,7 @@ test('nearby resource cells each have ten guards and seed treasure only on first
 
 test('treasure that evicts an older guarded deposit changes its marker on the next resource refresh', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
-  const loot = new LootManager(new RNGService(7));
+  const loot = new LootManager(new RNGService(7), () => Date.now());
   const west = { x: 14_800, y: 5_000 };
   const east = { x: 15_200, y: 5_000 };
   const pilot = {

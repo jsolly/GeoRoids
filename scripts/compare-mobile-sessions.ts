@@ -9,6 +9,7 @@ import { compareMobileSessions } from '../benchmarks/mobile-comparison';
 import type { Pilot } from '../benchmarks/pilot';
 import { inspectReleaseEvidence } from '../benchmarks/release-evidence';
 import { canonicalJson } from '../benchmarks/results';
+import { parseRenderDprLimit } from '../src/rendering/renderQuality';
 
 function record(value: unknown): Record<string, unknown> {
   assert(
@@ -68,12 +69,14 @@ const lockfileHash = hash(experiment['lockfileSha256']);
 const fixtureHash = hash(experiment['fixtureHash']);
 function parseQuality(value: unknown) {
   const quality = record(value);
+  const maxDpr = quality['maxDpr'];
   assert(
-    quality['maxDpr'] === 'native' || quality['maxDpr'] === 2 || quality['maxDpr'] === 1.5,
-    'Declare maxDpr native, 2 or 1.5'
+    maxDpr === 'native' || typeof maxDpr === 'number',
+    'Declare maxDpr native or a numeric cap'
   );
+  const parsedDpr = parseRenderDprLimit(String(maxDpr));
   assert(quality['glow'] === 'full' || quality['glow'] === 'off', 'Declare glow full or off');
-  return { maxDpr: quality['maxDpr'], glow: quality['glow'] };
+  return { maxDpr: parsedDpr, glow: quality['glow'] };
 }
 function parseArm(value: unknown) {
   const arm = record(value);

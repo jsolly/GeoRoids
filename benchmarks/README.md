@@ -339,7 +339,10 @@ Defaults remain DPR 1, CPU slowdown 1, clean network, seed 42, and traversal.
 CPU throttling is Chromium-only. Simultaneous touch automation is also
 Chromium-only; WebKit runs require `--viewport desktop`. Neither is physical
 phone acceptance. Diagnostic graphics comparisons accept `--render-dpr native`,
-`2`, or `1.5`, and `--render-glow full` or `off`.
+`2`, `1.5`, `1`, or `0.75`, and `--render-glow full` or `off`. Caps 2 and 1.5
+do not reduce flight resolution on a native-DPR-1.5 device; use cap 1 to isolate
+flight backing-pixel cost. Automatic simplified Scan has its own DPR 0.75 and
+backing-size limits, so a flight cap of 1 does not lower that Scan resolution.
 
 The runner starts an owned impairment proxy before building the production
 client and bakes its ready port into the WebSocket endpoint. Calibration records

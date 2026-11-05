@@ -4,6 +4,7 @@ import { createPlayer } from '../../../src/entities/player/createPlayer';
 import type { Player } from '../../../src/entities/player/Player';
 import { computeHudLayout } from '../../../src/rendering/hud/hudLayout';
 import { drawLeaderboard, fitLeaderboardName } from '../../../src/rendering/hud/leaderboard';
+import { formatPoints } from '../../../src/utils/formatPoints';
 
 type FillTextCall = {
   text: string;
@@ -123,15 +124,21 @@ test('long mobile leaderboard names fit before a wide right-aligned score', () =
 
   const rank = calls.find((call) => call.text === '1.');
   const name = calls.find((call) => call.text.includes('…'));
-  const score = calls.find((call) => call.text === String(wideScore));
+  // The board prints the same bank the HUD does, through the one formatter, so
+  // a row cannot read 24000 beside a bank line reading 24,000 in the same frame.
+  const score = calls.find((call) => call.text === formatPoints(wideScore));
   if (!rank || !name || !score) {
-    throw new Error('Leaderboard did not draw the rank, truncated name, and score');
+    throw new Error('Leaderboard did not draw the rank, truncated name, and grouped score');
   }
+  expect(score.text).toBe('987,654,321');
+  expect(calls.some((call) => call.text === String(wideScore))).toBe(false);
   expect(name.textAlign).toBe('left');
   expect(score.textAlign).toBe('right');
   ctx.font = name.font;
   const nameWidth = ctx.measureText(name.text).width;
   const scoreWidth = ctx.measureText(score.text).width;
+  // Grouping widens the right column, and nameMaxWidth is derived from it, so
+  // this is what proves the name still fits rather than overlapping the score.
   expect(nameWidth).toBeLessThanOrEqual(score.x - name.x - scoreWidth - 6);
   expect(name.text.length).toBeLessThan(longName.length);
 });

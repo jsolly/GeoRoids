@@ -7,7 +7,7 @@ import { keyDown, keyUp, reconcilePlayerInput } from '../../../../src/input/keyb
 
 import { setSelectedShipKitId } from '../../../../src/runtime/shipSelection';
 
-// Keyboard steering and combat remain usable while the ship automatically cruises.
+// Steering and combat remain independent of manual propulsion.
 
 const TURN = ((540 / 180) * Math.PI) / 60;
 
@@ -41,6 +41,15 @@ test('held KeyE repeat does not re-fire the ability', () => {
   expect(activateSpy).not.toHaveBeenCalled();
 });
 
+test('Q activates protection once and its repeat cannot restart the cooldown', () => {
+  press('KeyQ');
+  expect(player.ship.shieldFrames).toBe(120);
+  expect(player.ship.shieldCooldownFrames).toBe(720);
+  player.ship.update();
+  keyDown(new KeyboardEvent('keydown', { code: 'KeyQ', repeat: true }), player);
+  expect(player.ship.shieldCooldownFrames).toBe(719);
+});
+
 test('Shift toggles Contour Lock on and off without holding', () => {
   vi.spyOn(player.ship, 'toggleContourLock').mockImplementation(() => {
     player.ship.contourLock = player.ship.contourLocked ? null : { height: 0.1, direction: 1 };
@@ -62,39 +71,42 @@ test('KeyE preserves the joined Scout when the title menu has a stale Hauler sel
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
   expect(player.ship.kitId).toBe('scout');
   const health = player.ship.health;
-  const speed = player.ship.maxVelocity;
   press('KeyE');
   expect(player.ship.kitId).toBe('scout');
   expect(player.ship.health).toBe(health);
-  expect(player.ship.maxVelocity).toBe(speed);
   expect(player.ship.harpoonTargetId).toBeNull();
 });
 
-test('a cargo pilot hovers on a furnace, steering releases that visit and an empty hold resumes cruise', () => {
-  player.cargo = 400;
-  player.ship.position = { x: 0, y: 0 };
-  player.ship.velocity = { x: 3, y: 1 };
-  reconcilePlayerInput(player);
-  player.ship.update();
-  expect(player.ship.cargoHover).toBe(true);
-  expect(player.ship.velocity).toEqual({ x: 0, y: 0 });
-  expect(player.ship.thrusting).toBe(false);
-  press('ArrowLeft');
-  expect(player.ship.cargoHover).toBe(false);
-  expect(player.ship.thrusting).toBe(true);
-  release('ArrowLeft');
-  reconcilePlayerInput(player);
-  expect(player.ship.cargoHover).toBe(false);
-  player.ship.position = { x: 200, y: 0 };
-  reconcilePlayerInput(player);
-  player.ship.position = { x: 0, y: 0 };
-  reconcilePlayerInput(player);
-  expect(player.ship.cargoHover).toBe(true);
-  player.cargo = 0;
-  reconcilePlayerInput(player);
-  expect(player.ship.cargoHover).toBe(false);
-  expect(player.ship.thrusting).toBe(true);
-});
+test.each(['scout', 'hauler'] as const)(
+  'a loaded high-mass %s stops at a furnace until steering or unloading',
+  (kitId) => {
+    player = new Player({ id: 'carrier', name: 'Carrier', type: 'local', kitId });
+    player.ship.mass = 8;
+    player.cargo = 400;
+    player.ship.position = { x: 0, y: 0 };
+    player.ship.velocity = { x: 3, y: 1 };
+    reconcilePlayerInput(player);
+    player.ship.update();
+    expect(player.ship.cargoHover).toBe(true);
+    expect(player.ship.velocity).toEqual({ x: 0, y: 0 });
+    expect(player.ship.thrusting).toBe(false);
+    press('ArrowLeft');
+    expect(player.ship.cargoHover).toBe(false);
+    expect(player.ship.thrusting).toBe(false);
+    release('ArrowLeft');
+    reconcilePlayerInput(player);
+    expect(player.ship.cargoHover).toBe(false);
+    player.ship.position = { x: 200, y: 0 };
+    reconcilePlayerInput(player);
+    player.ship.position = { x: 0, y: 0 };
+    reconcilePlayerInput(player);
+    expect(player.ship.cargoHover).toBe(true);
+    player.cargo = 0;
+    reconcilePlayerInput(player);
+    expect(player.ship.cargoHover).toBe(false);
+    expect(player.ship.thrusting).toBe(false);
+  }
+);
 
 test.each(['scout', 'hauler'] as const)(
   '%s catches the furnace rim despite its approach heading and releases on fresh steering',
@@ -126,6 +138,7 @@ test.each(['scout', 'hauler'] as const)(
     controlSources.pointerHeading = Math.PI / 2;
     reconcilePlayerInput(player);
     expect(player.ship.cargoHover).toBe(false);
+    press('KeyW');
     player.ship.update();
     expect(player.ship.velocity).not.toEqual({ x: 0, y: 0 });
     controlSources.pointerHeading = null;
@@ -147,34 +160,31 @@ test('opposing turn keys cancel and releasing either resumes the other turn', ()
   expect(player.ship.angularVelocity).toBeCloseTo(TURN);
   release('KeyA');
   expect(player.ship.angularVelocity).toBe(0);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
 });
 
-test('Space fires and release re-arms without interrupting automatic thrust', () => {
+test('Space fires and release re-arms without starting propulsion', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
   expect(player.ship.lasers).toHaveLength(0);
   press('Space');
   expect(shoot).toHaveBeenCalledOnce();
   expect(player.ship.lasers).toHaveLength(1);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
   expect(player.ship.canShoot).toBe(false);
   release('Space');
   expect(player.ship.canShoot).toBe(true);
-  expect(player.ship.thrusting).toBe(true);
+  expect(player.ship.thrusting).toBe(false);
 });
 
-test.each(['ArrowUp', 'KeyW', 'KeyZ'])(
-  '%s is unbound and cannot change cruise or steering',
-  (code) => {
-    press('ArrowLeft');
-    press(code);
-    expect(player.ship.angularVelocity).toBeCloseTo(TURN);
-    expect(player.ship.thrusting).toBe(true);
-    release(code);
-    expect(player.ship.angularVelocity).toBeCloseTo(TURN);
-    expect(player.ship.thrusting).toBe(true);
-  }
-);
+test.each(['ArrowUp', 'KeyW'])('%s supplies thrust without changing steering', (code) => {
+  press('ArrowLeft');
+  press(code);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN);
+  expect(player.ship.thrusting).toBe(true);
+  release(code);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN);
+  expect(player.ship.thrusting).toBe(false);
+});
 
 test('a dead pilot cannot restart thrust, turn, or fire', () => {
   player.ship.health = 0;
@@ -185,4 +195,27 @@ test('a dead pilot cannot restart thrust, turn, or fire', () => {
   expect(shoot).not.toHaveBeenCalled();
   expect(player.ship.angularVelocity).toBe(0);
   expect(player.ship.thrusting).toBe(false);
+});
+
+test.each(['scout', 'hauler'] as const)('a %s turns at the same 540-degree pace', (kitId) => {
+  player = new Player({ id: 'turner', name: 'Turner', type: 'local', kitId });
+  player.ship.mass = 8;
+  player.ship.position = { x: 2000, y: 0 };
+  player.ship.angle = 0;
+  press('ArrowLeft');
+  player.ship.update();
+  expect(player.ship.angle).toBeCloseTo(TURN, 10);
+  release('ArrowLeft');
+  expect(player.ship.angularVelocity).toBe(0);
+});
+
+test('held thrust repeats preserve Contour Lock while a fresh thrust press releases it', () => {
+  press('KeyW');
+  player.ship.contourLock = { height: 0.1, direction: 1 };
+  keyDown(new KeyboardEvent('keydown', { code: 'KeyW', repeat: true }), player);
+  expect(player.ship.contourLocked).toBe(true);
+  release('KeyW');
+  press('KeyW');
+  expect(player.ship.contourLocked).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
 });

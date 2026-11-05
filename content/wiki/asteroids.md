@@ -21,6 +21,10 @@ Rocks gather in rich fields separated by quiet voids, and they come in every siz
 
 Ordinary ice and crystal rocks break on the first laser hit, whatever their size; metal takes repeated hits, larger rubble fragments, and colossal deposits need sustained mining. Mining leaves collectible points and salvage to haul home. Delivery contributors share banked furnace rewards.
 
+## Mining sound
+
+With Sound Effects on, every laser hit a durable deposit survives plays a directional chip from the rock, so you can tell a shot landed without watching it. Only rocks on screen are audible, and the chip sounds the same for every hit, so it marks contact rather than remaining health. Ordinary ice and crystal rocks break on the first hit and play their shatter instead.
+
 ## Colossal deposits
 
 These rare, stationary landmarks resist rams and need many laser hits to fragment. Move one with two Tow Cables, or launch it with a Boost Coupling: alone it crawls, and a second coupling brings it to full speed. Both Haulers earn delivery credit.

@@ -8,7 +8,7 @@ import { configureRenderQuality } from '../../../src/rendering/renderQuality';
 
 afterEach(() => {
   drawLootRelative(new Ship(), []);
-  configureRenderQuality('', false);
+  configureRenderQuality('', 'desktop');
   vi.restoreAllMocks();
 });
 
@@ -24,10 +24,6 @@ function scene() {
   vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
   vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 400, height: 200 });
   const scale = vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
-  vi.spyOn(canvasManager, 'worldToScreen').mockImplementation((position) => ({
-    x: position.x,
-    y: position.y,
-  }));
   vi.spyOn(canvasManager, 'worldToScreenInto').mockImplementation((out, position) =>
     Object.assign(out, position)
   );
@@ -156,7 +152,7 @@ test('a scanning pilot repaints both friendly and bounced laser colors without r
   draw('#21CDAB');
   expect(view.created).toHaveLength(2);
   expect(view.pixels()).not.toEqual(baseline);
-  configureRenderQuality('?performance=collect&renderGlow=off', false);
+  configureRenderQuality('?performance=collect&renderGlow=off', 'desktop');
   const widths = view.sources().map((canvas) => canvas.width);
   view.clear(1);
   draw('#21CDAB');

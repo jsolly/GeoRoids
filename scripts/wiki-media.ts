@@ -2,6 +2,7 @@ import { scannedMaterial } from '../shared/surveyScan';
 import type { ShipKitId } from '../shared-types';
 import { drawSatelliteHealth } from '../src/entities/satellitePickup/satelliteHealthRenderer';
 import { drawSatellitePickupGlow } from '../src/entities/satellitePickup/satellitePickupGlow';
+import { beginNavigation } from '../src/entities/ship/navigation';
 import './wiki-media-fonts';
 import './wiki-media-node-shim';
 import { spawnSync } from 'node:child_process';
@@ -55,7 +56,7 @@ import {
   tickAbilityHost,
   tickTowLine,
 } from '../shared/shipAbilities';
-import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
+import { cruiseVelocity } from '../shared/shipFlight';
 import { GROWTH, lootOverlap } from '../shared/shipGrowth';
 import { getShipKit, hullRadiusForKit } from '../shared/shipKits';
 import { SnapshotDecoder } from '../shared/snapshotProtocol';
@@ -880,28 +881,15 @@ function makeHaulerDemo(): Demo {
 }
 
 function makeMovementDemo(): Demo {
-  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
-    position: { x: -500, y: 160 },
-    velocity: { x: 0, y: 0 },
-    angle: 0,
-    mass: 1,
-    thrust: SHIP.THRUST,
-  };
+  const state = new Ship({ position: { x: -500, y: 160 } });
+  state.angle = 0;
+  beginNavigation(state, { x: -350, y: 90 });
   const positions: Position[] = [copyPosition(state.position)];
   const speeds: number[] = [0];
   const angles: number[] = [0];
   const totalTicks = FRAME_COUNT * SIM_TICKS_PER_FRAME;
   for (let tick = 0; tick < totalTicks; tick++) {
-    if (tick >= 12 * SIM_TICKS_PER_FRAME && tick < 18 * SIM_TICKS_PER_FRAME) {
-      state.angle += steeringTurn(
-        state.angle,
-        Math.PI / 6,
-        (getShipKit('scout').turnSpeed * Math.PI) / (180 * GAME.FPS)
-      );
-    }
-    advanceCruiseVelocity(state, cruiseSpeed(1, SHIP.MAX_VELOCITY, 0, 1));
-    state.position.x += state.velocity.x;
-    state.position.y += state.velocity.y;
+    state.update();
     if ((tick + 1) % SIM_TICKS_PER_FRAME === 0) {
       positions.push(copyPosition(state.position));
       speeds.push(Math.hypot(state.velocity.x, state.velocity.y));
@@ -913,15 +901,18 @@ function makeMovementDemo(): Demo {
     posterFrame: 20,
     verify: () => {
       invariant(positions.length === FRAME_COUNT + 1, 'movement frame count changed');
-      invariant((speeds[10] ?? 0) > 0, 'automatic thrust did not accelerate');
+      invariant((speeds[10] ?? 0) > 0, 'destination order did not accelerate');
       invariant((angles[20] ?? 0) > 0, 'steering did not turn the nose');
-      invariant((speeds.at(-1) ?? 0) > 0, 'releasing steering stopped propulsion');
+      invariant(
+        speeds.at(-1) === 0 && state.navigation === null,
+        'destination arrival did not stop'
+      );
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'MOVEMENT · ALWAYS-ON THRUST',
-        'steer → turn · release → keep flying',
+        'MOVEMENT · TAP TO TRAVEL',
+        'tap destination → travel hands-free → stop',
         frame,
         PALETTE.LOCAL
       );
@@ -943,10 +934,12 @@ function makeMovementDemo(): Demo {
       drawTag(
         ctx,
         frame < 12
-          ? 'automatic thrust'
+          ? 'destination chosen'
           : frame < 18
-            ? 'steer · turning'
-            : 'released · still flying',
+            ? 'travelling hands-free'
+            : (speeds[frame + 1] ?? 0) > 0
+              ? 'approaching destination'
+              : 'arrived · holding position',
         350,
         112,
         PALETTE.LOCAL
@@ -958,7 +951,7 @@ function makeMovementDemo(): Demo {
 
 const TERRAIN_LOCK_START_FRAME = 14;
 const TERRAIN_CROSSING_START_FRAME = 30;
-const TERRAIN_TURN_PER_TICK = (getShipKit('scout').turnSpeed * Math.PI) / (180 * GAME.FPS);
+const TERRAIN_TURN_PER_TICK = (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS);
 
 /** Nose angle whose cruiseVelocity (canvas y-down) points along `(dirX, dirY)`. */
 function headingForDirection(dirX: number, dirY: number): number {
@@ -1004,7 +997,7 @@ function makeTerrainDemo(): Demo {
     throw new Error('wiki-media verification failed: terrain field has no steep contour');
   }
   const contours = extractIsoContours(field);
-  const cruise = cruiseSpeed(1, SHIP.MAX_VELOCITY, 0, 1);
+  const cruise = SHIP.MAX_VELOCITY;
   const initialGradient = sampleGradient(field, start.x, start.y);
   const state = new Ship({ kitId: 'scout', position: copyPosition(start) });
   state.angle = headingAlongContour(initialGradient.x, initialGradient.y, 0);
@@ -1211,7 +1204,7 @@ function drawLootDiamond(
 
 function makeLootDemo(): Demo {
   const displayScale = 0.28;
-  const lootManager = new LootManager(new RNGService(0x55aa1122));
+  const lootManager = new LootManager(new RNGService(0x55aa1122), () => 0);
   const firstDrop = lootManager.spawnShard({ x: 0, y: 0 }, 0, 0.4);
   const secondDrop = lootManager.spawnShard({ x: 60, y: 0 }, 0, 0.25);
   const rock = makeAsteroid('loot-rock', { x: 44, y: 0 }, 22, 'rubble');

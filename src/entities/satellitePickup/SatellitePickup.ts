@@ -3,7 +3,6 @@ import type {
   SatellitePickupData,
   SatellitePickupState,
   SatellitePickupTypeId,
-  Velocity,
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
 import { playFeedback } from '../../audio/feedbackSounds';
@@ -14,9 +13,7 @@ export class SatellitePickup {
   id: string;
   name: string;
   typeId: SatellitePickupTypeId;
-  assetKey: string;
   position: Position;
-  velocity: Velocity;
   angle: number;
   radius: number;
   color: string;
@@ -29,9 +26,7 @@ export class SatellitePickup {
     this.id = data.id;
     this.name = data.name;
     this.typeId = data.typeId;
-    this.assetKey = data.assetKey;
     this.position = { ...data.position };
-    this.velocity = { ...data.velocity };
     this.angle = data.angle;
     this.radius = data.radius;
     this.color = data.color;
@@ -51,9 +46,7 @@ export class SatellitePickup {
     }
     this.name = data.name;
     this.typeId = data.typeId;
-    this.assetKey = data.assetKey;
     this.position = { ...data.position };
-    this.velocity = { ...data.velocity };
     this.angle = data.angle;
     this.radius = data.radius;
     this.color = data.color;

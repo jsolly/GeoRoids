@@ -137,13 +137,13 @@ describe('server-authoritative player shooting', () => {
     const player = engine.getPlayer('pilot');
     assert.ok(player, 'delayed pose pilot');
     const kit = getShipKit(player.kitId);
-    player.velocity = { x: kit.maxVelocity, y: 0 };
+    player.velocity = { x: SHIP.MAX_VELOCITY, y: 0 };
     const delayedPosition = {
-      x: (-kit.maxVelocity * GAME.FPS * PLAYER_SHOOT_POSE_ALLOWANCE_MS) / 1000,
+      x: (-SHIP.MAX_VELOCITY * GAME.FPS * PLAYER_SHOOT_POSE_ALLOWANCE_MS) / 1000,
       y: 0,
     };
     const muzzle = calculateLaserStartPosition(delayedPosition, 0, kit.size / 2);
-    shoot(muzzle, { x: kit.maxVelocity + LASER.SPEED / GAME.FPS, y: 0 });
+    shoot(muzzle, { x: SHIP.MAX_VELOCITY + LASER.SPEED / GAME.FPS, y: 0 });
     expect(engine.getServerLasers()).toHaveLength(1);
   });
 

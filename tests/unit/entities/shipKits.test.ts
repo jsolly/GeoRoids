@@ -21,14 +21,10 @@ test('pilots choose exactly Scout or Hauler and retired selections fall back to 
   }
 });
 
-test('Scout handles more nimbly while Hauler keeps its heavy hull at the same cruise speed', () => {
+test('Hauler keeps its larger hull and health while Scout retains Mineral Scan', () => {
   const scout = getShipKit('scout'),
     hauler = getShipKit('hauler');
-  expect(scout.turnSpeed).toBe(540);
-  expect(scout.turnSpeed).toBeGreaterThan(hauler.turnSpeed);
   expect(scout.size).toBeLessThan(hauler.size);
-  expect(scout.maxVelocity).toBe(SHIP.MAX_VELOCITY);
-  expect(hauler.maxVelocity).toBe(scout.maxVelocity);
   expect(hauler.maxHealth).toBeGreaterThan(scout.maxHealth);
   expect(scout.abilityId).toBe('surveyScan');
   expect(hauler.abilityId).toBe('harpoon');
@@ -61,6 +57,5 @@ test('every ship uses the same two kit definitions', () => {
   expect(ship.maxHealth).toBe(140);
   applyShipKitToShip(ship, 'scout');
   expect(ship.kitId).toBe('scout');
-  expect(ship.turnSpeed).toBe(540);
   expect(ship.maxHealth).toBe(100);
 });

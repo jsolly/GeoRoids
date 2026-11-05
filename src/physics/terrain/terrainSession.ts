@@ -28,6 +28,7 @@ const contourPatches = new Map<string, ContourPatch>();
 let contourPatchBuilds = 0;
 let contourPatchAccess = 0;
 let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
+let prefetchSuspended = false;
 
 // A large world needs a local contour patch. Overlap between adjacent patches
 // keeps the camera from seeing a gap when it crosses a patch boundary.
@@ -45,6 +46,14 @@ export function stopTerrainPrefetch(): void {
   if (prefetchTimer !== undefined) {
     clearTimeout(prefetchTimer);
     prefetchTimer = undefined;
+  }
+}
+
+/** Keep required local navigation geometry, but retire speculative work during simple Scan. */
+export function suspendTerrainPrefetch(suspended: boolean): void {
+  prefetchSuspended = suspended;
+  if (suspended) {
+    stopTerrainPrefetch();
   }
 }
 
@@ -141,7 +150,7 @@ function scheduleNeighborPrefetch(
   region: ContourRegion,
   center: Position
 ): void {
-  if (prefetchTimer !== undefined) {
+  if (prefetchSuspended || prefetchTimer !== undefined) {
     return;
   }
   prefetchTimer = setTimeout(() => {
@@ -221,4 +230,16 @@ export function peekBuiltContourPatch(
   }
   const region = contourRegionFor(center, viewRadius);
   return contourPatches.get(regionKey(region))?.levels;
+}
+
+/** Read complete built geometry and its coverage without extracting or prefetching. */
+export function peekBuiltContourRegion(center: Position, viewRadius: number) {
+  const current = syncContourCache();
+  if (fieldRadiusIsSmallEnoughForFullContours(current.field)) {
+    const bounds = current.contourRegion;
+    return bounds ? { levels: current.contours, bounds } : undefined;
+  }
+  const bounds = contourRegionFor(center, viewRadius);
+  const patch = contourPatches.get(regionKey(bounds));
+  return patch ? { levels: patch.levels, bounds } : undefined;
 }

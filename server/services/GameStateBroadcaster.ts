@@ -10,6 +10,7 @@ import {
   SnapshotBroadcastCapture,
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
+import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import { isActiveScanner } from '../../shared/surveyScan';
 import {
   asteroidReach,
@@ -17,7 +18,8 @@ import {
   nearbyAsteroidRows,
   nearbyWorldRows,
 } from '../../shared/world';
-import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
+import type { AsteroidData, AsteroidHitEvent, SatellitePickupCollected } from '../../shared-types';
+import type { GameEntity } from '../core/EntityManager';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 
@@ -261,13 +263,19 @@ export class GameStateBroadcaster {
                 (recipient.worldRemains && isWithinWorldInterest(asset.position, player.position))
             ),
 
-            entities: gameState.entities.map((entity) =>
-              entity.id === player.id ||
-              !entity.utilityFlight ||
-              isWithinWorldInterest(entity.utilityFlight.position, player.position)
-                ? entity
-                : { ...entity, utilityFlight: null }
-            ),
+            entities: gameState.entities
+              .filter(
+                (entity) =>
+                  entity.botRole === undefined ||
+                  isWithinWorldInterest(entity.position, player.position)
+              )
+              .map((entity) =>
+                entity.id === player.id ||
+                !entity.utilityFlight ||
+                isWithinWorldInterest(entity.utilityFlight.position, player.position)
+                  ? entity
+                  : { ...entity, utilityFlight: null }
+              ),
             asteroids,
             loot: this.gameEngine
               .getNearbyLoot(player.position)
@@ -593,10 +601,29 @@ export class GameStateBroadcaster {
       timestamp: Date.now(),
     };
 
+    const target = this.gameEngine.getPlayer(targetPlayerId);
+    if (target?.botRole !== undefined) {
+      // A bot can take damage before its first local snapshot, or after leaving
+      // another pilot's interest region. Only recipients with that hull may
+      // apply this event; its next snapshot already carries current health.
+      for (const pilot of this.gameEngine.getAllPlayers()) {
+        const ws = pilot.ws;
+        const recipient = ws ? this.snapshotRecipients.get(ws) : undefined;
+        if (
+          ws &&
+          recipient &&
+          !recipient.pending &&
+          recipient.baseline?.state.entities.some((entity) => entity.id === targetPlayerId)
+        ) {
+          this.sendToWebSocket(ws, message);
+        }
+      }
+      return;
+    }
     this.broadcastToAll(message);
   }
 
-  public broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
+  private broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
     this.broadcastToAll({
       type: 'satellitePickupCollected',
       data,
@@ -626,7 +653,7 @@ export class GameStateBroadcaster {
     }
   }
 
-  public broadcastLootExploded(event: {
+  private broadcastLootExploded(event: {
     lootId: string;
     position: { x: number; y: number };
     radius: number;
@@ -637,6 +664,23 @@ export class GameStateBroadcaster {
       data: event,
       timestamp: Date.now(),
     });
+  }
+
+  /** A chip a durable deposit survived; its shatter reports destruction instead. */
+  public broadcastAsteroidHit(event: AsteroidHitEvent): void {
+    // The client culls this cue outside the viewport, which is smaller than the
+    // interest radius, so sending it to the whole world would spend a message
+    // per pilot to be discarded on arrival. Event-class backpressure closes a
+    // socket rather than skipping it, which no cosmetic cue is worth.
+    this.broadcastToAll(
+      {
+        type: 'asteroidHit',
+        data: event,
+        timestamp: Date.now(),
+      },
+      undefined,
+      (pilot) => isWithinWorldInterest(event.position, pilot.position)
+    );
   }
 
   public broadcastAsteroidDestruction(
@@ -729,12 +773,7 @@ export class GameStateBroadcaster {
       recordOutbound(outboundClass(message), 'failed');
       logger.error('Failed to serialize direct message', {
         type: messageType(message),
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
+        error: boundedDiagnosticError(error, 'Unserializable direct message'),
       });
       return;
     }
@@ -749,34 +788,35 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastToAll(message: unknown, excludeId?: string): void {
+  public broadcastToAll(
+    message: unknown,
+    excludeId?: string,
+    reaches?: (player: GameEntity) => boolean
+  ): void {
     if (!serverPerformanceMetrics.enabled) {
-      this.broadcastToAllInternal(message, excludeId);
+      this.broadcastToAllInternal(message, excludeId, reaches);
       return;
     }
     const startedAt = globalThis.performance.now();
     try {
-      this.broadcastToAllInternal(message, excludeId);
+      this.broadcastToAllInternal(message, excludeId, reaches);
     } finally {
       serverPerformanceMetrics.recordBroadcast(globalThis.performance.now() - startedAt);
     }
   }
 
-  private broadcastToAllInternal(message: unknown, excludeId?: string): void {
+  private broadcastToAllInternal(
+    message: unknown,
+    excludeId?: string,
+    reaches?: (player: GameEntity) => boolean
+  ): void {
     let messageStr: string;
     try {
       messageStr = JSON.stringify(message);
     } catch (error) {
-      // A circular Timeout on player.ws used to kill the process here and
-      // flap every client into the Reconnecting banner (#485 live miss).
       logger.error('Failed to serialize broadcast', {
         type: messageType(message),
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
+        error: boundedDiagnosticError(error, 'Unserializable broadcast'),
       });
       return;
     }
@@ -784,6 +824,10 @@ export class GameStateBroadcaster {
 
     for (const player of players) {
       if (excludeId != null && excludeId !== '' && player.id === excludeId) {
+        continue;
+      }
+
+      if (reaches !== undefined && reaches(player) !== true) {
         continue;
       }
 

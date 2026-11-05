@@ -3,8 +3,8 @@ import { PALETTE, VISUAL } from '../constants';
 import type { ContourLevel } from '../physics/terrain/contours';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvasSurface';
 import { createContourQuery } from './contourSpatialIndex';
+import type { PlayfieldSize } from './playfieldCamera';
 
 type ContourSegment = ContourLevel['segments'][number];
 
@@ -12,10 +12,12 @@ const contourPathCache = new WeakMap<readonly ContourSegment[], Path2D>();
 const playfieldCandidates = createContourQuery();
 
 /** The same local candidate sequence feeds the Canvas and GPU rear layers. */
-export function visibleContourLayers(shipPosition: Position) {
+export function visibleContourLayers(
+  shipPosition: Position,
+  viewport: Readonly<PlayfieldSize>,
+  scale: number
+) {
   const pad = 32;
-  const scale = canvasManager.getPlayfieldScale();
-  const viewport = canvasManager.getViewportSize();
   const viewRadius =
     Math.hypot(viewport.width / 2, viewport.height / 2) / Math.max(scale, Number.EPSILON) +
     pad / Math.max(scale, Number.EPSILON);
@@ -37,22 +39,29 @@ export function visibleContourLayers(shipPosition: Position) {
  * Neutral contour currents in world space. Keep alpha low so
  * ships, lasers, and roids stay readable on top.
  */
-export function drawIsoContours(shipPosition: Position): number {
-  return drawContourLayers(shipPosition, visibleContourLayers(shipPosition));
+export function drawIsoContours(
+  ctx: CanvasRenderingContext2D,
+  shipPosition: Position,
+  viewport: Readonly<PlayfieldSize>,
+  scale: number
+): number {
+  return drawContourLayers(
+    ctx,
+    shipPosition,
+    viewport,
+    scale,
+    visibleContourLayers(shipPosition, viewport, scale)
+  );
 }
 
 /** Shared native painter for ordinary Canvas frames and subpixel GPU-frame contours. */
 export function drawContourLayers(
+  ctx: CanvasRenderingContext2D,
   shipPosition: Position,
+  viewport: Readonly<PlayfieldSize>,
+  scale: number,
   levels: readonly { index: number; segments: readonly ContourSegment[] }[]
 ): number {
-  const ctx = canvasManager.getContext();
-  const cvs = canvasManager.getCanvas();
-  if (!ctx || !cvs) {
-    return 0;
-  }
-
-  const scale = canvasManager.getPlayfieldScale();
   if (levels.length === 0) {
     return 0;
   }
@@ -90,7 +99,9 @@ export function drawContourLayers(
 
       ctx.save();
       try {
-        canvasManager.applyWorldTransform(ctx, shipPosition);
+        ctx.translate(viewport.width / 2, viewport.height / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-shipPosition.x, -shipPosition.y);
         ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH / scale;
         ctx.stroke(path);
         submittedSegments += candidates.length;

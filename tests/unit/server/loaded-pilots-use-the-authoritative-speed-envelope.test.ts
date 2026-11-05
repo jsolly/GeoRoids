@@ -5,7 +5,7 @@ import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine | undefined;
 afterEach(() => engine?.stopGameLoop());
-test('full cargo reduces legal cruise to 70% and rejects an empty-hold velocity', () => {
+test('loaded pilots retain empty-hold cruise and still reject excess velocity', () => {
   engine = new GameEngine(82);
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('carrier', 'Carrier', socket, { x: 0, y: 0 }, 'hauler');
@@ -13,10 +13,10 @@ test('full cargo reduces legal cruise to 70% and rejects an empty-hold velocity'
   pilot.contourLock = null;
   const empty = engine.playerMotion.legalSpeed(pilot, 0);
   pilot.cargo = cargoCapacity(pilot.kitId) / 2;
-  expect(engine.playerMotion.legalSpeed(pilot, 0)).toBeCloseTo(empty * 0.85);
+  expect(engine.playerMotion.legalSpeed(pilot, 0)).toBeCloseTo(empty);
   pilot.cargo = cargoCapacity(pilot.kitId);
   const full = engine.playerMotion.legalSpeed(pilot, 0);
-  expect(full).toBeCloseTo(empty * 0.7);
+  expect(full).toBeCloseTo(empty);
   expect(engine.playerMotion.register(pilot, socket, 0).ok).toBe(true);
   const pose = {
     epoch: 1,
@@ -30,7 +30,7 @@ test('full cargo reduces legal cruise to 70% and rejects an empty-hold velocity'
   expect(
     engine.playerMotion.acceptFreePose(
       socket,
-      { ...pose, sequence: 1, velocity: { x: empty, y: 0 } },
+      { ...pose, sequence: 1, velocity: { x: empty * 2, y: 0 } },
       200
     ).ok
   ).toBe(false);

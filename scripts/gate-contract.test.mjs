@@ -19,7 +19,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { afterAll, test } from 'vitest';
 import { runGate } from './gate.mjs';
-import { candidateMatches, digest, fileRecord, STAGES, sourceRows } from './gate-receipt.mjs';
+import {
+  candidateMatches,
+  digest,
+  fileRecord,
+  GRAPH_COMMANDS,
+  STAGES,
+  sourceRows,
+} from './gate-receipt.mjs';
 import { canonicalEnvironment, lifecycleCommand } from './gate-runtime.mjs';
 import { literalOnlyChange } from './literal-only-change.mjs';
 
@@ -41,10 +48,12 @@ afterAll(() => rmSync(fixtureHome, { recursive: true, force: true }));
 // Independent acceptance contract: never derive this battery from STAGES.
 const REQUIRED_COMMANDS = [
   'check:repo-hooks',
+  'check:python',
   'check:lint-policy',
   'check:lint',
   'check:knip',
   'check:ts-prune',
+  'check:members',
   'check:md',
   'check:yaml',
   'check:actions',
@@ -390,6 +399,16 @@ test('a newer failed or interrupted code attempt blocks an older pass until fres
   }
 });
 
+test('the receipt validator and the runner agree on which graph checks skip', () => {
+  // `readReusable` compares the skipped and recorded commands IN ORDER, so a
+  // reorder makes every green receipt unreusable while each stage still passes.
+  assert.deepEqual(GRAPH_COMMANDS, ['check:knip', 'check:ts-prune', 'check:members']);
+  assert.deepEqual(
+    STAGES.map(([, command]) => command).filter((command) => GRAPH_COMMANDS.includes(command)),
+    GRAPH_COMMANDS
+  );
+});
+
 test('literal tuning skips only graphs while partial staging never certifies candidate', async () => {
   const f = fixture();
   try {
@@ -400,7 +419,7 @@ test('literal tuning skips only graphs while partial staging never certifies can
     assert.equal(result.candidateCertified, false);
     assert.deepEqual(
       f.calls,
-      STAGES.filter(([, command]) => !['check:knip', 'check:ts-prune'].includes(command)).map(
+      STAGES.filter(([, command]) => !GRAPH_COMMANDS.includes(command)).map(
         ([, command]) => command
       )
     );
@@ -614,6 +633,87 @@ function runtimeIdentityFixture(root) {
   });
   return { bash, python, npm, cli };
 }
+
+test('installed identity ignores the caches validation itself writes', async () => {
+  const { identity } = await import('./gate-receipt.mjs');
+  const f = fixture();
+  try {
+    mkdirSync(join(f.root, 'bin'));
+    mkdirSync(join(f.root, 'node_modules'));
+    for (const name of ['npm', 'bash', 'git', 'uvx']) {
+      writeFileSync(join(f.root, 'bin', name), name, { mode: 0o755 });
+    }
+    // runtimeIdentityFixture copies bin/npm into the CLI it then wraps, so the
+    // configuration probe identity runs must be in place before that call.
+    writeFileSync(
+      join(f.root, 'bin', 'npm'),
+      `console.log('userconfig='+(process.env.npm_config_userconfig || process.env.NPM_CONFIG_USERCONFIG || process.env.HOME+'/.npmrc')); console.log('globalconfig='+(process.env.npm_config_globalconfig || process.env.HOME+'/etc/npmrc'));`,
+      { mode: 0o755 }
+    );
+    writeFileSync(join(f.root, '.gitignore'), '.performance/\nnode_modules/\nbin/\n.env.local\n');
+    writeFileSync(join(f.root, 'node_modules', 'installed.js'), 'module.exports = 1;\n');
+    const pythonTools = runtimeIdentityFixture(f.root);
+    const env = {
+      PATH: join(f.root, 'bin'),
+      HOME: fixtureHome,
+      npm_execpath: pythonTools.cli,
+      npm_node_execpath: process.execPath,
+    };
+
+    // A cold installation: no tool downloads, loader caches or build caches yet.
+    const cold = identity(f.root, env).installation;
+
+    // Stages then write their own scratch, exactly as a real run does: pinned
+    // tool archives and their extraction directory, jiti's loader cache for the
+    // Vitest configuration, and the build and test caches.
+    const scratch = {
+      '.cache/check-actions': { 'actionlint-abc.tar.gz': 'archive', 'shellcheck-def.tar.gz': 'ar' },
+      '.cache/check-actions/run.abc123': { extracted: 'tool' },
+      '.cache/jiti': { 'testing-vitest.deadbeef.mjs': 'export default 1;\n' },
+      '.vite/deps': { '_metadata.json': '{}\n' },
+      '.vite-temp': {},
+      '.vitest-cache': { 'results.json': '{}\n' },
+    };
+    for (const [directory, files] of Object.entries(scratch)) {
+      mkdirSync(join(f.root, 'node_modules', directory), { recursive: true });
+      for (const [name, body] of Object.entries(files)) {
+        writeFileSync(join(f.root, 'node_modules', directory, name), body);
+      }
+    }
+    assert.equal(
+      identity(f.root, env).installation,
+      cold,
+      'Validation must not invalidate its own identity by writing its caches'
+    );
+
+    // A second run finds the caches present and moves them on.
+    writeFileSync(join(f.root, 'node_modules/.cache/jiti/testing-vitest.deadbeef.mjs'), 'nine\n');
+    rmSync(join(f.root, 'node_modules/.cache/check-actions/run.abc123'), {
+      recursive: true,
+      force: true,
+    });
+    assert.equal(identity(f.root, env).installation, cold, 'Cache churn is not an install change');
+
+    // The exclusion must stay narrow: a real installed package still counts.
+    mkdirSync(join(f.root, 'node_modules/.cache-like-package'));
+    writeFileSync(join(f.root, 'node_modules/.cache-like-package/index.js'), 'module.exports=2;\n');
+    assert.notEqual(
+      identity(f.root, env).installation,
+      cold,
+      'A package whose name merely begins with .cache must still be inventoried'
+    );
+    rmSync(join(f.root, 'node_modules/.cache-like-package'), { recursive: true, force: true });
+
+    writeFileSync(join(f.root, 'node_modules', 'installed.js'), 'module.exports = 2;\n');
+    assert.notEqual(
+      identity(f.root, env).installation,
+      cold,
+      'Installed bytes must still move the identity'
+    );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
 test('real identity covers installed bytes, ignored env, tool bytes, and unknown overrides', async () => {
   const { identity } = await import('./gate-receipt.mjs');
@@ -877,7 +977,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
       'package-lock.json',
       'config/testing/vitest.ts',
       'config/testing/tooling.ts',
-      'config/app/svelte.js',
+      'config/app/svelte.ts',
       'tests/viteSetup.ts',
       'tests/support/canvas.html',
       'src/utils/logLevel.ts',
@@ -948,14 +1048,14 @@ test('every gate stage writes generated caches in its issued artifact session', 
     }
     // Execute the tooling configuration too: its caches must preserve the
     // installed tree just as the game projects do during an admitted gate.
-    for (const name of [
-      'code-integration-runner',
-      'ci-contract',
-      'server-release-inputs',
-      'dev-server',
-      'lint-policy',
+    for (const [name, extension] of [
+      ['code-integration-runner', 'mjs'],
+      ['ci-contract', 'mjs'],
+      ['server-release-inputs', 'mjs'],
+      ['dev-server', 'ts'],
+      ['lint-policy', 'ts'],
     ]) {
-      const target = join(consumer, 'scripts', `${name}.test.mjs`);
+      const target = join(consumer, 'scripts', `${name}.test.${extension}`);
       mkdirSync(resolve(target, '..'), { recursive: true });
       writeFileSync(
         target,
@@ -988,7 +1088,16 @@ test('every gate stage writes generated caches in its issued artifact session', 
   }
 });
 
-test('hostile inherited Git repository, index and config never affect parent state', () => {
+// This case spawns a nested Vitest run of this same file that excludes only
+// itself, so it costs the sum of every other case here and every case added
+// here is paid for twice. It measured 117.6s in a cloud sandbox against the
+// 120000 default, which is why it carries its own ceiling; CI's runner is far
+// cheaper, spending 98s on the whole check:actions step. The nested run is
+// bounded below that ceiling so a hang reports as a spawn timeout carrying the
+// child's output rather than an opaque one.
+test('hostile inherited Git repository, index and config never affect parent state', {
+  timeout: 240000,
+}, () => {
   const f = fixture();
   try {
     f.git('config', '--local', 'fixture.guard', 'original');
@@ -1038,8 +1147,12 @@ test('hostile inherited Git repository, index and config never affect parent sta
         },
         encoding: 'utf8',
         maxBuffer: 16 * 1024 * 1024,
+        timeout: 220000,
       }
     );
+    if (result.error) {
+      assert.fail(`${result.error.message}\n${result.stdout}${result.stderr}`);
+    }
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /every gate stage writes generated caches/u);
     for (const [name, bytes] of tracked) {
@@ -1054,7 +1167,7 @@ test('hostile inherited Git repository, index and config never affect parent sta
   }
 });
 
-test('changed TypeScript symlink plus literal tuning requires both graph checks', async () => {
+test('changed TypeScript symlink plus literal tuning requires every graph check', async () => {
   const f = fixture();
   try {
     writeFileSync(join(f.root, 'a.ts'), 'export const a=1;');
@@ -1069,6 +1182,7 @@ test('changed TypeScript symlink plus literal tuning requires both graph checks'
     await f.gate();
     assert.ok(f.calls.includes('check:knip'));
     assert.ok(f.calls.includes('check:ts-prune'));
+    assert.ok(f.calls.includes('check:members'));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
@@ -1645,7 +1759,8 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
       const report = `const fs = require('node:fs');
         const start = require('node:child_process').spawnSync('ps', ['-p', String(process.pid), '-o', 'lstart='], {encoding:'utf8'}).stdout.trim();
         if (process.env.TERM_RESISTANT === '1') process.on('SIGTERM', () => {});
-        fs.writeFileSync(process.argv[1], JSON.stringify({pid:process.pid,start}));
+        fs.writeFileSync(process.argv[1] + '.tmp', JSON.stringify({pid:process.pid,start}));
+        fs.renameSync(process.argv[1] + '.tmp', process.argv[1]);
         setInterval(() => {}, 1000);`;
       const shell = join(f.root, 'stalled-shell.cjs');
       writeFileSync(
@@ -1655,7 +1770,8 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         const cp = require('node:child_process');
         if (process.env.TERM_RESISTANT === '1') process.on('SIGTERM', () => {});
         const start = cp.spawnSync('ps', ['-p', String(process.pid), '-o', 'lstart='], {encoding:'utf8'}).stdout.trim();
-        fs.writeFileSync(${JSON.stringify(records[0])}, JSON.stringify({pid:process.pid,start}));
+        fs.writeFileSync(${JSON.stringify(`${records[0]}.tmp`)}, JSON.stringify({pid:process.pid,start}));
+        fs.renameSync(${JSON.stringify(`${records[0]}.tmp`)}, ${JSON.stringify(records[0])});
         cp.spawn(process.execPath, ['-e', ${JSON.stringify(report)}, ${JSON.stringify(records[1])}], {stdio:'inherit'});
         process.stdout.write(${JSON.stringify(privateValue)});
         if (${JSON.stringify(fault)} === 'overflow') {

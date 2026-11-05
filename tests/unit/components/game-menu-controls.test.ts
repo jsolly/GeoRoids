@@ -160,6 +160,13 @@ test('initialization failure exposes retry separately from a rejected join', asy
 
 test('pilots change supported preferences and ship selection through real controls', async () => {
   const { onpreference, onselectship, currentView, joining } = await start(true);
+  for (const [kind, name] of [
+    ['sound', 'Sound'],
+    ['music', 'Music'],
+    ['haptics', 'Haptics'],
+  ]) {
+    expect(element(`#preference-${kind}`, HTMLButtonElement).getAttribute('aria-label')).toBe(name);
+  }
   element('#preference-sound', HTMLButtonElement).click();
   element('#preference-music', HTMLButtonElement).click();
   element('#preference-haptics', HTMLButtonElement).click();

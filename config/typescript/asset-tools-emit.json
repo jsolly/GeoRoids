@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "sourceMap": false,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "../../scripts"
+  },
+  "include": [
+    "../../scripts/merge-wiki-ledger.mts",
+    "../../scripts/build-vercel-output.mts",
+    "../../scripts/production-smoke-network.mts",
+    "../../scripts/production-smoke-scenario.mts",
+    "../../scripts/production-smoke-entry.mts",
+    "../../scripts/verify-retained-assets.mts",
+    "../../scripts/benchmark-build-receipt.mts"
+  ]
+}

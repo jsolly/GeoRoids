@@ -27,7 +27,7 @@ const serial = [
   '--fileParallelism=false',
 ];
 
-export function integrationFiles(root) {
+function integrationFiles(root) {
   const files = [];
   function visit(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

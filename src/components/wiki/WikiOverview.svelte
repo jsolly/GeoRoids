@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GAME } from '../../../shared/constants/gameplay';
+  import { GAME, SHIP } from '../../../shared/constants/gameplay';
   import { isShipKitId, listShipKits, SHIP_ABILITY } from '../../../shared/shipKits';
   import type { WikiArticle } from '../../wiki/article';
   import Table from '../ui/table/table.svelte';
@@ -68,9 +68,9 @@
             <TableRow>
               <TableHead scope="row"><a href={`#${kit.id}`}>{kit.name}</a></TableHead>
               <TableCell>{kit.maxHealth}</TableCell>
-              <TableCell>{kit.thrust}</TableCell>
-              <TableCell>{kit.maxVelocity}</TableCell>
-              <TableCell>{kit.turnSpeed}</TableCell>
+              <TableCell>{SHIP.THRUST}</TableCell>
+              <TableCell>{SHIP.MAX_VELOCITY}</TableCell>
+              <TableCell>{SHIP.TURN_SPEED}</TableCell>
               <TableCell>{kit.shotCooldown} ms</TableCell>
               <TableCell>{SHIP_ABILITY.COOLDOWN_FRAMES[kit.id] / GAME.FPS} s</TableCell>
             </TableRow>

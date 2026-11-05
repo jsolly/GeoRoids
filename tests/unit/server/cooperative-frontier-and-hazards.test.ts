@@ -1,7 +1,9 @@
 /* @vitest-environment node */
 import { afterEach, expect, test } from 'vitest';
+import { EntityManager } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { HiveEncounters } from '../../../server/core/HiveEncounters';
+import { RNGService } from '../../../server/core/RNGService';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { WorldHazards } from '../../../server/core/WorldHazards';
 import { CooperativeCampaign } from '../../../server/world/CooperativeCampaign';
@@ -208,3 +210,43 @@ test('new belt occupants shrink ordinary capacity without stealing the twelve sw
   hazards.advance(180_000, [pilot], () => {});
   expect(spiders.snapshot().spiders).toHaveLength(24);
 });
+
+test.each(['downed', 'exploding', 'disconnected', 'transit'] as const)(
+  'meteors pass through %s hulls and hit a live bot behind them',
+  (state) => {
+    const { engine, pilot, spiders } = scene();
+    const inactive = engine.addPlayer('inactive', 'Inactive', new RecordingSocket());
+    if (state === 'downed') {
+      inactive.health = 0;
+    }
+    if (state === 'exploding') {
+      inactive.exploding = true;
+    }
+    if (state === 'disconnected') {
+      delete inactive.ws;
+    }
+    if (state === 'transit') {
+      inactive.furnaceTransit = {
+        sourceId: 'source',
+        destinationId: 'destination',
+        startedAt: 1_800_000,
+        durationMs: 1000,
+      };
+    }
+    const bot = new EntityManager(new RNGService(82)).addBot('worker', 'worker', { x: 0, y: 0 });
+    const hazards = new WorldHazards(spiders);
+    const hits: string[] = [];
+    hazards.advance(1_800_000, [pilot], (id) => hits.push(id));
+    const meteor = hazards.snapshot()[0];
+    if (!meteor) {
+      throw new Error('Meteor missing');
+    }
+    inactive.position = { ...meteor.position };
+    bot.position = { ...meteor.position };
+    hazards.advance(1_800_017, [pilot, inactive, bot], (id) => hits.push(id));
+    expect(hits).toEqual(['worker']);
+    hazards.advance(1_800_034, [pilot, inactive, bot], (id) => hits.push(id));
+    expect(hazards.snapshot()).toEqual([]);
+    expect(hits).toEqual(['worker']);
+  }
+);

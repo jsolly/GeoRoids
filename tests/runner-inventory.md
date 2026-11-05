@@ -27,8 +27,9 @@ use Vitest's native test API. `t.after` cleanup becomes `t.onTestFinished`, and
 file cleanup uses `afterAll`. Node strict assertions remain unchanged.
 
 The `runner` project owns benchmark build receipts, benchmark runner, built
-client checks, unused TypeScript checks, code integration runner, port selection,
-TypeScript toolchain and validation admission. The `smoke` project owns server
+client checks, unused TypeScript checks, unused public class members, code
+integration runner, port selection, TypeScript toolchain and validation
+admission. The `smoke` project owns server
 release inputs and production smoke scenario tests against owned fixtures. It
 never contacts production.
 

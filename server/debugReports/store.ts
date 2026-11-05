@@ -38,8 +38,17 @@ export interface StoredReport {
   attempts: number;
 }
 export interface QueueDiagnostics {
-  pending: number;
-  blocked: number;
+  /**
+   * Null means the depth is unknown, not empty: the store failed to answer, or
+   * the worker has not reported yet. Reporting zero for an unmeasured queue
+   * tells an operator reading `/health` that the queue is drained when its depth
+   * is in fact unknown. Nothing automated asserts these two fields: the
+   * production smoke receipt fetches `/health` but reads only `world.*`, so a
+   * wrong depth here is read by a person during an incident, not caught by a
+   * check.
+   */
+  pending: number | null;
+  blocked: number | null;
   oldestPendingAt: string | null;
   lastError: string | null;
 }
@@ -126,7 +135,16 @@ function parseCommands(json: string): DeliveryCommand[] {
   });
 }
 
-/** Only the report worker opens this SQLite connection. */
+/**
+ * Only the report worker opens this SQLite connection, and the connection
+ * enforces it: `locking_mode=EXCLUSIVE` holds the database lock from the first
+ * access until `close()`, so a second connection -- an orphaned or overlapping
+ * worker thread -- cannot read, claim or deliver a row; it fails to open with
+ * `database is locked`. Nothing waits for the lock (no busy timeout), because
+ * a second connection is a defect to surface, not a condition to survive.
+ * `DebugReportWorker` constructs a replacement only after its predecessor's
+ * `exit`, which is when Node has closed the predecessor's connection.
+ */
 export class DebugReportStore {
   private readonly db: DatabaseSync;
   private lastError: string | null = null;
@@ -136,6 +154,8 @@ export class DebugReportStore {
     this.databaseBytes = config.limits?.databaseBytes ?? 128 * 1024 * 1024;
     this.db = new DatabaseSync(config.path);
     try {
+      // First, before anything reads the file, so the lock covers every access.
+      this.db.exec('PRAGMA locking_mode=EXCLUSIVE');
       const pageRow = this.db.prepare('PRAGMA page_size').get();
       const pageSize = pageRow ? rowNumber(pageRow, 'page_size') : 4096;
       this.db.exec(`PRAGMA auto_vacuum=INCREMENTAL; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
@@ -179,6 +199,32 @@ export class DebugReportStore {
       return { id: submission.id, state: stateOf(duplicate['state']) };
     }
     this.checkCapacity();
+    const hour = Math.floor(now / 3_600_000);
+    const day = Math.floor(now / 86_400_000);
+    const limits = [
+      [`address:${digest(address)}`, hour, 3],
+      ['global', day, 30],
+    ] satisfies [string, number, number][];
+    const rejectIfLimited = (): void => {
+      for (const [scope, bucket, maximum] of limits) {
+        const counter = this.db
+          .prepare('SELECT count FROM rate_counters WHERE scope=? AND bucket=?')
+          .get(scope, bucket);
+        if (counter && rowNumber(counter, 'count') >= maximum) {
+          throw new ReportStoreError(
+            429,
+            'Debug report submission limit reached. Keep your local copy and try later.'
+          );
+        }
+      }
+    };
+    // Refuse a limited caller before the report sanitizer runs, so repeated
+    // uploads cannot buy worker time. A counter only grows within its bucket, so
+    // a refusal here would also happen inside the transaction. A pass here can go
+    // stale, because anything that counts a report while this one is redacted
+    // (another accept on this connection or another connection) moves the
+    // counter, so the transaction checks again before it counts this report.
+    rejectIfLimited();
     const receivedAt = new Date(now).toISOString();
     const diagnostics = sanitizeDebugDiagnostics(
       submission.diagnostics,
@@ -256,24 +302,10 @@ export class DebugReportStore {
         'Debug report storage is full. Keep your local copy and try later.'
       );
     }
-    const hour = Math.floor(now / 3_600_000);
-    const day = Math.floor(now / 86_400_000);
-    const addressScope = `address:${digest(address)}`;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      for (const [scope, bucket, maximum] of [
-        [addressScope, hour, 3],
-        ['global', day, 30],
-      ] satisfies [string, number, number][]) {
-        const counter = this.db
-          .prepare('SELECT count FROM rate_counters WHERE scope=? AND bucket=?')
-          .get(scope, bucket);
-        if (counter && rowNumber(counter, 'count') >= maximum) {
-          throw new ReportStoreError(
-            429,
-            'Debug report submission limit reached. Keep your local copy and try later.'
-          );
-        }
+      rejectIfLimited();
+      for (const [scope, bucket] of limits) {
         this.db
           .prepare(
             'INSERT INTO rate_counters(scope,bucket,count) VALUES(?,?,1) ON CONFLICT(scope,bucket) DO UPDATE SET count=count+1'

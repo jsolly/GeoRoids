@@ -188,7 +188,7 @@ test('capture and spider queries leave the stationary camera world paths reusabl
     const expectedPaths = firstCandidates.filter((candidates) => candidates.length > 0);
     ctx.setTransform(3, 0, 0, 3, 0, 0);
 
-    drawIsoContours(firstCamera);
+    drawIsoContours(ctx, firstCamera, viewport, 1);
 
     expect(strokes).toHaveLength(expectedPaths.length);
     for (const [index, candidates] of expectedPaths.entries()) {
@@ -209,19 +209,19 @@ test('capture and spider queries leave the stationary camera world paths reusabl
     const firstPaths = strokes.splice(0).map(({ path }) => path);
     findContourCapture(firstCamera, 0);
     spiderFootContacts({ position: firstCamera, angle: 0 }, levels, 0);
-    drawIsoContours({ x: 33, y: 32 });
+    drawIsoContours(ctx, { x: 33, y: 32 }, viewport, 1);
     expect(strokes).toHaveLength(firstPaths.length);
     for (const [index, stroke] of strokes.entries()) {
       expect(stroke.path).toBe(firstPaths[index]);
     }
 
     strokes.length = 0;
-    drawIsoContours({ x: 1e9, y: 1e9 });
+    drawIsoContours(ctx, { x: 1e9, y: 1e9 }, viewport, 1);
     expect(strokes).toEqual([]);
 
     strokes.length = 0;
     ensureTerrain(TERRAIN.DEFAULT_SEED + 1, { cx: 0, cy: 0, radius: 3100 });
-    drawIsoContours(firstCamera);
+    drawIsoContours(ctx, firstCamera, viewport, 1);
     expect(strokes.length).toBeGreaterThan(0);
     expect(strokes.every(({ path }) => !firstPaths.includes(path))).toBe(true);
   } finally {

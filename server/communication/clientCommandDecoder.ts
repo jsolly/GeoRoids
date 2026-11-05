@@ -52,6 +52,7 @@ export type ClientCommand =
   | ({ type: 'snapshotAck' } & SnapshotAcknowledgement)
   | { type: 'crewAction'; id: string; action: CrewAction }
   | { type: 'useAbility'; id: string }
+  | { type: 'activateShield'; id: string }
   | { type: 'chargeWeapon'; id: string; action: WeaponChargeAction }
   | {
       type: 'setHaulerUtility';
@@ -82,7 +83,6 @@ export type ClientCommand =
       laserDirection: Velocity;
       requestId?: string;
     }
-  | { type: 'collisionDamage'; targetPlayerId: string; attackerId: string }
   | PingMessage;
 
 type ClientCommandDecodeResult =
@@ -312,6 +312,8 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
     }
     case 'useAbility':
       return decodeUseAbility(id);
+    case 'activateShield':
+      return id ? { ok: true, command: { type, id } } : invalid(type, 'Missing shield owner');
     case 'chargeWeapon': {
       const action = fields['action'];
       return id && (action === 'start' || action === 'release' || action === 'cancel')
@@ -388,16 +390,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
             },
           }
         : invalid(type, 'Missing finite laser coordinates for shoot');
-    }
-    case 'collisionDamage': {
-      const targetPlayerId = readNonEmptyString(fields['targetPlayerId']);
-      const attackerId = readNonEmptyString(fields['attackerId']);
-      return targetPlayerId != null &&
-        targetPlayerId !== '' &&
-        attackerId != null &&
-        attackerId !== ''
-        ? { ok: true, command: { type, targetPlayerId, attackerId } }
-        : invalid(type, 'Missing required fields for collisionDamage');
     }
     default:
       return {

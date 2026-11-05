@@ -5,6 +5,7 @@ export const LOCAL_STORAGE_KEYS = {
   soundOn: 'soundOn',
   musicOn: 'musicOn',
   hapticsOn: 'hapticsOn',
+  mobileFlightHelpDismissed: 'mobileFlightHelpDismissed',
   debugHudHidden: 'debugHudHidden',
 };
 

@@ -254,7 +254,7 @@ test('most old rocks are barren and breaking mineral rocks sacrifices harvest wh
 test('mined cargo pickups survive disposable-loot pressure and expire by elapsed time', () => {
   vi.useFakeTimers();
   vi.setSystemTime(1000000);
-  const loot = new LootManager(new RNGService(42));
+  const loot = new LootManager(new RNGService(42), () => Date.now());
   for (let i = 0; i < 60; i++) {
     loot.spawnPoints({ x: 0, y: 0 }, 100);
   }

@@ -46,11 +46,16 @@ install_public_mise() (
 
 # A successful npm ci binds the dependency tree to its inputs and runtime.
 # npm's hidden lock alone does not prove that the current tree still matches it.
+# Verification reads the runtime identity from the installation mise resolves and
+# leaves the complete npm ls tree check to the write: a new cloud session's disk is
+# slow, and starting node and npm pages in thousands of blocks.
 dependency_receipt() {
   MISE_EXEC_AUTO_INSTALL=false bash scripts/repo-python.sh - "$1" <<'PYTHON'
 import hashlib
 import json
 from pathlib import Path
+import platform
+import re
 import subprocess
 import sys
 
@@ -58,6 +63,24 @@ receipt = Path('node_modules/.georoids-setup.json')
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+def resolved(tool):
+    path = Path(subprocess.check_output(['mise', 'which', tool], text=True).strip())
+    if not path.is_absolute() or path.name != tool or path.parent.name != 'bin':
+        raise ValueError(f'mise resolved {tool} to an unexpected path: {path}')
+    return path.resolve(strict=True)
+
+def node_runtime(prefix):
+    # Same value as node -p [process.version, process.versions.modules, process.platform, process.arch].
+    # Identity comes from the installation's header and this host, so a damaged node
+    # binary or one built for another architecture under emulation is not detected.
+    header = (prefix / 'include/node/node_version.h').read_text()
+    def define(name):
+        return re.search(rf'^#define {name} (\d+)$', header, re.M).group(1)
+    version = 'v' + '.'.join(define(f'NODE_{part}_VERSION') for part in ('MAJOR', 'MINOR', 'PATCH'))
+    system = {'Linux': 'linux', 'Darwin': 'darwin'}[platform.system()]
+    arch = {'x86_64': 'x64', 'aarch64': 'arm64', 'arm64': 'arm64'}[platform.machine()]
+    return json.dumps([version, define('NODE_MODULE_VERSION'), system, arch], separators=(',', ':'))
 
 try:
     inputs = {name: digest(name) for name in (
@@ -70,20 +93,21 @@ try:
         if not path.parts or path.parts[0] != 'node_modules' or '..' in path.parts:
             raise ValueError('Invalid installed package path')
         manifests[name] = digest(path / 'package.json')
-    runtime = subprocess.check_output([
-        'mise', 'exec', '--', 'node', '-p',
-        'JSON.stringify([process.version, process.versions.modules, process.platform, process.arch])'
-    ], text=True).strip()
-    npm = subprocess.check_output(['mise', 'exec', '--', 'npm', '--version'], text=True).strip()
-    current = {'version': 1, 'inputs': inputs, 'runtime': runtime, 'npm': npm,
+    prefix = resolved('node').parents[1]
+    # mise's bin/npm wraps the npm bundled with this Node; its manifest carries npm --version.
+    if prefix not in resolved('npm').parents:
+        raise ValueError('npm does not belong to the resolved Node installation')
+    npm = json.loads((prefix / 'lib/node_modules/npm/package.json').read_text())['version']
+    current = {'version': 1, 'inputs': inputs, 'runtime': node_runtime(prefix), 'npm': npm,
                'installedLock': digest(hidden_lock), 'manifests': manifests}
     if sys.argv[1] == 'verify' and json.loads(receipt.read_text()) != current:
         raise ValueError('Dependency inputs, runtime or installed packages changed')
-    subprocess.run(['mise', 'exec', '--', 'npm', 'ls', '--all', '--include=dev',
-                    '--include=optional', '--include=peer'], check=True, stdout=subprocess.DEVNULL)
     if sys.argv[1] == 'write':
+        subprocess.run(['mise', 'exec', '--', 'npm', 'ls', '--all', '--include=dev',
+                        '--include=optional', '--include=peer'], check=True, stdout=subprocess.DEVNULL)
         receipt.write_text(json.dumps(current, sort_keys=True) + '\n')
-except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
+except (OSError, ValueError, KeyError, TypeError, AttributeError, IndexError, RuntimeError,
+        subprocess.CalledProcessError) as error:
     print(f'Dependency setup verification failed: {error}', file=sys.stderr)
     sys.exit(1)
 PYTHON
@@ -92,7 +116,29 @@ PYTHON
 # A warm hook must not reinstall dependencies or tools beneath a running service.
 # An old or incomplete tree needs a deliberate repair after its services stop.
 if $session_hook && [[ -e node_modules || -L node_modules ]]; then
-  bash scripts/repo-python.sh scripts/repo-hooks.py verify --root "$root"
+  # A cached cloud environment keeps hooks installed from the bundle reviewed when it
+  # was built. Reinstall only that stale case; install refuses a bundle not yet trusted.
+  hooks_rc=0
+  hooks_out="$(bash scripts/repo-python.sh scripts/repo-hooks.py verify --root "$root" 2>&1)" || hooks_rc=$?
+  if ((hooks_rc == 0)); then
+    printf '%s\n' "$hooks_out"
+  elif [[ "$hooks_out" == 'repo-hooks: Installed bundle is stale; run reviewed repository setup' ]]; then
+    echo 'Installed hooks predate the trusted current bundle; reinstalling them' >&2
+    # Cloud environments check out the session commit without updating origin/main,
+    # so refresh that trust anchor before install compares the bundle against it.
+    # A session hook must never wait on a credential, passphrase or host-key prompt;
+    # a user's own SSH command or core.sshCommand still takes precedence.
+    ssh_command="${GIT_SSH_COMMAND:-$(git config --get core.sshCommand || echo 'ssh -o BatchMode=yes -o ConnectTimeout=20')}"
+    GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="$ssh_command" \
+      git -c credential.interactive=false -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 \
+      fetch --quiet --no-tags --no-write-fetch-head --no-auto-maintenance origin \
+      '+refs/heads/main:refs/remotes/origin/main' ||
+      echo 'Could not refresh origin/main; install compares against the local copy' >&2
+    bash scripts/repo-python.sh scripts/repo-hooks.py install --root "$root"
+  else
+    printf '%s\n' "$hooks_out" >&2
+    exit "$hooks_rc"
+  fi
   if ! dependency_receipt verify; then
     echo "Stop this checkout's services with npm run dev:kill, then run bash scripts/setup-agent-environment.sh explicitly to repair dependencies." >&2
     exit 1

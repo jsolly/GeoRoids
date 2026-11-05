@@ -24,6 +24,9 @@ interface ObservedClockStep {
   discardedMs: number;
   now: number;
   gameTime: number;
+}
+
+interface StallLogContext {
   players: number;
   persistence: WorldPersistenceDiagnostics | undefined;
 }
@@ -39,6 +42,8 @@ export class GameLoopHealth {
   private stalls = 0;
   private lastLoggedAtMs = Number.NEGATIVE_INFINITY;
 
+  constructor(private readonly readContext: () => StallLogContext) {}
+
   observe(step: ObservedClockStep): void {
     this.discardedDebtMs += step.discardedMs;
     if (step.blockedMs < STALL_WARN_MS) {
@@ -50,15 +55,16 @@ export class GameLoopHealth {
       return;
     }
     this.lastLoggedAtMs = step.now;
+    const context = this.readContext();
     logger.warn('STATE', 'game_loop_stalled', {
       releaseId: SERVER_RELEASE_ID,
       observedAt: step.now,
       gameTime: step.gameTime,
-      players: step.players,
+      players: context.players,
       blockedMs: Math.round(step.blockedMs),
       catchupTicks: step.catchupTicks,
       discardedMs: Math.round(step.discardedMs),
-      persistence: step.persistence,
+      persistence: context.persistence,
     });
   }
 

@@ -30,6 +30,10 @@
     "src/input/keybindings.ts",
     "src/input/mouse.ts",
     "src/input/touchControls.ts",
+    "src/input/objectActions.ts",
+    "src/entities/ship/navigation.ts",
+    "src/rendering/navigationJourney.ts",
+    "shared/playerShield.ts",
     "src/input/playfieldSelection.ts",
     "src/input/touchAbility.ts",
     "index.css",
@@ -39,7 +43,7 @@
     "tests/unit/entities/input/keyboardControls.test.ts",
     "tests/unit/input/mouseDesktop.test.ts",
     "tests/unit/input/touchAbility.test.ts",
-    "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts",
+    "tests/unit/input/mobile-pilots-command-travel-and-combat.test.ts",
     "tests/unit/input/playfield-taps-do-not-open-copy-banners.test.ts",
     "src/input/pointerSteering.ts",
     "src/entities/ship/cruiseMotion.ts",
@@ -195,6 +199,7 @@
     "tests/unit/entities/roidScore.test.ts",
     "tests/unit/entities/mineral-asteroids-break-with-distinct-rewards.test.ts",
     "tests/unit/entities/ordinary-asteroids-break-on-the-first-hit.test.ts",
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts",
     "tests/unit/physics/lasers-bounce-on-asteroid-faces.test.ts",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/integration/server/pilots-observe-first-hit-asteroid-destruction.test.ts",
@@ -403,7 +408,10 @@
     "tests/unit/network/cooperative-state-survives-snapshot-v3.test.ts",
     "shared/chargedWeapon.ts",
     "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts",
-    "tests/unit/rendering/ship-deployment-assembles-existing-hull-parts.test.ts"
+    "tests/unit/rendering/ship-deployment-assembles-existing-hull-parts.test.ts",
+    "shared/aiShips.ts",
+    "server/core/BotFleet.ts",
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
   ],
   "hud-network": [
     "src/components/UpdateNotice.svelte",
@@ -484,6 +492,7 @@
     "scripts/generate-sounds.ts",
     "src/audio/interactionSounds.ts",
     "src/audio/destructionSounds.ts",
+    "src/audio/gameSounds.ts",
     "src/audio/spatialAudio.ts",
     "src/constants/user-preferences.ts",
     "src/fx/haptics.ts",
@@ -714,6 +723,9 @@
     "tests/unit/server/physical-supplies-restore-frontier.test.ts",
     "tests/unit/network/cooperative-state-survives-snapshot-v3.test.ts",
     "shared/contourBridge.ts",
-    "server/core/CooperativeContourBridges.ts"
+    "server/core/CooperativeContourBridges.ts",
+    "shared/aiShips.ts",
+    "server/core/BotFleet.ts",
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
   ]
 }

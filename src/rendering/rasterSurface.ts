@@ -15,14 +15,21 @@ export function prepareRasterSurface(
     discardRasterSurface(recycled);
   }
   const canvas = reusable?.canvas ?? document.createElement('canvas');
-  // Even equal dimensions must reset paths, clips, styles and transparent pixels.
-  canvas.width = width;
-  canvas.height = height;
-  const context = reusable?.context ?? canvas.getContext('2d');
-  if (!context) {
-    throw new Error(unavailableMessage);
+  try {
+    // Even equal dimensions must reset paths, clips, styles and transparent pixels.
+    canvas.width = width;
+    canvas.height = height;
+    const context = reusable?.context ?? canvas.getContext('2d');
+    if (!context) {
+      throw new Error(unavailableMessage);
+    }
+    return reusable ?? { canvas, context };
+  } catch (error) {
+    // A failed getContext never returns a surface to the caller for disposal.
+    canvas.width = 0;
+    canvas.height = 0;
+    throw error;
   }
-  return reusable ?? { canvas, context };
 }
 
 /** Drop unused backing storage while the detached handle awaits collection. */

@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "decision": {
+    "date": "2026-10-20",
+    "pullRequest": "https://github.com/jsolly/GeoRoids/pull/854",
+    "outcome": "Retired without merge at John's request. Earlier optional WebGL2 code and shared tools on main are outside this retirement."
+  },
+  "matrixSourceHead": "09322a61678ae3bbeda3a03bf2cf25dd7f2c9b3f",
+  "matrixClientReleaseId": "698b02474f517360232e6ee42c705fd899aaa349",
+  "retainedArtifactDirectory": "/Users/johnsolly/.codex/visualizations/2026/10/16/01a14258-744b-7ea1-bbca-f704e35c9dd7",
+  "artifacts": [
+    {
+      "file": "fire-gpu-ab-canvas-verified-oct20.json",
+      "bytes": 36238,
+      "sha256": "5bf1140e4496044478e0f743cd5646984d15303f3dd49b7af6f4c1a73f8ea397"
+    },
+    {
+      "file": "fire-gpu-ab-gpu-verified-oct20.json",
+      "bytes": 36077,
+      "sha256": "d3fd780b066f33427f76b540ac34fb0773015aea246b00fba09567c77fb8dcdf"
+    },
+    {
+      "file": "fire-matrix-a-verified-oct20.json",
+      "bytes": 39036,
+      "sha256": "50d7a27d36dedcc87411829e003dbdeef201c6854a60d8177936a9930fb56d79"
+    },
+    {
+      "file": "fire-matrix-b-verified-oct20.json",
+      "bytes": 38937,
+      "sha256": "e2da2f7ac107ee3d3432231fa02a3ac634e5ab649fb681d25d75db3ced240f5a"
+    },
+    {
+      "file": "fire-matrix-c-verified-oct20.json",
+      "bytes": 39518,
+      "sha256": "0ce242190afb2c6a65b990f736aebfdd7113f002bcdf359be7e7237ae0d2d62a"
+    },
+    {
+      "file": "fire-gpu-ab-independent-arithmetic-oct20.json",
+      "bytes": 10738,
+      "sha256": "d26b5008b20173de9773d63fa0e824adbe55348d5bdb403c8772e148ea9401fb"
+    },
+    {
+      "file": "fire-matrix-independent-analysis-oct20.json",
+      "bytes": 18245,
+      "sha256": "ba45d16920d200fd3fd4bbe66f2096d82e10ad997dcf253627511adad6682221"
+    },
+    {
+      "file": "gpu-retirement-evidence.json",
+      "bytes": 21618,
+      "sha256": "f5e9ef66c951709b81f637ef0fbf1bf59dc8006fef942635313c691c4600a9a4"
+    }
+  ],
+  "measurement": {
+    "fps": "1000 * completed frame-interval count / interval sum in milliseconds",
+    "intervalPercentiles": "p95/p99 values retained in uploaded recording summaries",
+    "limits": [
+      "Short sequential manual runs with different scenes and unequal durations.",
+      "Uncontrolled temperature and power; sustained acceptance not completed.",
+      "Uploaded bundles do not contain complete raw frame timelines.",
+      "Initial A/B forced full-detail Scan; later matrix used automatic simplified Scan.",
+      "No universal GPU conclusion or completed sustained 60 FPS qualification."
+    ]
+  }
+}

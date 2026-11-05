@@ -1,10 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
+import { SHIP } from '../../../shared/constants/gameplay';
 import { MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { getShipKit } from '../../../shared/shipKits';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -40,7 +39,7 @@ function flight() {
   reconcile();
   ship.angle = 0;
   ship.thrusting = true;
-  ship.velocity = { x: cruiseSpeed(ship.mass, getShipKit('hauler').maxVelocity, 0, 1), y: 0 };
+  ship.velocity = { x: SHIP.MAX_VELOCITY, y: 0 };
   // Build the pose now; the transport may deliver it later.
   const capture = () => {
     const pose = prediction.buildHandoffPose(ship);

@@ -14,18 +14,21 @@ describe('readers find mechanics in the field manual', () => {
   test.each([
     ['Scout', 'scout'],
     ['Systems', 'hud-network'],
-    ['nimble', 'scout'],
+    ['compact', 'scout'],
     ['materials', 'asteroids'],
   ])('finds %s in the published reference', (query, id) => {
     expect(searchArticles(articles, query).some((article) => article.id === id)).toBe(true);
   });
 
   test('ignores letter case and extra spaces', () => {
-    expect(searchArticles(articles, '  HARPOON  ')).toEqual(searchArticles(articles, 'harpoon'));
+    const results = searchArticles(articles, 'scout');
+    expect(results.some((article) => article.id === 'scout')).toBe(true);
+    expect(searchArticles(articles, '  SCOUT  ')).toEqual(results);
   });
 
   test('requires all search words and returns an empty result for an unknown mechanic', () => {
-    expect(searchArticles(articles, 'harpoon nonexistent-mechanic')).toEqual([]);
+    expect(searchArticles(articles, 'scout').some((article) => article.id === 'scout')).toBe(true);
+    expect(searchArticles(articles, 'scout nonexistent-mechanic')).toEqual([]);
   });
 
   test('returns the full inventory for an empty query', () => {

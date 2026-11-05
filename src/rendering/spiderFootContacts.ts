@@ -2,7 +2,6 @@ import type { Position, TerrainSpider } from '../../shared-types';
 import type { ContourLevel } from '../physics/terrain/contours';
 import { createContourQuery } from './contourSpatialIndex';
 
-const footCandidates = createContourQuery();
 const SIDES = [-1, 1] as const;
 
 /** Feet are projected onto the very same line segments drawn as terrain. */
@@ -10,7 +9,8 @@ export function spiderFootContacts(
   spider: Pick<TerrainSpider, 'position' | 'angle'>,
   levels: readonly ContourLevel[],
   time: number,
-  reach = 1
+  reach = 1,
+  footCandidates: ReturnType<typeof createContourQuery> = createContourQuery()
 ): Position[] {
   const view = { ...spider.position, width: 768, height: 768, scale: 1, pad: 0 };
   const nearby = levels.map((_, ordinal) => footCandidates(levels, ordinal, view));

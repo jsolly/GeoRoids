@@ -3,7 +3,7 @@ import { GAME, SHIP } from './constants/gameplay';
 import { cargoCapacity } from './economy';
 
 /**
- * Shared pickup rules and persisted ship mass, health, and handling. Hull draw size and collision
+ * Shared pickup rules and persisted ship mass and health. Hull draw size and collision
  * radius stay at the kit base; mass does not scale the silhouette.
  * Existing ship mass is bounded; collecting pickups does not change it.
  */
@@ -31,8 +31,6 @@ export const GROWTH = {
   LOOT_TTL_FRAMES: 20 * 60,
   /** Scout-base HP multiplier at SOFT_MAX_MASS. */
   MAX_HEALTH_SCALE: 2.2,
-  MIN_THRUST_SCALE: 0.55,
-  MIN_SPEED_SCALE: 0.6,
 } as const;
 
 interface GrowableShip {
@@ -59,14 +57,6 @@ function massProgress(mass: number): number {
 
 export function maxHealthFromMass(mass: number): number {
   return Math.round(SHIP.MAX_HEALTH * (1 + (GROWTH.MAX_HEALTH_SCALE - 1) * massProgress(mass)));
-}
-
-export function thrustScaleFromMass(mass: number): number {
-  return 1 - (1 - GROWTH.MIN_THRUST_SCALE) * massProgress(mass);
-}
-
-export function maxVelocityFromMass(mass: number): number {
-  return SHIP.MAX_VELOCITY * (1 - (1 - GROWTH.MIN_SPEED_SCALE) * massProgress(mass));
 }
 
 export function applyShipMass(ship: GrowableShip, nextMass: number): void {

@@ -60,10 +60,13 @@ export class WorldHazards {
         }
       }
     }
+    const targets = players.filter(
+      (p) => (p.ws || p.botRole) && p.health > 0 && !p.exploding && !p.furnaceTransit
+    );
     for (const meteor of this.meteors) {
       meteor.position.x += meteor.velocity.x;
       meteor.position.y += meteor.velocity.y;
-      for (const pilot of crew) {
+      for (const pilot of targets) {
         if (
           Math.hypot(pilot.position.x - meteor.position.x, pilot.position.y - meteor.position.y) <=
           48

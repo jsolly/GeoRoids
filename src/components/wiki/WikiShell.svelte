@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { injectSpeedInsights } from '@vercel/speed-insights';
   import { onMount, tick } from 'svelte';
   import { isShipKitId } from '../../../shared/shipKits';
   import type { WikiArticle } from '../../wiki/article';
@@ -193,6 +194,7 @@
     }
   }
   onMount(() => {
+    injectSpeedInsights({ framework: 'svelte', route: window.location.pathname });
     alive = true;
     const initial = savedScroll(history.state);
     const id = initial.id ?? crypto.randomUUID();

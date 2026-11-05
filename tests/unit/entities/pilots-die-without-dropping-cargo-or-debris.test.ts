@@ -53,7 +53,7 @@ describe('death, shared pickups and saved mass', () => {
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p3', { spawnProtectionTimer: 0 });
 
-    const lootManager = new LootManager(new RNGService(42));
+    const lootManager = new LootManager(new RNGService(42), () => Date.now());
     lootManager.spawnShard(victim.position, 0);
     const shard = lootManager.getAll()[0];
     assert.ok(shard);

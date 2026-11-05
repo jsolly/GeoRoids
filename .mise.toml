@@ -1,5 +1,5 @@
 
 [tools]
-node = "24"
+node = "26"
 gitleaks = "8.24.2"
 uv = "0.12.22"

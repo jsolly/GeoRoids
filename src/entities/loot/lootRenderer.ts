@@ -88,9 +88,8 @@ function isOrdinaryLootKind(kind: LootData['kind']): kind is OrdinaryLootKind {
 }
 
 function prepareOrdinaryLootSprites(ctx: CanvasRenderingContext2D): OrdinaryLootSprites {
-  const transform = ctx.getTransform();
-  const dpr = Math.hypot(transform.a, transform.b);
   const glow = resolveGlow(VISUAL.LOOT_GLOW);
+  const dpr = canvasManager.getRasterPixelRatio(ctx, glow);
   if (
     !ordinaryLootSprites ||
     ordinaryLootSprites.dpr !== dpr ||
@@ -248,9 +247,9 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
 
   let reducedMotion: boolean | undefined;
   const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  const screen = { x: 0, y: 0 };
   for (const drop of loot) {
-    const projected = canvasManager.worldToScreen(drop.position, ship.position);
-    const screen = { x: projected.x, y: projected.y };
+    canvasManager.worldToScreenInto(screen, drop.position, ship.position);
     const equipment = isEquipmentId(drop.kind) ? drop.kind : null;
     const prominent = equipment !== null || drop.kind === 'tap';
     const r = lootScreenRadius(prominent ? Math.max(22, drop.radius) : drop.radius, scale);

@@ -106,7 +106,9 @@
         class="inline-flex min-h-11 items-center underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
         >Field manual <span aria-hidden="true" class="ml-2">↗</span></a
       >
-      <span class="max-w-full break-words" aria-label="Game version">{view.buildInfo}</span>
+      <span class="max-w-full break-words" role="group" aria-label="Game version"
+        >{view.buildInfo}</span
+      >
     </footer>
   </div>
 </section>

@@ -14,9 +14,6 @@ interface ShipKit {
   abilityName: string;
   maxHealth: number;
   size: number;
-  thrust: number;
-  maxVelocity: number;
-  turnSpeed: number;
   shotCooldown: number;
 }
 
@@ -51,9 +48,6 @@ const KITS: Record<ShipKitId, ShipKit> = {
     abilityName: 'Mineral scan',
     maxHealth: SHIP.MAX_HEALTH,
     size: SHIP.SIZE,
-    thrust: SHIP.THRUST,
-    maxVelocity: SHIP.MAX_VELOCITY,
-    turnSpeed: 540,
     shotCooldown: 250,
   },
   hauler: {
@@ -63,9 +57,6 @@ const KITS: Record<ShipKitId, ShipKit> = {
     abilityName: 'Harpoon',
     maxHealth: 140,
     size: SHIP.SIZE * HAULER_TO_SCOUT_SIZE,
-    thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
-    maxVelocity: SHIP.MAX_VELOCITY,
-    turnSpeed: 380,
     shotCooldown: 280,
   },
 };
@@ -95,9 +86,6 @@ interface KitStatTarget {
 interface KitShipTarget extends KitStatTarget {
   r: number;
   shotCooldown: number;
-  thrust: number;
-  maxVelocity: number;
-  turnSpeed: number;
 }
 
 /** Draw, collision, latch, and loot all use this kit hull radius. */
@@ -118,8 +106,5 @@ export function applyShipKitToShip(ship: KitShipTarget, kitId: unknown): ShipKit
   const kit = applyShipKitStats(ship, kitId);
   ship.r = hullRadiusForKit(kit.id);
   ship.shotCooldown = kit.shotCooldown;
-  ship.thrust = kit.thrust;
-  ship.maxVelocity = kit.maxVelocity;
-  ship.turnSpeed = kit.turnSpeed;
   return kit;
 }

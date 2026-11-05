@@ -3,6 +3,7 @@ import { applyShipKitToShip } from '../../../shared/shipKits';
 import { DEFAULT_HAULER_UTILITY, DEFAULT_SCOUT_UTILITY } from '../../../shared/shipUtilities';
 import { purchasedHullColor } from '../../../shared/townStore';
 import type {
+  BotRole,
   ContourLockState,
   CrewSignal,
   EquipmentId,
@@ -38,6 +39,7 @@ function copyVec2(dest: { x: number; y: number }, src: { x: number; y: number })
 }
 
 export class Player {
+  botRole?: BotRole;
   id: string;
   name: string;
   type: 'local' | 'remote';
@@ -120,6 +122,8 @@ export class Player {
     angle?: number;
     cargo?: number;
     bankedCargo?: number;
+    shieldFrames?: number;
+    shieldCooldownFrames?: number;
     weaponChargeFrames?: number;
     navigationAssistFrames?: number;
     contourDraftFrames?: number;
@@ -244,6 +248,12 @@ export class Player {
 
     if (data.score !== undefined) {
       this.score = data.score;
+    }
+    if (data.shieldFrames !== undefined) {
+      this.ship.shieldFrames = data.shieldFrames;
+    }
+    if (data.shieldCooldownFrames !== undefined) {
+      this.ship.shieldCooldownFrames = data.shieldCooldownFrames;
     }
     if (data.weaponChargeFrames !== undefined) {
       this.ship.weaponChargeFrames = data.weaponChargeFrames;

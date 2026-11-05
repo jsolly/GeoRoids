@@ -6,7 +6,7 @@ Use this runbook with the [mobile performance research](../mobile-performance-re
 
 Record a baseline before editing rendering or network behavior. Use a clean, committed checkout for pinned benchmark comparisons. Run timing work alone, without simultaneous tests, coverage, builds, or another load generator. The existing benchmark harness records source and dependency provenance; its [guide](../../benchmarks/README.md) describes the difference between archived revision comparisons and current-worktree realtime sessions.
 
-DPR and glow candidates are implemented as diagnostic overrides. Normal desktop and touch rendering remains native DPR with full glow pending physical acceptance. See the [quality decision ledger](mobile-quality-decisions.md) for controls, tradeoffs, and retirement criteria. Cadence and other optimizations still require measured attribution.
+DPR and glow candidates are implemented as diagnostic overrides. Ordinary flight uses native DPR with full glow. Low-end Mineral Scan automatically uses a separate bounded visible canvas, then restores flight resolution. See the [quality decision ledger](mobile-quality-decisions.md) for controls, tradeoffs, and retirement criteria. Cadence and other optimizations still require measured attribution.
 
 ## Browser optimization sequence
 
@@ -68,7 +68,7 @@ The realtime harness accepts independent constraints. For example, from `/Users/
 npm run benchmark:realtime -- --viewport touch-portrait --scenario combat --seed 42 --dpr 3 --cpu-slowdown 4 --network degraded --warmup 30 --seconds 300 --output .performance/mobile-combined.json
 ```
 
-Use `--render-dpr native|2|1.5` and `--render-glow full|off` for independent fixed comparisons. Do not combine both changes until each has its own matched comparison. Defaults preserve native/full rendering. Reports include setup witnesses and actual population observations; a requested constraint alone is not evidence it took effect.
+Use `--render-dpr native|2|1.5|1|0.75` and `--render-glow full|off` for independent fixed comparisons. Do not combine both changes until each has its own matched comparison. Defaults preserve native/full flight rendering. A native-DPR-1.5 device needs cap 1 or 0.75 to reduce flight backing resolution; simplified Scan already has its own DPR 0.75 and backing-size limits. Reports include setup witnesses and actual population observations; a requested constraint alone is not evidence it took effect.
 
 | Lane | Browser CPU slowdown | Device DPR | Network path | Purpose |
 | --- | ---: | ---: | --- | --- |
@@ -77,6 +77,8 @@ Use `--render-dpr native|2|1.5` and `--render-glow full|off` for independent fix
 | Network constrained | 1× | 3 | Existing degraded proxy | Queueing, recovery, state delivery |
 | Combined | 4× | 3 | Existing degraded proxy | Competing frame and receive work |
 | Severe diagnostic | 6× | 3 | Existing degraded proxy | Failure behavior; not an initial FPS gate |
+
+The `fire-hd-10` cohort pins device DPR 1.5 from the [Fire tablet record](fire-tablet-experiments.md) and rejects `--dpr`, so this table's Device DPR column does not describe it; vary only CPU and network there, and treat no slowdown as calibrated against that tablet. `--viewport all` includes it, so the baseline sweep above covers four cohorts rather than three.
 
 Run portrait and landscape, with an additional DPR 1 diagnostic when isolating pixel cost. Hold the candidate's quality tier fixed. The numbers are initial stress settings, to be calibrated against the affected device. The [report's constrained-path section](../mobile-performance-research.md#a-constrained-mobile-regression-path) cites the APIs, existing parameters, and limitations.
 
@@ -93,13 +95,15 @@ Test the detector with controlled faults: extra repeated draw work should affect
 
 Do not use host-wide CPU contention to slow the browser; it also slows the server, proxy, and generator and destroys attribution. Do not emulate scarce memory by only changing a reported browser property. Use actual physical-device acceptance for GPU, memory, and thermal limits, and a separately isolated server resource test for Railway capacity questions.
 
-## Physical-phone sessions
+## Physical-device sessions
 
-Available hardware: iPhone 16e; OS/Safari version and hands-on recordings remain pending. The user has no Android phone. Android acceptance is outstanding; browser emulation cannot close it. No paid service is required for implementing or checking the harness, and none has been purchased.
+Available hardware includes an iPhone 16e and a Fire HD 10, 13th generation. The iPhone OS/Safari version and hands-on recordings remain pending. The [Fire tablet record](fire-tablet-experiments.md) preserves a complete short Canvas run with glow off; sustained and full-glow acceptance remain unqualified. John waived the longer test as a condition of shipping PR #855, without performing or passing it. Browser emulation cannot close those measurement gaps. No paid service is required for implementing or checking the harness, and none has been purchased.
 
-1. Record phone model, OS/browser version, DPR, viewport, refresh mode, power-saving state, charging state, network, geography, and both release IDs.
-2. Open the production build over HTTPS on the phone. `?performance=1` enables logged diagnostics; `?performance=collect` exposes the explicit Start/Stop/Download collector. Fill in the device and conditions for comparison runs. Start after warmup, stop after the measured session, and save the checksum-bearing JSON export. Starting a new session replaces the locally saved session; download first. Recover last session restores the latest persisted recording after reload, explicitly marking interruption or corruption. Record any incomplete reason. Diagnostic candidates append `&renderDpr=2` (or `1.5`) or `&renderGlow=off`. The collector remains idle during automated benchmark collection.
-3. Capture a short baseline trace on the actual phone. On Android, use Chrome remote debugging with screencasting disabled. On iPhone, use Safari Web Inspector with JavaScript and rendering timelines. Save trace files with the session identifier.
+Use the following procedure for a future controlled device comparison; it does not create a new testing handoff for the shipped release.
+
+1. Record device model, OS/browser version, DPR, viewport, refresh mode, power-saving state, charging state, network, geography, and both release IDs.
+2. Open the production build over HTTPS on the device. `?performance=1` enables logged diagnostics; `?performance=collect` exposes the explicit Start/Stop/Download collector. Fill in the device and conditions for comparison runs. Start after warmup, stop after the measured session, and save the checksum-bearing JSON export. Starting a new session replaces the locally saved session; download first. Recover last session restores the latest persisted recording after reload, explicitly marking interruption or corruption. Record any incomplete reason. Diagnostic candidates append `&renderDpr=2`, `1.5`, `1`, or `0.75`, or `&renderGlow=off`. Low-end devices, including the Fire tablet, already default to glow off, so their full-glow control appends `&renderGlow=full`. Use `&scanDetail=full` or `simple` to isolate Scan detail at the same flight settings. The collector remains idle during automated benchmark collection.
+3. Capture a short baseline trace on the actual device. On Android, use Chrome remote debugging with screencasting disabled. On iPhone, use Safari Web Inspector with JavaScript and rendering timelines. Save trace files with the session identifier.
 4. Run three baseline sessions with separate warmup and five minutes of measured gameplay. Include repeated direction changes and button presses, not only held inputs. Record quiet and heavy scenes separately.
 5. Alternate baseline/candidate order and return the phone to comparable starting conditions. Compare resolution and glow independently before combining them.
 6. Repeat the successful candidate for at least fifteen minutes. Compare early and late windows, then exercise rotation, background/return, simultaneous controls, death/respawn, and network transition.

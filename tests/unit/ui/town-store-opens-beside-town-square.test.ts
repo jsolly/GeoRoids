@@ -4,6 +4,7 @@ import { SHIP_ABILITY } from '../../../shared/shipKits';
 import { TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { tickObjectApproach } from '../../../src/input/objectActions';
 import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
@@ -189,7 +190,7 @@ test('a lit street offers free travel to Town Square and other lit streets but n
   worldFurnaces.replaceLit([]);
 });
 
-test('a boarding command rechecks the current footprint before opening a furnace menu', () => {
+test('a furnace command approaches first and opens the menu only after entry', () => {
   closeTownStore();
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
@@ -207,12 +208,14 @@ test('a boarding command rechecks the current footprint before opening a furnace
       actionLabel: 'Enter',
     });
     expect(isGameOverlayOpen('town-store')).toBe(false);
-    // A stored hint cannot board after the ship leaves the offered footprint.
+    // Choosing outside the footprint starts approach rather than entering remotely.
     player.ship.position = { x: 800, y: 0 };
     activateFieldHint('furnace-travel-prompt');
     expect(isGameOverlayOpen('town-store')).toBe(false);
+    expect(player.ship.pendingObjectAction?.action).toBe('enter');
     player.ship.position = { x: 0, y: 0 };
-    activateFieldHint('furnace-travel-prompt');
+    tickObjectApproach(player);
+    syncFurnaceTravelPrompt();
     expect(isGameOverlayOpen('town-store')).toBe(true);
     expect(readFieldHints().find((hint) => hint.id === 'furnace-travel-prompt')).toBeUndefined();
     closeTownStore();
@@ -285,7 +288,7 @@ test('boarding hints query the current touch mode only while a live pilot can bo
     media.mockClear();
     player.ship.position = { ...street.position };
     syncFurnaceTravelPrompt();
-    expect(hint()?.actionLabel).toBe('Tap to travel');
+    expect(hint()?.actionLabel).toBe('Travel');
     coarse = false;
     syncFurnaceTravelPrompt();
     expect(hint()?.text).toBe('Press E to travel');
@@ -301,7 +304,7 @@ test('boarding hints query the current touch mode only while a live pilot can bo
     coarse = true;
     syncFurnaceTravelPrompt();
     expect(shown()).toBe(true);
-    expect(hint()?.actionLabel).toBe('Tap to travel');
+    expect(hint()?.actionLabel).toBe('Travel');
     expect(hint()?.actionLabel).not.toBeNull();
     expect(media).toHaveBeenCalledTimes(2);
   } finally {

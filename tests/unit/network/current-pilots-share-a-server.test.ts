@@ -6,6 +6,7 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { serverPerformanceMetrics } from '../../../server/performanceMetrics';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
+import { logger } from '../../../setup/serverLogger';
 import {
   SNAPSHOT_BACKPRESSURE_BYTES,
   SNAPSHOT_VERSION,
@@ -513,6 +514,75 @@ describe('current pilots share the production handler and broadcaster', () => {
     expect(first.fake.close).toHaveBeenCalled();
     expect(second.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
   });
+
+  test.each(['direct', 'broadcast'] as const)(
+    '%s serialization failures are logged once without sending or escaping',
+    (path) => {
+      const pilot = socket();
+      joinPilot(handler, pilot.ws, 'serialization-pilot');
+      applySnapshots(pilot, handler);
+      pilot.fake.clear();
+      const target = broadcaster;
+      const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const enabled = vi.spyOn(serverPerformanceMetrics, 'enabled', 'get').mockReturnValue(true);
+      const outbound = vi
+        .spyOn(serverPerformanceMetrics, 'recordOutbound')
+        .mockImplementation(() => undefined);
+      const circular: { self?: unknown } = {};
+      circular.self = circular;
+      const fallback =
+        path === 'direct' ? 'Unserializable direct message' : 'Unserializable broadcast';
+      const failures = [
+        { message: { type: 'error', data: circular }, expected: { name: 'TypeError' } },
+        ...[
+          { value: new Error('serializer refused'), expected: { message: 'serializer refused' } },
+          { value: 'rejected by serializer', expected: { message: 'rejected by serializer' } },
+          { value: 1n, expected: { message: fallback } },
+          { value: circular, expected: { message: fallback } },
+        ].map(({ value, expected }) => ({
+          message: {
+            type: 'error',
+            toJSON() {
+              throw value;
+            },
+          },
+          expected,
+        })),
+      ];
+      try {
+        for (const { message, expected } of failures) {
+          log.mockClear();
+          outbound.mockClear();
+          expect(() => {
+            if (path === 'direct') {
+              target.sendToWebSocket(pilot.ws, message);
+            } else {
+              target.broadcastToAll(message);
+            }
+          }).not.toThrow();
+          expect(pilot.fake.sent).toHaveLength(0);
+          expect(pilot.close).not.toHaveBeenCalled();
+          expect(log).toHaveBeenCalledExactlyOnceWith(
+            path === 'direct'
+              ? 'Failed to serialize direct message'
+              : 'Failed to serialize broadcast',
+            { type: 'error', error: expect.any(Error) }
+          );
+          expect(log.mock.calls[0]?.[1]).toMatchObject({ error: expected });
+          expect(outbound.mock.calls).toEqual(
+            path === 'direct'
+              ? [[{ kind: 'control', outcome: 'failed', payloadBytes: 0, bufferedBytes: 0 }]]
+              : []
+          );
+        }
+      } finally {
+        log.mockRestore();
+        enabled.mockRestore();
+        outbound.mockRestore();
+      }
+    }
+  );
+
   test('heartbeat replies echo probe identity while legacy pings remain bare and invalid probes are rejected', () => {
     const pilot = socket();
     handler.handleMessage({ type: 'ping', probeId: 7 }, pilot.ws);

@@ -34,6 +34,7 @@ import {
 } from '../rendering/hud/furnaceMapMark';
 import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
 import { drawRemainsMark } from '../rendering/remainsRenderer';
+import { resolveGlow } from '../rendering/renderQuality';
 import { drawCourtMapMark } from '../rendering/ricochetCourtRenderer';
 import { sendCrewAction } from '../runtime/crewRescue';
 
@@ -336,7 +337,7 @@ function mapStrokeWidth(screen: number, nearSize: number, frame: MapFrame): numb
 }
 
 function mapGlowBlur(screen: number, nearSize: number, frame: MapFrame): number {
-  return (8 * screen) / nearSize / frame.scale;
+  return resolveGlow((8 * screen) / nearSize / frame.scale);
 }
 
 function drawMapAsset(
@@ -639,7 +640,15 @@ function drawLitFurnacePipes(context: CanvasRenderingContext2D, frame: MapFrame)
       continue;
     }
     const hop = pipeHopToParent(lot.id);
-    strokeFurnaceFireTrail(context, hop, hop.length, now, width, 12 / frame.scale, 480);
+    strokeFurnaceFireTrail(
+      context,
+      hop,
+      hop.length,
+      now,
+      width,
+      resolveGlow(12 / frame.scale),
+      480
+    );
   }
 }
 

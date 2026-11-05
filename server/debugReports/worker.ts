@@ -48,13 +48,20 @@ async function deliverNext(): Promise<void> {
     if (!closed) {
       statistics();
     }
-  } catch {
+  } catch (error) {
     if (!closed) {
+      // `/health` is public, so the message stays generic and the cause goes to
+      // the parent thread to be logged there. The counts are null because this
+      // failure means the depth was never measured.
+      reply({
+        type: 'fault',
+        detail: error instanceof Error ? (error.stack ?? error.message) : String(error),
+      });
       reply({
         type: 'diagnostics',
         diagnostics: {
-          pending: 0,
-          blocked: 0,
+          pending: null,
+          blocked: null,
           oldestPendingAt: null,
           lastError: 'Debug report storage is unavailable.',
         },

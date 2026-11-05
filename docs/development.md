@@ -22,16 +22,19 @@ tools and lockfile dependencies, and leaves browser binaries to explicitly reque
 Claude Code's `startup|resume` hook passes `--session-hook`. A fresh checkout
 without `node_modules` runs setup; an existing tree is checked without installing
 tools or dependencies. Setup records the manifest, lockfile, repository tool and
-npm settings, actual Node/npm runtime, installed lock and package manifests after
+npm settings, resolved Node/npm runtime, installed lock and package manifests after
 a successful install and complete `npm ls --all` check. Warm hooks require that
-receipt and repeat dependency validation.
+receipt to match without starting Node, npm or the tree check, because a new cloud
+session's first disk reads are slow.
 
 Changed inputs, missing packages, failed installs and older trees without a receipt
 fail the hook instead of replacing dependencies underneath a running service.
 Stop this checkout's services with `npm run dev:kill`, then run
 `bash scripts/setup-agent-environment.sh` explicitly to repair and record the tree.
 Manual setup deliberately reinstalls dependencies; stop services before using it.
-The receipt detects install drift, not arbitrary changes to every package file.
+The receipt detects install drift, not arbitrary changes to every package file;
+warm hooks also miss packages outside the installed lock or an invalid dependency
+graph until the next explicit setup.
 
 Automated code checks never launch or download browsers. Run the repo's documented quality gate with its pinned tools:
 
@@ -43,6 +46,16 @@ Use the repository's README and AGENTS.md for its build, test and deployment
 commands. A missing prerequisite is a failed setup; report it rather than claiming
 that the gate ran. No setup command deploys the application or infrastructure.
 
+The complete gate and static CI lane run `check:python` as an explicit step,
+using pinned mypy 2.4.1 in strict mode
+with implicit `Any` expressions rejected. It checks the complete Wiki GIF
+encoder with Pillow 12.3.0's inline types and targets Python 3.11. The typed
+argument namespace describes the same parser conversions and defaults. The
+three hook implementation/test/legacy Python files remain outside this slice
+while the separately owned hook rollout is in progress; this is not complete
+repository Python coverage. Production builds and `check:wiki` do not require
+uv or mypy. No Wiki behavior or media baseline changes.
+
 ## Hook trust
 
 The dispatcher lives in this clone's Git common directory, shared only by its
@@ -51,6 +64,13 @@ bundle must match current reviewed `origin/main`, or a deliberately approved exa
 bundle digest. Missing files, symlinks, unreviewed modes and a foreign origin fail
 closed. The dispatcher executes a verified snapshot, then runs quality scripts in
 the committing checkout. Re-run reviewed setup after changing tool setup on main.
+A warm session hook reinstalls hooks itself only when the installed bundle is
+stale and the current one is trusted, as in a cached cloud environment built
+before a reviewed bundle change. Those environments check out the session commit
+without updating `origin/main`, so the repair first refreshes that trust anchor from
+the remote; if it cannot, install compares against the local copy and fails closed
+for a newer bundle. The repair applies no new provisioning steps,
+such as native APT packages; explicit setup or the environment's next build does.
 
 This is hook-registration integrity, not a sandbox. Never check out or execute
 third-party/fork PR code in a trusted clone; review its diff through GitHub. Do not
@@ -90,8 +110,19 @@ intended deployment and exact-release smoke when the repository requires them.
 
 ## Infrastructure and access
 
-Use existing scoped identities. Agents do not recover credentials, broaden grants
-or run destructive infrastructure/database operations. Review Railway's complete
+Setup, build and checks use public tools and need no AWS login. Separately
+authorized AWS reads use exactly one native production `aws_mcp` connection for
+`agent@jsolly.com`, authorized as `AgentMcp` in account `730335616323`. Do not
+export its OAuth credentials, install an agent AWS profile or credential-process
+helper, add a second MCP connection, or bridge it into local CLI calls. Preserve
+AWS Core for skills and public knowledge, and preserve named human administrator,
+application, Vercel and workload credentials.
+
+Removing the repository bootstrap does not remove installed helpers, cached
+sessions, saved provider settings or live IAM trust. Provider isolation and
+legacy credential retirement require their separate acceptance evidence.
+Agents do not recover credentials, broaden grants or run destructive
+infrastructure/database operations. Review Railway's complete
 redacted live configuration and plan before any production configuration apply;
 preserve unrelated staged dashboard changes. Follow the repository's
 [deployment operations](agent-operations.md#deploy) and

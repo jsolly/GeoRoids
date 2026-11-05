@@ -1,7 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { SHIP } from '../../../shared/constants/gameplay';
 import { contourLockVelocity } from '../../../shared/contourLock';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { getShipKit } from '../../../shared/shipKits';
 import { ensureTerrain } from '../../../shared/terrainField';
 import type { WeaponChargeAction } from '../../../shared-types';
 import { Player } from '../../../src/entities/player/Player';
@@ -50,11 +49,10 @@ test('bracket keys use the same adjacent contour hop as touch without repeating 
   const ship = player.ship;
   ship.position = { x: -4995.842222553734, y: -4996.116910407352 };
   ship.contourLock = { height: 0.08, direction: 1 };
-  ship.velocity = contourLockVelocity(
-    ship.position,
-    ship.contourLock,
-    cruiseSpeed(ship.mass, getShipKit(ship.kitId).maxVelocity, 0, 1)
-  ) ?? { x: 0, y: 0 };
+  ship.velocity = contourLockVelocity(ship.position, ship.contourLock, SHIP.MAX_VELOCITY) ?? {
+    x: 0,
+    y: 0,
+  };
   ship.angle = Math.atan2(-ship.velocity.y, ship.velocity.x);
   ship.abilityCooldownFrames = 100;
   // This known rail needs two guided steps before its lower neighbor is reachable.

@@ -37,6 +37,7 @@ import { GLOWTOY } from '../../shared/glowtoy';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { NAVIGATION_SALVAGE } from '../../shared/navigationSalvage';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
+import { PLAYER_SHIELD } from '../../shared/playerShield';
 import { ROLY_POLY } from '../../shared/rolyPoly';
 import { GROWTH } from '../../shared/shipGrowth';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../../shared/shipKits';
@@ -60,7 +61,7 @@ function frameValue(frames: number): string {
 function shipStats(id: ShipKitId): string {
   const kit = getShipKit(id);
   const cooldown = SHIP_ABILITY.COOLDOWN_FRAMES[id];
-  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
+  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, ${SHIP.TURN_SPEED} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
 }
 
 function satelliteProfiles(): string[] {
@@ -93,14 +94,14 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Movement values',
       paragraphs: [
-        `Both kits share maximum velocity ${SHIP.MAX_VELOCITY}; thrust and turn rate differ per kit (see the ship pages). Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
+        `Both kits share thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, and turn rate ${SHIP.TURN_SPEED} degrees per second, regardless of cargo or saved hull mass. Terrain still affects flight. The simulation runs at ${GAME.FPS} frames per second.`,
         `Shift, right-click, or the Contour Lock button catches the nearest visible contour within ${CONTOUR_LOCK.captureRadius} world units. Mobile flicks can catch an adjacent line within ${CONTOUR_LOCK.hopRadius} world units. Locked travel follows its curves at ${CONTOUR_LOCK.speedMultiplier} times maximum contour cruise. Tap the same control again to release. Steering is ignored while locked; damage, the wall, asteroid contact even while protected, a shove above cruise speed, opening a menu or map, death, and furnace travel also release it, while lasers pass through invulnerable hulls without releasing it. There is no charge or cooldown.`,
       ],
     },
     {
       heading: 'Town store values',
       paragraphs: [
-        `Inside any lit furnace’s visible footprint, press E on desktop or tap the travel prompt on mobile to open Furnace travel. B toggles the same menu. The mobile ability button keeps the equipped tool; the approach prompt shows Tap to travel. Select another lit furnace on the destination map for a free rocket ride along the pipe network, lasting ${FURNACE_TRAVEL.MIN_DURATION_MS / 1000}–${FURNACE_TRAVEL.MAX_DURATION_MS / 1000} seconds. Boarding releases towed cargo and couplings; the ship is protected and cannot act during the ride. The menu holds the ship like the map and schematic. Town Square’s store, within ${TOWN_STORE_RADIUS} units of the square, sells each placeholder once: ${STORE_OFFERS.map((offer) => `${offer.name} at level ${offer.level} for ${offer.cost} banked points`).join(', ')}. They have no gameplay effect.`,
+        `Inside any lit furnace’s visible footprint, press E on desktop or tap the travel prompt on mobile to open Furnace travel. B toggles the same menu. The mobile tool indicator keeps the equipped tool; nearby prompts offer Enter, Travel, or Build. Select another lit furnace on the destination map for a free rocket ride along the pipe network, lasting ${FURNACE_TRAVEL.MIN_DURATION_MS / 1000}–${FURNACE_TRAVEL.MAX_DURATION_MS / 1000} seconds. Boarding releases towed cargo and couplings; the ship is protected and cannot act during the ride. The menu holds the ship like the map and schematic. Town Square’s store, within ${TOWN_STORE_RADIUS} units of the square, sells each placeholder once: ${STORE_OFFERS.map((offer) => `${offer.name} at level ${offer.level} for ${offer.cost} banked points`).join(', ')}. They have no gameplay effect.`,
       ],
     },
   ],
@@ -118,6 +119,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Ability and exploration values',
       paragraphs: [
+        'Supported low-end devices use a softer, lower-resolution wide Scan view with coarse distant terrain and mineral symbols; hazards, ships, shots and controls stay live. Detailed flight resolution returns as the camera settles back.',
         `With Mineral Scan equipped, E runs one radar pulse lasting ${seconds(SHIP_ABILITY.SCAN_FRAMES)} within ${SHIP_ABILITY.SCAN_RANGE} units. The camera zooms out to fit the whole scan range while that thin cyan sweep expands to the view edge, then eases back; neither visual cue expands the scan range. Spiders inside that range flee and cannot bite while the pulse is active. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.scout)}; each identified rock keeps its classification and records the Scout player ID for a later furnace delivery. A probe shares the scan cooldown. Beacons are lost on a server restart.`,
         `Survey Probe: launch range ${SURVEY_PROBE.LAUNCH_RANGE} units; beacon scan radius ${SURVEY_PROBE.RANGE} units every ${SURVEY_PROBE.PULSE_MS / 1000} seconds; battery ${SURVEY_PROBE.LIFETIME_MS / 60000} minutes with a warning during the last ${SURVEY_PROBE.WARNING_MS / 1000} seconds. Health: ${SURVEY_PROBE.MAX_HEALTH}. Maximum ${SURVEY_PROBE.MAX_PER_OWNER} active probes per Scout; a successful extra attachment replaces the oldest. Launch cooldown, including misses: ${seconds(SURVEY_PROBE.COOLDOWN_FRAMES)}.`,
         `Passive shared exploration reaches ${EXPLORATION_RANGE.scout} world units for Scout and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist with the world, including server restarts. An active Mineral Scan charts its whole scan range, and live probes chart around their host.`,
@@ -142,7 +144,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Loot and salvage values',
       paragraphs: [
-        `Pickups leave ship mass, health capacity and hull size unchanged. The live loot limit is ${GROWTH.MAX_LOOT}. Shards, Tap canisters, and silk last ${seconds(GROWTH.LOOT_TTL_FRAMES)}; point drops from mined rocks last ${ECONOMY.pointLootFrames / GAME.FPS} seconds of real time and survive restarts; equipment and nest caches last ${EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES / GAME.FPS / 60} minutes. A nest holds a tool with ${EQUIPMENT_DROPS.NEST_CHANCE * 100}% chance, and an ordinary laser-killed rock with ${EQUIPMENT_DROPS.ASTEROID_CHANCE * 100}%. Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}.`,
+        `Cargo and saved hull mass do not change acceleration or ship speed. Pickups leave ship mass, health capacity and hull size unchanged. The live loot limit is ${GROWTH.MAX_LOOT}. Shards, Tap canisters, and silk last ${seconds(GROWTH.LOOT_TTL_FRAMES)}; point drops from mined rocks last ${ECONOMY.pointLootMs / 1000} seconds of real time and survive restarts; equipment and nest caches last ${EQUIPMENT_DROPS.NEST_LIFETIME_FRAMES / GAME.FPS / 60} minutes. A nest holds a tool with ${EQUIPMENT_DROPS.NEST_CHANCE * 100}% chance, and an ordinary laser-killed rock with ${EQUIPMENT_DROPS.ASTEROID_CHANCE * 100}%. Cargo capacity: Scout ${ECONOMY.scoutCapacity}, Hauler ${ECONOMY.haulerCapacity}.`,
         `Shard drops have radius ${GROWTH.LOOT_RADIUS}. Tap canisters have radius ${GROWTH.TAP_LOOT_RADIUS}: ice restores up to ${NAVIGATION_SALVAGE.iceRepair} HP, metal grants ${NAVIGATION_SALVAGE.metalCargo} cargo, rubble grants one fiber, and crystal refreshes ${seconds(NAVIGATION_SALVAGE.frames)} of ${NAVIGATION_SALVAGE.captureRadius}-unit Contour Lock acquisition reach. A living ship magnetizes ordinary drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL}. Tap loot uses range ${GROWTH.TAP_LOOT_MAGNET_RANGE} and acceleration ${GROWTH.TAP_LOOT_MAGNET_ACCEL} toward a Hauler. Pickup overlap uses each kit's hull radius plus the drop radius.`,
         `Furnace offloading transfers ${ECONOMY.offloadPoints} points every ${ECONOMY.offloadIntervalFrames / GAME.FPS} seconds. Cargo protects one HP per ${ECONOMY.cargoPointsPerHp} points ejected; hit spills pause magnetism and collection for ${ECONOMY.cargoSpillEjectFrames / GAME.FPS} seconds and launch at ${ECONOMY.cargoSpillSpeed} units per frame.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. Reflected shots can reach a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
@@ -208,7 +210,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Neutral roly-polys curl within ${ROLY_POLY.curlDistance} units and roll for ${seconds(ROLY_POLY.rollFrames)} after a hull nudge. At most ${ROLY_POLY.maximumActive} visited wildlife bodies are active; they award no cargo and deal no damage.`,
         `Glowtoys charge under headlights within ${GLOWTOY.headlightRange} units or aft thrust within ${GLOWTOY.thrusterRange}. A laser adds ${GLOWTOY.laserCharge} charge per energy, up to 1. Charge above 0.7 attracts wandering spiders within ${GLOWTOY.attractionRadius} units and reveals its one-time ${GLOWTOY.cachePoints}-point cache within ${GLOWTOY.revealRadius} units. At most ${GLOWTOY.maximumActive} nearby glowtoys update each ${GLOWTOY.tickFrames} frames.`,
-        `At full contour strength, following a line in either direction reaches ${(1 + TERRAIN.CONTOUR_SPEED_BONUS) * 100}% of normal cruise. Crossing perpendicular to the lines keeps normal cruise. Kit and mass scale the baseline together; Contour Lock adds guided travel along a nearby line.`,
+        `At full contour strength, following a line in either direction reaches ${(1 + TERRAIN.CONTOUR_SPEED_BONUS) * 100}% of normal cruise. Crossing perpendicular to the lines keeps normal cruise. Both kits share the same baseline regardless of cargo or saved hull mass; Contour Lock adds guided travel along a nearby line.`,
       ],
     },
     {
@@ -224,8 +226,9 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `Hold F or two playfield fingers, then release to fire a beam. Minimum charge is ${seconds(CHARGED_WEAPON.minimumFrames)}, full charge ${seconds(CHARGED_WEAPON.fullFrames)}, maximum energy ${CHARGED_WEAPON.maximumEnergy}, and cooldown ${seconds(CHARGED_WEAPON.cooldownFrames)}. The server owns elapsed charge; death, menus, cancellation and ${seconds(CHARGED_WEAPON.expiryFrames)} without release discard it.`,
+        `Hold F or the mobile Fire button, then release to fire a beam. Minimum charge is ${seconds(CHARGED_WEAPON.minimumFrames)}, full charge ${seconds(CHARGED_WEAPON.fullFrames)}, maximum energy ${CHARGED_WEAPON.maximumEnergy}, and cooldown ${seconds(CHARGED_WEAPON.cooldownFrames)}. The server owns elapsed charge; death, menus, cancellation and ${seconds(CHARGED_WEAPON.expiryFrames)} without release discard it.`,
         `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS} and expire after ${LASER.MAX_TRAVEL_DISTANCE} world units of travel; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; a towed ordinary rock uses that same impact against another ship and then breaks. A colossal deposit deals that impact without shattering. Boundary contact applies the current hull health as damage; cargo absorbs it first.`,
+        `Q, two playfield fingers, or the Shield indicator activate ${seconds(PLAYER_SHIELD.durationFrames)} of damage immunity with a ${seconds(PLAYER_SHIELD.cooldownFrames)} cooldown starting on activation. Collision shoves and weapon use continue.`,
         `Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },
@@ -267,7 +270,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Restoration: ${COOPERATIVE.restoreValue} physical supply value; each shipment carries at most 1000. Commissioning permanently reveals ${COOPERATIVE.atlasRadius} units. Deep Scanner: ${COOPERATIVE.scannerValue} physical ore value at Town Square.`,
         `Initial frontier: ${COOPERATIVE.initialInnerRadius}–${COOPERATIVE.initialOuterRadius} units from Town Square; expanded frontier: ${COOPERATIVE.initialOuterRadius}–${COOPERATIVE.expandedOuterRadius}.`,
         'UTC hazards warn at :25–:30 and :55–:00, then run at :30–:33 and :00–:03. Spider population is capped at 48 including 12 reserved swarm slots; no offline replay.',
-        'Crew signals: one per pilot, a two-second placement interval, a 30-second lifetime and a 3600-unit placement radius. Cargo slows cruise linearly from full speed empty to 70% speed full. Travelling tow and probe heads move at 1200 world units per second.',
+        'Crew signals: one per pilot, a two-second placement interval, a 30-second lifetime and a 3600-unit placement radius. Travelling tow and probe heads move at 1200 world units per second.',
       ],
     },
     {

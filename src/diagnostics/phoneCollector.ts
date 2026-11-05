@@ -1,4 +1,5 @@
 import type { ClientPerformanceMetrics } from './performanceMetrics';
+import { summarizePhoneRecording } from './phoneRecordingSummary';
 
 const MAX_BYTES = 32 * 1024 * 1024;
 const MAX_DURATION_MS = 30 * 60 * 1000;
@@ -20,6 +21,7 @@ type Session = {
   escapedSampleBytes: number;
   persistedSamples: number;
   stopped: boolean;
+  recovered: boolean;
 };
 
 function openStore(): Promise<IDBDatabase> {
@@ -143,6 +145,7 @@ async function recoverSession(database: IDBDatabase): Promise<Session | undefine
     escapedSampleBytes: 0,
     persistedSamples: 0,
     stopped: true,
+    recovered: true,
   };
   for (let index = 0; index < header.sampleCount; index++) {
     const sample = await readStored(database, `${id}:${index}`);
@@ -363,6 +366,7 @@ export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed:
         escapedSampleBytes: 0,
         persistedSamples: 0,
         stopped: false,
+        recovered: false,
       };
       metrics.claimDrain(OWNER);
       ownsDrain = true;
@@ -510,5 +514,30 @@ export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed:
     database = undefined;
     void writing.finally(() => store?.close());
   };
-  return { read, start, stop, recover, download, dispose };
+  const readDiagnostics = () => {
+    if (!active) {
+      return {
+        schemaVersion: 1,
+        source: 'phone-collector',
+        complete: false,
+        incompleteReasons: ['No collected performance session'],
+      };
+    }
+    try {
+      const summary = summarizePhoneRecording(active);
+      if (encoder.encode(JSON.stringify(summary)).byteLength > 32 * 1024) {
+        throw new Error('Summary exceeds report limit');
+      }
+      return summary;
+    } catch {
+      return {
+        schemaVersion: 1,
+        source: 'phone-collector',
+        sessionId: active.id.slice(0, 128),
+        complete: false,
+        incompleteReasons: ['Performance summary unavailable; recording remains local'],
+      };
+    }
+  };
+  return { read, start, stop, recover, download, readDiagnostics, dispose };
 }

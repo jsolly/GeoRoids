@@ -40,7 +40,7 @@ test('full holds leave loot intact and two partial collectors conserve the origi
   const engine = new GameEngine(42);
   const first = pilot(engine, 'a');
   const second = pilot(engine, 'b');
-  const loot = new LootManager(new RNGService(7));
+  const loot = new LootManager(new RNGService(7), () => Date.now());
   loot.spawnPoints(first.position, 80);
   const original = loot.savedPoints()[0];
   if (!original) {
@@ -65,7 +65,7 @@ test('full holds leave loot intact and two partial collectors conserve the origi
     expiresAt: original.expiresAt,
     points: 50,
   });
-  const restored = new LootManager(new RNGService(7));
+  const restored = new LootManager(new RNGService(7), () => Date.now());
   restored.restorePoints(loot.savedPoints());
   expect(restored.savedPoints()).toEqual(loot.savedPoints());
   vi.setSystemTime(original.expiresAt);
@@ -76,7 +76,7 @@ test('full holds leave loot intact and two partial collectors conserve the origi
 test('a partial shard or tap retains its identity and frame deadline instead of discarding points', () => {
   const engine = new GameEngine(42);
   const actor = pilot(engine);
-  const loot = new LootManager(new RNGService(7));
+  const loot = new LootManager(new RNGService(7), () => Date.now());
   for (const kind of ['shard', 'tap'] as const) {
     actor.cargo = cargoCapacity(actor.kitId) - 1;
     const drop =
@@ -100,7 +100,7 @@ test('distant shield spills settle without idle frame work and wake when a crew 
   vi.setSystemTime(1000);
   const engine = new GameEngine(42);
   const actor = pilot(engine);
-  const loot = new LootManager(new RNGService(7));
+  const loot = new LootManager(new RNGService(7), () => Date.now());
   loot.spawnPoints({ x: 1000, y: 1000 }, 250, {
     velocity: { x: 9, y: 0 },
     ejectFramesLeft: ECONOMY.cargoSpillEjectFrames,
@@ -127,7 +127,7 @@ test('distant shield spills settle without idle frame work and wake when a crew 
   }
   expect(work.snapshot().motionRows).toBe(motion);
   expect(loot.pointRevision).toBe(revision);
-  const restored = new LootManager(new RNGService(7));
+  const restored = new LootManager(new RNGService(7), () => Date.now());
   restored.restorePoints(loot.savedPoints());
   restored.expire(240);
   expect(restored.savedPoints()[0]).toEqual(settled);

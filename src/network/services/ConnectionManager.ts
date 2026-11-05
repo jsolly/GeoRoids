@@ -18,6 +18,7 @@ import type {
   AbilityUsedEvent,
   AsteroidData,
   AsteroidDestroyEvent,
+  AsteroidHitEvent,
   ClientGameplayMessage,
   ClientWireMessage,
   FurnaceDelivery,
@@ -32,7 +33,7 @@ import type {
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
 import { playFeedback } from '../../audio/feedbackSounds';
-import { playLaserSound } from '../../audio/gameSounds';
+import { playHitSound, playLaserSound } from '../../audio/gameSounds';
 import {
   playAbilityActivation,
   playHarpoonRelease,
@@ -258,6 +259,9 @@ export class ConnectionManager {
       get isConnected() {
         return connection.isConnected;
       },
+      sendShield: () =>
+        this.joinAcknowledged &&
+        this.sendMessage({ type: 'activateShield', id: this.getLocalPlayerId(), data: {} }),
       sendCharge: (action) =>
         this.chargedWeapons &&
         this.joinAcknowledged &&
@@ -577,6 +581,9 @@ export class ConnectionManager {
     this.motionReconciliation.reset();
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
+      localShip.navigation = null;
+      localShip.pendingObjectAction = null;
+      localShip.thrusting = false;
       localShip.serverOwnsMotion = false;
       delete localShip.playerMotion;
       localShip.furnaceTransit = null;
@@ -733,11 +740,12 @@ export class ConnectionManager {
     }
 
     const pingNow = performance.now();
-    this.pingPayload.probeId = clientPerformance.probe(pingNow);
+    const probeId = clientPerformance.probe(pingNow);
+    this.pingPayload.probeId = probeId;
     if (!this.sendPayload(this.pingPayload)) {
       return;
     }
-    noteDebugPingSent(pingNow);
+    noteDebugPingSent(probeId, pingNow);
 
     if (isConnectionStale(this.lastServerMessageAt, Date.now())) {
       logger.warn('NETWORK', 'No server traffic within timeout; treating connection as lost', {
@@ -794,8 +802,8 @@ export class ConnectionManager {
     }
   }
 
-  updatePlayerState(state: Omit<PlayerUpdate, 'id'>): void {
-    this.sendPlayerState({ id: this.getLocalPlayerId(), ...state });
+  updatePlayerState(state: Omit<PlayerUpdate, 'id'>): boolean {
+    return this.sendPlayerState({ id: this.getLocalPlayerId(), ...state });
   }
 
   // Send player state to server
@@ -948,7 +956,7 @@ export class ConnectionManager {
       case 'pong': {
         const now = performance.now();
         clientPerformance.pong(message.probeId, now);
-        noteDebugPong(now);
+        noteDebugPong(message.probeId, now);
         return;
       }
       case 'playerShotFired':
@@ -1025,6 +1033,9 @@ export class ConnectionManager {
         break;
       case 'asteroidDestroy':
         this.handleAsteroidDestroyed(data as AsteroidDestroyEvent);
+        break;
+      case 'asteroidHit':
+        this.handleAsteroidHit(data as AsteroidHitEvent);
         break;
       case 'satellitePickupCollected':
         this.handleSatellitePickupCollected(data as SatellitePickupCollected);
@@ -1372,6 +1383,8 @@ export class ConnectionManager {
         // Apply the parsed entity directly — no per-tick snapshot wrapper.
         // Kit / ability / mass stay on the row.
         entityData.spawnProtectionTimer ??= 0;
+        entityData.shieldFrames ??= 0;
+        entityData.shieldCooldownFrames ??= 0;
         entityData.weaponChargeFrames ??= 0;
         entityData.navigationAssistFrames ??= 0;
         entityData.contourDraftFrames ??= 0;
@@ -1381,6 +1394,11 @@ export class ConnectionManager {
           delete entity.ship.playerMotion;
         }
         entity.name = entityData.name;
+        if (entityData.botRole) {
+          entity.botRole = entityData.botRole;
+        } else {
+          delete entity.botRole;
+        }
         if (entity.type !== 'local') {
           entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
         }
@@ -1391,21 +1409,26 @@ export class ConnectionManager {
         const scoutToolSelected =
           entity.ship.kitId === 'scout' && snapshotUtility !== 'mineral_scan';
         const serverCooldown = entityData.abilityCooldownFrames ?? 0;
-        // Mineral Scan predicts its cooldown on send. A snapshot that still
-        // reads 0 must not clear that timer before the server echo. Failed
+        // Mineral Scan predicts its timers on send. A snapshot that still
+        // reads 0 must not reverse its camera before the server echo. Death
+        // and the first live echo after death always accept authority. Failed
         // probe launches and furnace builds stay at 0 and remain usable.
         if (
           entity.type !== 'local' ||
           entity.ship.kitId !== 'scout' ||
           scoutToolSelected ||
+          entityData.health <= 0 ||
+          entityData.exploding ||
+          entity.ship.health <= 0 ||
+          entity.ship.exploding ||
           serverCooldown > 0 ||
           entity.ship.abilityCooldownFrames <= 0
         ) {
           entity.ship.abilityCooldownFrames = serverCooldown;
+          entity.ship.abilityActiveFrames = scoutToolSelected
+            ? 0
+            : (entityData.abilityActiveFrames ?? 0);
         }
-        entity.ship.abilityActiveFrames = scoutToolSelected
-          ? 0
-          : (entityData.abilityActiveFrames ?? 0);
 
         entity.ship.furnaceClockOffsetMs = data.serverTime - Date.now();
         if (isLocalPlayer && entityData.bankedCargo !== undefined) {
@@ -1681,6 +1704,14 @@ export class ConnectionManager {
     });
   }
 
+  /** A durable deposit took a chip; its shatter plays a destruction sound instead. */
+  private handleAsteroidHit(data: AsteroidHitEvent): void {
+    if (!data?.asteroidId || !isFinitePosition(data.position)) {
+      return;
+    }
+    playHitSound(data.position);
+  }
+
   private handleSatellitePickupCollected(data: SatellitePickupCollected): void {
     if (!data?.playerId || !data.pickupId) {
       return;
@@ -1749,6 +1780,14 @@ export class ConnectionManager {
       const shouldLogDamage = data.isDestroyed || observedAt - this.lastDamageStateLogAt >= 1000;
       if (shouldLogDamage) {
         this.lastDamageStateLogAt = observedAt;
+        // The server distinguishes a cooperative downing as `player_downed`;
+        // this mirror deliberately does not. The discriminator is on the wire —
+        // `remainingHealth <= 0` with `isDestroyed` false is a downing, and the
+        // record below already carries it as `healthAfter` — but production
+        // forwards only `player_died` and `player_respawned`
+        // (`src/utils/logForwardPolicy.ts`), so a client row for a downing never
+        // ships, and the server record is the authority for damage and death
+        // (`docs/diagnostics.md`). A downing reads as `damage_applied` here.
         logger.info('STATE', data.isDestroyed ? 'player_died' : 'damage_applied', {
           observedAt,
           playerId: data.targetPlayerId,

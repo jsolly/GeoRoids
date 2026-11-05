@@ -3,10 +3,7 @@ import { reflectVector } from '../../../shared/asteroidReflection';
 import { GAME, LASER } from '../../../shared/constants/gameplay';
 import { findLaserSurfaceImpact } from '../../../shared/laserSurface';
 import type { Position, Velocity } from '../../../shared-types';
-import {
-  playHitSound as playHitSoundAt,
-  playLaserSound as playLaserSoundAt,
-} from '../../audio/gameSounds';
+import { playLaserSound as playLaserSoundAt } from '../../audio/gameSounds';
 import { getVelocityMagnitude } from '../../utils/mathUtils';
 
 export class Laser {
@@ -68,7 +65,7 @@ export class Laser {
     this.hasExploded = true;
   }
 
-  isExpired(): boolean {
+  private isExpired(): boolean {
     return this.distTraveled >= LASER.MAX_TRAVEL_DISTANCE;
   }
 
@@ -79,9 +76,5 @@ export class Laser {
 
   playLaserSound(): void {
     playLaserSoundAt(this.position);
-  }
-
-  playHitSound(): void {
-    playHitSoundAt(this.position);
   }
 }

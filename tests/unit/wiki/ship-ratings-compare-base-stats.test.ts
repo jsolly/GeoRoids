@@ -2,14 +2,14 @@ import { expect, test } from 'vitest';
 import { listShipKits } from '../../../shared/shipKits';
 import { shipRatings } from '../../../src/wiki/shipScorecard';
 
-test('Hauler rates highest for hull while Scout rates highest for quick, compact handling', () => {
+test('Hauler rates highest for hull while Scout rates highest for compact size and firing', () => {
   const hauler = shipRatings('hauler');
   const scout = shipRatings('scout');
   expect(hauler.find((stat) => stat.label === 'Hull')?.rating).toBe(5);
   expect(scout.find((stat) => stat.label === 'Hull')?.rating).toBe(1);
   expect(scout.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
   expect(hauler.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
-  for (const label of ['Size', 'Thrust', 'Turn rate', 'Shot interval']) {
+  for (const label of ['Size', 'Shot interval']) {
     expect(scout.find((stat) => stat.label === label)?.rating).toBe(5);
   }
   expect(shipRatings('scout').find((stat) => stat.label === 'E cooldown')?.rating).toBe(1);
@@ -25,5 +25,14 @@ test('all ships use seven whole-bubble ratings within the same fleet scale', () 
       expect(stat.rating).toBeGreaterThanOrEqual(1);
       expect(stat.rating).toBeLessThanOrEqual(5);
     }
+  }
+});
+
+test('both kits display equal movement values and ratings', () => {
+  for (const label of ['Thrust', 'Speed cap', 'Turn rate']) {
+    const scout = shipRatings('scout').find((stat) => stat.label === label);
+    const hauler = shipRatings('hauler').find((stat) => stat.label === label);
+    expect(hauler).toEqual(scout);
+    expect(scout?.rating).toBe(3);
   }
 });

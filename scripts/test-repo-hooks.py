@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import stat
 import subprocess
@@ -451,6 +452,8 @@ class SessionBootstrap(unittest.TestCase):
         self.write_script(scripts / 'repo-hooks.py', '''import os, sys
 with open(os.environ['SETUP_LOG'], 'a') as log:
     log.write(__import__('json').dumps(['hooks', *sys.argv[1:]]) + '\\n')
+if sys.argv[1] == 'verify' and os.environ.get('HOOK_VERIFY_ERROR'):
+    sys.exit('repo-hooks: ' + os.environ['HOOK_VERIFY_ERROR'])
 sys.exit(int(os.environ.get('HOOK_FAILURE', '0')))
 ''')
         self.write_script(self.bin / 'uname', '#!/usr/bin/env bash\necho Linux\n')
@@ -462,12 +465,34 @@ with open(os.environ['SETUP_LOG'], 'a') as log:
 if sys.argv[1] == 'exec':
     assert os.environ.get('MISE_EXEC_AUTO_INSTALL') == 'false' or sys.argv[3:] == ['npm', 'ci']
     os.execvp(sys.argv[3], sys.argv[3:])
+if sys.argv[1] == 'which':
+    print(os.environ.get(f'FIXTURE_{sys.argv[2].upper()}_PATH',
+                         os.path.join(os.environ['FIXTURE_NODE'], 'bin', sys.argv[2])))
 sys.exit(0)
 ''')
-        self.write_script(self.bin / 'node', '''#!/usr/bin/env python3
-import os
-print(os.environ.get('FIXTURE_RUNTIME', '["v24.16.0","137","linux","x64"]'))
+        self.write_script(self.bin / 'git', '''#!/usr/bin/env python3
+import json, os, sys
+with open(os.environ['SETUP_LOG'], 'a') as log:
+    log.write(json.dumps(['git', *sys.argv[1:]]) + '\\n')
+    if sys.argv[1:3] != ['config', '--get']:
+        log.write(json.dumps(['git-env', os.environ.get('GIT_TERMINAL_PROMPT'), os.environ.get('GIT_SSH_COMMAND')]) + '\\n')
+if sys.argv[1:3] == ['config', '--get']:
+    configured = os.environ.get('FIXTURE_SSH_CONFIG')
+    print(configured or '', end='')
+    sys.exit(0 if configured else 1)
+sys.exit(int(os.environ.get('GIT_FAILURE', '0')))
 ''')
+        self.write_script(self.bin / 'node', '#!/usr/bin/env bash\nexit 0\n')
+        # mise resolves node and its npm wrapper inside one installation prefix.
+        self.node = self.root / 'node-install'
+        (self.node / 'include/node').mkdir(parents=True)
+        (self.node / 'lib/node_modules/npm').mkdir(parents=True)
+        (self.node / 'bin').mkdir()
+        for name in ('node', 'npm'):
+            self.write_script(self.node / 'bin' / name, '#!/usr/bin/env bash\nexit 0\n')
+        self.write_node_version(24, 16, 0)
+        (self.node / 'lib/node_modules/npm/package.json').write_text('{"version":"11.12.0"}\n')
+        self.env['FIXTURE_NODE'] = str(self.node)
         self.write_script(self.bin / 'npm', '''#!/usr/bin/env python3
 import json, os, pathlib, sys
 with open(os.environ['SETUP_LOG'], 'a') as log:
@@ -495,6 +520,12 @@ else:
         path.write_text(text)
         path.chmod(0o755)
 
+    def write_node_version(self, major, minor, patch):
+        (self.node / 'include/node/node_version.h').write_text(
+            f'#define NODE_MAJOR_VERSION {major}\n#define NODE_MINOR_VERSION {minor}\n'
+            f'#define NODE_PATCH_VERSION {patch}\n#define NODE_MODULE_VERSION NODE_EMBEDDER_MODULE_VERSION\n'
+            '#define NODE_MODULE_VERSION 137\n')
+
     def setup(self, *args, extra=None):
         return subprocess.run([str(self.bin / 'bash'), 'scripts/setup-agent-environment.sh', *args],
                               cwd=self.root, env={**self.env, **(extra or {})}, text=True, capture_output=True)
@@ -514,12 +545,22 @@ else:
         self.assert_ready(self.setup('--session-hook'))
         receipt = self.root / 'node_modules/.georoids-setup.json'
         self.assertTrue(receipt.is_file())
+        tree_check = ['npm', 'ls', '--all', '--include=dev', '--include=optional', '--include=peer']
+        self.assertIn(tree_check, self.commands())
+        self.assertEqual(json.loads(receipt.read_text())['runtime'], json.dumps(
+            ['v24.16.0', '137', platform.system().lower(),
+             {'x86_64': 'x64', 'aarch64': 'arm64', 'arm64': 'arm64'}[platform.machine()]], separators=(',', ':')))
+        self.assertEqual(json.loads(receipt.read_text())['npm'], '11.12.0')
         before = self.tree()
         self.log.write_text('')
         self.assert_ready(self.setup('--session-hook'))
         self.assertEqual(self.tree(), before)
         self.assertEqual((self.root / '.env').read_text(), 'fixture setting\n')
-        self.assertIn(['npm', 'ls', '--all', '--include=dev', '--include=optional', '--include=peer'], self.commands())
+        # A warm resume compares the receipt without starting Node, npm or the tree check.
+        self.assertEqual([c for c in self.commands() if c[0] == 'npm' or c[1] == 'exec'], [])
+        # A current installed bundle never touches the network.
+        self.assertNotIn('git', [c[0] for c in self.commands()])
+        self.assertNotIn(tree_check, self.commands())
         self.assertNotIn(['npm', 'ci'], self.commands())
         self.assertNotIn(['mise', 'install'], self.commands())
         self.assertNotIn(['mise', 'trust', str(self.root / '.mise.toml')], self.commands())
@@ -566,16 +607,40 @@ else:
                 self.assertNotIn(['npm', 'ci'], self.commands())
                 self.assert_ready(self.setup())
 
-    def test_changed_runtime_or_invalid_dependency_graph_refuses_warm_resume(self):
+    def test_changed_runtime_or_foreign_npm_refuses_warm_resume(self):
         self.assert_ready(self.setup())
         before = self.tree()
-        for extra in ({'FIXTURE_RUNTIME': 'changed runtime'}, {'TREE_FAILURE': '1'}):
-            with self.subTest(extra=extra):
+        npm_manifest = self.node / 'lib/node_modules/npm/package.json'
+        changes = {
+            'node version': lambda: self.write_node_version(24, 17, 0),
+            'npm version': lambda: npm_manifest.write_text('{"version":"11.13.0"}\n'),
+            'missing runtime header': lambda: (self.node / 'include/node/node_version.h').unlink(),
+        }
+        for name, change in changes.items():
+            with self.subTest(change=name):
+                change()
                 self.log.write_text('')
-                result = self.setup('--session-hook', extra=extra)
+                result = self.setup('--session-hook')
                 self.assertNotEqual(result.returncode, 0)
+                self.assertIn('npm run dev:kill', result.stderr)
                 self.assertEqual(self.tree(), before)
                 self.assertNotIn(['npm', 'ci'], self.commands())
+                self.write_node_version(24, 16, 0)
+                npm_manifest.write_text('{"version":"11.12.0"}\n')
+                self.assert_ready(self.setup('--session-hook'))
+        foreign = self.root / 'other-npm/bin/npm'
+        foreign.parent.mkdir(parents=True)
+        self.write_script(foreign, '#!/usr/bin/env bash\nexit 0\n')
+        result = self.setup('--session-hook', extra={'FIXTURE_NPM_PATH': str(foreign)})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('npm does not belong to the resolved Node installation', result.stderr)
+        self.assertEqual(self.tree(), before)
+        for unexpected in ('', 'relative/bin/node', str(self.node / 'node'), str(self.node / 'bin/nodejs')):
+            with self.subTest(node_path=unexpected):
+                result = self.setup('--session-hook', extra={'FIXTURE_NODE_PATH': unexpected})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('mise resolved node to an unexpected path', result.stderr)
+                self.assertEqual(self.tree(), before)
 
     def test_failed_explicit_repair_invalidates_receipt_and_failure_propagates(self):
         self.assert_ready(self.setup())
@@ -625,6 +690,58 @@ else:
         self.assertEqual(result.returncode, 17)
         self.assertEqual(len(self.commands()), 1)
         self.assertFalse((self.root / 'node_modules').exists())
+
+    def test_warm_resume_reinstalls_only_a_stale_trusted_bundle(self):
+        self.assert_ready(self.setup())
+        before = self.tree()
+        message = 'Installed bundle is stale; run reviewed repository setup'
+        # Setup matches this exact verify message; rewording it must update both.
+        self.assertIn(f"raise ValueError('{message}')", (SOURCE / 'scripts/repo-hooks.py').read_text())
+        stale = {'HOOK_VERIFY_ERROR': message}
+        self.log.write_text('')
+        self.assert_ready(self.setup('--session-hook', extra=stale))
+        # The trust anchor is refreshed from origin before the trust-gated install.
+        refresh = ['git', '-c', 'credential.interactive=false', '-c', 'http.lowSpeedLimit=1000',
+                   '-c', 'http.lowSpeedTime=20', 'fetch', '--quiet', '--no-tags', '--no-write-fetch-head',
+                   '--no-auto-maintenance', 'origin', '+refs/heads/main:refs/remotes/origin/main']
+        batch_ssh = 'ssh -o BatchMode=yes -o ConnectTimeout=20'
+
+        def sequence():
+            return [c if c[0] in ('git', 'git-env') else c[:2] for c in self.commands()
+                    if c[0] in ('hooks', 'git', 'git-env') and c[1:3] != ['config', '--get']]
+
+        self.assertEqual(sequence(), [['hooks', 'verify'], refresh, ['git-env', '0', batch_ssh], ['hooks', 'install']])
+        self.assertNotIn(['npm', 'ci'], self.commands())
+        self.assertEqual(self.tree(), before)
+        # A user's own SSH command still wins over the non-interactive default.
+        for extra, expected in (({'FIXTURE_SSH_CONFIG': 'ssh -i key'}, 'ssh -i key'),
+                                ({'GIT_SSH_COMMAND': 'ssh -F cfg'}, 'ssh -F cfg')):
+            with self.subTest(ssh=expected):
+                self.log.write_text('')
+                self.assert_ready(self.setup('--session-hook', extra={**stale, **extra}))
+                self.assertIn(['git-env', '0', expected], self.commands())
+        # An unreachable origin still reaches install, which compares against the local copy.
+        self.log.write_text('')
+        result = self.setup('--session-hook', extra={**stale, 'GIT_FAILURE': '128'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Could not refresh origin/main', result.stderr)
+        self.assertEqual(sequence(), [['hooks', 'verify'], refresh, ['git-env', '0', batch_ssh], ['hooks', 'install']])
+        # Install still enforces trust: an untrusted current bundle fails the hook.
+        result = self.setup('--session-hook', extra={**stale, 'HOOK_FAILURE': '17'})
+        self.assertEqual(result.returncode, 17)
+        self.assertEqual(self.tree(), before)
+        # Any other verify failure, including a path that merely contains the
+        # stale phrase, keeps failing without an install attempt.
+        for error in ('Current source bundle is not trusted',
+                      "[Errno 2] No such file or directory: '/x/versions/Installed bundle is stale/installation.json'"):
+            with self.subTest(error=error):
+                self.log.write_text('')
+                result = self.setup('--session-hook', extra={'HOOK_VERIFY_ERROR': error})
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(error, result.stderr)
+                self.assertNotIn('install', [c[1] for c in self.commands() if c[0] == 'hooks'])
+                self.assertNotIn('git', [c[0] for c in self.commands()])
+                self.assertEqual(self.tree(), before)
 
 
 class PytestSubtestReporting(unittest.TestCase):

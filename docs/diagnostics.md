@@ -2,20 +2,32 @@
 
 ## Send a problem report
 
-Visit `/debug` and choose **Report a problem**, before joining or during play.
+Visit `/debug` and choose **Report a problem** on the title screen. During play,
+tap or click the bug icon to expand the diagnostics panel and find the report button;
+tap it again to collapse the whole panel. The panel starts collapsed and this browser
+remembers your later choice.
 Describe what happened and choose **Send**. The form captures diagnostics when
-it opens, before typing changes the input state. Inspect **Diagnostic preview**
+it opens, before typing changes the game input state. At Send, it adds bounded
+report-editor event counts, focus, selection and text lengths to help diagnose
+keyboard failures; it does not record keys, composition text or clipboard content.
+Inspect **Diagnostic preview**
 or use **Copy report** or **Download report** to keep your own copy.
 
 The report includes the current diagnostic snapshot and up to 80 recent client
 log records, plus aggregate server health at receipt. It excludes resume tokens,
 player names, chat and browser storage. Diagnostic strings also redact known
-credentials and strip URL credentials, query strings and fragments. The description
+credentials and strip URL credentials, query strings and fragments. A diagnostic
+state string longer than 8,192 characters is clipped and ends in `…[truncated]`,
+without the partial word at the cut. URLs beyond the first 2,048 in a report are
+redacted whole. The description
 is intentionally submitted free text: do not enter passwords or secrets. Members
 of the shared `jsolly/GeoRoids` Todoist project can read the report.
 
 **Saved, pending delivery** means the separate Railway report database committed
 the report. **Delivered** means Todoist contains the verified complete bundle.
+Opening **Report a problem** after delivery starts a fresh report. For a pending or
+blocked receipt, **New report** opens the editor in the same dialog and captures
+fresh diagnostics.
 **Saved, delivery blocked** means the report is retained but needs credential,
 permission or project-capacity repair. The browser stores an immutable submission
 before sending; reload or retry reuses its identity, including after a lost response.
@@ -26,6 +38,41 @@ open; it does not pause the shared world.
 Reports appear as tasks in **jsolly/GeoRoids → Debug reports**. Submission does
 not start an agent or authorize repairs. Ask an agent to "Review GeoRoids debug
 reports" and state whether to investigate or implement fixes.
+
+## Record a device performance session
+
+Open `/debug?performance=collect` and enter the game. In **Performance collection**,
+fill in the device and test conditions, warm up before choosing **Start**, then
+play the planned route with the same graphics settings and workload. Choose
+**Stop** before opening **Report a problem** and sending a description that names
+the run and settings.
+
+The report includes a bounded timing summary of that collection, including its
+sample counts and completeness. **Download** retains the full recording for
+further analysis; starting another collection replaces the saved session, so
+download it first. An incomplete collection cannot establish a performance result.
+Reports from ordinary sessions do not include a collection summary.
+
+Simplified Scan paints directly into the visible game canvas, capped at 0.75 DPR,
+one million backing pixels and 1536 pixels per dimension. Its world, canvas HUD
+and minimap are temporarily softer; DOM controls and CSS/input coordinates stay
+unchanged. Flight backing resolution returns when the camera reaches flight scale.
+The full-detail Scan path keeps its normal resolution.
+
+Recordings compare fixed flight policy (`flightEffectiveDpr`, `flightBackingWidth`,
+`flightBackingHeight`) and the Scan caps. `presentation` reports current actual
+backing dimensions and both DPR axes. Bounded `presentationStates` retain short
+Scan transitions between collection drains, and the report's `observedPresentation`
+collects those states separately from fixed policy. A viewport, device DPR or
+quality-policy change, including a change reverted within a drain, makes a run
+incomplete. Historical recordings keep strict comparison of their older backing
+fields.
+
+For the Fire Tablet check, warm up with native DPR, glow off and automatic Scan
+detail. Record one 90-second route with three Mineral Scans, steering and firing
+through each entry, wide view and return. Keep the raw download and compare
+flight/Scan frame intervals, CPU time, resolution states and live hazards. This
+protocol alone does not establish 60 FPS; the physical tablet's samples do.
 
 ## Review reports as an agent
 
@@ -190,9 +237,41 @@ The socket is terminated once it passes that quota, or on the first malformed
 or invalid frame. Later frames on it are ignored, and a malformed frame warns
 once. A page keeps one log socket and waits five seconds before opening
 another, including after that close. An idle log socket does not reconnect.
-Log upgrades over 6 per minute per address are refused before the handshake,
-so the browser does not treat them as open and drop its queue. Gameplay
-upgrades keep a separate budget of 50 per minute. Inspect
+Upgrades past a per-window budget are refused before the handshake, so the
+browser does not treat them as open and drop its queue. Each lane has its own
+budget -- 300 log and 600 gameplay upgrades -- and behind Railway public HTTP
+ingress **the fleet shares each one**, because the socket address the budget is
+keyed on is the edge proxy rather than the pilot. Both are therefore sized for a
+full fleet: `MAX_PLAYERS` times one pilot's demand in that lane -- for gameplay
+the upgrade plus every rung of the retry ladder, for logs the record a deploy
+makes every pilot forward plus two retries. The log lane is deliberately held
+below the twelve attempts a window the five-second socket floor above permits a
+pilot, so a page whose sockets keep closing can still be refused: each admitted
+socket brings a fresh 256 KiB quota and this file retains 20 MiB, so a
+fleet-wide twelve would license 300 MiB a window into it. Size the rotation
+before raising that lane. An earlier
+gameplay budget of 50 sat below the 100 the server accepts, so a deploy that
+re-upgraded the whole fleet had its 51st reconnect refused and a full server
+could not come back; the log budget of 6 was for the entire server, when a deploy
+makes every pilot forward a record. Read a budget as headroom for a burst, not as
+a rate per minute: a bucket rolls only after a full window with no accepted
+upgrade in that lane, and a refusal does not advance that clock, so accepted
+upgrades accumulate with no decay while the lane stays busy and a continuously
+busy lane reaches its budget eventually. A deploy is carried because the new
+process starts with empty buckets. When a refusal does happen the client is not
+patient: the gameplay ladder gives up after its fifth retry, 15.5 seconds in, and
+shows the permanent-disconnect banner, so a pilot refused through every rung
+needs a reload even though the bucket clears inside the minute. What these
+budgets do not provide is per-client fairness: one abusive caller can spend the
+fleet's budget, as it could before, only now the threshold is higher. The raise
+is not free either. The quotas above are per socket, not per address; a fresh
+one comes with every admitted socket, `MAX_PLAYERS` is enforced on the join
+message rather than on the upgrade, and nothing closes a socket that never
+joins. So the rate at which one address can accumulate sockets, and the bytes it
+can push through them, rise with these budgets -- twelve times for gameplay,
+fifty for logs. A bound on concurrent sockets and a deadline for an unjoined one
+are what would hold that, and neither exists yet; the old budgets only slowed
+the accumulation. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
 `logging.gameplayIngress` reports the per-connection `/ws` message budget
@@ -315,3 +394,44 @@ contour strokes. Measure repeated primitives, state changes and text work before
 adding caches or layers. Preserve smooth vector motion and the existing visual
 style; image-coordinate rounding advice does not justify quantizing ship or
 asteroid simulation coordinates.
+
+## Compare cached Scan scenery
+
+The Canvas renderer has an opt-in scenery-cache prototype. Open
+`/debug?performance=collect&scanScenery=cache` to collect it, and use
+`scanScenery=native` with the same collection, DPR, glow and orientation as the
+control. Outside performance mode the parameter has no effect. The default
+renderer stays native. A requested WebGL2 backend bypasses this Canvas prototype,
+even when GPU initialization fails and the existing renderer falls back to Canvas.
+
+The prototype reuses only the background, stars and neutral contours through the
+wide Mineral Scan. Moving ships, spiders, rocks, shots, controls, labels and radar
+stay live. Static stars and thin contour lines can look softer or change pixel
+coverage while the cached image scales; gameplay coordinates and glow settings
+are unchanged. Inspect contour navigation and hazard readability before treating
+this as an acceptable device preset.
+
+One active buffer and one temporary replacement share an 8-million-pixel limit,
+approximately 32 MB of RGBA before browser overhead. Each backing dimension is
+limited to 4096. A missing terrain source, coverage gap, limit or drawing failure
+uses the complete existing renderer. Allocation and painting failures disable the
+cache for that projection until resize, DPR, terrain or scan-session invalidation;
+source misses can recover once the existing renderer has built the needed patch.
+The first cold scan can still pay existing contour extraction and a measured
+raster build. A requested cache mode is not evidence that frames used it.
+
+Compare scan entry, stable wide view and return separately. Cache hits, builds,
+misses and native fallback counts describe the actual rendering path; build
+latency includes selection, allocation and paint. Scan-conditioned frame
+intervals describe the preceding completed scene, while conditioned CPU work
+describes the scene just rendered. These observations do not prove GPU
+presentation or identify a complete event timeline. Physical-device frame cadence
+and live steering/firing remain required for performance acceptance.
+
+Copied diagnostics include `graphics.sceneryCache`: current and peak owned backing
+pixels plus the last source-patch radius, scoped to the canvas lifetime. These
+changing observations are separate from the recording's fixed graphics settings.
+Stopped phone reports retain the 16 largest recorded intervals over 25 ms across
+all chunks, with the preceding completed frame's Scan stage, scenery path, visible
+spider count and CPU work. The report includes the total number of slow intervals;
+the retained examples are neither a complete event timeline nor causal attribution.

@@ -1,22 +1,31 @@
-/** Last-known Debug HUD samples. On-screen only — never forwarded to Railway. */
+/** Last-known Debug HUD samples, also included in explicit diagnostics captures. */
 
-const FPS_BLEND = 0.18;
-const MAX_FRAME_MS = 250;
+const FPS_WINDOW_MS = 1000;
+const frameIntervals = new Float64Array(512);
 
-let fps = Number.NaN;
-let lastPingSentAt = Number.NaN;
+let firstFrame = 0;
+let frameCount = 0;
+let frameElapsedMs = 0;
+let pendingPing: { probeId: number; sentAt: number } | undefined;
 let lastRttMs = Number.NaN;
 let lastSnapshotSequence = 0;
 let lastSnapshotAt = Number.NaN;
 
-export function noteDebugPingSent(now: number): void {
-  lastPingSentAt = now;
+export function noteDebugPingSent(probeId: number, now: number): void {
+  pendingPing = { probeId, sentAt: now };
 }
 
-export function noteDebugPong(now: number): void {
-  if (Number.isFinite(lastPingSentAt) && now >= lastPingSentAt) {
-    lastRttMs = now - lastPingSentAt;
+export function noteDebugPong(probeId: unknown, now: number): void {
+  if (
+    pendingPing === undefined ||
+    probeId !== pendingPing.probeId ||
+    !Number.isFinite(now) ||
+    now < pendingPing.sentAt
+  ) {
+    return;
   }
+  lastRttMs = now - pendingPing.sentAt;
+  pendingPing = undefined;
 }
 
 export function noteDebugSnapshot(sequence: number, now: number): void {
@@ -25,22 +34,40 @@ export function noteDebugSnapshot(sequence: number, now: number): void {
 }
 
 export function noteDebugFrame(dtMs: number): void {
-  if (!Number.isFinite(dtMs) || dtMs <= 0 || dtMs > MAX_FRAME_MS) {
+  if (!Number.isFinite(dtMs) || dtMs <= 0) {
     return;
   }
-  const instant = 1000 / dtMs;
-  fps = Number.isFinite(fps) ? fps + (instant - fps) * FPS_BLEND : instant;
+  if (frameCount === frameIntervals.length) {
+    frameElapsedMs -= frameIntervals[firstFrame] ?? 0;
+    firstFrame = (firstFrame + 1) % frameIntervals.length;
+    frameCount--;
+  }
+  frameIntervals[(firstFrame + frameCount) % frameIntervals.length] = dtMs;
+  frameCount++;
+  frameElapsedMs += dtMs;
+  // Keep a complete foreground interval at the window boundary, including long stalls.
+  while (frameCount > 1) {
+    const oldest = frameIntervals[firstFrame] ?? 0;
+    if (frameElapsedMs - oldest < FPS_WINDOW_MS) {
+      break;
+    }
+    frameElapsedMs -= oldest;
+    firstFrame = (firstFrame + 1) % frameIntervals.length;
+    frameCount--;
+  }
 }
 
 export function resetDebugHudSession(): void {
-  lastPingSentAt = Number.NaN;
+  pendingPing = undefined;
   lastRttMs = Number.NaN;
   lastSnapshotSequence = 0;
   lastSnapshotAt = Number.NaN;
 }
 
 export function resetDebugHudMetricsForTests(): void {
-  fps = Number.NaN;
+  firstFrame = 0;
+  frameCount = 0;
+  frameElapsedMs = 0;
   resetDebugHudSession();
 }
 
@@ -51,7 +78,7 @@ export function readDebugHudMetrics(now: number): {
   snapshotAgeMs: number | undefined;
 } {
   return {
-    fps: Number.isFinite(fps) ? Math.round(fps) : undefined,
+    fps: frameCount > 0 ? Math.round((1000 * frameCount) / frameElapsedMs) : undefined,
     rttMs: Number.isFinite(lastRttMs) ? Math.round(lastRttMs) : undefined,
     snapshotSequence: lastSnapshotSequence > 0 ? lastSnapshotSequence : undefined,
     snapshotAgeMs:

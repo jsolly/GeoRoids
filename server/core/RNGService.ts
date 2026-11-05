@@ -51,14 +51,4 @@ export class RNGService {
       y: (this.random() - 0.5) * maxSpeed,
     };
   }
-
-  // Get current RNG state
-  public getState(): number {
-    return this.rngState;
-  }
-
-  // Set RNG state
-  public setState(state: number): void {
-    this.rngState = RNGService.toUint32(state); // Ensure unsigned 32-bit with validation
-  }
 }

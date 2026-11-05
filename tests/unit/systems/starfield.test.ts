@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawStarfield } from '../../../src/rendering/starfield';
 
 const view = vi.hoisted(() => ({
@@ -27,7 +28,11 @@ afterEach(() => {
 
 function sky(x: number, y: number) {
   view.points = [];
-  drawStarfield({ x, y });
+  const context = canvasManager.getContext();
+  if (!context) {
+    throw new Error('Missing star painter test context');
+  }
+  drawStarfield(context, { x, y }, view, view.scale);
   return view.points;
 }
 

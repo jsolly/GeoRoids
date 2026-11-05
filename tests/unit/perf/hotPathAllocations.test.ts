@@ -89,19 +89,19 @@ test('120 gameState-style apply ticks reuse lists, sets, and entity vectors', ()
 
 test('120 belt motion ticks reuse each live roid vector pair and advance their known positions', () => {
   const belt = new RoidBelt();
-  belt.roids.push(
+  belt.replaceAll([
     new Roid({ ...roid('first-moving-rock', 10, 4), velocity: { x: 1, y: -0.5 } }),
-    new Roid({ ...roid('second-moving-rock', -20, 8), velocity: { x: -1, y: 0.25 } })
-  );
-  const positions = belt.roids.map((body) => body.position);
-  const velocities = belt.roids.map((body) => body.velocity);
+    new Roid({ ...roid('second-moving-rock', -20, 8), velocity: { x: -1, y: 0.25 } }),
+  ]);
+  const positions = belt.getRoids().map((body) => body.position);
+  const velocities = belt.getRoids().map((body) => body.velocity);
   for (let tick = 0; tick < 120; tick++) {
     belt.moveRoids();
   }
-  expect(belt.roids[0]?.position).toBe(positions[0]);
-  expect(belt.roids[0]?.velocity).toBe(velocities[0]);
-  expect(belt.roids[1]?.position).toBe(positions[1]);
-  expect(belt.roids[1]?.velocity).toBe(velocities[1]);
-  expect(belt.roids[0]?.position).toEqual({ x: 130, y: -56 });
-  expect(belt.roids[1]?.position).toEqual({ x: -140, y: 38 });
+  expect(belt.getRoids()[0]?.position).toBe(positions[0]);
+  expect(belt.getRoids()[0]?.velocity).toBe(velocities[0]);
+  expect(belt.getRoids()[1]?.position).toBe(positions[1]);
+  expect(belt.getRoids()[1]?.velocity).toBe(velocities[1]);
+  expect(belt.getRoids()[0]?.position).toEqual({ x: 130, y: -56 });
+  expect(belt.getRoids()[1]?.position).toEqual({ x: -140, y: 38 });
 });

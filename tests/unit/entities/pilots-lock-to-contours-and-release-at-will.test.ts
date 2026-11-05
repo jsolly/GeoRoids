@@ -1,11 +1,11 @@
 import { beforeEach, expect, test } from 'vitest';
+import { SHIP } from '../../../shared/constants/gameplay';
 import {
   CONTOUR_LOCK,
   contourLockDistance,
   contourLockSpeed,
   contourLockVelocity,
 } from '../../../shared/contourLock';
-import { cruiseSpeed } from '../../../shared/shipFlight';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { ensureTerrain } from '../../../shared/terrainField';
 import { terrainSpeedLimit } from '../../../shared/terrainTravel';
@@ -31,7 +31,7 @@ test.each(['scout', 'hauler'] as const)(
   (kitId) => {
     const ship = pilot(kitId);
     const start = { ...ship.position };
-    const baseline = cruiseSpeed(ship.mass, ship.maxVelocity, 0, 1);
+    const baseline = SHIP.MAX_VELOCITY;
     expect(ship.toggleContourLock()).toBe(true);
     const lock = ship.contourLock;
     if (!lock) {
@@ -111,11 +111,7 @@ test('a diagonal flick takes the reachable reverse route around an adjacent bend
   const ship = new Ship({ position: { x: -5500.184203251847, y: 748.8849359526744 } });
   const original = { height: -0.16, direction: 1 } as const;
   ship.contourLock = original;
-  const velocity = contourLockVelocity(
-    ship.position,
-    original,
-    cruiseSpeed(ship.mass, ship.maxVelocity, 0, 1)
-  );
+  const velocity = contourLockVelocity(ship.position, original, SHIP.MAX_VELOCITY);
   if (!velocity) {
     throw new Error('Missing fixture guidance');
   }

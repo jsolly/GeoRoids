@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
+import { SHIP } from '../../../shared/constants/gameplay';
 import { sampleGradient } from '../../../shared/heightfield';
-import { cruiseSpeed } from '../../../shared/shipFlight';
-import { getShipKit } from '../../../shared/shipKits';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import { ensureTerrain } from '../../../shared/terrainField';
 import { terrainCruiseVelocity, terrainSpeedLimit } from '../../../shared/terrainTravel';
@@ -23,18 +22,14 @@ test.each(['scout', 'hauler'] as const)(
     const gradient = sampleGradient(field, position.x, position.y);
     expect(Math.hypot(gradient.x, gradient.y)).toBeGreaterThan(0.002);
     const across = Math.atan2(-gradient.y, gradient.x);
-    const kit = getShipKit(kitId);
     for (const mass of [1, 8]) {
-      const cruise = cruiseSpeed(mass, kit.maxVelocity, 0, 1);
+      const cruise = SHIP.MAX_VELOCITY;
       const speeds = [across, across + Math.PI, across + Math.PI / 2, across - Math.PI / 2].map(
         (angle) => {
-          const ship: Parameters<typeof advanceCruiseVelocity>[0] = {
-            position,
-            angle,
-            mass,
-            thrust: kit.thrust,
-            velocity: { x: 0, y: 0 },
-          };
+          const ship = new Ship({ kitId, position: { ...position } });
+          ship.angle = angle;
+          ship.mass = mass;
+          ship.velocity = { x: 0, y: 0 };
           for (let frame = 0; frame < 300; frame++) {
             advanceCruiseVelocity(ship, cruise);
           }
@@ -59,37 +54,34 @@ test('turning across a current sheds the bonus gently without a speed debt', () 
   const field = ensureTerrain(TERRAIN.DEFAULT_SEED, bounds);
   const gradient = sampleGradient(field, position.x, position.y);
   const across = Math.atan2(-gradient.y, gradient.x);
-  const kit = getShipKit('scout');
   const ship = {
     position,
     angle: across + Math.PI / 2,
-    mass: 1,
-    thrust: kit.thrust,
     velocity: { x: 0, y: 0 },
   };
   for (let frame = 0; frame < 180; frame++) {
-    advanceCruiseVelocity(ship, kit.maxVelocity);
+    advanceCruiseVelocity(ship, SHIP.MAX_VELOCITY);
   }
-  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(kit.maxVelocity * 1.9);
+  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(SHIP.MAX_VELOCITY * 1.9);
   ship.angle = across;
   const before = Math.hypot(ship.velocity.x, ship.velocity.y);
-  advanceCruiseVelocity(ship, kit.maxVelocity);
-  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(kit.maxVelocity);
+  advanceCruiseVelocity(ship, SHIP.MAX_VELOCITY);
+  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(SHIP.MAX_VELOCITY);
   expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThan(before);
   let previous = before;
   for (let frame = 0; frame < 22; frame++) {
-    advanceCruiseVelocity(ship, kit.maxVelocity);
+    advanceCruiseVelocity(ship, SHIP.MAX_VELOCITY);
     const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
     expect(speed).toBeLessThanOrEqual(previous + 1e-10);
-    expect(speed).toBeGreaterThanOrEqual(kit.maxVelocity - 1e-10);
+    expect(speed).toBeGreaterThanOrEqual(SHIP.MAX_VELOCITY - 1e-10);
     previous = speed;
   }
-  expect(previous).toBeCloseTo(kit.maxVelocity, 10);
+  expect(previous).toBeCloseTo(SHIP.MAX_VELOCITY, 10);
 });
 
 test('flat spawn preserves normal cruise and every current heading stays between cruise and its ceiling', () => {
   ensureTerrain(TERRAIN.DEFAULT_SEED, bounds);
-  const cruise = getShipKit('scout').maxVelocity;
+  const cruise = SHIP.MAX_VELOCITY;
   expect(terrainSpeedLimit({ x: 0, y: 0 }, cruise)).toBe(cruise);
   for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
     const flat = terrainCruiseVelocity({ x: 0, y: 0 }, angle, cruise);
@@ -147,7 +139,7 @@ test.each(['scout', 'hauler'] as const)(
   '%s speed lines reflect terrain speed rather than blasts',
   (kitId) => {
     const ship = new Ship({ position: { x: 0, y: 0 }, isLocalPlayer: true, kitId });
-    const baseline = cruiseSpeed(ship.mass, ship.maxVelocity, 0, 1);
+    const baseline = SHIP.MAX_VELOCITY;
     for (const bonus of [0, 0.5, 1]) {
       ship.velocity = { x: baseline * (1 + TERRAIN.CONTOUR_SPEED_BONUS * bonus), y: 0 };
       expect(contourSpeedStrength(ship)).toBeCloseTo(bonus, 10);

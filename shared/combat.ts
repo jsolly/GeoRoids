@@ -1,4 +1,4 @@
-import type { Position } from '../shared-types';
+import type { BotRole, Position } from '../shared-types';
 
 interface CombatantState {
   exploding: boolean;
@@ -17,7 +17,7 @@ export interface CombatCircle {
   immune: boolean;
 }
 
-/** True when a ship must not take or report collision / combat damage. */
+/** True when a ship must not take collision / combat damage. */
 export function isCombatantImmune(state: CombatantState): boolean {
   if (state.exploding || state.health <= 0 || state.respawnTimer !== undefined) {
     return true;
@@ -46,33 +46,6 @@ export function circlesOverlap(
   return dx * dx + dy * dy < minDist * minDist;
 }
 
-export function findShipAsteroidOverlaps(
-  ships: CombatCircle[],
-  asteroids: Array<{ id: string; position: Position; radius: number }>,
-  shouldSkip?: (shipId: string, asteroidId: string) => boolean
-): Array<{ shipId: string; asteroidId: string }> {
-  const hits: Array<{ shipId: string; asteroidId: string }> = [];
-  for (const ship of ships) {
-    if (ship.immune) {
-      continue;
-    }
-    for (const asteroid of asteroids) {
-      if (shouldSkip?.(ship.id, asteroid.id) === true) {
-        continue;
-      }
-      if (circlesOverlap(ship.position, ship.radius, asteroid.position, asteroid.radius)) {
-        hits.push({ shipId: ship.id, asteroidId: asteroid.id });
-        break;
-      }
-    }
-  }
-  return hits;
-}
-
-export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
-  return attackerId === 'boundary';
-}
-
 /** World hazards the server may apply to crew hulls. */
 export function isWorldHazard(attackerId: string): boolean {
   return (
@@ -83,7 +56,7 @@ export function isWorldHazard(attackerId: string): boolean {
   );
 }
 
-/** Direct crew shots pass through hulls; a bounce arms the bolt as a hazard. */
-export function laserDamagesShips(bounces: number): boolean {
-  return bounces > 0;
+/** Allied direct shots pass through hulls; opposing factions and ricochets can hit. */
+export function laserDamagesShips(bounces: number, attacker?: BotRole, target?: BotRole): boolean {
+  return bounces > 0 || (attacker === 'raider') !== (target === 'raider');
 }

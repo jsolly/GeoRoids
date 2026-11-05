@@ -46,6 +46,7 @@ export class EventLoop {
       return;
     }
     this.disposed = true;
+    clientPerformance.resetFrameScene();
     this.gameLoopScheduled = false;
     if (this.pendingFrame !== undefined) {
       this.host.cancelAnimationFrame(this.pendingFrame);
@@ -114,7 +115,7 @@ export class EventLoop {
         clientPerformance.setPhase(
           this.lifecycle.getCurrPlayer()?.ship.exploding === true ? 'respawn' : 'play'
         );
-        clientPerformance.record('frameIntervalMs', dtMs);
+        clientPerformance.recordFrameInterval(dtMs, now);
       }
       if (debugHudOn) {
         noteDebugFrame(dtMs);
@@ -133,9 +134,11 @@ export class EventLoop {
       }
       if (observing) {
         const rendered = this.host.now();
-        clientPerformance.record('updateMs', updated - started);
-        clientPerformance.record('renderMs', rendered - updated);
-        clientPerformance.record('frameCpuMs', rendered - started);
+        clientPerformance.recordFrameWork(
+          updated - started,
+          rendered - updated,
+          rendered - started
+        );
         clientPerformance.rendered(rendered);
         this.host.observeRenderer?.();
         clientPerformance.exportIfDue(rendered);
@@ -144,6 +147,7 @@ export class EventLoop {
       this.scheduleFrame();
     } catch (error) {
       this.gameLoopScheduled = false;
+      clientPerformance.resetFrameScene();
       clientPerformance.count('frameFailures');
       this.lifecycle.stopAfterFrameFailure();
       this.host.reportFailure(error);

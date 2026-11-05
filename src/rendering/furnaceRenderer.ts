@@ -6,8 +6,10 @@ import { PALETTE, VISUAL } from '../constants';
 import { activeFurnacePipePulses, furnacePipeFrame } from '../fx/furnacePipePulse';
 import { getSettlement, getWorldExploration, worldFurnaces } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
+import { formatPoints } from '../utils/formatPoints';
 import { canvasManager } from './canvasSurface';
 import type { DrawingContext } from './drawingContext';
+import { discardRasterSurface, prepareRasterSurface, type RasterSurface } from './rasterSurface';
 import { resolveGlow } from './renderQuality';
 import { strokePhosphorPolyline, type Vec2 } from './vectorJuice';
 
@@ -22,6 +24,29 @@ const FLAME_STEPS = 18;
 const EMBER_COUNT = 7;
 /** Largest stretch the tip snap can add, used to keep surges under the name plate. */
 const FLAME_SNAP_CEILING = 1.13;
+
+// All ordinary furnaces share one radius. Never retain artwork per world ID.
+const MAX_STATIC_FURNACE_PIXELS = 1_000_000;
+const MAX_STATIC_FURNACE_DIMENSION = 1024;
+interface StaticFurnaceArtwork {
+  radius: number;
+  dpr: number;
+  glow: number;
+  outer: RasterSurface;
+  bed: RasterSurface;
+  outerHalf: number;
+  bedHalfWidth: number;
+  bedHalfHeight: number;
+}
+let staticFurnaceArtwork: StaticFurnaceArtwork | null = null;
+
+export function clearStaticFurnaceArtwork(): void {
+  if (staticFurnaceArtwork) {
+    discardRasterSurface(staticFurnaceArtwork.outer);
+    discardRasterSurface(staticFurnaceArtwork.bed);
+    staticFurnaceArtwork = null;
+  }
+}
 
 interface FlameTongue {
   /** Flame height and belly width, both in furnace radii. */
@@ -160,7 +185,7 @@ function drawKnownFurnaces(viewerPosition: Position, pass: 'artwork' | 'labels')
       if (furnace.id === TOWN_HEARTH.id) {
         drawDockingStation(ctx, screen.x, screen.y, radius, getSettlement().level);
       }
-      drawFurnaceArtwork(ctx, screen.x, screen.y, radius, now);
+      drawFlightFurnaceArtwork(ctx, screen.x, screen.y, radius, now);
     } else {
       drawFurnaceLabel(
         ctx,
@@ -190,6 +215,21 @@ export function drawFurnaceArtwork(
   const pulse = 0.78 + Math.sin(now / 850) * 0.12;
   const line = Math.max(1, Math.min(2, radius * 0.018));
 
+  drawFurnaceOuterRing(ctx, x, y, radius, line);
+  strokeFurnaceIntake(ctx, x, y, radius, line, pulse);
+  const mouthY = y + radius * 0.42;
+  strokeFireBed(ctx, x, mouthY, radius, line);
+  strokeFlames(ctx, x, mouthY, y - radius, radius, seconds);
+  strokeEmbers(ctx, x, mouthY, radius, seconds, line);
+}
+
+function drawFurnaceOuterRing(
+  ctx: DrawingContext,
+  x: number,
+  y: number,
+  radius: number,
+  line: number
+): void {
   ctx.save();
   ctx.fillStyle = hexToRgba(FURNACE_COLOR, 0.045);
   ctx.shadowBlur = 0;
@@ -201,7 +241,21 @@ export function drawFurnaceArtwork(
   ctx.shadowBlur = resolveGlow(VISUAL.FURNACE_GLOW);
   ctx.lineWidth = line;
   ctx.stroke();
+  ctx.restore();
+}
 
+function strokeFurnaceIntake(
+  ctx: DrawingContext,
+  x: number,
+  y: number,
+  radius: number,
+  line: number,
+  pulse: number
+): void {
+  ctx.save();
+  ctx.shadowColor = FURNACE_COLOR;
+  ctx.shadowBlur = resolveGlow(VISUAL.FURNACE_GLOW);
+  ctx.lineWidth = line;
   ctx.setLineDash([Math.max(4, radius * 0.1), Math.max(3, radius * 0.06)]);
   ctx.strokeStyle = hexToRgba(FURNACE_COLOR, 0.75 * pulse);
   ctx.beginPath();
@@ -209,11 +263,116 @@ export function drawFurnaceArtwork(
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
+}
 
+/** Browser-only composition; the portable vector painter remains the reference. */
+function drawFlightFurnaceArtwork(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  now: number
+): void {
+  if (!canvasManager.isFlightView()) {
+    drawFurnaceArtwork(ctx, x, y, radius, now);
+    return;
+  }
+  const glow = resolveGlow(VISUAL.FURNACE_GLOW);
+  const dpr = canvasManager.getRasterPixelRatio(ctx, glow);
+  const line = Math.max(1, Math.min(2, radius * 0.018));
+  const padding = line / 2 + (3 * glow + 2) / dpr;
+  const outerHalf = Math.ceil((radius + padding) * dpr);
+  const bedHalfWidth = Math.ceil((radius * 0.36 * 1.24 + padding) * dpr);
+  const bedHalfHeight = Math.ceil((radius * 0.1 + padding) * dpr);
+  const pixels = 4 * (outerHalf ** 2 + bedHalfWidth * bedHalfHeight);
+  if (
+    !(radius > 0) ||
+    !Number.isFinite(pixels) ||
+    pixels > MAX_STATIC_FURNACE_PIXELS ||
+    Math.max(outerHalf, bedHalfWidth, bedHalfHeight) * 2 > MAX_STATIC_FURNACE_DIMENSION
+  ) {
+    drawFurnaceArtwork(ctx, x, y, radius, now);
+    return;
+  }
+  let art = staticFurnaceArtwork;
+  if (
+    !art ||
+    art.radius !== radius ||
+    art.dpr !== dpr ||
+    art.glow !== glow ||
+    art.outer.context.isContextLost?.() ||
+    art.bed.context.isContextLost?.()
+  ) {
+    // Release before construction so old and replacement bitmaps cannot double the cap.
+    clearStaticFurnaceArtwork();
+    const outer = prepareRasterSurface(
+      outerHalf * 2,
+      outerHalf * 2,
+      undefined,
+      'Furnace ring canvas unavailable'
+    );
+    let bed: RasterSurface | undefined;
+    try {
+      bed = prepareRasterSurface(
+        bedHalfWidth * 2,
+        bedHalfHeight * 2,
+        undefined,
+        'Furnace bed canvas unavailable'
+      );
+      outer.context.setTransform(dpr, 0, 0, dpr, outerHalf, outerHalf);
+      drawFurnaceOuterRing(outer.context, 0, 0, radius, line);
+      bed.context.setTransform(dpr, 0, 0, dpr, bedHalfWidth, bedHalfHeight);
+      strokeFireBed(bed.context, 0, 0, radius, line);
+      art = {
+        radius,
+        dpr,
+        glow,
+        outer,
+        bed,
+        outerHalf,
+        bedHalfWidth,
+        bedHalfHeight,
+      };
+      staticFurnaceArtwork = art;
+    } catch (error) {
+      discardRasterSurface(outer);
+      if (bed) {
+        discardRasterSurface(bed);
+      }
+      throw error;
+    }
+  }
   const mouthY = y + radius * 0.42;
-  strokeFireBed(ctx, x, mouthY, radius, line);
-  strokeFlames(ctx, x, mouthY, y - radius, radius, seconds);
-  strokeEmbers(ctx, x, mouthY, radius, seconds, line);
+  ctx.save();
+  try {
+    ctx.shadowBlur = 0;
+    ctx.drawImage(
+      art.outer.canvas,
+      x - art.outerHalf / dpr,
+      y - art.outerHalf / dpr,
+      art.outer.canvas.width / dpr,
+      art.outer.canvas.height / dpr
+    );
+  } finally {
+    ctx.restore();
+  }
+  // Alpha changes before Canvas composites source and shadow; never fade a flattened ring.
+  strokeFurnaceIntake(ctx, x, y, radius, line, 0.78 + Math.sin(now / 850) * 0.12);
+  ctx.save();
+  try {
+    ctx.shadowBlur = 0;
+    ctx.drawImage(
+      art.bed.canvas,
+      x - art.bedHalfWidth / dpr,
+      mouthY - art.bedHalfHeight / dpr,
+      art.bed.canvas.width / dpr,
+      art.bed.canvas.height / dpr
+    );
+  } finally {
+    ctx.restore();
+  }
+  strokeFlames(ctx, x, mouthY, y - radius, radius, now / 1000);
+  strokeEmbers(ctx, x, mouthY, radius, now / 1000, line);
 }
 
 /** Open fire bed the tongues rise from; the flat lip keeps the flame grounded. */
@@ -711,7 +870,7 @@ function drawFoundations(viewerPosition: Position, pass: 'artwork' | 'labels'): 
         screen.y,
         radius,
         lot.name,
-        `SCORE ${lot.cost.toLocaleString('en-US')}`
+        `SCORE ${formatPoints(lot.cost)}`
       );
     }
   }

@@ -264,6 +264,32 @@ describe('painted HUD composition', () => {
     expect(texts.some((row) => row.text.includes('crystal 0/20'))).toBe(true);
   });
 
+  test('banked points keep one grouping instead of following the viewer locale', async () => {
+    const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
+    const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
+    const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
+    const { formatPoints } = await import('../../../src/utils/formatPoints');
+    // The concern only exists because locales disagree; if these matched, every
+    // surface would already agree and this guard would prove nothing.
+    expect(new Intl.NumberFormat('de-DE').format(24_000)).not.toBe(formatPoints(24_000));
+
+    const player = PlayerManager.getInstance().createLocalPlayer('scout');
+    const ctx = canvasContext();
+    const { texts } = recordCanvas(ctx);
+    // Spying after setup: the pinned formatter is built once at module load, so
+    // any remaining call here is a surface reading the viewer's locale instead.
+    const viewerLocale = vi.spyOn(Number.prototype, 'toLocaleString');
+    player.score = 24_000;
+    drawScoreOverlay(
+      ctx,
+      computeHudLayout(ctx.canvas, { touchControls: false }),
+      ctx.canvas,
+      player
+    );
+    expect(texts.some((row) => row.text === `Bank ${formatPoints(24_000)}`)).toBe(true);
+    expect(viewerLocale).not.toHaveBeenCalled();
+  });
+
   test('phone status fits two lines and leaves room for the action row', async () => {
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');

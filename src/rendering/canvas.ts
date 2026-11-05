@@ -1,6 +1,7 @@
 import { SHIP_ABILITY } from '../../shared/shipKits';
 import { isActiveScanner } from '../../shared/surveyScan';
-import type { Position } from '../../shared-types';
+import { getTerrainField } from '../../shared/terrainField';
+import type { ContourLockState, Position } from '../../shared-types';
 import { PALETTE } from '../constants';
 import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
@@ -19,8 +20,14 @@ import {
   drawThrusterAtPosition,
 } from '../entities/ship/shipRenderer';
 import { shouldDrawShipHull } from '../entities/ship/shipUtils';
+import { getWorldCampaign } from '../network/worldCampaign';
+import { getWorldExploration, getWorldRemains, worldFurnaces } from '../network/worldExploration';
+import { getContourBridges } from '../physics/terrain/contourBridgeSession';
+import { findContourCapture } from '../physics/terrain/contourCapture';
+import { getRolyPolys } from '../physics/terrain/rolyPolySession';
+import { getSpiderField } from '../physics/terrain/spiderSession';
 import { drawSchematicEquipHint } from '../ui/schematicEquipHint';
-import { drawBeltEncounters } from './beltRenderer';
+import { drawBeltEncounters, getBeltRecovery } from './beltRenderer';
 import { drawFieryBoundary } from './boundaryRenderer';
 import { drawCampaign } from './campaignRenderer';
 import { paintOpaqueBackground } from './canvasBackground';
@@ -47,12 +54,14 @@ import { drawScoreOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawMiniMap } from './hud/minimap';
+import { drawNavigationJourney } from './navigationJourney';
 import { drawWorldRemains } from './remainsRenderer';
 import { drawRicochetCourt } from './ricochetCourtRenderer';
 import { drawRolyPolys } from './rolyPolyRenderer';
 import { drawRouteWaypoints } from './routeWaypoints';
 import { drawShipLighting } from './shipLighting';
-import { drawTerrainSpiders } from './spiderRenderer';
+import { simpleScanNavigation } from './simpleScanNavigation';
+import { drawSpiderDanger, drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield, visibleStarTiles } from './starfield';
 
 /** Mineral Scan widens the view to the whole scanned disc plus this margin. */
@@ -85,32 +94,43 @@ function drawWorldLayers(
   roids: ReturnType<RoidBelt['getRoids']>,
   loot: ReturnType<LootField['getAll']>,
   satellitePickups: ReturnType<SatellitePickupManager['getAll']>,
-  allPlayers: Player[]
+  allPlayers: Player[],
+  navigationTarget: ContourLockState | null
 ): void {
   const currShip = currPlayer.ship;
   const localId = currPlayer.id;
   const viewport = canvasManager.getViewportSize();
 
-  const gpuContours = canvasManager.canDrawGpuRear()
-    ? visibleContourLayers(currShip.position)
-    : undefined;
-  const gpuDrawn =
-    gpuContours !== undefined &&
-    canvasManager.drawGpuRear({
-      position: currShip.position,
-      contours: gpuContours,
-      starTiles: visibleStarTiles(currShip.position),
-    }) &&
-    canvasManager.composeGpuRear(ctx);
-  if (!gpuDrawn) {
-    paintOpaqueBackground(ctx);
-    drawStarfield(currShip.position);
-    drawIsoContours(currShip.position);
-  } else if (gpuContours !== undefined && canvasManager.requiresNativeGpuContours()) {
-    canvasManager.recordNativeGpuContours(drawContourLayers(currShip.position, gpuContours));
+  if (!canvasManager.drawScanScenery(currShip.position)) {
+    const gpuContours = canvasManager.canDrawGpuRear()
+      ? visibleContourLayers(currShip.position, viewport, canvasManager.getPlayfieldScale())
+      : undefined;
+    const gpuDrawn =
+      gpuContours !== undefined &&
+      canvasManager.drawGpuRear({
+        position: currShip.position,
+        contours: gpuContours,
+        starTiles: visibleStarTiles(currShip.position, viewport, canvasManager.getPlayfieldScale()),
+      }) &&
+      canvasManager.composeGpuRear(ctx);
+    if (!gpuDrawn) {
+      paintOpaqueBackground(ctx);
+      drawStarfield(ctx, currShip.position, viewport, canvasManager.getPlayfieldScale());
+      drawIsoContours(ctx, currShip.position, viewport, canvasManager.getPlayfieldScale());
+    } else if (gpuContours !== undefined && canvasManager.requiresNativeGpuContours()) {
+      canvasManager.recordNativeGpuContours(
+        drawContourLayers(
+          ctx,
+          currShip.position,
+          viewport,
+          canvasManager.getPlayfieldScale(),
+          gpuContours
+        )
+      );
+    }
   }
   if (!currShip.exploding && currShip.health > 0 && !currShip.furnaceTransit) {
-    drawContourTrack(currShip.position, currShip.angle, currShip.contourLock);
+    drawContourTrack(currShip.position, navigationTarget, currShip.contourLock !== null);
   }
   drawShipLighting(
     currShip.position,
@@ -242,17 +262,78 @@ export function drawGame(currPlayer: Player, currRoidBelt: RoidBelt, allPlayers:
   const loot = LootField.getInstance().getAll();
   const satellitePickups = SatellitePickupManager.getInstance().getAll();
   const localId = currPlayer.id;
+  const navigable = !currShip.exploding && currShip.health > 0 && !currShip.furnaceTransit;
+  // Resolve against the genuine flight viewport, before world painters enlarge it for Scan.
+  const navigationTarget = navigable
+    ? (currShip.contourLock ?? findContourCapture(currShip.position, currShip.angle))
+    : null;
 
-  // Always close the zoomed layer so a painter failure cannot leave the HUD viewport inflated.
-  canvasManager.beginWorldLayers(ctx);
-  let worldLayersCompleted = false;
-  try {
-    drawWorldLayers(ctx, currPlayer, roids, loot, satellitePickups, allPlayers);
-    worldLayersCompleted = true;
-  } finally {
-    canvasManager.endWorldLayers(ctx, !worldLayersCompleted);
+  if (canvasManager.usesSimpleScan()) {
+    const spiders = getSpiderField();
+    canvasManager.drawSimpleScan(
+      {
+        localPlayer: currPlayer,
+        players: allPlayers,
+        roids,
+        loot,
+        lootBlast: LootField.getInstance().getBlast(),
+        pickups: satellitePickups,
+        spiders,
+        recovery: getBeltRecovery(),
+        rolyPolys: getRolyPolys(),
+        bridges: getContourBridges(),
+        remains: getWorldRemains(),
+        campaign: getWorldCampaign(),
+        terrain: getTerrainField(),
+        furnaces: worldFurnaces,
+        exploration: getWorldExploration(),
+      },
+      performance.now()
+    );
+    // Accurate nearby capture/hop lines remain visible over the coarse distant terrain.
+    const localLines = navigable
+      ? simpleScanNavigation(currShip.position, viewport, canvasManager.getPlayfieldScale())
+      : [];
+    canvasManager.beginWorldLayers(ctx);
+    let localLayersCompleted = false;
+    try {
+      drawContourLayers(
+        ctx,
+        currShip.position,
+        canvasManager.getViewportSize(),
+        canvasManager.getPlayfieldScale(),
+        localLines
+      );
+      if (navigable) {
+        drawContourTrack(currShip.position, navigationTarget, currShip.contourLock !== null);
+      }
+      localLayersCompleted = true;
+    } finally {
+      canvasManager.endWorldLayers(ctx, !localLayersCompleted);
+    }
+    drawSpiderDanger(ctx, viewport, currShip.position, spiders, localId, navigable);
+    drawHeadingCue(ctx, viewport, currShip);
+    if (shouldDrawShipHull(currShip) && !currShip.exploding) {
+      drawSchematicEquipHint(
+        ctx,
+        viewport.width / 2,
+        viewport.height / 2,
+        currShip.r * canvasManager.getPlayfieldScale()
+      );
+    }
+  } else {
+    // Always close the zoomed layer so a painter failure cannot leave the HUD viewport inflated.
+    canvasManager.beginWorldLayers(ctx);
+    let worldLayersCompleted = false;
+    try {
+      drawWorldLayers(ctx, currPlayer, roids, loot, satellitePickups, allPlayers, navigationTarget);
+      worldLayersCompleted = true;
+    } finally {
+      canvasManager.endWorldLayers(ctx, !worldLayersCompleted);
+    }
   }
 
+  drawNavigationJourney(currPlayer, roids, allPlayers);
   const hudLayout = hudLayoutForCanvas(viewport);
   const otherPlayers = allPlayers.filter((player) => player.id !== localId);
   drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups, otherPlayers);

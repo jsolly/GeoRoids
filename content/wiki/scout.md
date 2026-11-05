@@ -1,7 +1,7 @@
 ---
 title: Scout
 category: Ships
-summary: A nimble scout with shared mineral scans, mobile probe beacons, and furnace construction.
+summary: A compact scout with shared mineral scans, mobile probe beacons, and furnace construction.
 order: 30
 related:
   - content/wiki/controls.md
@@ -15,7 +15,9 @@ media:
 
 ## Mineral scan
 
-Scout starts with Mineral Scan and turns faster than Hauler. Select Mineral Scan in Inventory, then press E or Scan to send one pulse that shares nearby mineral classification and earns banked credit whenever a scanned rock is delivered (barren rocks pay only a token amount). The pulse also reveals the chart across its whole range and repels spiders in range while it lasts, then the scan must recharge before it can fire again.
+Scout starts with Mineral Scan and shares Hauler's acceleration, cruise speed, and turn rate. Select Mineral Scan in Inventory, then press E or Scan to send one pulse that shares nearby mineral classification and earns banked credit whenever a scanned rock is delivered (barren rocks pay only a token amount). The pulse also reveals the chart across its whole range and repels spiders in range while it lasts, then the scan must recharge before it can fire again.
+
+On supported low-end devices, Scan uses a simpler wide view with coarse distant terrain and clear mineral symbols. Hazards, ships, shots and controls stay live, and detailed scenery returns as the camera comes back to flight.
 
 ## Survey probe
 

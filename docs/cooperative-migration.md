@@ -2,7 +2,7 @@
 
 The code ships inactive against an existing world. Ordinary startup reads the
 optional schema; it never creates the campaign tables, backfills progress or
-activates features. Cargo speed and tool travel tuning do not need this migration.
+activates features. Tool travel tuning does not need this migration.
 
 John owns all production migration, activation, configuration and recovery
 operations. No production operation was run while preparing this change. Review

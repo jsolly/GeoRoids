@@ -27,7 +27,8 @@ export const GAME = {
 const EXPLODE_DURATION_FRAMES = 18;
 
 export const SHIP = {
-  // Movement
+  // Shared Scout and Hauler movement, independent of saved mass and cargo.
+  TURN_SPEED: 540,
   THRUST: 5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   MAX_VELOCITY: 2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   SIZE: 30, // Scout / classic hull height in pixels. Hauler uses kit size.

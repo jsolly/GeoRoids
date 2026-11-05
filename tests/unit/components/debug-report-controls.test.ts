@@ -28,10 +28,16 @@ test('typing a report and sending crosses browser storage before HTTP and expose
     },
   };
   const snapshot: DebugDiagnosticSnapshot = {
-    state: { version: 1, capturedAt: '2026-10-15T12:00:00.000Z', sessionId: 'session' },
+    state: {
+      version: 1,
+      capturedAt: '2026-10-15T12:00:00.000Z',
+      sessionId: 'session',
+      input: { liveTouches: 0 },
+    },
     recentLogs: [],
   };
   let sending: Promise<void> | undefined;
+  let submittedDiagnostics: DebugDiagnosticSnapshot | undefined;
   const views = writable<DebugReportClientView>({
     state: 'idle',
     message: '',
@@ -50,10 +56,11 @@ test('typing a report and sending crosses browser storage before HTTP and expose
         return view.current;
       },
       onsend(description: string, diagnostics: DebugDiagnosticSnapshot) {
+        submittedDiagnostics = diagnostics;
         sending = client.send(description, diagnostics);
       },
       onretry: () => {},
-      onnew: () => {},
+      onnew: async () => false,
       onclose: () => {},
     },
   });
@@ -75,6 +82,15 @@ test('typing a report and sending crosses browser storage before HTTP and expose
   await sending;
   await tick();
   expect(request).not.toHaveBeenCalled();
+  expect(submittedDiagnostics?.state).toMatchObject({
+    capturedAt: '2026-10-15T12:00:00.000Z',
+    input: {
+      liveTouches: 0,
+      reportForm: { counts: { input: 1 }, field: { valueLength: 19 } },
+    },
+  });
+  expect(JSON.stringify(submittedDiagnostics)).not.toContain('Ship stopped moving');
+  expect(snapshot.state['input']).toEqual({ liveTouches: 0 });
   expect(document.querySelector('[role="status"]')?.textContent).toContain('Not saved');
   expect(field.disabled).toBe(true);
   expect(document.querySelector('pre')?.textContent).toContain('Ship stopped moving');
@@ -116,7 +132,7 @@ test.each(['pending', 'blocked', 'delivered'] as const)(
         view: restoredView,
         onsend: () => {},
         onretry: () => {},
-        onnew: () => {},
+        onnew: async () => false,
         onclose: () => {},
       },
     });

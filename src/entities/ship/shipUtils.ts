@@ -1,5 +1,4 @@
 import { GAME, SHIP } from '../../../shared/constants/gameplay';
-import { GROWTH, maxVelocityFromMass, thrustScaleFromMass } from '../../../shared/shipGrowth';
 import type { Position, Velocity } from '../../../shared-types';
 import { addPositions, createPositionFromAngle } from '../../utils/mathUtils';
 
@@ -26,12 +25,6 @@ interface SharedShipCombatVisuals extends ShipSpawnProtectionState {
 
 interface ShipImpactFlashState {
   impactFlashFrames: number;
-}
-
-interface ShipLethalHitState extends ShipImpactFlashState {
-  health: number;
-  exploding: boolean;
-  takeDamage(amount: number): void;
 }
 
 /** Only a positive timer is an active respawn countdown. Omitted or 0 is not dead. */
@@ -88,14 +81,6 @@ export function applySharedShipRespawnCue(
   }
 }
 
-/** Predict wall contact while the server confirms the life loss. */
-export function applyShipBoundaryDeath(ship: ShipLethalHitState): void {
-  applyShipImpactFlash(ship);
-  if (!ship.exploding) {
-    ship.takeDamage(ship.health);
-  }
-}
-
 interface OverlayHoldShip extends ShipSpawnProtectionState {
   exploding: boolean;
   health: number;
@@ -106,7 +91,7 @@ interface OverlayHoldShip extends ShipSpawnProtectionState {
   releaseContourLock(): void;
 }
 
-/** True when a ship must not report or receive collision damage. */
+/** True when a ship must not register a collision impact. */
 export function isShipCollisionImmune(ship: ShipCollisionState): boolean {
   return ship.exploding || ship.health <= 0 || ship.blinkCount > 0 || ship.movementLocked === true;
 }
@@ -204,27 +189,20 @@ export function calculateLaserStartPosition(
 /**
  * Thrust / friction step for ships carrying combat knockback.
  * Callers pass their own friction so local and server-owned policies stay explicit.
- * Scalar mass/kit arguments keep saved ship mass and Hauler thrust on the same
- * formula without allocating an options object on every frame.
  */
 export function applyThrustOrFriction(
   velocity: Velocity,
   angle: number,
   thrusting: boolean,
   frictionCoefficient: number,
-  thrust: number = SHIP.THRUST,
-  mass: number = GROWTH.BASE_MASS,
   maxVelocity: number = SHIP.MAX_VELOCITY
 ): Velocity {
   if (thrusting) {
-    const thrustScale = thrustScaleFromMass(mass);
-    const massMax = maxVelocityFromMass(mass);
-    const nextX = velocity.x + (Math.cos(angle) * thrust * thrustScale) / GAME.FPS;
-    const nextY = velocity.y - (Math.sin(angle) * thrust * thrustScale) / GAME.FPS;
+    const nextX = velocity.x + (Math.cos(angle) * SHIP.THRUST) / GAME.FPS;
+    const nextY = velocity.y - (Math.sin(angle) * SHIP.THRUST) / GAME.FPS;
     const currentSpeed = Math.hypot(nextX, nextY);
-    const speedCap = maxVelocity * (massMax / SHIP.MAX_VELOCITY);
-    if (currentSpeed > speedCap) {
-      const scale = speedCap / currentSpeed;
+    if (currentSpeed > maxVelocity) {
+      const scale = maxVelocity / currentSpeed;
       return { x: nextX * scale, y: nextY * scale };
     }
     return { x: nextX, y: nextY };

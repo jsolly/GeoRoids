@@ -2,8 +2,11 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
+import { checkBoundaryCollision } from '../../../../shared/boundary';
 import { SHIP } from '../../../../shared/constants/gameplay';
+import { hullRadiusForKit } from '../../../../shared/shipKits';
 import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../../shared/snapshotProtocol';
+import { WORLD } from '../../../../shared/world';
 import type {
   AsteroidData,
   Position,
@@ -34,9 +37,6 @@ export const EXPLOSION_FRAMES = SHIP.EXPLODE_DURATION_FRAMES;
 /** GameEngine schedules this at death; the explosion runs in parallel. */
 export const RESPAWN_COUNTDOWN_FRAMES = SHIP.RESPAWN_DELAY_FRAMES;
 export const SPAWN_PROTECTION_FRAMES = SHIP.INVINCIBILITY_DURATION_FRAMES;
-/** Circular arena used by the server (`WORLD_BOUNDARY` / EntityManager). */
-export const ARENA_RADIUS = 3100;
-
 export interface Pilot {
   id: string;
   name: string;
@@ -299,12 +299,45 @@ export class GameServerWorld {
     this.core.handleClientMessage(message, pilot.socket);
   }
 
+  /**
+   * Fly the pilot into the arena wall for real: park the hull on the rim and
+   * report the overlapping pose a live client reports there. The server refuses
+   * that pose and reads the wall from its own geometry, exactly as in play —
+   * local death prediction no longer silences the report.
+   */
   hitBoundary(pilot: Pilot): void {
+    const actor = this.entity(pilot);
+    if (actor.overlayHold === true) {
+      throw new Error(`${pilot.name} cannot fly into the wall while a menu holds it`);
+    }
+    const now = this.engine.getServerTime();
+    const rim = { x: WORLD.radius - hullRadiusForKit(actor.kitId), y: 0 };
+    if (!this.engine.playerMotion.placeActorForTesting(pilot.id, rim, now)) {
+      throw new Error(`${pilot.name} has no current motion session`);
+    }
+    const parked = this.entity(pilot);
+    const motion = parked.playerMotion;
+    if (!motion) {
+      throw new Error(`${pilot.name} lost its motion session at the wall`);
+    }
+    const outward = this.engine.playerMotion.legalSpeed(parked, now) * 0.9;
+    const hullRadius = hullRadiusForKit(actor.kitId);
+    const contact = { x: rim.x + outward, y: 0 };
+    // The premise this helper depends on: the reported pose actually overlaps the
+    // wall. Fail loudly rather than quietly not colliding.
+    if (!checkBoundaryCollision(contact, hullRadius)) {
+      throw new Error(`${pilot.name} cannot reach the wall in one legal step`);
+    }
     this.send(pilot, {
-      type: 'collisionDamage',
+      type: 'update',
+      id: pilot.id,
       data: {
-        targetPlayerId: pilot.id,
-        attackerId: 'boundary',
+        position: contact,
+        velocity: { x: outward, y: 0 },
+        angle: 0,
+        thrusting: true,
+        motionEpoch: motion.epoch,
+        motionSequence: motion.ack + 1,
       },
     });
   }

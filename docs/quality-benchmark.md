@@ -71,12 +71,13 @@ Its dependency exceptions identify `concurrently`, `markdownlint-cli2`, and
 includes the benchmark modules added after this measurement. ts-prune uses `--error`; its default exit status
 would otherwise permit findings. [ts-prune CLI](https://github.com/nadeesha/ts-prune)
 
-Run both gates from the repository:
+Run the three gates from the repository:
 
 ```sh
 cd /Users/johnsolly/code/GeoRoids
 npm run prune
 ```
 
-The individual commands are `npm run check:knip` and `npm run check:ts-prune`.
-Both are required by the pre-commit gate and GitHub CI.
+The individual commands are `npm run check:knip`, `npm run check:ts-prune` and
+`npm run check:members`.
+All three are required by the pre-commit gate and GitHub CI.

@@ -183,9 +183,8 @@ function prepareRoidSilhouetteSprites(
   ctx: CanvasRenderingContext2D,
   scale: number
 ): RoidSilhouetteSprites {
-  const transform = ctx.getTransform();
-  const dpr = Math.hypot(transform.a, transform.b);
   const glow = resolveGlow(VISUAL.ROID_GLOW);
+  const dpr = canvasManager.getRasterPixelRatio(ctx, glow);
   if (
     !roidSilhouetteSprites ||
     roidSilhouetteSprites.dpr !== dpr ||
@@ -512,7 +511,7 @@ function drawRoidShatter(
   );
 }
 
-export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
+export function drawRoidsRelative(ship: Ship, roids: readonly Roid[]): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
     return;

@@ -95,7 +95,7 @@
     "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",
     "@vitest/coverage-v8": "5.0.5",
-    "bits-ui": "^2.20.3",
+    "bits-ui": "^2.20.4",
     "canvas": "^3.2.3",
     "cn": "0.4.0",
     "concurrently": "^10.0.6",

@@ -311,6 +311,38 @@ backoff and jitter, respecting Todoist's retry delay. Do not complete unrelated
 tasks to make space. A caller can check only its own report state using the
 receipt capability; there is no public report-content endpoint.
 
+`GET /health` also exposes `debugReportPosts`, aggregate observation of exact
+`POST /debug-reports` attempts, including rejected origins and invalid bodies.
+Queries do not change the matched path; trailing-slash POSTs, receipt GETs and
+preflight requests are excluded. Observation never changes a response or the
+existing report quotas. It adds no disk writes, outbound requests or per-request
+logs. Gameplay and player controls are unchanged, so no Wiki update is needed.
+
+Counters reset on process restart; `startedAt` is epoch milliseconds. `requests`
+counts starts; `outcomes` counts completed responses or aborted connections, so
+in-flight requests explain any difference. `accepted` means HTTP 202, including
+idempotent retries, not new stored reports or successful Todoist delivery.
+`rateLimited` means an existing HTTP 429 response; the observer enforces nothing.
+
+`ipMinuteBursts` counts source-IP/minute pairs across UTC-aligned fixed 60-second
+windows since startup, including the active window. Each pair moves between
+count bands as requests arrive. `peakRequestsPerIpMinute` records the maximum;
+`requestsAboveSixtyPerIpMinute` counts tracked attempts after the sixtieth in a
+window. Sixty is an observation marker, not an approved enforcement threshold.
+Addresses never appear in the health response. Identity follows the report
+handler: Railway uses its validated `X-Real-IP`; local requests use the socket
+address and ignore forwarded headers. Existing ingress-trust limitations still
+apply. `unattributedRequests` counts attempts without a valid identity.
+
+At most 2,048 distinct addresses are tracked per minute. Additional addresses
+contribute to request/outcome totals and `capacityExcludedRequests`, but not the
+burst distribution. Existing tracked addresses continue counting. Any excluded
+or unattributed attempts make burst measurements incomplete, not zero. Save
+health snapshots with their `releaseId`, `startedAt` and capture time across a
+representative traffic period; restarts lose unsaved observation history.
+Counters are local to one process, not a distributed or per-Vercel-region limit.
+Review shared-IP traffic and existing rejections before any enforcement proposal.
+
 For release acceptance, submit one explicitly identified test report through
 `/debug`, read the resulting task and all comment pages through the Todoist
 connector, and verify the reconstructed UTF-8 size and SHA-256 against the

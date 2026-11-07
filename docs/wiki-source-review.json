@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:7499d6311193e05d8e0d91b5cdb332edbb49f19efc4dcec08d7b6a5603f6798e",
+    "server/createServer.ts": "sha256:df33d393615b9b178c590947d32f93d622096f5340cd71b987656c2440c64094",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
@@ -8256,6 +8256,13 @@
       "owners": {
         "package.json": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed the HUD/network diagnostics article against the report HTTP and health wiring. Only aggregate backend health observation changes; player controls, report responses, gameplay rules and all demonstrations remain unchanged. Independent source review is clean; lint, types and all 2484 unit/component tests passed. No desktop/mobile Wiki smoke is needed for unchanged UI; no media changed.",
+      "sources": ["server/createServer.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

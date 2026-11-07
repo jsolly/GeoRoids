@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { MAX_DEBUG_REPORT_BYTES } from '../../shared/debugReports';
 import type { DebugJsonValue } from '../../shared-types';
 import { DebugReportError, type DebugReportWorker } from './client';
+import { createReportPostObservation } from './postObservation';
 
 const JSON_CONTENT_TYPE = /^application\/json(?:\s*;|$)/iu;
 const REPORT_ID = /^[0-9a-f-]{36}$/iu;
@@ -57,10 +58,11 @@ function clientAddress(req: IncomingMessage, railwayIngress: boolean): string {
 export function createDebugReportHttp(
   worker: DebugReportWorker | undefined,
   options: ReportHttpOptions
-): (req: IncomingMessage, res: ServerResponse) => boolean {
+) {
+  const observation = createReportPostObservation();
   let uploads = 0;
   const statusRequests = new Map<string, { count: number; until: number }>();
-  return (req, res) => {
+  const handle = (req: IncomingMessage, res: ServerResponse): boolean => {
     let pathname: string;
     try {
       pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -70,6 +72,13 @@ export function createDebugReportHttp(
     }
     if (pathname !== '/debug-reports' && !pathname.startsWith('/debug-reports/')) {
       return false;
+    }
+    if (pathname === '/debug-reports' && req.method === 'POST') {
+      const supplied = options.railwayIngress ? req.headers['x-real-ip'] : req.socket.remoteAddress;
+      const address = typeof supplied === 'string' && isIP(supplied) ? supplied : undefined;
+      const complete = observation.start(address);
+      res.once('finish', () => complete(res.statusCode));
+      res.once('close', () => complete(null));
     }
     res.setHeader('Vary', 'Origin');
     const origin = req.headers.origin;
@@ -177,4 +186,5 @@ export function createDebugReportHttp(
     })();
     return true;
   };
+  return { handle, observation: observation.read };
 }

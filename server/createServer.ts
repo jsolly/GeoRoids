@@ -132,7 +132,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     if (pathname === '/debug' || pathname?.startsWith('/debug/')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     }
-    if (reportHttp(req, res)) {
+    if (reportHttp.handle(req, res)) {
       return;
     }
     // Add CORS headers for production
@@ -165,6 +165,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         JSON.stringify({
           ...health.body,
           debugReports: reportWorker?.diagnostics() ?? { enabled: false },
+          debugReportPosts: reportHttp.observation(),
         })
       );
       return;

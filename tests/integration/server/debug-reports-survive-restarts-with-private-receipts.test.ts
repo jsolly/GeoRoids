@@ -101,6 +101,7 @@ test('a disconnected browser saves through HTTP, then retries after server resta
   expect(health.status).toBe(200);
   expect(await health.json()).toMatchObject({
     debugReports: { blocked: 1 },
+    debugReportPosts: { requests: 1, outcomes: { accepted: 1 } },
     world: { players: 0 },
   });
 });
@@ -124,6 +125,9 @@ test('invalid origins and malformed reports are refused without making the game 
   expect(malformed.status).toBe(400);
   const health = await fetch(`${origin}/health`);
   expect(health.status).toBe(200);
+  expect(await health.json()).toMatchObject({
+    debugReportPosts: { requests: 2, outcomes: { clientRejected: 2 } },
+  });
   const malformedTargetStatus = await new Promise<number>((resolve, reject) => {
     const req = request(`${origin}/`, { path: '//[/' }, (res) => {
       res.resume();
@@ -134,6 +138,43 @@ test('invalid origins and malformed reports are refused without making the game 
   });
   expect(malformedTargetStatus).toBe(400);
   expect((await fetch(`${origin}/health`)).status).toBe(200);
+});
+
+test('sixty-one rejected POST attempts keep their responses while other report routes stay outside observation', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-report-observation-'));
+  directories.push(directory);
+  const { origin } = await start(join(directory, 'reports.sqlite'));
+  for (let index = 0; index < 61; index++) {
+    const response = await fetch(`${origin}/debug-reports?ignored=private`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain', 'X-Real-IP': `192.0.2.${index + 1}` },
+      body: 'private report content',
+    });
+    expect(response.status).toBe(415);
+    expect(await response.json()).toEqual({ error: 'Reports require application/json' });
+  }
+  for (const path of ['/debug-reports', '/debug-reports/', `/debug-reports/${report.id}`]) {
+    const response = await fetch(`${origin}${path}`);
+    await response.text();
+  }
+  const trailingPost = await fetch(`${origin}/debug-reports/`, { method: 'POST' });
+  expect(trailingPost.status).toBe(405);
+  await trailingPost.text();
+  const health = await fetch(`${origin}/health`);
+  const data = await health.text();
+  expect(JSON.parse(data)).toMatchObject({
+    debugReportPosts: {
+      mode: 'observe-only',
+      requests: 61,
+      outcomes: { accepted: 0, rateLimited: 0, clientRejected: 61, aborted: 0 },
+      unattributedRequests: 0,
+      capacityExcludedRequests: 0,
+    },
+  });
+  expect(data).not.toContain('192.0.2.');
+  expect(data).not.toContain('127.0.0.1');
+  expect(data).not.toContain('private');
+  expect(data).not.toContain(report.receiptToken);
 });
 
 function previewClient(directory: string): string {

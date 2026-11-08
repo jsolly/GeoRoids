@@ -5,7 +5,7 @@
 # The PR head is uploaded to the single Railway `preview` environment, whose game
 # server also serves the built client (GEOROIDS_PREVIEW_CLIENT=1), so one URL runs
 # client and server from the same commit against a disposable world. Last request
-# wins. Vercel stays production-only (vercel.json git.deploymentEnabled); this file
+# wins. Vercel stays production-only (vercel.ts git.deploymentEnabled); this file
 # replaces the fleet vercel-preview.yml template and reuses its /preview matcher.
 #
 # RAILWAY_TOKEN is a Railway project token scoped to the `preview` environment; it

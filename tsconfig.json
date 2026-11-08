@@ -8,6 +8,7 @@
     "config/app/astro.ts",
     "config/app/svelte.ts",
     "config/quality/knip.ts",
+    "vercel.ts",
     "setup",
     "server",
     "server.ts",

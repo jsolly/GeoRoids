@@ -48,7 +48,7 @@ under `tests/`. Give each setting one repository-owned home.
 Required native exceptions remain: package manifests and lockfiles, `.npmrc`,
 `.nvmrc`, `.mise.toml`, Git files, `.worktreeinclude`, `.github/`, native agent
 registrations, the two TypeScript adapters above, `components.json`, `.pages.yml`,
-`src/content.config.ts` and `vercel.json`. Each has an active native consumer.
+`src/content.config.ts` and `vercel.ts`. Each has an active native consumer.
 Railway infrastructure definitions stay in `.railway/`. Application/setup code,
 executable helpers, gameplay data, Wiki provenance/media, fixtures and public
 assets retain their owners. No VS Code setup or editor extension is required.

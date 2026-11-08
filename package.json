@@ -94,6 +94,7 @@
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",
+    "@vercel/config": "0.14.1",
     "@vitest/coverage-v8": "5.0.5",
     "bits-ui": "^2.20.3",
     "canvas": "^3.2.3",

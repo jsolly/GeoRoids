@@ -37,7 +37,7 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.xml': 'application/xml; charset=utf-8',
 };
 
-// Mirrors vercel.json: open clients poll these manifests to detect a new build.
+// Mirrors vercel.ts: open clients poll these manifests to detect a new build.
 const UNCACHED_PATHS = new Set(['/release.json', '/client-assets.json']);
 
 type RequestHandler = (req: IncomingMessage, res: ServerResponse) => void;

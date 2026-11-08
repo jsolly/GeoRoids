@@ -117,7 +117,7 @@ Two separate production deploy targets — client and server do not share a host
 | **Project** | `georoids` (`jsollys-projects`) |
 | **Production URLs** | **Canonical:** <https://www.georoids.com>; **apex:** <https://georoids.com> (redirects to www); **Vercel default:** `https://georoids-jsollys-projects.vercel.app` |
 | **Build** | `npm run build` → `dist/` for local/Railway serving, plus `.vercel/output/` with static files, routes and the shared immutable manifest for Vercel. Astro manages Vite. |
-| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration. Branch pushes do **not** create Preview deployments (`vercel.json` `git.deploymentEnabled`); Vercel is production-only. The opt-in preview path is the [Railway preview](#railway-preview). |
+| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration. Branch pushes do **not** create Preview deployments (`vercel.ts` `git.deploymentEnabled`); Vercel is production-only. The opt-in preview path is the [Railway preview](#railway-preview). |
 | **Local deploy** | None — no `npm run deploy` or CLI deploy step in the release process |
 
 **Required Vercel production env vars:**

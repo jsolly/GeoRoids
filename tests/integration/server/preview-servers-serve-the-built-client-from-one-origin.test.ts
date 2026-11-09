@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { request } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { createServerInstance } from '../../../server/createServer';
+import { config as vercelConfig } from '../../../vercel';
 
 const servers: ReturnType<typeof createServerInstance>[] = [];
 const directories: string[] = [];
@@ -117,10 +118,8 @@ test('a preview server reports a broken client file instead of hiding it as miss
   expect((await fetch(`${origin}/`)).status).toBe(200);
 });
 
-test('preview manifests stay uncached exactly as vercel.json serves them in production', async () => {
-  const vercel: { headers: { source: string; headers: { key: string; value: string }[] }[] } =
-    JSON.parse(await readFile(path.resolve(__dirname, '../../../vercel.json'), 'utf8'));
-  const uncached = vercel.headers
+test('preview manifests stay uncached exactly as vercel.ts serves them in production', async () => {
+  const uncached = (vercelConfig.headers ?? [])
     .filter(({ headers }) =>
       headers.some(({ key, value }) => key === 'Cache-Control' && value === 'no-store')
     )

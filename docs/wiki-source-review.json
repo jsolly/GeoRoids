@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:22b4d4b4fb318807546c9ba69779f73ac661a33774e45a41d94768c6a2e634f8",
+    "package.json": "sha256:6fe47d7438d4c61898b91234a14e02af79bb57867aa7a094a0a2dca9dfae18a8",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -115,7 +115,7 @@
     "server/createServer.ts": "sha256:df33d393615b9b178c590947d32f93d622096f5340cd71b987656c2440c64094",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
-    "server/staticClient.ts": "sha256:76d1794966d9a6a2580c3c5bf8525adc5592e5bae6ed1859c9733cd9b27a77c8",
+    "server/staticClient.ts": "sha256:e68a7c48e159fbae08ef8428bccb87f396ca967b9e3b04e6dac82188ec143dac",
     "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
     "server/world/InlineWorldPersistence.ts": "sha256:aa8a6f7ebbb1ce31afa87d6eae34d262c81765b8fc0788c6853f57e83b7d3828",
@@ -579,7 +579,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:c9d1b85ad4199de57f927af4debc64662986ebf8bf45157426baa613970ba322"
+    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8"
   },
   "reviews": [
     {
@@ -8263,6 +8263,16 @@
       "topics": ["hud-network"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed Vercel config move to vercel.ts: new devDependency @vercel/config, a comment path update in server/staticClient.ts and a tsconfig include. No player rules, generated values or demonstrations change.",
+      "sources": ["package.json", "server/staticClient.ts", "tsconfig.json"],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "tsconfig.json": "field-manual"
+      }
     }
   ]
 }

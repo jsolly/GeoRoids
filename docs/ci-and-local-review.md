@@ -36,7 +36,7 @@ release, runs Semgrep `p/default --error` against the pull-request base, scans
 The `security` job needs those four scanners, runs with `if: always()`, and
 fails unless every one succeeded. That job name is the ruleset check `security`.
 It does not replace the lane secrets scans. Branch protection is unchanged.
-Non-draft pull requests from `solly-agent`, `jsolly`, or `cursor[bot]` arm GitHub squash
+Non-draft pull requests from `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arm GitHub squash
 auto-merge. Hold one by converting it to a draft or by running
 `gh pr merge --disable-auto`. The 30-minute sweep squash-merges the current
 head only after both `ci` and `security` have succeeded.

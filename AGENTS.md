@@ -4,7 +4,7 @@
 
 Ship profile: `vercel-static`.
 
-**Integration: branch → reviewed PR → merge on green `CI / ci`.** A non-draft pull request whose author login is exactly `solly-agent`, `jsolly`, or `cursor[bot]`, with its head branch in this repository, gets GitHub squash auto-merge armed. Convert that pull request to a draft, or run `gh pr merge --disable-auto`, to hold it. Every 30 minutes, and on manual dispatch, a sweep re-arms that auto-merge and squash-merges the current head once `ci` and `security` are green. Auto-merge is limited to those three logins. The workflow uses `AUTO_MERGE_TOKEN` and fails when that secret is absent. Follow [local release instructions](docs/development.md). Agents never push to `main`, change rulesets, or admin-merge.
+**Integration: branch → reviewed PR → merge on green `CI / ci`.** A non-draft pull request whose author login is exactly `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor`, with its head branch in this repository, gets GitHub squash auto-merge armed. `pull_request` events report Cursor as `cursor[bot]`; `gh pr view` reports `app/cursor`. Convert that pull request to a draft, or run `gh pr merge --disable-auto`, to hold it. Every 30 minutes, and on manual dispatch, a sweep re-arms that auto-merge and squash-merges the current head once `ci` and `security` are green. Auto-merge is limited to those logins. The workflow uses `AUTO_MERGE_TOKEN` and fails when that secret is absent. Follow [local release instructions](docs/development.md). Agents never push to `main`, change rulesets, or admin-merge.
 
 Local gate: `npm run gate`; static checks, hook trust/bootstrap fixtures, runner contracts, the complete unit suite, build, and all server integration tests are mandatory. CI runs independent static, runner-contract, Actions-contract, complete code-integration and Wiki media lanes; all must pass. Browser tests and automatic frame-work/constrained-client gates are retired.
 
@@ -244,7 +244,7 @@ Canonical contract: [local CI helper](scripts/ci-verified-tree.sh).
 
 Dependabot PRs run the same `ci` check as every other PR; labels start no runs.
 Agents never approve, rebase, arm or merge a Dependabot PR unless John asks.
-Auto-merge arming is limited to author logins `solly-agent`, `jsolly`, and `cursor[bot]`.
+Auto-merge arming is limited to author logins `solly-agent`, `jsolly`, `cursor[bot]`, and `app/cursor`.
 Skipped and absent checks cannot satisfy required `ci`. Merge only the reviewed
 current head with successful real CI. See the repository workflow and
 [release instructions](docs/development.md).

@@ -1,0 +1,298 @@
+---
+name: Auto-merge
+
+# Arms GitHub squash auto-merge for non-draft pull requests from solly-agent
+# and jsolly whose head branch is in this repository. Convert a pull request
+# to a draft, or run `gh pr merge --disable-auto`, to hold it. The 30-minute
+# sweep re-arms that setting and squash-merges the current head once `ci` and
+# `security` are green. AUTO_MERGE_TOKEN performs every API call. This file
+# never reads GITHUB_TOKEN and never checks out a pull request, so it pins no
+# action.
+'on':
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event.pull_request.number && format('auto-merge-{0}', github.event.pull_request.number) || 'auto-merge-sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    name: auto-merge
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Arm squash auto-merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
+          GH_PROMPT_DISABLED: "1"
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_DRAFT: ${{ github.event.pull_request.draft }}
+          EVENT_AUTHOR: ${{ github.event.pull_request.user.login }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          PR_STATE=""
+          PR_DRAFT=""
+          PR_LOGIN=""
+          PR_HEAD_REPO=""
+          PR_BASE_REPO=""
+          PR_SHA=""
+          PR_ARMED=""
+          PR_URL=""
+
+          fail() {
+            printf '::error::%s\n' "$1" >&2
+            exit 1
+          }
+
+          say() {
+            printf '%s\n' "$1"
+          }
+
+          summarize() {
+            [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
+            printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          require_token() {
+            if [[ -z "${GH_TOKEN:-}" ]]; then
+              fail "AUTO_MERGE_TOKEN is not set. Refusing to fall back to GITHUB_TOKEN."
+            fi
+          }
+
+          author_allowed() {
+            case "$1" in
+              solly-agent | jsolly) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          benign_auto_status() {
+            local message="$1" folded
+            folded=$(printf '%s' "$message" | tr '[:upper:]' '[:lower:]' | tr '\n' ' ')
+            case "$folded" in
+              *'already enabled'* | *'already merged'* | *'clean status'*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          already_merged_status() {
+            local message="$1" folded
+            folded=$(printf '%s' "$message" | tr '[:upper:]' '[:lower:]' | tr '\n' ' ')
+            case "$folded" in
+              *'already merged'*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          head_moved_status() {
+            local message="$1" folded
+            folded=$(printf '%s' "$message" | tr '[:upper:]' '[:lower:]' | tr '\n' ' ')
+            case "$folded" in
+              *'head branch was modified'* | *'does not match'* | *'head sha'*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          command -v gh >/dev/null 2>&1 || fail "gh is required on the runner"
+          [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail "repository name is invalid"
+
+          fetch_pr() {
+            gh api "repos/${REPO}/pulls/${1}" \
+              --jq '[.state, (.draft|tostring), .user.login, (.head.repo.full_name // ""), (.base.repo.full_name // ""), .head.sha, (if .auto_merge == null then "false" else "true" end), .html_url] | @tsv'
+          }
+
+          eligible() {
+            local state="$1" draft="$2" login="$3" head_repo="$4" base_repo="$5"
+            [[ "$state" == "open" && "$draft" == "false" ]] || return 1
+            author_allowed "$login" || return 1
+            [[ -n "$head_repo" && "$head_repo" == "$base_repo" && "$head_repo" == "$REPO" ]] || return 1
+          }
+
+          note_check() {
+            local started="$1" status="$2" conclusion="$3" current="$4"
+            if [[ -z "$started" ]]; then
+              [[ "$status" == "completed" ]] && return 1
+              started='~'
+            fi
+            if [[ -z "$current" || "$started" > "$current" || ("$started" == "$current" && "$conclusion" != "success") ]]; then
+              printf '%s\t%s\t%s\n' "$started" "$status" "$conclusion"
+              return 0
+            fi
+            return 1
+          }
+
+          checks_green() {
+            local sha="$1" lines name started status conclusion picked
+            local ci_time="" ci_status="" ci_conclusion=""
+            local security_time="" security_status="" security_conclusion=""
+            lines=$(gh api --paginate "repos/${REPO}/commits/${sha}/check-runs?per_page=100" \
+              --jq '.check_runs[] | select(.name == "ci" or .name == "security") | [.name, (.started_at // ""), .status, (.conclusion // "")] | @tsv') || return 2
+            while IFS=$'\t' read -r name started status conclusion; do
+              [[ -n "$name" ]] || continue
+              if [[ "$name" == "ci" ]]; then
+                picked=$(note_check "$started" "$status" "$conclusion" "$ci_time") || true
+                if [[ -n "$picked" ]]; then
+                  IFS=$'\t' read -r ci_time ci_status ci_conclusion <<<"$picked"
+                fi
+              elif [[ "$name" == "security" ]]; then
+                picked=$(note_check "$started" "$status" "$conclusion" "$security_time") || true
+                if [[ -n "$picked" ]]; then
+                  IFS=$'\t' read -r security_time security_status security_conclusion <<<"$picked"
+                fi
+              fi
+            done <<<"$lines"
+            [[ "$ci_status" == "completed" && "$ci_conclusion" == "success" && "$security_status" == "completed" && "$security_conclusion" == "success" ]]
+          }
+
+          merge_auto() {
+            local url="$1" output status
+            status=0
+            output=$(gh pr merge --auto --squash "$url" 2>&1) || status=$?
+            if [[ "$status" -eq 0 ]]; then
+              say "Armed squash auto-merge for ${url}"
+              summarize "Armed squash auto-merge for ${url} (${EVENT_NAME})."
+              return 0
+            fi
+            if benign_auto_status "$output"; then
+              say "Auto-merge already settled for ${url}"
+              summarize "Auto-merge already settled for ${url} (${EVENT_NAME})."
+              return 0
+            fi
+            printf '%s\n' "${output//::/:}" >&2
+            return 1
+          }
+
+          merge_direct() {
+            local url="$1" sha="$2" output status
+            status=0
+            output=$(gh pr merge --squash --match-head-commit "$sha" "$url" 2>&1) || status=$?
+            if [[ "$status" -eq 0 ]]; then
+              say "Squash-merged ${url} at ${sha}"
+              summarize "Squash-merged ${url} at ${sha} via ${EVENT_NAME}."
+              return 0
+            fi
+            if already_merged_status "$output"; then
+              say "Pull request already merged: ${url}"
+              summarize "Pull request already merged: ${url} (${EVENT_NAME})."
+              return 0
+            fi
+            if head_moved_status "$output"; then
+              say "Head moved before merge for ${url}; leaving it for the next sweep"
+              summarize "Head moved before merge for ${url}; the next sweep retries."
+              return 0
+            fi
+            printf '%s\n' "${output//::/:}" >&2
+            return 1
+          }
+
+          load_pr() {
+            local number="$1" row
+            row=$(fetch_pr "$number") || return 1
+            [[ -n "$row" ]] || return 1
+            IFS=$'\t' read -r PR_STATE PR_DRAFT PR_LOGIN PR_HEAD_REPO PR_BASE_REPO PR_SHA PR_ARMED PR_URL <<<"$row"
+            if ! eligible "$PR_STATE" "$PR_DRAFT" "$PR_LOGIN" "$PR_HEAD_REPO" "$PR_BASE_REPO"; then
+              say "PR #${number} is not an auto-merge candidate (${EVENT_NAME})"
+              return 2
+            fi
+            [[ "$PR_SHA" =~ ^[0-9a-f]{40}$ ]] || return 1
+            [[ "$PR_URL" == "https://github.com/${REPO}/pull/${number}" ]] || return 1
+          }
+
+          arm_number() {
+            local number="$1" loaded
+            loaded=0
+            load_pr "$number" || loaded=$?
+            if [[ "$loaded" -eq 2 ]]; then
+              return 0
+            fi
+            [[ "$loaded" -eq 0 ]] || return 1
+            merge_auto "$PR_URL"
+          }
+
+          sweep_one() {
+            local number="$1" loaded fresh_state fresh_sha check_status
+            loaded=0
+            load_pr "$number" || loaded=$?
+            if [[ "$loaded" -eq 2 ]]; then
+              return 0
+            fi
+            [[ "$loaded" -eq 0 ]] || return 1
+            if [[ "$PR_ARMED" == "true" ]]; then
+              say "PR #${number} already has auto-merge armed"
+            else
+              merge_auto "$PR_URL" || return 1
+            fi
+            loaded=0
+            load_pr "$number" || loaded=$?
+            if [[ "$loaded" -eq 2 ]]; then
+              say "PR #${number} is no longer an open auto-merge candidate"
+              return 0
+            fi
+            [[ "$loaded" -eq 0 ]] || return 1
+            fresh_state="$PR_STATE"
+            fresh_sha="$PR_SHA"
+            [[ "$fresh_state" == "open" ]] || return 0
+            check_status=0
+            checks_green "$fresh_sha" || check_status=$?
+            if [[ "$check_status" -eq 0 ]]; then
+              merge_direct "$PR_URL" "$fresh_sha" || return 1
+            elif [[ "$check_status" -eq 2 ]]; then
+              say "Could not read ci and security checks for PR #${number}" >&2
+              return 1
+            else
+              say "PR #${number} is waiting for green ci and security on ${fresh_sha}"
+            fi
+          }
+
+          case "$EVENT_NAME" in
+            pull_request)
+              if [[ "$EVENT_DRAFT" == "true" ]]; then
+                say "Draft pull request; not arming"
+                exit 0
+              fi
+              if ! author_allowed "$EVENT_AUTHOR"; then
+                say "Author is not allowlisted; not arming"
+                exit 0
+              fi
+              if [[ -z "$EVENT_HEAD_REPO" || "$EVENT_HEAD_REPO" != "$EVENT_BASE_REPO" || "$EVENT_HEAD_REPO" != "$REPO" ]]; then
+                say "Head repository is not this repository; not arming"
+                exit 0
+              fi
+              require_token
+              [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || fail "pull request number is missing"
+              arm_number "$PR_NUMBER" || fail "could not arm squash auto-merge for PR #${PR_NUMBER}"
+              ;;
+            schedule | workflow_dispatch)
+              require_token
+              numbers=$(gh api --paginate "repos/${REPO}/pulls?state=open&per_page=100" --jq '.[] | .number') || fail "could not list open pull requests"
+              if [[ -z "$numbers" ]]; then
+                say "No open pull requests"
+                exit 0
+              fi
+              failed=0
+              while IFS= read -r number; do
+                [[ -n "$number" ]] || continue
+                [[ "$number" =~ ^[1-9][0-9]*$ ]] || fail "open pull request list has a non-numeric id"
+                if ! sweep_one "$number"; then
+                  failed=1
+                  printf '::error::auto-merge sweep failed for PR #%s\n' "$number" >&2
+                fi
+              done <<<"$numbers"
+              [[ "$failed" -eq 0 ]] || fail "auto-merge sweep failed for one or more pull requests"
+              ;;
+            *)
+              fail "unsupported event ${EVENT_NAME}"
+              ;;
+          esac

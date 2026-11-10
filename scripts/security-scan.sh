@@ -149,7 +149,7 @@ run_pre_push() {
   ensure_tool gate_gitleaks_bin install_gitleaks
   ensure_tool gate_semgrep_bin install_semgrep
   ensure_tool gate_osv_scanner_bin install_osv
-  while IFS= read -r local_ref local_sha _remote_ref remote_sha; do
+  while read -r local_ref local_sha _remote_ref remote_sha; do
     [[ -n "$local_ref" ]] || continue
     if [[ "$local_sha" =~ ^0+$ ]]; then
       continue

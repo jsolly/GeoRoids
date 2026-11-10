@@ -268,8 +268,10 @@ and a separate verified PR in each affected repository.
 
 This repo owns `gate/gate-lib.sh` and `scripts/repo-hooks.py`. Run reviewed
 `scripts/setup-agent-environment.sh` on main to install its outside-worktree
-pre-commit dispatcher. Never set hooksPath to `.git-hooks`: a branch could then
-register executable hooks. See [development and release](docs/development.md).
+dispatcher. That dispatcher registers pre-commit and pre-push only. Pre-push is
+the ranged gitleaks scan plus Semgrep and osv-scanner. Never set hooksPath to
+`.git-hooks`: a branch could then register executable hooks. See
+[development and release](docs/development.md).
 
 ## Agent environment
 

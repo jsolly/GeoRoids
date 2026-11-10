@@ -693,6 +693,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       # Nothing but the checkout runs before the scan: an earlier step could rewrite the git config,
       # PATH, or environment the scan reads history with.
       - name: Secrets scan (range)

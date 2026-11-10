@@ -42,6 +42,9 @@ under `tests/`. Give each setting one repository-owned home.
   selects the actual framework/testing/quality owners and retains Svelte's Vite globs.
 - `quality/yamllint.yaml` and `quality/.markdownlint-cli2.jsonc` are selected by
   the existing YAML command and root-anchored Markdown helper.
+- `security/zizmor.yml` and `security/osv-scanner.toml` own the recorded workflow
+  audit ignores and the osv-scanner advisory exceptions. The security workflow
+  and `scripts/security-scan.sh` select those files.
 - `agents/repository.json` owns hook identity and the trusted file inventory.
   The authenticated upgrade procedure is in [development](../docs/development.md#hook-trust).
 

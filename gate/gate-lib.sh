@@ -81,6 +81,17 @@ GATE_GITLEAKS_VERSION=8.24.2
 GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64=c75ea6f594e0a857efa1220fa08088b55e1465a32ab00cfc7aa2ec64cec031fe
 GATE_GITLEAKS_BIN_SHA256_LINUX_X64=64805175c8f88959587ba6afc58210401088206a27ba582cfbb98791137d6208
 GATE_GITLEAKS_BIN_SHA256_LINUX_ARM64=455494f14c34ee5394fa0eef6af986d0eebbabc16aca5be0bdc9bdd62518eb03
+# Official release binaries, same bytes mise installs. Semgrep is a Python distribution
+# with no single-binary archive, so its pin is the version only.
+GATE_ZIZMOR_VERSION=1.32.0
+GATE_ZIZMOR_BIN_SHA256_DARWIN_ARM64=fd1e0503f98714dac56fb6859ccb8ddbac2dc1eb00562dc9d174c6858994c0f1
+GATE_ZIZMOR_BIN_SHA256_LINUX_X64=04d55fb88e582a8e9a9ce6b4753df723fc44c35e0d1a8e8771db9e017066c6df
+GATE_ZIZMOR_BIN_SHA256_LINUX_ARM64=5056aebea3b0ec5238921c5fd11dae104fdb65589e3ed0a8bb2e06ef85d6e809
+GATE_OSV_SCANNER_VERSION=2.7.1
+GATE_OSV_BIN_SHA256_DARWIN_ARM64=b22c02877a811c8f78956e8643efa554932b7378f590d13f8e97d4e9448a29f3
+GATE_OSV_BIN_SHA256_LINUX_X64=fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
+GATE_OSV_BIN_SHA256_LINUX_ARM64=983d22fbad9724514e3fcc6acc83b5fa64c5ffa6b0d9f510028f22c1b223ff81
+GATE_SEMGREP_VERSION=1.185.0
 
 # Verify bytes from mise before returning a path that a scanner or installer will execute.
 # These are hashes of the binaries extracted from the checksum-verified official release archives.
@@ -136,6 +147,110 @@ gate_gitleaks_bin() {
   return 1
 }
 
+# A version token equal to the pin. Dots are literal, so 2.7.1 does not accept 2.7.10 or 12.7.1.
+gate__version_is() { # <reported> <pin>
+  local reported="$1" pin="$2" escaped
+  escaped="${pin//./\\.}"
+  [[ "$reported" =~ (^|[^0-9])${escaped}([^0-9]|$) ]]
+}
+
+# Checksummed mise binary for a pinned release, or a PATH binary at that version.
+# CI puts the checksum-verified archive binary on PATH; mise installs are checked here.
+gate__pinned_tool() { # <tool> <version> <darwin-arm64> <linux-x64> <linux-arm64> <version-arg>
+  local tool="$1" version="$2" sha_darwin="$3" sha_linux_x64="$4" sha_linux_arm64="$5" version_arg="$6"
+  local bin="" reported="" dir expected actual platform
+  if bin="$(command -v "$tool" 2>/dev/null)"; then
+    reported="$("$bin" "$version_arg" 2>/dev/null)" || reported=""
+    reported="${reported%%$'\n'*}"
+    if gate__version_is "$reported" "$version"; then
+      printf '%s' "$bin"
+      return 0
+    fi
+  fi
+  if command -v mise >/dev/null 2>&1 && dir="$(cd / && mise where "$tool@$version" 2>/dev/null)"; then
+    platform="$(uname -s)/$(uname -m)"
+    case "$platform" in
+      Darwin/arm64) expected="$sha_darwin" ;;
+      Linux/x86_64) expected="$sha_linux_x64" ;;
+      Linux/aarch64|Linux/arm64) expected="$sha_linux_arm64" ;;
+      *) echo "✗ $tool mise binary verification is unsupported on $platform" >&2; return 1 ;;
+    esac
+    if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "✗ $tool mise binary checksum is missing or invalid for $platform" >&2
+      return 1
+    fi
+    for bin in "$dir/$tool" "$dir/bin/$tool"; do
+      if [[ -x "$bin" ]]; then
+        if command -v sha256sum >/dev/null 2>&1; then
+          actual="$(sha256sum "$bin")" || actual=""
+        elif command -v shasum >/dev/null 2>&1; then
+          actual="$(shasum -a 256 "$bin")" || actual=""
+        else
+          echo "✗ $tool mise binary verification requires sha256sum or shasum" >&2
+          return 1
+        fi
+        actual="${actual%% *}"
+        if [[ "$actual" != "$expected" ]]; then
+          echo "✗ $tool mise binary checksum mismatch for $bin ($platform); reinstall $tool@$version with mise" >&2
+          return 1
+        fi
+        printf '%s' "$bin"
+        return 0
+      fi
+    done
+  fi
+  if [[ -n "$reported" ]]; then
+    echo "✗ $tool on PATH is not $version — run: $(gate__cli_hint "$tool")" >&2
+  else
+    echo "✗ required CLI not on PATH: $tool $version — run: $(gate__cli_hint "$tool")" >&2
+  fi
+  return 1
+}
+
+gate_zizmor_bin() {
+  gate__pinned_tool zizmor "$GATE_ZIZMOR_VERSION" \
+    "$GATE_ZIZMOR_BIN_SHA256_DARWIN_ARM64" "$GATE_ZIZMOR_BIN_SHA256_LINUX_X64" \
+    "$GATE_ZIZMOR_BIN_SHA256_LINUX_ARM64" --version
+}
+
+gate_osv_scanner_bin() {
+  gate__pinned_tool osv-scanner "$GATE_OSV_SCANNER_VERSION" \
+    "$GATE_OSV_BIN_SHA256_DARWIN_ARM64" "$GATE_OSV_BIN_SHA256_LINUX_X64" \
+    "$GATE_OSV_BIN_SHA256_LINUX_ARM64" --version
+}
+
+# Semgrep publishes a Python distribution. The gate accepts that exact version and does not
+# hash the interpreter entry point.
+gate_semgrep_bin() {
+  local bin="" reported="" dir
+  if bin="$(command -v semgrep 2>/dev/null)"; then
+    reported="$("$bin" --version 2>/dev/null)" || reported=""
+    reported="${reported%%$'\n'*}"
+    if gate__version_is "$reported" "$GATE_SEMGREP_VERSION"; then
+      printf '%s' "$bin"
+      return 0
+    fi
+  fi
+  if command -v mise >/dev/null 2>&1 && dir="$(cd / && mise where "semgrep@$GATE_SEMGREP_VERSION" 2>/dev/null)"; then
+    for bin in "$dir/semgrep" "$dir/bin/semgrep"; do
+      if [[ -x "$bin" ]]; then
+        reported="$("$bin" --version 2>/dev/null)" || reported=""
+        reported="${reported%%$'\n'*}"
+        if gate__version_is "$reported" "$GATE_SEMGREP_VERSION"; then
+          printf '%s' "$bin"
+          return 0
+        fi
+      fi
+    done
+  fi
+  if [[ -n "$reported" ]]; then
+    echo "✗ semgrep on PATH is not $GATE_SEMGREP_VERSION — run: $(gate__cli_hint semgrep)" >&2
+  else
+    echo "✗ required CLI not on PATH: semgrep $GATE_SEMGREP_VERSION — run: $(gate__cli_hint semgrep)" >&2
+  fi
+  return 1
+}
+
 # Staged secrets scan: gitleaks over the index (what the commit will capture), not a
 # ref range. `--pre-commit --staged` is gitleaks' documented pre-commit mode ("scan
 # staged commits"). Fail-loud if the pinned gitleaks is absent.
@@ -162,6 +277,25 @@ gate_secrets_scan_staged() {
     exit 1
   fi
   GIT_ATTR_SOURCE="$tree" "$gl" git --no-banner --no-color --redact --verbose --pre-commit --staged
+}
+
+# Range scan used by pre-push and the security workflow. An empty argument scans all history.
+# A three-parent merge is refused only for an explicit range: remerge cannot show that merge's
+# unique diff, and full history already contains one historical merge whose tree was checked apart
+# from this helper. Flags match the lane scans in .github/workflows/ci.yml.
+gate_secrets_scan_log() { # [revision-range]
+  local gl range="${1-}" merges
+  gl="$(gate_gitleaks_bin)" || return 1
+  if [[ -n "$range" ]]; then
+    merges="$(git rev-list --min-parents=3 "$range")" || return 1
+    if [[ -n "$merges" ]]; then
+      printf '✗ gitleaks cannot read a merge with three or more parents in %s\n' "$range" >&2
+      return 1
+    fi
+    "$gl" git --no-banner --no-color --redact --verbose --log-opts="--text --diff-merges=remerge --no-color --no-textconv ${range}"
+    return
+  fi
+  "$gl" git --no-banner --no-color --redact --verbose --log-opts="--text --diff-merges=remerge --no-color --no-textconv"
 }
 
 # Markdown lint when any path on stdin (added/changed, one per line) is authored
@@ -252,6 +386,7 @@ gate_begin_commit() { # <repo-name>
      || [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; }; then
     trap 'gate__on_commit_err' ERR
     gate_secrets_scan_staged
+    bash "$ROOT/scripts/security-scan.sh" zizmor
     echo "▶ merge/rebase in progress — skipping the full gate (replayed commits were already gated; CI validates the result)"
     exit 0
   fi
@@ -266,6 +401,7 @@ gate_begin_commit() { # <repo-name>
   # failure also prints the standard "commit aborted" line.
   trap 'gate__on_commit_err' ERR
   gate_secrets_scan_staged
+  bash "$ROOT/scripts/security-scan.sh" zizmor
   gate_markdown_lint_staged
   if gate__docs_only_staged; then
     echo "▶ pre-commit ($GATE_REPO): docs-only change — skipping the full gate."

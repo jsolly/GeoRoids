@@ -29,6 +29,14 @@ Post-merge CI reuses successful PR evidence only for the identical Git tree and
 matching lane. Missing proof reruns that lane; manual dispatch validates normally.
 Dependabot PRs run the same lanes and `ci`; labels start no runs.
 
+`.github/workflows/security.yml` runs on pull requests and is not part of the
+required `ci` aggregate. It scans full history with the same pinned gitleaks
+release, runs Semgrep `p/default --error` against the pull-request base, scans
+`package-lock.json` with osv-scanner, and audits workflows with offline zizmor.
+The `security` job needs those four scanners, runs with `if: always()`, and
+fails unless every one succeeded. That job name is the ruleset check `security`.
+It does not replace the lane secrets scans. Branch protection is unchanged.
+
 ## Local review
 
 Testing commands, deterministic setup, runner ownership, cleanup and evidence

@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 SOURCE = Path(__file__).resolve().parent.parent
 BUNDLE = ('config/agents/repository.json', 'gate/gate-lib.sh', 'gate/hooks/pre-commit',
+          'gate/hooks/pre-push', '.git-hooks/pre-push',
           'scripts/repo-hooks.py', 'scripts/repo-python.sh', 'scripts/setup-agent-environment.sh')
 
 
@@ -40,7 +41,7 @@ class HookTrust(unittest.TestCase):
             shutil.copy2(SOURCE / name, target)
         slug = json.loads((self.root / 'config/agents/repository.json').read_text())['repo']
         self.git('remote', 'add', 'origin', 'https://github.com/' + slug + '.git')
-        (self.root / '.git-hooks').mkdir()
+        (self.root / '.git-hooks').mkdir(exist_ok=True)
         floor = (SOURCE / '.git-hooks/pre-commit').read_text().splitlines()[1]
         hook = self.root / '.git-hooks/pre-commit'
         hook.write_text('#!/usr/bin/env bash\n' + floor + '''
@@ -70,6 +71,23 @@ fi
         self.tool('install', check=True)
         self.hooks = Path(self.git('config', '--get', 'core.hooksPath').stdout.strip())
         self.installed = self.hooks.parent / 'scripts/repo-hooks.py'
+
+    def test_dispatcher_registers_only_pre_commit_and_pre_push(self):
+        self.assertEqual(sorted(path.name for path in self.hooks.iterdir()), ['pre-commit', 'pre-push'])
+        self.assertEqual((self.hooks / 'pre-push').read_bytes(), (self.root / 'gate/hooks/pre-push').read_bytes())
+        self.assertNotEqual((self.hooks / 'pre-push').read_bytes(), (self.root / '.git-hooks/pre-push').read_bytes())
+
+    def test_cursor_wrapper_forwards_only_to_the_installed_dispatcher(self):
+        wrapper = self.scratch / 'cursor-wrapper'
+        wrapper.mkdir()
+        (wrapper / '.cursor-original-hooks-path').write_text(str(self.hooks) + '\n')
+        self.git('config', '--local', 'core.hooksPath', str(wrapper))
+        result = self.dispatch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (wrapper / '.cursor-original-hooks-path').write_text(str(self.scratch / 'missing-hooks') + '\n')
+        result = self.dispatch()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('hooksPath', result.stderr)
 
     def git(self, *args, root=None, check=True):
         return subprocess.run(['git', '-C', str(root or self.root), *args], env=self.env,
@@ -145,8 +163,21 @@ fi
         """Install the frozen real pre-migration helper, then prepare a new candidate."""
         candidate = (self.root / 'scripts/repo-hooks.py').read_bytes()
         marker = self.root / 'config/agents/repository.json'
+        original_marker = marker.read_bytes()
+        slug = json.loads(original_marker)['repo']
         legacy = self.root / '.repo-independent.json'
-        marker.rename(legacy)
+        # The frozen helper's allowlist has no pre-push entry. Write that manifest
+        # explicitly; renaming today's manifest would fail its equality check.
+        legacy_files = {
+            '.git-hooks/pre-commit': 493,
+            'gate/gate-lib.sh': 420,
+            'gate/hooks/pre-commit': 493,
+            'scripts/repo-hooks.py': 493,
+            'scripts/repo-python.sh': 493,
+            'scripts/setup-agent-environment.sh': 493,
+        }
+        marker.unlink()
+        legacy.write_text(json.dumps({'version': 1, 'repo': slug, 'files': legacy_files}) + '\n')
         (self.root / 'scripts/repo-hooks.py').write_bytes((SOURCE / 'scripts/fixtures/repo-hooks-legacy.py').read_bytes())
         self.git('add', '-A')
         self.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'reviewed old format')
@@ -154,7 +185,8 @@ fi
         self.tool('install', check=True)
         self.hooks = Path(self.git('config', '--get', 'core.hooksPath').stdout.strip())
         self.installed = self.hooks.parent / 'scripts/repo-hooks.py'
-        legacy.rename(marker)
+        legacy.unlink()
+        marker.write_bytes(original_marker)
         (self.root / 'scripts/repo-hooks.py').write_bytes(candidate)
         return self.tool('digest', check=True).stdout.strip()
 
@@ -321,6 +353,22 @@ fi
                     with self.assertRaises(ValueError):
                         current.install(root, common, slug, digest, payload)
                 self.assertEqual(config.read_bytes(), before)
+
+    def test_pre_push_forwards_the_remote_and_the_ref_list(self):
+        hook = self.root / '.git-hooks/pre-push'
+        hook.write_text('#!/usr/bin/env bash\nprintf "push-args=%s\\n" "$*"\ncat\n')
+        hook.chmod(0o755)
+        digest = self.tool('digest', check=True).stdout.strip()
+        self.tool('approve', '--digest', digest, check=True)
+        self.tool('install', check=True)
+        self.hooks = Path(self.git('config', '--get', 'core.hooksPath').stdout.strip())
+        result = subprocess.run(
+            [str(self.hooks / 'pre-push'), 'origin', 'https://example.invalid/geo.git'],
+            input='refs/heads/topic aaaa refs/heads/topic bbbb\n',
+            cwd=self.root, env=self.env, text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('push-args=origin https://example.invalid/geo.git', result.stdout)
+        self.assertIn('refs/heads/topic aaaa refs/heads/topic bbbb', result.stdout)
 
 
 

@@ -19,14 +19,25 @@ from urllib.parse import urlsplit
 
 FILES = {
     '.git-hooks/pre-commit': 0o755,
+    '.git-hooks/pre-push': 0o755,
     'gate/gate-lib.sh': 0o644,
     'gate/hooks/pre-commit': 0o755,
+    'gate/hooks/pre-push': 0o755,
     'scripts/repo-hooks.py': 0o755,
     'scripts/repo-python.sh': 0o755,
     'scripts/setup-agent-environment.sh': 0o755,
 }
 MANIFEST = 'config/agents/repository.json'
 LEGACY_MANIFEST = '.repo-independent.json'
+# Frozen pre-push allowlist. Upgrade proof still reads that manifest; current bundles use FILES.
+LEGACY_FILES = {
+    '.git-hooks/pre-commit': 0o755,
+    'gate/gate-lib.sh': 0o644,
+    'gate/hooks/pre-commit': 0o755,
+    'scripts/repo-hooks.py': 0o755,
+    'scripts/repo-python.sh': 0o755,
+    'scripts/setup-agent-environment.sh': 0o755,
+}
 CONTEXT = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
            'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
            'GIT_CEILING_DIRECTORIES', 'GIT_NAMESPACE'}
@@ -90,24 +101,33 @@ def unique_pairs(items):
     return result
 
 
-def manifest(data: bytes, slug: str) -> dict:
+def allowlist(manifest_path: str) -> dict[str, int]:
+    if manifest_path == MANIFEST:
+        return FILES
+    if manifest_path == LEGACY_MANIFEST:
+        return LEGACY_FILES
+    raise ValueError('Unknown manifest path')
+
+
+def manifest(data: bytes, slug: str, files: dict[str, int]) -> dict:
     value = json.loads(data, object_pairs_hook=unique_pairs)
-    if value != {'version': 1, 'repo': slug, 'files': FILES}:
+    if value != {'version': 1, 'repo': slug, 'files': files}:
         raise ValueError('Unknown manifest, repository identity or file allowlist')
     return value
 
 
 def _bundle(root: Path, slug: str, manifest_path: str, ref: str | None = None) -> tuple[str, dict[str, bytes]]:
     """Read one fixed format; historical reads are limited to installed snapshots/ref proof."""
+    files = allowlist(manifest_path)
     if ref is None:
         raw = regular(root, manifest_path, 0o644)
-        manifest(raw, slug)
-        payload = {rel: regular(root, rel, mode) for rel, mode in FILES.items()}
+        manifest(raw, slug, files)
+        payload = {rel: regular(root, rel, mode) for rel, mode in files.items()}
     else:
         raw = git(root, 'show', f'{ref}:{manifest_path}', binary=True)
-        manifest(raw, slug)
+        manifest(raw, slug, files)
         payload = {}
-        for rel, mode in FILES.items():
+        for rel, mode in files.items():
             tree = str(git(root, 'ls-tree', ref, '--', rel))
             if not tree.startswith(f'{0o100000 | mode:o} blob '):
                 raise ValueError('Reviewed bundle file missing or has wrong mode: ' + rel)
@@ -116,7 +136,7 @@ def _bundle(root: Path, slug: str, manifest_path: str, ref: str | None = None) -
         if not tree.startswith('100644 blob '):
             raise ValueError('Reviewed manifest missing or has wrong mode')
     payload[manifest_path] = raw
-    rows = [{'path': rel, 'mode': FILES.get(rel, 0o644),
+    rows = [{'path': rel, 'mode': files.get(rel, 0o644),
              'sha256': hashlib.sha256(data).hexdigest()} for rel, data in sorted(payload.items())]
     digest = hashlib.sha256(json.dumps({'repo': slug, 'files': rows},
                                       sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -193,8 +213,10 @@ def snapshot(parent: Path, digest: str, payload: dict[str, bytes], slug: str) ->
         (staging / 'installation.json').write_text(json.dumps({'version': 2, 'manifest': MANIFEST, 'repo': slug, 'digest': digest}))
         (staging / 'installation.json').chmod(0o600)
         (staging / 'hooks').mkdir(mode=0o700)
-        (staging / 'hooks/pre-commit').write_bytes(payload['gate/hooks/pre-commit'])
-        (staging / 'hooks/pre-commit').chmod(0o755)
+        for name in ('pre-commit', 'pre-push'):
+            target = staging / 'hooks' / name
+            target.write_bytes(payload['gate/hooks/' + name])
+            target.chmod(0o755)
         # Rename publishes all bytes at once. Old configured versions remain usable.
         staging.rename(dest)
     finally:
@@ -225,13 +247,41 @@ def snapshot_bundle(version: Path, slug: str, *, allow_legacy: bool = False) -> 
     return digest, manifest_path
 
 
-def verify_installed(common: Path, slug: str, *, allow_legacy: bool = False) -> Path:
-    configured = str(git(common, 'config', '--local', '--no-includes', '--get', 'core.hooksPath'))
-    hookdir = Path(configured)
+def installed_hookdir(common: Path) -> Path:
+    """Resolve the repository hook directory selected by core.hooksPath.
+
+    Cursor's agent wrapper may own core.hooksPath and record the repository
+    directory in `.cursor-original-hooks-path`. Only that exact forward is accepted.
+    """
+    configured = Path(str(git(common, 'config', '--local', '--no-includes', '--get', 'core.hooksPath')))
     base = common / 'repo-hooks' / 'versions'
-    if not hookdir.is_absolute() or hookdir.parent.parent != base or hookdir.name != 'hooks':
-        raise ValueError('hooksPath does not select this repository common directory')
+
+    def selected(path: Path) -> Path | None:
+        if not path.is_absolute() or path.is_symlink():
+            return None
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError:
+            return None
+        if resolved.parent.parent != base or resolved.name != 'hooks':
+            return None
+        return resolved
+
+    direct = selected(configured)
+    if direct is not None:
+        return direct
+    pointer = configured / '.cursor-original-hooks-path'
+    if pointer.is_file() and not pointer.is_symlink():
+        forwarded = selected(Path(pointer.read_text().strip()))
+        if forwarded is not None:
+            return forwarded
+    raise ValueError('hooksPath does not select this repository common directory')
+
+
+def verify_installed(common: Path, slug: str, *, allow_legacy: bool = False) -> Path:
+    hookdir = installed_hookdir(common)
     version = hookdir.parent
+    base = common / 'repo-hooks' / 'versions'
     if any(p.is_symlink() for p in (common / 'repo-hooks', base, version, hookdir)):
         raise ValueError('Symlinked installed hooks refused')
     snapshot_bundle(version, slug, allow_legacy=allow_legacy)
@@ -243,12 +293,27 @@ def verify_dispatcher(version: Path):
     hookdir = version / 'hooks'
     if hookdir.is_symlink() or not hookdir.is_dir():
         raise ValueError('Unsafe installed dispatcher directory')
-    dispatcher = regular(version, 'hooks/pre-commit', 0o755)
-    if stat.S_IMODE((hookdir / 'pre-commit').stat().st_mode) != 0o755 or dispatcher != regular(version, 'gate/hooks/pre-commit', 0o755):
-        raise ValueError('Installed dispatcher differs from its verified snapshot')
+    # A snapshot records the dispatchers it contains. Current bundles have pre-commit and
+    # pre-push; a previously installed pre-commit-only snapshot stays verifiable.
+    expected = {}
+    for name in ('pre-commit', 'pre-push'):
+        rel = 'gate/hooks/' + name
+        candidate = version / rel
+        if candidate.exists() or candidate.is_symlink():
+            expected[name] = rel
+    if 'pre-commit' not in expected:
+        raise ValueError('Installed dispatcher is missing pre-commit')
+    seen = set()
     for path in hookdir.iterdir():
-        if path.name != 'pre-commit' or path.is_symlink() or not path.is_file():
+        rel = expected.get(path.name)
+        if rel is None or path.is_symlink() or not path.is_file():
             raise ValueError('Unexpected hook in installed dispatcher directory')
+        dispatcher = regular(version, 'hooks/' + path.name, 0o755)
+        if stat.S_IMODE(path.stat().st_mode) != 0o755 or dispatcher != regular(version, rel, 0o755):
+            raise ValueError('Installed dispatcher differs from its verified snapshot')
+        seen.add(path.name)
+    if seen != set(expected):
+        raise ValueError('Installed dispatcher is missing a repository hook')
 
 
 def approve_upgrade(root: Path, common: Path, slug: str, digest: str):
@@ -302,14 +367,21 @@ def install(root: Path, common: Path, slug: str, digest: str, payload: dict[str,
     print('Repository-owned hooks installed: ' + str(hooks))
 
 
-def dispatch(root: Path, common: Path, slug: str, digest: str, payload: dict[str, bytes]):
+def dispatch(root: Path, common: Path, slug: str, digest: str, payload: dict[str, bytes], entry: str = '.git-hooks/pre-commit', hook_args: tuple[str, ...] = ()):
     installed = verify_installed(common, slug)
-    for rel in ['scripts/repo-hooks.py', 'scripts/repo-python.sh', 'gate/hooks/pre-commit']:
-        if (installed / rel).read_bytes() != payload[rel]:
+    for rel in ['scripts/repo-hooks.py', 'scripts/repo-python.sh', 'gate/hooks/pre-commit', 'gate/hooks/pre-push']:
+        installed_copy = installed / rel
+        if not installed_copy.is_file() or installed_copy.is_symlink() or installed_copy.read_bytes() != payload[rel]:
             raise ValueError('Trust implementation changed; run reviewed repository setup before dispatch')
-    # Do not let a worktree override select another dispatcher.
-    effective = str(git(root, 'config', '--type=path', '--get', 'core.hooksPath'))
-    if Path(effective) != installed / 'hooks':
+    # Do not let a worktree override select another dispatcher. The Cursor agent
+    # wrapper may own hooksPath when its pointer names this installed directory.
+    effective = Path(str(git(root, 'config', '--type=path', '--get', 'core.hooksPath')))
+    installed_hooks = (installed / 'hooks').resolve()
+    forwarded = None
+    pointer = effective / '.cursor-original-hooks-path'
+    if pointer.is_file() and not pointer.is_symlink():
+        forwarded = Path(pointer.read_text().strip())
+    if effective.resolve() != installed_hooks and (forwarded is None or forwarded.resolve() != installed_hooks):
         raise ValueError('Worktree hooksPath override is stale; run reviewed repository setup')
     if not trusted(root, slug, digest):
         raise ValueError('Unreviewed hook/setup/library bundle; review and approve exact digest ' + digest)
@@ -331,12 +403,14 @@ def dispatch(root: Path, common: Path, slug: str, digest: str, payload: dict[str
         env['GIT_INDEX_FILE'] = str(index)
     # Snapshot shim sources snapshot library; quality scripts run in the committing root.
     os.chdir(root)
-    os.execve(str(snap / '.git-hooks/pre-commit'), [str(snap / '.git-hooks/pre-commit')], env)
+    target = snap / entry
+    os.execve(str(target), [str(target), *hook_args], env)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['install', 'dispatch', 'verify', 'digest', 'approve', 'approve-upgrade'])
+    parser.add_argument('command', choices=['install', 'dispatch', 'dispatch-push', 'verify', 'digest', 'approve', 'approve-upgrade'])
+    parser.add_argument('hook_args', nargs='*')
     parser.add_argument('--root', type=Path, default=Path.cwd())
     parser.add_argument('--digest')
     args = parser.parse_args()
@@ -366,6 +440,8 @@ def main() -> int:
             if not trusted(root, slug, digest):
                 raise ValueError('Current source bundle is not trusted')
             print('Repository-owned hooks verified')
+        elif args.command == 'dispatch-push':
+            dispatch(root, common, slug, digest, payload, entry='.git-hooks/pre-push', hook_args=tuple(args.hook_args))
         else:
             dispatch(root, common, slug, digest, payload)
     return 0

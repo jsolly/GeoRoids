@@ -1,0 +1,27 @@
+# Pre-existing advisories. A newly published id still fails the scan.
+# None of these is a lockfile-only bump: the parent pin or the lack of a fix
+# would require a dependency upgrade this change does not take.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+reason = "deepmerge 4.3.1 is a direct dependency and the advisory has no fixed release."
+
+[[IgnoredVulns]]
+id = "GHSA-238p-pmpm-9mq7"
+reason = "katex 0.16.47 is dev-only; the fixed release is 0.18.2."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+reason = "minimatch 10.2.5 is dev-only; the fixed release is major 11."
+
+[[IgnoredVulns]]
+id = "GHSA-9wv6-86v2-598j"
+reason = "@vercel/routing-utils pins path-to-regexp exactly at 6.1.0."
+
+[[IgnoredVulns]]
+id = "GHSA-gg6h-894w-4m9c"
+reason = "markdownlint pins re2js exactly at 2.8.6."
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+reason = "@vercel/config still installs zod 3.25.76; the app's own zod is 4.6.6."

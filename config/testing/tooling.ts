@@ -44,6 +44,7 @@ export default defineConfig({
         test: {
           name: 'actions',
           include: [
+            'scripts/auto-merge-contract.test.mjs',
             'scripts/ci-contract.test.mjs',
             'scripts/gate-contract.test.mjs',
             'scripts/review-receipt-contract.test.mjs',

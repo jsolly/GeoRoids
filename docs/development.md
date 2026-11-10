@@ -106,6 +106,14 @@ Merge only when the required CI validates the exact current head. Never push to
 the default branch, weaken rulesets, bypass checks or use an admin merge. Optional
 personal review skills may help, but they are not prerequisites for this flow.
 
+A non-draft pull request from this repository whose author login is exactly
+`solly-agent` or `jsolly` arms GitHub squash auto-merge. Convert the pull request
+to a draft, or run `gh pr merge --disable-auto`, to hold it. The 30-minute sweep
+re-arms that auto-merge and squash-merges with `--match-head-commit` once `ci`
+and `security` have succeeded on the current head. The workflow authenticates
+with `AUTO_MERGE_TOKEN` and fails closed when that secret is absent. Those merges
+start the repository's normal push workflows.
+
 Preserve existing code-only Deploy, production-main-only Vercel and opt-in Preview
 rules. Never trigger a preview merely to validate this migration. Verify the
 intended deployment and exact-release smoke when the repository requires them.

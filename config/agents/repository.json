@@ -3,8 +3,10 @@
   "repo": "jsolly/georoids",
   "files": {
     ".git-hooks/pre-commit": 493,
+    ".git-hooks/pre-push": 493,
     "gate/gate-lib.sh": 420,
     "gate/hooks/pre-commit": 493,
+    "gate/hooks/pre-push": 493,
     "scripts/repo-hooks.py": 493,
     "scripts/repo-python.sh": 493,
     "scripts/setup-agent-environment.sh": 493

@@ -3,3 +3,6 @@
 node = "26"
 gitleaks = "8.24.2"
 uv = "0.12.22"
+zizmor = "1.32.0"
+osv-scanner = "2.7.1"
+semgrep = "1.185.0"

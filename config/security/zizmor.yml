@@ -1,0 +1,20 @@
+---
+# Recorded findings that predate this workflow audit. New workflow files are not
+# listed, so an unpinned action in a new workflow still fails. The ignored
+# workflows keep the major-version tags locked by scripts/ci-contract.test.mjs.
+rules:
+  unpinned-uses:
+    ignore:
+      - ci.yml
+      - coverage.yml
+      - production-smoke.yml
+      - railway-preview.yml
+  dangerous-triggers:
+    ignore:
+      - railway-preview.yml
+  excessive-permissions:
+    ignore:
+      - railway-preview.yml
+  dependabot-cooldown:
+    ignore:
+      - dependabot.yml

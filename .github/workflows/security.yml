@@ -61,3 +61,26 @@ jobs:
           persist-credentials: false
       - name: Audit workflows offline
         run: bash scripts/security-scan.sh zizmor
+
+  # The ruleset requires a check named exactly security. This job is that check.
+  # It runs even when a scanner fails, and it succeeds only when every scanner did.
+  security:
+    name: security
+    if: always()
+    needs: [gitleaks, semgrep, osv-scanner, zizmor]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every scanner to succeed
+        env:
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+          SEMGREP_RESULT: ${{ needs.semgrep.result }}
+          OSV_RESULT: ${{ needs.osv-scanner.result }}
+          ZIZMOR_RESULT: ${{ needs.zizmor.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITLEAKS_RESULT" != success || "$SEMGREP_RESULT" != success ||
+            "$OSV_RESULT" != success || "$ZIZMOR_RESULT" != success ]]; then
+            echo "Security scanners failed: gitleaks=$GITLEAKS_RESULT semgrep=$SEMGREP_RESULT osv-scanner=$OSV_RESULT zizmor=$ZIZMOR_RESULT" >&2
+            exit 1
+          fi

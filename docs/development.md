@@ -107,7 +107,7 @@ the default branch, weaken rulesets, bypass checks or use an admin merge. Option
 personal review skills may help, but they are not prerequisites for this flow.
 
 A non-draft pull request from this repository whose author login is exactly
-`solly-agent` or `jsolly` arms GitHub squash auto-merge. Convert the pull request
+`solly-agent`, `jsolly`, or `cursor[bot]` arms GitHub squash auto-merge. Convert the pull request
 to a draft, or run `gh pr merge --disable-auto`, to hold it. The 30-minute sweep
 re-arms that auto-merge and squash-merges with `--match-head-commit` once `ci`
 and `security` have succeeded on the current head. The workflow authenticates

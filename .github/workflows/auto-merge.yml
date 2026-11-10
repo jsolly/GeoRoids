@@ -1,8 +1,8 @@
 ---
 name: Auto-merge
 
-# Arms GitHub squash auto-merge for non-draft pull requests from solly-agent
-# and jsolly whose head branch is in this repository. Convert a pull request
+# Arms GitHub squash auto-merge for non-draft pull requests from solly-agent,
+# jsolly, and cursor[bot] whose head branch is in this repository. Convert a pull request
 # to a draft, or run `gh pr merge --disable-auto`, to hold it. The 30-minute
 # sweep re-arms that setting and squash-merges the current head once `ci` and
 # `security` are green. AUTO_MERGE_TOKEN performs every API call. This file
@@ -73,7 +73,7 @@ jobs:
 
           author_allowed() {
             case "$1" in
-              solly-agent | jsolly) return 0 ;;
+              solly-agent | jsolly | 'cursor[bot]') return 0 ;;
               *) return 1 ;;
             esac
           }

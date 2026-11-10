@@ -157,7 +157,7 @@ test('auto-merge workflow arms native squash merge and keeps a sweep backstop', 
   assert.match(script, /gh pr merge --squash --match-head-commit/u);
   assert.match(script, /select\(\.name == "ci" or \.name == "security"\)/u);
   assert.match(script, /AUTO_MERGE_TOKEN is not set/u);
-  assert.match(script, /solly-agent \| jsolly \| 'cursor\[bot\]'/u);
+  assert.match(script, /solly-agent \| jsolly \| 'cursor\[bot\]' \| 'app\/cursor'/u);
 
   const armed = run({}, { 'pr.tsv': `${prLine()}\n`, arm_exit: '0', arm_output: 'enabled\n' });
   assert.equal(armed.status, 0, armed.stderr);
@@ -196,6 +196,7 @@ test('auto-merge workflow arms native squash merge and keeps a sweep backstop', 
   for (const [label, env] of [
     ['draft', { EVENT_DRAFT: 'true', GH_TOKEN: '' }],
     ['dependabot', { EVENT_AUTHOR: 'dependabot[bot]', GH_TOKEN: '' }],
+    ['dependabot app', { EVENT_AUTHOR: 'app/dependabot', GH_TOKEN: '' }],
     ['cursor lookalike', { EVENT_AUTHOR: 'cursorb', GH_TOKEN: '' }],
     ['wrong case', { EVENT_AUTHOR: 'Jsolly', GH_TOKEN: '' }],
     ['fork', { EVENT_HEAD_REPO: 'other/GeoRoids', GH_TOKEN: '' }],
@@ -217,14 +218,16 @@ test('auto-merge workflow arms native squash merge and keeps a sweep backstop', 
   assert.equal(staleDraft.status, 0, staleDraft.stderr);
   assert.equal(merges(staleDraft.calls, true).length, 0);
 
-  const cursorBot = run(
-    { EVENT_AUTHOR: 'cursor[bot]' },
-    { 'pr.tsv': `${prLine({ login: 'cursor[bot]' })}\n`, arm_exit: '0', arm_output: 'enabled\n' }
-  );
-  assert.equal(cursorBot.status, 0, cursorBot.stderr);
-  assert.deepEqual(merges(cursorBot.calls, true), [
-    ['pr', 'merge', '--auto', '--squash', `https://github.com/${repo}/pull/12`],
-  ]);
+  for (const login of ['cursor[bot]', 'app/cursor']) {
+    const cursorAuthor = run(
+      { EVENT_AUTHOR: login },
+      { 'pr.tsv': `${prLine({ login })}\n`, arm_exit: '0', arm_output: 'enabled\n' }
+    );
+    assert.equal(cursorAuthor.status, 0, `${login}\n${cursorAuthor.stderr}`);
+    assert.deepEqual(merges(cursorAuthor.calls, true), [
+      ['pr', 'merge', '--auto', '--squash', `https://github.com/${repo}/pull/12`],
+    ]);
+  }
 
   const staleAuthor = run({}, { 'pr.tsv': `${prLine({ login: 'dependabot[bot]' })}\n` });
   assert.equal(staleAuthor.status, 0, staleAuthor.stderr);
@@ -359,27 +362,31 @@ test('auto-merge sweep re-arms and direct-merges only when ci and security are g
   assert.equal(none.status, 0, none.stderr);
   assert.match(none.stdout, /No open pull requests/u);
 
-  const cursorSweep = run(
-    { EVENT_NAME: 'schedule' },
-    {
-      'open-numbers.txt': '12\n',
-      'pr.tsv': `${prLine({ login: 'cursor[bot]', armed: 'true' })}\n`,
-      'checks.tsv': `${green}\n`,
-      direct_exit: '0',
-      direct_output: 'merged\n',
-    }
-  );
-  assert.equal(cursorSweep.status, 0, cursorSweep.stderr);
-  assert.equal(merges(cursorSweep.calls, true).length, 0);
-  assert.deepEqual(merges(cursorSweep.calls, false), [
-    ['pr', 'merge', '--squash', '--match-head-commit', sha, `https://github.com/${repo}/pull/12`],
-  ]);
+  for (const login of ['cursor[bot]', 'app/cursor']) {
+    const cursorSweep = run(
+      { EVENT_NAME: 'schedule' },
+      {
+        'open-numbers.txt': '12\n',
+        'pr.tsv': `${prLine({ login, armed: 'true' })}\n`,
+        'checks.tsv': `${green}\n`,
+        direct_exit: '0',
+        direct_output: 'merged\n',
+      }
+    );
+    assert.equal(cursorSweep.status, 0, `${login}\n${cursorSweep.stderr}`);
+    assert.equal(merges(cursorSweep.calls, true).length, 0, login);
+    assert.deepEqual(merges(cursorSweep.calls, false), [
+      ['pr', 'merge', '--squash', '--match-head-commit', sha, `https://github.com/${repo}/pull/12`],
+    ]);
+  }
 
-  const skippedAuthor = run(
-    { EVENT_NAME: 'schedule' },
-    { 'open-numbers.txt': '12\n', 'pr.tsv': `${prLine({ login: 'dependabot[bot]' })}\n` }
-  );
-  assert.equal(skippedAuthor.status, 0, skippedAuthor.stderr);
-  assert.equal(merges(skippedAuthor.calls, true).length, 0);
-  assert.equal(merges(skippedAuthor.calls, false).length, 0);
+  for (const login of ['dependabot[bot]', 'app/dependabot']) {
+    const skippedAuthor = run(
+      { EVENT_NAME: 'schedule' },
+      { 'open-numbers.txt': '12\n', 'pr.tsv': `${prLine({ login })}\n` }
+    );
+    assert.equal(skippedAuthor.status, 0, `${login}\n${skippedAuthor.stderr}`);
+    assert.equal(merges(skippedAuthor.calls, true).length, 0, login);
+    assert.equal(merges(skippedAuthor.calls, false).length, 0, login);
+  }
 });

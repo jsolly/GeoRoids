@@ -63,7 +63,7 @@ Successful production Git deployments establish the release; metadata is diagnos
 
 The recovered reference sheets, canonical vector assets, palette and provenance are indexed in [georoids-art/README.md](georoids-art/README.md). Runtime ship, EO satellite and mineral geometry generates the matching SVG assets.
 
-Contributions use topic branches and pull requests that merge on green `CI / ci`. Non-draft pull requests from `solly-agent`, `jsolly`, or `cursor[bot]` arm squash auto-merge; convert one to a draft, or run `gh pr merge --disable-auto`, to hold it. Direct pushes to `main` are reserved for an emergency the maintainer explicitly authorizes. Use Conventional Commits with a scope and include relevant validation.
+Contributions use topic branches and pull requests that merge on green `CI / ci`. Non-draft pull requests from `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arm squash auto-merge; convert one to a draft, or run `gh pr merge --disable-auto`, to hold it. Direct pushes to `main` are reserved for an emergency the maintainer explicitly authorizes. Use Conventional Commits with a scope and include relevant validation.
 
 [Apache-2.0 license](LICENSE)
 

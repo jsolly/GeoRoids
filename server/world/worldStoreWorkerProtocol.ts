@@ -1,6 +1,6 @@
 import type { AsteroidData } from '../../shared-types';
 import type { PersistentPilot, SavedEconomy, SavedWorld } from './WorldStore';
-import type { WorldCheckpoint } from './worldPersistence';
+import type { WorldCheckpoint, WorldVolumeDiagnostics } from './worldPersistence';
 
 /** Messages the game thread sends to the world-store worker. */
 export type WorldStoreWorkerRequest =
@@ -24,6 +24,7 @@ export type WorldStoreWorkerRequest =
  */
 export type WorldStoreWorkerReply =
   | { type: 'done'; id: number; durationMs: number }
+  | { type: 'volume'; volume: Exclude<WorldVolumeDiagnostics, { status: 'pending' }> }
   | { type: 'failed'; id: number | undefined; error: SerializedWorkerError };
 
 /** Errors cross the thread boundary as plain data and are rebuilt on arrival. */

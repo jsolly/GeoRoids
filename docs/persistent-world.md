@@ -78,6 +78,22 @@ Keep the database and its `-wal` and `-shm` files on that mounted volume. Enable
 
 Do not run multiple server replicas against the same world. The game loop has one authoritative writer; changing replica count requires a different world ownership design.
 
+For file-backed worlds, `/health` includes `world.persistence.volume`. The writer
+samples available bytes, database bytes and WAL bytes before a write and every
+30 seconds while idle; `sampledAt` records when those cached figures were read.
+`pending` means the worker has not sampled yet, and `unavailable` means inspection
+failed, with a filesystem error code and an error-level
+`world_volume_inspection_failed` log. Neither means zero free space.
+
+Below 384 MiB available, the sample reports `low` and logs `world_volume_low`
+once per low-space episode. This gives 128 MiB of notice before the debug-report
+store's 256 MiB reserve. Expand the volume or review non-world files for removal;
+never remove the live database or its journals. The warning does not refuse a
+world commit or make the deploy health check fail. Actual commit failures retain
+the fatal behavior above. World connections auto-checkpoint the WAL at 256 pages
+and retain at most 16 MiB after a checkpoint can reset it. Those settings do not
+cap an active transaction or guarantee space while another reader holds the WAL.
+
 ## Asteroid belt recovery
 
 The world row stores a finite `asteroidBelt` ledger with a generation and

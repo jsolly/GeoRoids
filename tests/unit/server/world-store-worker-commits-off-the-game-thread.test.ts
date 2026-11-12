@@ -1,8 +1,10 @@
 /* @vitest-environment node */
-import { mkdtempSync, rmSync } from 'node:fs';
+import fs, { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
+import { GameEngine } from '../../../server/core/GameEngine';
+import { buildHealthResponse } from '../../../server/health';
 import { WorkerWorldPersistence } from '../../../server/world/WorkerWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import {
@@ -16,9 +18,39 @@ import type { AsteroidData } from '../../../shared-types';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const cleanup of cleanups.splice(0).reverse()) {
     await cleanup();
   }
+});
+
+test('health reports real off-thread volume samples without accessing the filesystem on the game thread', async () => {
+  const path = worldFile();
+  const persistence = new WorkerWorldPersistence(path);
+  shutDownAfter(persistence);
+  const engine = new GameEngine(7, undefined, persistence);
+  expect(buildHealthResponse(engine, {}).body.world.persistence?.volume).toEqual({
+    status: 'pending',
+  });
+  const disk = vi.spyOn(fs, 'statfsSync').mockImplementation(() => {
+    throw new Error('The game thread must not inspect the volume');
+  });
+  persistence.persist(batch(new Map(), 10));
+  await persistence.whenIdle();
+  const health = buildHealthResponse(engine, {});
+  expect(health.statusCode).toBe(200);
+  expect(health.body.world.persistence?.volume).toMatchObject({
+    status: 'ok',
+    databaseBytes: expect.any(Number),
+    walBytes: expect.any(Number),
+    freeBytes: expect.any(Number),
+    sampledAt: expect.any(Number),
+  });
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceOneFrame();
+    buildHealthResponse(engine, {});
+  }
+  expect(disk).not.toHaveBeenCalled();
 });
 
 function worldFile(): string {

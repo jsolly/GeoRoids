@@ -13,6 +13,9 @@
     "../../scripts/generate-asset-boundaries.ts",
     "../../scripts/benchmark-build-receipt.test.ts",
     "../../tests/unit/testing/old-client-assets-survive-new-builds.test.ts",
-    "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts"
+    "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts",
+    "../../scripts/production-health-watch.ts",
+    "../../scripts/production-health-watch-entry.ts",
+    "../../scripts/production-health-watch.test.ts"
   ]
 }

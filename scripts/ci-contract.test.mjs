@@ -22,6 +22,23 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
   const ci = parse(read('.github/workflows/ci.yml'));
   const coverage = parse(read('.github/workflows/coverage.yml'));
   const required = ci.jobs.ci;
+  // ci.yml pins the checkout and artifact actions every lane shares to full commits, each with its
+  // release as a comment, so no lane runs a tag that can be moved under it.
+  const checkoutAction = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1';
+  const uploadArtifactAction = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9';
+  const usesLines = read('.github/workflows/ci.yml')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^(?:- )?uses: actions\/(?:checkout|upload-artifact)@/u.test(line));
+  assert.ok(usesLines.length > 0);
+  for (const line of usesLines) {
+    assert.ok(
+      [`uses: ${checkoutAction}  # v7.0.1`, `uses: ${uploadArtifactAction}  # v7.0.2`].includes(
+        line.replace(/^- /u, '')
+      ),
+      `ci.yml must use the pinned checkout or upload-artifact commit: ${line}`
+    );
+  }
   assert.deepEqual(required.needs, [
     'static-checks',
     'runner-contracts',
@@ -72,7 +89,7 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
   // Secrets scan precedes reusable-tree decisions in each independently validated lane.
   for (const name of required.needs) {
     const steps = ci.jobs[name].steps;
-    assert.equal(steps[0].uses, 'actions/checkout@v7');
+    assert.equal(steps[0].uses, checkoutAction);
     assert.equal(steps[0].with['fetch-depth'], 0);
     assert.equal(steps[0].with['persist-credentials'], false);
     assert.equal(steps[1].name, 'Secrets scan (range)');
@@ -85,6 +102,7 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
     assert.equal(steps[2].run, 'bash scripts/ci-verified-tree.sh');
     const proof = steps.find((step) => step.name === 'Record validated PR tree');
     assert.ok(proof);
+    assert.equal(proof.uses, uploadArtifactAction);
     assert.equal(
       proof.with.name,
       `ci-tree-v1-\${{ github.job }}-\${{ steps.verified-tree.outputs.tree }}-\${{ github.run_attempt }}`
@@ -779,10 +797,7 @@ if (command === 'gh') {
   );
   assert.deepEqual(
     mediaCandidate.map((step) => step.run ?? step.uses),
-    [
-      'npm run wiki:media -- --output "$RUNNER_TEMP/wiki-media-baseline"',
-      'actions/upload-artifact@v7',
-    ]
+    ['npm run wiki:media -- --output "$RUNNER_TEMP/wiki-media-baseline"', uploadArtifactAction]
   );
   assert.equal(mediaCandidate[1].with.path, `\${{ runner.temp }}/wiki-media-baseline`);
 

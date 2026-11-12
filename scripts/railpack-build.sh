@@ -9,7 +9,8 @@
 #
 # RAILPACK_VERSION must equal build.railpackVersion in .railway/railway.ts, and
 # START_COMMAND its deploy.startCommand; scripts/railpack-build.test.ts fails
-# otherwise. The release archive is checked against its pinned SHA-256, and the
+# otherwise. Railway builds with that pin only once the reviewed
+# `railway config apply` has applied it (.railway/README.md). The release archive is checked against its pinned SHA-256, and the
 # frontend and BuildKit images are pinned by digest. Railpack's plan names its own
 # builder and runtime images by tag, exactly as on Railway. Not reproduced:
 # Railway's BuildKit daemon, its service variables and build secrets. No Railway
@@ -47,7 +48,8 @@ trap cleanup EXIT
 
 archive="railpack-v$RAILPACK_VERSION-x86_64-unknown-linux-musl.tar.gz"
 url="https://github.com/railwayapp/railpack/releases/download/v$RAILPACK_VERSION/$archive"
-curl --fail --location --silent --show-error --connect-timeout 10 --max-time 120 \
+curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+  --connect-timeout 10 --max-time 120 \
   "$url" --output "$work/railpack.tar.gz" ||
   fail "could not download Railpack $RAILPACK_VERSION from $url"
 sha256sum --check --status <<<"$RAILPACK_SHA256  $work/railpack.tar.gz" ||

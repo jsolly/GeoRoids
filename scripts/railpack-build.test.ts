@@ -7,13 +7,16 @@ import railway from '../.railway/railway.ts';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-/** The single shell assignment `name=value` (quotes stripped) in the build script. */
+/** The single non-empty shell assignment `name=value` (quotes stripped) in the build script. */
 function scriptSetting(script: string, name: string): string {
-  const values = [...script.matchAll(new RegExp(`^${name}=(.+)$`, 'gmu'))].map((match) =>
-    (match[1] ?? '').replace(/^'(.*)'$/u, '$1')
-  );
+  const values = script
+    .split('\n')
+    .filter((line) => line.startsWith(`${name}=`))
+    .map((line) => line.slice(name.length + 1).replace(/^'(.*)'$/u, '$1'));
   assert.equal(values.length, 1, `scripts/railpack-build.sh must set ${name} exactly once`);
-  return values[0] ?? '';
+  const [value] = values;
+  assert.ok(value, `scripts/railpack-build.sh must give ${name} a value`);
+  return value;
 }
 
 async function productionService(): Promise<ServiceNode> {
@@ -67,6 +70,16 @@ test('CI builds with the Railpack release and start command Railway production u
     scriptSetting(script, 'BUILDKIT_IMAGE'),
     /^moby\/buildkit:v[\d.]+@sha256:[0-9a-f]{64}$/u
   );
+
+  // The pins are what the commands use: the start command plans, the images build.
+  const lines = script.split('\n');
+  for (const use of [
+    '  --start-cmd "$START_COMMAND" ||',
+    '  --driver-opt "image=$BUILDKIT_IMAGE" --bootstrap >/dev/null ||',
+    '  --build-arg "BUILDKIT_SYNTAX=$RAILPACK_FRONTEND" \\',
+  ]) {
+    assert.ok(lines.includes(use), `scripts/railpack-build.sh must contain the line: ${use}`);
+  }
 
   // The lane is the script, run on x64 like Railway's builder, and the required ci check needs it.
   const ci = parse(read('.github/workflows/ci.yml'));

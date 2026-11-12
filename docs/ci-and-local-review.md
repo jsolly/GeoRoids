@@ -23,11 +23,16 @@ runs `scripts/railpack-build.sh` on `ubuntu-24.04`: the Railpack release pinned
 as `railpackVersion` in `.railway/railway.ts` plans the checkout, and a
 digest-pinned BuildKit runs that plan through the release's digest-pinned
 frontend, from `mise install` through `npm run build`, as Railway's production
-build does. It uses no Railway credential and exports no image. It does not
-reproduce Railway's BuildKit daemon, service variables or build secrets, and the
-plan's builder and runtime images come by tag, as on Railway.
-`scripts/railpack-build.test.ts` fails when the script's release or start command
-differs from `.railway/railway.ts`. The other lanes run on arm64.
+build does once the reviewed `railway config apply` has applied that pin
+([Railway IaC](../.railway/README.md)). It uses no Railway credential and exports
+no image. It does not reproduce Railway's BuildKit daemon, service variables or
+build secrets, and the plan's builder and runtime images come by tag, as on
+Railway. `scripts/railpack-build.test.ts` fails when the script's release or start
+command differs from `.railway/railway.ts`. The lane downloads Railpack, pulls
+BuildKit and Railpack's images, and installs tools and packages, so a network or
+registry failure there is handled by re-running the failed jobs. A failure caused
+by a new third-party image or tool release, such as a re-pushed builder tag, needs
+an owner decision rather than a re-run. The other lanes run on arm64.
 
 The required `ci` aggregate succeeds only when all six lanes succeed. Failed,
 cancelled, skipped or absent required evidence cannot pass. Each lane performs

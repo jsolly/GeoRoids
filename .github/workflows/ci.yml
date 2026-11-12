@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -148,7 +148,7 @@ jobs:
           exit "$status"
       - name: Upload code integration artifacts
         if: (always()) && steps.verified-tree.outputs.run_full != 'false'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: integration-tests-${{ github.run_id }}
           path: .performance/ci-code-integration
@@ -159,7 +159,7 @@ jobs:
         if: >-
           success() && github.event_name == 'pull_request' &&
           steps.verified-tree.outputs.tree != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -304,7 +304,7 @@ jobs:
         if: >-
           success() && github.event_name == 'pull_request' &&
           steps.verified-tree.outputs.tree != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
@@ -316,7 +316,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -420,7 +420,7 @@ jobs:
         if: >-
           success() && github.event_name == 'pull_request' &&
           steps.verified-tree.outputs.tree != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
@@ -436,7 +436,7 @@ jobs:
     # cancel the job first.
     timeout-minutes: 6
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -543,7 +543,7 @@ jobs:
         if: >-
           success() && github.event_name == 'pull_request' &&
           steps.verified-tree.outputs.tree != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
@@ -555,7 +555,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -666,7 +666,7 @@ jobs:
         if: failure() && steps.wiki-media.outcome == 'failure'
       - name: Upload the regenerated Wiki media baseline
         if: failure() && steps.wiki-media.outcome == 'failure'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: wiki-media-baseline-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/wiki-media-baseline
@@ -676,7 +676,7 @@ jobs:
         if: >-
           success() && github.event_name == 'pull_request' &&
           steps.verified-tree.outputs.tree != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
@@ -684,12 +684,13 @@ jobs:
           retention-days: 7
   railpack-build:
     name: railpack-build
-    # Railway builds the production server on x64 with the Railpack release pinned in
-    # .railway/railway.ts; scripts/railpack-build.sh runs that release's plan with BuildKit.
+    # Railway builds the production server on x64. scripts/railpack-build.sh runs the plan of the
+    # Railpack release pinned in .railway/railway.ts with BuildKit; Railway builds with that pin
+    # once the reviewed `railway config apply` has applied it (.railway/README.md).
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -786,7 +787,7 @@ jobs:
         if: >-
           success() && github.event_name == 'pull_request' &&
           steps.verified-tree.outputs.tree != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
@@ -800,7 +801,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false

@@ -23,6 +23,7 @@ const config = {
     'benchmarks/sample.ts',
     'benchmarks/realtime-client.ts',
     'benchmarks/load.ts',
+    'benchmarks/loaded-battle.ts',
     'tests/**/*.test.ts',
   ],
   project: [

@@ -1,0 +1,89 @@
+---
+name: Browser smoke
+run-name: Browser smoke ${{ inputs.commit_sha }}
+
+'on':
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact reviewed candidate commit, with its PR kept in draft
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REQUESTED_SHA: ${{ inputs.commit_sha }}
+    steps:
+      - name: Validate candidate identity
+        run: |
+          set -euo pipefail
+          [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s/browser-binaries\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Check out the workflow's verification code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: verification
+          persist-credentials: false
+      - name: Check out the exact candidate
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ inputs.commit_sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Verify checked-out identity
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$REQUESTED_SHA" ]]
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: '26.13.1'
+      - name: Install verification and candidate dependencies
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --prefix verification --cache "$RUNNER_TEMP/npm-cache"
+          npm ci --ignore-scripts --prefix candidate --cache "$RUNNER_TEMP/npm-cache"
+      - name: Install pinned Chromium
+        working-directory: verification
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Run the local browser smoke
+        env:
+          BROWSER_SMOKE_ARTIFACTS: ${{ runner.temp }}/browser-smoke
+          BROWSER_SMOKE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          candidate_root="$GITHUB_WORKSPACE/candidate"
+          mkdir -p "$BROWSER_SMOKE_ARTIFACTS" "$RUNNER_TEMP/browser-world"
+          export GEOROIDS_WORLD_PATH="$RUNNER_TEMP/browser-world/world.sqlite"
+          export GEOROIDS_DEBUG_REPORTS_ENABLED=0 GEOROIDS_BACKUP_ENABLED=0 VITE_WEBSOCKET_URL=
+          cleanup() {
+            local result=$?
+            trap - EXIT
+            if ! (cd "$candidate_root" && npm run dev:kill); then
+              result=1
+            fi
+            wait "$dev_pid" || true
+            exit "$result"
+          }
+          cd "$candidate_root"
+          npm run dev > "$BROWSER_SMOKE_ARTIFACTS/development.log" 2>&1 &
+          dev_pid=$!
+          trap cleanup EXIT
+          cd "$GITHUB_WORKSPACE/verification"
+          node --import tsx scripts/ci-browser-smoke.ts
+      - name: Retain browser evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: browser-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/browser-smoke
+          retention-days: 14
+          if-no-files-found: error

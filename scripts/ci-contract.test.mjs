@@ -16,7 +16,7 @@ import process from 'node:process';
 import { test } from 'vitest';
 import { parse } from 'yaml';
 
-test('CI preserves five mandatory lanes and failure propagation', () => {
+test('CI preserves six mandatory lanes and failure propagation', () => {
   const root = new URL('../', import.meta.url);
   const read = (path) => readFileSync(new URL(path, root), 'utf8');
   const ci = parse(read('.github/workflows/ci.yml'));
@@ -28,6 +28,7 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
     'actions-contracts',
     'integration-tests',
     'wiki-media',
+    'railpack-build',
   ]);
   // The required check runs whenever its lanes run, Dependabot PRs included, and fails when any
   // of its steps fails. Labels start no runs.
@@ -47,11 +48,15 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
       undefined,
       `${name} must start without waiting for another lane`
     );
-    assert.equal(ci.jobs[name]['timeout-minutes'], name === 'actions-contracts' ? 6 : 4);
-    // The committed Wiki media baseline belongs to linux-x64; every other lane runs on arm64.
+    assert.equal(
+      ci.jobs[name]['timeout-minutes'],
+      { 'actions-contracts': 6, 'railpack-build': 10 }[name] ?? 4
+    );
+    // The committed Wiki media baseline belongs to linux-x64, and Railway builds the server on
+    // x64; every other lane runs on arm64.
     assert.equal(
       ci.jobs[name]['runs-on'],
-      name === 'wiki-media' ? 'ubuntu-24.04' : 'ubuntu-24.04-arm'
+      ['wiki-media', 'railpack-build'].includes(name) ? 'ubuntu-24.04' : 'ubuntu-24.04-arm'
     );
     assert.equal(ci.jobs[name].if, undefined);
     assert.equal(ci.jobs[name].name, name);
@@ -101,7 +106,7 @@ test('CI preserves five mandatory lanes and failure propagation', () => {
     'bash scripts/test-review.sh'
   );
 
-  // The lanes' scan is the canonical `ci` step plus an x64 archive for the media lane: the same
+  // The lanes' scan is the canonical `ci` step plus an x64 archive for the x64 lanes: the same
   // release, arm64 pin and range logic, so a canonical bump cannot leave the lanes behind.
   const laneScan = ci.jobs['static-checks'].steps[1].run;
   const armPin = laneScan.match(
@@ -781,9 +786,9 @@ if (command === 'gh') {
   );
   assert.equal(mediaCandidate[1].with.path, `\${{ runner.temp }}/wiki-media-baseline`);
 
-  // Execute the actual aggregate step for all 1024 GitHub dependency outcomes.
+  // Execute the actual aggregate step for all 4096 GitHub dependency outcomes.
   const aggregate = required.steps.find(
-    (step) => step.name === 'Require all five validation lanes to pass'
+    (step) => step.name === 'Require all six validation lanes to pass'
   );
   assert.ok(aggregate);
   const laneResults = {
@@ -792,6 +797,7 @@ if (command === 'gh') {
     ACTIONS_RESULT: 'actions-contracts',
     INTEGRATION_RESULT: 'integration-tests',
     WIKI_MEDIA_RESULT: 'wiki-media',
+    RAILPACK_RESULT: 'railpack-build',
   };
   for (const [variable, lane] of Object.entries(laneResults)) {
     assert.equal(aggregate.env[variable], `\${{ needs.${lane}.result }}`);
@@ -802,7 +808,7 @@ if (command === 'gh') {
       rows.flatMap((row) => outcomes.map((outcome) => ({ ...row, [variable]: outcome }))),
     [{}]
   );
-  assert.equal(combinations.length, 1024);
+  assert.equal(combinations.length, 4096);
   for (const results of combinations) {
     const result = spawnSync('bash', ['-c', aggregate.run], {
       env: { ...process.env, ...results },
@@ -816,6 +822,6 @@ if (command === 'gh') {
   }
 
   process.stdout.write(
-    'CI contracts passed: five parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
+    'CI contracts passed: six parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
   );
 });

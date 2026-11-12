@@ -6,7 +6,7 @@ Ship profile: `vercel-static`.
 
 **Integration: branch → reviewed PR → merge on green `CI / ci`.** A non-draft pull request whose author login is exactly `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor`, with its head branch in this repository, gets GitHub squash auto-merge armed. `pull_request` events report Cursor as `cursor[bot]`; `gh pr view` reports `app/cursor`. Convert that pull request to a draft, or run `gh pr merge --disable-auto`, to hold it. Every 30 minutes, and on manual dispatch, a sweep re-arms that auto-merge and squash-merges the current head once `ci` and `security` are green. Auto-merge is limited to those logins. The workflow uses `AUTO_MERGE_TOKEN` and fails when that secret is absent. Follow [local release instructions](docs/development.md). Agents never push to `main`, change rulesets, or admin-merge.
 
-Local gate: `npm run gate`; static checks, hook trust/bootstrap fixtures, runner contracts, the complete unit suite, build, and all server integration tests are mandatory. CI runs independent static, runner-contract, Actions-contract, complete code-integration and Wiki media lanes; all must pass. Browser tests and automatic frame-work/constrained-client gates are retired.
+Local gate: `npm run gate`; static checks, hook trust/bootstrap fixtures, runner contracts, the complete unit suite, build, and all server integration tests are mandatory. CI runs independent static, runner-contract, Actions-contract, complete code-integration, Wiki media and Railpack build lanes; all must pass. Browser tests and automatic frame-work/constrained-client gates are retired.
 
 Deploy: Vercel Git at <https://www.georoids.com> plus Railway Git at <https://georoids-production-2403.up.railway.app>. Classify server inputs with `scripts/server-release-inputs.mjs` from the merged checkout; its server/shared/setup/manifest inputs determine which Railway release needs verification, and it fails if server code imports `src/`. A successful client deployment cannot prove the server deployed. Successful production Git deployments establish the release. Do not gate builds or production smoke on served release metadata, bundle SHA searches or server SHA ancestry. Follow the canonical smoke receipt through asset availability, genuine join, snapshots, movement, accepted firing and healthy persistence. Production smoke uses HTTP/assets and WebSocket protocol evidence; it does not certify browser rendering, keyboard/touch controls, graphics or audio. Skipped, cancelled, failed or missing smoke is unverified.
 
@@ -231,8 +231,8 @@ Start `npm run dev`; verify at origin `http://127.0.0.1:5173/` (routes `/`, `/de
 
 ## Verified-tree CI
 
-PRs run static checks, runner contracts, Actions contracts, the complete server integration suites, and Wiki media verification concurrently.
-The final `ci` job requires all five lanes to succeed; failed, cancelled, or skipped
+PRs run static checks, runner contracts, Actions contracts, the complete server integration suites, Wiki media verification and the Railpack server build concurrently.
+The final `ci` job requires all six lanes to succeed; failed, cancelled, or skipped
 lanes fail the aggregate. Each lane has its own exact-tree proof.
 Full unit and server integration checks run locally in the review gate. Manual performance measurements remain outside it. Post-merge CI reuses each successful PR lane only
 when its recorded checkout tree exactly matches the landed tree, using

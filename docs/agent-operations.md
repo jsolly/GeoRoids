@@ -144,7 +144,11 @@ tracked [`.railway/railway.ts`](../.railway/railway.ts) keeps the explicit
 `startCommand` on Node with the installed `tsx` loader so the server owns
 shutdown signals; restarts do not install packages or start the Astro development client.
 The IaC package is a development-only dependency and the CLI must be at least
-5.42.1.
+5.42.1. `build.railpackVersion` pins the Railpack release; CI's `railpack-build`
+lane builds every PR with that release, so a change that breaks Railway's
+`mise install` or build fails before merge
+([Railway IaC](../.railway/README.md)). The pin, like every IaC change, is live
+only after John applies the reviewed plan.
 
 Railway stops reading legacy `railway.json` files on **2026-12-01**. The
 [IaC migration](https://docs.railway.com/infrastructure-as-code) is now prepared

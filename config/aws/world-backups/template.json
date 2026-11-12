@@ -1,0 +1,89 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "GeoRoids private world backup bucket; human-owned resource creation and activation",
+  "Resources": {
+    "WorldBackups": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            { "ServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" } }
+          ]
+        },
+        "OwnershipControls": { "Rules": [{ "ObjectOwnership": "BucketOwnerEnforced" }] },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "Daily30Days",
+              "Status": "Enabled",
+              "Prefix": "daily/",
+              "ExpirationInDays": 30
+            },
+            {
+              "Id": "Weekly12Weeks",
+              "Status": "Enabled",
+              "Prefix": "weekly/",
+              "ExpirationInDays": 84
+            }
+          ]
+        },
+        "Tags": [
+          { "Key": "project", "Value": "GeoRoids" },
+          { "Key": "purpose", "Value": "private-world-backups" }
+        ]
+      }
+    },
+    "WorldBackupPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Bucket": { "Ref": "WorldBackups" },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RequireTLS",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                { "Fn::GetAtt": ["WorldBackups", "Arn"] },
+                { "Fn::Sub": "${WorldBackups.Arn}/*" }
+              ],
+              "Condition": { "Bool": { "aws:SecureTransport": "false" } }
+            },
+            {
+              "Sid": "RequireExplicitEncryption",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": { "Fn::Sub": "${WorldBackups.Arn}/*" },
+              "Condition": { "StringNotEquals": { "s3:x-amz-server-side-encryption": "AES256" } }
+            },
+            {
+              "Sid": "RequireCreateOnlyUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": { "Fn::Sub": "${WorldBackups.Arn}/*" },
+              "Condition": { "Null": { "s3:if-none-match": "true" } }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "BucketName": { "Value": { "Ref": "WorldBackups" } },
+    "BucketArn": { "Value": { "Fn::GetAtt": ["WorldBackups", "Arn"] } }
+  }
+}

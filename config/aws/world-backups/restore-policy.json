@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadReviewedBackupArtifacts",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "REPLACE_WITH_REVIEWED_BUCKET_ARN/daily/*",
+        "REPLACE_WITH_REVIEWED_BUCKET_ARN/weekly/*"
+      ]
+    }
+  ]
+}

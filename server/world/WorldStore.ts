@@ -1,23 +1,13 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { type BeltSlotState, readBeltState } from '../../shared/asteroidBelt';
 import { validCooperativeRecord } from '../../shared/cooperativeWorld';
-import { ECONOMY, emptySettlement, validSettlement } from '../../shared/economy';
-import { epochField } from '../../shared/epochField';
-import { validEquipment } from '../../shared/equipment';
 import { validExploration } from '../../shared/exploration';
-import { validCivicModules } from '../../shared/furnaces';
-import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
-import { PLAYER_SHIELD } from '../../shared/playerShield';
-import { releaseField } from '../../shared/releaseId';
+import { flightReturnWindowOpen } from '../../shared/playerMotion';
 import { isShipKitId } from '../../shared/shipKits';
-import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { purchasedHullColor } from '../../shared/townStore';
-import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { parseSectorId } from '../../shared/world';
 import type {
   AsteroidData,
-  CivicModule,
   EquipmentId,
   ExplorationTile,
   Position,
@@ -27,27 +17,9 @@ import type {
   Velocity,
 } from '../../shared-types';
 import { readCooperativeWorld } from './cooperativeSchema';
+import { readSavedWorld, type SavedWorld as SavedWorldMetadata } from './savedWorld';
+import { readSavedEconomy, readSavedPilot, readSavedSector } from './worldDataValidation';
 import type { LoadedWorld, WorldCheckpoint } from './worldPersistence';
-
-const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
-
-function readCivicModules(value: object): CivicModule[] {
-  if ('civicModules' in value) {
-    if (!validCivicModules(value.civicModules)) {
-      throw new Error('Saved furnaces are invalid; refusing to replace player progress');
-    }
-    return value.civicModules;
-  }
-  return [];
-}
-
-function validSectorId(id: string): boolean {
-  return parseSectorId(id) !== null;
-}
-
-function validWorldPosition(position: Position): boolean {
-  return finiteMotionVector(position) && Math.hypot(position.x, position.y) <= WORLD.radius;
-}
 
 /** Browser credential plus the saved score and optional recent flight. */
 export interface PersistentPilot {
@@ -103,174 +75,11 @@ export interface SavedEconomy {
   pointLoot: SavedPointLoot[];
 }
 
-export interface SavedWorld {
-  asteroidBelt?: BeltSlotState[];
-  /** Furnaces a Scout paid for. Absent on older rows. */
-  civicModules?: CivicModule[];
-  seed: number;
-  startedAt: number;
-  generation: number;
-  writtenReleaseId?: string;
+/** The legacy runtime still requires its atlas until an explicitly stopped transition. */
+export interface SavedWorld extends SavedWorldMetadata {
   exploration: ExplorationTile[];
 }
 
-function readVector(value: unknown): Position | undefined {
-  if (value === null || typeof value !== 'object') {
-    return undefined;
-  }
-  const vector = value as Record<string, unknown>;
-  const x = vector['x'];
-  const y = vector['y'];
-  if (typeof x !== 'number' || typeof y !== 'number') {
-    return undefined;
-  }
-  return { x, y };
-}
-
-function readOptionalFlight(
-  pilot: Record<string, unknown>
-): Omit<PersistentPilot, 'id' | 'tokenHash' | 'name' | 'score'> | undefined {
-  if (!('lastSeenAt' in pilot)) {
-    return undefined;
-  }
-  const lastSeenAt = pilot['lastSeenAt'];
-  const position = readVector(pilot['position']);
-  const angle = pilot['angle'];
-  const mass = pilot['mass'];
-  const health = pilot['health'];
-  const kitId = pilot['kitId'];
-  const healthRegenTimer = pilot['healthRegenTimer'];
-  if (
-    typeof lastSeenAt !== 'number' ||
-    !Number.isFinite(lastSeenAt) ||
-    lastSeenAt < 0 ||
-    !position ||
-    !validWorldPosition(position) ||
-    typeof angle !== 'number' ||
-    !Number.isFinite(angle) ||
-    typeof mass !== 'number' ||
-    !Number.isFinite(mass) ||
-    mass <= 0 ||
-    typeof health !== 'number' ||
-    !Number.isFinite(health) ||
-    health < 0 ||
-    !isShipKitId(kitId) ||
-    (healthRegenTimer !== undefined &&
-      (typeof healthRegenTimer !== 'number' ||
-        !Number.isSafeInteger(healthRegenTimer) ||
-        healthRegenTimer < 0))
-  ) {
-    return undefined;
-  }
-  const velocity = readVector(pilot['velocity']);
-  return {
-    lastSeenAt,
-    kitId,
-    position,
-    angle,
-    mass,
-    health,
-    ...(typeof healthRegenTimer === 'number' ? { healthRegenTimer } : {}),
-    ...(typeof pilot['shieldFrames'] === 'number' &&
-    Number.isSafeInteger(pilot['shieldFrames']) &&
-    pilot['shieldFrames'] >= 0 &&
-    pilot['shieldFrames'] <= PLAYER_SHIELD.durationFrames
-      ? { shieldFrames: pilot['shieldFrames'] }
-      : {}),
-    ...(typeof pilot['shieldCooldownFrames'] === 'number' &&
-    Number.isSafeInteger(pilot['shieldCooldownFrames']) &&
-    pilot['shieldCooldownFrames'] >= 0 &&
-    pilot['shieldCooldownFrames'] <= PLAYER_SHIELD.cooldownFrames
-      ? { shieldCooldownFrames: pilot['shieldCooldownFrames'] }
-      : {}),
-    ...(velocity && finiteMotionVector(velocity) ? { velocity } : {}),
-  };
-}
-
-function readReleaseProvenance(
-  pilot: Record<string, unknown>
-): Pick<
-  PersistentPilot,
-  | 'credentialReleaseId'
-  | 'credentialClientReleaseId'
-  | 'credentialIssuedAt'
-  | 'scoreReleaseId'
-  | 'scoreClientReleaseId'
-  | 'scoreUpdatedAt'
-  | 'lastClientReleaseId'
-> {
-  return {
-    ...releaseField('credentialReleaseId', pilot['credentialReleaseId']),
-    ...releaseField('credentialClientReleaseId', pilot['credentialClientReleaseId']),
-    ...epochField('credentialIssuedAt', pilot['credentialIssuedAt']),
-    ...releaseField('scoreReleaseId', pilot['scoreReleaseId']),
-    ...releaseField('scoreClientReleaseId', pilot['scoreClientReleaseId']),
-    ...epochField('scoreUpdatedAt', pilot['scoreUpdatedAt']),
-    ...releaseField('lastClientReleaseId', pilot['lastClientReleaseId']),
-  };
-}
-
-function readPilot(value: unknown): PersistentPilot | undefined {
-  if (value === null || typeof value !== 'object') {
-    return undefined;
-  }
-  const pilot = value as Record<string, unknown>;
-  const id = pilot['id'];
-  const name = pilot['name'];
-  const tokenHash = pilot['tokenHash'];
-  const score = pilot['score'];
-  const equipment = pilot['equipment'];
-  if (equipment !== undefined && !validEquipment(equipment)) {
-    return undefined;
-  }
-  const cargo = pilot['cargo'];
-  const purchases = pilot['purchases'];
-  if (
-    cargo !== undefined &&
-    (typeof cargo !== 'number' || !Number.isSafeInteger(cargo) || cargo < 0)
-  ) {
-    return undefined;
-  }
-  if (
-    purchases !== undefined &&
-    (!Array.isArray(purchases) || !purchases.every((offerId) => typeof offerId === 'string'))
-  ) {
-    return undefined;
-  }
-  const silk = pilot['silk'];
-  if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
-    return undefined;
-  }
-  const hullColor = pilot['hullColor'];
-  if (hullColor !== undefined && typeof hullColor !== 'string') {
-    return undefined;
-  }
-  if (
-    typeof id !== 'string' ||
-    typeof name !== 'string' ||
-    typeof tokenHash !== 'string' ||
-    !PILOT_TOKEN_HASH_PATTERN.test(tokenHash) ||
-    typeof score !== 'number' ||
-    !Number.isFinite(score)
-  ) {
-    return undefined;
-  }
-  return {
-    id,
-    tokenHash,
-    name,
-    score,
-    ...(equipment !== undefined ? { equipment: [...equipment] } : {}),
-    cargo: typeof cargo === 'number' ? cargo : 0,
-    purchases: Array.isArray(purchases) ? purchases : [],
-    ...(typeof silk === 'number' ? { silk } : {}),
-    ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
-    ...readOptionalFlight(pilot),
-    ...readReleaseProvenance(pilot),
-  };
-}
-
-/** Restore pose only when last-seen is present, recent, and the hull is alive. */
 export function restorableFlight(
   pilot: PersistentPilot,
   now: number
@@ -342,60 +151,6 @@ export class WorldStore {
     }
   }
 
-  private validateSectorValue(id: string, value: unknown): AsteroidData[] {
-    if (!validSectorId(id) || !Array.isArray(value)) {
-      throw new Error(`Saved sector ${id} is invalid; refusing to regenerate mined deposits`);
-    }
-    const ids = new Set<string>();
-    const rocks: AsteroidData[] = [];
-    for (const [index, saved] of value.entries()) {
-      // Retired finite burns never stored an owner. Preserve the deposit and
-      // momentum, but cancel that uncreditable propulsion at the storage boundary.
-      let candidate = saved;
-      if (typeof saved === 'object' && saved !== null && 'boost' in saved) {
-        const boost = saved.boost;
-        if (
-          typeof boost === 'object' &&
-          boost !== null &&
-          'phase' in boost &&
-          boost.phase === 'burning' &&
-          !('ownerId' in boost) &&
-          'remainingFrames' in boost &&
-          typeof boost.remainingFrames === 'number' &&
-          Number.isInteger(boost.remainingFrames) &&
-          boost.remainingFrames > 0 &&
-          boost.remainingFrames <= 180 &&
-          'angle' in boost &&
-          typeof boost.angle === 'number' &&
-          Number.isFinite(boost.angle)
-        ) {
-          candidate = { ...saved, boost: null };
-        }
-      }
-      // Retire the saved cooperative marker without undoing prior migrations.
-      if (typeof candidate === 'object' && candidate !== null && 'isCollabTarget' in candidate) {
-        const { isCollabTarget: _retiredMarker, ...normalized } = candidate;
-        candidate = normalized;
-      }
-      try {
-        validateAsteroidDto(candidate);
-      } catch (error) {
-        throw new Error(`Saved sector ${id} asteroid ${index} is invalid`, { cause: error });
-      }
-      if (
-        candidate.id.length === 0 ||
-        ids.has(candidate.id) ||
-        !validWorldPosition(candidate.position) ||
-        sectorAt(candidate.position).id !== id
-      ) {
-        throw new Error(`Saved sector ${id} contains an invalid or duplicate asteroid identity`);
-      }
-      ids.add(candidate.id);
-      rocks.push(candidate);
-    }
-    return rocks;
-  }
-
   /** Record a sector row in the duplicate-deposit index; the caller has checked for conflicts. */
   private indexSector(id: string, rocks: readonly AsteroidData[]): void {
     for (const rockId of this.persistedSectorRocks.get(id) ?? []) {
@@ -449,9 +204,11 @@ export class WorldStore {
       try {
         value = JSON.parse(String(row['json']));
       } catch (error) {
-        throw new Error(`Saved sector ${id} is not valid JSON`, { cause: error });
+        throw new Error(`Saved sector ${id} is not valid JSON`, {
+          cause: error,
+        });
       }
-      const rocks = this.validateSectorValue(id, value);
+      const rocks = readSavedSector(id, value);
       for (const rock of rocks) {
         const other = this.persistedAsteroidSectors.get(rock.id);
         if (other !== undefined && other !== id) {
@@ -471,38 +228,16 @@ export class WorldStore {
     }
     this.worldJson = String(row['json']);
     const value: unknown = JSON.parse(this.worldJson);
+    const metadata = readSavedWorld(value);
     if (
       value === null ||
       typeof value !== 'object' ||
-      !('seed' in value) ||
-      !('startedAt' in value) ||
       !('exploration' in value) ||
-      typeof value.seed !== 'number' ||
-      !Number.isFinite(value.seed) ||
-      typeof value.startedAt !== 'number' ||
-      !Number.isFinite(value.startedAt) ||
       !validExploration(value.exploration)
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
-    const asteroidBelt = readBeltState('asteroidBelt' in value ? value.asteroidBelt : undefined);
-    return {
-      seed: value.seed,
-      ...(asteroidBelt ? { asteroidBelt } : {}),
-      civicModules: readCivicModules(value),
-      startedAt: value.startedAt,
-      generation:
-        'generation' in value &&
-        typeof value.generation === 'number' &&
-        Number.isSafeInteger(value.generation)
-          ? value.generation
-          : 0,
-      ...releaseField(
-        'writtenReleaseId',
-        'writtenReleaseId' in value ? value.writtenReleaseId : undefined
-      ),
-      exploration: value.exploration,
-    };
+    return { ...metadata, exploration: value.exploration };
   }
 
   loadPilots(): PersistentPilot[] {
@@ -511,7 +246,7 @@ export class WorldStore {
       .all()
       .map((row) => {
         const value: unknown = JSON.parse(String(row['json']));
-        const pilot = readPilot(value);
+        const pilot = readSavedPilot(value);
         if (!pilot) {
           throw new Error('Saved pilot is invalid; refusing to replace player progress');
         }
@@ -535,11 +270,8 @@ export class WorldStore {
   load(): LoadedWorld {
     const row = this.db.prepare('SELECT json FROM economy WHERE id=1').get();
     const saved: unknown = row ? JSON.parse(String(row['json'])) : {};
-    if (saved === null || typeof saved !== 'object') {
-      throw new Error('Invalid saved economy');
-    }
     const cooperative = readCooperativeWorld(this.db);
-    const economy = { settlement: readSettlement(saved), pointLoot: readPointLoot(saved) };
+    const economy = readSavedEconomy(saved);
     return {
       ...(cooperative ? { cooperative } : {}),
       economy,
@@ -551,7 +283,7 @@ export class WorldStore {
 
   /** One saved row, for tests and tooling; the server reads the world once through `load`. */
   loadSector(id: string): AsteroidData[] | undefined {
-    if (!validSectorId(id)) {
+    if (parseSectorId(id) === null) {
       throw new Error(`Invalid sector identity ${id}`);
     }
     const row = this.db.prepare('SELECT json FROM sectors WHERE id=?').get(id);
@@ -564,7 +296,7 @@ export class WorldStore {
     } catch (error) {
       throw new Error(`Saved sector ${id} is not valid JSON`, { cause: error });
     }
-    return this.validateSectorValue(id, value);
+    return readSavedSector(id, value);
   }
 
   /**
@@ -580,7 +312,7 @@ export class WorldStore {
   ): void {
     const validatedSectors = [...sectors].map(([id, rocks]): [string, AsteroidData[]] => [
       id,
-      this.validateSectorValue(id, rocks),
+      readSavedSector(id, rocks),
     ]);
     this.assertNoDuplicateDeposits(validatedSectors);
     const worldJson = world === undefined ? undefined : JSON.stringify(world);
@@ -688,51 +420,4 @@ export class WorldStore {
   close(): void {
     this.db.close();
   }
-}
-
-function readSettlement(value: object): SettlementState {
-  if (!('settlement' in value)) {
-    return emptySettlement();
-  }
-  if (!validSettlement(value.settlement)) {
-    throw new Error('Invalid saved settlement');
-  }
-  return value.settlement;
-}
-function readPointLoot(value: object): SavedPointLoot[] {
-  if (!('pointLoot' in value)) {
-    return [];
-  }
-  if (!Array.isArray(value.pointLoot)) {
-    throw new Error('Invalid saved point loot');
-  }
-  const drops: SavedPointLoot[] = [];
-  for (const row of value.pointLoot) {
-    if (
-      !row ||
-      typeof row !== 'object' ||
-      typeof row.id !== 'string' ||
-      !finiteMotionVector(row.position) ||
-      !Number.isSafeInteger(row.points) ||
-      row.points < 0 ||
-      typeof row.expiresAt !== 'number' ||
-      !Number.isFinite(row.expiresAt) ||
-      (row.velocity !== undefined && !finiteMotionVector(row.velocity)) ||
-      (row.ejectFramesLeft !== undefined &&
-        (!Number.isSafeInteger(row.ejectFramesLeft) ||
-          row.ejectFramesLeft < 0 ||
-          row.ejectFramesLeft > ECONOMY.cargoSpillEjectFrames))
-    ) {
-      throw new Error('Invalid saved point loot');
-    }
-    drops.push({
-      id: row.id,
-      position: { ...row.position },
-      points: row.points,
-      expiresAt: row.expiresAt,
-      ...(row.velocity !== undefined ? { velocity: { ...row.velocity } } : {}),
-      ...(row.ejectFramesLeft !== undefined ? { ejectFramesLeft: row.ejectFramesLeft } : {}),
-    });
-  }
-  return drops;
 }

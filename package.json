@@ -70,6 +70,7 @@
   },
   "dependencies": {
     "@astrojs/svelte": "9.0.1",
+    "@aws-sdk/client-s3": "3.1167.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.6",
     "@types/ws": "^8.18.2",

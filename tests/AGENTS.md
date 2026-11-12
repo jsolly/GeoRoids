@@ -183,7 +183,8 @@ smoke is the same brief check; cloud-session mechanics live in
 
 The manual `Browser smoke` workflow is a scoped alternative to the basic local
 smoke. It uses an ephemeral local world on a hosted runner and takes an exact
-candidate commit. Dispatch from `main`, with the candidate PR kept in draft.
+candidate commit. Run its first self-check against its landed `main` commit.
+For a UI change, dispatch from `main`, with the candidate PR kept in draft.
 The verification script comes from the workflow commit, separately from the
 candidate checkout. It checks desktop and mobile Chromium viewports, joins through
 the start screen, sends playfield input, opens and closes the map, visits `/wiki/`

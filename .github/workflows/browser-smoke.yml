@@ -6,7 +6,7 @@ run-name: Browser smoke ${{ inputs.commit_sha }}
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: Exact reviewed candidate commit, with its PR kept in draft
+        description: Exact reviewed commit; keep UI PRs draft until verified
         required: true
         type: string
 

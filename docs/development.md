@@ -19,6 +19,16 @@ a missing file is created empty for the local server.
 
 Setup installs repo-owned hooks outside the working tree, provisions the pinned
 tools and lockfile dependencies, and leaves browser binaries to explicitly requested manual tools.
+Node comes from mise. uv is mise's when mise has it, else the host's, and mise installs
+it only when PATH has none. Semgrep comes from
+PyPI through mise. gitleaks, zizmor and osv-scanner are reused when a pinned copy is
+already on PATH or in mise; otherwise setup downloads each from its pinned GitHub release
+URL into `~/.local/share/georoids-toolchain/bin` and installs it only after the gate's
+checksum matches. The gate's lookups check that directory's hashes too, so hooks find those
+scanners from any shell. None of these needs the GitHub API, which Claude Code cloud sessions
+cannot reach. Setup writes `~/.local/share/georoids-toolchain/env.sh`, which puts mise's Node,
+and mise's uv when it has one, first on PATH. In a cloud session the setup hook adds that file
+to `CLAUDE_ENV_FILE`, so every later command of the session runs on the pinned Node.
 Claude Code's `startup|resume` hook passes `--session-hook`. A fresh checkout
 without `node_modules` runs setup; an existing tree is checked without installing
 tools or dependencies. Setup records the manifest, lockfile, repository tool and
@@ -42,6 +52,14 @@ Automated code checks never launch or download browsers. Run the repo's document
 mise exec -- npm run gate
 ```
 
+Where setup downloaded release archives, as in a Claude Code cloud session, `mise exec`
+would try to install the missing `.mise.toml` tools through the GitHub API. Run the gate
+from the env file instead:
+
+```bash
+. ~/.local/share/georoids-toolchain/env.sh && npm run gate
+```
+
 Use the repository's README and AGENTS.md for its build, test and deployment
 commands. A missing prerequisite is a failed setup; report it rather than claiming
 that the gate ran. No setup command deploys the application or infrastructure.
@@ -61,7 +79,11 @@ uv or mypy. No Wiki behavior or media baseline changes.
 The dispatcher lives in this clone's Git common directory, shared only by its
 linked worktrees. It registers pre-commit and pre-push only. Pre-commit keeps the
 staged gitleaks scan and adds an offline zizmor audit. Pre-push runs a ranged
-gitleaks scan, then Semgrep and osv-scanner. The complete hook/library/setup
+gitleaks scan, then Semgrep and osv-scanner. Pre-push first probes `https://semgrep.dev/`
+and `https://api.osv.dev/`. A scan whose server refuses or drops the connection (curl
+exits 5, 6, 7, 28, 35 or 56, as behind a cloud session's egress proxy) is skipped with a
+warning, because CI's Security workflow runs it on the pull request. Any HTTP answer runs
+the scan, any other probe failure fails the push, and the gitleaks scan always runs. The complete hook/library/setup
 bundle must match current reviewed `origin/main`, or a deliberately approved exact
 bundle digest. Missing files, symlinks, unreviewed modes and a foreign origin fail
 closed. The dispatcher executes a verified snapshot, then runs quality scripts in

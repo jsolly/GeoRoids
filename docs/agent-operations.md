@@ -466,21 +466,24 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 
 ### Cloud sessions
 
-Claude Code cloud containers start on an image Node and without dependencies. When a session is rooted above the repository (multi-repo sessions), the repo's SessionStart hook does not run. Bootstrap from the repository root:
+Claude Code cloud containers start on an image Node and without dependencies. The repo's SessionStart hook runs setup and adds `~/.local/share/georoids-toolchain/env.sh` to the session environment, so later commands, hooks included, run on the pinned Node. When a session is rooted above the repository (multi-repo sessions, or a repository added mid-session), that hook does not run. Bootstrap from the repository root:
 
 ```shell
-bash .cursor/install-app.sh        # native libraries, pinned mise tools, npm ci, .env
-mise exec -- node --version        # v26.x
-mise exec -- npm run gate
+bash .cursor/install-app.sh                  # native libraries, pinned tools, npm ci, .env
+. ~/.local/share/georoids-toolchain/env.sh   # pinned Node first on PATH
+node --version                               # v26.x
+npm run gate
 ```
+
+Without the hook, start every later command, `git commit` and `git push` included, by sourcing the env file, then call `npm` directly. `mise exec` would try to install `.mise.toml` tools through the GitHub API, which cloud sessions cannot reach ([development](development.md)).
 
 For a brief manual smoke ([tests/AGENTS.md](../tests/AGENTS.md#basic-manual-browser-smoke)):
 
-1. Start `mise exec -- npm run dev` in the background.
+1. Start `npm run dev` in the background, from a shell that sourced the env file.
 2. Wait for `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/` to return `200` and `curl http://127.0.0.1:3001/health` to answer.
 3. Open the affected route with the session's browser controls and exercise the changed control or a brief join/steer/fire flow. Check console and page errors. For layout changes, inspect desktop and mobile widths and attach both screenshots; report the routes, interactions, errors and observed result.
 4. If the repository's pinned Playwright expects a different browser revision than `/opt/pw-browsers`, use the image's preinstalled Playwright from a scratch directory, never as a package script. Wait for the game canvas rather than a fixed delay. Report missing browser access as unverified. Personal skills may help with the check but are not a bootstrap requirement.
-5. Stop with `mise exec -- npm run dev:kill`.
+5. Stop with `npm run dev:kill`.
 
 ### Local playground
 

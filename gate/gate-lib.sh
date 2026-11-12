@@ -76,7 +76,8 @@ gate__on_commit_err() {
 # The gitleaks release this gate and .github/workflows/ci.yml both pin.
 # Releases differ in their default rules, so a scan on another release can pass here and fail in CI,
 # or the reverse. Update the release, binary hashes, linux_arm64 archive hash, workflows and
-# .mise.toml together. The archive hash is CI's download check; the separate binary hashes verify mise installs.
+# .mise.toml together. The archive hash is CI's download check; the separate binary hashes verify mise installs
+# and the release archives scripts/setup-agent-environment.sh downloads.
 GATE_GITLEAKS_VERSION=8.24.2
 GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64=c75ea6f594e0a857efa1220fa08088b55e1465a32ab00cfc7aa2ec64cec031fe
 GATE_GITLEAKS_BIN_SHA256_LINUX_X64=64805175c8f88959587ba6afc58210401088206a27ba582cfbb98791137d6208
@@ -92,39 +93,59 @@ GATE_OSV_BIN_SHA256_DARWIN_ARM64=b22c02877a811c8f78956e8643efa554932b7378f590d13
 GATE_OSV_BIN_SHA256_LINUX_X64=fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
 GATE_OSV_BIN_SHA256_LINUX_ARM64=983d22fbad9724514e3fcc6acc83b5fa64c5ffa6b0d9f510028f22c1b223ff81
 GATE_SEMGREP_VERSION=1.185.0
+# Where repository setup installs gitleaks, zizmor and osv-scanner from their release archives
+# when mise cannot (it resolves them through the GitHub API). Lookups accept a copy here only
+# after its hash matches, so hooks and the gate find it from any shell without a PATH change.
+GATE_TOOLCHAIN_BIN="${HOME:-}/.local/share/georoids-toolchain/bin"
 
-# Verify bytes from mise before returning a path that a scanner or installer will execute.
-# These are hashes of the binaries extracted from the checksum-verified official release archives.
-gate__verify_gitleaks_bin() { # <binary>
-  local platform expected actual
+# Verify a pinned tool's bytes, from mise or from setup's release-archive install, before a scanner
+# or installer executes them. These are hashes of the binaries extracted from the
+# checksum-verified official release archives.
+gate__verify_pinned_bin() { # <tool> <binary> <darwin-arm64> <linux-x64> <linux-arm64>
+  local tool="$1" bin="$2" platform expected actual
   platform="$(uname -s)/$(uname -m)"
   case "$platform" in
-    Darwin/arm64) expected="$GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64" ;;
-    Linux/x86_64) expected="$GATE_GITLEAKS_BIN_SHA256_LINUX_X64" ;;
-    Linux/aarch64|Linux/arm64) expected="$GATE_GITLEAKS_BIN_SHA256_LINUX_ARM64" ;;
-    *) echo "✗ gitleaks mise binary verification is unsupported on $platform" >&2; return 1 ;;
+    Darwin/arm64) expected="$3" ;;
+    Linux/x86_64) expected="$4" ;;
+    Linux/aarch64|Linux/arm64) expected="$5" ;;
+    *) echo "✗ $tool binary verification is unsupported on $platform" >&2; return 1 ;;
   esac
   if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "✗ gitleaks mise binary checksum is missing or invalid for $platform" >&2
+    echo "✗ $tool binary checksum is missing or invalid for $platform" >&2
     return 1
   fi
   if command -v sha256sum >/dev/null 2>&1; then
-    actual="$(sha256sum "$1")" || actual=""
+    actual="$(sha256sum "$bin")" || actual=""
   elif command -v shasum >/dev/null 2>&1; then
-    actual="$(shasum -a 256 "$1")" || actual=""
+    actual="$(shasum -a 256 "$bin")" || actual=""
   else
-    echo "✗ gitleaks mise binary verification requires sha256sum or shasum" >&2
+    echo "✗ $tool binary verification requires sha256sum or shasum" >&2
     return 1
   fi
   actual="${actual%% *}"
   if [[ "$actual" != "$expected" ]]; then
-    echo "✗ gitleaks mise binary checksum mismatch for $1 ($platform); reinstall gitleaks@$GATE_GITLEAKS_VERSION with mise" >&2
+    echo "✗ $tool binary checksum mismatch for $bin ($platform): it is not the pinned release" >&2
     return 1
   fi
 }
 
+gate__verify_gitleaks_bin() { # <binary>
+  gate__verify_pinned_bin gitleaks "$1" "$GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64" \
+    "$GATE_GITLEAKS_BIN_SHA256_LINUX_X64" "$GATE_GITLEAKS_BIN_SHA256_LINUX_ARM64"
+}
+
+gate__verify_zizmor_bin() { # <binary>
+  gate__verify_pinned_bin zizmor "$1" "$GATE_ZIZMOR_BIN_SHA256_DARWIN_ARM64" \
+    "$GATE_ZIZMOR_BIN_SHA256_LINUX_X64" "$GATE_ZIZMOR_BIN_SHA256_LINUX_ARM64"
+}
+
+gate__verify_osv_scanner_bin() { # <binary>
+  gate__verify_pinned_bin osv-scanner "$1" "$GATE_OSV_BIN_SHA256_DARWIN_ARM64" \
+    "$GATE_OSV_BIN_SHA256_LINUX_X64" "$GATE_OSV_BIN_SHA256_LINUX_ARM64"
+}
+
 # Print a gitleaks binary at GATE_GITLEAKS_VERSION: the one on PATH when it is that release (CI
-# installs it there), else mise's repo-pinned installed release.
+# installs it there), else mise's repo-pinned installed release, else setup's verified release copy.
 # Anything else is refused. This lookup never installs tools or changes configuration.
 gate_gitleaks_bin() {
   local bin="" ver="" dir
@@ -136,8 +157,16 @@ gate_gitleaks_bin() {
   # From /, so an untrusted .mise.toml in the committing repo cannot make mise refuse the lookup.
   if command -v mise >/dev/null 2>&1 && dir="$(cd / && mise where "gitleaks@$GATE_GITLEAKS_VERSION" 2>/dev/null)"; then
     for bin in "$dir/gitleaks" "$dir/bin/gitleaks"; do
-      [ ! -x "$bin" ] || { gate__verify_gitleaks_bin "$bin" || return 1; printf '%s' "$bin"; return 0; }
+      [ ! -x "$bin" ] || {
+        gate__verify_gitleaks_bin "$bin" || { echo "✗ reinstall gitleaks@$GATE_GITLEAKS_VERSION with mise" >&2; return 1; }
+        printf '%s' "$bin"; return 0
+      }
     done
+  fi
+  bin="$GATE_TOOLCHAIN_BIN/gitleaks"
+  if [ -x "$bin" ]; then
+    gate__verify_gitleaks_bin "$bin" || { echo "✗ $bin is not the pinned release — rerun reviewed scripts/setup-agent-environment.sh" >&2; return 1; }
+    printf '%s' "$bin"; return 0
   fi
   if [ -n "$ver" ]; then
     echo "✗ gitleaks $ver is on PATH, but the gate pins $GATE_GITLEAKS_VERSION to match CI — run: $(gate__cli_hint gitleaks)" >&2
@@ -154,11 +183,11 @@ gate__version_is() { # <reported> <pin>
   [[ "$reported" =~ (^|[^0-9])${escaped}([^0-9]|$) ]]
 }
 
-# Checksummed mise binary for a pinned release, or a PATH binary at that version.
-# CI puts the checksum-verified archive binary on PATH; mise installs are checked here.
+# A PATH binary at a pinned release, else a checksummed mise install or setup release copy.
+# CI puts the checksum-verified archive binary on PATH; mise and setup installs are checked here.
 gate__pinned_tool() { # <tool> <version> <darwin-arm64> <linux-x64> <linux-arm64> <version-arg>
   local tool="$1" version="$2" sha_darwin="$3" sha_linux_x64="$4" sha_linux_arm64="$5" version_arg="$6"
-  local bin="" reported="" dir expected actual platform
+  local bin="" reported="" dir
   if bin="$(command -v "$tool" 2>/dev/null)"; then
     reported="$("$bin" "$version_arg" 2>/dev/null)" || reported=""
     reported="${reported%%$'\n'*}"
@@ -168,36 +197,21 @@ gate__pinned_tool() { # <tool> <version> <darwin-arm64> <linux-x64> <linux-arm64
     fi
   fi
   if command -v mise >/dev/null 2>&1 && dir="$(cd / && mise where "$tool@$version" 2>/dev/null)"; then
-    platform="$(uname -s)/$(uname -m)"
-    case "$platform" in
-      Darwin/arm64) expected="$sha_darwin" ;;
-      Linux/x86_64) expected="$sha_linux_x64" ;;
-      Linux/aarch64|Linux/arm64) expected="$sha_linux_arm64" ;;
-      *) echo "✗ $tool mise binary verification is unsupported on $platform" >&2; return 1 ;;
-    esac
-    if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
-      echo "✗ $tool mise binary checksum is missing or invalid for $platform" >&2
-      return 1
-    fi
     for bin in "$dir/$tool" "$dir/bin/$tool"; do
       if [[ -x "$bin" ]]; then
-        if command -v sha256sum >/dev/null 2>&1; then
-          actual="$(sha256sum "$bin")" || actual=""
-        elif command -v shasum >/dev/null 2>&1; then
-          actual="$(shasum -a 256 "$bin")" || actual=""
-        else
-          echo "✗ $tool mise binary verification requires sha256sum or shasum" >&2
-          return 1
-        fi
-        actual="${actual%% *}"
-        if [[ "$actual" != "$expected" ]]; then
-          echo "✗ $tool mise binary checksum mismatch for $bin ($platform); reinstall $tool@$version with mise" >&2
-          return 1
-        fi
+        gate__verify_pinned_bin "$tool" "$bin" "$sha_darwin" "$sha_linux_x64" "$sha_linux_arm64" ||
+          { echo "✗ reinstall $tool@$version with mise" >&2; return 1; }
         printf '%s' "$bin"
         return 0
       fi
     done
+  fi
+  bin="$GATE_TOOLCHAIN_BIN/$tool"
+  if [[ -x "$bin" ]]; then
+    gate__verify_pinned_bin "$tool" "$bin" "$sha_darwin" "$sha_linux_x64" "$sha_linux_arm64" ||
+      { echo "✗ $bin is not the pinned release — rerun reviewed scripts/setup-agent-environment.sh" >&2; return 1; }
+    printf '%s' "$bin"
+    return 0
   fi
   if [[ -n "$reported" ]]; then
     echo "✗ $tool on PATH is not $version — run: $(gate__cli_hint "$tool")" >&2

@@ -3,6 +3,9 @@
 set -euo pipefail
 # Local and CI entry for the scanners that are not already the staged gitleaks check.
 # Pre-commit calls `zizmor`. Pre-push calls `pre-push`. CI calls history, semgrep, osv, and zizmor.
+# Pre-push skips Semgrep or osv-scanner, with a warning, only when semgrep.dev or api.osv.dev
+# cannot be reached at all; any HTTP answer, any other probe failure, a finding or a scan error
+# still fails the push. The ranged gitleaks scan always runs.
 
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
@@ -144,11 +147,36 @@ run_cursor_push() {
   gate_secrets_scan_log "refs/remotes/origin/main..HEAD"
 }
 
+# skip_unreachable <url> <scan>: probe <url> with a HEAD request before a pre-push scan that needs
+# it. Without --fail an HTTP error status still exits 0, so any answer means run the scan
+# (return 1). Only curl's no-connection exits skip it (warn, return 0): 5/6 proxy or host not
+# resolved, 7 no connect, 28 no answer in time, 35 TLS handshake, 56 connection dropped (a proxy
+# that refuses the CONNECT, as in Claude's cloud sessions). Any other curl failure, such as a
+# broken local CA bundle, fails the push. CI's Security workflow always runs both scans.
+skip_unreachable() {
+  local rc=0
+  command -v curl >/dev/null 2>&1 || { echo "✗ curl is not on PATH — the $2 pre-push scan needs it to reach $1" >&2; exit 1; }
+  curl --head --silent --output /dev/null --connect-timeout 5 --max-time 15 "$1" </dev/null || rc=$?
+  case "$rc" in
+    0) return 1 ;;
+    5 | 6 | 7 | 28 | 35 | 56)
+      echo "⚠ $2 skipped: $1 is unreachable from this host (curl exit $rc). CI's Security workflow runs it on the pull request." >&2
+      return 0 ;;
+    *)
+      echo "✗ could not probe $1 for the $2 pre-push scan (curl exit $rc, not a refused connection) — fix this host's curl, or let CI's Security workflow run the scan" >&2
+      exit 1 ;;
+  esac
+}
+
 run_pre_push() {
-  local local_ref local_sha remote_sha range count
+  local local_ref local_sha remote_sha range count semgrep=true osv=true
   ensure_tool gate_gitleaks_bin install_gitleaks
-  ensure_tool gate_semgrep_bin install_semgrep
-  ensure_tool gate_osv_scanner_bin install_osv
+  # Probe before requiring a scanner, so a host that cannot reach a scan's server
+  # needs neither that server nor that scanner installed.
+  if skip_unreachable https://semgrep.dev/ semgrep; then semgrep=false; fi
+  if skip_unreachable https://api.osv.dev/ osv-scanner; then osv=false; fi
+  if $semgrep; then ensure_tool gate_semgrep_bin install_semgrep; fi
+  if $osv; then ensure_tool gate_osv_scanner_bin install_osv; fi
   while read -r local_ref local_sha _remote_ref remote_sha; do
     [[ -n "$local_ref" ]] || continue
     if [[ "$local_sha" =~ ^0+$ ]]; then
@@ -174,8 +202,8 @@ run_pre_push() {
     echo "• gitleaks (${range})"
     gate_secrets_scan_log "$range"
   done
-  run_semgrep
-  run_osv
+  if $semgrep; then run_semgrep; fi
+  if $osv; then run_osv; fi
 }
 
 case "${1:-}" in

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise this repository's hook trust with real Git and an isolated home."""
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,25 @@ SOURCE = Path(__file__).resolve().parent.parent
 BUNDLE = ('config/agents/repository.json', 'gate/gate-lib.sh', 'gate/hooks/pre-commit',
           'gate/hooks/pre-push', '.git-hooks/pre-push',
           'scripts/repo-hooks.py', 'scripts/repo-python.sh', 'scripts/setup-agent-environment.sh')
+
+
+def gate_pin(name):
+    lib = (SOURCE / 'gate/gate-lib.sh').read_text()
+    return next(line.split('=', 1)[1].strip('"') for line in lib.splitlines() if line.startswith(name + '='))
+
+
+def pinned_versions():
+    """What each scanner prints for its version at the gate library's pins."""
+    return {'gitleaks': gate_pin('GATE_GITLEAKS_VERSION'),
+            'zizmor': 'zizmor ' + gate_pin('GATE_ZIZMOR_VERSION'),
+            'osv-scanner': 'osv-scanner version: ' + gate_pin('GATE_OSV_SCANNER_VERSION'),
+            'semgrep': gate_pin('GATE_SEMGREP_VERSION')}
+
+
+def write_executable(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    path.chmod(0o755)
 
 
 class HookTrust(unittest.TestCase):
@@ -485,13 +505,16 @@ class SessionBootstrap(unittest.TestCase):
         scripts.mkdir()
         for name in ('setup-agent-environment.sh', 'repo-python.sh'):
             shutil.copy2(SOURCE / 'scripts' / name, scripts / name)
+        (self.root / 'gate').mkdir()
+        shutil.copy2(SOURCE / 'gate/gate-lib.sh', self.root / 'gate/gate-lib.sh')
         self.bin = self.root / 'bin'
         self.bin.mkdir()
-        for name in ('bash', 'dirname', 'touch', 'rm'):
+        for name in ('bash', 'dirname', 'touch', 'rm', 'mkdir', 'mktemp', 'mv', 'cat', 'env'):
             (self.bin / name).symlink_to(shutil.which(name))
         (self.bin / 'python3').symlink_to(sys.executable)
         self.log = self.root / 'commands.jsonl'
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('GIT_', 'PYTHON', 'MISE_', 'npm_', 'NPM_'))}
+        self.env = {k: v for k, v in os.environ.items()
+                    if not k.startswith(('GIT_', 'PYTHON', 'MISE_', 'npm_', 'NPM_', 'CLAUDE_'))}
         self.env.update(HOME=str(self.root), PATH=str(self.bin), SETUP_LOG=str(self.log))
         for name, value in {'.mise.toml': '[tools]\nnode = "24"\n', '.nvmrc': '24\n',
                             '.npmrc': 'yes=false\n', 'package.json': '{"name":"fixture","version":"1.0.0"}\n',
@@ -504,16 +527,23 @@ if sys.argv[1] == 'verify' and os.environ.get('HOOK_VERIFY_ERROR'):
     sys.exit('repo-hooks: ' + os.environ['HOOK_VERIFY_ERROR'])
 sys.exit(int(os.environ.get('HOOK_FAILURE', '0')))
 ''')
-        self.write_script(self.bin / 'uname', '#!/usr/bin/env bash\necho Linux\n')
+        self.write_script(self.bin / 'uname', '#!/usr/bin/env bash\nif [[ "$1" == -m ]]; then echo x86_64; else echo Linux; fi\n')
         self.write_script(self.bin / 'pkg-config', '#!/usr/bin/env bash\nexit 0\n')
         self.write_script(self.bin / 'mise', '''#!/usr/bin/env python3
 import json, os, sys
 with open(os.environ['SETUP_LOG'], 'a') as log:
     log.write(json.dumps(['mise', *sys.argv[1:]]) + '\\n')
+marker = os.path.join(os.path.dirname(os.environ['SETUP_LOG']), 'mise-has-uv')
 if sys.argv[1] == 'exec':
-    assert os.environ.get('MISE_EXEC_AUTO_INSTALL') == 'false' or sys.argv[3:] == ['npm', 'ci']
+    assert os.environ.get('MISE_EXEC_AUTO_INSTALL') == 'false', 'mise exec would auto-install tools'
     os.execvp(sys.argv[3], sys.argv[3:])
-if sys.argv[1] == 'which':
+if sys.argv[1:3] == ['install', 'uv']:
+    open(marker, 'w').close()
+if sys.argv[1:3] == ['which', 'uv']:
+    if not os.path.exists(marker):
+        sys.exit('uv is not installed')
+    print(os.environ['FIXTURE_UV_PATH'])
+elif sys.argv[1] == 'which':
     print(os.environ.get(f'FIXTURE_{sys.argv[2].upper()}_PATH',
                          os.path.join(os.environ['FIXTURE_NODE'], 'bin', sys.argv[2])))
 sys.exit(0)
@@ -531,13 +561,17 @@ if sys.argv[1:3] == ['config', '--get']:
 sys.exit(int(os.environ.get('GIT_FAILURE', '0')))
 ''')
         self.write_script(self.bin / 'node', '#!/usr/bin/env bash\nexit 0\n')
+        # The host already has the gate's pinned scanners and uv, so setup installs none of them.
+        for name, answer in pinned_versions().items():
+            self.write_script(self.bin / name, '#!/usr/bin/env bash\necho "' + answer + '"\n')
+        for name in ('uv', 'uvx'):
+            self.write_script(self.bin / name, '#!/usr/bin/env bash\nexit 0\n')
         # mise resolves node and its npm wrapper inside one installation prefix.
         self.node = self.root / 'node-install'
         (self.node / 'include/node').mkdir(parents=True)
         (self.node / 'lib/node_modules/npm').mkdir(parents=True)
         (self.node / 'bin').mkdir()
-        for name in ('node', 'npm'):
-            self.write_script(self.node / 'bin' / name, '#!/usr/bin/env bash\nexit 0\n')
+        self.write_script(self.node / 'bin/node', '#!/usr/bin/env bash\nexit 0\n')
         self.write_node_version(24, 16, 0)
         (self.node / 'lib/node_modules/npm/package.json').write_text('{"version":"11.12.0"}\n')
         self.env['FIXTURE_NODE'] = str(self.node)
@@ -562,6 +596,8 @@ elif sys.argv[1] == 'ls':
 else:
     sys.exit('Unexpected npm operation')
 ''')
+        # Setup puts the resolved Node's bin first on PATH, so its npm is the one npm ci runs.
+        shutil.copy2(self.bin / 'npm', self.node / 'bin/npm')
 
     @staticmethod
     def write_script(path, text):
@@ -613,6 +649,131 @@ else:
         self.assertNotIn(['mise', 'install'], self.commands())
         self.assertNotIn(['mise', 'trust', str(self.root / '.mise.toml')], self.commands())
         self.assertEqual(self.commands()[0][0:2], ['hooks', 'verify'])
+
+    def test_fresh_setup_asks_mise_only_for_node_and_writes_the_env_file(self):
+        self.assert_ready(self.setup())
+        self.assertEqual([c for c in self.commands() if c[:2] == ['mise', 'install']], [['mise', 'install', 'node']])
+        self.assertIn(['mise', 'exec', '--', 'npm', 'ci'], self.commands())
+        env_file = self.root / '.local/share/georoids-toolchain/env.sh'
+        self.assertIn('export PATH="' + str(self.node / 'bin') + ':$PATH"', env_file.read_text())
+
+    def env_file(self):
+        return self.root / '.local/share/georoids-toolchain/env.sh'
+
+    def env_path(self):
+        """PATH as a shell that sourced env.sh would see it."""
+        line = self.env_file().read_text().strip()
+        self.assertTrue(line.startswith('export PATH="') and line.endswith(':$PATH"'), line)
+        return line[len('export PATH="'):-len(':$PATH"')] + ':' + self.env['PATH']
+
+    def test_missing_uv_comes_from_mise_and_a_rerun_keeps_it(self):
+        for name in ('uv', 'uvx'):
+            (self.bin / name).unlink()
+        uv = self.root / 'uv-install'
+        uv.mkdir()
+        for name in ('uv', 'uvx'):
+            self.write_script(uv / name, '#!/usr/bin/env bash\nexit 0\n')
+        extra = {'FIXTURE_UV_PATH': str(uv / 'uv')}
+        self.assert_ready(self.setup(extra=extra))
+        self.assertIn(['mise', 'install', 'uv'], self.commands())
+        written = self.env_file().read_text()
+        self.assertIn(str(uv), written)
+        # Rerun from a shell that sourced env.sh: uv is now on PATH, and env.sh still names it.
+        self.log.write_text('')
+        self.assert_ready(self.setup(extra={**extra, 'PATH': self.env_path()}))
+        self.assertNotIn(['mise', 'install', 'uv'], self.commands())
+        self.assertEqual(self.env_file().read_text(), written)
+
+    def serve_releases(self):
+        """Serve stand-in gitleaks, zizmor and osv-scanner releases that the fixture gate pins."""
+        served = self.root / 'served'
+        staging = self.root / 'staging'
+        for name in ('tar', 'gzip', 'install', 'sha256sum', 'cp', 'grep', 'chmod'):
+            if not (self.bin / name).exists():
+                (self.bin / name).symlink_to(shutil.which(name))
+        answers = pinned_versions()
+        digests = {}
+        for tool in ('gitleaks', 'zizmor', 'osv-scanner'):
+            text = '#!/usr/bin/env bash\necho "' + answers[tool] + '"\n'
+            digests[tool] = hashlib.sha256(text.encode()).hexdigest()
+            write_executable(staging / tool, text)
+        served.mkdir()
+        gitleaks = gate_pin('GATE_GITLEAKS_VERSION')
+        subprocess.run(['tar', '-czf', str(served / f'gitleaks_{gitleaks}_linux_x64.tar.gz'), '-C', str(staging), 'gitleaks'], check=True)
+        subprocess.run(['tar', '-czf', str(served / 'zizmor-x86_64-unknown-linux-gnu.tar.gz'), '-C', str(staging), 'zizmor'], check=True)
+        shutil.copy2(staging / 'osv-scanner', served / 'osv-scanner_linux_amd64')
+        lib = self.root / 'gate/gate-lib.sh'
+        text = lib.read_text()
+        for tool, variable in (('gitleaks', 'GATE_GITLEAKS_BIN_SHA256'), ('zizmor', 'GATE_ZIZMOR_BIN_SHA256'),
+                               ('osv-scanner', 'GATE_OSV_BIN_SHA256')):
+            for suffix in ('DARWIN_ARM64', 'LINUX_X64', 'LINUX_ARM64'):
+                key = f'{variable}_{suffix}='
+                start = text.index(key)
+                text = text[:start + len(key)] + digests[tool] + text[text.index('\n', start):]
+        lib.write_text(text)
+        # Fake curl logs each URL and copies the served file with its basename to -o.
+        self.write_script(self.bin / 'curl', '''#!/usr/bin/env python3
+import json, os, shutil, sys
+url = next(a for a in sys.argv[1:] if a.startswith('https://'))
+with open(os.environ['SETUP_LOG'], 'a') as log:
+    log.write(json.dumps(['curl', url]) + '\\n')
+source = os.path.join(os.environ['FIXTURE_SERVED'], url.rsplit('/', 1)[1])
+if not os.path.exists(source):
+    sys.exit(22)
+shutil.copy(source, sys.argv[sys.argv.index('-o') + 1])
+''')
+        self.env['FIXTURE_SERVED'] = str(served)
+        for tool in ('gitleaks', 'zizmor', 'osv-scanner'):
+            (self.bin / tool).unlink()
+
+    def test_missing_scanners_come_from_releases_and_hooks_find_them_without_env_file(self):
+        self.serve_releases()
+        self.assert_ready(self.setup())
+        downloads = [c[1] for c in self.commands() if c[0] == 'curl']
+        self.assertEqual(len(downloads), 3, downloads)
+        self.assertTrue(all(url.startswith('https://github.com/') and '/releases/download/v' in url for url in downloads))
+        toolchain = self.root / '.local/share/georoids-toolchain/bin'
+        self.assertEqual(sorted(p.name for p in toolchain.iterdir()), ['gitleaks', 'osv-scanner', 'zizmor'])
+        # env.sh is only for Node: a plain shell's gate lookups find the verified release copies.
+        self.assertNotIn(str(toolchain), self.env_file().read_text())
+        lookup = subprocess.run(
+            [str(self.bin / 'bash'), '-c', 'source gate/gate-lib.sh && gate_gitleaks_bin && echo && gate_zizmor_bin && echo && gate_osv_scanner_bin'],
+            cwd=self.root, env=self.env, text=True, capture_output=True)
+        self.assertEqual(lookup.returncode, 0, lookup.stderr)
+        self.assertEqual(lookup.stdout.split(), [str(toolchain / t) for t in ('gitleaks', 'zizmor', 'osv-scanner')])
+        # A rerun, from env.sh's PATH too, downloads nothing and writes the same env.sh.
+        written = self.env_file().read_text()
+        for path in (self.env['PATH'], self.env_path()):
+            with self.subTest(path=path):
+                self.log.write_text('')
+                self.assert_ready(self.setup(extra={'PATH': path}))
+                self.assertEqual([c for c in self.commands() if c[0] == 'curl'], [])
+                self.assertEqual(self.env_file().read_text(), written)
+        # Other bytes at a release copy's path are refused, and the next setup replaces them.
+        (toolchain / 'zizmor').write_text('#!/usr/bin/env bash\necho "' + pinned_versions()['zizmor'] + ' other"\n')
+        refused = subprocess.run([str(self.bin / 'bash'), '-c', 'source gate/gate-lib.sh && gate_zizmor_bin'],
+                                 cwd=self.root, env=self.env, text=True, capture_output=True)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('is not the pinned release', refused.stderr)
+        self.log.write_text('')
+        self.assert_ready(self.setup())
+        self.assertEqual(len([c for c in self.commands() if c[0] == 'curl']), 1)
+
+    def test_session_hook_adds_env_file_to_the_claude_session_once(self):
+        (self.bin / 'grep').symlink_to(shutil.which('grep'))
+        session_env = self.root / 'claude-session-env'
+        session_env.write_text('export EXISTING=1\n')
+        extra = {'CLAUDE_ENV_FILE': str(session_env)}
+        self.assert_ready(self.setup('--session-hook', extra=extra))
+        self.assert_ready(self.setup('--session-hook', extra=extra))
+        self.assertEqual(session_env.read_text(), f'export EXISTING=1\n. "{self.env_file()}"\n')
+        # A later session resumes warm with its own empty env file, which gets the line once too.
+        warm_env = self.root / 'claude-warm-session-env'
+        warm_env.write_text('')
+        result = self.setup('--session-hook', extra={'CLAUDE_ENV_FILE': str(warm_env)})
+        self.assert_ready(result)
+        self.assertIn('verified without reinstalling', result.stdout)
+        self.assertEqual(warm_env.read_text(), f'. "{self.env_file()}"\n')
 
     def test_changed_inputs_refuse_then_explicit_setup_repairs(self):
         self.assert_ready(self.setup('--session-hook'))
@@ -918,6 +1079,219 @@ class SemgrepLookup(unittest.TestCase):
         self.assertIn('--baseline-commit ' + environment['SECURITY_BASE_SHA'], scan[0])
         self.assertEqual([line for line in runs if line.startswith('ran-from-checkout ')], [])
         self.assertEqual(self.asked_from(), {'/'})
+
+
+class PinnedReleaseInstall(unittest.TestCase):
+    """Setup installs gitleaks, zizmor and osv-scanner from release URLs, hash-checked by the gate."""
+
+    PINNED = '#!/bin/sh\necho the release\n'
+
+    def setUp(self):
+        scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        self.root = Path(scratch.name).resolve()
+        self.bin = self.root / 'bin'
+        self.downloads = self.root / 'downloads'
+        self.served = self.root / 'served'
+        self.served.mkdir()
+        self.home = self.root / 'home'
+        self.toolchain = self.home / '.local/share/georoids-toolchain/bin'
+        write_executable(self.bin / 'uname', '#!/usr/bin/env bash\n'
+                         'if [[ "$1" == -s ]]; then echo "${FIXTURE_SYSTEM:-Linux}"; else echo "${FIXTURE_ARCH:-x86_64}"; fi\n')
+        # Fake curl logs each request, then copies $SERVE to -o, or fails like curl --fail when unset.
+        write_executable(self.bin / 'curl', '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$DOWNLOADS"\n'
+                         '[[ -n "${SERVE:-}" ]] || exit 22\nwhile [[ "$1" != -o ]]; do shift; done\ncp "$SERVE" "$2"\n')
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('GIT_', 'PYTHON', 'MISE_'))}
+        self.env.update(HOME=str(self.home), PATH=str(self.bin) + ':/usr/bin:/bin', DOWNLOADS=str(self.downloads))
+
+    def release(self, name, member, text):
+        """A served release: a .tar.gz holding <member>, or the bare binary when member is None."""
+        staging = self.root / ('staging-' + name)
+        write_executable(staging / (member or 'bare'), text)
+        if member is None:
+            return staging / 'bare'
+        archive = self.served / name
+        subprocess.run(['tar', '-czf', str(archive), '-C', str(staging), member], check=True)
+        return archive
+
+    def install(self, tool, serve=None, extra=None):
+        text = (SOURCE / 'scripts/setup-agent-environment.sh').read_text()
+        start = text.index('install_pinned_release() (')
+        body = text[start:text.index('\n)\n', start) + 3]
+        variable = {'gitleaks': 'GATE_GITLEAKS_BIN_SHA256', 'zizmor': 'GATE_ZIZMOR_BIN_SHA256',
+                    'osv-scanner': 'GATE_OSV_BIN_SHA256'}[tool]
+        digest = hashlib.sha256(self.PINNED.encode()).hexdigest()
+        # The fixture pins the stand-in release's hash on every platform.
+        command = ('set -euo pipefail\nsource "$1"\n'
+                   + ''.join(f'{variable}_{suffix}={digest}\n' for suffix in ('DARWIN_ARM64', 'LINUX_X64', 'LINUX_ARM64'))
+                   + body + '\ninstall_pinned_release "$2"\n')
+        environment = {**self.env, **(extra or {})}
+        if serve is not None:
+            environment['SERVE'] = str(serve)
+        return subprocess.run([shutil.which('bash'), '-c', command, 'fixture', str(SOURCE / 'gate/gate-lib.sh'), tool],
+                              cwd=SOURCE, env=environment, text=True, capture_output=True)
+
+    def test_verified_archive_installs_from_the_release_url_without_the_api(self):
+        result = self.install('gitleaks', serve=self.release('gitleaks.tar.gz', 'gitleaks', self.PINNED))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.toolchain / 'gitleaks').read_text(), self.PINNED)
+        requested = self.downloads.read_text()
+        version = gate_pin('GATE_GITLEAKS_VERSION')
+        self.assertIn(f'https://github.com/gitleaks/gitleaks/releases/download/v{version}/gitleaks_{version}_linux_x64.tar.gz', requested)
+        self.assertNotIn('api.github.com', requested)
+        # The gate's lookup finds the verified copy from a shell that never changed PATH.
+        lookup = subprocess.run([shutil.which('bash'), '-c', 'source "$1" && GATE_GITLEAKS_BIN_SHA256_LINUX_X64=$2 && '
+                                 'GATE_GITLEAKS_BIN_SHA256_LINUX_ARM64=$2 && GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64=$2 && gate_gitleaks_bin',
+                                 'fixture', str(SOURCE / 'gate/gate-lib.sh'), hashlib.sha256(self.PINNED.encode()).hexdigest()],
+                                cwd=SOURCE, env=self.env, text=True, capture_output=True)
+        self.assertEqual(lookup.returncode, 0, lookup.stderr)
+        self.assertEqual(lookup.stdout, str(self.toolchain / 'gitleaks'))
+
+    def test_each_platform_requests_its_own_release_asset(self):
+        zizmor = gate_pin('GATE_ZIZMOR_VERSION')
+        osv = gate_pin('GATE_OSV_SCANNER_VERSION')
+        cases = [('zizmor', 'Linux', 'aarch64', 'zizmor', f'zizmor/releases/download/v{zizmor}/zizmor-aarch64-unknown-linux-gnu.tar.gz'),
+                 ('zizmor', 'Darwin', 'arm64', 'zizmor', f'zizmor/releases/download/v{zizmor}/zizmor-aarch64-apple-darwin.tar.gz'),
+                 ('osv-scanner', 'Linux', 'x86_64', None, f'osv-scanner/releases/download/v{osv}/osv-scanner_linux_amd64'),
+                 ('osv-scanner', 'Darwin', 'arm64', None, f'osv-scanner/releases/download/v{osv}/osv-scanner_darwin_arm64')]
+        for tool, system, arch, member, asset in cases:
+            with self.subTest(tool=tool, system=system, arch=arch):
+                shutil.rmtree(self.home, ignore_errors=True)
+                self.downloads.unlink(missing_ok=True)
+                served = self.release(f'{tool}-{system}-{arch}', member, self.PINNED)
+                result = self.install(tool, serve=served, extra={'FIXTURE_SYSTEM': system, 'FIXTURE_ARCH': arch})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(asset, self.downloads.read_text())
+                self.assertEqual((self.toolchain / tool).read_text(), self.PINNED)
+
+    def test_other_bytes_or_an_archive_without_the_binary_install_nothing(self):
+        for name, served, message in (
+                ('other bytes', self.release('other.tar.gz', 'gitleaks', '#!/bin/sh\necho other\n'), 'checksum mismatch'),
+                ('no binary', self.release('empty.tar.gz', 'LICENSE', 'license\n'), 'holds no gitleaks binary')):
+            with self.subTest(case=name):
+                result = self.install('gitleaks', serve=served)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+                self.assertIn('Nothing was installed', result.stderr)
+                self.assertFalse((self.toolchain / 'gitleaks').exists())
+
+    def test_failed_download_or_unsupported_host_installs_nothing(self):
+        result = self.install('zizmor')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.toolchain / 'zizmor').exists())
+        self.downloads.unlink()
+        result = self.install('zizmor', extra={'FIXTURE_SYSTEM': 'Darwin', 'FIXTURE_ARCH': 'x86_64'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Darwin x86_64', result.stderr)
+        self.assertFalse(self.downloads.exists())
+
+
+class PrePushReachability(unittest.TestCase):
+    """Pre-push skips Semgrep or osv-scanner only when its server's connection fails."""
+
+    def setUp(self):
+        scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        self.scratch = Path(scratch.name).resolve()
+        self.bin = self.scratch / 'bin'
+        self.checkout = self.scratch / 'checkout'
+        self.runs = self.scratch / 'runs'
+        system_path = '/usr/bin:/bin'
+        for tool, answer in pinned_versions().items():
+            if tool == 'zizmor':
+                continue
+            # $MISSING names stand-ins that act uninstalled; $FINDINGS names scans that report one.
+            write_executable(self.bin / tool, '#!/bin/sh\n'
+                             'case " ${MISSING:-} " in *" ' + tool + ' "*) exit 127 ;; esac\n'
+                             'case "$1" in version|--version) echo "' + answer + '"; exit 0 ;; esac\n'
+                             'echo "' + tool + ' $*" >> "$RUNS"\n'
+                             'case " ${FINDINGS:-} " in *" ' + tool + ' "*) exit 1 ;; esac\nexit 0\n')
+        # Fake curl: a probe of a host in $UNREACHABLE exits $UNREACHABLE_EXIT (default 56, a proxy
+        # refusing the CONNECT); any other probe gets an HTTP answer, which exits 0 without --fail.
+        write_executable(self.bin / 'curl', '#!/bin/sh\n'
+                         'for arg in "$@"; do case "$arg" in -f|--fail|--fail-with-body) exit 22 ;; esac; done\n'
+                         'for host in ${UNREACHABLE:-}; do case "$*" in *"$host"*) exit "${UNREACHABLE_EXIT:-56}" ;; esac; done\n'
+                         'exit 0\n')
+        for relative in ('gate/gate-lib.sh', 'scripts/security-scan.sh'):
+            target = self.checkout / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(SOURCE / relative, target)
+        self.environment = {'PATH': str(self.bin) + ':' + system_path, 'HOME': str(self.scratch / 'home'),
+                            'RUNS': str(self.runs), 'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1',
+                            'GIT_AUTHOR_NAME': 'Fixture', 'GIT_AUTHOR_EMAIL': 'fixture@example.invalid',
+                            'GIT_COMMITTER_NAME': 'Fixture', 'GIT_COMMITTER_EMAIL': 'fixture@example.invalid'}
+        self.git('init', '-q')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'base')
+        self.base = self.git('rev-parse', 'HEAD')
+        (self.checkout / 'change.txt').write_text('change\n')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'change')
+        self.tip = self.git('rev-parse', 'HEAD')
+        self.environment['SECURITY_BASE_SHA'] = self.base
+
+    def git(self, *arguments):
+        return subprocess.run(['git', *arguments], cwd=self.checkout, env=self.environment,
+                              text=True, capture_output=True, check=True).stdout.strip()
+
+    def push(self, **extra):
+        self.runs.unlink(missing_ok=True)
+        refs = f'refs/heads/fix {self.tip} refs/heads/fix {self.base}\n'
+        return subprocess.run([shutil.which('bash'), 'scripts/security-scan.sh', 'pre-push'], input=refs,
+                              cwd=self.checkout, env={**self.environment, **extra}, text=True, capture_output=True)
+
+    def ran(self):
+        return [line.split(' ', 1)[0] for line in self.runs.read_text().splitlines()] if self.runs.exists() else []
+
+    def test_reachable_servers_run_every_scan(self):
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sorted(set(self.ran())), ['gitleaks', 'osv-scanner', 'semgrep'])
+        self.assertNotIn('skipped', result.stderr)
+
+    def test_unreachable_servers_skip_those_scans_with_a_warning_even_without_the_scanners(self):
+        result = self.push(UNREACHABLE='semgrep.dev api.osv.dev', MISSING='semgrep osv-scanner')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(set(self.ran()), {'gitleaks'})
+        for scan, url in (('semgrep', 'https://semgrep.dev/'), ('osv-scanner', 'https://api.osv.dev/')):
+            self.assertIn(f'{scan} skipped: {url} is unreachable from this host (curl exit 56)', result.stderr)
+        self.assertIn("CI's Security workflow", result.stderr)
+
+    def test_one_unreachable_server_skips_only_its_scan(self):
+        for unreachable, kept in (('semgrep.dev', 'osv-scanner'), ('api.osv.dev', 'semgrep')):
+            with self.subTest(unreachable=unreachable):
+                result = self.push(UNREACHABLE=unreachable)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(set(self.ran()), {'gitleaks', kept})
+
+    def test_a_reachable_scan_still_fails_the_push_when_the_other_is_skipped(self):
+        for unreachable, finding in (('semgrep.dev', 'osv-scanner'), ('api.osv.dev', 'semgrep')):
+            with self.subTest(unreachable=unreachable):
+                result = self.push(UNREACHABLE=unreachable, FINDINGS=finding)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(finding, self.ran())
+
+    def test_a_reachable_server_still_needs_its_scanner(self):
+        result = self.push(MISSING='osv-scanner')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('osv-scanner', result.stderr)
+
+    def test_every_no_connection_exit_skips_and_any_other_probe_failure_fails(self):
+        for code in ('5', '6', '7', '28', '35'):
+            with self.subTest(code=code):
+                result = self.push(UNREACHABLE='semgrep.dev', UNREACHABLE_EXIT=code)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'curl exit {code})', result.stderr)
+                self.assertNotIn('semgrep', self.ran())
+        result = self.push(UNREACHABLE='semgrep.dev', UNREACHABLE_EXIT='77')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('curl exit 77, not a refused connection', result.stderr)
+        self.assertNotIn('semgrep', self.ran())
+
+    def test_the_secret_scan_always_runs_and_still_fails_the_push(self):
+        result = self.push(UNREACHABLE='semgrep.dev api.osv.dev', FINDINGS='gitleaks')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(set(self.ran()), {'gitleaks'})
 
 
 class PytestSubtestReporting(unittest.TestCase):

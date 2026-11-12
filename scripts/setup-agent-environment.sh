@@ -108,10 +108,10 @@ install_pinned_release() ( # <gitleaks|zizmor|osv-scanner>
 # archives when the gate's own lookup finds no pinned copy. env.sh records only mise's Node and
 # uv directories, which are the same whatever PATH this run started with.
 install_toolchain() {
-  local dirs=() tool node_path uv_path="" staged joined
+  local tool node_path uv_path="" staged joined
   mise install node
   node_path="$(MISE_EXEC_AUTO_INSTALL=false mise which node)"
-  dirs+=("$(dirname "$node_path")")
+  joined="$(dirname "$node_path")"
   if ! uv_path="$(MISE_EXEC_AUTO_INSTALL=false mise which uv 2>/dev/null)"; then
     uv_path=""
     if ! command -v uv >/dev/null 2>&1 || ! command -v uvx >/dev/null 2>&1; then
@@ -119,8 +119,7 @@ install_toolchain() {
       uv_path="$(MISE_EXEC_AUTO_INSTALL=false mise which uv)"
     fi
   fi
-  [[ -z "$uv_path" ]] || dirs+=("$(dirname "$uv_path")")
-  joined="$(IFS=:; echo "${dirs[*]}")"
+  [[ -z "$uv_path" ]] || joined="$joined:$(dirname "$uv_path")"
   export PATH="$joined:$PATH"
   gate_semgrep_bin >/dev/null 2>&1 || (cd / && mise install "semgrep@$GATE_SEMGREP_VERSION")
   for tool in gitleaks zizmor osv-scanner; do
@@ -129,7 +128,6 @@ install_toolchain() {
   # Written beside env.sh and renamed over it, so a failure leaves an earlier env.sh whole.
   mkdir -p "$(dirname "$env_file")"
   staged="$(mktemp "$env_file.XXXXXX")"
-  joined="$(IFS=:; echo "${dirs[*]}")"
   # shellcheck disable=SC2016 # $PATH is expanded by the shell that sources env.sh
   { printf 'export PATH="%s:$PATH"\n' "$joined" >"$staged" && mv -f "$staged" "$env_file"; } ||
     { rm -f "$staged"; echo "✗ Could not write $env_file; the error is above." >&2; return 1; }

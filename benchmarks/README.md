@@ -307,6 +307,87 @@ records actual joins separately from TCP connections. It measures generator CPU,
 delay alongside server health and client delivery. A shared-host run does not
 establish Railway capacity or prove an independent load generator has headroom.
 
+### Loaded server CPU and allocation profiles
+
+`benchmark:loaded` owns one port-zero server child and ten real negotiated
+synthetic pilots. It uses Node only. Run from the absolute checkout directory,
+with a new artifact directory outside the checkout for each invocation:
+
+```sh
+npm run benchmark:loaded -- --scene natural --warmup 10 --seconds 45 --profile --output /tmp/georoids-natural-profile-1
+npm run benchmark:loaded -- --scene endurance --warmup 10 --seconds 45 --profile --output /tmp/georoids-endurance-profile-1
+npm run benchmark:loaded-summary -- /tmp/georoids-natural-profile-1
+```
+
+The command uses the common-Git heavyweight queue and checkout admission in
+`runner` mode. After closing every owned pilot and awaiting the server's normal
+exit, it invokes the existing runner receipt writer. Admission independently
+waits for the issued process group to disappear before accepting that receipt.
+There is no Astro build or browser process. Run under a process reaper when the
+host's PID 1 does not reap orphaned children.
+
+Both scenes begin with 80 seeded rocks. Five Scouts and five Haulers receive
+explicit positions, motion epochs and fresh keyframes. Five Haulers start with
+actual shared tow-cable attachments. The pilot driver offers 20 movement
+commands and two aimed shots per second. It excludes cargo from its aim targets.
+Ordinary simulation, collision, shot admission, damage, towing, death and respawn
+continue afterward. No measured interval resets health or tops up the field.
+The arrangement places rocks individually on a grid and near the pilots, so it
+does not reproduce a naturally generated regional field or reflective-pocket
+geometry.
+
+`natural`, the default, retains the seeded materials, health and phenomena.
+Destruction and fragmentation change its population. `endurance` starts the
+same rocks as metal with finite health 100000. Reflective phenomena remain and
+can still destroy rocks. This companion keeps most rocks alive for attribution
+of sustained snapshot, collision and tow work. It excludes ordinary material
+destruction frequency. Use the natural scene as the combat evidence and retain
+both scenes' actual measured population ranges.
+
+The server records per-second populations, original-rock survival, damaged
+rocks, live tow targets and their poses, projectiles, memory and simulation
+ticks. A complete workload requires every pilot, positive authoritative damage
+or destruction during measurement, and motion of all five original tow targets.
+Pilot completion additionally requires measured motion acknowledgments,
+authoritative projectiles born afterward, contiguous snapshots and answered
+measured pings. Delivery overruns retain the load driver's report-only 27 Hz and
+250 ms references. They are not capacity certification.
+
+`GEOROIDS_PERFORMANCE=1` enables the existing server histograms. `--profile`
+brackets main-isolate V8 CPU sampling at 1 ms and allocation sampling at 32 KiB,
+including objects collected by both major and minor GC. `server.cpuprofile` and
+`server.heapprofile` contain raw profiles. `server.json` retains whole-process
+CPU counters, metric windows and workload samples. `driver.json` records separate
+generator CPU, source hashes, machine limits and each pilot's delivery evidence.
+`attribution.json` contains raw-profile hashes and self/inclusive sample weights.
+The benchmark retains finalized metric windows in its own collection while the
+measurement runs. It excludes premeasurement IDs, deduplicates repeated reads,
+and freezes the collection immediately after the final export. Missing IDs or
+overlapping windows fail coverage explicitly. `metricWindowCoverage` records the
+actual first/last IDs, count and summed duration; the production eight-window
+diagnostic ring is unchanged. This supports the default 120-second and maximum
+300-second intervals without silently retaining only their final suffix.
+Inclusive rows overlap and must not be summed. Allocation sizes are V8 estimates,
+not exact object counts or a leak test. Profiled runs do not qualify as timing
+comparisons. Repeat attribution, and retain an unprofiled observation separately.
+
+Persistence is excluded by default to isolate simulation and snapshot allocation.
+`--persistence` creates an isolated file-backed world and the real production
+persistence worker inside the new artifact directory. Main-isolate profiles omit
+that worker's stacks; whole-process CPU includes worker threads. The small fixture
+does not represent a large explored world or production disk latency.
+
+For a separately scheduled bounded capacity investigation, `--pilots` accepts
+10, 25, 50 or 100. Extra pilots occupy a declared grid near the same rock field,
+keep real negotiated snapshots and ordinary inputs, and retain the five original
+tows. Use worker persistence, fresh processes and an unprofiled interval at each
+step. Stop before larger steps after workload failure, unproven cleanup or
+generator saturation. Test mode bypasses connection/message admission budgets;
+it retains the game's player ceiling. Shared-host generator limits, evolving
+combat, VM quotas and the small saved world prevent treating this staircase as
+Railway capacity or evidence for 100 human players. No in-game Wiki page changes
+for this measurement tool.
+
 `benchmarks/tcp-proxy.ts` provides a bounded, ordered TCP impairment building block.
 The load driver's `--network normal` and `--network degraded` modes use it against
 the owned local server's WebSocket path. HTTP health probes bypass the proxy to

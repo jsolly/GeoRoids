@@ -153,9 +153,14 @@ test('cache reveal and cargo persist in the same next-second batch, even between
   const commits = vi.spyOn(store, 'checkpoint');
   let restored: GameEngine | undefined;
   try {
-    for (let i = 0; i < 6; i++) {
+    for (let i = 1; i < GLOWTOY.tickFrames; i++) {
       engine.advanceOneFrame();
     }
+    expect(target.glowtoy.charge).toBe(0.95);
+    expect(target.glowtoy.cacheRevealed).toBe(false);
+    expect(engine.getLoot().filter((drop) => drop.kind === 'points')).toEqual([]);
+    engine.advanceOneFrame();
+    expect(target.glowtoy.charge).toBe(0.95 + GLOWTOY.chargePerTick);
     expect(target.glowtoy.cacheRevealed).toBe(true);
     expect(commits).not.toHaveBeenCalled();
     engine.checkpointWorld();
@@ -200,6 +205,57 @@ test('cache reveal and cargo persist in the same next-second batch, even between
     restored?.stopGameLoop();
     engine.stopGameLoop();
     store.close();
+  }
+});
+
+test('a bright crystal guides spiders before the next glow tick, but a world reset removes that light', () => {
+  const engine = new GameEngine(123);
+  const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 8000, y: 8000 });
+  pilot.position = { x: 8000, y: 8000 };
+  pilot.angle = 0;
+  for (const row of engine.getAllAsteroids()) {
+    engine.removeAsteroid(row.id);
+  }
+  engine.parkSatellitePickups();
+  const target = rock();
+  target.position = { x: 8300, y: 8000 };
+  target.glowtoy = {
+    charge: 0.95,
+    cachePosition: { x: 10000, y: 8000 },
+    cacheRevealed: false,
+  };
+  engine.addAsteroid(target);
+  try {
+    for (let i = 0; i < GLOWTOY.tickFrames; i++) {
+      engine.advanceOneFrame();
+    }
+    pilot.position = { x: 9000, y: 8500 };
+    engine.clearSpiderField();
+    const attracted = engine.spawnTerrainSpider({ x: 8000, y: 8000 }, Math.PI);
+    if (!attracted) {
+      throw new Error('Expected roamer before reset');
+    }
+    engine.advanceOneFrame();
+    const litSpider = engine.getSpiderField().spiders.find((row) => row.id === attracted.id);
+    expect(litSpider?.position.x).toBeGreaterThan(8000);
+    expect(litSpider?.targetId).toBeNull();
+
+    engine.prepareDiagnosticWorld('traversal');
+    for (const row of engine.getAllAsteroids()) {
+      engine.removeAsteroid(row.id);
+    }
+    engine.parkSatellitePickups();
+    engine.clearSpiderField();
+    const unlit = engine.spawnTerrainSpider({ x: 8000, y: 8000 }, Math.PI);
+    if (!unlit) {
+      throw new Error('Expected roamer after reset');
+    }
+    engine.advanceOneFrame();
+    const resetSpider = engine.getSpiderField().spiders.find((row) => row.id === unlit.id);
+    expect(resetSpider?.position.x).toBeLessThan(8000);
+    expect(resetSpider?.targetId).toBeNull();
+  } finally {
+    engine.stopGameLoop();
   }
 });
 

@@ -23,6 +23,11 @@ const CLIPPED_WORD_REACH = 128;
  * `new URL` throw every few bytes would otherwise cost about a second per MiB.
  */
 const MAX_URL_PARSES = 2048;
+/** Bound URL conversion work as well as its count, including percent-encoding expansion. */
+const MAX_URL_TEXT = 65_536;
+const MAX_DIAGNOSTIC_KEY = 128;
+const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}\p{Pc}]$/u;
+const EMAIL_CHARACTER = /^[\p{L}\p{N}\p{M}\p{Pc}.!#$%&'*+\-/=?^`{|}~@]$/u;
 const STATE_KEYS = new Set([
   'version',
   'capturedAt',
@@ -66,13 +71,13 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isWordCharacter(code: number): boolean {
-  return (
-    (code >= 48 && code <= 57) ||
-    (code >= 65 && code <= 90) ||
-    (code >= 97 && code <= 122) ||
-    code === 95
-  );
+/** Step over a whole code point when walking a UTF-16 string backwards. */
+function previousCharacter(value: string, end: number): number {
+  const last = value.charCodeAt(end - 1);
+  const before = value.charCodeAt(end - 2);
+  return last >= 0xdc00 && last <= 0xdfff && before >= 0xd800 && before <= 0xdbff
+    ? end - 2
+    : end - 1;
 }
 
 /**
@@ -89,15 +94,44 @@ function boundedText(value: string): string {
     return value;
   }
   let kept = MAX_DIAGNOSTIC_TEXT - TRUNCATED.length;
-  if (isWordCharacter(value.charCodeAt(kept))) {
-    const reach = kept - CLIPPED_WORD_REACH;
-    while (kept > reach && isWordCharacter(value.charCodeAt(kept - 1))) {
-      kept--;
-    }
-  }
   const last = value.charCodeAt(kept - 1);
   if (last >= 0xd800 && last <= 0xdbff) {
     kept--;
+  }
+  const nextCodePoint = value.codePointAt(kept);
+  const next = nextCodePoint === undefined ? '' : String.fromCodePoint(nextCodePoint);
+  const reach = Math.max(0, kept - CLIPPED_WORD_REACH);
+  let emailStart = kept;
+  while (emailStart > reach) {
+    const at = previousCharacter(value, emailStart);
+    if (at < reach || !EMAIL_CHARACTER.test(value.slice(at, emailStart))) {
+      break;
+    }
+    emailStart = at;
+  }
+  let emailEnd = kept;
+  while (emailEnd < Math.min(value.length, kept + CLIPPED_WORD_REACH)) {
+    const codePoint = value.codePointAt(emailEnd);
+    if (codePoint === undefined) {
+      break;
+    }
+    const character = String.fromCodePoint(codePoint);
+    if (!EMAIL_CHARACTER.test(character)) {
+      break;
+    }
+    emailEnd += character.length;
+  }
+  // Include a nearby @ on either side of the cut, so a partial local part cannot survive.
+  const emailCut = EMAIL_CHARACTER.test(next) && value.slice(emailStart, emailEnd).includes('@');
+  const word = emailCut ? EMAIL_CHARACTER : WORD_CHARACTER;
+  if (emailCut || word.test(next)) {
+    while (kept > reach) {
+      const at = previousCharacter(value, kept);
+      if (at < reach || !word.test(value.slice(at, kept))) {
+        break;
+      }
+      kept = at;
+    }
   }
   return `${value.slice(0, kept)}${TRUNCATED}`;
 }
@@ -121,7 +155,12 @@ function jsonValue(value: unknown, depth = 0): DebugJsonValue {
   if (object(value) && Object.keys(value).length <= 128) {
     const result: { [key: string]: DebugJsonValue } = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      if (
+        key.length > MAX_DIAGNOSTIC_KEY ||
+        key === '__proto__' ||
+        key === 'constructor' ||
+        key === 'prototype'
+      ) {
         throw new Error('Invalid diagnostic key');
       }
       result[key] = jsonValue(child, depth + 1);
@@ -201,6 +240,7 @@ export function parseDebugReportSubmission(input: unknown): DebugReportSubmissio
 
 interface UrlBudget {
   remaining: number;
+  textRemaining: number;
 }
 
 /** A clip marker is not evidence: redact the text before it, so no rule can swallow it. */
@@ -214,10 +254,11 @@ function redactText(value: string, secrets: readonly string[], urls: UrlBudget):
   // Scrub patterns first: a pilot named "http" or "Bearer" must not hide their labels.
   let text = dropPathQueries(
     value.replace(/\b(?:https?|wss?):\/\/[^\s"'<>]+/giu, (match) => {
-      if (urls.remaining <= 0) {
-        return '[redacted-url]';
+      if (urls.remaining <= 0 || match.length > urls.textRemaining) {
+        return '[redacted-url-budget]';
       }
       urls.remaining--;
+      urls.textRemaining -= match.length;
       try {
         const url = new URL(match);
         url.username = '';
@@ -275,7 +316,7 @@ export function sanitizeDebugDiagnostics(
   snapshot: DebugDiagnosticSnapshot,
   secrets: readonly string[] = []
 ): DebugDiagnosticSnapshot {
-  const urls: UrlBudget = { remaining: MAX_URL_PARSES };
+  const urls: UrlBudget = { remaining: MAX_URL_PARSES, textRemaining: MAX_URL_TEXT };
   const state: { [key: string]: DebugJsonValue } = {};
   for (const [key, value] of Object.entries(snapshot.state)) {
     state[key] = sanitize(value, STRUCTURAL_FIELDS.has(key) ? [] : secrets, urls);

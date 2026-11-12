@@ -114,6 +114,19 @@ function failureContext(cause: Exclude<FailureCause, { kind: 'close' }>): Record
   return { deadlineMs: REQUEST_DEADLINE_MS };
 }
 
+/** The rolling budget is derived from actual thread starts, including late handovers. */
+function replacementBudget(starts: readonly number[], now: number) {
+  const active = starts.filter((at) => now - at < REPLACEMENT_WINDOW_MS);
+  const oldest = active[0];
+  return {
+    active,
+    nextAttemptInMs:
+      oldest !== undefined && active.length >= MAX_REPLACEMENTS
+        ? Math.ceil(oldest + REPLACEMENT_WINDOW_MS - now)
+        : 0,
+  };
+}
+
 export class DebugReportError extends Error {
   constructor(
     readonly status: number,
@@ -180,7 +193,7 @@ interface ReportThread {
  *   was posted to. The handover itself is not cancelled by any deadline: a
  *   retired thread still running after `HANDOVER_DEADLINE_MS` is logged and
  *   published as stuck, refusals stop promising a restart, and the
- *   replacement already charged to the budget starts when it finally exits.
+ *   replacement starts and is counted when its predecessor finally exits.
  * - **The budget refills on the clock only.** See `MAX_REPLACEMENTS`. A
  *   replacement is counted when its thread is constructed; the single-flight
  *   `handover` already stops a second request claiming a slot meanwhile, so a
@@ -268,12 +281,12 @@ export class DebugReportWorker {
       return this.handover === 'waiting';
     }
     const now = globalThis.performance.now();
-    this.replacements = this.replacements.filter((at) => now - at < REPLACEMENT_WINDOW_MS);
-    const [oldest] = this.replacements;
-    if (oldest !== undefined && this.replacements.length >= MAX_REPLACEMENTS) {
+    const budget = replacementBudget(this.replacements, now);
+    this.replacements = budget.active;
+    if (budget.nextAttemptInMs > 0) {
       if (!this.exhaustionLogged) {
         this.exhaustionLogged = true;
-        const nextAttemptInMs = Math.ceil(oldest + REPLACEMENT_WINDOW_MS - now);
+        const nextAttemptInMs = budget.nextAttemptInMs;
         logger.error('DEBUG_REPORTS', 'Debug report worker replacement budget is spent', {
           replacements: this.replacements.length,
           windowMs: REPLACEMENT_WINDOW_MS,
@@ -284,18 +297,12 @@ export class DebugReportWorker {
       return false;
     }
     this.exhaustionLogged = false;
-    logger.warn('DEBUG_REPORTS', 'Replacing the debug report worker', {
-      replacement: this.replacements.length + 1,
-      of: MAX_REPLACEMENTS,
-      windowMs: REPLACEMENT_WINDOW_MS,
-    });
     this.handover = 'waiting';
     const predecessor = this.thread;
     // `fail()` terminated the predecessor; its `exit` is when its connection
     // is gone. The deadline reports a thread stuck in a native SQLite call
     // rather than leaving every refusal promising a restart forever. It does
-    // not cancel the replacement: that stays charged once and starts on the
-    // late exit, so one incident costs one attempt.
+    // not cancel the replacement: it starts and spends one attempt on the late exit.
     const deadline = setTimeout(() => {
       if (this.closing === undefined) {
         this.handover = 'overdue';
@@ -326,7 +333,14 @@ export class DebugReportWorker {
       // Counted when it starts, so a start up to an hour after its request
       // does not leave the window early. A construction that throws still
       // spends its slot.
-      this.replacements.push(globalThis.performance.now());
+      const startedAt = globalThis.performance.now();
+      this.replacements = replacementBudget(this.replacements, startedAt).active;
+      this.replacements.push(startedAt);
+      logger.warn('DEBUG_REPORTS', 'Replacing the debug report worker', {
+        replacement: this.replacements.length,
+        of: MAX_REPLACEMENTS,
+        windowMs: REPLACEMENT_WINDOW_MS,
+      });
       try {
         this.thread = this.spawn();
       } catch (error) {

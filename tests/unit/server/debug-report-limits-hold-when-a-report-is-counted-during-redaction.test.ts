@@ -7,9 +7,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { DebugReportStore } from '../../../server/debugReports/store';
 import type { DebugReportSubmission } from '../../../shared-types';
 
-// Redaction runs between the early limit check and the counting transaction.
-// Hooking it lets the same store count another report in exactly that gap,
-// which needs no second connection to the database.
+// Hook the external sanitizer boundary to attempt a reentrant submission.
+// No second connection is needed to exercise the reservation order.
 const gap = vi.hoisted(() => ({ during: null as (() => void) | null }));
 vi.mock('../../../shared/debugReports', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../shared/debugReports')>();
@@ -46,7 +45,7 @@ function submission(): DebugReportSubmission {
   };
 }
 
-test('a report counted while another is being redacted is still refused at the limit', () => {
+test('a report reserves its last slot before another report can enter during redaction', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-debug-limits-'));
   cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
   const store = new DebugReportStore({
@@ -60,11 +59,11 @@ test('a report counted while another is being redacted is still refused at the l
   store.accept(submission(), 'pilot', {}, now);
   store.accept(submission(), 'pilot', {}, now);
   gap.during = () => {
-    expect(store.accept(submission(), 'pilot', {}, now).state).toBe('pending');
+    expect(() => store.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
   };
-  // Two of three were counted when this upload passed its early check; the third
-  // was counted during its redaction, so only the transaction can see the limit.
-  expect(() => store.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
+  // The outer attempt owns the third slot before its sanitizer runs, so the
+  // reentrant attempt is refused before it can sanitize or persist anything.
+  expect(store.accept(submission(), 'pilot', {}, now).state).toBe('pending');
   expect(gap.during).toBeNull();
   expect(store.diagnostics().pending).toBe(3);
 });

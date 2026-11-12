@@ -113,7 +113,7 @@
     "prettier-plugin-svelte": "4.1.1",
     "railway": "3.16.0",
     "shadcn-svelte": "1.7.0",
-    "svelte-check": "4.7.6",
+    "svelte-check": "4.7.8",
     "tailwind-variants": "4.0.1",
     "ts-prune": "0.10.3",
     "vitest": "^5.0.5",

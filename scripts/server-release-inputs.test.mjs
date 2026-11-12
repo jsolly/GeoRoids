@@ -40,6 +40,7 @@ test('shared modules and manifests require a server release; client sources do n
       'src/runtime.ts',
       'src/render.ts',
       'shared/state.ts',
+      '.mise.toml',
       'config'
     );
     git('commit', '-qm', message);
@@ -52,6 +53,7 @@ test('shared modules and manifests require a server release; client sources do n
     mkdirSync(join(cwd, 'src'));
     mkdirSync(join(cwd, 'shared'));
     write('package.json', '{"private":true}');
+    write('.mise.toml', '[tools]\nnode = "26"\n');
     write('astro.config.mjs', 'export default {};');
     // Retired owners model historical diffs; the current native owner is checked too.
     write('tsconfig.json', '{"extends":"./config/typescript/project.json"}');
@@ -98,6 +100,7 @@ test('shared modules and manifests require a server release; client sources do n
     assert.equal(requiresServerDeployment(runtime, config, cwd), true);
     let previous = config;
     for (const path of [
+      '.mise.toml',
       'config/typescript/project.json',
       'config/typescript/tsconfig.json',
       'config/typescript/build.json',
@@ -116,6 +119,16 @@ test('shared modules and manifests require a server release; client sources do n
     write('config/quality/prettier.json', '{"singleQuote":true}');
     const quality = commit('quality settings only');
     assert.equal(requiresServerDeployment(previous, quality, cwd), false);
+    // Adding or removing a mise lock changes what Railpack installs, as #929 and #930 did.
+    write('mise.lock', '');
+    git('add', 'mise.lock');
+    git('commit', '-qm', 'lock mise tools');
+    const locked = git('rev-parse', 'HEAD');
+    assert.ok(serverReleaseInputs(cwd).includes('mise.lock'));
+    assert.equal(requiresServerDeployment(quality, locked, cwd), true);
+    git('rm', '-q', 'mise.lock');
+    git('commit', '-qm', 'unlock mise tools');
+    assert.equal(requiresServerDeployment(locked, git('rev-parse', 'HEAD'), cwd), true);
     assert.throws(() => requiresServerDeployment(initial, ui, cwd), /target commit checkout/u);
     assert.throws(
       () => requiresServerDeployment('--all', config, cwd),
@@ -128,6 +141,24 @@ test('shared modules and manifests require a server release; client sources do n
     rmSync(cwd, { recursive: true, force: true });
     Object.assign(process.env, inheritedGit);
   }
+});
+
+test('the Railway server build is given no mise lock', () => {
+  const tracked = execFileSync('git', ['ls-files', '-z', '--', 'mise.lock', '.mise/locks'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  })
+    .split('\0')
+    .filter(Boolean);
+  assert.deepEqual(
+    tracked,
+    [],
+    'Do not track mise.lock or .mise/locks/. Railpack copies .mise.toml and mise.lock, but not ' +
+      'the .mise/locks/ sidecars, into the Railway image and runs `mise install` with its own ' +
+      'mise, which then fails and stops the Railway server build (#929 broke production; #930 ' +
+      'removed the lock). Lift this only for a lock form that the mise bundled in Railpack on ' +
+      'Railway accepts, proven by a successful Railway build of that commit.'
+  );
 });
 
 test('the GeoRoids server graph loads no client sources', () => {

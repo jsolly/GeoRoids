@@ -793,7 +793,7 @@ else:
 
 
 class SemgrepLookup(unittest.TestCase):
-    """mise.lock installs Semgrep under a hashed directory that mise resolves only beside the lock."""
+    """Semgrep comes from PATH at the pin, else from the install mise names when asked from /."""
 
     def setUp(self):
         scratch = tempfile.TemporaryDirectory()
@@ -834,11 +834,11 @@ class SemgrepLookup(unittest.TestCase):
                         '[ "$*" = "where semgrep@' + self.version + '" ] || exit 1\n'
                         'case "$(pwd -P)" in\n' + cases + 'esac\nexit 1')
 
-    def lookup(self, *arguments, cwd=None):
+    def lookup(self, cwd=None):
         return subprocess.run(
             [shutil.which('bash'), '-c',
-             'source "$1"; set -euo pipefail; shift; gate_semgrep_bin "$@"', '_',
-             str(SOURCE / 'gate/gate-lib.sh'), *map(str, arguments)],
+             'source "$1"; set -euo pipefail; gate_semgrep_bin', '_',
+             str(SOURCE / 'gate/gate-lib.sh')],
             cwd=cwd or self.scratch, env=self.environment,
             text=True, capture_output=True, check=False)
 
@@ -846,64 +846,51 @@ class SemgrepLookup(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, str(directory / 'bin/semgrep'))
 
-    def test_install_mise_names_only_beside_the_lock_is_found_from_the_named_checkout(self):
-        beside_lock = self.install('beside-lock')
-        self.mise({self.checkout: beside_lock})
-        self.assertFound(self.lookup(self.checkout), beside_lock)
+    def asked_from(self):
+        return {line.split(' ', 1)[0] for line in self.calls.read_text().splitlines()}
 
-    def test_install_mise_names_from_the_filesystem_root_wins_over_the_checkout(self):
-        from_root, beside_lock = self.install('from-root'), self.install('beside-lock')
-        self.mise({'/': from_root, self.checkout: beside_lock})
-        self.assertFound(self.lookup(self.checkout), from_root)
+    def test_install_mise_names_from_the_filesystem_root_is_found(self):
+        from_root = self.install('from-root')
+        self.mise({'/': from_root})
+        self.assertFound(self.lookup(), from_root)
 
-    def test_root_install_at_another_version_falls_through_to_the_checkout(self):
-        beside_lock = self.install('beside-lock')
-        self.mise({'/': self.install('from-root', '0.0.1'), self.checkout: beside_lock})
-        self.assertFound(self.lookup(self.checkout), beside_lock)
+    def test_mise_is_asked_only_from_the_filesystem_root_whatever_the_working_directory(self):
+        # The checkout's mise config would name another install; the lookup must not see it.
+        decoy = self.install('from-checkout')
+        from_root = self.install('from-root')
+        self.mise({'/': from_root, self.checkout: decoy})
+        self.assertFound(self.lookup(cwd=self.checkout), from_root)
+        self.mise({self.checkout: decoy})
+        result = self.lookup(cwd=self.checkout)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('mise names no install', result.stderr)
+        self.assertEqual(self.asked_from(), {'/'})
 
-    def test_no_named_checkout_never_asks_mise_from_the_working_directory(self):
-        self.mise({self.checkout: self.install('beside-lock')})
-        for arguments in ((), ('',)):
-            with self.subTest(arguments=arguments):
-                result = self.lookup(*arguments, cwd=self.checkout)
-                self.assertEqual(result.returncode, 1, result.stdout)
-                self.assertIn('semgrep ' + self.version, result.stderr)
-        self.assertEqual({line.split(' ', 1)[0] for line in self.calls.read_text().splitlines()}, {'/'})
-
-    def test_checkout_that_is_missing_or_a_file_is_refused(self):
-        self.mise({self.checkout: self.install('beside-lock')})
-        regular_file = self.scratch / 'file'
-        regular_file.write_text('')
-        for named in (self.scratch / 'missing', regular_file):
-            with self.subTest(named=named.name):
-                self.assertEqual(self.lookup(named).returncode, 1)
-
-    def test_install_at_another_version_everywhere_is_refused(self):
-        self.mise({'/': self.install('from-root', '0.0.1'),
-                   self.checkout: self.install('beside-lock', '0.0.2')})
-        result = self.lookup(self.checkout)
+    def test_install_at_another_version_is_refused(self):
+        self.mise({'/': self.install('from-root', '0.0.1')})
+        result = self.lookup()
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn('mise names no install', result.stderr)
 
     def test_semgrep_on_path_at_the_pin_is_used_without_asking_mise(self):
         self.mise({'/': self.install('from-root')})
         self.executable(self.bin / 'semgrep', 'echo ' + self.version)
-        result = self.lookup(self.checkout)
+        result = self.lookup()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, str(self.bin / 'semgrep'))
         self.assertFalse(self.calls.exists())
 
     def test_semgrep_on_path_at_another_version_falls_through_to_mise(self):
-        beside_lock = self.install('beside-lock')
-        self.mise({self.checkout: beside_lock})
+        from_root = self.install('from-root')
+        self.mise({'/': from_root})
         self.executable(self.bin / 'semgrep', 'echo 0.0.1')
-        self.assertFound(self.lookup(self.checkout), beside_lock)
+        self.assertFound(self.lookup(), from_root)
         self.mise({})
-        result = self.lookup(self.checkout)
+        result = self.lookup()
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn('semgrep on PATH is not ' + self.version, result.stderr)
 
-    def test_security_scan_finds_the_install_beside_its_own_checkout(self):
+    def test_security_scan_runs_the_install_mise_names_from_the_filesystem_root(self):
         for relative in ('gate/gate-lib.sh', 'scripts/security-scan.sh'):
             target = self.checkout / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -920,16 +907,17 @@ class SemgrepLookup(unittest.TestCase):
         git('add', '.')
         git('commit', '-qm', 'fixture')
         environment['SECURITY_BASE_SHA'] = git('rev-parse', 'HEAD')
-        beside_lock = self.install('beside-lock')
-        self.mise({self.checkout: beside_lock})
+        self.mise({'/': self.install('from-root'), self.checkout: self.install('from-checkout')})
         result = subprocess.run([shutil.which('bash'), 'scripts/security-scan.sh', 'semgrep'],
                                 cwd=self.checkout, env=environment, text=True, capture_output=True,
                                 check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        scan = [line for line in (self.scratch / 'semgrep-runs').read_text().splitlines()
-                if line.startswith('ran-beside-lock scan ')]
+        runs = (self.scratch / 'semgrep-runs').read_text().splitlines()
+        scan = [line for line in runs if line.startswith('ran-from-root scan ')]
         self.assertEqual(len(scan), 1, result.stdout + result.stderr)
         self.assertIn('--baseline-commit ' + environment['SECURITY_BASE_SHA'], scan[0])
+        self.assertEqual([line for line in runs if line.startswith('ran-from-checkout ')], [])
+        self.assertEqual(self.asked_from(), {'/'})
 
 
 class PytestSubtestReporting(unittest.TestCase):

@@ -76,7 +76,7 @@ gate__on_commit_err() {
 # The gitleaks release this gate and .github/workflows/ci.yml both pin.
 # Releases differ in their default rules, so a scan on another release can pass here and fail in CI,
 # or the reverse. Update the release, binary hashes, linux_arm64 archive hash, workflows and
-# mise.lock (`mise lock`) together. The archive hash is CI's download check; the separate binary hashes verify mise installs.
+# .mise.toml together. The archive hash is CI's download check; the separate binary hashes verify mise installs.
 GATE_GITLEAKS_VERSION=8.24.2
 GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64=c75ea6f594e0a857efa1220fa08088b55e1465a32ab00cfc7aa2ec64cec031fe
 GATE_GITLEAKS_BIN_SHA256_LINUX_X64=64805175c8f88959587ba6afc58210401088206a27ba582cfbb98791137d6208
@@ -229,27 +229,19 @@ gate__reports_version() { # <bin> <pin>
 # Semgrep publishes a Python distribution. The gate accepts that exact version and does not
 # hash the interpreter entry point, wherever the entry point was found.
 #
-# mise is asked from / first, so that answer does not depend on any checkout's mise config. With a
-# mise.lock, mise installs a Python tool under a hashed directory that it resolves only beside the
-# lock, so the caller may name the checkout that carries the lock and mise is then asked there.
-# That second answer trusts the named checkout: where its directory is mise-trusted, its mise
-# config can run code and choose the directory. The caller is that checkout's own scan script,
-# which is already repository code outside the hook bundle, so nothing new is trusted.
-gate_semgrep_bin() { # [lock-checkout]
-  local bin dir origin
+# mise is asked from /, so the answer does not depend on any checkout's mise config.
+gate_semgrep_bin() {
+  local bin dir
   if bin="$(command -v semgrep 2>/dev/null)" && gate__reports_version "$bin" "$GATE_SEMGREP_VERSION"; then
     printf '%s' "$bin"
     return 0
   fi
-  if command -v mise >/dev/null 2>&1; then
-    for origin in / ${1:+"$1"}; do
-      dir="$(cd "$origin" 2>/dev/null && mise where "semgrep@$GATE_SEMGREP_VERSION" 2>/dev/null)" || continue
-      for bin in "$dir/semgrep" "$dir/bin/semgrep"; do
-        if [[ -x "$bin" ]] && gate__reports_version "$bin" "$GATE_SEMGREP_VERSION"; then
-          printf '%s' "$bin"
-          return 0
-        fi
-      done
+  if command -v mise >/dev/null 2>&1 && dir="$(cd / && mise where "semgrep@$GATE_SEMGREP_VERSION" 2>/dev/null)"; then
+    for bin in "$dir/semgrep" "$dir/bin/semgrep"; do
+      if [[ -x "$bin" ]] && gate__reports_version "$bin" "$GATE_SEMGREP_VERSION"; then
+        printf '%s' "$bin"
+        return 0
+      fi
     done
   fi
   if command -v semgrep >/dev/null 2>&1; then

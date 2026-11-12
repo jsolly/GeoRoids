@@ -36,7 +36,10 @@ const report: DebugReportSubmission = {
         releaseId: 'a'.repeat(40),
         message: `Alice Bearer password-123 ${'b'.repeat(64)}`,
         context: {
-          nested: { resumeToken: 'private', stack: 'https://example.com/error?secret=abc#private' },
+          nested: {
+            resumeToken: 'private',
+            stack: 'https://example.com/error?secret=abc#private',
+          },
         },
       }),
     ],
@@ -73,7 +76,10 @@ test('report boundary rejects unsupported state dumps and invalid log records wi
   expect(() =>
     parseDebugReportSubmission({
       ...report,
-      diagnostics: { ...report.diagnostics, state: { ...report.diagnostics.state, rawWorld: {} } },
+      diagnostics: {
+        ...report.diagnostics,
+        state: { ...report.diagnostics.state, rawWorld: {} },
+      },
     })
   ).toThrow('Unsupported diagnostic field');
   expect(() =>
@@ -94,7 +100,10 @@ test.each(['client', 'e', '2026', 'http', 'Bearer', 'token', 'password'])(
   'pilot name %s cannot corrupt structural diagnostic fields',
   (nickname) => {
     const snapshot = sanitizeDebugDiagnostics(report.diagnostics, [nickname]);
-    const parsed = parseDebugReportSubmission({ ...report, diagnostics: snapshot });
+    const parsed = parseDebugReportSubmission({
+      ...report,
+      diagnostics: snapshot,
+    });
     expect(parsed.diagnostics.state['capturedAt']).toBe('2026-10-15T11:59:00.000Z');
     const line: unknown = JSON.parse(parsed.diagnostics.recentLogs[0] ?? '');
     expect(line).toMatchObject({
@@ -244,7 +253,7 @@ const RATIO_LIMIT = 10;
  * until a harmless sample spans several scheduler slices, because on a loaded
  * machine a run shorter than one slice often escapes preemption while a longer
  * one never does. Rounds alternate, so load lands on both sides, and each keeps
- * its fastest round. A shape past both a generous multiple of the current harmless baseline is
+ * its fastest round. A shape past a generous multiple of the current harmless baseline is
  * already far beyond the limit, so measuring stops there.
  */
 function workRatio(shape: () => void, harmless: () => void): number {
@@ -409,7 +418,10 @@ test('one sanitizer pass parses 2,048 URLs across state and logs, then redacts t
 function clippedState(state: Record<string, string>) {
   return parseDebugReportSubmission({
     ...report,
-    diagnostics: { ...report.diagnostics, state: { ...report.diagnostics.state, ...state } },
+    diagnostics: {
+      ...report.diagnostics,
+      state: { ...report.diagnostics.state, ...state },
+    },
   });
 }
 
@@ -518,6 +530,8 @@ test('a cut at a complete word preserves it, while Unicode words and email local
     audio: `${prefix(kept - 5)}pilot@domain.example`,
     graphics: `${prefix(kept - 8)}a.b-c+d@domain.example`,
     page: `${prefix(kept - 10)}pilot@domain.${'example'.repeat(20)}`,
+    ship: `${prefix(kept - 156)}pilot@${'a'.repeat(60)}.${'b'.repeat(60)}.${'c'.repeat(60)}.example`,
+    world: `${prefix(kept - 200)}${'local'.repeat(40)}@domain.example`,
   });
   expect(parsed.diagnostics.state).toMatchObject({
     browser: `${prefix(kept - 4)}word${marker}`,
@@ -525,8 +539,90 @@ test('a cut at a complete word preserves it, while Unicode words and email local
     audio: `${prefix(kept - 5)}${marker}`,
     graphics: `${prefix(kept - 8)}${marker}`,
     page: `${prefix(kept - 10)}${marker}`,
+    ship: `${prefix(kept - 156)}${marker}`,
+    world: `${prefix(kept - 200)}${marker}`,
   });
   expect(parseDebugReportSubmission(parsed)).toEqual(parsed);
+});
+
+test('every clipped URI and address token drops its entire private span', () => {
+  const kept = cap - marker.length;
+  // Each punctuation class belongs to the actual URL lexer or address span.
+  // Malformed URLs must not become a different, valid URL when clipped.
+  // Assemble fake credentials separately so secret scanning still checks real literals.
+  const tokens = [
+    'https://' + 'private-user:private-password@host.example/path?q=private#fragment',
+    'HTTP://' + 'user.name+tag:p%40ss@host.example:8080/a;b,c!$&()*+=~_%20',
+    'ws://' + 'user@127.0.0.1/path',
+    'WSS://' + 'user:password@[2001:db8::1]:8080/path',
+    'httpſ://' + 'user:password@host.example/path',
+    'https://' + 'user:password@[broken/path',
+    'https://' + 'user:password@host.example:broken/path',
+    'https://' + 'user:password@',
+    'https://',
+    '<https://' + 'user:password@host.example/path>',
+    '"https://' + 'user:password@host.example/path"',
+    "'https://" + "user:password@host.example/path'",
+    'pilot@domain.example',
+    'a.b-c+d@domain.example',
+    '"alice smith"@domain.example',
+    '"alice \\" smith"@domain.example',
+    `pilot@${'a'.repeat(60)}.${'b'.repeat(60)}.${'c'.repeat(60)}.example`,
+    `${'local'.repeat(40)}@domain.example`,
+  ];
+  for (const token of tokens) {
+    for (let cut = 1; cut < token.length; cut++) {
+      const prefix = ' '.repeat(kept - cut);
+      const parsed = clippedState({
+        browser: `${prefix}${token}${' '.repeat(cap)}`,
+      });
+      const expected = `${prefix}${marker}`;
+      expect(parsed.diagnostics.state['browser'], `${JSON.stringify(token)} at ${cut}`).toBe(
+        expected
+      );
+      expect(sanitizeDebugDiagnostics(parsed.diagnostics).state['browser']).toBe(expected);
+      expect(parseDebugReportSubmission(parsed)).toEqual(parsed);
+    }
+  }
+});
+
+test('clipping keeps the credential and fixed-width secret redactors effective', () => {
+  const kept = cap - marker.length;
+  const cases = [
+    ...['authorization', 'cookie', 'password', 'resumeToken', 'secret', 'token'].flatMap(
+      (label) => [`${label}: QQQ.QQQ:QQQ/QQQ`, `${label}=QQQ.QQQ:QQQ/QQQ`]
+    ),
+    'Bearer QQQ.QQQ:QQQ/QQQ',
+    'F'.repeat(64),
+  ];
+  for (const token of cases) {
+    for (let cut = 1; cut < token.length; cut++) {
+      const parsed = clippedState({
+        browser: `${' '.repeat(kept - cut)}${token}${' '.repeat(cap)}`,
+      });
+      const redacted = sanitizeDebugDiagnostics(parsed.diagnostics).state['browser'];
+      expect(redacted, `${token} at ${cut}`).not.toMatch(/[QF]/u);
+    }
+  }
+});
+
+test('clipping preserves complete URLs and balanced quoted evidence', () => {
+  const kept = cap - marker.length;
+  const url = 'https://' + 'user:password@host.example/path?q=private';
+  const prefix = ' '.repeat(kept - url.length);
+  const parsed = clippedState({
+    browser: `${prefix}${url} ${'x'.repeat(100)}`,
+  });
+  expect(sanitizeDebugDiagnostics(parsed.diagnostics).state['browser']).toBe(
+    `${prefix}https://host.example/path${marker}`
+  );
+  const quoted = '"complete evidence"';
+  const quotedPrefix = ' '.repeat(kept - quoted.length);
+  expect(
+    clippedState({ browser: `${quotedPrefix}${quoted} ${'x'.repeat(100)}` }).diagnostics.state[
+      'browser'
+    ]
+  ).toBe(`${quotedPrefix}${quoted}${marker}`);
 });
 
 test('diagnostic keys are bounded without truncating or merging distinct keys', () => {
@@ -544,7 +640,10 @@ test('diagnostic keys are bounded without truncating or merging distinct keys', 
       ...input,
       diagnostics: {
         ...input.diagnostics,
-        state: { ...input.diagnostics.state, browser: { [`${key}x`]: 'rejected' } },
+        state: {
+          ...input.diagnostics.state,
+          browser: { [`${key}x`]: 'rejected' },
+        },
       },
     })
   ).toThrow('Invalid diagnostic key');
@@ -569,6 +668,9 @@ test('URL conversion consumes one aggregate text budget before percent expansion
     Array.from({ length: 30 - converted.length }, () => '[redacted-url-budget]')
   );
   expect(JSON.stringify(browser)).not.toContain('private');
-  const invalid = sanitizeDebugDiagnostics({ state: { browser: 'http://[' }, recentLogs: [] });
+  const invalid = sanitizeDebugDiagnostics({
+    state: { browser: 'http://[' },
+    recentLogs: [],
+  });
   expect(invalid.state['browser']).toBe('[redacted-url]');
 });

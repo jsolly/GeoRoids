@@ -245,9 +245,12 @@ later storage refusals still spend that attempt. An exact retry of an already
 stored report does not. Parsing, which cleans each log record, runs before that reservation.
 
 A diagnostic state string longer than 8,192 UTF-16 units is clipped and ends in
-`…[truncated]`. A split Unicode word or email fragment loses its kept part, up
-to 128 units; complete words at the cut are retained. Redaction preserves the
-marker. Diagnostic object keys over 128 units are rejected rather than clipped,
+`…[truncated]`. A split Unicode word drops up to 128 kept units. A cut inside a
+URI or address drops its whole non-whitespace span, including long local parts,
+domains and URL userinfo; an incomplete double-quoted span is also removed.
+Complete words, URLs and balanced quoted text at the cut are retained. Redaction
+preserves the marker. Diagnostic object keys over 128 units are rejected rather
+than clipped,
 so distinct keys cannot collapse. A client log record over 8 KiB still rejects
 the report. One sanitizer pass converts at most 2,048 URLs and 65,536 units of
 URL input, bounding percent-encoding expansion as well as parse count. Later or

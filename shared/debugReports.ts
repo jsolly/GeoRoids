@@ -27,7 +27,11 @@ const MAX_URL_PARSES = 2048;
 const MAX_URL_TEXT = 65_536;
 const MAX_DIAGNOSTIC_KEY = 128;
 const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}\p{Pc}]$/u;
-const EMAIL_CHARACTER = /^[\p{L}\p{N}\p{M}\p{Pc}.!#$%&'*+\-/=?^`{|}~@]$/u;
+/** Maximal runs: clipping must never turn userinfo into a different, apparently valid host. */
+const CLIP_TOKEN = /\S+/gu;
+const URI_SCHEME = /(?:https?|wss?):\/\//iu;
+/** An escape consumes its following character, so escaped quotes never open or close a span. */
+const QUOTE_BOUNDARY = /\\.|"/gu;
 const STATE_KEYS = new Set([
   'version',
   'capturedAt',
@@ -100,38 +104,45 @@ function boundedText(value: string): string {
   }
   const nextCodePoint = value.codePointAt(kept);
   const next = nextCodePoint === undefined ? '' : String.fromCodePoint(nextCodePoint);
-  const reach = Math.max(0, kept - CLIPPED_WORD_REACH);
-  let emailStart = kept;
-  while (emailStart > reach) {
-    const at = previousCharacter(value, emailStart);
-    if (at < reach || !EMAIL_CHARACTER.test(value.slice(at, emailStart))) {
-      break;
+  let privateStart: number | undefined;
+  CLIP_TOKEN.lastIndex = 0;
+  for (let run = CLIP_TOKEN.exec(value); run; run = CLIP_TOKEN.exec(value)) {
+    if (CLIP_TOKEN.lastIndex <= kept) {
+      continue;
     }
-    emailStart = at;
+    if (run.index <= kept && (run[0].includes('@') || URI_SCHEME.test(run[0]))) {
+      privateStart = run.index;
+    }
+    break;
   }
-  let emailEnd = kept;
-  while (emailEnd < Math.min(value.length, kept + CLIPPED_WORD_REACH)) {
-    const codePoint = value.codePointAt(emailEnd);
-    if (codePoint === undefined) {
-      break;
-    }
-    const character = String.fromCodePoint(codePoint);
-    if (!EMAIL_CHARACTER.test(character)) {
-      break;
-    }
-    emailEnd += character.length;
-  }
-  // Include a nearby @ on either side of the cut, so a partial local part cannot survive.
-  const emailCut = EMAIL_CHARACTER.test(next) && value.slice(emailStart, emailEnd).includes('@');
-  const word = emailCut ? EMAIL_CHARACTER : WORD_CHARACTER;
-  if (emailCut || word.test(next)) {
+  if (privateStart !== undefined) {
+    kept = privateStart;
+  } else if (WORD_CHARACTER.test(next)) {
+    const reach = Math.max(0, kept - CLIPPED_WORD_REACH);
     while (kept > reach) {
       const at = previousCharacter(value, kept);
-      if (at < reach || !word.test(value.slice(at, kept))) {
+      if (at < reach || !WORD_CHARACTER.test(value.slice(at, kept))) {
         break;
       }
       kept = at;
     }
+  }
+  // A quoted local part or diagnostic value can include whitespace. Do not retain
+  // an earlier piece when clipping removes its closing quote or a later token.
+  let quoteStart: number | undefined;
+  QUOTE_BOUNDARY.lastIndex = 0;
+  const prefix = value.slice(0, kept);
+  for (
+    let boundary = QUOTE_BOUNDARY.exec(prefix);
+    boundary;
+    boundary = QUOTE_BOUNDARY.exec(prefix)
+  ) {
+    if (boundary[0] === '"') {
+      quoteStart = quoteStart === undefined ? boundary.index : undefined;
+    }
+  }
+  if (quoteStart !== undefined) {
+    kept = quoteStart;
   }
   return `${value.slice(0, kept)}${TRUNCATED}`;
 }
@@ -316,7 +327,10 @@ export function sanitizeDebugDiagnostics(
   snapshot: DebugDiagnosticSnapshot,
   secrets: readonly string[] = []
 ): DebugDiagnosticSnapshot {
-  const urls: UrlBudget = { remaining: MAX_URL_PARSES, textRemaining: MAX_URL_TEXT };
+  const urls: UrlBudget = {
+    remaining: MAX_URL_PARSES,
+    textRemaining: MAX_URL_TEXT,
+  };
   const state: { [key: string]: DebugJsonValue } = {};
   for (const [key, value] of Object.entries(snapshot.state)) {
     state[key] = sanitize(value, STRUCTURAL_FIELDS.has(key) ? [] : secrets, urls);

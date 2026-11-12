@@ -151,7 +151,7 @@
     "shared/contourLock.ts": "sha256:8bb4ed4b2c74bf6fea4d5836ef48ac096f1dd6f125133018004d43fbb91d367e",
     "shared/cooperativeRules.ts": "sha256:be4525cd642746f148cc5d538ebdb9fb7ea14692f652bc0f9eca37ebc50349f4",
     "shared/cooperativeWorld.ts": "sha256:dbed5f7a5ae9295687d3f5030f90c65347aab21ea4d9081ab0e6b945128fe3a6",
-    "shared/debugReports.ts": "sha256:e4f28e3d0dcf3ddabe25d2fcfdaf1a6d97908ed7ffdb3d9574320a62e0fb6614",
+    "shared/debugReports.ts": "sha256:5a49de07dbc2d925312e752aee317353d3e4d16895252f7a0167416199147619",
     "shared/economy.ts": "sha256:2d4525f8a11a6bd967d347753fe8837b4b4c6a4c8ff9adefb1c00da55dc7e2fc",
     "shared/eoSatellites.ts": "sha256:198c46704cc1dddeca402c1bfae14d8fa3ad5329d7a7d9d7b413b65d197be9b6",
     "shared/epochField.ts": "sha256:ef83f6258bc1f007c5e5525f0186facd8087b3457ac2304aa3702426f86ee85e",
@@ -8316,6 +8316,20 @@
     },
     {
       "note": "Reviewed report clipping, bounded URL conversion and failed-attempt accounting against diagnostics and real worker/store tests; documented failed sends using the submission limit. Gameplay controls and demonstrations are unchanged.",
+      "sources": ["shared/debugReports.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed maximal email-token clipping using the real parser and long-domain/local-part regressions; eight deliberate guard defects were rejected and restored. Player controls and demonstrations are unchanged.",
+      "sources": ["shared/debugReports.ts"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Reviewed maximal URI/address clipping and incomplete quoted spans against actual redactor delimiters. All internal cut positions across 18 valid, malformed, partial and quoted token shapes plus credential boundaries passed; ten deliberate guard defects were rejected and restored. Player controls and demonstrations are unchanged.",
       "sources": ["shared/debugReports.ts"],
       "topics": ["hud-network"],
       "media": [],

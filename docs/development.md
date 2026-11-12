@@ -7,13 +7,7 @@ required. Templates used during migration are examples, not an enforced upstream
 Prerequisites: Git, Bash >= 5 and Python >= 3.11. Install mise on non-Linux hosts;
 fresh Linux setup provisions a pinned, checksum-verified public mise binary in
 `/usr/local/bin`, using noninteractive sudo only when needed. The repository's `.mise.toml`
-and `.nvmrc` own its tool pins; `mise.lock` records each tool's download URL and checksum per
-platform so installs need no GitHub API lookup. To bump a pin, edit `.mise.toml`, run
-`mise lock` and commit `.mise.toml`, `mise.lock` and any changed `.mise/locks/` files together. A major-only pin
-such as node stays at its locked patch until `mise lock --bump`. `gate/gate-lib.sh` repeats the
-gitleaks, zizmor, osv-scanner and Semgrep versions and hashes; change them in the same commit.
-
-On a reviewed fresh `origin/main` checkout run:
+and `.nvmrc` own its tool pins. On a reviewed fresh `origin/main` checkout run:
 
 ```bash
 bash scripts/setup-agent-environment.sh

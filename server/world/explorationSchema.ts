@@ -4,6 +4,14 @@ import { isDeepStrictEqual } from 'node:util';
 import { validExploration } from '../../shared/exploration';
 import type { ExplorationTile } from '../../shared-types';
 import { readSavedWorld } from './savedWorld';
+import {
+  canonicalSqliteTable,
+  readSqliteCatalog,
+  readSqliteTable,
+  readSqliteText,
+  type SqliteTableSnapshot,
+  sqliteText,
+} from './sqliteSnapshot';
 
 type ExplorationStorageState = 'legacy' | 'prepared' | 'stale-preparation' | 'active';
 type ExplorationTransition = 'prepare' | 'activate' | 'rollback';
@@ -17,7 +25,7 @@ function hasTileTable(db: DatabaseSync): boolean {
 }
 
 function savedWorldValue(db: DatabaseSync): object | undefined {
-  const rows = db.prepare('SELECT id,json FROM world').all();
+  const rows = db.prepare('SELECT id,json,CAST(json AS BLOB) AS bytes FROM world').all();
   if (rows.length > 1 || (rows[0] && rows[0]['id'] !== 1)) {
     throw new Error('Invalid saved world rows');
   }
@@ -25,7 +33,19 @@ function savedWorldValue(db: DatabaseSync): object | undefined {
   if (!row) {
     return undefined;
   }
-  const value: unknown = JSON.parse(String(row['json']));
+  const json = readSqliteText(row['json'], row['bytes']);
+  // JSON.parse selects the last duplicate key; SQLite JSON paths select the first.
+  // Refuse ambiguous objects before either interpretation can authorize a write.
+  if (
+    db
+      .prepare(
+        "SELECT 1 FROM json_tree(?) WHERE typeof(key)='text' GROUP BY parent,key HAVING count(*)>1 LIMIT 1"
+      )
+      .get(json)
+  ) {
+    throw new Error('Duplicate saved world JSON key');
+  }
+  const value: unknown = JSON.parse(json);
   readSavedWorld(value);
   if (value === null || typeof value !== 'object') {
     throw new Error('Invalid saved world');
@@ -63,24 +83,23 @@ function tileRows(db: DatabaseSync): ExplorationTile[] {
 }
 
 function tableSchema(db: DatabaseSync, table: 'world' | 'exploration') {
-  return db
-    .prepare(
-      "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE tbl_name=? AND name NOT LIKE 'sqlite_%' ORDER BY type,name"
-    )
-    .all(table)
-    .map((row) => ({ ...row }));
+  return readSqliteCatalog(db).filter((entry) => entry.tbl_name === table);
 }
 
 type StoredTiles =
   | { kind: 'absent' }
-  | { kind: 'present'; schema: ReturnType<typeof tableSchema>; rows: ExplorationTile[] };
+  | {
+      kind: 'present';
+      schema: ReturnType<typeof tableSchema>;
+      table: SqliteTableSnapshot;
+    };
 
 function storedTiles(db: DatabaseSync): StoredTiles {
   return hasTileTable(db)
     ? {
         kind: 'present',
         schema: tableSchema(db, 'exploration'),
-        rows: tileRows(db).map(({ id, bits }) => ({ id, bits })),
+        table: readSqliteTable(db, 'exploration'),
       }
     : { kind: 'absent' };
 }
@@ -88,11 +107,101 @@ function storedTiles(db: DatabaseSync): StoredTiles {
 function ownedStorage(db: DatabaseSync) {
   return {
     worldSchema: tableSchema(db, 'world'),
-    worldRows: db
-      .prepare('SELECT * FROM world ORDER BY id')
-      .all()
-      .map((row) => ({ ...row })),
+    world: readSqliteTable(db, 'world'),
     exploration: storedTiles(db),
+  };
+}
+
+function worldWithJson(table: SqliteTableSnapshot, json: string): SqliteTableSnapshot {
+  const index = table.columns.indexOf('json');
+  const replace = (values: (typeof table.rows)[number]['values']) =>
+    values.map((value, column) => (column === index ? sqliteText(json) : value));
+  return table.kind === 'rowid'
+    ? {
+        ...table,
+        rows: table.rows.map((row) => ({
+          ...row,
+          values: replace(row.values),
+        })),
+      }
+    : {
+        ...table,
+        rows: table.rows.map((row) => ({
+          ...row,
+          values: replace(row.values),
+        })),
+      };
+}
+
+function rewrittenWorldJson(
+  db: DatabaseSync,
+  change: { kind: 'remove' } | { kind: 'restore'; tiles: ExplorationTile[] }
+): string {
+  const expression =
+    change.kind === 'remove'
+      ? "json_remove(json,'$.exploration')"
+      : "json_set(json,'$.exploration',json(?))";
+  const statement = db.prepare(
+    `SELECT value,CAST(value AS BLOB) AS bytes FROM (SELECT ${expression} AS value FROM world WHERE id=1)`
+  );
+  const row =
+    change.kind === 'remove' ? statement.get() : statement.get(JSON.stringify(change.tiles));
+  return readSqliteText(row?.['value'], row?.['bytes']);
+}
+
+type TileReplacement =
+  | {
+      kind: 'rowid';
+      table: Extract<SqliteTableSnapshot, { kind: 'rowid' }>;
+      writes: { id: string; bits: string; rowid: bigint }[];
+    }
+  | {
+      kind: 'without-rowid';
+      table: Extract<SqliteTableSnapshot, { kind: 'without-rowid' }>;
+      writes: ExplorationTile[];
+    };
+
+function tileReplacement(table: SqliteTableSnapshot, atlas: ExplorationTile[]): TileReplacement {
+  const values = ({ id, bits }: ExplorationTile) =>
+    table.columns.map((column) => sqliteText(column === 'id' ? id : bits));
+  if (table.kind === 'without-rowid') {
+    return {
+      kind: 'without-rowid',
+      writes: atlas,
+      table: canonicalSqliteTable({
+        ...table,
+        rows: atlas.map((tile) => ({ values: values(tile) })),
+      }),
+    };
+  }
+  const idIndex = table.columns.indexOf('id');
+  const existing = new Map(
+    table.rows.map((row) => [JSON.stringify(row.values[idIndex]), row.rowid])
+  );
+  const used = new Set(table.rows.map((row) => row.rowid));
+  let next = 1n;
+  const writes = atlas.map((tile) => {
+    const prior = existing.get(JSON.stringify(sqliteText(tile.id)));
+    if (prior !== undefined) {
+      return { ...tile, rowid: BigInt(prior) };
+    }
+    while (used.has(next.toString())) {
+      next++;
+    }
+    const rowid = next++;
+    used.add(rowid.toString());
+    return { ...tile, rowid };
+  });
+  return {
+    kind: 'rowid',
+    writes,
+    table: canonicalSqliteTable({
+      ...table,
+      rows: writes.map((tile) => ({
+        rowid: tile.rowid.toString(),
+        values: values(tile),
+      })),
+    }),
   };
 }
 
@@ -116,7 +225,10 @@ export function inspectExplorationStorage(db: DatabaseSync): {
     return { state: 'legacy', tiles: legacyTiles(world).length };
   }
   const rows = tileRows(db);
-  if ((!world && rows.length === 0) || (world && !('exploration' in world))) {
+  if (
+    (world === undefined && rows.length === 0) ||
+    (world !== undefined && !('exploration' in world))
+  ) {
     return { state: 'active', tiles: rows.length };
   }
   const atlas = legacyTiles(world);
@@ -126,7 +238,10 @@ export function inspectExplorationStorage(db: DatabaseSync): {
   const expected = new Map(atlas.map(({ id, bits }) => [id, bits]));
   const matches =
     rows.length === atlas.length && rows.every(({ id, bits }) => expected.get(id) === bits);
-  return { state: matches ? 'prepared' : 'stale-preparation', tiles: atlas.length };
+  return {
+    state: matches ? 'prepared' : 'stale-preparation',
+    tiles: atlas.length,
+  };
 }
 
 /** Hash all application tables and schema, including private rows, without printing their contents. */
@@ -135,28 +250,16 @@ export function explorationStorageFingerprint(
   excludedTables: readonly string[] = []
 ): string {
   const hash = createHash('sha256');
-  const schema = db
-    .prepare(
-      "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name"
-    )
-    .all();
+  const schema = readSqliteCatalog(db);
   for (const entry of schema) {
-    if (typeof entry['tbl_name'] === 'string' && excludedTables.includes(entry['tbl_name'])) {
+    if (excludedTables.includes(entry.tbl_name)) {
       continue;
     }
     hash.update(JSON.stringify(['schema', entry]));
-    if (entry['type'] !== 'table' || typeof entry['name'] !== 'string') {
+    if (entry.type !== 'table') {
       continue;
     }
-    const quoted = `"${entry['name'].replaceAll('"', '""')}"`;
-    const rows = db
-      .prepare(`SELECT * FROM ${quoted}`)
-      .all()
-      .map((row) => JSON.stringify(row))
-      .sort();
-    for (const row of rows) {
-      hash.update(JSON.stringify(['row', entry['name'], row]));
-    }
+    hash.update(JSON.stringify(['table', entry.name, readSqliteTable(db, entry.name)]));
   }
   return hash.digest('hex');
 }
@@ -191,9 +294,18 @@ export function transitionExplorationStorage(
     const expected = ownedStorage(db);
     if (action === 'prepare' && before.state !== 'active') {
       const previousTiles = expected.exploration;
-      const atlas = legacyTiles(world)
-        .map(({ id, bits }) => ({ id, bits }))
-        .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+      const atlas = legacyTiles(world).map(({ id, bits }) => ({ id, bits }));
+      const plan = tileReplacement(
+        previousTiles.kind === 'present'
+          ? previousTiles.table
+          : {
+              kind: 'rowid',
+              rowidColumn: 'rowid',
+              columns: ['id', 'bits'],
+              rows: [],
+            },
+        atlas
+      );
       expected.exploration = {
         kind: 'present',
         schema:
@@ -207,33 +319,39 @@ export function transitionExplorationStorage(
                   sql: CREATE_TILE_TABLE,
                 },
               ],
-        rows: atlas,
+        table: plan.table,
       };
       if (previousTiles.kind === 'absent') {
         db.exec(CREATE_TILE_TABLE);
       }
       db.exec('DELETE FROM exploration;');
-      const write = db.prepare('INSERT INTO exploration(id,bits) VALUES(?,?)');
-      for (const { id, bits } of atlas) {
-        write.run(id, bits);
+      if (plan.kind === 'rowid') {
+        const write = db.prepare('INSERT INTO exploration(rowid,id,bits) VALUES(?,?,?)');
+        for (const { id, bits, rowid } of plan.writes) {
+          write.run(rowid, id, bits);
+        }
+      } else {
+        const write = db.prepare('INSERT INTO exploration(id,bits) VALUES(?,?)');
+        for (const { id, bits } of plan.writes) {
+          write.run(id, bits);
+        }
       }
     } else if (action === 'activate' && before.state !== 'active') {
       if (before.state !== 'prepared') {
         throw new Error('Activation requires a current prepared exploration copy');
       }
       if (world && 'exploration' in world) {
-        const { exploration: _atlas, ...metadata } = world;
-        const json = JSON.stringify(metadata);
-        expected.worldRows = expected.worldRows.map((row) => ({ ...row, json }));
+        const json = rewrittenWorldJson(db, { kind: 'remove' });
+        expected.world = worldWithJson(expected.world, json);
         db.prepare('UPDATE world SET json=? WHERE id=1').run(json);
       }
     } else if (action === 'rollback' && expected.exploration.kind === 'present') {
-      const tiles = expected.exploration.rows;
+      const tiles = tileRows(db).map(({ id, bits }) => ({ id, bits }));
       expected.exploration = { kind: 'absent' };
       if (before.state === 'active' && world) {
         // Export current discoveries, including everything learned since activation.
-        const json = JSON.stringify({ ...world, exploration: tiles });
-        expected.worldRows = expected.worldRows.map((row) => ({ ...row, json }));
+        const json = rewrittenWorldJson(db, { kind: 'restore', tiles });
+        expected.world = worldWithJson(expected.world, json);
         db.prepare('UPDATE world SET json=? WHERE id=1').run(json);
       }
       db.exec('DROP TABLE exploration');

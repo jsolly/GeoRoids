@@ -59,6 +59,14 @@ function loadWithLegacyReader(path: string) {
   }
 }
 
+function cli(...args: string[]) {
+  return execFileSync(
+    process.execPath,
+    ['--import', 'tsx', 'scripts/migrate-exploration-storage.ts', ...args],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+  );
+}
+
 test('preparing the captured old schema preserves the old reader, activation retains every discovery, and rollback exports new discoveries', () => {
   const { path, db } = legacyFixture();
   const legacy = loadWithLegacyReader(path);
@@ -68,7 +76,10 @@ test('preparing the captured old schema preserves the old reader, activation ret
   transition(db, 'prepare');
   expect(rawWorld(db)).toBe(before);
   expect(loadWithLegacyReader(path)).toEqual(legacy);
-  expect(inspectExplorationStorage(db)).toEqual({ state: 'prepared', tiles: 2 });
+  expect(inspectExplorationStorage(db)).toEqual({
+    state: 'prepared',
+    tiles: 2,
+  });
   const prepared = explorationStorageFingerprint(db);
   transition(db, 'prepare');
   expect(explorationStorageFingerprint(db)).toBe(prepared);
@@ -142,12 +153,6 @@ test('activation failure rolls back the world rewrite, and malformed legacy disc
 
 test('CLI dry-run is read-only, backups include committed WAL, stale receipts and reused backup paths fail, and receipts expose no pilot data', () => {
   const { path, db } = legacyFixture();
-  const cli = (...args: string[]) =>
-    execFileSync(
-      process.execPath,
-      ['--import', 'tsx', 'scripts/migrate-exploration-storage.ts', ...args],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-    );
   const before = explorationStorageFingerprint(db);
   const output = cli('dry-run', path);
   expect(JSON.parse(output)).toMatchObject({
@@ -242,7 +247,10 @@ test.each([
     name: 'an extra retained column',
     columns: 'id TEXT PRIMARY KEY, bits TEXT NOT NULL, retained TEXT',
   },
-  { name: 'a missing tile primary key', columns: 'id TEXT, bits TEXT NOT NULL' },
+  {
+    name: 'a missing tile primary key',
+    columns: 'id TEXT, bits TEXT NOT NULL',
+  },
   { name: 'nullable tile bits', columns: 'id TEXT PRIMARY KEY, bits TEXT' },
 ])('preparing exploration with $name refuses before changing data', ({ name, columns }) => {
   const { db } = legacyFixture();
@@ -284,5 +292,212 @@ test.each([
   const before = explorationStorageFingerprint(db);
   expect(() => transition(db, 'activate')).toThrow('unrelated saved data');
   expect(explorationStorageFingerprint(db)).toBe(before);
-  expect(inspectExplorationStorage(db)).toEqual({ state: 'prepared', tiles: 2 });
+  expect(inspectExplorationStorage(db)).toEqual({
+    state: 'prepared',
+    tiles: 2,
+  });
 });
+
+test.each([
+  {
+    name: 'a REAL infinity replacing NULL',
+    table: 'auxiliary',
+    value: 'NULL',
+    change: 'value=1e999',
+  },
+  {
+    name: 'a sqliteAux application write',
+    table: 'sqliteAux',
+    value: "'saved'",
+    change: "value='changed'",
+  },
+])('$name invalidates the actual CLI inspection receipt', ({ table, value, change }) => {
+  const { path, db } = legacyFixture();
+  db.exec(`CREATE TABLE ${table}(value); INSERT INTO ${table} VALUES(${value});`);
+  const receipt = JSON.parse(cli('inspect', path)).fingerprint;
+  db.exec(`UPDATE ${table} SET ${change};`);
+  const changed = explorationStorageFingerprint(db);
+  expect(() => cli('prepare', path, receipt, join(dirname(path), 'stale.sqlite'))).toThrow();
+  expect(explorationStorageFingerprint(db)).toBe(changed);
+  expect(inspectExplorationStorage(db).state).toBe('legacy');
+});
+
+test.each([
+  {
+    name: 'REAL infinity replacing NULL',
+    table: 'auxiliary',
+    value: 'NULL',
+    change: 'value=1e999',
+  },
+  {
+    name: 'sqliteAux application data',
+    table: 'sqliteAux',
+    value: "'saved'",
+    change: "value='lost'",
+  },
+])('activation rolls back an unrelated trigger change to $name', ({ table, value, change }) => {
+  const { db } = legacyFixture();
+  db.exec(`CREATE TABLE ${table}(value); INSERT INTO ${table} VALUES(${value});`);
+  transition(db, 'prepare');
+  db.exec(
+    `CREATE TRIGGER corrupt_aux AFTER UPDATE ON world BEGIN UPDATE ${table} SET ${change}; END;`
+  );
+  const before = explorationStorageFingerprint(db);
+  const original = db.prepare(`SELECT typeof(value) type,value FROM ${table}`).get();
+  expect(() => transition(db, 'activate')).toThrow('unrelated saved data');
+  expect(db.prepare(`SELECT typeof(value) type,value FROM ${table}`).get()).toEqual(original);
+  expect(explorationStorageFingerprint(db)).toBe(before);
+  expect(inspectExplorationStorage(db).state).toBe('prepared');
+  expect(db.isTransaction).toBe(false);
+});
+
+test('fingerprints distinguish SQLite storage classes, int64 values, non-finite reals and raw text/blob bytes', () => {
+  const { db } = legacyFixture();
+  db.exec('CREATE TABLE auxiliary(value); INSERT INTO auxiliary VALUES(NULL);');
+  const values = [
+    'NULL',
+    '0',
+    '0.0',
+    '1',
+    '1.0',
+    '1e999',
+    '-1e999',
+    '9223372036854775807',
+    '9223372036854775806',
+    '-9223372036854775808',
+    "''",
+    "x''",
+    "CAST(x'610062' AS TEXT)",
+    "CAST(x'610063' AS TEXT)",
+    "x'610062'",
+    "x'610063'",
+    "CAST(x'ff' AS TEXT)",
+    "CAST(x'fe' AS TEXT)",
+  ];
+  const fingerprints = values.map((value) => {
+    db.exec(`UPDATE auxiliary SET value=${value};`);
+    return explorationStorageFingerprint(db);
+  });
+  expect(new Set(fingerprints).size).toBe(values.length);
+});
+
+test('a sqliteAux index is application schema and invalidates an inspection', () => {
+  const { db } = legacyFixture();
+  const before = explorationStorageFingerprint(db);
+  db.exec('CREATE INDEX sqliteAux_index ON pilots(json);');
+  expect(explorationStorageFingerprint(db)).not.toBe(before);
+});
+
+test('implicit row identities invalidate stale receipts and online backups retain gaps', () => {
+  const { path, db } = legacyFixture();
+  db.exec(
+    "CREATE TABLE auxiliary(value TEXT); INSERT INTO auxiliary(rowid,value) VALUES(7,'one'),(99,'two');"
+  );
+  const before = explorationStorageFingerprint(db);
+  db.exec('UPDATE auxiliary SET rowid=8 WHERE rowid=7;');
+  expect(explorationStorageFingerprint(db)).not.toBe(before);
+  const backupPath = join(dirname(path), 'rowids.sqlite');
+  cli('prepare', path, explorationStorageFingerprint(db), backupPath);
+  const copy = new DatabaseSync(backupPath, { readOnly: true });
+  try {
+    expect(copy.prepare('SELECT rowid,value FROM auxiliary ORDER BY rowid').all()).toEqual(
+      db.prepare('SELECT rowid,value FROM auxiliary ORDER BY rowid').all()
+    );
+  } finally {
+    copy.close();
+  }
+});
+
+test('WITHOUT ROWID tables retain composite keys and exact int64 values', () => {
+  const { path, db } = legacyFixture();
+  db.exec(
+    "CREATE TABLE auxiliary(a TEXT,b INTEGER,value BLOB,PRIMARY KEY(a,b)) WITHOUT ROWID; INSERT INTO auxiliary VALUES('key',9223372036854775807,x'0001');"
+  );
+  const before = explorationStorageFingerprint(db);
+  cli('prepare', path, before, join(dirname(path), 'without-rowid.sqlite'));
+  db.exec('UPDATE auxiliary SET b=9223372036854775806;');
+  expect(explorationStorageFingerprint(db)).not.toBe(before);
+});
+
+test.each([
+  {
+    name: 'generated columns',
+    sql: 'CREATE TABLE auxiliary(value INTEGER,generated INTEGER GENERATED ALWAYS AS(value+1) STORED);',
+  },
+  {
+    name: 'virtual/hidden state',
+    sql: 'CREATE VIRTUAL TABLE auxiliary USING fts5(value);',
+  },
+  {
+    name: 'inaccessible implicit rowids',
+    sql: 'CREATE TABLE auxiliary(rowid,_rowid_,oid,value);',
+  },
+])('unsupported $name fail closed before a CLI mutation', ({ sql }) => {
+  const { path, db } = legacyFixture();
+  db.exec(sql);
+  const world = rawWorld(db);
+  expect(() => explorationStorageFingerprint(db)).toThrow('Unsupported SQLite');
+  expect(() =>
+    cli('prepare', path, 'not-a-receipt', join(dirname(path), 'unsupported.sqlite'))
+  ).toThrow();
+  expect(rawWorld(db)).toBe(world);
+  expect(inspectExplorationStorage(db).state).toBe('legacy');
+});
+
+test('an unrelated AUTOINCREMENT sequence advance rolls back even when its temporary row was deleted', () => {
+  const { db } = legacyFixture();
+  db.exec(
+    "CREATE TABLE auxiliary(id INTEGER PRIMARY KEY AUTOINCREMENT,value TEXT); INSERT INTO auxiliary(value) VALUES('saved');"
+  );
+  transition(db, 'prepare');
+  db.exec(
+    "CREATE TRIGGER advance_sequence AFTER UPDATE ON world BEGIN INSERT INTO auxiliary(value) VALUES('temporary'); DELETE FROM auxiliary WHERE value='temporary'; END;"
+  );
+  const before = explorationStorageFingerprint(db);
+  const sequence = db.prepare("SELECT seq FROM sqlite_sequence WHERE name='auxiliary'").get();
+  expect(() => transition(db, 'activate')).toThrow('unrelated saved data');
+  expect(db.prepare("SELECT seq FROM sqlite_sequence WHERE name='auxiliary'").get()).toEqual(
+    sequence
+  );
+  expect(explorationStorageFingerprint(db)).toBe(before);
+});
+
+test.each(['activate', 'rollback'] satisfies ('activate' | 'rollback')[])(
+  '%s preserves opaque world JSON numbers and nested values',
+  (action) => {
+    const { db } = legacyFixture();
+    transition(db, 'prepare');
+    if (action === 'rollback') {
+      transition(db, 'activate');
+    }
+    const opaque =
+      '"opaque":{"integer":9007199254740993,"huge":9223372036854775808123,"overflow":1e999,"negative":-1e999,"nested":[9007199254740993,{"text":"a\\u0000b"}]}';
+    db.prepare('UPDATE world SET json=? WHERE id=1').run(`${rawWorld(db).slice(0, -1)},${opaque}}`);
+    transition(db, action);
+    expect(rawWorld(db)).toContain(opaque);
+  }
+);
+
+test.each(['"exploration":[]', '"opaque":{"value":1,"value":2}'])(
+  'ambiguous duplicate JSON keys fail closed before preparation: %s',
+  (duplicate) => {
+    const { db } = legacyFixture();
+    const raw = `${rawWorld(db).slice(0, -1)},${duplicate}}`;
+    db.prepare('UPDATE world SET json=? WHERE id=1').run(raw);
+    if (duplicate.startsWith('"exploration"')) {
+      expect(JSON.parse(raw).exploration).toEqual([]);
+      expect(
+        db
+          .prepare(
+            "SELECT json_array_length(json_extract(json,'$.exploration')) AS count FROM world"
+          )
+          .get()?.['count']
+      ).toBe(2);
+    }
+    const before = explorationStorageFingerprint(db);
+    expect(() => transition(db, 'prepare')).toThrow('Duplicate saved world JSON key');
+    expect(rawWorld(db)).toBe(raw);
+    expect(explorationStorageFingerprint(db)).toBe(before);
+    expect(db.isTransaction).toBe(false);
+  }
+);

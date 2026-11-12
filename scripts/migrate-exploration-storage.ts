@@ -1,7 +1,7 @@
 import { closeSync, openSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import process from 'node:process';
-import { DatabaseSync } from 'node:sqlite';
+import { backup, DatabaseSync } from 'node:sqlite';
 import {
   assertExplorationDatabaseIntegrity,
   explorationStorageFingerprint,
@@ -45,17 +45,17 @@ try {
     // Reserve a private new file first. SQLite alone also accepts existing
     // empty files, which must never be mistaken for permission to overwrite.
     closeSync(openSync(backupPath, 'wx', 0o600));
-    // VACUUM INTO includes committed WAL content in one consistent copy.
-    db.prepare('VACUUM INTO ?').run(backupPath);
-    const backup = new DatabaseSync(backupPath, { readOnly: true });
+    // Online backup includes committed WAL and retains implicit row identities.
+    await backup(db, backupPath);
+    const backupDb = new DatabaseSync(backupPath, { readOnly: true });
     try {
-      assertExplorationDatabaseIntegrity(backup);
-      if (explorationStorageFingerprint(backup) !== fingerprint) {
+      assertExplorationDatabaseIntegrity(backupDb);
+      if (explorationStorageFingerprint(backupDb) !== fingerprint) {
         throw new Error('Backup differs from the inspected database');
       }
-      inspectExplorationStorage(backup);
+      inspectExplorationStorage(backupDb);
     } finally {
-      backup.close();
+      backupDb.close();
     }
     transitionExplorationStorage(db, fingerprint, mode);
   }

@@ -33,9 +33,9 @@ schema change also invalidates a receipt.
 
 Each mutation requires the fresh inspection fingerprint and a new absolute
 backup filename. The tool reserves that filename exclusively with permissions
-0600, so even an existing empty file is refused. `VACUUM INTO` includes committed
-WAL content. The tool checks database
-integrity and verifies its complete logical fingerprint before changing source
+0600, so even an existing empty file is refused. SQLite’s online backup API
+includes committed WAL content and preserves implicit row identities. The tool
+checks database integrity and verifies its complete fingerprint before changing source
 data. It checks that fingerprint again under `BEGIN IMMEDIATE`. A concurrent
 write before backup verification or lock acquisition therefore aborts the
 operation. Data and schema changes commit together, and a failure rolls them
@@ -48,6 +48,24 @@ bits. Before committing, the tool compares complete world rows, discovery rows
 and owned schema objects with the expected result of the selected transition.
 An undeclared effect rolls the transaction back. A separate fingerprint protects
 every other application table and schema object.
+
+The fingerprint distinguishes SQLite storage classes, exact 64-bit integers,
+IEEE 754 real values (including infinities), raw TEXT/BLOB bytes and rowids.
+Application names such as `sqliteAux` are included; only the literal `sqlite_`
+internal prefix is excluded, except that `sqlite_sequence` counters are retained.
+Ordinary rowid and WITHOUT ROWID tables are supported. Virtual/shadow tables,
+generated/hidden columns and tables that shadow all three rowid aliases are
+rejected before mutation. Unsupported text encodings in schema or world JSON
+also fail closed; opaque table data retains its raw bytes. Duplicate object keys
+anywhere in world JSON are rejected because JavaScript and SQLite select
+different occurrences.
+
+Preparation retains existing discovery rowids and assigns new tiles unused
+positive rowids. Activation and rollback edit only the exploration JSON path
+using SQLite JSON functions; opaque numeric values never pass through JavaScript
+serialization. JSON whitespace may change. Retained values, world row identity,
+extra columns, discovery rows and associated schema must match the declared
+transition exactly before commit.
 
 A repeated transition is logically idempotent with a fresh fingerprint and a
 new verified backup. `prepare` leaves an already active database untouched.
@@ -62,6 +80,7 @@ Publish only these new files, plus their actual Wiki source review:
 
 - `server/world/savedWorld.ts`
 - `server/world/explorationSchema.ts`
+- `server/world/sqliteSnapshot.ts`
 - `scripts/migrate-exploration-storage.ts`
 - `tests/fixtures/exploration-legacy-world.sql`
 - `tests/unit/server/offline-exploration-storage-transition-preserves-progress.test.ts`

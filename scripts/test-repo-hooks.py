@@ -767,6 +767,13 @@ shutil.copy(source, sys.argv[sys.argv.index('-o') + 1])
         self.assert_ready(self.setup('--session-hook', extra=extra))
         self.assert_ready(self.setup('--session-hook', extra=extra))
         self.assertEqual(session_env.read_text(), f'export EXISTING=1\n. "{self.env_file()}"\n')
+        # A later session resumes warm with its own empty env file, which gets the line once too.
+        warm_env = self.root / 'claude-warm-session-env'
+        warm_env.write_text('')
+        result = self.setup('--session-hook', extra={'CLAUDE_ENV_FILE': str(warm_env)})
+        self.assert_ready(result)
+        self.assertIn('verified without reinstalling', result.stdout)
+        self.assertEqual(warm_env.read_text(), f'. "{self.env_file()}"\n')
 
     def test_changed_inputs_refuse_then_explicit_setup_repairs(self):
         self.assert_ready(self.setup('--session-hook'))
@@ -1190,9 +1197,6 @@ class PrePushReachability(unittest.TestCase):
         self.checkout = self.scratch / 'checkout'
         self.runs = self.scratch / 'runs'
         system_path = '/usr/bin:/bin'
-        for tool in ('gitleaks', 'semgrep', 'osv-scanner'):
-            if shutil.which(tool, path=system_path):
-                self.skipTest(f'a {tool} on {system_path} would answer before the stand-ins')
         for tool, answer in pinned_versions().items():
             if tool == 'zizmor':
                 continue

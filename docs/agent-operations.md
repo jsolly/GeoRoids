@@ -12,6 +12,12 @@ Follow the repository-owned Production smoke workflow and inspect its exact-rele
 
 Manual production smoke requires a full `PRODUCTION_SMOKE_RELEASE_SHA` and unique `PRODUCTION_SMOKE_REQUEST_ID` to select the scenario checkout and correlate its receipt. Use the workflow dispatch inputs `release_sha` and `request_id`. The production runner starts no local server. After a new Railway deployment, follow a fresh smoke. Skipped, cancelled, missing, failed or timed-out smoke remains unverified. Artifacts retain HTTP/assets and protocol observations, descriptive release metadata, accepted-shot evidence, persistence health and owned-pilot cleanup.
 
+Each server-health observation retains only the volume status, sample time and
+available free, database, WAL and warning byte counts. Missing, pending and
+unavailable samples remain explicit, without invented zero counts or raw health
+details. A successful gameplay smoke alone does not establish available disk
+capacity; inspect the recorded volume samples for that acceptance.
+
 Open clients compare their embedded full build identity with static same-origin
 `release.json`, served with `Cache-Control: no-store`. The game, debug page and
 Wiki share a shell-owned notice, with no service worker. Successful checks require

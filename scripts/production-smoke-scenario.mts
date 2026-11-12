@@ -19,6 +19,52 @@ const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+type VolumeEvidence =
+  | { status: 'missing' | 'pending' }
+  | { status: 'unavailable'; sampledAt: number }
+  | {
+      status: 'ok' | 'low';
+      sampledAt: number;
+      freeBytes: number;
+      databaseBytes: number;
+      walBytes: number;
+      warningBytes: number;
+    };
+
+function nonnegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Retain public disk counters only; never copy the complete health payload. */
+function volumeEvidence(value: unknown): VolumeEvidence {
+  if (value === undefined) {
+    return { status: 'missing' };
+  }
+  requireEvidence(isRecord(value), 'Malformed world volume diagnostics');
+  const status = value['status'];
+  if (status === 'pending') {
+    return { status };
+  }
+  const sampledAt = value['sampledAt'];
+  requireEvidence(nonnegativeInteger(sampledAt), 'Malformed world volume diagnostics');
+  if (status === 'unavailable') {
+    return { status, sampledAt };
+  }
+  const freeBytes = value['freeBytes'];
+  const databaseBytes = value['databaseBytes'];
+  const walBytes = value['walBytes'];
+  const warningBytes = value['warningBytes'];
+  requireEvidence(
+    (status === 'ok' || status === 'low') &&
+      nonnegativeInteger(freeBytes) &&
+      nonnegativeInteger(databaseBytes) &&
+      nonnegativeInteger(walBytes) &&
+      nonnegativeInteger(warningBytes),
+    'Malformed world volume diagnostics'
+  );
+  return { status, sampledAt, freeBytes, databaseBytes, walBytes, warningBytes };
+}
 const protocol: unknown = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
 requireEvidence(isRecord(protocol), 'Local snapshot protocol module is malformed');
 const capability = protocol['ASTEROID_INTERACTIONS_CAPABILITY'];
@@ -316,6 +362,7 @@ export async function smoke({
       persistenceMode: 'worker',
       persistenceFailed: false,
       stalls: 0,
+      volume: volumeEvidence(persistence['volume']),
     });
   };
   const checkWire = () => {

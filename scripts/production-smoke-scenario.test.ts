@@ -345,10 +345,29 @@ test('the deployed HTTP assets and genuine current-protocol gameplay produce a c
   await fixture(async (artifacts, reports) => {
     const transport = codedSocket(),
       clock = controlledClock();
+    const volume = {
+      status: 'ok',
+      sampledAt: 10000,
+      freeBytes: 800000000,
+      databaseBytes: 12000000,
+      walBytes: 4096,
+      warningBytes: 384 * 1024 * 1024,
+    };
     const receipt = await runNetworkSmoke({
       scenario: { productionUrl, smoke },
       env,
-      fetcher: clientHttp(),
+      fetcher: clientHttp({
+        world: {
+          ...healthy,
+          world: {
+            ...healthy.world,
+            persistence: {
+              ...healthy.world.persistence,
+              volume: { ...volume, privateHealthField: 'private-volume-detail' },
+            },
+          },
+        },
+      }),
       clock,
       createSocket: transport.createSocket,
       artifacts,
@@ -358,6 +377,13 @@ test('the deployed HTTP assets and genuine current-protocol gameplay produce a c
     assert.deepEqual(receipt.errors, []);
     assert.equal(receipt.requestId, env.PRODUCTION_SMOKE_REQUEST_ID);
     assert.equal(receipt.releaseSha, release);
+    const health = receipt.observations.filter(
+      (observation) => record(observation)['source'] === 'server-health'
+    );
+    assert.equal(health.length, 2);
+    for (const observation of health) {
+      assert.deepEqual(record(observation)['volume'], volume);
+    }
     assert.equal(clock.pending(), 0);
     assert.equal(transport.socket().readyState, WebSocket.CLOSED);
     assert.ok(transport.sent().filter((message) => message['type'] === 'snapshotAck').length >= 3);
@@ -374,7 +400,7 @@ test('the deployed HTTP assets and genuine current-protocol gameplay produce a c
     const retained = JSON.stringify(receipt) + JSON.stringify(evidence);
     assert.doesNotMatch(
       retained,
-      /private-resume-token|private-github-token|resumeToken|authorization/u
+      /private-resume-token|private-github-token|resumeToken|authorization|privateHealthField|private-volume-detail/u
     );
     assert.deepEqual(parseJson(await readFile(join(artifacts, 'receipt.json'), 'utf8')), receipt);
   });
@@ -433,6 +459,96 @@ for (const outcome of [
           /socketSecret/u
         );
       }
+    });
+  });
+}
+for (const volume of [
+  undefined,
+  { status: 'pending', privateDetail: 'private-volume-detail' },
+  { status: 'unavailable', sampledAt: 10000, errorCode: 'private-volume-detail' },
+  {
+    status: 'low',
+    sampledAt: 10000,
+    freeBytes: 1,
+    databaseBytes: 12000000,
+    walBytes: 4096,
+    warningBytes: 384 * 1024 * 1024,
+  },
+]) {
+  test(`volume evidence preserves diagnostic state ${volume?.status ?? 'missing'}`, async () => {
+    await fixture(async (artifacts, reports) => {
+      const transport = codedSocket();
+      const receipt = await runNetworkSmoke({
+        scenario: { productionUrl, smoke },
+        env,
+        fetcher: clientHttp({
+          world: {
+            ...healthy,
+            world: { ...healthy.world, persistence: { ...healthy.world.persistence, volume } },
+          },
+        }),
+        createSocket: transport.createSocket,
+        clock: controlledClock(),
+        artifacts,
+        report: (error) => reports.push(error),
+      });
+      assert.equal(receipt.success, true);
+      const samples = receipt.observations
+        .map(record)
+        .filter((entry) => entry['source'] === 'server-health');
+      assert.equal(samples.length, 2);
+      for (const sample of samples) {
+        assert.equal(record(sample['volume'])['status'], volume?.status ?? 'missing');
+      }
+      assert.doesNotMatch(
+        await readFile(join(artifacts, 'receipt.json'), 'utf8'),
+        /private-volume-detail/u
+      );
+      assert.equal(reports.length, 0);
+    });
+  });
+}
+for (const volume of [
+  null,
+  { status: 'unexpected', sampledAt: 10000, privateDetail: 'private-volume-detail' },
+  { status: 'unavailable', sampledAt: -1 },
+  { status: 'ok', sampledAt: 10000, freeBytes: -1, databaseBytes: 0, walBytes: 0, warningBytes: 1 },
+  {
+    status: 'ok',
+    sampledAt: 10000,
+    freeBytes: 1,
+    databaseBytes: 0,
+    walBytes: 0.5,
+    warningBytes: 1,
+  },
+]) {
+  test(`malformed volume diagnostics fail before gameplay ${JSON.stringify(volume)}`, async () => {
+    await fixture(async (artifacts, reports) => {
+      let launched = false;
+      const receipt = await runNetworkSmoke({
+        scenario: { productionUrl, smoke },
+        env,
+        fetcher: clientHttp({
+          world: {
+            ...healthy,
+            world: { ...healthy.world, persistence: { ...healthy.world.persistence, volume } },
+          },
+        }),
+        clock: controlledClock(),
+        artifacts,
+        report: (error) => reports.push(error),
+        createSocket: () => {
+          launched = true;
+          throw new Error('Must not launch');
+        },
+      });
+      assert.equal(receipt.success, false);
+      assert.equal(launched, false);
+      assert.deepEqual(receipt.errors, ['Malformed world volume diagnostics']);
+      assert.doesNotMatch(
+        await readFile(join(artifacts, 'receipt.json'), 'utf8'),
+        /private-volume-detail/u
+      );
     });
   });
 }

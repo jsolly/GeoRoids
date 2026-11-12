@@ -330,6 +330,7 @@ export class WorldStore {
     this.db = new DatabaseSync(path);
     try {
       this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
+        PRAGMA wal_autocheckpoint=256; PRAGMA journal_size_limit=16777216;
         CREATE TABLE IF NOT EXISTS world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS economy (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);

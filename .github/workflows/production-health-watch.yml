@@ -1,0 +1,29 @@
+---
+name: Production health watch
+'on':
+  schedule:
+    - cron: '3-58/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: production-health-watch
+  cancel-in-progress: false
+jobs:
+  watch:
+    if: github.repository == 'jsolly/GeoRoids' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version-file: .nvmrc
+      - name: Probe production and reconcile the monitor issue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/production-health-watch-entry.ts

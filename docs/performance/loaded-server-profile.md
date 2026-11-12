@@ -30,6 +30,13 @@ four-CPU quota, `cpu.max=400000 100000`, and a 16 GiB memory limit. Server and
 generator shared that quota. The production 24-CPU limit reported by the separate
 operations review is a different configuration, not a measured speed multiplier.
 
+The report was subsequently integrated with `origin/main` at `ed5b79fe`, after
+the Wiki-policy and health/volume-observability changes in PRs 934 and 935. The
+profiled GameEngine, broadcaster, LootManager and snapshot modules are unchanged
+between those revisions, but the newer persistence/volume observer was not
+measured. All numerical results below remain evidence for the historical
+`b741509c` source, not a fresh measurement of the merged tree.
+
 The Node-only tool owns a port-zero server child and real negotiated synthetic
 pilots. Both scenes start with 80 seeded rocks, five Scouts, five Haulers and
 five actual tow-cable attachments. The driver offers 20 movement commands and
@@ -93,11 +100,68 @@ samples and 18.95–19.42% of estimated allocation across its callers. Those cal
 include both recipient loot queries and per-laser arm-range loot queries in
 `resolveEnhancedLaser`; its full cost must not be assigned to snapshot filtering.
 
-The profiles estimate 19.95–22.55 GB allocated per measured window. That figure
-describes sampled allocation churn under profiling, not live RAM. Transformed
-TypeScript modules appear at line 1 in these profiles, so anonymous locations
-coalesce. The decisions above use named methods; raw profiles retain the
-original call frames for further inspection.
+The profiles estimate 19.95–22.55 GB allocated per measured window. The reducer
+sums each unique heap node's exclusive native `selfSize` once. That total equals
+the sum of the reducer's self rows and its root inclusive row. It never sums the
+overlapping inclusive method rows to obtain allocated bytes.
+
+An independent check also walked every raw sample. Tree node IDs and sample
+ordinals are unique, and every sample names an existing node. The native
+per-sample weights differ by 0.0133–0.0314% from the native per-node totals.
+Those are different estimates, so the discrepancy is retained rather than
+forced to zero. The installed Node/V8 profiler header describes randomized
+Poisson sampling at an average byte interval. Here the mean returned sample
+weight is 32,951–32,992 bytes, near the requested 32 KiB interval. Sample entries
+are not an exact allocation-object count.
+
+| Profile | Unique heap nodes | Raw sample entries / unique ordinals | Node `selfSize` sum, GB | Sample-weight excess over node sum | Largest per-second heap-used probe, MB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `natural-p1` | 2114 | 684290 / 684290 | 22.545 | 0.0133% | 143.3 |
+| `endurance-p1` | 1813 | 613680 / 613680 | 20.237 | 0.0314% | 137.2 |
+| `natural-p2` | 2078 | 682818 / 682818 | 22.521 | 0.0296% | 188.4 |
+| `endurance-p2` | 1926 | 605044 / 605044 | 19.945 | 0.0303% | 103.3 |
+
+GB and MB in this table are decimal units. Both collected-object flags were
+enabled, so these estimates describe allocation churn under profiling, not live
+RAM. Per-second RSS probes peaked at 298.2–360.5 MB. Neither sampled live-memory
+probes nor a 45-second allocation profile proves leak freedom. Transformed
+TypeScript modules appear at line 1, so anonymous locations coalesce. The code
+decisions use named methods; raw profiles retain the original call frames.
+
+## Tick, broadcast and GC distributions
+
+These summaries use only finalized, nonoverlapping measured windows. Means are
+total observed duration divided by total sample count; maxima are the largest
+observed values. The p99 columns show the range of each window's histogram
+bucket upper bound. They are not pooled or exact p99 quantiles.
+
+| Session | Tick mean / max, ms | Window tick p99 bounds, ms | Broadcast mean / max, ms | Window broadcast p99 bounds, ms |
+| --- | ---: | ---: | ---: | ---: |
+| `natural-p1` | 3.518 / 33.390 | 8–16.667 | 11.616 / 117.855 | 33.333–50 |
+| `endurance-p1` | 2.733 / 47.223 | 8–16.667 | 8.301 / 111.571 | 33.333 |
+| `natural-p2` | 3.431 / 66.667 | 8–16.667 | 10.769 / 87.701 | 33.333–50 |
+| `endurance-p2` | 2.664 / 34.504 | 8 | 8.558 / 67.327 | 33.333 |
+| `natural-unprofiled` | 2.814 / 31.497 | 8 | 8.640 / 82.655 | 33.333 |
+| `endurance-unprofiled` | 2.104 / 44.598 | 8 | 7.002 / 44.730 | 33.333 |
+| `capacity-10` | 2.185 / 24.909 | 8 | 7.223 / 99.252 | 33.333 |
+| `capacity-25` | 4.656 / 29.543 | 16.667 | 8.067 / 103.257 | 50–100 |
+
+The broadcast histogram includes snapshot and gameplay-event broadcasts, with
+some nested event work. Its mean is not the mean duration of a periodic snapshot
+alone. Tick, broadcast, event-loop and GC timings overlap and cannot be added to
+partition CPU work. Profiled rows also include sampling overhead and evolving
+workloads, so the table makes no causal timing comparison.
+
+| Session | Recorded GC events | Total observed pause, ms | Largest pause, ms | Window GC p99 bounds, ms |
+| --- | ---: | ---: | ---: | ---: |
+| `natural-p1` | 745 | 1589.4 | 36.45 | 8–16.667 |
+| `endurance-p1` | 678 | 1121.7 | 24.80 | 8–16.667 |
+| `natural-p2` | 735 | 1467.2 | 22.29 | 8–16.667 |
+| `endurance-p2` | 686 | 1091.0 | 24.66 | 4–8 |
+| `natural-unprofiled` | 741 | 1349.9 | 25.76 | 4–16.667 |
+| `endurance-unprofiled` | 690 | 1007.1 | 93.08 | 4–16.667 |
+| `capacity-10` | 456 | 671.6 | 16.65 | 8–16.667 |
+| `capacity-25` | 802 | 980.9 | 27.77 | 2–8 |
 
 ## Local capacity observation and its cause
 
@@ -166,9 +230,9 @@ and the committed reducer's `attribution.json`.
 `audit.json` records all source fingerprints, scenario parameters, machine facts,
 raw byte counts/hashes, selected finalized metric window IDs and aggregate work.
 Its SHA-256 is
-`f558631884ba8ae1d39d8dc7df361f3efede95ac59422f57a11c0cbb0d9b43fc`.
+`0c35d157f357794d5e3b1ec85cc060ceff85faf699bf2ffa03eaffb10ac0a5f5`.
 The rerunnable audit tool is `/workspace/work/loaded-profile-audit.py`, SHA-256
-`c0367ebbc4790ad546cd49069046232d8d6b98abba0f2aad01cee5307ed262fb`.
+`631445b65c682480ae591be369a198e8b0d77ac1f03cbb95a643e179ae8d3c57`.
 It verified all eight clean pinned sessions, every retained runner artifact hash
 and all cleanup receipts. It selects the finalized post-boundary window suffix
 that reconciles with the independent measured interval, recording the actual

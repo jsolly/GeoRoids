@@ -166,6 +166,34 @@ Smoke: `curl -i https://georoids-production-2403.up.railway.app/health`. The pla
 
 The former `geoasteroids-production-2403.up.railway.app` hostname returns a Railway edge 404. Use the current `georoids-production-2403.up.railway.app` host for client configuration and verification.
 
+### Production health alerts
+
+`Production health watch` reads the production `/health` every five minutes on
+`main`, independently of CI, deployments and production smoke. Each request and
+body has a 15-second deadline. Three failed probes ten seconds apart open or
+reopen one monitor-owned GitHub issue; two consecutive healthy probes close it.
+Mixed results leave the existing incident unchanged. A healthy first run creates
+no issue. The monitor requires the healthy status and a nonfailed persistence
+worker; HTTP failures, malformed responses and failed persistence alert.
+
+The issue's exact ownership marker and `github-actions[bot]` author identify it,
+including after recovery. Repeated observations make no issue changes; changed
+failure categories update the body. Workflow concurrency serializes scheduled
+and manual runs, and an ambiguous API mutation fails without a blind retry; the
+next run reads the issue state again. Multiple owned issues fail for operator
+reconciliation. No production data or configuration is changed, and only a fixed
+failure category and probe count leave the health response.
+
+The incident body mentions `@jsolly`; subscribe to the monitor issue or watch
+repository issues in GitHub to follow later incidents and recovery. GitHub
+notification preferences determine email/push delivery. The
+five-minute schedule is best effort: GitHub can delay or drop scheduled runs,
+and this is not a strict alerting SLA. Manually dispatch the workflow to check
+monitor operation without forcing an outage; an initially healthy dispatch is
+quiet. Workflow/API failures appear as failed Actions runs and require operator
+attention. This monitor checks availability and persistence, not gameplay or
+browser rendering.
+
 ### Railway preview
 
 One shared Railway environment, `preview`, runs a pull request's server **and** serves its built client from the same origin, so the client's same-origin `/ws` reaches the matching server. Use it to play a change before merge. It is never release evidence.

@@ -22,6 +22,82 @@ export function requireEvidence(condition, message) {
     throw new SmokeFailure(message);
   }
 }
+export async function verifyProductionHttp({
+  url,
+  signal = new AbortController().signal,
+  fetcher = fetch,
+  clock = smokeClock,
+  timeoutMs = 15000,
+  observe = () => {},
+}) {
+  const request = new AbortController();
+  let requestTimer;
+  const expired = new Promise((_, reject) => {
+    requestTimer = clock.setTimeout(() => {
+      reject(new SmokeFailure('Production HTTP request deadline exceeded'));
+      request.abort();
+    }, timeoutMs);
+  });
+  let response;
+  try {
+    response = await Promise.race([
+      fetcher(url, {
+        redirect: 'follow',
+        cache: 'no-store',
+        signal: AbortSignal.any([signal, request.signal]),
+      }),
+      expired,
+    ]);
+    const requested = new URL(url),
+      observed = new URL(response.url);
+    requireEvidence(
+      requested.protocol === 'https:' &&
+        !requested.username &&
+        !requested.password &&
+        observed.origin === requested.origin &&
+        observed.pathname === requested.pathname &&
+        observed.search === requested.search &&
+        !observed.username &&
+        !observed.password &&
+        Number.isInteger(response.status) &&
+        response.status >= 200 &&
+        response.status < 300,
+      'Production HTTP response was unsuccessful or noncanonical'
+    );
+    observe({ url: requested.href, status: response.status });
+    const readBody = async (read, method) => {
+      try {
+        return await Promise.race([read(), expired]);
+      } catch (error) {
+        // biome-ignore lint/style/useErrorCause: JSON parser causes can expose response bodies; normalize before public reporting.
+        throw new SmokeFailure('Production HTTP body failed or timed out', {
+          // JSON parser messages can contain the response body. Keep only a
+          // code-authored diagnostic at this external-data boundary.
+          cause:
+            method === 'json' && error instanceof SyntaxError
+              ? new Error('Production HTTP JSON parsing failed')
+              : smokeCause(error),
+        });
+      } finally {
+        clock.clearTimeout(requestTimer);
+      }
+    };
+    return {
+      url: requested.href,
+      status: response.status,
+      headers: response.headers,
+      text: () => readBody(() => response.text(), 'text'),
+      json: () => readBody(() => response.json(), 'json'),
+      arrayBuffer: () => readBody(() => response.arrayBuffer(), 'arrayBuffer'),
+    };
+  } catch (error) {
+    clock.clearTimeout(requestTimer);
+    request.abort();
+    throw error instanceof SmokeFailure
+      ? error
+      : new SmokeFailure('Production HTTP request failed', { cause: smokeCause(error) });
+  }
+}
 export async function runNetworkSmoke({
   scenario,
   env = process.env,
@@ -58,75 +134,14 @@ export async function runNetworkSmoke({
   };
   let timer;
   let behavior;
-  const verifyHttp = async (url) => {
-    const request = new AbortController();
-    let requestTimer;
-    const expired = new Promise((_, reject) => {
-      requestTimer = clock.setTimeout(() => {
-        reject(new SmokeFailure('Production HTTP request deadline exceeded'));
-        request.abort();
-      }, 15000);
+  const verifyHttp = (url) =>
+    verifyProductionHttp({
+      url,
+      signal,
+      fetcher,
+      clock,
+      observe: (value) => receipt.observations.push(value),
     });
-    let response;
-    try {
-      response = await Promise.race([
-        fetcher(url, {
-          redirect: 'follow',
-          cache: 'no-store',
-          signal: AbortSignal.any([signal, request.signal]),
-        }),
-        expired,
-      ]);
-      const requested = new URL(url),
-        observed = new URL(response.url);
-      requireEvidence(
-        requested.protocol === 'https:' &&
-          !requested.username &&
-          !requested.password &&
-          observed.origin === requested.origin &&
-          observed.pathname === requested.pathname &&
-          observed.search === requested.search &&
-          !observed.username &&
-          !observed.password &&
-          Number.isInteger(response.status) &&
-          response.status >= 200 &&
-          response.status < 300,
-        'Production HTTP response was unsuccessful or noncanonical'
-      );
-      receipt.observations.push({ url: requested.href, status: response.status });
-      const readBody = async (read, method) => {
-        try {
-          return await Promise.race([read(), expired]);
-        } catch (error) {
-          // biome-ignore lint/style/useErrorCause: JSON parser causes can expose response bodies; normalize before public reporting.
-          throw new SmokeFailure('Production HTTP body failed or timed out', {
-            // JSON parser messages can contain the response body. Keep only a
-            // code-authored diagnostic at this external-data boundary.
-            cause:
-              method === 'json' && error instanceof SyntaxError
-                ? new Error('Production HTTP JSON parsing failed')
-                : smokeCause(error),
-          });
-        } finally {
-          clock.clearTimeout(requestTimer);
-        }
-      };
-      return {
-        url: requested.href,
-        status: response.status,
-        headers: response.headers,
-        text: () => readBody(() => response.text(), 'text'),
-        json: () => readBody(() => response.json(), 'json'),
-        arrayBuffer: () => readBody(() => response.arrayBuffer(), 'arrayBuffer'),
-      };
-    } catch (error) {
-      clock.clearTimeout(requestTimer);
-      request.abort();
-      throw error instanceof SmokeFailure
-        ? error
-        : new SmokeFailure('Production HTTP request failed', { cause: smokeCause(error) });
-    }
-  };
   try {
     requireEvidence(
       /^[a-zA-Z0-9_-]{1,100}$/u.test(receipt.requestId ?? ''),

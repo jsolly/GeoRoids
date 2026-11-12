@@ -70,7 +70,7 @@
     "scripts/client-build.ts": "sha256:abe7ea029d9606ce316a76b6cef432aa7002420783f8dc739622af74a90e5892",
     "scripts/client-release-sha.ts": "sha256:e4d51752d83d1324cd254fbc9720a8f10970e323ad245b3541226a3463aee9ba",
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
-    "scripts/wiki-check.ts": "sha256:5cb40a6d454e8e75ba6df9a551a7999ac478ce44bc7cc3edb2adf6dab804c853",
+    "scripts/wiki-check.ts": "sha256:a0bd0a0b2959cbce1cb8ec7e6f9f6b9e18a84f26094fe1935e0ba5791a98a091",
     "scripts/wiki-content.ts": "sha256:190a89be185ac685e37e7ae3d962d1fabb059a2a39fc3eee2f9cc09567e8a162",
     "scripts/wiki-media-encode.py": "sha256:2f26d0853381c7d0f39f2db13fd1442623ac287e10d66e76872e0481f413befc",
     "scripts/wiki-media-fonts.ts": "sha256:6f2554c263f3812b7734f721adb197d559b2838a4ce7b34f74731768878c9509",
@@ -121,16 +121,17 @@
     "server/world/InlineWorldPersistence.ts": "sha256:aa8a6f7ebbb1ce31afa87d6eae34d262c81765b8fc0788c6853f57e83b7d3828",
     "server/world/MapAssets.ts": "sha256:2ffe843156946dc2c0234948433805560daf15f424987a933cdfb2030c6519ad",
     "server/world/RegionalAsteroidField.ts": "sha256:acac5f455055955bf824acfaf5ad435a5c0aa871b2edf50b81dc9c19d2bbcca4",
-    "server/world/WorkerWorldPersistence.ts": "sha256:52b83ae60b1ab1d41dfe1e384b2119804bb051fc1737ff3afd16f31ccede475d",
+    "server/world/WorkerWorldPersistence.ts": "sha256:62c36d2ce77968ceef89e92a6f8387287cf1e957399354bb95ed1eacd8d01074",
     "server/world/WorldRemains.ts": "sha256:c33b88806c9504fd5727e08a44ebf92d4718b92043369bb0ce685b6f72390110",
-    "server/world/WorldStore.ts": "sha256:330284b10078fc200786bbb2f360bb56508b0d9505dfe7eb7a47713c5ebd83d1",
+    "server/world/WorldStore.ts": "sha256:affed8c8f40e493fc28f7bccfad165293aeab61a01aafbafef71e51a7ebd2624",
     "server/world/cooperativeSchema.ts": "sha256:6cec4cad8874b7ec0e23bfb6e612ac80726696fd21e97cf5da9713324ddd8e00",
     "server/world/depositLayout.ts": "sha256:5fe2e83866fe5cd843e4187e753839b22b840170d90de855b02efb2129d5d0c5",
     "server/world/openWorldPersistence.ts": "sha256:3aed1f7650463bc093af50086c120568c49a959d6bbd486f5611a729b9a0ecde",
     "server/world/spatialQueryBounds.ts": "sha256:5b1ff4fd81460be2a0dd6bb4ea00ebf63873587cb5613abd041bd0c87f4083f8",
-    "server/world/worldPersistence.ts": "sha256:0846eb3503a381325733e295f7541760baf03c5d7cf1b9e64db2248c1bfba38c",
-    "server/world/worldStoreWorker.ts": "sha256:10691d33041b176ff3a78464a58eab107990ac70f38339cadf521524748cc2c7",
-    "server/world/worldStoreWorkerProtocol.ts": "sha256:88d2be9701f0d600bdb35c04c70ce7a113f87adf270f5998113ec063c1ba90d8",
+    "server/world/worldPersistence.ts": "sha256:64d8794262d1f1059033ebc1e3c77357d4a564f455324047aa5abd91ceac3302",
+    "server/world/worldStoreWorker.ts": "sha256:d051dfb86ede3da4eb82f6eeac4cf8aba57a04f55a32e9a48de6d7dd0b17955f",
+    "server/world/worldStoreWorkerProtocol.ts": "sha256:8864d0c2925d0d3f574477e3de84fd29b69211a86e4ab30223c234f4a4b776da",
+    "server/world/worldVolume.ts": "sha256:d619ac7bbe065f63d3ea21d5093d9f01b668ec4304d121e0f896411e6807c7a1",
     "shared-types.ts": "sha256:7007ce66d101c3cc37653dbbf6eed47158dcc7fe892526c15ab2f80cc7474dac",
     "shared/aiShips.ts": "sha256:9793248321163dbc5cf6475a5e8722a9e5cc73dfdd847bf0a5bd1d6788bff4f3",
     "shared/asteroidBelt.ts": "sha256:94d55e4288a9d968066ac05f666ae0cfe757739166a00ff1dd7a368339378b49",
@@ -8272,6 +8273,45 @@
       "owners": {
         "package.json": "field-manual",
         "tsconfig.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the Wiki source-review policy: gameplay, declared article/media sources and published entrypoints still require explicit review; uncited maintenance diagnostics, styles and frontend configuration are advisory. No documented gameplay rules or demonstration images changed.",
+      "sources": ["scripts/wiki-check.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "scripts/wiki-check.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Preserved mandatory review of the shared game document used by both published game and debug pages. Maintenance sources remain advisory; no player rules or demonstration media changed.",
+      "sources": ["scripts/wiki-check.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "scripts/wiki-check.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed worker-cached disk diagnostics, bounded volume warnings and WAL checkpoint limits against the field manual, terrain, loot and teamwork rules. Storage monitoring changes no player rules, saved gameplay data or demonstration media.",
+      "sources": [
+        "server/world/WorkerWorldPersistence.ts",
+        "server/world/WorldStore.ts",
+        "server/world/worldPersistence.ts",
+        "server/world/worldStoreWorker.ts",
+        "server/world/worldStoreWorkerProtocol.ts",
+        "server/world/worldVolume.ts"
+      ],
+      "topics": ["field-manual", "loot-growth", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "server/world/WorkerWorldPersistence.ts": "field-manual",
+        "server/world/WorldStore.ts": "field-manual",
+        "server/world/worldPersistence.ts": "field-manual",
+        "server/world/worldStoreWorker.ts": "field-manual",
+        "server/world/worldStoreWorkerProtocol.ts": "field-manual",
+        "server/world/worldVolume.ts": "field-manual"
       }
     },
     {

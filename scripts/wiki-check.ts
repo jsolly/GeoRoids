@@ -144,6 +144,7 @@ export async function checkWiki({
     'server/world',
   ];
   const reviewEntrypoints = new Set([
+    'src/components/GameDocument.astro',
     'src/content.config.ts',
     'middleware.ts',
     'package.json',

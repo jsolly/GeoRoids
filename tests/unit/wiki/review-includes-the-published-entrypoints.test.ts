@@ -238,6 +238,7 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     // Gameplay and published interfaces invalidate on addition, edit and deletion.
     for (const path of [
       'src/runtime/review-fixture.ts',
+      'src/components/GameDocument.astro',
       'src/components/wiki/ReviewFixture.svelte',
       'src/pages/review-fixture.astro',
       'scripts/client-build.ts',

@@ -70,7 +70,7 @@
     "scripts/client-build.ts": "sha256:abe7ea029d9606ce316a76b6cef432aa7002420783f8dc739622af74a90e5892",
     "scripts/client-release-sha.ts": "sha256:e4d51752d83d1324cd254fbc9720a8f10970e323ad245b3541226a3463aee9ba",
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
-    "scripts/wiki-check.ts": "sha256:a5d62c9b6192a0dae934ff9774060dfe6e8a5a9c5a7ffc781c8d058c1776571b",
+    "scripts/wiki-check.ts": "sha256:a0bd0a0b2959cbce1cb8ec7e6f9f6b9e18a84f26094fe1935e0ba5791a98a091",
     "scripts/wiki-content.ts": "sha256:190a89be185ac685e37e7ae3d962d1fabb059a2a39fc3eee2f9cc09567e8a162",
     "scripts/wiki-media-encode.py": "sha256:2f26d0853381c7d0f39f2db13fd1442623ac287e10d66e76872e0481f413befc",
     "scripts/wiki-media-fonts.ts": "sha256:6f2554c263f3812b7734f721adb197d559b2838a4ce7b34f74731768878c9509",
@@ -8276,6 +8276,15 @@
     },
     {
       "note": "Reviewed the Wiki source-review policy: gameplay, declared article/media sources and published entrypoints still require explicit review; uncited maintenance diagnostics, styles and frontend configuration are advisory. No documented gameplay rules or demonstration images changed.",
+      "sources": ["scripts/wiki-check.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "scripts/wiki-check.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Preserved mandatory review of the shared game document used by both published game and debug pages. Maintenance sources remain advisory; no player rules or demonstration media changed.",
       "sources": ["scripts/wiki-check.ts"],
       "topics": ["field-manual"],
       "media": [],

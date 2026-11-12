@@ -77,6 +77,7 @@ export class Pilot {
       maximumStateGapMs?: number;
       repeatMeasuredPings?: boolean;
       naturalSpawn?: boolean;
+      aimAtAsteroids?: boolean;
       deliveryBudget?: () => { minimumStateHz: number; maximumStateGapMs: number };
     }
   ) {
@@ -286,7 +287,21 @@ export class Pilot {
       return;
     }
     this.sequence++;
-    const angle = Math.atan2(Math.sin(tick * 0.04), Math.cos(tick * 0.04));
+    const travelAngle = Math.atan2(Math.sin(tick * 0.04), Math.cos(tick * 0.04));
+    let target: ServerGameSnapshot['asteroids'][number] | undefined;
+    if (this.options.aimAtAsteroids === true) {
+      const cargo = new Set(this.state.entities.map((actor) => actor.harpoonTargetId));
+      target = this.state.asteroids
+        .filter((rock) => !cargo.has(rock.id))
+        .sort(
+          (left, right) =>
+            Math.hypot(left.position.x - entity.position.x, left.position.y - entity.position.y) -
+            Math.hypot(right.position.x - entity.position.x, right.position.y - entity.position.y)
+        )[0];
+    }
+    const angle = target
+      ? Math.atan2(entity.position.y - target.position.y, target.position.x - entity.position.x)
+      : travelAngle;
     const motion = entity.playerMotion;
     const alive = !entity.exploding && entity.health > 0;
     if (alive) {
@@ -295,10 +310,10 @@ export class Pilot {
         id: this.id,
         data: {
           position: {
-            x: entity.position.x + Math.cos(angle),
-            y: entity.position.y + Math.sin(angle),
+            x: entity.position.x + Math.cos(travelAngle),
+            y: entity.position.y + Math.sin(travelAngle),
           },
-          velocity: { x: Math.cos(angle) / 3, y: Math.sin(angle) / 3 },
+          velocity: { x: Math.cos(travelAngle) / 3, y: Math.sin(travelAngle) / 3 },
           angle,
           thrusting: true,
           ...(motion ? { motionEpoch: motion.epoch, motionSequence: this.sequence } : {}),

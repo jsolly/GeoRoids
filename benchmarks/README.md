@@ -360,6 +360,13 @@ including objects collected by both major and minor GC. `server.cpuprofile` and
 CPU counters, metric windows and workload samples. `driver.json` records separate
 generator CPU, source hashes, machine limits and each pilot's delivery evidence.
 `attribution.json` contains raw-profile hashes and self/inclusive sample weights.
+The benchmark retains finalized metric windows in its own collection while the
+measurement runs. It excludes premeasurement IDs, deduplicates repeated reads,
+and freezes the collection immediately after the final export. Missing IDs or
+overlapping windows fail coverage explicitly. `metricWindowCoverage` records the
+actual first/last IDs, count and summed duration; the production eight-window
+diagnostic ring is unchanged. This supports the default 120-second and maximum
+300-second intervals without silently retaining only their final suffix.
 Inclusive rows overlap and must not be summed. Allocation sizes are V8 estimates,
 not exact object counts or a leak test. Profiled runs do not qualify as timing
 comparisons. Repeat attribution, and retain an unprofiled observation separately.

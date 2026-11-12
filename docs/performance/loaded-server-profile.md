@@ -216,6 +216,26 @@ no numeric CI gate or supported-player claim was added.
 
 ## Reproduce and inspect
 
+The original tool used for the historical runs read the production metrics
+ring only at measurement end. That ring retains eight finalized windows. Review
+finding `PROFILE-R1-001` reproduced silent truncation for the tool's default
+120-second and longer supported invocations. The eight historical sessions here
+lasted only 30 or 45 measured seconds, and both independent reviewers verified
+their complete retained windows. Their raw files, derived audit and numerical
+tables remain unchanged.
+
+The subsequent tool correction retains finalized windows in a benchmark-owned
+collection during measurement, excludes premeasurement IDs, and requires every
+actual ID through the final export. It rejects missing or overlapping windows
+instead of accepting a successful suffix. The final list is frozen before
+asynchronous profiler shutdown and file writes can introduce later exports.
+New `metricWindowCoverage` receipts describe that collection. The production
+ring remains eight windows. Controlled-clock tests use the real
+`ServerPerformanceMetrics` class over 120000 and 300000 ms, including the final
+partial window, warmup exclusion, repeated-read deduplication and explicit
+coverage loss. This corrected capture was not used for the historical sessions,
+and no new wall-time measurement is claimed for this fix.
+
 Use the committed [loaded-server commands](../../benchmarks/README.md#loaded-server-cpu-and-allocation-profiles).
 The exact six-session execution plan is retained at
 `/workspace/work/loaded-profile-run-plan.sh`, SHA-256

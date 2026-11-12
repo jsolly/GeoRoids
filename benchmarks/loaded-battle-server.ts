@@ -11,6 +11,7 @@ import { applyShipKitStats } from '../shared/shipKits';
 import { attachTowCable } from '../shared/towCable';
 import { ownBenchmarkIdentity } from './benchmark-identity';
 import { writeFixtureManifest } from './fixture-manifest';
+import { MeasuredMetricWindows } from './measured-metric-windows';
 
 const requestedDirectory = process.env['GEOROIDS_LOADED_PROFILE_DIRECTORY'];
 assert(requestedDirectory, 'Missing owned profile directory');
@@ -38,6 +39,7 @@ let cpuStart = process.cpuUsage();
 let stopping = false;
 const samples: ReturnType<typeof sample>[] = [];
 let sampling: NodeJS.Timeout | undefined;
+let measuredMetrics: MeasuredMetricWindows | undefined;
 const originalRocks = new Set<string>();
 
 function sample() {
@@ -187,7 +189,7 @@ async function command(message: unknown) {
       });
       break;
     }
-    case 'begin':
+    case 'begin': {
       assert(!profiling);
       assert('profile' in message && typeof message.profile === 'boolean');
       profiling = message.profile;
@@ -203,18 +205,30 @@ async function command(message: unknown) {
         await inspector.post('Profiler.start');
       }
       serverPerformanceMetrics.exportWindow();
+      const metricCapture = new MeasuredMetricWindows(serverPerformanceMetrics.read());
+      measuredMetrics = metricCapture;
       startedAt = performance.now();
       cpuStart = process.cpuUsage();
       samples.push(sample());
-      sampling = setInterval(() => samples.push(sample()), 1000);
+      sampling = setInterval(() => {
+        metricCapture.collect(serverPerformanceMetrics.read().closedWindows ?? []);
+        samples.push(sample());
+      }, 1000);
       await send({ type: 'begun' });
       break;
+    }
     case 'end': {
       clearInterval(sampling);
       samples.push(sample());
       const elapsedMs = performance.now() - startedAt;
       const cpu = process.cpuUsage(cpuStart);
       const metrics = serverPerformanceMetrics.exportWindow();
+      assert(measuredMetrics, 'Metric measurement was not started');
+      // Freeze before profiler shutdown/file I/O can yield to another periodic export.
+      const metricEvidence = measuredMetrics.finish(
+        metrics,
+        serverPerformanceMetrics.read().closedWindows ?? []
+      );
       const first = samples[0];
       const last = samples.at(-1);
       assert(first !== undefined && last !== undefined);
@@ -257,7 +271,7 @@ async function command(message: unknown) {
         samples,
         workload,
         metrics,
-        closedWindows: serverPerformanceMetrics.read().closedWindows,
+        ...metricEvidence,
         diagnostics: engine.getDiagnostics(),
       };
       await writeFile(join(directory, 'server.json'), JSON.stringify(result, null, 2));

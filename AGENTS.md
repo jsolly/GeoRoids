@@ -223,7 +223,7 @@ Read [tests/AGENTS.md](tests/AGENTS.md) for all testing instructions.
 
 ## Local development
 
-Node 26 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development). Before `npm run gate` or `npm run dev` in a Claude Code cloud session, run `bash .cursor/install-app.sh` ([cloud sessions](docs/agent-operations.md#cloud-sessions)).
+Node 26 matches `.nvmrc`. Never attach to another checkout's services or kill listeners by port alone. Use `npm run dev`, `dev:check`, and `dev:kill` for this checkout's interactive session. Before provisioning native dependencies or running a smoke, read [local development](docs/agent-operations.md#local-development). Before `npm run gate`, `npm run dev`, `git commit` or `git push` in a Claude Code cloud session whose SessionStart hook did not run, run `bash .cursor/install-app.sh`, then start each command by sourcing `~/.local/share/georoids-toolchain/env.sh` ([cloud sessions](docs/agent-operations.md#cloud-sessions)).
 
 ## Local UI verification
 
@@ -270,7 +270,9 @@ and a separate verified PR in each affected repository.
 This repo owns `gate/gate-lib.sh` and `scripts/repo-hooks.py`. Run reviewed
 `scripts/setup-agent-environment.sh` on main to install its outside-worktree
 dispatcher. That dispatcher registers pre-commit and pre-push only. Pre-push is
-the ranged gitleaks scan plus Semgrep and osv-scanner. Never set hooksPath to
+the ranged gitleaks scan plus Semgrep and osv-scanner; it skips Semgrep or
+osv-scanner with a warning only when that scan's server is unreachable, leaving it
+to CI. Never set hooksPath to
 `.git-hooks`: a branch could then register executable hooks. See
 [development and release](docs/development.md).
 

@@ -44,6 +44,103 @@ install_public_mise() (
   command -v mise >/dev/null || { echo 'mise was installed in /usr/local/bin; put that directory on PATH before retrying setup.' >&2; exit 1; }
 )
 
+# Setup writes env.sh here; later shells source it to put the pinned Node and uv first on PATH.
+env_file="$HOME/.local/share/georoids-toolchain/env.sh"
+
+# Claude Code sources $CLAUDE_ENV_FILE before each later Bash command of the session, so the
+# session hook adds env.sh there once and every command runs on the pinned Node.
+register_session_env() {
+  local line
+  [[ -n "${CLAUDE_ENV_FILE:-}" && -f "$env_file" ]] || return 0
+  line=". \"$env_file\""
+  grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || printf '%s\n' "$line" >>"$CLAUDE_ENV_FILE"
+}
+
+# Install a pinned single-binary scanner from its GitHub release download URL into the gate's
+# GATE_TOOLCHAIN_BIN, where its lookups find it. mise resolves these through the GitHub API, which
+# Claude's cloud sessions cannot reach, while release downloads work there. The extracted binary
+# must match the gate library's hash for this platform before it is installed or run.
+# scripts/security-scan.sh keeps its own Linux installers for CI: they pin archive hashes that
+# CI's contract test shares with ci.yml, where this one checks the binary on every platform.
+install_pinned_release() ( # <gitleaks|zizmor|osv-scanner>
+  tool="$1"
+  case "$tool" in
+    gitleaks) base="https://github.com/gitleaks/gitleaks/releases/download/v$GATE_GITLEAKS_VERSION" ;;
+    zizmor) base="https://github.com/zizmorcore/zizmor/releases/download/v$GATE_ZIZMOR_VERSION" ;;
+    osv-scanner) base="https://github.com/google/osv-scanner/releases/download/v$GATE_OSV_SCANNER_VERSION" ;;
+    *) echo "✗ No pinned release for $tool." >&2; exit 1 ;;
+  esac
+  # Archive member, or empty for a release that is the bare binary.
+  member="$tool"
+  case "$tool $(uname -s) $(uname -m)" in
+    'gitleaks Linux x86_64') asset="gitleaks_${GATE_GITLEAKS_VERSION}_linux_x64.tar.gz" ;;
+    'gitleaks Linux aarch64' | 'gitleaks Linux arm64') asset="gitleaks_${GATE_GITLEAKS_VERSION}_linux_arm64.tar.gz" ;;
+    'gitleaks Darwin arm64') asset="gitleaks_${GATE_GITLEAKS_VERSION}_darwin_arm64.tar.gz" ;;
+    'zizmor Linux x86_64') asset=zizmor-x86_64-unknown-linux-gnu.tar.gz ;;
+    'zizmor Linux aarch64' | 'zizmor Linux arm64') asset=zizmor-aarch64-unknown-linux-gnu.tar.gz ;;
+    'zizmor Darwin arm64') asset=zizmor-aarch64-apple-darwin.tar.gz ;;
+    'osv-scanner Linux x86_64') asset=osv-scanner_linux_amd64; member='' ;;
+    'osv-scanner Linux aarch64' | 'osv-scanner Linux arm64') asset=osv-scanner_linux_arm64; member='' ;;
+    'osv-scanner Darwin arm64') asset=osv-scanner_darwin_arm64; member='' ;;
+    *) echo "✗ No pinned $tool release for $(uname -s) $(uname -m). Install the gate's pinned $tool on PATH, then rerun $0." >&2; exit 1 ;;
+  esac
+  scratch="$(mktemp -d)"
+  trap 'rm -rf "$scratch"' EXIT
+  url="$base/$asset"
+  curl --fail --silent --show-error --location --retry 3 --connect-timeout 20 --max-time 300 "$url" -o "$scratch/download"
+  if [[ -n "$member" ]]; then
+    tar -xzf "$scratch/download" -C "$scratch" "$member" ||
+      { echo "✗ $url holds no $member binary. Nothing was installed." >&2; exit 1; }
+    bin="$scratch/$member"
+  else
+    bin="$scratch/download"
+  fi
+  "gate__verify_${tool//-/_}_bin" "$bin" || { echo "✗ Nothing was installed from $url." >&2; exit 1; }
+  mkdir -p "$GATE_TOOLCHAIN_BIN"
+  install -m 0755 "$bin" "$GATE_TOOLCHAIN_BIN/$tool"
+)
+
+# The gate's tools, each from the source that works without the GitHub API where it can.
+# Node always comes from mise, whose installation the dependency receipt records. uv is mise's
+# when mise has it, else the host's, and mise installs it only when PATH has none. Semgrep is a
+# Python distribution mise installs from PyPI, asked from / with the gate's pin so .mise.toml's
+# uv entry is not an install dependency. gitleaks, zizmor and osv-scanner come from their release
+# archives when the gate's own lookup finds no pinned copy. env.sh records only mise's Node and
+# uv directories, which are the same whatever PATH this run started with.
+install_toolchain() {
+  local dirs=() tool node_path uv_path="" staged joined
+  mise install node
+  node_path="$(MISE_EXEC_AUTO_INSTALL=false mise which node)"
+  dirs+=("$(dirname "$node_path")")
+  if ! uv_path="$(MISE_EXEC_AUTO_INSTALL=false mise which uv 2>/dev/null)"; then
+    uv_path=""
+    if ! command -v uv >/dev/null 2>&1 || ! command -v uvx >/dev/null 2>&1; then
+      mise install uv
+      uv_path="$(MISE_EXEC_AUTO_INSTALL=false mise which uv)"
+    fi
+  fi
+  [[ -z "$uv_path" ]] || dirs+=("$(dirname "$uv_path")")
+  joined="$(IFS=:; echo "${dirs[*]}")"
+  export PATH="$joined:$PATH"
+  gate_semgrep_bin >/dev/null 2>&1 || (cd / && mise install "semgrep@$GATE_SEMGREP_VERSION")
+  for tool in gitleaks zizmor osv-scanner; do
+    "gate_${tool//-/_}_bin" >/dev/null 2>&1 || install_pinned_release "$tool"
+  done
+  # Written beside env.sh and renamed over it, so a failure leaves an earlier env.sh whole.
+  mkdir -p "$(dirname "$env_file")"
+  staged="$(mktemp "$env_file.XXXXXX")"
+  joined="$(IFS=:; echo "${dirs[*]}")"
+  # shellcheck disable=SC2016 # $PATH is expanded by the shell that sources env.sh
+  { printf 'export PATH="%s:$PATH"\n' "$joined" >"$staged" && mv -f "$staged" "$env_file"; } ||
+    { rm -f "$staged"; echo "✗ Could not write $env_file; the error is above." >&2; return 1; }
+  # shellcheck source=/dev/null # written just above
+  source "$env_file"
+  for tool in gitleaks zizmor osv-scanner semgrep; do
+    "gate_${tool//-/_}_bin" >/dev/null || { echo "✗ The installed toolchain still lacks $tool; the gate's error is above." >&2; return 1; }
+  done
+  command -v uvx >/dev/null || { echo '✗ uvx is not on PATH after setup.' >&2; return 1; }
+}
+
 # A successful npm ci binds the dependency tree to its inputs and runtime.
 # npm's hidden lock alone does not prove that the current tree still matches it.
 # Verification reads the runtime identity from the installation mise resolves and
@@ -144,6 +241,7 @@ if $session_hook && [[ -e node_modules || -L node_modules ]]; then
     exit 1
   fi
   [[ -e .env ]] || touch .env
+  register_session_env
   echo 'Repository environment ready; existing dependencies verified without reinstalling.'
   exit 0
 fi
@@ -162,12 +260,17 @@ if [[ "$(uname -s)" == Linux ]] && ! pkg-config --exists cairo pangocairo librsv
 fi
 install_public_mise
 mise trust "$root/.mise.toml"
-mise install
+# shellcheck source=/dev/null
+source "$root/gate/gate-lib.sh"
+install_toolchain
 # A failed repair must never leave an old success receipt behind.
 rm -f node_modules/.georoids-setup.json
-mise exec -- npm ci
+# Not auto-installing: .mise.toml lists tools this host got from their release archives.
+MISE_EXEC_AUTO_INSTALL=false mise exec -- npm ci
 dependency_receipt write
 # The local server's --env-file requires a file; never replace existing settings.
 [[ -e .env ]] || touch .env
 bash scripts/repo-python.sh scripts/repo-hooks.py verify --root "$root"
+register_session_env
 echo 'Repository environment ready; no private configuration repository is required.'
+echo "Later shells put the pinned Node first on PATH with: . \"$env_file\""

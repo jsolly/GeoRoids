@@ -580,7 +580,9 @@
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
-    "server/world/worldVolume.ts": "sha256:d619ac7bbe065f63d3ea21d5093d9f01b668ec4304d121e0f896411e6807c7a1"
+    "server/world/worldVolume.ts": "sha256:d619ac7bbe065f63d3ea21d5093d9f01b668ec4304d121e0f896411e6807c7a1",
+    "server/world/explorationSchema.ts": "sha256:f024a573dfea3bac31e859b800c5208ab8deb8de8f9dba962142841d4c3bc739",
+    "server/world/savedWorld.ts": "sha256:d2aa2225ba2338a2d11507e39d1846561c57bf6149f63396851a4983aa5a0fce"
   },
   "reviews": [
     {
@@ -8312,6 +8314,16 @@
         "server/world/worldStoreWorker.ts": "field-manual",
         "server/world/worldStoreWorkerProtocol.ts": "field-manual",
         "server/world/worldVolume.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed offline exploration transition tooling and metadata parsing. The deployed legacy reader and writer are unchanged. Seven real SQLite/CLI scenarios cover prepared-reader compatibility, current-discovery rollback, stale inspections, verified WAL backups, write failure rollback and table-bound fingerprint records. Player controls, rules and demonstrations are unchanged.",
+      "sources": ["server/world/explorationSchema.ts", "server/world/savedWorld.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "server/world/explorationSchema.ts": "field-manual",
+        "server/world/savedWorld.ts": "field-manual"
       }
     }
   ]

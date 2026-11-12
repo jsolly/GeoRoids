@@ -7,8 +7,8 @@ publication; PR CI independently validates the integration inventory.
 
 ## Required PR checks
 
-`static-checks`, `runner-contracts`, `actions-contracts`, `integration-tests` and
-`wiki-media` start concurrently.
+`static-checks`, `runner-contracts`, `actions-contracts`, `integration-tests`,
+`wiki-media` and `railpack-build` start concurrently.
 Static checks cover lint policy, formatting, unused code, Markdown, YAML,
 TypeScript, benchmark types, Wiki source review and the production build.
 Runner contracts exercise owned process startup, admission, ports and cleanup.
@@ -17,14 +17,28 @@ longest single check, so it runs beside static checks instead of inside them,
 with a 6-minute budget that fits the suite's own nested-run bounds.
 Integration runs every test in `tests/integration/server/` through the repository runner. Wiki media verifies
 the committed demonstration baseline on `ubuntu-24.04`, the x64 platform that owns
-it, and uploads a regenerated candidate when it is stale; the other lanes run on
-arm64 ([Wiki maintenance](wiki-maintenance.md#generate-or-verify-gifs)).
+it, and uploads a regenerated candidate when it is stale
+([Wiki maintenance](wiki-maintenance.md#generate-or-verify-gifs)). Railpack build
+runs `scripts/railpack-build.sh` on `ubuntu-24.04`: the Railpack release pinned
+as `railpackVersion` in `.railway/railway.ts` plans the checkout, and a
+digest-pinned BuildKit runs that plan through the release's digest-pinned
+frontend, from `mise install` through `npm run build`, as Railway's production
+build does once the reviewed `railway config apply` has applied that pin
+([Railway IaC](../.railway/README.md)). It uses no Railway credential and exports
+no image. It does not reproduce Railway's BuildKit daemon, service variables or
+build secrets, and the plan's builder and runtime images come by tag, as on
+Railway. `scripts/railpack-build.test.ts` fails when the script's release or start
+command differs from `.railway/railway.ts`. The lane downloads Railpack, pulls
+BuildKit and Railpack's images, and installs tools and packages, so a network or
+registry failure there is handled by re-running the failed jobs. A failure caused
+by a new third-party image or tool release, such as a re-pushed builder tag, needs
+an owner decision rather than a re-run. The other lanes run on arm64.
 
-The required `ci` aggregate succeeds only when all five lanes succeed. Failed,
+The required `ci` aggregate succeeds only when all six lanes succeed. Failed,
 cancelled, skipped or absent required evidence cannot pass. Each lane performs
 the range secrets scan before considering reusable exact-tree proof. The lanes'
 copy selects the pinned gitleaks archive for its runner architecture, because the
-media lane runs on x64; the `ci` job keeps the canonical arm64 step.
+media and Railpack lanes run on x64; the `ci` job keeps the canonical arm64 step.
 Post-merge CI reuses successful PR evidence only for the identical Git tree and
 matching lane. Missing proof reruns that lane; manual dispatch validates normally.
 Dependabot PRs run the same lanes and `ci`; labels start no runs.

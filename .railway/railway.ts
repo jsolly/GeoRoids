@@ -7,6 +7,8 @@ export default defineRailway(() => {
     build: {
       builder: 'RAILPACK',
       buildEnvironment: 'V3',
+      // Pinned so CI's railpack-build lane reproduces this build; move it with scripts/railpack-build.sh.
+      railpackVersion: '0.43.0',
     },
     deploy: {
       startCommand: 'node --import tsx server.ts',

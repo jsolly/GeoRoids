@@ -5,6 +5,8 @@ describes the `geoasteroids` service, its GitHub source, Railpack build, server
 start command, healthcheck, replica placement, persistent world volume, and environment. The two existing service variables use `preserve()`; `GEOROIDS_WORLD_PATH` points at `/data/world.sqlite`. Client admission is always
 current-protocol-only in server code; no service variable controls it.
 
+The build pins Railpack with `railpackVersion` (0.43.0, the release production built with on 2026-11-12). Without a pin Railway uses its current Railpack release, whose bundled mise decides how `.mise.toml` and `mise.lock` install. CI's `railpack-build` lane runs that same release in `scripts/railpack-build.sh`, and `scripts/railpack-build.test.ts` fails when the two differ, so bump them together. Merging a new value changes nothing on Railway: it takes effect only after the reviewed `railway config apply` below. Confirm it with a read of the service configuration (`build.railpackVersion`) and the next build log's `using build driver railpack-v<version>` line.
+
 The earlier service definition was compared with an authenticated full-project pull and plan. The new world volume and path require a fresh reviewed plan before deployment. Railway's documented restart defaults are `ON_FAILURE` with 10 retries;
 these values are verified on the service and omitted from the definition because
 Railway omits them from its imported graph. Compare the complete live graph before

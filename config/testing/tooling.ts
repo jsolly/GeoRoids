@@ -49,6 +49,7 @@ export default defineConfig({
             'scripts/gate-contract.test.mjs',
             'scripts/review-receipt-contract.test.mjs',
             'scripts/preview-comment.test.ts',
+            'scripts/railpack-build.test.ts',
           ],
         },
       },

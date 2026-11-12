@@ -75,8 +75,8 @@ gate__on_commit_err() {
 
 # The gitleaks release this gate and .github/workflows/ci.yml both pin.
 # Releases differ in their default rules, so a scan on another release can pass here and fail in CI,
-# or the reverse. Update the release, binary hashes, linux_arm64 archive hash and workflows
-# together. The archive hash is CI's download check; the separate binary hashes verify mise installs.
+# or the reverse. Update the release, binary hashes, linux_arm64 archive hash, workflows and
+# mise.lock (`mise lock`) together. The archive hash is CI's download check; the separate binary hashes verify mise installs.
 GATE_GITLEAKS_VERSION=8.24.2
 GATE_GITLEAKS_BIN_SHA256_DARWIN_ARM64=c75ea6f594e0a857efa1220fa08088b55e1465a32ab00cfc7aa2ec64cec031fe
 GATE_GITLEAKS_BIN_SHA256_LINUX_X64=64805175c8f88959587ba6afc58210401088206a27ba582cfbb98791137d6208
@@ -219,34 +219,43 @@ gate_osv_scanner_bin() {
     "$GATE_OSV_BIN_SHA256_LINUX_ARM64" --version
 }
 
+# True when <bin> runs and its first output line names exactly <pin>.
+gate__reports_version() { # <bin> <pin>
+  local reported
+  reported="$("$1" --version 2>/dev/null)" || return 1
+  gate__version_is "${reported%%$'\n'*}" "$2"
+}
+
 # Semgrep publishes a Python distribution. The gate accepts that exact version and does not
-# hash the interpreter entry point.
-gate_semgrep_bin() {
-  local bin="" reported="" dir
-  if bin="$(command -v semgrep 2>/dev/null)"; then
-    reported="$("$bin" --version 2>/dev/null)" || reported=""
-    reported="${reported%%$'\n'*}"
-    if gate__version_is "$reported" "$GATE_SEMGREP_VERSION"; then
-      printf '%s' "$bin"
-      return 0
-    fi
+# hash the interpreter entry point, wherever the entry point was found.
+#
+# mise is asked from / first, so that answer does not depend on any checkout's mise config. With a
+# mise.lock, mise installs a Python tool under a hashed directory that it resolves only beside the
+# lock, so the caller may name the checkout that carries the lock and mise is then asked there.
+# That second answer trusts the named checkout: where its directory is mise-trusted, its mise
+# config can run code and choose the directory. The caller is that checkout's own scan script,
+# which is already repository code outside the hook bundle, so nothing new is trusted.
+gate_semgrep_bin() { # [lock-checkout]
+  local bin dir origin
+  if bin="$(command -v semgrep 2>/dev/null)" && gate__reports_version "$bin" "$GATE_SEMGREP_VERSION"; then
+    printf '%s' "$bin"
+    return 0
   fi
-  if command -v mise >/dev/null 2>&1 && dir="$(cd / && mise where "semgrep@$GATE_SEMGREP_VERSION" 2>/dev/null)"; then
-    for bin in "$dir/semgrep" "$dir/bin/semgrep"; do
-      if [[ -x "$bin" ]]; then
-        reported="$("$bin" --version 2>/dev/null)" || reported=""
-        reported="${reported%%$'\n'*}"
-        if gate__version_is "$reported" "$GATE_SEMGREP_VERSION"; then
+  if command -v mise >/dev/null 2>&1; then
+    for origin in / ${1:+"$1"}; do
+      dir="$(cd "$origin" 2>/dev/null && mise where "semgrep@$GATE_SEMGREP_VERSION" 2>/dev/null)" || continue
+      for bin in "$dir/semgrep" "$dir/bin/semgrep"; do
+        if [[ -x "$bin" ]] && gate__reports_version "$bin" "$GATE_SEMGREP_VERSION"; then
           printf '%s' "$bin"
           return 0
         fi
-      fi
+      done
     done
   fi
-  if [[ -n "$reported" ]]; then
+  if command -v semgrep >/dev/null 2>&1; then
     echo "✗ semgrep on PATH is not $GATE_SEMGREP_VERSION — run: $(gate__cli_hint semgrep)" >&2
   else
-    echo "✗ required CLI not on PATH: semgrep $GATE_SEMGREP_VERSION — run: $(gate__cli_hint semgrep)" >&2
+    echo "✗ semgrep $GATE_SEMGREP_VERSION is not on PATH and mise names no install of it — run: $(gate__cli_hint semgrep)" >&2
   fi
   return 1
 }

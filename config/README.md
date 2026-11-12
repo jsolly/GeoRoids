@@ -49,7 +49,7 @@ under `tests/`. Give each setting one repository-owned home.
   The authenticated upgrade procedure is in [development](../docs/development.md#hook-trust).
 
 Required native exceptions remain: package manifests and lockfiles, `.npmrc`,
-`.nvmrc`, `.mise.toml`, Git files, `.worktreeinclude`, `.github/`, native agent
+`.nvmrc`, `.mise.toml`, `mise.lock`, `.mise/locks/`, Git files, `.worktreeinclude`, `.github/`, native agent
 registrations, the two TypeScript adapters above, `components.json`, `.pages.yml`,
 `src/content.config.ts` and `vercel.ts`. Each has an active native consumer.
 Railway infrastructure definitions stay in `.railway/`. Application/setup code,

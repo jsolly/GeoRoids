@@ -103,10 +103,13 @@ run_zizmor() {
   "$bin" --offline --config "$root/config/security/zizmor.yml" "$root"
 }
 
+# mise resolves a lock-installed Semgrep only beside mise.lock, so name this checkout.
+semgrep_bin() { gate_semgrep_bin "$root"; }
+
 run_semgrep() {
   local bin base
-  ensure_tool gate_semgrep_bin install_semgrep
-  bin="$(gate_semgrep_bin)"
+  ensure_tool semgrep_bin install_semgrep
+  bin="$(semgrep_bin)"
   base="${SECURITY_BASE_SHA:-}"
   if [[ -z "$base" ]]; then
     if ! git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null; then
@@ -147,7 +150,7 @@ run_cursor_push() {
 run_pre_push() {
   local local_ref local_sha remote_sha range count
   ensure_tool gate_gitleaks_bin install_gitleaks
-  ensure_tool gate_semgrep_bin install_semgrep
+  ensure_tool semgrep_bin install_semgrep
   ensure_tool gate_osv_scanner_bin install_osv
   while read -r local_ref local_sha _remote_ref remote_sha; do
     [[ -n "$local_ref" ]] || continue

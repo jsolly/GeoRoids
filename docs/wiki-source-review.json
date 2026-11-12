@@ -581,7 +581,7 @@
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
     "server/world/worldVolume.ts": "sha256:d619ac7bbe065f63d3ea21d5093d9f01b668ec4304d121e0f896411e6807c7a1",
-    "server/world/explorationSchema.ts": "sha256:f024a573dfea3bac31e859b800c5208ab8deb8de8f9dba962142841d4c3bc739",
+    "server/world/explorationSchema.ts": "sha256:1983878e37523d148adfbe07c0759634b696c4906a1f93dc567e403bfe9aac5f",
     "server/world/savedWorld.ts": "sha256:d2aa2225ba2338a2d11507e39d1846561c57bf6149f63396851a4983aa5a0fce"
   },
   "reviews": [
@@ -8324,6 +8324,15 @@
       "owners": {
         "server/world/explorationSchema.ts": "field-manual",
         "server/world/savedWorld.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the offline transition effect contract. Fourteen real SQLite/CLI scenarios pass. A single expected-state postcondition preserves complete world and discovery rows/schema, with a separate fingerprint for other data. Activation deletion/rewrite regressions fail the preceding world-only guard. Deployed runtime, player rules and demonstrations remain unchanged.",
+      "sources": ["server/world/explorationSchema.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "server/world/explorationSchema.ts": "field-manual"
       }
     }
   ]

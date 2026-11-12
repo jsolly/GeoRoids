@@ -42,6 +42,13 @@ operation. Data and schema changes commit together, and a failure rolls them
 back. Operators must still stop the service: a fingerprint cannot prevent an
 old process from writing after a completed preparation.
 
+The tool allows an empty world table or one world row with id `1`. Exploration
+needs exactly the `id` and `bits` TEXT columns, a primary key on `id` and non-null
+bits. Before committing, the tool compares complete world rows, discovery rows
+and owned schema objects with the expected result of the selected transition.
+An undeclared effect rolls the transaction back. A separate fingerprint protects
+every other application table and schema object.
+
 A repeated transition is logically idempotent with a fresh fingerprint and a
 new verified backup. `prepare` leaves an already active database untouched.
 `activate` requires an exact prepared copy and rejects stale copies. `rollback`

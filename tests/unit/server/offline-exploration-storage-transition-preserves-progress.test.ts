@@ -222,3 +222,67 @@ test('moving a schema-shaped auxiliary row between tables invalidates the inspec
   );
   expect(inspectExplorationStorage(db).state).toBe('legacy');
 });
+
+test('a world trigger cannot change a retained column while activation removes the atlas', () => {
+  const { db } = legacyFixture();
+  db.exec("ALTER TABLE world ADD COLUMN retained TEXT NOT NULL DEFAULT 'keep';");
+  transition(db, 'prepare');
+  db.exec(
+    "CREATE TRIGGER change_retained AFTER UPDATE ON world BEGIN UPDATE world SET retained='lost'; END;"
+  );
+  const before = explorationStorageFingerprint(db);
+  expect(() => transition(db, 'activate')).toThrow('unrelated saved data');
+  expect(explorationStorageFingerprint(db)).toBe(before);
+  expect(db.prepare('SELECT retained FROM world').get()?.['retained']).toBe('keep');
+  expect(inspectExplorationStorage(db).state).toBe('prepared');
+});
+
+test.each([
+  {
+    name: 'an extra retained column',
+    columns: 'id TEXT PRIMARY KEY, bits TEXT NOT NULL, retained TEXT',
+  },
+  { name: 'a missing tile primary key', columns: 'id TEXT, bits TEXT NOT NULL' },
+  { name: 'nullable tile bits', columns: 'id TEXT PRIMARY KEY, bits TEXT' },
+])('preparing exploration with $name refuses before changing data', ({ name, columns }) => {
+  const { db } = legacyFixture();
+  db.exec(`CREATE TABLE exploration (${columns});`);
+  const write = db.prepare('INSERT INTO exploration(id,bits) VALUES(?,?)');
+  for (const { id, bits } of atlas) {
+    write.run(id, bits);
+  }
+  if (name === 'an extra retained column') {
+    db.exec("UPDATE exploration SET retained='saved-progress';");
+  }
+  const before = explorationStorageFingerprint(db);
+  expect(() => transition(db, 'prepare')).toThrow('Unsupported exploration schema');
+  expect(explorationStorageFingerprint(db)).toBe(before);
+});
+
+test('an ambiguous world table refuses preparation instead of choosing one world to migrate', () => {
+  const { db } = legacyFixture();
+  db.exec(`ALTER TABLE world RENAME TO old_world;
+    CREATE TABLE world (id INTEGER, json TEXT NOT NULL);
+    INSERT INTO world SELECT id,json FROM old_world;
+    INSERT INTO world SELECT id,json_set(json,'$.seed',84) FROM old_world;
+    DROP TABLE old_world;`);
+  const before = explorationStorageFingerprint(db);
+  expect(() => transition(db, 'prepare')).toThrow('Invalid saved world rows');
+  expect(explorationStorageFingerprint(db)).toBe(before);
+});
+
+test.each([
+  { name: 'delete', statement: "DELETE FROM exploration WHERE id='7,12';" },
+  {
+    name: 'rewrite',
+    statement: `UPDATE exploration SET bits='${'ff'.repeat(32)}' WHERE id='7,12';`,
+  },
+])('activation refuses a world trigger that can $name discovery rows', ({ statement }) => {
+  const { db } = legacyFixture();
+  transition(db, 'prepare');
+  db.exec(`CREATE TRIGGER change_tiles AFTER UPDATE ON world BEGIN ${statement} END;`);
+  const before = explorationStorageFingerprint(db);
+  expect(() => transition(db, 'activate')).toThrow('unrelated saved data');
+  expect(explorationStorageFingerprint(db)).toBe(before);
+  expect(inspectExplorationStorage(db)).toEqual({ state: 'prepared', tiles: 2 });
+});

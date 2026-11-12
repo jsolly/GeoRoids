@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { isDeepStrictEqual } from 'node:util';
 import { validExploration } from '../../shared/exploration';
 import type { ExplorationTile } from '../../shared-types';
 import { readSavedWorld } from './savedWorld';
 
 type ExplorationStorageState = 'legacy' | 'prepared' | 'stale-preparation' | 'active';
 type ExplorationTransition = 'prepare' | 'activate' | 'rollback';
+const CREATE_TILE_TABLE = 'CREATE TABLE exploration (id TEXT PRIMARY KEY, bits TEXT NOT NULL)';
 
 function hasTileTable(db: DatabaseSync): boolean {
   return (
@@ -15,7 +17,11 @@ function hasTileTable(db: DatabaseSync): boolean {
 }
 
 function savedWorldValue(db: DatabaseSync): object | undefined {
-  const row = db.prepare('SELECT json FROM world WHERE id=1').get();
+  const rows = db.prepare('SELECT id,json FROM world').all();
+  if (rows.length > 1 || (rows[0] && rows[0]['id'] !== 1)) {
+    throw new Error('Invalid saved world rows');
+  }
+  const row = rows[0];
   if (!row) {
     return undefined;
   }
@@ -28,11 +34,66 @@ function savedWorldValue(db: DatabaseSync): object | undefined {
 }
 
 function tileRows(db: DatabaseSync): ExplorationTile[] {
+  const columns = db.prepare('PRAGMA table_xinfo(exploration)').all();
+  if (
+    columns.length !== 2 ||
+    !columns.some(
+      (column) =>
+        column['name'] === 'id' &&
+        column['type'] === 'TEXT' &&
+        column['pk'] === 1 &&
+        column['hidden'] === 0
+    ) ||
+    !columns.some(
+      (column) =>
+        column['name'] === 'bits' &&
+        column['type'] === 'TEXT' &&
+        column['notnull'] === 1 &&
+        column['pk'] === 0 &&
+        column['hidden'] === 0
+    )
+  ) {
+    throw new Error('Unsupported exploration schema');
+  }
   const rows = db.prepare('SELECT id,bits FROM exploration ORDER BY id').all();
   if (!validExploration(rows)) {
     throw new Error('Invalid exploration rows');
   }
   return rows;
+}
+
+function tableSchema(db: DatabaseSync, table: 'world' | 'exploration') {
+  return db
+    .prepare(
+      "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE tbl_name=? AND name NOT LIKE 'sqlite_%' ORDER BY type,name"
+    )
+    .all(table)
+    .map((row) => ({ ...row }));
+}
+
+type StoredTiles =
+  | { kind: 'absent' }
+  | { kind: 'present'; schema: ReturnType<typeof tableSchema>; rows: ExplorationTile[] };
+
+function storedTiles(db: DatabaseSync): StoredTiles {
+  return hasTileTable(db)
+    ? {
+        kind: 'present',
+        schema: tableSchema(db, 'exploration'),
+        rows: tileRows(db).map(({ id, bits }) => ({ id, bits })),
+      }
+    : { kind: 'absent' };
+}
+
+function ownedStorage(db: DatabaseSync) {
+  return {
+    worldSchema: tableSchema(db, 'world'),
+    worldRows: db
+      .prepare('SELECT * FROM world ORDER BY id')
+      .all()
+      .map((row) => ({ ...row })),
+    exploration: storedTiles(db),
+  };
 }
 
 function legacyTiles(value: object | undefined): ExplorationTile[] {
@@ -125,12 +186,33 @@ export function transitionExplorationStorage(
     const protectedFingerprint = explorationStorageFingerprint(db, ['world', 'exploration']);
     const before = inspectExplorationStorage(db);
     const world = savedWorldValue(db);
-    let expectedWorldJson = db.prepare('SELECT json FROM world WHERE id=1').get()?.['json'];
+    // Start from the complete owned state. Each branch changes only its declared
+    // result before issuing SQL; one postcondition checks every row and schema.
+    const expected = ownedStorage(db);
     if (action === 'prepare' && before.state !== 'active') {
-      const atlas = legacyTiles(world);
-      db.exec(
-        'CREATE TABLE IF NOT EXISTS exploration (id TEXT PRIMARY KEY, bits TEXT NOT NULL); DELETE FROM exploration;'
-      );
+      const previousTiles = expected.exploration;
+      const atlas = legacyTiles(world)
+        .map(({ id, bits }) => ({ id, bits }))
+        .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+      expected.exploration = {
+        kind: 'present',
+        schema:
+          previousTiles.kind === 'present'
+            ? previousTiles.schema
+            : [
+                {
+                  type: 'table',
+                  name: 'exploration',
+                  tbl_name: 'exploration',
+                  sql: CREATE_TILE_TABLE,
+                },
+              ],
+        rows: atlas,
+      };
+      if (previousTiles.kind === 'absent') {
+        db.exec(CREATE_TILE_TABLE);
+      }
+      db.exec('DELETE FROM exploration;');
       const write = db.prepare('INSERT INTO exploration(id,bits) VALUES(?,?)');
       for (const { id, bits } of atlas) {
         write.run(id, bits);
@@ -141,14 +223,18 @@ export function transitionExplorationStorage(
       }
       if (world && 'exploration' in world) {
         const { exploration: _atlas, ...metadata } = world;
-        expectedWorldJson = JSON.stringify(metadata);
-        db.prepare('UPDATE world SET json=? WHERE id=1').run(expectedWorldJson);
+        const json = JSON.stringify(metadata);
+        expected.worldRows = expected.worldRows.map((row) => ({ ...row, json }));
+        db.prepare('UPDATE world SET json=? WHERE id=1').run(json);
       }
-    } else if (action === 'rollback' && hasTileTable(db)) {
+    } else if (action === 'rollback' && expected.exploration.kind === 'present') {
+      const tiles = expected.exploration.rows;
+      expected.exploration = { kind: 'absent' };
       if (before.state === 'active' && world) {
         // Export current discoveries, including everything learned since activation.
-        expectedWorldJson = JSON.stringify({ ...world, exploration: tileRows(db) });
-        db.prepare('UPDATE world SET json=? WHERE id=1').run(expectedWorldJson);
+        const json = JSON.stringify({ ...world, exploration: tiles });
+        expected.worldRows = expected.worldRows.map((row) => ({ ...row, json }));
+        db.prepare('UPDATE world SET json=? WHERE id=1').run(json);
       }
       db.exec('DROP TABLE exploration');
     }
@@ -162,7 +248,7 @@ export function transitionExplorationStorage(
     }
     if (
       explorationStorageFingerprint(db, ['world', 'exploration']) !== protectedFingerprint ||
-      db.prepare('SELECT json FROM world WHERE id=1').get()?.['json'] !== expectedWorldJson
+      !isDeepStrictEqual(ownedStorage(db), expected)
     ) {
       throw new Error('Exploration transition changed unrelated saved data');
     }

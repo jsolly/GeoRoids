@@ -14,6 +14,9 @@ const deploymentFiles = new Set([
   '.nvmrc',
   '.node-version',
   '.npmrc',
+  // Railpack copies both into the image and installs its tool versions from them.
+  '.mise.toml',
+  'mise.lock',
   'tsconfig.json',
   'tsconfig.build.json',
   // Retired names remain inputs for historical release diffs.

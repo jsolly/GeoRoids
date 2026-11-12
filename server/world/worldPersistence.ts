@@ -20,6 +20,18 @@ export interface LoadedWorld {
   pilots: PersistentPilot[];
 }
 
+export type WorldVolumeDiagnostics =
+  | { status: 'pending' }
+  | { status: 'unavailable'; sampledAt: number; errorCode: string }
+  | {
+      status: 'ok' | 'low';
+      sampledAt: number;
+      freeBytes: number;
+      databaseBytes: number;
+      walBytes: number;
+      warningBytes: number;
+    };
+
 export interface WorldPersistenceDiagnostics {
   mode: 'inline' | 'worker';
   /** Requests handed over (batches and resets) that have not been applied yet. */
@@ -31,6 +43,8 @@ export interface WorldPersistenceDiagnostics {
   /** Server clock (epoch ms) when the last commit was confirmed. */
   lastCommittedAt?: number;
   failed: boolean;
+  /** File-backed writers sample off-thread; an in-memory world has no volume. */
+  volume?: WorldVolumeDiagnostics;
 }
 
 /**

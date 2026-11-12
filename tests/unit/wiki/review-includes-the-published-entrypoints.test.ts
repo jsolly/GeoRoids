@@ -60,7 +60,11 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     const reviewPath = join(fixture, 'docs/wiki-source-review.json');
     writeFileSync(
       reviewPath,
-      JSON.stringify({ note: 'Existing review', hashes, reviews: [{ note: 'Previous batch' }] })
+      JSON.stringify({
+        note: 'Existing review',
+        hashes,
+        reviews: [{ note: 'Previous batch' }],
+      })
     );
     const cliCheck = (...args: string[]): string =>
       execFileSync(
@@ -231,20 +235,12 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     await accept('--source', added, '--topic', 'controls', '--owner', `${added}=controls`);
     expect(JSON.parse(readFileSync(reviewPath, 'utf8')).hashes[added]).toBeUndefined();
     expect(await check()).toContain('source review passed');
-    // Every new frontend language must invalidate on addition, edit and deletion.
+    // Gameplay and published interfaces invalidate on addition, edit and deletion.
     for (const path of [
       'src/runtime/review-fixture.ts',
-      'src/diagnostics/review-fixture.ts',
-      'src/release/review-fixture.ts',
+      'src/components/GameDocument.astro',
       'src/components/wiki/ReviewFixture.svelte',
       'src/pages/review-fixture.astro',
-      'src/styles/review-fixture.css',
-      'config/app/astro.ts',
-      'config/app/svelte.ts',
-      'config/quality/prettier.json',
-      'config/typescript/frontend.json',
-      'config/typescript/tsconfig.json',
-      'tsconfig.json',
       'scripts/client-build.ts',
     ]) {
       const target = join(fixture, path);
@@ -273,6 +269,52 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
           `${path}=field-manual`
         );
       }
+      expect(await check()).toContain('source review passed');
+    }
+    // These maintenance surfaces remain visible but need no acceptance or ledger write.
+    for (const path of [
+      'src/diagnostics/review-fixture.ts',
+      'src/release/review-fixture.ts',
+      'src/styles/review-fixture.css',
+      'src/components/ui/ReviewFixture.svelte',
+      'src/entities/review-fixture.css',
+      'config/app/astro.ts',
+      'config/app/svelte.ts',
+      'config/quality/prettier.json',
+      'config/typescript/frontend.json',
+      'config/typescript/tsconfig.json',
+      'tsconfig.json',
+    ]) {
+      const target = join(fixture, path);
+      mkdirSync(dirname(target), { recursive: true });
+      const originalSource = existsSync(target) ? readFileSync(target) : undefined;
+      const beforeAdvisory = readFileSync(reviewPath, 'utf8');
+      writeFileSync(target, '/* first maintenance edit */\n');
+      expect(await check()).toContain('source review passed');
+      expect(await check()).toContain(path);
+      writeFileSync(target, '/* second maintenance edit */\n');
+      expect(await check()).toContain(path);
+      expect(readFileSync(reviewPath, 'utf8')).toBe(beforeAdvisory);
+      // A previously inventoried maintenance file can be removed without a note.
+      const ledger = JSON.parse(beforeAdvisory);
+      ledger.hashes[path] = wikiSourceDigest(path, readFileSync(target));
+      writeFileSync(reviewPath, JSON.stringify(ledger));
+      rmSync(target);
+      expect(await check()).toContain('source review passed');
+      expect(await check()).toContain(path);
+      expect(JSON.parse(readFileSync(reviewPath, 'utf8')).hashes[path]).toBe(ledger.hashes[path]);
+      writeFileSync(reviewPath, beforeAdvisory);
+      if (originalSource !== undefined) {
+        writeFileSync(target, originalSource);
+      }
+    }
+    // A declared diagnostics or CSS source still controls documented behavior.
+    for (const path of ['src/diagnostics/debugHudMetrics.ts', 'index.css']) {
+      const target = join(fixture, path);
+      const originalSource = readFileSync(target);
+      writeFileSync(target, `${originalSource.toString()}\n/* changed documented behavior */\n`);
+      await expect(check()).rejects.toThrow(path);
+      writeFileSync(target, originalSource);
       expect(await check()).toContain('source review passed');
     }
     const mapped = 'src/input/keybindings.ts';

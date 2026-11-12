@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads';
+import { logger } from '../../setup/serverLogger';
 import { WorldStore } from './WorldStore';
 import {
   CommitStats,
@@ -6,6 +7,7 @@ import {
   type WorldCheckpoint,
   type WorldPersistence,
   type WorldPersistenceDiagnostics,
+  type WorldVolumeDiagnostics,
   WorldWriterUnreleasedError,
 } from './worldPersistence';
 import {
@@ -73,6 +75,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
   private failureHandler: ((error: Error) => void) | undefined;
   private closing: Promise<void> | undefined;
   private readonly stallTimeoutMs: number;
+  private volume: WorldVolumeDiagnostics = { status: 'pending' };
 
   constructor(
     private readonly path: string,
@@ -179,7 +182,10 @@ export class WorkerWorldPersistence implements WorldPersistence {
   }
 
   diagnostics(): WorldPersistenceDiagnostics {
-    return this.stats.diagnostics('worker', this.pending.size, this.failure !== undefined);
+    return {
+      ...this.stats.diagnostics('worker', this.pending.size, this.failure !== undefined),
+      volume: { ...this.volume },
+    };
   }
 
   private send(request: Exclude<WorldStoreWorkerRequest, { type: 'shutdown' }>): void {
@@ -251,6 +257,25 @@ export class WorkerWorldPersistence implements WorldPersistence {
 
   private receive(reply: WorldStoreWorkerReply): void {
     switch (reply.type) {
+      case 'volume': {
+        const previous = this.volume;
+        this.volume = reply.volume;
+        if (this.volume.status === 'low' && previous.status !== 'low') {
+          logger.warn('WORLD', 'world_volume_low', {
+            ...this.volume,
+            action: 'Expand the world volume or remove reviewed non-world files before it fills',
+          });
+        } else if (
+          this.volume.status === 'unavailable' &&
+          (previous.status !== 'unavailable' || previous.errorCode !== this.volume.errorCode)
+        ) {
+          logger.error('WORLD', 'world_volume_inspection_failed', {
+            ...this.volume,
+            action: 'Check the configured world volume mount, file access and filesystem',
+          });
+        }
+        return;
+      }
       case 'done': {
         const request = this.pending.get(reply.id);
         this.pending.delete(reply.id);

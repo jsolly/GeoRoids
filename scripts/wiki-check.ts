@@ -103,7 +103,9 @@ export async function checkWiki({
     if (!existsSync(resolve(root, directory))) {
       return [];
     }
-    return readdirSync(resolve(root, directory), { withFileTypes: true }).flatMap((entry) => {
+    return readdirSync(resolve(root, directory), {
+      withFileTypes: true,
+    }).flatMap((entry) => {
       const path = `${directory}/${entry.name}`;
       if (entry.isDirectory()) {
         return files(path);
@@ -112,47 +114,38 @@ export async function checkWiki({
     });
   }
 
-  // Track gameplay trees, including added/deleted files, rather than only the sources
-  // that happened to be cited when the manual was first written.
-  const sourcePaths = new Set([
-    ...[
-      'src/audio',
-      'src/entities',
-      'src/input',
-      'src/physics',
-      'src/constants',
-      'src/core',
-      'src/runtime',
-      'src/diagnostics',
-      'src/release',
-      'src/ui',
-      'src/components',
-      'src/pages',
-      'src/styles',
-      'src/rendering',
-      'src/network',
-      'src/fx',
-      'src/utils',
-      'shared',
-      'server/core',
-      'server/communication',
-      'server/ai',
-      'server/services',
-      'server/world',
-    ]
-      .flatMap(files)
-      .filter((path) => /\.(ts|svelte|astro|css)$/u.test(path)),
-    'index.css',
+  // Keep the wider inventory visible without requiring a gameplay review for
+  // maintenance-only edits. Declared sources always override the advisory policy.
+  const declaredSources = new Set([
+    ...articles.flatMap((article) => article.sources),
+    ...Object.values(media).flatMap((item) => item.sources),
+  ]);
+  const gameplayDirectories = [
+    'src/audio',
+    'src/entities',
+    'src/input',
+    'src/physics',
+    'src/constants',
+    'src/core',
+    'src/runtime',
+    'src/ui',
+    'src/components/game',
+    'src/components/wiki',
+    'src/pages',
+    'src/rendering',
+    'src/network',
+    'src/fx',
+    'src/utils',
+    'shared',
+    'server/core',
+    'server/communication',
+    'server/ai',
+    'server/services',
+    'server/world',
+  ];
+  const reviewEntrypoints = new Set([
+    'src/components/GameDocument.astro',
     'src/content.config.ts',
-    'src/env.d.ts',
-    'components.json',
-    'config/quality/prettier.json',
-    'config/app/astro.ts',
-    'config/app/svelte.ts',
-    'config/typescript/frontend.json',
-    'config/typescript/tsconfig.json',
-    'tsconfig.json',
-    'tsconfig.frontend.json',
     'middleware.ts',
     'package.json',
     'scripts/wiki-check.ts',
@@ -164,8 +157,36 @@ export async function checkWiki({
     'shared-types.ts',
     'server/configuration.ts',
     'server.ts',
-    ...articles.flatMap((article) => article.sources),
-    ...Object.values(media).flatMap((item) => item.sources),
+  ]);
+  function requiresReview(path: string): boolean {
+    return (
+      declaredSources.has(path) ||
+      reviewEntrypoints.has(path) ||
+      path.startsWith('src/wiki/') ||
+      path.startsWith('scripts/wiki-media') ||
+      ['public/wiki/media/', 'public/sounds/', 'public/music/'].some((directory) =>
+        path.startsWith(directory)
+      ) ||
+      (/\.(ts|svelte|astro)$/u.test(path) &&
+        gameplayDirectories.some((directory) => path.startsWith(`${directory}/`)))
+    );
+  }
+  const sourcePaths = new Set([
+    ...[...gameplayDirectories, 'src/diagnostics', 'src/release', 'src/components', 'src/styles']
+      .flatMap(files)
+      .filter((path) => /\.(ts|svelte|astro|css)$/u.test(path)),
+    'index.css',
+    'src/env.d.ts',
+    'components.json',
+    'config/quality/prettier.json',
+    'config/app/astro.ts',
+    'config/app/svelte.ts',
+    'config/typescript/frontend.json',
+    'config/typescript/tsconfig.json',
+    'tsconfig.json',
+    'tsconfig.frontend.json',
+    ...reviewEntrypoints,
+    ...declaredSources,
     ...files('src/wiki'),
     ...files('scripts').filter((path) => path.includes('/wiki-media')),
     ...files('public/wiki/media'),
@@ -260,11 +281,14 @@ export async function checkWiki({
   } catch {
     failures.push('Invalid wiki review baseline JSON');
   }
-  const changed = new Set(
-    [...new Set([...Object.keys(previous), ...Object.keys(hashes)])].filter(
-      (path) => previous[path] !== hashes[path]
-    )
+  const changedSources = [...new Set([...Object.keys(previous), ...Object.keys(hashes)])].filter(
+    (path) => previous[path] !== hashes[path]
   );
+  const changed = new Set(changedSources.filter(requiresReview));
+  const advisory = changedSources.filter((path) => !requiresReview(path));
+  const advisoryOutput = advisory.length
+    ? `Advisory Wiki sources changed (${advisory.length}; no review note required):\n${advisory.map((path) => `  ${path}`).join('\n')}\n`
+    : '';
   if (accepting) {
     if (!note || !selected.size || !topics.size) {
       failures.push(
@@ -394,10 +418,10 @@ export async function checkWiki({
     );
   }
   if (failures.length) {
-    return { output: `${failures.join('\n')}\n`, exitCode: 1 };
+    return { output: `${failures.join('\n')}\n${advisoryOutput}`, exitCode: 1 };
   }
   return {
-    output: accepting ? output : 'Wiki coverage, links, media, and source review passed.\n',
+    output: `${accepting ? output : 'Wiki coverage, links, media, and source review passed.\n'}${advisoryOutput}`,
     exitCode: 0,
   };
 }

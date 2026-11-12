@@ -1,4 +1,7 @@
-
+# mise.lock pins each tool's download URL and checksum per platform, so installs need no
+# GitHub API lookup. To bump a pin, edit it here, run `mise lock`, and commit both files and any
+# changed `.mise/locks/` files. A major-only pin such as node stays at its locked patch until
+# `mise lock --bump`.
 [tools]
 node = "26"
 gitleaks = "8.24.2"

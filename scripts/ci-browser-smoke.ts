@@ -4,11 +4,17 @@ import { isAbsolute, join } from 'node:path';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { type Browser, chromium, type Page } from 'playwright';
+import { runPhoneDiagnostics, runRemoteMotion } from './ci-browser-smoke-focus';
 
 // The verification entry point accepts no target URL and uses the owned local origin.
 const origin = 'http://127.0.0.1:5173';
 const artifactSetting = process.env['BROWSER_SMOKE_ARTIFACTS'];
 const candidateSha = process.env['REQUESTED_SHA'];
+const focus = process.env['BROWSER_SMOKE_FOCUS'] ?? 'basic';
+assert(
+  focus === 'basic' || focus === 'remote-motion' || focus === 'phone-diagnostics',
+  'Unknown browser smoke focus'
+);
 assert(process.env['GITHUB_ACTIONS'] === 'true', 'Run through the manual Browser smoke workflow');
 assert(
   artifactSetting && isAbsolute(artifactSetting),
@@ -29,6 +35,27 @@ async function capture(page: Page, name: string): Promise<void> {
   const filename = `${name}.png`;
   await page.screenshot({ path: join(artifacts, filename), fullPage: true });
   screenshots.push(filename);
+}
+
+function monitor(page: Page, name: string): void {
+  page.setDefaultTimeout(15_000);
+  page.on('pageerror', (error) => {
+    if (errors.length < 50) {
+      errors.push(`${name}: ${error.message.slice(0, 1000)}`);
+    }
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error' && errors.length < 50) {
+      errors.push(`${name}: ${message.text().slice(0, 1000)}`);
+    }
+    if (message.type() === 'warning') {
+      if (warnings.messages.length < 50) {
+        warnings.messages.push(`${name}: ${message.text().slice(0, 1000)}`);
+      } else {
+        warnings.dropped++;
+      }
+    }
+  });
 }
 
 try {
@@ -56,82 +83,75 @@ try {
     await readiness.close();
   }
 
-  for (const profile of [
-    { name: 'desktop', viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false },
-    { name: 'mobile', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
-  ]) {
-    const { name, ...contextOptions } = profile;
-    const context = await browser.newContext({
-      ...contextOptions,
-      deviceScaleFactor: 1,
-      recordVideo: { dir: join(artifacts, 'video'), size: profile.viewport },
-    });
-    const page = await context.newPage();
-    page.setDefaultTimeout(15_000);
-    page.on('pageerror', (error) => {
-      if (errors.length < 50) {
-        errors.push(`${name}: ${error.message.slice(0, 1000)}`);
-      }
-    });
-    page.on('console', (message) => {
-      if (message.type() === 'error' && errors.length < 50) {
-        errors.push(`${name}: ${message.text().slice(0, 1000)}`);
-      }
-      if (message.type() === 'warning') {
-        if (warnings.messages.length < 50) {
-          warnings.messages.push(`${name}: ${message.text().slice(0, 1000)}`);
+  if (focus === 'basic') {
+    for (const profile of [
+      { name: 'desktop', viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false },
+      { name: 'mobile', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
+    ]) {
+      const { name, ...contextOptions } = profile;
+      const context = await browser.newContext({
+        ...contextOptions,
+        deviceScaleFactor: 1,
+        recordVideo: { dir: join(artifacts, 'video'), size: profile.viewport },
+      });
+      const page = await context.newPage();
+      monitor(page, name);
+      try {
+        const response = await page.goto(origin);
+        assert(response?.ok(), 'Game document failed');
+        await page.getByRole('heading', { name: 'GeoRoids', exact: true }).waitFor();
+        await page.getByLabel('Pilot name', { exact: true }).fill(`CI ${profile.name}`);
+        await capture(page, `${profile.name}-title`);
+        await page.getByRole('button', { name: 'Enter Game', exact: true }).click();
+        const canvas = page.getByLabel('GeoRoids playfield', { exact: true });
+        await canvas.waitFor({ state: 'visible' });
+        await page.keyboard.press('Space');
+        await page.locator('#spawn-fly-in').waitFor({ state: 'hidden' });
+        assert(
+          await canvas.evaluate(
+            (element) =>
+              element instanceof HTMLCanvasElement && element.width > 0 && element.height > 0
+          )
+        );
+        if (profile.hasTouch) {
+          await canvas.tap({ position: { x: 150, y: 150 } });
         } else {
-          warnings.dropped++;
+          await canvas.click({ position: { x: 150, y: 150 } });
         }
-      }
-    });
-    try {
-      const response = await page.goto(origin);
-      assert(response?.ok(), 'Game document failed');
-      await page.getByRole('heading', { name: 'GeoRoids', exact: true }).waitFor();
-      await page.getByLabel('Pilot name', { exact: true }).fill(`CI ${profile.name}`);
-      await capture(page, `${profile.name}-title`);
-      await page.getByRole('button', { name: 'Enter Game', exact: true }).click();
-      const canvas = page.getByLabel('GeoRoids playfield', { exact: true });
-      await canvas.waitFor({ state: 'visible' });
-      await page.keyboard.press('Space');
-      await page.locator('#spawn-fly-in').waitFor({ state: 'hidden' });
-      assert(
-        await canvas.evaluate(
-          (element) =>
-            element instanceof HTMLCanvasElement && element.width > 0 && element.height > 0
-        )
-      );
-      if (profile.hasTouch) {
-        await canvas.tap({ position: { x: 150, y: 150 } });
-      } else {
-        await canvas.click({ position: { x: 150, y: 150 } });
-      }
-      await page.keyboard.press('Space');
-      await capture(page, `${profile.name}-flight`);
-      completed.push(`${profile.name}: join and playfield input sent`);
+        await page.keyboard.press('Space');
+        await capture(page, `${profile.name}-flight`);
+        completed.push(`${profile.name}: join and playfield input sent`);
 
-      await page.getByRole('button', { name: /^Open universe map/u }).click();
-      const map = page.getByRole('dialog', { name: 'Universe map', exact: true });
-      await map.waitFor({ state: 'visible' });
-      await capture(page, `${profile.name}-map`);
-      await map.getByRole('button', { name: 'Close', exact: true }).click();
-      await map.waitFor({ state: 'hidden' });
-      completed.push(`${profile.name}: map opened and closed`);
+        await page.getByRole('button', { name: /^Open universe map/u }).click();
+        const map = page.getByRole('dialog', { name: 'Universe map', exact: true });
+        await map.waitFor({ state: 'visible' });
+        await capture(page, `${profile.name}-map`);
+        await map.getByRole('button', { name: 'Close', exact: true }).click();
+        await map.waitFor({ state: 'hidden' });
+        completed.push(`${profile.name}: map opened and closed`);
 
-      for (const route of ['wiki/', 'debug']) {
-        const result = await page.goto(`${origin}/${route}`);
-        assert(result?.ok(), `${route} document failed`);
-        await page.locator('h1:visible').first().waitFor();
-        await capture(page, `${profile.name}-${route.replace('/', '')}`);
-        completed.push(`${profile.name}: /${route}`);
+        for (const route of ['wiki/', 'debug']) {
+          const result = await page.goto(`${origin}/${route}`);
+          assert(result?.ok(), `${route} document failed`);
+          await page.locator('h1:visible').first().waitFor();
+          await capture(page, `${profile.name}-${route.replace('/', '')}`);
+          completed.push(`${profile.name}: /${route}`);
+        }
+      } catch (error) {
+        await capture(page, `${profile.name}-failure`).catch(() => undefined);
+        throw error;
+      } finally {
+        await context.close();
       }
-    } catch (error) {
-      await capture(page, `${profile.name}-failure`).catch(() => undefined);
-      throw error;
-    } finally {
-      await context.close();
     }
+  }
+  const exercise = { browser, artifacts, origin, capture, monitor };
+  if (focus === 'remote-motion') {
+    await runRemoteMotion(exercise);
+    completed.push('Two identified pilots joined; observer received subject motion during steer');
+  } else if (focus === 'phone-diagnostics') {
+    await runPhoneDiagnostics(exercise);
+    completed.push('Same runtime recorded flight and map; raw download checksum verified');
   }
   assert.deepEqual(errors, [], 'Browser errors occurred');
   succeeded = true;
@@ -151,6 +171,7 @@ try {
     `${JSON.stringify(
       {
         candidateSha,
+        focus,
         workflowSha: process.env['BROWSER_SMOKE_WORKFLOW_SHA'],
         runId: process.env['GITHUB_RUN_ID'],
         browser: browser?.version() ?? null,

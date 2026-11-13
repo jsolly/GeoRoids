@@ -409,6 +409,9 @@ Read the matching receipt and inspect its screenshots/videos before marking the
 PR ready. [Hosted browser smoke](../tests/AGENTS.md#hosted-browser-smoke) defines
 the scope and limits. The workflow starts only an ephemeral local world; it does
 not deploy a preview or operate on production data.
+Leave `focus` at `basic` for the default smoke, or select the bounded
+`remote-motion` or `phone-diagnostics` exercise for its affected UI change.
+Inspect its focused JSON evidence and raw download as well as screenshots/video.
 
 Use `npm run dev` for live rebuilding.
 

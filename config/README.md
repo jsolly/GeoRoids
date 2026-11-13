@@ -26,6 +26,12 @@ under `tests/`. Give each setting one repository-owned home.
   TypeScript inputs; Railway definitions keep their native owner.
   Nested build, frontend, benchmark and unused-code owners retain their own input
   lists and inherit this policy. Package commands select them explicitly.
+  `typescript/tooling-contracts.json` owns the migrated gate contract and its
+  checked JavaScript interop boundary. Root excludes only those two files;
+  `check:ts` explicitly checks the strict project. It admits the real legacy
+  JavaScript import graph for static bindings without claiming its bodies are
+  typechecked. Build, frontend and benchmark scopes stay unchanged. The separate
+  prune program still follows those real named imports.
   Root `tsconfig.frontend.json` remains a minimal adapter: its directory preserves
   the pinned Svelte checker's workspace and explicit Svelte-owner scope. Moving
   it into `config/typescript/` would omit preprocessing for `src/`; moving it into

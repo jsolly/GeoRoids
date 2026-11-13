@@ -255,10 +255,10 @@ describe('Satellite pickups', () => {
     };
     gameEngine.addAsteroid(near);
     gameEngine.addAsteroid(far);
-    gameEngine.tickAbilities();
+    gameEngine.abilities.advance();
     expect(gameEngine.getAsteroid('near')?.surveyedBy).toBeUndefined();
     expect(gameEngine.equipSatellite('pilot', stored.id)).toBe(true);
-    gameEngine.tickAbilities();
+    gameEngine.abilities.advance();
     expect(gameEngine.getAsteroid('near')?.surveyedBy).toEqual(['pilot']);
     expect(gameEngine.getAsteroid('far')?.surveyedBy).toBeUndefined();
     expect(pilot.abilityActiveFrames).toBe(0);
@@ -279,7 +279,7 @@ describe('Satellite pickups', () => {
     gameEngine.updatePlayer('pilot', {
       position: { x: pilot.position.x + 1, y: pilot.position.y },
     });
-    gameEngine.tickAbilities();
+    gameEngine.abilities.advance();
     expect(gameEngine.getAsteroid('far')?.surveyedBy).toBeUndefined();
     expect(gameEngine.getAsteroid('near')?.surveyedBy).toEqual(['pilot']);
   });

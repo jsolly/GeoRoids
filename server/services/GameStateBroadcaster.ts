@@ -170,7 +170,7 @@ export class GameStateBroadcaster {
         data.charged === true ? undefined : data.ownerId
       );
     }
-    for (const data of this.gameEngine.drainTapEjections()) {
+    for (const data of this.gameEngine.abilities.drainTapEjections()) {
       this.broadcastToAll({ type: 'tapEjected', data, timestamp: Date.now() });
     }
     for (const data of this.gameEngine.drainLootCollections()) {

@@ -122,6 +122,7 @@
   "hauler": [
     "shared/shipKits.ts",
     "shared/shipAbilities.ts",
+    "server/core/ShipAbilityManager.ts",
     "src/entities/ship/shipRenderer.ts",
     "src/entities/ship/hullOutlines.ts",
     "src/entities/ship/harpoonField.ts",

@@ -62,7 +62,7 @@ test('a charge is cancelled before a furnace arrival clears its transit hold in 
   pilot.position = { x: 0, y: 0 };
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(CHARGED_WEAPON.fullFrames);
-  expect(engine.travelFurnace(pilot.id, street.id)).toBeUndefined();
+  expect(engine.furnaceTravel.start(pilot.id, street.id)).toBeUndefined();
   const transit = pilot.furnaceTransit;
   if (!transit) {
     throw new Error('Expected an admitted furnace trip');

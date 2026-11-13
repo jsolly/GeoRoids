@@ -204,7 +204,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
     nextShipment: 0,
   });
   pilot.position = { ...site.position };
-  expect(engine.travelFurnace(pilot.id, TOWN_HEARTH.id)).toBeUndefined();
+  expect(engine.furnaceTravel.start(pilot.id, TOWN_HEARTH.id)).toBeUndefined();
   expect(pilot.furnaceTransit).toMatchObject({ sourceId: site.id, destinationId: TOWN_HEARTH.id });
   expect(litTravelDestinations(TOWN_HEARTH.id, field).some((f) => f.id === site.id)).toBe(true);
 });

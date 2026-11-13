@@ -1,6 +1,7 @@
 /* @vitest-environment node */
 import assert from 'node:assert/strict';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+import { SHIP } from '../../../shared/constants/gameplay';
 import { FurnaceField } from '../../../shared/furnaceField';
 import { civicLot, pipeToTownSquare, TOWN_HEARTH } from '../../../shared/furnaces';
 import {
@@ -13,7 +14,10 @@ import { GameServerWorld, useQuietServerConsole } from '../scenarios/support/gam
 
 useQuietServerConsole();
 let world: GameServerWorld;
-afterEach(() => world?.dispose());
+afterEach(() => {
+  world?.dispose();
+  vi.restoreAllMocks();
+});
 
 function travelWorld() {
   world = new GameServerWorld();
@@ -35,13 +39,17 @@ test('spoofed, distant, dark and dead travel requests cannot take motion ownersh
   const other = world.join('Other');
   world.send(other, { type: 'travelFurnace', id: pilot.id, data: { destinationId: street.id } });
   expect(actor.furnaceTransit).toBeUndefined();
-  expect(world.engine.travelFurnace(actor.id, 'street-1-1')).toBe('That furnace is not lit');
-  expect(world.engine.travelFurnace(actor.id, TOWN_HEARTH.id)).toBe('Choose another lit furnace');
+  expect(world.engine.furnaceTravel.start(actor.id, 'street-1-1')).toBe('That furnace is not lit');
+  expect(world.engine.furnaceTravel.start(actor.id, TOWN_HEARTH.id)).toBe(
+    'Choose another lit furnace'
+  );
   actor.position = { x: TOWN_HEARTH.radius + 1, y: 0 };
-  expect(world.engine.travelFurnace(actor.id, street.id)).toBe('Move onto a lit furnace');
+  expect(world.engine.furnaceTravel.start(actor.id, street.id)).toBe('Move onto a lit furnace');
   actor.position = { x: 0, y: 0 };
   actor.health = 0;
-  expect(world.engine.travelFurnace(actor.id, street.id)).toBe('Your ship is not ready to travel');
+  expect(world.engine.furnaceTravel.start(actor.id, street.id)).toBe(
+    'Your ship is not ready to travel'
+  );
 });
 
 test('travelling releases an armed coupling and disconnecting completes the ride before resume', () => {
@@ -66,7 +74,7 @@ test('travelling releases an armed coupling and disconnecting completes the ride
   actor.harpoonTargetId = cargo.id;
   actor.harpoonLatchPos = { ...cargo.position };
   cargo.boost = { phase: 'armed', ownerId: actor.id, angle: 0, couplings: [actor.id] };
-  expect(world.engine.travelFurnace(actor.id, street.id)).toBeUndefined();
+  expect(world.engine.furnaceTravel.start(actor.id, street.id)).toBeUndefined();
   expect(actor.harpoonTargetId).toBeNull();
   expect(actor.harpoonLatchPos).toBeUndefined();
   expect(cargo.boost).toBeNull();
@@ -74,6 +82,63 @@ test('travelling releases an armed coupling and disconnecting completes the ride
   expect(actor.furnaceTransit).toBeNull();
   expect(actor.position).toEqual(street.position);
   expect(actor.overlayHold).toBe(false);
+});
+
+test('travel arrives on simulation frame 180 even when the server clock has passed its deadline', () => {
+  const { pilot, actor, street } = travelWorld();
+  const before = world.engine.playerMotion.getState(actor.id);
+  assert(before);
+  world.send(pilot, { type: 'travelFurnace', id: actor.id, data: { destinationId: street.id } });
+  const transit = actor.furnaceTransit;
+  assert(transit);
+  expect(transit.durationMs).toBe(3_000);
+  expect(actor.overlayHold).toBe(true);
+  expect(world.engine.playerMotion.getState(actor.id)?.epoch).toBe(before.epoch + 1);
+  const now = transit.startedAt + 10_000;
+  vi.spyOn(world.engine, 'getServerTime').mockReturnValue(now);
+
+  for (let frame = 1; frame <= 179; frame++) {
+    world.engine.advanceOneFrame(now);
+  }
+  expect(actor.furnaceTransit).toEqual(transit);
+  expect(actor.position).not.toEqual(street.position);
+  expect(actor.position).not.toEqual(TOWN_HEARTH.position);
+  expect(actor.overlayHold).toBe(true);
+  expect(actor.lastUpdate).toBe(now);
+  expect(world.engine.playerMotion.getState(actor.id)?.epoch).toBe(before.epoch + 1);
+
+  world.engine.advanceOneFrame(now);
+  expect(actor.furnaceTransit).toBeNull();
+  expect(actor.position).toEqual(street.position);
+  const route = planFurnaceRoute(TOWN_HEARTH.id, street.id);
+  const previous = route.at(-2);
+  assert(previous);
+  expect(actor.angle).toBe(
+    Math.atan2(-(street.position.y - previous.y), street.position.x - previous.x)
+  );
+  expect(actor.velocity).toEqual({ x: 0, y: 0 });
+  expect(actor.thrusting).toBe(false);
+  expect(actor.overlayHold).toBe(false);
+  expect(actor.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
+  expect(actor.lastUpdate).toBe(now);
+  expect(world.engine.playerMotion.getState(actor.id)?.epoch).toBe(before.epoch + 2);
+});
+
+test('removing a travelling pilot finishes the actor before capturing its resumable flight', () => {
+  const { pilot, actor, street } = travelWorld();
+  actor.cargo = 23;
+  expect(world.engine.furnaceTravel.start(actor.id, street.id)).toBeUndefined();
+  const departing = world.engine.removePlayer(actor.id);
+  expect(departing).toBe(actor);
+  expect(actor.furnaceTransit).toBeNull();
+  expect(actor.position).toEqual(street.position);
+  expect(actor.overlayHold).toBe(false);
+  expect(actor.velocity).toEqual({ x: 0, y: 0 });
+  expect(actor.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
+  const resumed = world.resume(pilot, TOWN_HEARTH.position);
+  expect(world.entity(resumed).position).toEqual(street.position);
+  expect(world.entity(resumed).furnaceTransit).toBeUndefined();
+  expect(world.entity(resumed).cargo).toBe(23);
 });
 
 test('routes between parent and child use their shared pipe without detouring through town', () => {

@@ -40,7 +40,7 @@ test('the global map shares the furnace plan while each pilot receives only near
     kind: 'foundation',
     position: distant,
   });
-  engine.tickAbilities();
+  engine.abilities.advance();
   broadcaster.broadcastGameState();
   const nearRaw = nearSocket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
   const farRaw = farSocket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');

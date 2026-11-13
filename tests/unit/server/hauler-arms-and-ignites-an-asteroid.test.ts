@@ -213,7 +213,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
       world.entity(bob).harpoonLatchPos = { ...rock.position };
       world.entity(bob).tapExtractFrames = 999;
       const velocity = { ...rock.velocity };
-      world.engine.tickAbilities();
+      world.engine.abilities.advance();
       expect(world.entity(bob).harpoonTargetId).toBeNull();
       expect(rock.velocity).toEqual(velocity);
       expect(world.engine.getLoot()).toEqual([]);

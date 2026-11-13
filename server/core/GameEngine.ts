@@ -37,7 +37,7 @@ import {
   EQUIPMENT_IDS,
   isEquipmentId,
 } from '../../shared/equipment';
-import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
+import { ExplorationMap } from '../../shared/exploration';
 import { frontierSite } from '../../shared/frontier';
 import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import {
@@ -67,10 +67,8 @@ import { readReleaseId, releaseField } from '../../shared/releaseId';
 import {
   activateAbilityOnHost,
   clearHaulerLatch,
-  pullHarpoonTarget,
   setHaulerUtilityOnHost,
   setScoutUtilityOnHost,
-  tickTapExtract,
   tickTowLine,
 } from '../../shared/shipAbilities';
 import { canCollectLoot, GROWTH } from '../../shared/shipGrowth';
@@ -118,7 +116,6 @@ import type {
   ServerGameState,
   SettlementState,
   ShipKitId,
-  TapEjected,
   TerrainSpider,
   ToolTargetPose,
   Velocity,
@@ -157,6 +154,7 @@ import { RNGService } from './RNGService';
 import { RolyPolyManager } from './RolyPolyManager';
 import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
+import { markSurveyedAsteroids, ShipAbilityManager } from './ShipAbilityManager';
 import { SurveyProbeManager } from './SurveyProbeManager';
 import { spiderResources } from './spiderResources';
 import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
@@ -189,25 +187,6 @@ type LaserAuxiliaryTarget = {
   | { kind: 'surveyProbe'; hostId: string; ownerId: string }
   | { kind: 'ship' | 'satellitePickup' | 'loot' | 'encounter'; ownerId?: string }
 );
-
-function tapLootEjection(
-  ship: Position,
-  rock: Pick<AsteroidData, 'position' | 'size'>,
-  burst: number
-): { position: Position; velocity: Velocity } {
-  const angle =
-    Math.atan2(rock.position.y - ship.y, rock.position.x - ship.x) +
-    (burst / (SHIP_ABILITY.TAP_EXTRACT_BURSTS - 1) - 0.5) * 1.4;
-  const dx = Math.cos(angle);
-  const dy = Math.sin(angle);
-  return {
-    position: {
-      x: rock.position.x + dx * rock.size,
-      y: rock.position.y + dy * rock.size,
-    },
-    velocity: { x: dx * 3, y: dy * 3 },
-  };
-}
 
 export interface AppliedAsteroidHit {
   applied: boolean;
@@ -347,7 +326,6 @@ export class GameEngine {
   private persistenceFailure: Error | undefined;
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
   private pendingLootCollections: LootCollected[] = [];
-  private pendingTapEjections: TapEjected[] = [];
   private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
   private pendingSpiderAttacks: SpiderAttack[] = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
@@ -419,6 +397,7 @@ export class GameEngine {
   }
 
   private readonly bots: BotFleet;
+  public readonly abilities: ShipAbilityManager;
 
   constructor(
     rngSeed?: number,
@@ -504,6 +483,17 @@ export class GameEngine {
     );
     this.hives = new HiveEncounters(this.cooperative, this.spiderManager);
     this.hazards = new WorldHazards(this.spiderManager);
+    this.abilities = new ShipAbilityManager({
+      actors: this.entityManager,
+      rocks: this.asteroidManager,
+      pickups: this.satellitePickupManager,
+      spiders: this.spiderManager,
+      hives: this.hives,
+      loot: this.lootManager,
+      frame: () => this.gameTime,
+      revealArea: (position, range) => this.revealArea(position, range),
+      maximumPendingEjections: MAX_PENDING_LOOT_COLLECTIONS,
+    });
     for (const row of this.cooperative.all()) {
       if (row.kind === 'hive' && row.commissionedAt !== null) {
         this.commissioned.add(row.id);
@@ -697,7 +687,7 @@ export class GameEngine {
     this.chargedWeapons.advance(this.gameTime);
     this.contourBridges.advance(this.gameTime, serverNow);
     this.furnaceTravel.advance(this.gameTime, serverNow);
-    this.tickAbilities();
+    this.abilities.advance();
     this.tickSurveyProbes(serverNow);
     this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
@@ -749,7 +739,7 @@ export class GameEngine {
     }
     this.entityManager.updateExplosions();
     this.logRespawns(this.entityManager.updateRespawns());
-    this.tickAbilities();
+    this.abilities.advance();
     this.advanceSpiderField();
     this.entityManager.updateHealthRegeneration();
   }
@@ -866,7 +856,7 @@ export class GameEngine {
   private clearPendingFeedback(): void {
     this.pendingLootBlasts = [];
     this.pendingLootCollections = [];
-    this.pendingTapEjections = [];
+    this.abilities.clearPendingFeedback();
     this.pendingShotSounds = [];
     this.pendingSatellitePickupCollections = [];
     this.pendingFurnaceDeliveries = [];
@@ -1860,10 +1850,6 @@ export class GameEngine {
 
   public drainLootCollections(): LootCollected[] {
     return this.pendingLootCollections.splice(0);
-  }
-
-  public drainTapEjections(): TapEjected[] {
-    return this.pendingTapEjections.splice(0);
   }
 
   public drainLootBlasts() {
@@ -3470,28 +3456,7 @@ export class GameEngine {
     range: number
   ): void {
     this.revealArea(position, range);
-    this.markSurveyedAsteroids(ownerId, position, asteroids, range);
-  }
-
-  private markSurveyedAsteroids(
-    ownerId: string,
-    position: Position,
-    asteroids: readonly AsteroidData[],
-    range: number
-  ): void {
-    for (const rock of asteroids) {
-      if (
-        rock.health <= 0 ||
-        rock.boost?.phase === 'burning' ||
-        Math.hypot(rock.position.x - position.x, rock.position.y - position.y) > range
-      ) {
-        continue;
-      }
-      rock.surveyedBy ??= [];
-      if (!rock.surveyedBy.includes(ownerId)) {
-        rock.surveyedBy.push(ownerId);
-      }
-    }
+    markSurveyedAsteroids(ownerId, position, asteroids, range);
   }
 
   private tickSurveyProbes(now: number): void {
@@ -3739,122 +3704,6 @@ export class GameEngine {
         );
         if (pilot.harpoonTargetId != null && pilot.harpoonTargetId !== '') {
           cargo.add(pilot.harpoonTargetId);
-        }
-      }
-    }
-  }
-
-  public tickAbilities(): void {
-    this.entityManager.tickAbilityState();
-    const towCrew = new Map<string, number>();
-    for (const actor of this.entityManager.getAllEntities()) {
-      if (
-        isTowCableUtility(actor) &&
-        actor.harpoonTargetId != null &&
-        actor.harpoonTargetId !== '' &&
-        !actor.exploding &&
-        actor.health > 0 &&
-        actor.respawnTimer === undefined
-      ) {
-        towCrew.set(actor.harpoonTargetId, (towCrew.get(actor.harpoonTargetId) ?? 0) + 1);
-      }
-    }
-    for (const entity of this.entityManager.getAllEntities()) {
-      entity.contourDraftFrames = Math.max(0, (entity.contourDraftFrames ?? 0) - 1);
-      entity.navigationAssistFrames = Math.max(0, (entity.navigationAssistFrames ?? 0) - 1);
-      const scanRange =
-        entity.kitId === 'scout' && entity.abilityActiveFrames > 0
-          ? SHIP_ABILITY.SCAN_RANGE
-          : this.satellitePickupManager.countOrbitingFor(entity.id) > 0
-            ? SATELLITE_PICKUP.SCAN_RANGE
-            : 0;
-      if (!entity.exploding && entity.health > 0 && entity.respawnTimer === undefined) {
-        this.revealArea(entity.position, Math.max(EXPLORATION_RANGE[entity.kitId], scanRange));
-        if (scanRange > 0) {
-          const nearbyAsteroids = this.asteroidManager.spatialIndex().query({
-            minX: entity.position.x - scanRange,
-            minY: entity.position.y - scanRange,
-            maxX: entity.position.x + scanRange,
-            maxY: entity.position.y + scanRange,
-          });
-          this.markSurveyedAsteroids(entity.id, entity.position, nearbyAsteroids, scanRange);
-        }
-      }
-      const spider =
-        entity.harpoonTargetId != null && entity.harpoonTargetId !== ''
-          ? this.spiderManager.getBody(entity.harpoonTargetId)
-          : undefined;
-      const target =
-        entity.harpoonTargetId != null && entity.harpoonTargetId !== ''
-          ? (this.getAsteroid(entity.harpoonTargetId) ??
-            spider ??
-            (isTowCableUtility(entity) ? this.hives.body(entity.harpoonTargetId) : undefined))
-          : undefined;
-      if (target && 'boost' in target && target.boost?.phase === 'burning') {
-        clearHaulerLatch(entity);
-        continue;
-      }
-      if (target && 'contourRider' in target && isTowCableUtility(entity)) {
-        target.contourRider = null;
-      }
-      pullHarpoonTarget(
-        entity,
-        target ? [target] : [],
-        target !== undefined &&
-          !target.id.startsWith('frontier:') &&
-          (towCrew.get(target.id) ?? 0) >= asteroidCrewNeeded(target.size ?? 0)
-      );
-      const extract = tickTapExtract(entity, target);
-      if ((extract === 'burst' || extract === 'complete') && target) {
-        const burst =
-          Math.floor(
-            ((entity.tapExtractFrames ?? 0) * SHIP_ABILITY.TAP_EXTRACT_BURSTS) /
-              SHIP_ABILITY.TAP_EXTRACT_FRAMES
-          ) - 1;
-        const ejection = tapLootEjection(
-          entity.position,
-          { position: target.position, size: target.size ?? 0 },
-          burst
-        );
-        const hasSilk = !spider || this.spiderManager.extractSilk(spider.id, entity.id);
-        if (!hasSilk) {
-          clearHaulerLatch(entity);
-          continue;
-        }
-        const drop = spider
-          ? this.lootManager.spawnSilk(ejection.position, this.gameTime, ejection.velocity)
-          : this.lootManager.spawnTap(
-              ejection.position,
-              this.gameTime,
-              ejection.velocity,
-              'material' in target ? target.material : undefined
-            );
-        if (this.pendingTapEjections.length >= MAX_PENDING_LOOT_COLLECTIONS) {
-          this.pendingTapEjections.shift();
-        }
-        this.pendingTapEjections.push({ lootId: drop.id, position: { ...drop.position } });
-        if (extract === 'complete') {
-          clearHaulerLatch(entity);
-        }
-      }
-    }
-    for (const rock of this.asteroidManager.boostedAsteroids()) {
-      if (rock.boost?.phase !== 'armed') {
-        continue;
-      }
-      for (const ownerId of boostOwnerIds(rock.boost)) {
-        const owner = this.entityManager.getEntity(ownerId);
-        if (
-          !owner ||
-          owner.exploding ||
-          owner.health <= 0 ||
-          owner.harpoonTargetId !== rock.id ||
-          haulerUtilityOf(owner) !== 'boost_coupling'
-        ) {
-          rock.boost = removeBoostOwner(rock.boost, ownerId);
-          if (!rock.boost) {
-            break;
-          }
         }
       }
     }

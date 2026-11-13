@@ -103,7 +103,7 @@ test('physical ore funds scanner once per consumed rock, preserves payouts and p
     [...store.load().sectors.values()].flat().find((rock) => rock.id === supply?.id)?.supply
   ).toEqual({ sourceId: TOWN_HEARTH.id, value: 200 });
   pilot.position.x = -100;
-  engine.tickAbilities();
+  engine.abilities.advance();
   expect(supply?.velocity.x).toBeLessThan(0);
 
   expect(engine.crewAction(pilot.id, { kind: 'withdraw-supply' })).toBe(false);

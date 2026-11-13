@@ -51,14 +51,14 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
       data: {},
     });
     for (let frame = 0; frame < 23; frame++) {
-      world.engine.tickAbilities();
+      world.engine.abilities.advance();
     }
     expect(world.engine.getLoot().filter((drop) => drop.kind === 'tap')).toHaveLength(1);
     world.disconnect(alice);
     expect(world.engine.isGamePaused()).toBe(true);
     const bob = world.join('Bob', { x: 0, y: 0 });
     expect(bob.socket.received('tapEjected')).toEqual([]);
-    expect(world.engine.drainTapEjections()).toEqual([]);
+    expect(world.engine.abilities.drainTapEjections()).toEqual([]);
   });
 
   test.each(['release', 'death'] as const)(
@@ -79,9 +79,16 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
         data: {},
       });
       for (let frame = 0; frame < 23; frame++) {
-        world.engine.tickAbilities();
+        world.engine.abilities.advance();
       }
-      expect(world.engine.getLoot().filter((drop) => drop.kind === 'tap')).toHaveLength(1);
+      const drops = world.engine.getLoot().filter((drop) => drop.kind === 'tap');
+      expect(drops).toHaveLength(1);
+      const ejections = world.engine.abilities.drainTapEjections();
+      expect(ejections).toEqual(
+        drops.map((drop) => ({ lootId: drop.id, position: drop.position }))
+      );
+      expect(ejections[0]?.position).not.toBe(drops[0]?.position);
+      expect(world.engine.abilities.drainTapEjections()).toEqual([]);
       if (cause === 'death') {
         world.entity(alice).spawnProtectionTimer = 0;
         expect(
@@ -96,7 +103,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
         });
       }
       for (let frame = 0; frame < 100; frame++) {
-        world.engine.tickAbilities();
+        world.engine.abilities.advance();
       }
       expect(world.entity(alice).harpoonTargetId).toBeNull();
       expect(world.engine.getLoot().filter((drop) => drop.kind === 'tap')).toHaveLength(1);

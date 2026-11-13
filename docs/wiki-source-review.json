@@ -95,9 +95,9 @@
     "server/core/BeltCrawlerManager.ts": "sha256:fe4a9e6b0a622452a633d016f0d76ae57ce7a9e2b464fe25bda3b7614afb55c7",
     "server/core/BotFleet.ts": "sha256:689e5e160eba8e5730312205aa1aa3f145a7f287066b6abd7e0e11b85795c0e2",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
-    "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
+    "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:9deee4ccc2d4e32495d85a7b12ca2aaa57f04751798cce5e4063186e395dac0d",
+    "server/core/GameEngine.ts": "sha256:81128fa21f97dbcc03df7d95f9c0b99714cea2a94b7bef502d90bc2d16d6619a",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -530,7 +530,7 @@
     "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:5bf0710c1f770f3314d55afb50e4e20b61d41205739d2e4bda55b40efe2aa96f",
     "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:e05382b1eb1fbb5d5482e540c08e305f672a24b7523e3a244b7db0d1a2a85c78",
-    "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:6dbb64e0affbaefd7d93c371f10a3ba7ea50a0ef508ada51710bd9b7d8e09f83",
+    "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:11ae77b8dd0195064d1e4e8c651273fcad3c193552c13916bcb03ed63d01084c",
     "tests/unit/server/contour-riding-rocks-drop-navigation-crystals.test.ts": "sha256:bac294d107876ca053de51802167966eb7f9aa740840adf92723c6b12e1f1086",
     "tests/unit/server/cooperative-frontier-and-hazards.test.ts": "sha256:8d76509f2058bf8a25c2c8b317179e2e804d2c32f7f2707484722f41b6e2e4aa",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:650355f9ab121d81b62a088b98ebac074d9c617ba6ef74e84fdd0d792f160a4e",
@@ -8715,6 +8715,29 @@
       "owners": {
         "src/wiki/articleSources.json": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed actual charged-main contour owner source, complete patch and canonical transit/lifecycle assertions against all eleven mapped articles. Real owner preserves the twelve-frame bridge, once-per-pilot use, fixed lifetime, motion epoch, draft and single pause/order. Native pixel/PNG, eight focused files/108 cases, real motion integration six cases, strict types and scoped lint passed; both timing/finish defects failed intended runtime assertions and restored exactly. Current Scout/Hauler/Cargo declarations and generator functions reviewed; poster bytes match the images inspected for the charged release. Player controls, prose and media rules are unchanged. No fresh browser, physical touch, audio or performance acceptance is claimed.",
+      "sources": [
+        "server/core/CooperativeContourBridges.ts",
+        "server/core/GameEngine.ts",
+        "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
     }
   ]
 }

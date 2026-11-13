@@ -21,8 +21,6 @@ import { checkBoundaryCollision } from '../../shared/boundary';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
-import { CONTOUR_BRIDGE } from '../../shared/contourBridge';
-import { contourLockVelocity } from '../../shared/contourLock';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
 import {
   advanceSettlement,
@@ -340,7 +338,7 @@ export class GameEngine {
   private laserSeq = 0;
   private readonly laserNonce = randomUUID();
   private readonly surveyProbeManager = new SurveyProbeManager();
-  private readonly contourBridges = new CooperativeContourBridges();
+  private readonly contourBridges: CooperativeContourBridges;
   public readonly playerMotion = new PlayerMotionService((id, from, source, target, count) =>
     this.contourBridges.noteHop(id, from, source, target, count, this.gameTime)
   );
@@ -467,6 +465,10 @@ export class GameEngine {
     }
     persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
+    this.contourBridges = new CooperativeContourBridges({
+      actors: this.entityManager,
+      motion: this.playerMotion,
+    });
     this.chargedWeapons = new ChargedWeaponManager({
       actors: this.entityManager,
       frame: () => this.gameTime,
@@ -699,7 +701,7 @@ export class GameEngine {
     }
     this.bots.advance(this.gameTime);
     this.chargedWeapons.advance(this.gameTime);
-    this.advanceContourBridges(serverNow);
+    this.contourBridges.advance(this.gameTime, serverNow);
     this.advanceFurnaceTravel(serverNow);
     this.tickAbilities();
     this.tickSurveyProbes(serverNow);
@@ -3578,55 +3580,6 @@ export class GameEngine {
     this.furnaceTravelFrames.set(actor.id, this.gameTime);
     this.playerMotion.handoffActor(actor.id, now);
     return undefined;
-  }
-
-  private advanceContourBridges(now: number): void {
-    this.contourBridges.expire(this.gameTime);
-    for (const actor of this.entityManager.getAllEntities()) {
-      if (
-        actor.health <= 0 ||
-        actor.exploding ||
-        actor.overlayHold === true ||
-        actor.furnaceTransit
-      ) {
-        delete actor.contourTransit;
-        continue;
-      }
-      if (!actor.contourTransit) {
-        const bridge = this.contourBridges.catch(actor, this.gameTime);
-        if (!bridge) {
-          continue;
-        }
-        this.playerMotion.handoffActor(actor.id, now);
-        actor.contourTransit = {
-          from: { ...actor.position },
-          to: { ...bridge.to },
-          target: { ...bridge.target },
-          frame: 0,
-        };
-      }
-      const transit = actor.contourTransit;
-      const t = Math.min(1, ++transit.frame / CONTOUR_BRIDGE.transitFrames);
-      actor.position = {
-        x: transit.from.x + (transit.to.x - transit.from.x) * t,
-        y: transit.from.y + (transit.to.y - transit.from.y) * t,
-      };
-      if (t < 1) {
-        continue;
-      }
-      actor.contourLock = transit.target;
-      actor.contourDraftFrames = CONTOUR_BRIDGE.draftFrames;
-      const velocity = contourLockVelocity(
-        actor.position,
-        transit.target,
-        SHIP.MAX_VELOCITY * CONTOUR_BRIDGE.draftMultiplier
-      );
-      actor.velocity = velocity ?? { x: 0, y: 0 };
-      actor.angle = Math.atan2(-actor.velocity.y, actor.velocity.x);
-      actor.thrusting = true;
-      delete actor.contourTransit;
-      this.playerMotion.finishContourBridge(actor.id, now);
-    }
   }
 
   private finishFurnaceTravel(actor: GameEntity, now: number): void {

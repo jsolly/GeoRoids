@@ -53,7 +53,7 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
       }
       actor.position = { ...settled.position };
       const healthBeforeCollection = actor.health;
-      world.engine.collectLoot();
+      world.engine.lootCollection.collect();
       expect(world.engine.getLoot().some((row) => row.id === drop.id)).toBe(false);
       if (material === 'ice') {
         expect(actor.health).toBe(healthBeforeCollection + NAVIGATION_SALVAGE.iceRepair);
@@ -73,7 +73,7 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
         world.engine.advanceOneFrame();
         expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames - 2);
         expect(actor.contourDraftFrames).toBe(0);
-        world.engine.collectLoot();
+        world.engine.lootCollection.collect();
         expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames - 2);
         expect(
           world.engine.getSnapshotState().entities.find((row) => row.id === actor.id)

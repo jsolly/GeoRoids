@@ -353,10 +353,10 @@ describe('current pilots share the production handler and broadcaster', () => {
     assert.ok(collector, 'recovery player');
     collector.position = { ...shard.position };
     const score = collector.cargo;
-    engine.collectLoot();
+    engine.lootCollection.collect();
     expect(collector.cargo).toBeGreaterThanOrEqual(score + 5);
     const collectedScore = collector.cargo;
-    engine.collectLoot();
+    engine.lootCollection.collect();
     expect(collector.cargo).toBe(collectedScore);
     broadcaster.broadcastGameState();
     expect(

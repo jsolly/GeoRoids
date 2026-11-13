@@ -173,7 +173,7 @@ export class GameStateBroadcaster {
     for (const data of this.gameEngine.abilities.drainTapEjections()) {
       this.broadcastToAll({ type: 'tapEjected', data, timestamp: Date.now() });
     }
-    for (const data of this.gameEngine.drainLootCollections()) {
+    for (const data of this.gameEngine.lootCollection.drainCollections()) {
       const message = { type: 'lootCollected', data, timestamp: Date.now() };
       if (isEquipmentId(data.kind)) {
         // Equipment drops are private to each eligible ship; do not reveal them to others.

@@ -60,7 +60,6 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../../shared/lootBlast';
-import { NAVIGATION_SALVAGE } from '../../shared/navigationSalvage';
 import { chooseCrewSpawn, sanitizePlayerName } from '../../shared/player';
 import { activatePlayerShield } from '../../shared/playerShield';
 import { readReleaseId, releaseField } from '../../shared/releaseId';
@@ -106,7 +105,6 @@ import type {
   CrewAction,
   ExplorationTile,
   FurnaceDelivery,
-  LootCollected,
   LootData,
   PlayerProjectileState,
   PlayerShotFired,
@@ -153,6 +151,7 @@ import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { GlowtoyManager } from './GlowtoyManager';
 import { HiveEncounters } from './HiveEncounters';
 
+import { LootCollectionManager } from './LootCollectionManager';
 import { LootManager } from './LootManager';
 import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
@@ -330,7 +329,6 @@ export class GameEngine {
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private persistenceFailure: Error | undefined;
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
-  private pendingLootCollections: LootCollected[] = [];
   private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
   private pendingSpiderAttacks: SpiderAttack[] = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
@@ -402,6 +400,7 @@ export class GameEngine {
   }
 
   private readonly bots: BotFleet;
+  public readonly lootCollection: LootCollectionManager;
   public readonly abilities: ShipAbilityManager;
 
   constructor(
@@ -465,6 +464,13 @@ export class GameEngine {
       );
     });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
+    this.lootCollection = new LootCollectionManager({
+      actors: this.entityManager,
+      loot: this.lootManager,
+      now: () => this.getServerTime(),
+      capturePilot: (id) => this.capturePilot(id),
+      maximumPendingCollections: MAX_PENDING_LOOT_COLLECTIONS,
+    });
     this.bots = new BotFleet({
       actors: this.entityManager,
       loot: this.lootManager,
@@ -700,8 +706,7 @@ export class GameEngine {
     this.abilities.advance();
     this.tickSurveyProbes(serverNow);
     this.entityManager.updateHealthRegeneration();
-    this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
-    this.collectLoot();
+    this.lootCollection.advance(this.gameTime);
     this.tickSatellitePickups();
     const toolStartPositions = this.captureToolStartPositions();
     this.asteroidManager.updateMotion(
@@ -865,7 +870,7 @@ export class GameEngine {
   /** State and earned rewards persist; missed sounds/notifications do not. */
   private clearPendingFeedback(): void {
     this.pendingLootBlasts = [];
-    this.pendingLootCollections = [];
+    this.lootCollection.clearPendingFeedback();
     this.abilities.clearPendingFeedback();
     this.pendingShotSounds = [];
     this.pendingSatellitePickupCollections = [];
@@ -1851,10 +1856,6 @@ export class GameEngine {
       position,
       ...(laser.charged ? { charged: true } : {}),
     }));
-  }
-
-  public drainLootCollections(): LootCollected[] {
-    return this.pendingLootCollections.splice(0);
   }
 
   public drainLootBlasts() {
@@ -4009,60 +4010,6 @@ export class GameEngine {
 
   public getLoot(): LootData[] {
     return this.lootManager.getAll();
-  }
-
-  /** Server-authoritative pickup: first overlapping live ship wins. */
-  public collectLoot(): void {
-    const collected = this.lootManager.collectOverlaps(this.entityManager.getAllEntities());
-    const events: LootCollected[] = [];
-    for (const { collector, loot } of collected) {
-      events.push({
-        eventId: randomUUID(),
-        lootId: loot.id,
-        collectorId: collector.id,
-        kind: loot.kind,
-        position: { ...loot.position },
-      });
-      if (isEquipmentId(loot.kind)) {
-        collector.equipment = [...(collector.equipment ?? []), loot.kind];
-        collector.lastUpdate = this.getServerTime();
-        this.capturePilot(collector.id);
-        continue;
-      }
-      if ((loot.points ?? 0) > 0) {
-        this.capturePilot(collector.id);
-        continue;
-      }
-      if (loot.salvage === 'ice') {
-        collector.health = Math.min(
-          collector.maxHealth,
-          collector.health + NAVIGATION_SALVAGE.iceRepair
-        );
-      }
-      if (loot.salvage === 'crystal') {
-        collector.navigationAssistFrames = NAVIGATION_SALVAGE.frames;
-      }
-      if (loot.kind === 'silk' || loot.salvage === 'rubble') {
-        collector.silk = (collector.silk ?? 0) + 1;
-        collector.lastUpdate = this.getServerTime();
-        this.capturePilot(collector.id);
-        continue;
-      }
-      collector.lastUpdate = this.getServerTime();
-      logger.debug('LOOT', 'Collected loot', {
-        collectorId: collector.id,
-        lootId: loot.id,
-        kind: loot.kind,
-        mass: collector.mass,
-        maxHealth: collector.maxHealth,
-      });
-    }
-    for (const event of events) {
-      if (this.pendingLootCollections.length >= MAX_PENDING_LOOT_COLLECTIONS) {
-        this.pendingLootCollections.shift();
-      }
-      this.pendingLootCollections.push(event);
-    }
   }
 
   /**

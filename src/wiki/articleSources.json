@@ -616,6 +616,7 @@
     "shared/lootBlast.ts",
     "shared/asteroidReflection.ts",
     "server/core/LootManager.ts",
+    "server/core/LootCollectionManager.ts",
     "server/core/GameEngine.ts",
     "src/constants/index.ts",
     "shared/constants/gameplay.ts",

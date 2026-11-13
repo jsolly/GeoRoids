@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:4c8595cb5bcc705f285e483c2a2cb486a7f08fa8036cf52725de97f8726f3617",
-    "server/communication/MessageHandler.ts": "sha256:244425256ff48f55cc0acdf84ca884032744506cb2dbe281fd3ede790ff7c54a",
+    "server/communication/MessageHandler.ts": "sha256:1efc109f6267a1890e04086c75c24574a2ad92479c7897db02ecf9c390f7928f",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:9b449bab5cdab7ca39ea9cef64f55305b294fbb7bf285cf4fc4765201f9e6d43",
     "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
@@ -94,10 +94,12 @@
     "server/core/AsteroidManager.ts": "sha256:e536e0b0a44d8d4ab24fb5618210f3ab2648e516ec7c954c31e1073e54d2d959",
     "server/core/BeltCrawlerManager.ts": "sha256:fe4a9e6b0a622452a633d016f0d76ae57ce7a9e2b464fe25bda3b7614afb55c7",
     "server/core/BotFleet.ts": "sha256:689e5e160eba8e5730312205aa1aa3f145a7f287066b6abd7e0e11b85795c0e2",
+    "server/core/ChargedWeaponManager.ts": "sha256:51ca4cb8a3492c36246980b494432cfb70eb76e80e5c585bf30e9e32480d0232",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:cb75e343df0c3651bb5e0e7065dbb57cce5e037fc053fb4368dc95280e993807",
+    "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
+    "server/core/GameEngine.ts": "sha256:5c23d73adacb468d2ca68c7e1b11d97e94eae8c1f11125afdc2084190eb682f6",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -165,7 +167,7 @@
     "shared/exploration.ts": "sha256:5f05714298361793f6957c4f1f2e89f1527909c98dccb3437715e5eda4e1bf55",
     "shared/frontier.ts": "sha256:e335478d49629e1cd48c8b00a1a4d0cc050891c55ff371b40ae58cf185bfd52a",
     "shared/furnaceField.ts": "sha256:0001eca8e7c86c20d6124be8d4a24c29a97be32d1409a82da058aeaccd1491f8",
-    "shared/furnaceTravel.ts": "sha256:aaf873234df6c5ff4e9524edf4f3ed7d42aa3990685e4499662141f75ed09fb7",
+    "shared/furnaceTravel.ts": "sha256:b55c7e49921023c21d16bcc44dc6ceacd1f97bc97d406b6054796f91cc05db18",
     "shared/furnaces.ts": "sha256:3732414e7db2894c5a7b8bf459cc7c19ca37df7ce75d8653ca1f900cee09f1a4",
     "shared/gameClock.ts": "sha256:c1242df603c3e78e862772f97c4fb16cde0135d257006c02d12fcb4d2ef43f52",
     "shared/glowtoy.ts": "sha256:68fe1b551d6c608e652fd56f3fab4b816bddd288f6f9bf34cc838bdcd466a167",
@@ -444,7 +446,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:64a5e30b28bcf9aee9d8e92760ea3e5069bc0eaf324a8b40e12df599dab2adfd",
+    "src/wiki/articleSources.json": "sha256:930e4854e7fa57a61534d321ca17137d27cd6798278b6cc183d2868b69f27299",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
@@ -458,6 +460,7 @@
     "tests/unit/audio/title-and-play-loop-music-beds.test.ts": "sha256:5b117d30340357b3d24641a8690be93e5b79b6875dd04d4f965301a3098e6e6d",
     "tests/unit/audio/travel-route-music-requires-moving-through-a-real-passage.test.ts": "sha256:ad5c0bc7221f2ea0d0b8ea5443c15a96bed0b910360e6e28d02d4f8085385c4a",
     "tests/unit/components/debug-controls.test.ts": "sha256:f630bcae8b900129e9d6a1c21453de02d4e9d937af358ebea7b78d0c54811149",
+    "tests/unit/components/universe-map-controls.test.ts": "sha256:ca8295f97d4249bd03be8a0ed4a63f883912f1f3b705c69ebeb533d5e4c720c6",
     "tests/unit/diagnostics/debugHudMetrics.test.ts": "sha256:932a9430957b8d172cb80179e347912fbc7fb9078576825005c9b98574d40760",
     "tests/unit/entities/asteroids.test.ts": "sha256:4fd8d10f2e83cc2dcd0036c9dbd9834afbede779defb1b82fb21f62c5a65b79c",
     "tests/unit/entities/combatDamage.test.ts": "sha256:ea9f152d36b69574381bc2d091207eab311d8eb9b8f6bc673b2ef83273f34a81",
@@ -527,7 +530,7 @@
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:921c801eba2c4c2d3c4f2e1799f89f0463e1bb2c5bb3b5800d9a4256d3355178",
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:a211f6c8c0c593b809dde90c6f053e37e39963550b6d84d9552ebed8159e01ee",
-    "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:5bf0710c1f770f3314d55afb50e4e20b61d41205739d2e4bda55b40efe2aa96f",
+    "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:84e59c2a297511f01d7033477daefb1f5a5b499d4089443529a25fe6fa48f611",
     "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:e05382b1eb1fbb5d5482e540c08e305f672a24b7523e3a244b7db0d1a2a85c78",
     "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:11ae77b8dd0195064d1e4e8c651273fcad3c193552c13916bcb03ed63d01084c",
@@ -539,6 +542,7 @@
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:e6b50f2bb529ef1436b88e4836829991fd6e7976528a941fb21b65d251d6e841",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:539076e397a1c3496bec3eca8c4ea24a38158c79edd41782fe7ed1d4144fdab3",
+    "tests/unit/server/exploration-tiles-survive-checkpoints.test.ts": "sha256:91ad360405e8ba1e515049c062ac1c458e898d0ab3a7a09806ff6356228db37d",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:bff0c60fc4f68500ace3a6c0b71bde08ddfee861f71448661f9e413412696316",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:72be43233e9d5135fd7ad6fecb8f50fed04082cc7513274f9795ec897a290b56",
@@ -553,7 +557,7 @@
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts": "sha256:d9f9246b8cace56695ca00aacebf786abdd804ce2130af1f2bf5c46ab2b4cd4d",
     "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts": "sha256:e48180121688f0a7b1bee099cab26f7ccf4a19738d191abaaedcf462c1ef9283",
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:d7a62e65215c80498e566cbf6ae12a647d96e2ec729b91b85aec9e0ff4ddf2d7",
-    "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:c3e591d2673bece474c709447132bb502c7e6c4c99bf98de2ac4f473dce44a89",
+    "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:bc928879b9150d4e93eb1a308abb8baca05ba186ea6e10e1bdd8d107a7b3b9c1",
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:7c908d53d192c0fbfe663dc62a105e15bccf40cd4483e8f72517a31abe436e43",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1d2cb49eb4cd397956de0383853f1952b91ecd3c1338f244d85b3ddcabb314c6",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
@@ -561,7 +565,7 @@
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:da19d3ebc883fe2a9066392d511c28628a0bea890bc4cd055abd9adda9bd5884",
     "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:922d64babb97f5bcd5ff8533ea2a09c1c280c00343702e61a7ac969846a31f22",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:1b47acb818ed0095f0721980aa4cb0294309adfb8f615d45237db7f8b0f9e2d5",
-    "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts": "sha256:8991aa38633bda1bbc0d633a756d8c505e00ed0e45bbbe4956c86f674ff01455",
+    "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts": "sha256:e311cf56a7f58c234aed40e87e991fdab8fa383ed08b35a24b0705a2bff3e2bb",
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts": "sha256:a014fb3cc93e36091aa5b9cd17f25640270e08d9d63e9a102debceb69305b622",
     "tests/unit/server/regional-asteroid-density.test.ts": "sha256:c5e565c07c430902021135220b89401fea78f9990a43f6236a6c1c112206a6fe",
     "tests/unit/server/remains-stay-local-and-expire-without-awarding-loot.test.ts": "sha256:d9068ad99ce5f69e18a6e63b7ac7ee4cc56db22becc246411398841d60d75d9b",
@@ -587,10 +591,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:612101bf332ec0445eb1ee95e6d4208cbddf14367326e0b1c771d6b07a8965ce",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
-    "tests/unit/components/universe-map-controls.test.ts": "sha256:ca8295f97d4249bd03be8a0ed4a63f883912f1f3b705c69ebeb533d5e4c720c6",
-    "server/core/ChargedWeaponManager.ts": "sha256:51ca4cb8a3492c36246980b494432cfb70eb76e80e5c585bf30e9e32480d0232",
-    "tests/unit/server/exploration-tiles-survive-checkpoints.test.ts": "sha256:91ad360405e8ba1e515049c062ac1c458e898d0ab3a7a09806ff6356228db37d"
+    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8"
   },
   "reviews": [
     {
@@ -8741,6 +8742,36 @@
       "owners": {}
     },
     {
+      "note": "Reviewed actual Contour-main FurnaceTravelManager admission, simulation-frame progress, departure and arrival against all eleven mapped articles. The real owner replaces Engine storage and methods; Charged then Contour then Furnace ordering and the single active pause gate are preserved. Existing controls, pipe routes, travel duration, immunity and resume rules remain unchanged. Added the defining owner source to controls and corrected its coverage reference. Native pixel/PNG, nine canonical unit files125cases, real socket integration6cases, strict types, scoped lint and unused checks passed. Four controlled defects failed actual progress, departing transit, escaped charge and same-frame live-duration assertions; all source and protected hashes restored. Existing Scout/Hauler/Cargo demonstrations retain their reviewed source and poster bytes. Full gate, independent reviews, browser and production acceptance remain pending; no physical-device or performance claim.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/FurnaceTravelManager.ts",
+        "server/core/GameEngine.ts",
+        "shared/furnaceTravel.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts",
+        "tests/unit/server/physical-supplies-restore-frontier.test.ts",
+        "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {
+        "src/wiki/articleSources.json": "controls"
+      }
+    },
+    {
       "note": "Reviewed storage preparation against actual main90884dca, preserving shipped Atlas, Charged and Contour behavior. Dirty tile checkpoints are independent of network offers/ACKs and saved metadata; incompatible saved expeditions refuse startup without erasing progress. Teamwork now states that refusal and names defining persistence sources. All eleven mapped articles and existing Scout/Hauler/Cargo declarations and generators reviewed; poster bytes unchanged from inspected shipped evidence. Native pixel/PNG,247 focused cases, two real integration files/four cases, strict types/benchmark types, scoped lint, unused checks and actual pinned legacy-reader transition passed on this integration. Earlier causal records retain their original failures and exact restorations. Full gate, independent review and hosted browser checks remain pending. No physical device, performance or production activation acceptance is claimed.",
       "sources": [
         "server.ts",
@@ -8800,6 +8831,31 @@
       "topics": ["combat-survival", "field-manual"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reconciled exploration tile checkpoints with actually shipped Furnace955 main1ac299. The defining Furnace owner, Charged then Contour then Furnace order, departure handoff, active pause gate and five budget positions remain. Storage restore and dirty tile ownership remain separate from network Atlas credit. Reviewed the complete combined Engine delta, unchanged phase2 sources, exact shipped Furnace paths, both source mappings, all affected articles and preserved demonstration bytes. Twelve focused files pass 157 cases; three real server integration files, strict types, scoped lint and real pinned legacy-reader transition pass. Canonical ledger resolver preserved all348 distinct prior batches and left these three overlapping sources pending; this acceptance records their actual combined bytes. Complete combined gate and independent review remain pending. Production activation remains held for approved backup, restore and stopped-world transition; no physical-device/performance claim.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/physical-supplies-restore-frontier.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
+      }
     }
   ]
 }

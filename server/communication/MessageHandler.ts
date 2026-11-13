@@ -102,7 +102,7 @@ export class MessageHandler {
           if (owner?.id !== command.id) {
             break;
           }
-          const issue = this.gameEngine.travelFurnace(command.id, command.destinationId);
+          const issue = this.gameEngine.furnaceTravel.start(command.id, command.destinationId);
           this.broadcaster.sendToWebSocket(ws, {
             type: 'furnaceTravelResult',
             data: { ok: issue == null || issue === '', message: issue ?? 'Travelling' },

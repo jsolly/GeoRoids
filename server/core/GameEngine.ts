@@ -49,12 +49,7 @@ import {
   TOWN_HEARTH,
   townSquareSpawn,
 } from '../../shared/furnaces';
-import {
-  furnaceTravelDuration,
-  furnaceTravelPose,
-  nearestTravelFurnace,
-  planFurnaceRoute,
-} from '../../shared/furnaceTravel';
+import { furnaceTravelPose } from '../../shared/furnaceTravel';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { GLOWTOY } from '../../shared/glowtoy';
 import { findLaserSurfaceImpact } from '../../shared/laserSurface';
@@ -151,6 +146,7 @@ import { ChargedWeaponManager } from './ChargedWeaponManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
 import { EntityManager, type GameEntity } from './EntityManager';
+import { FurnaceTravelManager } from './FurnaceTravelManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { GlowtoyManager } from './GlowtoyManager';
 import { HiveEncounters } from './HiveEncounters';
@@ -337,7 +333,7 @@ export class GameEngine {
   public readonly playerMotion = new PlayerMotionService((id, from, source, target, count) =>
     this.contourBridges.noteHop(id, from, source, target, count, this.gameTime)
   );
-  private readonly furnaceTravelFrames = new Map<string, number>();
+  public readonly furnaceTravel: FurnaceTravelManager;
   private departedPlayers: string[] = [];
   private decoratedFieldId?: string | undefined;
   private pendingLootBlasts: Array<{
@@ -455,6 +451,14 @@ export class GameEngine {
     }
     persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
+    this.furnaceTravel = new FurnaceTravelManager({
+      actors: this.entityManager,
+      furnaces: this.furnaces,
+      motion: this.playerMotion,
+      frame: () => this.gameTime,
+      now: () => this.getServerTime(),
+      cancelArmedBoost: (ownerId, targetId) => this.cancelArmedBoost(ownerId, targetId),
+    });
     this.contourBridges = new CooperativeContourBridges({
       actors: this.entityManager,
       motion: this.playerMotion,
@@ -692,7 +696,7 @@ export class GameEngine {
     this.bots.advance(this.gameTime);
     this.chargedWeapons.advance(this.gameTime);
     this.contourBridges.advance(this.gameTime, serverNow);
-    this.advanceFurnaceTravel(serverNow);
+    this.furnaceTravel.advance(this.gameTime, serverNow);
     this.tickAbilities();
     this.tickSurveyProbes(serverNow);
     this.entityManager.updateHealthRegeneration();
@@ -974,7 +978,7 @@ export class GameEngine {
     this.lastCrewSignalAt.delete(id);
     const traveler = this.getPlayer(id);
     if (traveler?.furnaceTransit) {
-      this.finishFurnaceTravel(traveler, this.getServerTime());
+      this.furnaceTravel.finish(traveler, this.getServerTime());
     }
     if (traveler?.botRole && traveler.cargo > 0) {
       this.lootManager.spawnPoints(traveler.position, traveler.cargo);
@@ -1518,7 +1522,7 @@ export class GameEngine {
   public transportClosed(ws: WebSocket): boolean {
     const actor = this.entityManager.getEntityBySocket(ws);
     if (actor?.furnaceTransit) {
-      this.finishFurnaceTravel(actor, this.getServerTime());
+      this.furnaceTravel.finish(actor, this.getServerTime());
     }
     if (actor) {
       this.cancelRescue(actor.id);
@@ -3534,87 +3538,6 @@ export class GameEngine {
 
   public furnaceBuildNotice(): string {
     return this.lastFurnaceBuildNotice;
-  }
-
-  /** Validate the destination against live world state before taking motion ownership. */
-  public travelFurnace(entityId: string, destinationId: string): string | undefined {
-    const actor = this.getPlayer(entityId);
-    if (!actor || actor.exploding || actor.health <= 0 || actor.respawnTimer !== undefined) {
-      return 'Your ship is not ready to travel';
-    }
-    if (actor.furnaceTransit) {
-      return 'Already travelling';
-    }
-    const source = nearestTravelFurnace(actor.position, this.furnaces);
-    if (!source) {
-      return 'Move onto a lit furnace';
-    }
-    if (!this.furnaces.isLit(destinationId)) {
-      return 'That furnace is not lit';
-    }
-    const route = planFurnaceRoute(source.id, destinationId);
-    if (route.length < 2) {
-      return 'Choose another lit furnace';
-    }
-    const now = this.getServerTime();
-    this.cancelArmedBoost(actor.id, actor.harpoonTargetId);
-    clearHaulerLatch(actor);
-    actor.abilityActiveFrames = 0;
-    actor.contourLock = null;
-    actor.velocity = { x: 0, y: 0 };
-    actor.thrusting = false;
-    actor.overlayHold = true;
-    actor.utilityFlight = null;
-    actor.furnaceTransit = {
-      sourceId: source.id,
-      destinationId,
-      startedAt: now,
-      durationMs: furnaceTravelDuration(route),
-    };
-    actor.position = { ...source.position };
-    this.furnaceTravelFrames.set(actor.id, this.gameTime);
-    this.playerMotion.handoffActor(actor.id, now);
-    return undefined;
-  }
-
-  private finishFurnaceTravel(actor: GameEntity, now: number): void {
-    const transit = actor.furnaceTransit;
-    if (!transit) {
-      return;
-    }
-    const pose = furnaceTravelPose(transit, transit.startedAt + transit.durationMs);
-    actor.position = pose.position;
-    actor.angle = pose.angle;
-    actor.velocity = { x: 0, y: 0 };
-    actor.thrusting = false;
-    actor.furnaceTransit = null;
-    actor.overlayHold = false;
-    actor.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
-    actor.lastUpdate = now;
-    this.furnaceTravelFrames.delete(actor.id);
-    this.playerMotion.handoffActor(actor.id, now);
-  }
-
-  private advanceFurnaceTravel(now: number): void {
-    for (const [id, frame] of this.furnaceTravelFrames) {
-      const actor = this.getPlayer(id);
-      const transit = actor?.furnaceTransit;
-      if (!actor || !transit) {
-        this.furnaceTravelFrames.delete(id);
-        continue;
-      }
-      const pose = furnaceTravelPose(
-        transit,
-        transit.startedAt + (this.gameTime - frame) * GAME_TICK_MS
-      );
-      actor.position = pose.position;
-      actor.angle = pose.angle;
-      actor.velocity = { x: 0, y: 0 };
-      actor.lastUpdate = now;
-      if (pose.progress >= 1) {
-        this.finishFurnaceTravel(actor, now);
-      }
-    }
   }
 
   public isFurnaceLit(id: string): boolean {

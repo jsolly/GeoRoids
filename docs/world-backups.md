@@ -155,8 +155,10 @@ aws --profile "$GEOROIDS_AWS_PROFILE" --region "$GEOROIDS_BACKUP_REGION" cloudfo
 Before giving the uploader credentials, inspect the actual bucket's public
 access blocks, encryption, policy, lifecycle, stack policy and termination
 protection. The bucket name is CloudFormation-generated, not guessed.
-CloudFormation schema/compliance validation and independent review remain
-pending. The local policy fixture checks authored policy contracts only.
+The resource validation review records completed template checks, managed-rule
+failures and their reviewed dispositions. Actual resource controls remain
+unverified until provisioning. The local policy fixture checks authored policy
+contracts only.
 
 ## Proposed access and cost
 

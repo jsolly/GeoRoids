@@ -104,7 +104,7 @@ describe('debug report acceptance is durable and bounded', () => {
     });
   });
 
-  test('counts only new accepted reports and preserves the per-address limit across restart', () => {
+  test('counts new attempts and preserves the per-address limit across restart', () => {
     const config = configuration();
     const db = new DebugReportStore(config);
     const first = submission();
@@ -126,6 +126,54 @@ describe('debug report acceptance is durable and bounded', () => {
     expect(() => reopened.accept(unredactable, 'other-pilot', {}, now)).toThrow(SyntaxError);
     expect(reopened.diagnostics().pending).toBe(3);
     expect(reopened.accept(submission(), 'pilot', {}, now + 3_600_000).state).toBe('pending');
+  });
+
+  test('failed redaction spends a durable slot while immutable retries remain free', () => {
+    const config = configuration();
+    const now = 1_800_000_000_000;
+    const first = new DebugReportStore(config);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect(() => first.accept(unredactableSubmission(), 'pilot', {}, now)).toThrow(SyntaxError);
+    }
+    expect(first.diagnostics().pending).toBe(0);
+    first.close();
+    const reopened = store(config);
+    expect(() => reopened.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
+    expect(reopened.accept(submission(), 'pilot', {}, now + 3_600_000).state).toBe('pending');
+  });
+
+  test('post-redaction storage refusals also spend a durable attempt', () => {
+    const config = configuration({ limits: { pendingCount: 0 } });
+    const now = 1_800_000_000_000;
+    const first = new DebugReportStore(config);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const parsed = parseDebugReportSubmission(submission());
+      expect(() => first.accept(parsed, 'pilot', {}, now)).toThrow('storage is full');
+    }
+    first.close();
+    const reopened = store(config);
+    expect(() => reopened.accept(submission(), 'pilot', {}, now)).toThrow('limit reached');
+    expect(reopened.diagnostics().pending).toBe(0);
+  });
+
+  test('an oversized historical identity keeps strict conflict checks and authenticated recovery', () => {
+    const config = configuration();
+    const now = 1_800_000_000_000;
+    const report = submission();
+    report.diagnostics.state['browser'] = '/'.repeat(9000);
+    // Model a row written before clipping was introduced. Do not manufacture a
+    // legacy identity path in the current submission boundary.
+    const first = new DebugReportStore(config);
+    first.accept(report, 'pilot', {}, now);
+    first.close();
+    const reopened = store(config);
+    const clipped = parseDebugReportSubmission(report);
+    expect(() => reopened.accept(clipped, 'pilot', {}, now)).toThrow('already used');
+    expect(reopened.status(report.id, 'wrong-capability')).toBeNull();
+    expect(reopened.status(report.id, report.receiptToken)).toEqual({
+      id: report.id,
+      state: 'pending',
+    });
   });
 
   test('retains existing pending reports when global limits or storage headroom reject new ones', () => {

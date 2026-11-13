@@ -18,6 +18,84 @@ const healthUrl = 'https://georoids-production-2403.up.railway.app/health';
 function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+function nonnegativeInteger(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+/** Retain public disk counters only; never copy the complete health payload. */
+function volumeEvidence(value) {
+  if (value === undefined) {
+    return { status: 'missing' };
+  }
+  requireEvidence(isRecord(value), 'Malformed world volume diagnostics');
+  const status = value['status'];
+  if (status === 'pending') {
+    return { status };
+  }
+  const sampledAt = value['sampledAt'];
+  requireEvidence(nonnegativeInteger(sampledAt), 'Malformed world volume diagnostics');
+  if (status === 'unavailable') {
+    return { status, sampledAt };
+  }
+  const freeBytes = value['freeBytes'];
+  const databaseBytes = value['databaseBytes'];
+  const walBytes = value['walBytes'];
+  const warningBytes = value['warningBytes'];
+  requireEvidence(
+    (status === 'ok' || status === 'low') &&
+      nonnegativeInteger(freeBytes) &&
+      nonnegativeInteger(databaseBytes) &&
+      nonnegativeInteger(walBytes) &&
+      nonnegativeInteger(warningBytes),
+    'Malformed world volume diagnostics'
+  );
+  return { status, sampledAt, freeBytes, databaseBytes, walBytes, warningBytes };
+}
+/** The snapshot decoder owns domain validation; project only bounded public scalars. */
+function campaignEvidence(snapshot) {
+  const active = snapshot['cooperativeActive'];
+  requireEvidence(
+    active === undefined || typeof active === 'boolean',
+    'Malformed public campaign activation'
+  );
+  const activation = active === undefined ? 'missing' : active === true ? 'active' : 'disabled';
+  const campaign = snapshot['campaign'];
+  if (campaign === undefined) {
+    return { activation, summary: { status: 'missing' } };
+  }
+  requireEvidence(isRecord(campaign), 'Malformed public campaign summary');
+  const hives = campaign['hives'];
+  const cleared = campaign['cleared'];
+  const commissioned = campaign['commissioned'];
+  const hazard = campaign['hazard'];
+  requireEvidence(
+    Array.isArray(hives) &&
+      Array.isArray(cleared) &&
+      Array.isArray(commissioned) &&
+      isRecord(hazard),
+    'Malformed public campaign summary'
+  );
+  const phase = hazard['phase'];
+  const kind = hazard['kind'];
+  const startsAt = hazard['startsAt'];
+  const endsAt = hazard['endsAt'];
+  requireEvidence(
+    (phase === 'quiet' || phase === 'warning' || phase === 'active') &&
+      (kind === 'swarm' || kind === 'meteors') &&
+      nonnegativeInteger(startsAt) &&
+      nonnegativeInteger(endsAt),
+    'Malformed public campaign summary'
+  );
+  return {
+    activation,
+    summary: {
+      status: 'available',
+      nearbyHiveCount: hives.length,
+      clearedCount: cleared.length,
+      commissionedCount: commissioned.length,
+      hazard: { phase, kind, startsAt, endsAt },
+    },
+  };
+}
 const protocol = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
 requireEvidence(isRecord(protocol), 'Local snapshot protocol module is malformed');
 const capability = protocol['ASTEROID_INTERACTIONS_CAPABILITY'];
@@ -221,6 +299,7 @@ export async function smoke({
       persistenceMode: 'worker',
       persistenceFailed: false,
       stalls: 0,
+      volume: volumeEvidence(persistence['volume']),
     });
   };
   const checkWire = () => {
@@ -315,6 +394,9 @@ export async function smoke({
               typeof metadata['sequence'] === 'number',
             'Malformed gameplay protocol message'
           );
+          if (evidence.acceptedSnapshots === 0) {
+            observations.push({ source: 'initial-campaign-state', ...campaignEvidence(snapshot) });
+          }
           state = { entities: snapshot['entities'] };
           evidence.acceptedSnapshots++;
           send({ type: 'snapshotAck', data: { sequence: metadata['sequence'] } });

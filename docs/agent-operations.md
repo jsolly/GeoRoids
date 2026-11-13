@@ -256,16 +256,30 @@ Automated tests use explicit temporary stores, never the developer's queue.
 Only the report worker parses, redacts and persists report bodies or contacts
 Todoist. The main server accepts at most two concurrent uploads and eight
 worker requests, with a ten-second request deadline. New reports are limited
-to 2 MiB, three per client address per hour and 30 globally per UTC day.
-The worker refuses a limited address before the report sanitizer runs
-(parsing, which cleans each log record, still runs first), then checks again
-inside the transaction that counts it. A diagnostic state string longer than
-8,192 characters is clipped to that length and ends in `…[truncated]`; a word
-the cut splits loses its kept part, up to 128 characters, so a clipped secret
-keeps no prefix, and redaction never removes the marker. A client log record
-over 8 KiB still rejects the report. One sanitizer pass parses at most 2,048
-URLs and redacts later ones whole. Redaction runs in time linear in the
-report's size.
+to 2 MiB. Each new attempt that reaches redaction durably spends one of three
+per client address per hour and 30 globally per UTC day. Redaction failures and
+later storage refusals still spend that attempt. An exact retry of an already
+stored report does not. Parsing, which cleans each log record, runs before that reservation.
+
+A diagnostic state string longer than 8,192 UTF-16 units is clipped and ends in
+`…[truncated]`. A split Unicode word drops up to 128 kept units. A cut inside a
+URI or address drops its whole non-whitespace span, including long local parts,
+domains and URL userinfo; an incomplete double-quoted span is also removed.
+Complete words, URLs and balanced quoted text at the cut are retained. Redaction
+preserves the marker. Diagnostic object keys over 128 units are rejected rather
+than clipped,
+so distinct keys cannot collapse. A client log record over 8 KiB still rejects
+the report. One sanitizer pass converts at most 2,048 URLs and 65,536 units of
+URL input, bounding percent-encoding expansion as well as parse count. Later or
+over-budget URLs become `[redacted-url-budget]`; malformed URLs inside the
+budget become `[redacted-url]`. Redaction work is linear in the report's size.
+
+An older saved report whose oversized text is now clipped can return HTTP 409
+on resubmission because its stored identity differs. Keep that conflict check.
+Recover the existing receipt through `GET /debug-reports/<id>` using its original
+receipt capability in the Authorization Bearer header; do not change the identity
+or retry with edited content.
+
 These limits are independent of gameplay admission. Railway public HTTP
 ingress supplies `X-Real-IP`; local development uses the socket address and
 ignores forwarded address headers. Before release, verify that Railway replaces
@@ -309,17 +323,18 @@ A later request starts one replacement and is itself refused as restarting; the
 player's retry reaches the new thread. The replacement starts only after the old
 thread has exited, because the store holds its database under an exclusive
 SQLite lock until its thread is gone. At most three replacement threads start
-in any rolling hour. Each is logged as `Replacing the debug report worker` when
-requested and counted from the moment its thread actually starts, so a late
-handover cannot fit a fourth start into the hour. A
-spent budget is logged once with the time of the next possible attempt, and
+in any rolling hour. Each is logged as `Replacing the debug report worker` and
+counted when its thread starts. The logged number excludes starts that have
+left the window while a handover waited. A late handover cannot fit a fourth
+start into the hour. A spent budget is logged once with the time of the next possible attempt, and
 reporting stays closed until then or until the service restarts. If the old
 thread has not exited ten seconds after its replacement was requested, the
 server logs that reporting stays closed until it does, `/health` reports the
 worker as not stopped, and refusals stop promising a restart. A thread stuck
-in a native SQLite call keeps reporting closed until it exits. When it does,
-the server logs the late exit and starts the replacement already charged to the
-budget, with no further request needed. Queued reports resume delivery once a
+in a native SQLite call keeps reporting closed until it exits. If that call
+never returns, only a process restart can recover reporting. When it does exit,
+the server logs the late exit, starts and counts its waiting replacement, with
+no further request needed. Queued reports resume delivery once a
 replacement runs. If shutdown cannot stop the worker within two seconds, the
 server logs that it may hold process exit.
 
@@ -333,8 +348,9 @@ The ways to reach the report database safely are to stop the service, or to
 redeploy with `GEOROIDS_DEBUG_REPORTS_ENABLED=0` so the worker never opens the
 store. Once the store is closed, `railway volume files download` can copy the
 file, together with its `-wal` file when one is present: a stop that was not
-clean leaves committed reports there. Restoring, stopping and redeploying are all human-owned production
-steps that agents do not perform; see
+clean leaves committed reports there. This stopped-service Railway download
+procedure has not been verified by this change. Restoring, stopping and
+redeploying remain human-owned production steps; see
 [persistent world operations](persistent-world.md#railway-deployment-and-recovery).
 
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,

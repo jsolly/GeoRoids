@@ -202,6 +202,18 @@ memory behavior, physical touch, audio or remote-motion quality. Use determinist
 code tests for regression assertions; keep this a small manual smoke, not a new
 browser scenario matrix.
 
+The optional `focus` input selects one brief exercise, with `basic` retaining the
+default checks above. `remote-motion` joins two independent pilots, retains the
+observer's video and before/after images, and records only their identified
+authoritative poses while the subject steers. It does not interrupt snapshots or
+assert packet-free animation or perceptual quality. `phone-diagnostics` uses
+`/?performance=collect` in one mobile-viewport runtime, records a short flight
+and map visit through Start/Stop/Download, and retains the raw export plus a
+checksum-verified summary. Its receipt counts optional bitmap-budget and
+heartbeat fields; absent fields on a main self-check do not prove a candidate
+implements them. Inspect the actual candidate's raw fields and clocks. These
+exercises remain manual evidence, with physical iPhone acceptance still required.
+
 ## Manual performance and media tools
 
 Keep manual measurement fixtures under `benchmarks/` and test-only instrumentation

@@ -443,6 +443,7 @@ describe('authoritative Scout probes', () => {
             position: { x: 0, y: id === 'owner' ? 0 : 100 },
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
+            explorationVersion: 1,
           },
         },
         socket

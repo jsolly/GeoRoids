@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { expect, test, vi } from 'vitest';
-import { captureSnapshot, SnapshotEncoder } from '../../../../shared/snapshotProtocol';
+import { captureSnapshot } from '../../../../shared/snapshotProtocol';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../../support/liveSnapshotFixture';
 import { GameServerWorld } from '../support/gameServerWorld';
 
 test('fixture pilots apply their initial world and keep receiving worlds before an observation', () => {

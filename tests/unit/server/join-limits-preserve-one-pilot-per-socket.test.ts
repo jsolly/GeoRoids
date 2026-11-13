@@ -83,6 +83,7 @@ test('a current pilot cannot be claimed without its private resume token', () =>
     id: 'owner',
     name: 'Owner',
     asteroidInteractions: 1,
+    explorationVersion: 1,
     snapshotVersion: SNAPSHOT_VERSION,
   };
   core.handleClientMessage({ type: 'join', data }, owner.socket);

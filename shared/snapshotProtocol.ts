@@ -1,5 +1,6 @@
-import type { ServerGameSnapshot } from '../shared-types';
-import { validateSnapshotDto } from './snapshotDto';
+import type { LiveGameSnapshot, ServerGameSnapshot } from '../shared-types';
+import { type AtlasOffer, AtlasReceiver, type AtlasSegment } from './atlasTransport';
+import { validateLiveSnapshotDto, validateSnapshotDto } from './snapshotDto';
 import {
   encodeRelativeMotion,
   type RelativeMotionPrediction,
@@ -30,7 +31,8 @@ type Immutable<Value> = Json extends Value
   : Value extends object
     ? { readonly [Key in keyof Value]: Immutable<Value[Key]> }
     : Value;
-type SnapshotState = Immutable<ServerGameSnapshot>;
+type SnapshotState = Immutable<ServerGameSnapshot | LiveGameSnapshot>;
+type SnapshotMode = 'diagnostic' | 'live';
 // Captured trees belong to an immutable encoder. A lower bound remains valid
 // after kinematic rounding and avoids serializing large losing alternatives.
 const jsonByteLowerBounds = new WeakMap<object, number>();
@@ -54,7 +56,7 @@ interface ObjectPatch {
 interface SnapshotPatch extends ObjectPatch {
   objects?: { spiderField: ObjectPatch };
 }
-export type SnapshotFrame =
+export type SnapshotFrame = (
   | { version: 3; sequence: number; kind: 'keyframe'; state: SnapshotState }
   | {
       version: 3;
@@ -62,7 +64,8 @@ export type SnapshotFrame =
       kind: 'delta';
       baseline: number;
       patch: Immutable<SnapshotPatch>;
-    };
+    }
+) & { readonly atlas?: AtlasSegment };
 export interface SnapshotBaseline {
   sequence: number;
   state: SnapshotState;
@@ -210,6 +213,7 @@ function freezeJsonTree(value: Json): void {
 
 /** A synchronous broadcast owns this cache; never retain it between engine frames. */
 export class SnapshotBroadcastCapture {
+  constructor(private readonly mode: SnapshotMode = 'diagnostic') {}
   private readonly parts = new Map<string, WeakMap<object, Json>>();
 
   capture(state: SnapshotState): SnapshotState {
@@ -263,7 +267,7 @@ export class SnapshotBroadcastCapture {
     });
     // Every recipient still receives exhaustive DTO and local-reference validation.
     // A bad recipient must not publish even otherwise valid staged pieces.
-    validateSnapshot(detached);
+    validateSnapshot(detached, this.mode);
     const freshRows = <T extends object>(items: T[]): T[] => {
       const selected: T[] = [];
       const visited = new Set<T>();
@@ -278,7 +282,7 @@ export class SnapshotBroadcastCapture {
       }
       return selected;
     };
-    const validated: ServerGameSnapshot = detached;
+    const validated: LiveGameSnapshot | ServerGameSnapshot = detached;
     const { spiderField, ...root } = validated;
     // Capture-owned identity, rather than freezing, proves which pieces still
     // need their first rounding pass. Unknown aliases are not part of this view.
@@ -303,6 +307,7 @@ export class SnapshotBroadcastCapture {
 export function captureSnapshot(state: SnapshotState): ServerGameSnapshot {
   const copy = copyJson(state);
   validateSnapshot(copy);
+  validateSnapshotDto(copy);
   return copy;
 }
 function equal(left: Json | undefined, right: Json | undefined): boolean {
@@ -778,13 +783,17 @@ export class SnapshotEncoder {
   private fullStateBytes?: number;
   private readonly patches = new Map<SnapshotState, SerializedPatch>();
 
-  constructor(state: SnapshotState, broadcast?: SnapshotBroadcastCapture) {
+  constructor(
+    state: SnapshotState,
+    broadcast?: SnapshotBroadcastCapture,
+    mode: SnapshotMode = 'diagnostic'
+  ) {
     if (broadcast) {
       this.state = broadcast.capture(state);
       return;
     }
     const detached = copyJson(state, 0, { bytes: 0 });
-    validateSnapshot(detached);
+    validateSnapshot(detached, mode);
     quantizeSnapshotKinematics(detached);
     this.state = detached;
   }
@@ -796,7 +805,8 @@ export class SnapshotEncoder {
   encodeSerialized(
     sequence: number,
     baseline: SnapshotBaseline | undefined,
-    timestamp: number
+    timestamp: number,
+    atlas?: AtlasOffer
   ): SerializedSnapshotMessage {
     const prepared = this.prepare(sequence, baseline, true);
     const frameText =
@@ -804,8 +814,8 @@ export class SnapshotEncoder {
         ? replaceNullField(prepared.shell, 'state', prepared.payload)
         : replaceNullField(prepared.shell, 'patch', prepared.payload);
     return {
-      frame: prepared.frame,
-      text: `{"type":"snapshot","data":${frameText},"timestamp":${stringifyJson(timestamp)}}`,
+      frame: atlas ? { ...prepared.frame, atlas: atlas.segment } : prepared.frame,
+      text: `{"type":"snapshot","data":${atlas ? `${frameText.slice(0, -1)},"atlas":${atlas.text}}` : frameText},"timestamp":${stringifyJson(timestamp)}}`,
     };
   }
 
@@ -1134,9 +1144,13 @@ function applyObjectPatch(base: Row, patch: unknown, nested: boolean): Row {
   }
   return state;
 }
-function applyPatch(base: SnapshotState, patch: unknown): ServerGameSnapshot {
+function applyPatch(
+  base: SnapshotState,
+  patch: unknown,
+  mode: SnapshotMode
+): ServerGameSnapshot | LiveGameSnapshot {
   const state = applyObjectPatch(base as unknown as Row, patch, false);
-  validateSnapshot(state);
+  validateSnapshot(state, mode);
   return state;
 }
 
@@ -1156,6 +1170,7 @@ type SnapshotRead =
       readonly kind: 'snapshot';
       readonly state: ServerGameSnapshot;
       readonly metadata: SnapshotMetadata;
+      readonly atlasSyncing: boolean;
     } & SnapshotReadTiming)
   | ({
       readonly kind: 'snapshot-rejected';
@@ -1189,18 +1204,32 @@ function readSnapshotMetadata(value: unknown): SnapshotMetadata | undefined {
   };
 }
 
-function copyOwnedSnapshot(state: ServerGameSnapshot): ServerGameSnapshot {
+function copyOwnedSnapshot(state: ServerGameSnapshot | LiveGameSnapshot): SnapshotState {
   // #decodeOwned has already validated this parser-owned graph. copyJson keeps
   // the wire-safety, depth and detachment checks without repeating DTO/index validation.
-  return copyJson(state) as unknown as ServerGameSnapshot;
+  const retained = copyJson(state);
+  if ('exploration' in state) {
+    validateSnapshotDto(retained);
+  } else {
+    validateLiveSnapshotDto(retained);
+  }
+  return retained;
 }
 
 /** Atomic decoder: neither a rejected packet nor consumers can mutate its baseline. */
 export class SnapshotDecoder {
   private baseline?: SnapshotBaseline;
+  private readonly atlas = new AtlasReceiver();
+
+  constructor(private readonly mode: SnapshotMode) {}
 
   reset(): void {
     delete this.baseline;
+    this.atlas.reset();
+  }
+
+  resetAtlas(): void {
+    this.atlas.reset();
   }
 
   readMessage(text: string, admission: SnapshotAdmission, collectTimings = false): SnapshotRead {
@@ -1233,6 +1262,7 @@ export class SnapshotDecoder {
         kind: 'snapshot',
         state,
         metadata,
+        atlasSyncing: this.mode === 'live' && this.atlas.isSyncing(),
         ...(collectTimings
           ? { timings: { parseMs, decodeMs: performance.now() - decodeStarted } }
           : {}),
@@ -1262,10 +1292,14 @@ export class SnapshotDecoder {
     if (this.baseline && sequence <= this.baseline.sequence) {
       throw new Error('Stale snapshot sequence');
     }
-    let state: ServerGameSnapshot;
+    let state: ServerGameSnapshot | LiveGameSnapshot;
     if (frame['kind'] === 'keyframe') {
-      structural(frame, ['version', 'sequence', 'kind', 'state'], 'keyframe');
-      validateSnapshot(frame['state']);
+      structural(
+        frame,
+        ['version', 'sequence', 'kind', 'state', ...(this.mode === 'live' ? ['atlas'] : [])],
+        'keyframe'
+      );
+      validateSnapshot(frame['state'], this.mode);
       state = frame['state'];
     } else if (
       frame['kind'] === 'delta' &&
@@ -1273,19 +1307,47 @@ export class SnapshotDecoder {
       frame['baseline'] === this.baseline.sequence &&
       sequence === this.baseline.sequence + 1
     ) {
-      structural(frame, ['version', 'sequence', 'kind', 'baseline', 'patch'], 'delta');
-      state = applyPatch(this.baseline.state, frame['patch']);
+      structural(
+        frame,
+        [
+          'version',
+          'sequence',
+          'kind',
+          'baseline',
+          'patch',
+          ...(this.mode === 'live' ? ['atlas'] : []),
+        ],
+        'delta'
+      );
+      state = applyPatch(this.baseline.state, frame['patch'], this.mode);
     } else {
       throw new Error('Snapshot baseline missing; keyframe required');
     }
     const retained = copyOwnedSnapshot(state);
+    const commitAtlas =
+      this.mode === 'live' && frame['atlas'] !== undefined
+        ? this.atlas.prepare(frame['atlas'])
+        : undefined;
+    // Both candidates validate before either accepted authority is changed.
+    commitAtlas?.();
     this.baseline = { sequence, state: retained };
+    if (this.mode === 'live') {
+      return { ...state, exploration: this.atlas.snapshot() };
+    }
+    validateSnapshotDto(state);
     return state;
   }
 }
 
-function validateSnapshot(value: unknown): asserts value is ServerGameSnapshot {
-  validateSnapshotDto(value);
+function validateSnapshot(
+  value: unknown,
+  mode: SnapshotMode = 'diagnostic'
+): asserts value is ServerGameSnapshot | LiveGameSnapshot {
+  if (mode === 'live') {
+    validateLiveSnapshotDto(value);
+  } else {
+    validateSnapshotDto(value);
+  }
   for (const collection of Object.values(value as unknown as Row)) {
     if (rows(collection)) {
       indexed(collection);

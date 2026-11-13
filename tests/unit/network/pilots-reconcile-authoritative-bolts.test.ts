@@ -1,15 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { LASER } from '../../../shared/constants/gameplay';
-import {
-  captureSnapshot,
-  SNAPSHOT_VERSION,
-  SnapshotEncoder,
-} from '../../../shared/snapshotProtocol';
+import { captureSnapshot, SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { PlayerProjectileState, ServerGameSnapshot } from '../../../shared-types';
 import { AuthoritativeProjectileField } from '../../../src/entities/laser/AuthoritativeProjectileField';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { snapshotFixture } from './snapshotFixture';
 
 /** Transport seam only: packets still cross the production onmessage handler,
@@ -89,11 +86,13 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
 
   function acknowledge(ws: Transport): void {
     ws.receive('joined', {
+      color: '#fff',
       id: manager.getClientId(),
       name: 'Projectile observer',
       position: { x: 0, y: 0 },
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
     });

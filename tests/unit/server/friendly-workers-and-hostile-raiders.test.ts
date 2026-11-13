@@ -358,7 +358,7 @@ test('decoded snapshots retain distant humans while bot geometry enters and leav
   const broadcaster = new GameStateBroadcaster(engine);
   broadcaster.negotiateSnapshot(socket);
   broadcaster.negotiateSnapshot(farSocket);
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('live');
   function state() {
     broadcaster.broadcastGameState();
     const raw = socket.sent.at(-1);
@@ -425,7 +425,7 @@ test('a queued bot-removal snapshot cannot be followed by damage for its old bas
   const broadcaster = new GameStateBroadcaster(engine);
   broadcaster.negotiateSnapshot(socket);
   broadcaster.broadcastGameState();
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('live');
   const initial = socket.sent.at(-1);
   assert(initial);
   const applied = decoder.readMessage(initial, { acceptSnapshots: true });

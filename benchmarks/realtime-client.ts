@@ -1208,7 +1208,7 @@ try {
         return;
       }
       sockets.push(socket.url());
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('live');
       let sequence = 0;
       let acceptSnapshots = false;
       socket.on('framesent', ({ payload }) => {
@@ -1808,7 +1808,7 @@ try {
       };
       const protocolPeerOptions = (_index: number): ConstructorParameters<typeof Pilot>[1] => ({
         url: new URL(
-          `${socketUrl}?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}`
+          `${socketUrl}?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}&explorationVersion=1`
         ),
         measuring: () => measuring,
         fail: protocolPeerFail,

@@ -52,7 +52,7 @@ beforeEach(() => {
   broadcaster = new GameStateBroadcaster(engine);
   handler = new MessageHandler(engine, broadcaster);
   socket = new RecordingSocket();
-  decoder = new SnapshotDecoder();
+  decoder = new SnapshotDecoder('live');
   cursor = 0;
   handler.handleMessage(
     {
@@ -62,6 +62,7 @@ beforeEach(() => {
         name: 'Pilot',
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
       },
     },
     socket

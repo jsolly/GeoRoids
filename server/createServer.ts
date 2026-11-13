@@ -302,6 +302,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       if (
         url.pathname !== '/logs' &&
         (url.searchParams.get('snapshotVersion') !== String(SNAPSHOT_VERSION) ||
+          url.searchParams.get('explorationVersion') !== '1' ||
           url.searchParams.get('asteroidInteractions') !== String(ASTEROID_INTERACTIONS_CAPABILITY))
       ) {
         // Reject before open: clients without the supported capability otherwise

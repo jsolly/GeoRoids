@@ -4,11 +4,8 @@ import { expect, test } from 'vitest';
 import { canonicalJson } from '../../../benchmarks/results';
 import { parseArguments } from '../../../benchmarks/run';
 import { sampleOptions } from '../../../benchmarks/sample';
-import {
-  partitionSnapshotBytes,
-  replayWireLedger,
-  websocketTextHeaderBytes,
-} from '../../../benchmarks/wire-ledger';
+import { websocketTextHeaderBytes } from '../../../benchmarks/websocket-frame-bytes';
+import { partitionSnapshotBytes, replayWireLedger } from '../../../benchmarks/wire-ledger';
 import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { snapshotFixture } from '../network/snapshotFixture';
 
@@ -129,15 +126,15 @@ test('crew movement, changing global spiders and Unicode map names account for e
 
 test('captured crew streams reject missing baselines, duplicate frames and altered decoded outcomes', () => {
   const { keyframe, delta } = wireScene();
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const frames = [capture(keyframe.text, decoder), capture(delta.text, decoder)];
   const first = frames[0];
   if (first == null) {
     throw new Error('Missing initial keyframe');
   }
-  expect(replayWireLedger(frames)).toBe(2);
-  expect(() => replayWireLedger(frames.slice(1))).toThrow();
-  expect(() => replayWireLedger([first, ...frames])).toThrow();
+  expect(replayWireLedger(frames, 'diagnostic')).toBe(2);
+  expect(() => replayWireLedger(frames.slice(1), 'diagnostic')).toThrow();
+  expect(() => replayWireLedger([first, ...frames], 'diagnostic')).toThrow();
   const changed = structuredClone(frames);
   const second = changed[1];
   if (!second) {
@@ -174,14 +171,14 @@ test('captured crew streams reject missing baselines, duplicate frames and alter
   second.rawSha256 = hash(second.text);
   // Same byte widths and baseline: only the retained decoded-state witness can reject this.
   expect(second.payloadBytes).toBe(Buffer.byteLength(second.text, 'utf8'));
-  expect(() => replayWireLedger(changed)).toThrow('changed state');
+  expect(() => replayWireLedger(changed, 'diagnostic')).toThrow('changed state');
   const wrongPilot = structuredClone(frames);
   const misrouted = wrongPilot[1];
   if (!misrouted) {
     throw new Error('Missing routed delta');
   }
   misrouted.pilot = 'wire-pilot-1';
-  expect(() => replayWireLedger(wrongPilot)).toThrow();
+  expect(() => replayWireLedger(wrongPilot, 'diagnostic')).toThrow();
 });
 
 test('packed asteroid drift accounts for its actual base64 property and replays the complete world', () => {
@@ -214,10 +211,10 @@ test('packed asteroid drift accounts for its actual base64 property and replays 
   expect(Object.values(partition.parts).reduce((sum, count) => sum + count, 0)).toBe(
     Buffer.byteLength(delta.text, 'utf8')
   );
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const frames = [capture(keyframe.text, decoder), capture(delta.text, decoder)];
-  expect(replayWireLedger(frames)).toBe(2);
-  const complete = new SnapshotDecoder();
+  expect(replayWireLedger(frames, 'diagnostic')).toBe(2);
+  const complete = new SnapshotDecoder('diagnostic');
   complete.readMessage(keyframe.text, { acceptSnapshots: true });
   const result = complete.readMessage(delta.text, { acceptSnapshots: true });
   expect(result.kind).toBe('snapshot');

@@ -61,7 +61,7 @@ afterEach(async () => {
 
 test('a later snapshot decoder rejects an otherwise satisfied message predicate', async () => {
   const { wire, peer } = await connect();
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('live');
   wire.ws.on('message', (raw) => {
     const result = decoder.readMessage(String(raw), { acceptSnapshots: true });
     if (result.kind === 'snapshot-rejected') {

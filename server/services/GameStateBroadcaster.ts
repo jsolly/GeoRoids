@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
+import { type AtlasCursor, offerAtlas } from '../../shared/atlasTransport';
 import { canCollectEquipment, isEquipmentId } from '../../shared/equipment';
 import { frontierSite } from '../../shared/frontier';
 import { civicLot, TOWN_HEARTH } from '../../shared/furnaces';
@@ -28,6 +29,7 @@ interface SnapshotFlight {
   bytes: number;
   submittedAt: number;
   kind: 'ordinary' | 'recovery';
+  atlas?: { transfer: number; cursor: AtlasCursor };
 }
 
 interface SnapshotSubmission extends SnapshotFlight {
@@ -36,6 +38,9 @@ interface SnapshotSubmission extends SnapshotFlight {
 }
 
 interface SnapshotRecipient {
+  atlasTransfer: number;
+  atlasOffered: AtlasCursor;
+  atlasApplied: AtlasCursor;
   worldRemains: boolean;
   baseline?: SnapshotBaseline;
   sequence: number;
@@ -180,7 +185,7 @@ export class GameStateBroadcaster {
         this.broadcastToAll(message);
       }
     }
-    let gameState: ReturnType<GameEngine['getSnapshotState']> | undefined;
+    let gameState: ReturnType<GameEngine['getBroadcastState']> | undefined;
     let capture: SnapshotBroadcastCapture | undefined;
     // Snapshot rows are the engine's live rows, so the engine's frame index covers them.
     const asteroidIndex = this.gameEngine.getAsteroidSpatialIndex();
@@ -213,8 +218,8 @@ export class GameStateBroadcaster {
       }
       try {
         // Prepare common rows only once, after a recipient can accept this broadcast.
-        capture ??= new SnapshotBroadcastCapture();
-        gameState ??= this.gameEngine.getSnapshotState();
+        capture ??= new SnapshotBroadcastCapture('live');
+        gameState ??= this.gameEngine.getBroadcastState();
         playerProjectiles ??= this.gameEngine.getPlayerProjectiles();
         const scanning = isActiveScanner(player);
         const reach = asteroidReach(scanning);
@@ -293,16 +298,23 @@ export class GameStateBroadcaster {
             ],
             playerProjectiles: nearbyWorldRows(playerProjectiles, player.position),
           },
-          capture
+          capture,
+          'live'
         );
         const sequence = recipient.sequence + 1;
         // Ordered delivery retains the successful baseline indefinitely. Joins
         // and explicit recovery require full worlds; the encoder also chooses
         // full when its actual envelope is no larger than the delta.
+        const atlas = offerAtlas(
+          this.gameEngine.getExplorationSource(),
+          recipient.atlasOffered,
+          recipient.atlasTransfer
+        );
         const encoded = canonical.encodeSerialized(
           sequence,
           recipient.needsKeyframe ? undefined : recipient.baseline,
-          timestamp
+          timestamp,
+          atlas
         );
         const bytes = Buffer.byteLength(encoded.text, 'utf8') + OUTBOUND_FRAME_HEADER_RESERVE_BYTES;
         const recovery = recipient.resyncRequested;
@@ -317,6 +329,7 @@ export class GameStateBroadcaster {
           kind: recovery ? 'recovery' : 'ordinary',
           generation: recipient.generation,
           applied: false,
+          ...(atlas ? { atlas: { transfer: recipient.atlasTransfer, cursor: atlas.next } } : {}),
         };
         const requiredKeyframe = recipient.needsKeyframe;
         recipient.pending = submission;
@@ -352,7 +365,11 @@ export class GameStateBroadcaster {
             bytes,
             submittedAt: submission.submittedAt,
             kind: submission.kind,
+            ...(submission.atlas ? { atlas: submission.atlas } : {}),
           });
+          if (submission.atlas?.transfer === recipient.atlasTransfer) {
+            recipient.atlasOffered = submission.atlas.cursor;
+          }
           // An old accepted frame still consumes sequence/credit, but its
           // baseline cannot cross the new joined acknowledgment.
           if (submission.generation === recipient.generation) {
@@ -483,6 +500,9 @@ export class GameStateBroadcaster {
         break;
       }
       recipient.outstandingBytes -= flight.bytes;
+      if (flight.atlas?.transfer === recipient.atlasTransfer) {
+        recipient.atlasApplied = flight.atlas.cursor;
+      }
       if (flight.kind === 'recovery') {
         delete recipient.recoverySequence;
         recipient.resyncRequested = false;
@@ -506,6 +526,9 @@ export class GameStateBroadcaster {
     if (existing) {
       // Same-socket rejoin never reuses a sent sequence or forgets TCP debt.
       existing.generation++;
+      existing.atlasTransfer++;
+      existing.atlasOffered = { kind: 'start' };
+      existing.atlasApplied = { kind: 'start' };
       existing.worldRemains = worldRemains;
       delete existing.baseline;
       existing.needsKeyframe = true;
@@ -514,6 +537,9 @@ export class GameStateBroadcaster {
       return SNAPSHOT_VERSION;
     }
     this.snapshotRecipients.set(ws, {
+      atlasTransfer: 1,
+      atlasOffered: { kind: 'start' },
+      atlasApplied: { kind: 'start' },
       worldRemains,
       sequence: 0,
       needsKeyframe: true,
@@ -529,11 +555,14 @@ export class GameStateBroadcaster {
   /** Request a keyframe and return its earliest possible sequence as a lower bound. */
   public requestSnapshotKeyframe(
     ws: WebSocket,
-    options: { recovery?: boolean } = {}
+    options: { recovery?: boolean; atlasReset?: boolean } = {}
   ): number | undefined {
     const recipient = this.snapshotRecipients.get(ws);
     if (recipient) {
-      if (options.recovery === true && recipient.resyncRequested) {
+      if (options.atlasReset === true) {
+        recipient.atlasApplied = { kind: 'start' };
+      }
+      if (options.recovery === true && recipient.resyncRequested && options.atlasReset !== true) {
         return recipient.recoverySequence ?? recipient.sequence + 1;
       }
       if (options.recovery === true && recipient.outstandingBytes > SNAPSHOT_APPLIED_WINDOW_BYTES) {
@@ -544,6 +573,8 @@ export class GameStateBroadcaster {
       }
       // Coalesce requests; the periodic broadcast supplies the keyframe.
       recipient.needsKeyframe = true;
+      recipient.atlasTransfer++;
+      recipient.atlasOffered = recipient.atlasApplied;
       recipient.resyncRequested ||= options.recovery === true;
       return recipient.sequence + 1;
     }

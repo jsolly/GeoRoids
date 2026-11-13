@@ -48,12 +48,14 @@ test('the server rejects stale gameplay clients before open and accepts a refres
   const port = await server.listening;
   for (const path of [
     '/ws',
-    '/ws?asteroidInteractions=1',
-    '/ws?snapshotVersion=1&asteroidInteractions=1',
-    '/ws?snapshotVersion=2&asteroidInteractions=1',
-    '/other?snapshotVersion=1&asteroidInteractions=1',
-    `/ws?snapshotVersion=${SNAPSHOT_VERSION + 1}&asteroidInteractions=1`,
+    '/ws?asteroidInteractions=1&explorationVersion=1',
+    '/ws?snapshotVersion=1&asteroidInteractions=1&explorationVersion=1',
+    '/ws?snapshotVersion=2&asteroidInteractions=1&explorationVersion=1',
+    '/other?snapshotVersion=1&asteroidInteractions=1&explorationVersion=1',
+    `/ws?snapshotVersion=${SNAPSHOT_VERSION + 1}&asteroidInteractions=1&explorationVersion=1`,
     `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=2`,
+    `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`,
+    `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=2`,
   ]) {
     const stale = connect(port, path);
     let opened = false;
@@ -68,7 +70,10 @@ test('the server rejects stale gameplay clients before open and accepts a refres
     expect(server.gameEngine.getPlayerCount()).toBe(0);
   }
 
-  const updated = connect(port, `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`);
+  const updated = connect(
+    port,
+    `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
+  );
   await updated.open();
   const joined = receive(updated, 'joined');
   updated.send({
@@ -78,6 +83,7 @@ test('the server rejects stale gameplay clients before open and accepts a refres
       name: 'Current pilot',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     },
   });
   expect(await joined).toMatchObject({
@@ -86,6 +92,7 @@ test('the server rejects stale gameplay clients before open and accepts a refres
       id: 'current-pilot',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     },
   });
   const logs = connect(port, '/logs');
@@ -97,7 +104,10 @@ test('a current gameplay socket rejects missing, retired and future snapshot joi
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
   const port = await server.listening;
   for (const offer of [undefined, 1, 2, SNAPSHOT_VERSION + 1, String(SNAPSHOT_VERSION)]) {
-    const socket = connect(port, `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`);
+    const socket = connect(
+      port,
+      `/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
+    );
     await socket.open();
     expect(socket.ws.readyState).toBe(WebSocket.OPEN);
     const error = receive(socket, 'error');
@@ -107,6 +117,7 @@ test('a current gameplay socket rejects missing, retired and future snapshot joi
         id: 'stale-pilot',
         name: 'Stale pilot',
         asteroidInteractions: 1,
+        explorationVersion: 1,
         ...(offer === undefined ? {} : { snapshotVersion: offer }),
       },
     });

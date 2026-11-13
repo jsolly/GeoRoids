@@ -236,6 +236,7 @@ test('joined echoes credential and score releases from the saved pilot', () => {
         position: { x: 100, y: 100 },
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
         clientReleaseId: CLIENT_RELEASE,
       },
     },
@@ -266,6 +267,7 @@ test('join decoding keeps a valid client release and ignores a malformed one', (
       position: { x: 12.5, y: -4 },
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     },
   };
   expect(

@@ -11,7 +11,7 @@ function receivePilot(utilityFields: Record<string, unknown>) {
     throw new Error('Utility snapshot requires a pilot');
   }
   const snapshot = decodeSnapshotMessage(
-    new SnapshotDecoder(),
+    new SnapshotDecoder('diagnostic'),
     JSON.stringify({
       type: 'snapshot',
       data: {

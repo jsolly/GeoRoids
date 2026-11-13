@@ -14,7 +14,7 @@ export class Pilot {
   readonly performanceBudget = new PerformanceBudget();
   readonly id: string;
   readonly socket: WebSocket;
-  readonly decoder = new SnapshotDecoder();
+  readonly decoder = new SnapshotDecoder('live');
   state: ServerGameSnapshot | undefined;
   joined = false;
   releaseId = 'unknown';
@@ -158,6 +158,8 @@ export class Pilot {
                 data.snapshotVersion === SNAPSHOT_VERSION &&
                 'asteroidInteractions' in data &&
                 data.asteroidInteractions === ASTEROID_INTERACTIONS_CAPABILITY &&
+                'explorationVersion' in data &&
+                data.explorationVersion === 1 &&
                 'resumeToken' in data &&
                 typeof data.resumeToken === 'string' &&
                 data.resumeToken.length > 0,
@@ -264,6 +266,7 @@ export class Pilot {
         kitId: 'scout',
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+        explorationVersion: 1,
         cooperativeVersion: 1,
       },
     });

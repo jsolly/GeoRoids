@@ -21,6 +21,7 @@ const clientFrames: { [K in ClientWireMessage['type']]: Extract<ClientWireMessag
         kitId: 'scout',
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+        explorationVersion: 1,
         clientReleaseId: 'a'.repeat(40),
       },
     },
@@ -212,6 +213,7 @@ test('nested joins keep finite positions once the required capabilities are offe
         position: { x: 12.5, y: -4 },
         kitId: 'hauler',
         asteroidInteractions: 1,
+        explorationVersion: 1,
         snapshotVersion: SNAPSHOT_VERSION,
       },
     })
@@ -259,6 +261,7 @@ test('join coordinates must be finite numbers', () => {
         position: { x: '12.5px', y: '-4' },
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
       },
     })
   ).toEqual({
@@ -411,6 +414,7 @@ test('world remains negotiation is additive and rejects malformed offers', () =>
       position: { x: 0, y: 0 },
       snapshotVersion: 3,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     },
   };
   expect(decodeClientCommand(join).ok).toBe(true);

@@ -98,7 +98,7 @@ test('normal and expanded scan work count only when the decoded state matches ac
 });
 
 test('a short expanded scan applied between two normal worlds remains evidence after a single browser drain', () => {
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const recorder = new ClientPerformanceMetrics(true);
   // Transport/session resets are recorder-owned; a wire join ordinal is not this ID.
   recorder.resetSnapshotWitness();
@@ -162,7 +162,7 @@ test('a short expanded scan applied between two normal worlds remains evidence a
 test('staggered natural setup keeps more than 1024 actual pre-drain applications correlatable', () => {
   const cache = new RegionalDecodedWorkCache();
   const recorder = new ClientPerformanceMetrics(true);
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const setupState = snapshotFixture();
   setupState.serverTime = 1000;
   const encoder = new SnapshotEncoder(setupState);

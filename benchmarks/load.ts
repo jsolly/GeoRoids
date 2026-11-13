@@ -54,6 +54,7 @@ const url = new URL(
   values.url ?? `ws://127.0.0.1:${process.env['GEOROIDS_TEST_SERVER_PORT'] ?? 3001}/ws`
 );
 url.searchParams.set('snapshotVersion', String(SNAPSHOT_VERSION));
+url.searchParams.set('explorationVersion', '1');
 url.searchParams.set('asteroidInteractions', String(ASTEROID_INTERACTIONS_CAPABILITY));
 assert(['ws:', 'wss:'].includes(url.protocol), 'Expected ws or wss URL');
 assert(!url.username && !url.password, 'Credentials must not appear in benchmark URLs');

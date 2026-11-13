@@ -22,6 +22,7 @@ async function connect(path: string): Promise<WebSocket> {
   if (url.pathname === '/ws') {
     url.searchParams.set('snapshotVersion', String(SNAPSHOT_VERSION));
     url.searchParams.set('asteroidInteractions', '1');
+    url.searchParams.set('explorationVersion', '1');
   }
   const socket = new WebSocket(url);
   const client = new WireClient(socket);

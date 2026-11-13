@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { SatellitePickupData } from '../../../shared-types';
 import * as audioRuntime from '../../../src/audio/audioRuntime';
 import * as feedbackSounds from '../../../src/audio/feedbackSounds';
@@ -24,6 +24,7 @@ import { getOpenGameOverlay } from '../../../src/runtime/overlayState';
 import type { GamePresentation } from '../../../src/runtime/uiTypes';
 import { setPlayView } from '../../../src/ui/uiUtils';
 import { drawSpawnChart } from '../../../src/ui/universeMap';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 // Logging transport is external to the gameplay runtime under test.
@@ -257,6 +258,7 @@ async function acceptTransportJoin(socket: RecordingTransport, name: string): Pr
     color: '#fff',
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
     terrainSeed: 7,
     serverReleaseId: '7'.repeat(40),
     resumeToken: 'a'.repeat(64),
@@ -848,6 +850,7 @@ test('wall-clock poses survive recovery and stop when play ends', async () => {
   await vi.advanceTimersByTimeAsync(50);
   expect(updates(recovered)).toHaveLength(3);
 
+  ConnectionManager.getInstance().initializeAsteroidSync();
   recovered.receive('joined', {
     id: acceptedId,
     name: 'Pose Pilot',
@@ -855,6 +858,7 @@ test('wall-clock poses survive recovery and stop when play ends', async () => {
     color: '#fff',
     snapshotVersion: SNAPSHOT_VERSION - 1,
     asteroidInteractions: 1,
+    explorationVersion: 1,
     terrainSeed: 7,
     serverReleaseId: '7'.repeat(40),
     resumeToken: 'a'.repeat(64),

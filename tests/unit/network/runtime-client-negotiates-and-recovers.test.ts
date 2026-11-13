@@ -1,13 +1,13 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
+import { MessageHandler } from '../../../server/communication/MessageHandler';
+import { GameEngine } from '../../../server/core/GameEngine';
+import { ServerClock } from '../../../server/core/ServerClock';
+import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
 import { SHIP_ABILITY } from '../../../shared/shipKits';
-import {
-  captureSnapshot,
-  SNAPSHOT_VERSION,
-  SnapshotEncoder,
-} from '../../../shared/snapshotProtocol';
+import { captureSnapshot, SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { TERRAIN } from '../../../shared/terrainConfig';
 import type { AsteroidData, ContourBridge, RolyPolyState } from '../../../shared-types';
 import { Sound, setSound } from '../../../src/audio/Sound';
@@ -32,14 +32,21 @@ import {
   unbindAsteroidFieldApply,
 } from '../../../src/network/services/asteroidFieldSync';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
+import { readStoredResumeToken } from '../../../src/network/services/resumeCredential';
 import { cooperativeActive, getWorldCampaign } from '../../../src/network/worldCampaign';
-import { worldFurnaces } from '../../../src/network/worldExploration';
+import {
+  getWorldExploration,
+  isAtlasSyncing,
+  worldFurnaces,
+} from '../../../src/network/worldExploration';
 import { getContourBridges } from '../../../src/physics/terrain/contourBridgeSession';
 import { getRolyPolys } from '../../../src/physics/terrain/rolyPolySession';
 import { scanCameraZoom } from '../../../src/rendering/canvas';
 import { sendCrewAction } from '../../../src/runtime/crewRescue';
 import { setSelectedShipKitId } from '../../../src/runtime/shipSelection';
 import { logger } from '../../../src/utils/Logger';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
+import { RecordingSocket } from '../../support/recordingSocket';
 import { emptySnapshotFixture, snapshotFixture } from './snapshotFixture';
 
 const LASER_SOUND_PATH_PATTERN = /sounds\/laser\.m4a$/u;
@@ -128,6 +135,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       color: '#fff',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken,
     });
@@ -572,6 +580,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(ws.sent.find((row) => row.type === 'join')?.data?.['worldRemains']).toBe(1);
     expect(manager.combatNetwork.sendCharge('start')).toBe(false);
     expect(ws.sent.some((row) => row.type === 'chargeWeapon')).toBe(false);
+    manager.initializeAsteroidSync();
     ws.receive('joined', {
       id: manager.getClientId(),
       name: 'Runtime pilot',
@@ -579,6 +588,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       color: '#fff',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
       chargedWeapons: 1,
@@ -1323,11 +1333,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
       vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
       const ws = await connect();
       ws.receive('joined', {
+        color: '#fff',
         id: manager.getClientId(),
         name: player.name,
         position: player.ship.position,
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
         terrainSeed: 7,
         resumeToken: 'a'.repeat(64),
       });
@@ -1387,11 +1399,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     ws.receive('joined', {
+      color: '#fff',
       id: manager.getClientId(),
       name: player.name,
       position: player.ship.position,
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'b'.repeat(64),
     });
@@ -1514,11 +1528,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const ws = await connect();
     const oldId = manager.getClientId();
     ws.receive('joined', {
+      color: '#fff',
       id: oldId,
       name: 'Runtime pilot',
       position: player.ship.position,
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
     });
@@ -1564,11 +1580,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getAllPlayers().find((candidate) => candidate.id === oldId)).toBeUndefined();
     expect(manager.getLocalPlayerId()).toBe(freshId);
     ws.receive('joined', {
+      color: '#fff',
       id: freshId,
       name: 'Runtime pilot',
       position: player.ship.position,
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'b'.repeat(64),
     });
@@ -2296,6 +2314,144 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(ws.close).not.toHaveBeenCalled();
   });
 
+  test('same-socket world recovery keeps the chart while explicit chart loss restarts its authority', async () => {
+    const ws = await connect();
+    acknowledge(ws);
+    const state = snapshotFixture();
+    const actor = state.entities[0];
+    assert(actor);
+    actor.id = manager.getClientId();
+    state.entities = [actor];
+    state.exploration = [{ id: '0,0', bits: `01${'00'.repeat(31)}` }];
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+    const received = getWorldExploration();
+    expect(received).toEqual(state.exploration);
+    expect(isAtlasSyncing()).toBe(false);
+    expect(manager.sendSnapshotResync()).toBe(true);
+    expect(getWorldExploration()).toBe(received);
+    expect(manager.sendSnapshotResync({ atlas: 'reset' })).toBe(true);
+    expect(ws.sent.at(-1)).toEqual({ type: 'snapshotResync', data: { atlas: 'reset' } });
+    expect(getWorldExploration()).toEqual([]);
+    expect(isAtlasSyncing()).toBe(true);
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
+    expect(getWorldExploration()).toEqual(state.exploration);
+    expect(isAtlasSyncing()).toBe(false);
+  });
+
+  test('an expired saved pilot keeps its genuinely rotated token while rejecting an older atlas server', async () => {
+    let monotonic = 0;
+    const engine = new GameEngine(
+      82,
+      new ServerClock({ wallNow: () => 1_700_000_000_000, monotonicNow: () => monotonic })
+    );
+    const broadcaster = new GameStateBroadcaster(engine);
+    const handler = new MessageHandler(engine, broadcaster);
+    const serverSocket = new RecordingSocket();
+    try {
+      let ws = await connect();
+      // This story starts a real new pilot, independent of other singleton cases.
+      ws.receive('sessionExpired', {});
+      const firstJoin = ws.sent.filter((message) => message.type === 'join').at(-1);
+      assert(firstJoin);
+      handler.handleMessage(firstJoin, serverSocket);
+      const original = serverSocket.lastReceived('joined')?.data;
+      assert(
+        original !== null &&
+          typeof original === 'object' &&
+          'resumeToken' in original &&
+          typeof original.resumeToken === 'string'
+      );
+      ws.receive('joined', original);
+      const prior = original.resumeToken;
+      expect(readStoredResumeToken() === prior).toBe(true);
+      manager.disconnect();
+      engine.transportClosed(serverSocket);
+      monotonic = 3000;
+      engine.advanceOneFrame();
+      ws = await connect();
+      const resumedSocket = new RecordingSocket();
+      const resume = ws.sent.filter((message) => message.type === 'join').at(-1);
+      assert(resume);
+      handler.handleMessage(resume, resumedSocket);
+      const actual = resumedSocket.lastReceived('joined')?.data;
+      assert(
+        actual !== null &&
+          typeof actual === 'object' &&
+          'resumeToken' in actual &&
+          typeof actual.resumeToken === 'string' &&
+          'explorationVersion' in actual
+      );
+      expect(actual.resumeToken !== prior).toBe(true);
+      const { explorationVersion: _olderServer, ...oldAcknowledgment } = actual;
+      ws.receive('joined', oldAcknowledgment);
+      expect(manager.isConnected).toBe(false);
+      expect(readStoredResumeToken() === actual.resumeToken).toBe(true);
+      expect(ws.sent.some((message) => message.type === 'snapshotAck')).toBe(false);
+      expect(ws.sent.some((message) => message.type === 'setScoutUtility')).toBe(false);
+      ws = await connect();
+      expect(
+        ws.sent.find((message) => message.type === 'join')?.data?.resumeToken === actual.resumeToken
+      ).toBe(true);
+    } finally {
+      broadcaster.stopPeriodicBroadcast();
+      engine.stopGameLoop();
+    }
+  });
+
+  test.each([
+    { id: 'different-pilot' },
+    { name: 'Different pilot' },
+    { position: { x: null, y: 0 } },
+    { resumeToken: 'invalid' },
+    { color: null },
+  ])('malformed or mismatched older joined input cannot replace a credential', async (changed) => {
+    let ws = await connect();
+    acknowledge(ws);
+    const prior = readStoredResumeToken();
+    manager.disconnect();
+    ws = await connect();
+    ws.receive('joined', {
+      id: manager.getClientId(),
+      name: 'Runtime pilot',
+      position: { x: 0, y: 0 },
+      color: '#fff',
+      snapshotVersion: SNAPSHOT_VERSION,
+      asteroidInteractions: 1,
+      terrainSeed: 7,
+      resumeToken: 'b'.repeat(64),
+      ...changed,
+    });
+    expect(manager.isConnected).toBe(false);
+    expect(readStoredResumeToken() === prior).toBe(true);
+    expect(ws.sent.some((message) => message.type === 'snapshotAck')).toBe(false);
+  });
+
+  test('an older socket cannot replace the current pending join credential', async () => {
+    const retired = await connect();
+    acknowledge(retired);
+    const prior = readStoredResumeToken();
+    const late = retired.onmessage;
+    manager.disconnect();
+    await connect();
+    late?.({
+      data: JSON.stringify({
+        type: 'joined',
+        data: {
+          id: manager.getClientId(),
+          name: 'Runtime pilot',
+          position: { x: 0, y: 0 },
+          color: '#fff',
+          snapshotVersion: SNAPSHOT_VERSION,
+          asteroidInteractions: 1,
+          terrainSeed: 7,
+          resumeToken: 'b'.repeat(64),
+        },
+      }),
+    });
+    expect(readStoredResumeToken() === prior).toBe(true);
+    expect(manager.isConnected).toBe(true);
+  });
+
   test('an existing pilot retries after a previous-version server rejects negotiation without losing its credential', async () => {
     let ws = await connect();
     acknowledge(ws);
@@ -2306,11 +2462,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
       resumeToken: 'a'.repeat(64),
     });
     ws.receive('joined', {
+      color: '#fff',
       id,
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       snapshotVersion: 2,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'b'.repeat(64),
     });
@@ -2330,6 +2488,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       label: 'previous snapshot version',
       snapshotVersion: 2,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: 'a'.repeat(64),
       terrainSeed: 7,
     },
@@ -2337,6 +2496,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       label: 'future snapshot version',
       snapshotVersion: SNAPSHOT_VERSION + 1,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: 'a'.repeat(64),
       terrainSeed: 7,
     },
@@ -2351,6 +2511,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       label: 'resume token',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: 'short',
       terrainSeed: 7,
     },
@@ -2358,12 +2519,14 @@ describe('actual ConnectionManager WebSocket message path', () => {
       label: 'terrain seed',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: 'a'.repeat(64),
     },
     {
       label: 'numeric terrain seed',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: 'a'.repeat(64),
       terrainSeed: 'seven',
     },

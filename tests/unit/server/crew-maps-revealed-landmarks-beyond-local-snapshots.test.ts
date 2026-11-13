@@ -45,8 +45,8 @@ test('the global map shares the furnace plan while each pilot receives only near
   const nearRaw = nearSocket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
   const farRaw = farSocket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
   assert(nearRaw && farRaw);
-  const near = decodeSnapshotMessage(new SnapshotDecoder(), nearRaw);
-  const far = decodeSnapshotMessage(new SnapshotDecoder(), farRaw);
+  const near = decodeSnapshotMessage(new SnapshotDecoder('live'), nearRaw);
+  const far = decodeSnapshotMessage(new SnapshotDecoder('live'), farRaw);
   expect(near.mapAssets).toEqual(far.mapAssets);
   expect(near.mapAssets).toContainEqual({
     id: `furnace:${distantLot.id}`,
@@ -131,11 +131,22 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
     engine.addPlayer('late', 'Late explorer', socket, { x: 0, y: 0 });
     const broadcaster = new GameStateBroadcaster(engine);
     broadcaster.negotiateSnapshot(socket);
-    broadcaster.broadcastGameState();
-    const first = socket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
-    assert(first, 'a complete atlas must fit the snapshot transport');
-    const applied = new SnapshotDecoder().readMessage(first, { acceptSnapshots: true });
-    assert(applied.kind === 'snapshot');
+    const completeAtlas = () => {
+      const decoder = new SnapshotDecoder('live');
+      for (let offer = 0; offer < 128; offer++) {
+        broadcaster.broadcastGameState();
+        const raw = socket.sent.at(-1);
+        assert(raw, 'bounded atlas recovery must make progress');
+        const result = decoder.readMessage(raw, { acceptSnapshots: true });
+        assert(result.kind === 'snapshot');
+        expect(broadcaster.acknowledgeSnapshot(socket, result.metadata.sequence)).toBe(true);
+        if (!result.atlasSyncing) {
+          return result;
+        }
+      }
+      throw new Error('Atlas did not finish within its bounded tile/chunk inventory');
+    };
+    const applied = completeAtlas();
     const decoded = applied.state;
     expect(decoded.exploration).toEqual(exploration.snapshot());
     expect(decoded.mapAssets.filter((asset) => asset.kind === 'furnace')).toContainEqual(
@@ -150,12 +161,7 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
 
     socket.sent.length = 0;
     broadcaster.negotiateSnapshot(socket);
-    broadcaster.broadcastGameState();
-    const recovered = socket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
-    assert(recovered, 'resynchronization must also send a complete atlas');
-    expect(decodeSnapshotMessage(new SnapshotDecoder(), recovered).exploration).toEqual(
-      decoded.exploration
-    );
+    expect(completeAtlas().state.exploration).toEqual(decoded.exploration);
     expect(socket.readyState).toBe(1);
   } finally {
     store.close();

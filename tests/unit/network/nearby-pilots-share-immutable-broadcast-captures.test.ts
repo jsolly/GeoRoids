@@ -57,8 +57,8 @@ test('overlapping Scout and Hauler broadcasts share captured rocks while retaini
     const scoutRaw = scoutSocket.sent.find((text) => text.startsWith('{"type":"snapshot"'));
     const haulerRaw = haulerSocket.sent.find((text) => text.startsWith('{"type":"snapshot"'));
     assert(scoutRaw && haulerRaw);
-    const scoutWorld = decodeSnapshotMessage(new SnapshotDecoder(), scoutRaw);
-    const haulerWorld = decodeSnapshotMessage(new SnapshotDecoder(), haulerRaw);
+    const scoutWorld = decodeSnapshotMessage(new SnapshotDecoder('live'), scoutRaw);
+    const haulerWorld = decodeSnapshotMessage(new SnapshotDecoder('live'), haulerRaw);
     expect(scoutWorld.loot.map((drop) => drop.id)).toContain(probe.id);
     expect(scoutWorld.loot.map((drop) => drop.id)).not.toContain(tap.id);
     expect(haulerWorld.loot.map((drop) => drop.id)).toContain(tap.id);
@@ -74,8 +74,10 @@ test('overlapping Scout and Hauler broadcasts share captured rocks while retaini
     expect(scoutCapture.asteroids).not.toBe(haulerCapture.asteroids);
     expect(scoutCapture.loot).not.toBe(haulerCapture.loot);
     expect(scoutCapture.entities[0]).toBe(haulerCapture.entities[0]);
-    expect(scoutWorld).toEqual(scoutCapture);
-    expect(haulerWorld).toEqual(haulerCapture);
+    const { exploration: _scoutAtlas, ...scoutLive } = scoutWorld;
+    const { exploration: _haulerAtlas, ...haulerLive } = haulerWorld;
+    expect(scoutLive).toEqual(scoutCapture);
+    expect(haulerLive).toEqual(haulerCapture);
   } finally {
     vi.restoreAllMocks();
     broadcaster.stopPeriodicBroadcast();

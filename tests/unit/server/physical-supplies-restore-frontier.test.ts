@@ -287,8 +287,8 @@ test('actual hive state reaches only nearby snapshot recipients and carries shie
   const broadcaster = new GameStateBroadcaster(engine);
   broadcaster.negotiateSnapshot(socket);
   broadcaster.negotiateSnapshot(remoteSocket);
-  const nearDecoder = new SnapshotDecoder(),
-    farDecoder = new SnapshotDecoder();
+  const nearDecoder = new SnapshotDecoder('live'),
+    farDecoder = new SnapshotDecoder('live');
   const hives = (recipient: RecordingSocket, decoder: SnapshotDecoder) => {
     const text = recipient.sent.filter((raw) => JSON.parse(raw).type === 'snapshot').at(-1);
     if (!text) {

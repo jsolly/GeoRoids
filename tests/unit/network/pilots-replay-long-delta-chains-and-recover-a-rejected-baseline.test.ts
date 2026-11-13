@@ -31,7 +31,7 @@ test('a pilot reconstructs more than a thousand consecutive deltas and a full re
   const nearLimit = world.asteroids.find((asteroid) => asteroid.id === 'asteroid-1');
   assert(nearLimit);
   nearLimit.position.x = 900_000_000_000.125;
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   let baseline: SnapshotBaseline | undefined;
   let elapsedTicks = 0;
   let predictedRecords = 0;

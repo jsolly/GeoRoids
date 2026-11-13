@@ -114,6 +114,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
           position: { x: 100, y: 100 },
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
         },
       },
       blocked

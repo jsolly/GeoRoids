@@ -61,6 +61,8 @@ Town Square's Store offers placeholders purchased with banked points. Higher set
 
 ## Map
 
+The shared chart fills in after joining or reconnecting. "Chart syncing" means more explored ground is still arriving. Returning to the same connected tab keeps the chart already received.
+
 M or Map opens the shared universe chart centred on your ship. Drag to pan and pinch to zoom; desktop also supports arrow keys, the mouse wheel, and +/− keys. Use Center on you or Home to restore the nearby ship view. M, Escape, or Close returns to flight.
 
 ## Keyboard access and motion

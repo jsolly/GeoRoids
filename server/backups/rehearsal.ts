@@ -3,6 +3,7 @@ import { mkdir, rm } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { WebSocket } from 'ws';
+import { EXPLORATION_VERSION } from '../../shared/atlasTransport';
 import {
   ASTEROID_INTERACTIONS_CAPABILITY,
   SNAPSHOT_VERSION,
@@ -69,9 +70,10 @@ export async function rehearseRestore(options: {
     }
     const engine = server.gameEngine;
     const id = `drill-${randomUUID()}`;
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('live');
+    let joinedAccepted = false;
     socket = new WebSocket(
-      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}`
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}&explorationVersion=${EXPLORATION_VERSION}`
     );
     const connection = socket;
     function send(type: string, data: Record<string, unknown>): void {
@@ -90,7 +92,7 @@ export async function rehearseRestore(options: {
         const received = (raw: WebSocket.RawData) => {
           try {
             const value = decoder.readMessage(String(raw), {
-              acceptSnapshots: true,
+              acceptSnapshots: joinedAccepted,
             });
             if (value.kind === 'snapshot-rejected') {
               throw value.error;
@@ -123,14 +125,23 @@ export async function rehearseRestore(options: {
       connection.once('error', reject);
     });
     await waitFor(
-      (value) =>
-        value.kind === 'message' &&
-        record(value.message) &&
-        value.message['type'] === 'joined' &&
-        record(value.message['data']) &&
-        value.message['data']['id'] === id &&
-        value.message['data']['terrainSeed'] === seed &&
-        value.message['data']['snapshotVersion'] === SNAPSHOT_VERSION,
+      (value) => {
+        const accepted =
+          value.kind === 'message' &&
+          record(value.message) &&
+          value.message['type'] === 'joined' &&
+          record(value.message['data']) &&
+          value.message['data']['id'] === id &&
+          value.message['data']['terrainSeed'] === seed &&
+          value.message['data']['snapshotVersion'] === SNAPSHOT_VERSION &&
+          value.message['data']['asteroidInteractions'] === ASTEROID_INTERACTIONS_CAPABILITY &&
+          value.message['data']['explorationVersion'] === EXPLORATION_VERSION;
+        if (accepted) {
+          decoder.reset();
+          joinedAccepted = true;
+        }
+        return accepted;
+      },
       () =>
         send('join', {
           id,
@@ -139,6 +150,7 @@ export async function rehearseRestore(options: {
           kitId: 'scout',
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+          explorationVersion: EXPLORATION_VERSION,
           cooperativeVersion: 1,
         })
     );

@@ -49,6 +49,7 @@ describe('server authority boundaries', () => {
           position: { x: 0, y: 0 },
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
         },
       },
       ws

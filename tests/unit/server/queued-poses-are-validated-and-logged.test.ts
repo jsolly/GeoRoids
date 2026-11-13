@@ -191,7 +191,13 @@ function join(id: string) {
   core.handleClientMessage(
     {
       type: 'join',
-      data: { id, name: id, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
+      data: {
+        id,
+        name: id,
+        snapshotVersion: SNAPSHOT_VERSION,
+        asteroidInteractions: 1,
+        explorationVersion: 1,
+      },
     },
     socket
   );

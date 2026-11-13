@@ -31,6 +31,7 @@ test('a store reply on a backed-up socket closes it for recovery instead of grow
         position: { x: 0, y: 0 },
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
       },
     },
     socket

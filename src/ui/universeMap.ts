@@ -21,7 +21,12 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
 import { getWorldCampaign } from '../network/worldCampaign';
-import { getWorldExploration, getWorldMapAssets, worldFurnaces } from '../network/worldExploration';
+import {
+  getWorldExploration,
+  getWorldMapAssets,
+  isAtlasSyncing,
+  worldFurnaces,
+} from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
 import { releaseBitmap, resizeBitmap } from '../rendering/bitmapBudget';
 import { strokeFurnaceFireTrail } from '../rendering/furnaceRenderer';
@@ -958,7 +963,9 @@ export function mountUniverseMap(
     context.textAlign = 'right';
     context.textBaseline = 'top';
     context.fillText(
-      `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
+      isAtlasSyncing()
+        ? 'Chart syncing'
+        : `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
       frame.x + frame.size - 8,
       frame.y + 8
     );

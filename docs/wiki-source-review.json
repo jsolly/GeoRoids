@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:19fb3ed51e7fa8c266615bdd93c9093b22d61834324dfaf588748a405c89a2e9",
+    "package.json": "sha256:29ff2102993d0f375661782e77e9288cc3906444d56ef71409b3b3f6f0322a31",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -8345,6 +8345,24 @@
       ],
       "media": ["cargo", "hauler", "scout"],
       "owners": {}
+    },
+    {
+      "note": "Reviewed the strict tooling-contract project and its package command; existing application, build, frontend and benchmark scopes remain unchanged. Player rules and demonstrations are unchanged.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the merged package commands: the strict tooling-contract project remains checked, and the incoming loaded battle measurement and summary commands remain available. These development tools do not change player rules, controls or demonstrations.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
     }
   ]
 }

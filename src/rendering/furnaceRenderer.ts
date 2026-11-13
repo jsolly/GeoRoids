@@ -311,6 +311,10 @@ function drawFlightFurnaceArtwork(
       undefined,
       'Furnace ring canvas unavailable'
     );
+    if (!outer) {
+      drawFurnaceArtwork(ctx, x, y, radius, now);
+      return;
+    }
     let bed: RasterSurface | undefined;
     try {
       bed = prepareRasterSurface(
@@ -319,6 +323,11 @@ function drawFlightFurnaceArtwork(
         undefined,
         'Furnace bed canvas unavailable'
       );
+      if (!bed) {
+        discardRasterSurface(outer);
+        drawFurnaceArtwork(ctx, x, y, radius, now);
+        return;
+      }
       outer.context.setTransform(dpr, 0, 0, dpr, outerHalf, outerHalf);
       drawFurnaceOuterRing(outer.context, 0, 0, radius, line);
       bed.context.setTransform(dpr, 0, 0, dpr, bedHalfWidth, bedHalfHeight);

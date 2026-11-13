@@ -4,6 +4,7 @@ import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { suspendTerrainPrefetch } from '../physics/terrain/terrainSession';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
+import { releaseBitmap, resizeBitmap } from './bitmapBudget';
 import { paintOpaqueBackground } from './canvasBackground';
 import { classifyDevice, type DeviceCategory } from './deviceCategory';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
@@ -237,12 +238,7 @@ class CanvasManager {
     const { miniMap } = refreshHudLayoutForCanvas(this.viewport);
     this.syncPlayfieldChrome(width, height, miniMap, touchControls);
 
-    if (this.canvas.width !== backingWidth) {
-      this.canvas.width = backingWidth;
-    }
-    if (this.canvas.height !== backingHeight) {
-      this.canvas.height = backingHeight;
-    }
+    resizeBitmap(this.canvas, backingWidth, backingHeight, 'playfield');
 
     const cssWidth = `${width}px`;
     const cssHeight = `${height}px`;
@@ -359,6 +355,9 @@ class CanvasManager {
     this.gpuRenderer = null;
     this.gpuRequested = false;
     this.gpuFrameActive = false;
+    if (this.canvas) {
+      releaseBitmap(this.canvas);
+    }
     this.canvas = null;
     this.context = null;
     this.viewport.width = 1;

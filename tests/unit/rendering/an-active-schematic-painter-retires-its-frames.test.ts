@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { afterEach, expect, test, vi } from 'vitest';
+import { readBitmapBudget } from '../../../src/rendering/bitmapBudget';
 import {
   mountShipSchematicCanvases,
   type SchematicSelection,
@@ -40,12 +41,14 @@ test('an active schematic pauses while hidden or reduced-motion and disposes eve
     haulerUtility: 'tow_cable' as const,
     scoutUtility: 'mineral_scan' as const,
   }));
+  const before = readBitmapBudget().liveBytes;
   const painter = mountShipSchematicCanvases(
     document.createElement('canvas'),
     document.createElement('canvas'),
     read
   );
   dispose = painter.dispose;
+  expect(readBitmapBudget().liveBytes).toBeGreaterThan(before);
   expect(read).toHaveBeenCalledOnce();
   expect(frames.size).toBe(1);
   const lateFrame = [...frames.values()][0];
@@ -66,6 +69,7 @@ test('an active schematic pauses while hidden or reduced-motion and disposes eve
   expect(frames.size).toBe(1);
   painter.dispose();
   painter.dispose();
+  expect(readBitmapBudget().liveBytes).toBe(before);
   window.dispatchEvent(new Event('resize'));
   media.dispatchEvent(new Event('change'));
   document.dispatchEvent(new Event('visibilitychange'));
@@ -239,7 +243,8 @@ test('schematic frames retain backing stores while resizing and changing the sel
   resetCalls();
   tick(600);
   expect([hull.width, hull.height, tool.width, tool.height]).toEqual([642, 360, 440, 162]);
-  expect(dimensionSetters.map((setter) => setter.mock.calls.length)).toEqual([1, 1, 1, 1]);
+  // Both-axis growth first releases width, then sets the new height and width.
+  expect(dimensionSetters.map((setter) => setter.mock.calls.length)).toEqual([2, 1, 2, 1]);
   expect(hullTransform).toHaveBeenCalledExactlyOnceWith(2, 0, 0, 2, 0, 0);
   expect(toolTransform).toHaveBeenCalledExactlyOnceWith(2, 0, 0, 2, 0, 0);
 

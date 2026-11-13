@@ -3,6 +3,7 @@ import { Player } from '../../../src/entities/player/Player';
 import { reconcilePlayerInput } from '../../../src/input/keybindings';
 
 import { handleMouseMove } from '../../../src/input/mouse';
+import { readBitmapBudget } from '../../../src/rendering/bitmapBudget';
 import { canvasManager, type PlayfieldGeometry } from '../../../src/rendering/canvasSurface';
 
 let canvas: HTMLCanvasElement;
@@ -242,15 +243,21 @@ describe('the playfield viewport stays in CSS-logical coordinates', () => {
     expect(canvasManager.requireContext().getTransform().a).toBe(2.25);
     expect(secondQuery?.listenerCount()).toBe(0);
     expect(mediaQueries.at(-1)?.media).toBe('(resolution: 2.25dppx)');
+    expect(readBitmapBudget().owners['playfield']).toBe(2700 * 2025 * 4);
 
     const lastQueryBeforeDestroy = mediaQueries.at(-1);
     canvasManager.destroy();
     expect(lastQueryBeforeDestroy?.listenerCount()).toBe(0);
+    expect(canvas.width).toBe(0);
+    expect(canvas.height).toBe(0);
+    expect(readBitmapBudget().owners['playfield']).toBeUndefined();
+    const releasedBudget = readBitmapBudget();
 
     setWindowValue('devicePixelRatio', 1.25);
     lastQueryBeforeDestroy?.emitChange();
-    expect(canvas.width).toBe(2700);
-    expect(canvas.height).toBe(2025);
+    expect(canvas.width).toBe(0);
+    expect(canvas.height).toBe(0);
+    expect(readBitmapBudget()).toEqual(releasedBudget);
 
     canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
 
@@ -259,5 +266,6 @@ describe('the playfield viewport stays in CSS-logical coordinates', () => {
     expect(canvas.height).toBe(1125);
     expect(canvasManager.requireContext().getTransform().a).toBe(1.25);
     expect(mediaQueries.at(-1)?.media).toBe('(resolution: 1.25dppx)');
+    expect(readBitmapBudget().owners['playfield']).toBe(1500 * 1125 * 4);
   });
 });

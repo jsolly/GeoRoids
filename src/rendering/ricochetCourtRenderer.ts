@@ -123,6 +123,9 @@ function drawStaticCourtHalo(ctx: CanvasRenderingContext2D): boolean {
   if (!art || art.dpr !== dpr || art.glow !== glow || art.surface.context.isContextLost?.()) {
     clearStaticCourtArtwork();
     const surface = prepareRasterSurface(side, side, undefined, 'Court artwork canvas unavailable');
+    if (!surface) {
+      return false;
+    }
     try {
       surface.context.setTransform(dpr, 0, 0, dpr, half, half);
       // Put source strokes outside the bitmap, retaining only their shadows.

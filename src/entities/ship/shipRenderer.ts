@@ -11,7 +11,11 @@ import { canvasManager } from '../../rendering/canvasSurface';
 import { drawContourSpeedLines } from '../../rendering/contourSpeedLines';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import type { PlayfieldSize } from '../../rendering/playfieldCamera';
-import { prepareRasterSurface, type RasterSurface } from '../../rendering/rasterSurface';
+import {
+  discardRasterSurface,
+  prepareRasterSurface,
+  type RasterSurface,
+} from '../../rendering/rasterSurface';
 import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
@@ -410,6 +414,17 @@ interface LaserBoltSprites {
 let laserBoltSprites: LaserBoltSprites | null = null;
 const idleLaserBoltSurfaces: RasterSurface[] = [];
 
+export function clearLaserBoltArtwork(): void {
+  for (const sprite of laserBoltSprites?.colors.values() ?? []) {
+    discardRasterSurface(sprite);
+  }
+  for (const surface of idleLaserBoltSurfaces) {
+    discardRasterSurface(surface);
+  }
+  idleLaserBoltSurfaces.length = 0;
+  laserBoltSprites = null;
+}
+
 /** Read once per drawLaserBolts batch, outside its projectile loop. */
 function prepareLaserBoltSprites(
   ctx: CanvasRenderingContext2D,
@@ -476,7 +491,7 @@ function paintLaserBolt(
   ctx.restore();
 }
 
-function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprite {
+function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprite | undefined {
   const existing = cache.colors.get(color);
   if (existing) {
     return existing;
@@ -493,6 +508,9 @@ function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprit
     idleLaserBoltSurfaces.pop(),
     'Laser bolt canvas context unavailable'
   );
+  if (!surface) {
+    return undefined;
+  }
   const { canvas, context: ctx } = surface;
   const sprite = {
     canvas,
@@ -500,8 +518,13 @@ function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprit
     originX: padding + halfLength + trailLength,
     originY: padding,
   };
-  ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
-  paintLaserBolt(ctx, sprite.originX, sprite.originY, color, cache.scale);
+  try {
+    ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
+    paintLaserBolt(ctx, sprite.originX, sprite.originY, color, cache.scale);
+  } catch (error) {
+    discardRasterSurface(surface);
+    throw error;
+  }
   cache.colors.set(color, sprite);
   return sprite;
 }
@@ -524,6 +547,11 @@ function drawCachedLaserBolt(
   ctx.rotate(angle);
   ctx.scale(Math.sqrt(energy), energy);
   ctx.shadowBlur = 0;
+  if (!sprite) {
+    paintLaserBolt(ctx, 0, 0, color, cache.scale);
+    ctx.restore();
+    return;
+  }
   ctx.drawImage(
     sprite.canvas,
     -sprite.originX,

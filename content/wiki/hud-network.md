@@ -60,7 +60,11 @@ Opening the report button after delivery starts a fresh report; **New report** b
 
 The bug icon expands or collapses player and page session IDs, frame rate, and connection health; this browser remembers your choice. Logging defaults to Info; add `?log-level=debug`, `info`, or `warn` to change it for that visit. Use Copy Diagnostics when reporting trouble, including silent audio or unexpected Contour Lock releases. Lock-release records name the cause; server position or heading rejections also record rail distance, alignment, and the acquisition window.
 
-For a device performance check, open `/debug?performance=collect`, enter the game, warm up, then choose **Start**. Choose **Stop** after the run, then send a report with the test conditions; it includes a timing summary. Download the full recording before starting another collection, and treat incomplete runs as unverified.
+For a device performance check, open `/?performance=collect`, enter the game, warm up, then choose **Start**. Choose **Stop** after the run, then send a report with the test conditions; it includes a timing summary. Download the full recording before starting another collection, and treat incomplete runs as unverified.
+
+For a freeze investigation, download the full performance recording after Stop.
+It includes canvas backing estimates and independent worker timing when available;
+these observations do not identify the device's memory limit or prove why it froze.
 
 ## Graphics option
 
@@ -68,7 +72,7 @@ Live diagnostics include a Device label: Low-end, Commodity, High-end, or Unknow
 
 Try the [experimental WebGL version](https://www.georoids.com/?renderer=webgl2) to compare graphics performance on your device. It uses the same scene and controls and falls back automatically if the renderer is unavailable. Reload the [standard version](https://www.georoids.com/) to return to the default renderer.
 
-For a flight-resolution comparison, open `/debug?performance=collect&renderDpr=1`; test `&renderGlow=off` separately at the original resolution, or `&renderGlow=full` on a low-end device. Lower resolution softens canvas details; these diagnostic choices apply only to that visit. Low-end [Mineral Scan](/wiki/#scout) keeps its separate resolution limit.
+For a flight-resolution comparison, open `/?performance=collect&renderDpr=1`; test `&renderGlow=off` separately at the original resolution, or `&renderGlow=full` on a low-end device. Lower resolution softens canvas details; these diagnostic choices apply only to that visit. Low-end [Mineral Scan](/wiki/#scout) keeps its separate resolution limit.
 
 ## Campaign status
 

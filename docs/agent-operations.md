@@ -402,6 +402,13 @@ infrastructure.
 
 ## Commands
 
+For the user-authorized hosted alternative to a blocked local browser, keep the
+reviewed UI PR in draft and run `Browser smoke` from main with its full head SHA.
+Read the matching receipt and inspect its screenshots/videos before marking the
+PR ready. [Hosted browser smoke](../tests/AGENTS.md#hosted-browser-smoke) defines
+the scope and limits. The workflow starts only an ephemeral local world; it does
+not deploy a preview or operate on production data.
+
 Use `npm run dev` for live rebuilding.
 
 ```shell

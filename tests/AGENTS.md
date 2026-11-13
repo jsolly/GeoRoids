@@ -189,7 +189,9 @@ The verification script comes from the workflow commit, separately from the
 candidate checkout. It checks desktop and mobile Chromium viewports, joins through
 the start screen, sends playfield input, opens and closes the map, visits `/wiki/`
 and `/debug`, and fails on page or console errors. It retains screenshots, short
-videos, the server log and a receipt, including on failures.
+videos, the server log and a receipt, including on failures. The receipt also
+records up to 50 console warnings and a dropped-warning count. Inspect every
+warning; a truncated warning inventory cannot establish a clean console.
 
 Read the actual receipt and inspect the images before marking the PR ready for
 the normal auto-merge workflow. A green job alone does not certify appearance.

@@ -19,6 +19,7 @@ assert(candidateSha && /^[0-9a-f]{40}$/u.test(candidateSha), 'An exact candidate
 await mkdir(artifacts, { recursive: true });
 
 const errors: string[] = [];
+const warnings: { messages: string[]; dropped: number } = { messages: [], dropped: 0 };
 const completed: string[] = [];
 const screenshots: string[] = [];
 let browser: Browser | undefined;
@@ -33,18 +34,26 @@ async function capture(page: Page, name: string): Promise<void> {
 try {
   browser = await chromium.launch();
   // A deadline bounds owned server startup; it is not a performance assertion.
-  const deadline = Date.now() + 60_000;
-  for (;;) {
-    try {
-      const response = await fetch(origin, { signal: AbortSignal.timeout(2000) });
-      if (response.ok) {
-        break;
+  const readiness = await browser.newPage();
+  try {
+    const deadline = Date.now() + 60_000;
+    for (;;) {
+      try {
+        const response = await readiness.goto(origin, {
+          waitUntil: 'domcontentloaded',
+          timeout: 2000,
+        });
+        if (response?.ok()) {
+          break;
+        }
+      } catch {
+        // Astro and its same-origin proxy may still be starting.
       }
-    } catch {
-      // Astro and its same-origin proxy may still be starting.
+      assert(Date.now() < deadline, 'Owned development server did not become ready');
+      await delay(250);
     }
-    assert(Date.now() < deadline, 'Owned development server did not become ready');
-    await delay(250);
+  } finally {
+    await readiness.close();
   }
 
   for (const profile of [
@@ -67,6 +76,13 @@ try {
     page.on('console', (message) => {
       if (message.type() === 'error' && errors.length < 50) {
         errors.push(`${name}: ${message.text().slice(0, 1000)}`);
+      }
+      if (message.type() === 'warning') {
+        if (warnings.messages.length < 50) {
+          warnings.messages.push(`${name}: ${message.text().slice(0, 1000)}`);
+        } else {
+          warnings.dropped++;
+        }
       }
     });
     try {
@@ -142,6 +158,8 @@ try {
         completed,
         screenshots,
         errors,
+        warnings: warnings.messages,
+        warningsDropped: warnings.dropped,
         success: succeeded,
         limitation:
           'Hosted Chromium viewport checks do not certify physical touch, audio, iPhone memory pressure or remote motion quality.',

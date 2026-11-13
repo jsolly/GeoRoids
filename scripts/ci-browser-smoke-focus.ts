@@ -4,8 +4,8 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Browser, Page } from 'playwright';
-import { SnapshotDecoder } from '../shared/snapshotProtocol';
 import { summarizePhoneRecording } from '../src/diagnostics/phoneRecordingSummary';
+import { CandidatePoseObserver, type CandidateProtocol } from './ci-browser-smoke-protocol';
 
 type Exercise = {
   browser: Browser;
@@ -14,7 +14,6 @@ type Exercise = {
   capture: (page: Page, name: string) => Promise<void>;
   monitor: (page: Page, name: string) => void;
 };
-type Pose = { id: string; sequence: number; x: number; y: number; angle: number };
 
 function object(value: unknown): Record<string, unknown> {
   assert(value !== null && typeof value === 'object' && !Array.isArray(value));
@@ -39,61 +38,25 @@ async function enter(page: Page, pilot: string): Promise<void> {
 
 // Passive protocol observations identify only the two owned pilots. No socket is replaced,
 // no packet is delayed, and no runtime or world state is injected into the candidate.
-function observe(page: Page, target: () => string | undefined) {
-  const state: { id?: string; pose?: Pose; ownPose?: Pose } = {};
+function observe(page: Page, target: () => string | null, protocol: CandidateProtocol) {
+  const observer = new CandidatePoseObserver({ createDecoder: protocol.createDecoder, target });
   page.on('websocket', (socket) => {
     if (new URL(socket.url()).pathname !== '/ws') {
       return;
     }
-    const decoder = new SnapshotDecoder();
+    const channel = observer.openSocket();
     socket.on('framereceived', ({ payload }) => {
-      try {
-        assert(typeof payload === 'string', 'Expected text protocol');
-        const result = decoder.readMessage(payload, { acceptSnapshots: state.id !== undefined });
-        if (result.kind === 'message') {
-          const message = object(result.message);
-          if (message['type'] === 'joined') {
-            const data = object(message['data']);
-            assert(typeof data['id'] === 'string');
-            state.id = data['id'];
-          }
-        } else if (result.kind === 'snapshot') {
-          const own = result.state.entities.find((row) => row.id === state.id);
-          if (own) {
-            state.ownPose = {
-              id: own.id,
-              sequence: result.metadata.sequence,
-              x: own.position.x,
-              y: own.position.y,
-              angle: own.angle,
-            };
-          }
-          const entity = result.state.entities.find((row) => row.id === target());
-          if (entity) {
-            state.pose = {
-              id: entity.id,
-              sequence: result.metadata.sequence,
-              x: entity.position.x,
-              y: entity.position.y,
-              angle: entity.angle,
-            };
-          }
-        } else {
-          throw result.error;
-        }
-      } catch (error) {
-        if (failures.length < 50) {
-          failures.push(error instanceof Error ? error.message.slice(0, 256) : 'Protocol failure');
-        }
-      }
+      channel.receive(payload);
     });
+    socket.on('close', () => channel.close());
   });
-  const failures: string[] = [];
-  return { state, failures };
+  return observer;
 }
 
-export async function runRemoteMotion(exercise: Exercise): Promise<void> {
-  const { browser, artifacts, origin, capture, monitor } = exercise;
+export async function runRemoteMotion(
+  exercise: Exercise & { protocol: CandidateProtocol }
+): Promise<void> {
+  const { browser, artifacts, origin, capture, monitor, protocol } = exercise;
   const options = {
     viewport: { width: 1280, height: 800 },
     recordVideo: { dir: join(artifacts, 'video'), size: { width: 1280, height: 800 } },
@@ -104,15 +67,15 @@ export async function runRemoteMotion(exercise: Exercise): Promise<void> {
   const subject = await subjectContext.newPage();
   monitor(observer, 'remote-observer');
   monitor(subject, 'remote-subject');
-  const subjectWire = observe(subject, () => subjectWire.state.id);
-  const observerWire = observe(observer, () => subjectWire.state.id);
+  const subjectWire = observe(subject, () => subjectWire.state.id, protocol);
+  const observerWire = observe(observer, () => subjectWire.state.id, protocol);
   try {
     assert((await observer.goto(origin))?.ok());
     await enter(observer, 'CI observer');
     assert((await subject.goto(origin))?.ok());
     await enter(subject, 'CI subject');
     await until(
-      () => observerWire.state.ownPose !== undefined && observerWire.state.pose !== undefined,
+      () => observerWire.state.ownPose !== null && observerWire.state.pose !== null,
       'Observer did not receive the identified subject'
     );
     assert(
@@ -133,7 +96,7 @@ export async function runRemoteMotion(exercise: Exercise): Promise<void> {
       await until(() => {
         const pose = observerWire.state.pose;
         return (
-          pose !== undefined &&
+          pose !== null &&
           pose.sequence > before.sequence &&
           Math.hypot(pose.x - before.x, pose.y - before.y) > 1
         );

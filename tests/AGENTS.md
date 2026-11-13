@@ -214,6 +214,13 @@ heartbeat fields; absent fields on a main self-check do not prove a candidate
 implements them. Inspect the actual candidate's raw fields and clocks. These
 exercises remain manual evidence, with physical iPhone acceptance still required.
 
+The remote observer loads the exact candidate's production snapshot decoder as
+code under test. Trusted workflow code verifies the checkout and decoder file,
+then validates only the identified finite poses it needs; the smoke assertions
+stay in the verification checkout. The receipt records both commit identities
+and the candidate decoder file hash. Protocol rejection or a malformed result
+fails the focus without retaining joined credentials or raw worlds.
+
 ## Manual performance and media tools
 
 Keep manual measurement fixtures under `benchmarks/` and test-only instrumentation

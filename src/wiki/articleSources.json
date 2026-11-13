@@ -65,6 +65,7 @@
     "src/entities/ship/shipUtils.ts",
     "shared/combat.ts",
     "server/core/GameEngine.ts",
+    "server/core/FurnaceTravelManager.ts",
     "server/core/ChargedWeaponManager.ts",
     "server/communication/MessageHandler.ts",
     "server/communication/clientCommandDecoder.ts",

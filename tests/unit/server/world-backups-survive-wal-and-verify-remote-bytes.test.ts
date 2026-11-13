@@ -39,7 +39,7 @@ function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-backup-'));
   cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'volume', 'world.sqlite');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('fixture-pilot', 'Fixture pilot', socket, { x: 0, y: 0 }, 'scout');
@@ -172,7 +172,7 @@ test('online snapshot includes committed WAL, every auxiliary table and a resuma
   // Boot a second copy so rehearsal writes never alter the exact preserved artifact.
   const rehearsal = join(directory, 'rehearsal.sqlite');
   await createSnapshot(destination, rehearsal);
-  const store = new WorldStore(rehearsal);
+  const store = new WorldStore(rehearsal, { intent: 'private' });
   try {
     const engine = new GameEngine(999, undefined, new InlineWorldPersistence(store));
     expect(engine.getTerrainSeed()).toBe(82);
@@ -285,6 +285,7 @@ test.each(['legacy', 'prepared', 'stale-preparation', 'active'] as const)(
   'a %s snapshot counts authoritative discoveries and preserves every source row',
   async (state) => {
     const { directory, path, db } = fixture();
+    transitionExplorationStorage(db, explorationStorageFingerprint(db), 'rollback');
     const atlas = [
       { id: '30,30', bits: `03${'00'.repeat(31)}` },
       { id: '7,12', bits: `${'00'.repeat(31)}80` },
@@ -405,6 +406,9 @@ test('a lost PUT response leaves one immutable daily artifact and restart verifi
 
 test('a stale prepared exploration copy preserves the authoritative legacy atlas and all exact table bytes', async () => {
   const { directory, path, db } = fixture();
+  // The current runtime creates ACTIVE worlds. Build a genuine legacy artifact
+  // explicitly, then retain a deliberately stale prepared copy for inspection.
+  transitionExplorationStorage(db, explorationStorageFingerprint(db), 'rollback');
   db.exec('CREATE TABLE exploration (id TEXT PRIMARY KEY, bits TEXT NOT NULL)');
   db.prepare('INSERT INTO exploration VALUES(?,?)').run('31,30', `04${'00'.repeat(31)}`);
   const world = JSON.parse(String(db.prepare('SELECT json FROM world').get()?.['json']));

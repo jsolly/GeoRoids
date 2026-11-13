@@ -17,6 +17,7 @@ import {
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import type { AsteroidData } from '../../../shared-types';
+import { createPrivateWorld } from '../../support/privateWorld';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { spiderAdvanceFixture } from '../../support/spiderAdvanceFixture';
 
@@ -63,12 +64,12 @@ test('activating a crowded belt sleeps excess bodies without killing their persi
 test('the real activated engine reserves twelve swarm slots before admitting crowded belt bodies', () => {
   const dir = mkdtempSync(join(tmpdir(), 'campaign-budget-'));
   const path = join(dir, 'world.sqlite');
-  new WorldStore(path).close();
+  createPrivateWorld(path).close();
   const db = new DatabaseSync(path);
   migrateCooperativeWorld(db, legacyWorldDigest(db));
   db.exec('UPDATE cooperative_schema SET activated=1');
   db.close();
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   let elapsed = 0;
   const clock = new ServerClock({ wallNow: () => 0, monotonicNow: () => elapsed });
   const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));

@@ -40,7 +40,7 @@ Town Square starts lit; Scouts spend score to build outward through dark furnace
 
 ## Persistent world
 
-Exploration, built furnaces, and the asteroid field survive server restarts until the expedition resets. Harvested deposits regrow out of sight, so a mined field is worth revisiting.
+Exploration, built furnaces, and the asteroid field survive server restarts. An incompatible saved expedition stops the server from loading; it does not erase crew progress. Harvested deposits regrow out of sight, so a mined field is worth revisiting.
 
 ## Build the settlement
 

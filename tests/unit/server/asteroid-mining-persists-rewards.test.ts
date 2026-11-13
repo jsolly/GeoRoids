@@ -39,7 +39,7 @@ function temporaryWorldPath(): string {
 }
 
 function fileStore(path: string): WorldStore {
-  const value = new WorldStore(path);
+  const value = new WorldStore(path, { intent: 'private' });
   stores.push(value);
   return value;
 }

@@ -99,7 +99,7 @@ test('recovery survives SQLite restart and expires while the home sector sleeps'
         seed: SEED,
         startedAt: START,
         generation: WORLD.generation,
-        exploration: [],
+
         asteroidBelt: [...field.beltState()],
       },
       field.checkpoint(manager),

@@ -1,5 +1,6 @@
 import type { AsteroidData } from '../../shared-types';
-import type { PersistentPilot, SavedEconomy, SavedWorld } from './WorldStore';
+import type { SavedWorld } from './savedWorld';
+import type { PersistentPilot, SavedEconomy } from './WorldStore';
 import type { WorldCheckpoint, WorldVolumeDiagnostics } from './worldPersistence';
 
 /** Messages the game thread sends to the world-store worker. */
@@ -10,6 +11,7 @@ export type WorldStoreWorkerRequest =
       world: SavedWorld | undefined;
       economy: SavedEconomy | undefined;
       cooperative: WorldCheckpoint['cooperative'];
+      exploration: WorldCheckpoint['exploration'];
       /** Structured clone carries the Map as-is; the worker validates its contents. */
       sectors: ReadonlyMap<string, AsteroidData[]>;
       pilots: PersistentPilot[];

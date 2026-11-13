@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parentPort } from 'node:worker_threads';
 import { expect, test, vi } from 'vitest';
-import { WorldStore } from '../../../server/world/WorldStore';
+import { createPrivateWorld } from '../../support/privateWorld';
 
 const state = vi.hoisted(() => ({ path: '' }));
 vi.mock('node:worker_threads', async () => {
@@ -12,6 +12,7 @@ vi.mock('node:worker_threads', async () => {
   return {
     isMainThread: false,
     workerData: {
+      intent: 'existing',
       get path() {
         return state.path;
       },
@@ -28,7 +29,7 @@ vi.mock('node:worker_threads', async () => {
 test('the idle writer refreshes disk health and shutdown removes its sampling timer', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-idle-volume-'));
   state.path = join(directory, 'world.sqlite');
-  new WorldStore(state.path).close();
+  createPrivateWorld(state.path).close();
   if (!parentPort) {
     throw new Error('Worker fixture has no parent port');
   }

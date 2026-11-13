@@ -323,3 +323,54 @@ test('a failed atlas-bearing send closes without acknowledging its offered chart
     engine.stopGameLoop();
   }
 });
+
+test('storage acceptance leaves transport progress intact while valid restore and reset advance their own epochs', () => {
+  const map = new ExplorationMap();
+  map.reveal({ x: 62.5, y: 62.5 }, 1);
+  const pending = map.checkpoint();
+  const identity = map.atlasIdentity();
+  const receiver = new AtlasReceiver();
+  map.accepted(pending);
+  expect(map.atlasIdentity()).toEqual(identity);
+  const first = offerAtlas(map, { kind: 'start' }, 1);
+  assert(first);
+  receiver.prepare(first.segment)();
+  expect(receiver.snapshot()).toEqual([{ id: '30,30', bits: `01${'00'.repeat(31)}` }]);
+  expect(map.checkpoint().size).toBe(0);
+  expect(map.atlasIdentity()).toEqual(identity);
+  expect(offerAtlas(map, first.next, 1)).toBeUndefined();
+
+  map.reveal({ x: 187.5, y: 62.5 }, 1);
+  const newer = map.checkpoint();
+  const beforeInvalid = map.atlasIdentity();
+  expect(() => map.restore([{ id: '30,30', bits: 'invalid' }])).toThrow();
+  expect(map.atlasIdentity()).toEqual(beforeInvalid);
+  expect([...map.checkpoint()]).toEqual([...newer]);
+  const restored = { id: '30,30', bits: `03${'00'.repeat(31)}`, future: { kept: true } };
+  map.restore([restored]);
+  expect(map.checkpoint().size).toBe(0);
+  expect(map.atlasIdentity().epoch).toBe(beforeInvalid.epoch + 1);
+  expect(map.snapshot()).toEqual([restored]);
+  const cell = explorationCellAt({ x: 187.5, y: 62.5 });
+  assert(cell !== null);
+  expect(map.hasCell(cell)).toBe(true);
+  const recovery = offerAtlas(map, first.next, 2);
+  assert(recovery);
+  expect(recovery.segment.reset).toBe(true);
+  receiver.prepare(recovery.segment)();
+  expect(receiver.snapshot()).toEqual([{ id: '30,30', bits: restored.bits }]);
+
+  map.reveal({ x: 2062.5, y: 62.5 }, 1);
+  const oldExpedition = map.checkpoint();
+  const beforeReset = map.atlasIdentity();
+  map.reset();
+  expect(map.checkpoint().size).toBe(0);
+  expect(map.atlasIdentity().epoch).toBe(beforeReset.epoch + 1);
+  const reset = offerAtlas(map, recovery.next, 3);
+  assert(reset);
+  receiver.prepare(reset.segment)();
+  expect(receiver.snapshot()).toEqual([]);
+  map.reveal({ x: 4062.5, y: 62.5 }, 1);
+  map.accepted(oldExpedition);
+  expect([...map.checkpoint()]).toEqual([['32,30', `01${'00'.repeat(31)}`]]);
+});

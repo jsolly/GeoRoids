@@ -9,6 +9,7 @@ import { afterEach, expect, test } from 'vitest';
 import {
   explorationStorageFingerprint,
   inspectExplorationStorage,
+  readExplorationStorage,
   transitionExplorationStorage,
 } from '../../../server/world/explorationSchema';
 import { WorldStore } from '../../../server/world/WorldStore';
@@ -50,12 +51,20 @@ function otherRows(db: DatabaseSync) {
   );
 }
 
-function loadWithLegacyReader(path: string) {
-  const store = new WorldStore(path);
+function readFormatProjection(path: string) {
+  const db = new DatabaseSync(path, { readOnly: true });
   try {
-    return store.load();
+    const { world, exploration } = readExplorationStorage(db);
+    // Retain exact non-atlas progress rows; the real old runtime is tested by the pinned lever.
+    return {
+      world,
+      exploration,
+      pilots: db.prepare('SELECT * FROM pilots ORDER BY id').all(),
+      economy: db.prepare('SELECT * FROM economy ORDER BY id').all(),
+      sectors: db.prepare('SELECT * FROM sectors ORDER BY id').all(),
+    };
   } finally {
-    store.close();
+    db.close();
   }
 }
 
@@ -67,20 +76,23 @@ function cli(...args: string[]) {
   );
 }
 
-test('preparing the captured old schema preserves the old reader, activation retains every discovery, and rollback exports new discoveries', () => {
+test('preparing the captured old schema preserves progress, active-only admission retains every discovery, and rollback exports new discoveries', () => {
   const { path, db } = legacyFixture();
-  const legacy = loadWithLegacyReader(path);
+  const legacy = readFormatProjection(path);
+  expect(() => new WorldStore(path)).toThrow('legacy');
   const before = rawWorld(db);
   const otherBefore = otherRows(db);
   expect(inspectExplorationStorage(db)).toEqual({ state: 'legacy', tiles: 2 });
   transition(db, 'prepare');
   expect(rawWorld(db)).toBe(before);
-  expect(loadWithLegacyReader(path)).toEqual(legacy);
+  expect(readFormatProjection(path)).toEqual(legacy);
   expect(inspectExplorationStorage(db)).toEqual({
     state: 'prepared',
     tiles: 2,
   });
   const prepared = explorationStorageFingerprint(db);
+  expect(() => new WorldStore(path)).toThrow('prepared');
+  expect(explorationStorageFingerprint(db)).toBe(prepared);
   transition(db, 'prepare');
   expect(explorationStorageFingerprint(db)).toBe(prepared);
   transition(db, 'activate');
@@ -88,7 +100,12 @@ test('preparing the captured old schema preserves the old reader, activation ret
   transition(db, 'activate');
   expect(explorationStorageFingerprint(db)).toBe(activated);
   expect(JSON.parse(rawWorld(db))).not.toHaveProperty('exploration');
-  expect(() => loadWithLegacyReader(path)).toThrow('Saved world is invalid');
+  const active = new WorldStore(path);
+  try {
+    expect(active.load().exploration).toEqual(atlas);
+  } finally {
+    active.close();
+  }
   expect(db.prepare('SELECT id,bits FROM exploration').all()).toEqual(atlas);
   db.prepare('INSERT INTO exploration(id,bits) VALUES(?,?)').run('31,30', `04${'00'.repeat(31)}`);
   transition(db, 'rollback');
@@ -97,8 +114,9 @@ test('preparing the captured old schema preserves the old reader, activation ret
     expect.arrayContaining([...atlas, { id: '31,30', bits: `04${'00'.repeat(31)}` }])
   );
   expect(otherRows(db)).toEqual(otherBefore);
-  const restored = loadWithLegacyReader(path);
-  expect(restored.world?.exploration).toEqual(
+  const restored = readFormatProjection(path);
+  expect(() => new WorldStore(path)).toThrow('legacy');
+  expect(restored.exploration).toEqual(
     expect.arrayContaining([...atlas, { id: '31,30', bits: `04${'00'.repeat(31)}` }])
   );
   expect(restored.pilots).toEqual(legacy.pilots);

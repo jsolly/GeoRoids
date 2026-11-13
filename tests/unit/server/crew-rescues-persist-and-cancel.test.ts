@@ -14,6 +14,7 @@ import {
 } from '../../../server/world/cooperativeSchema';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
+import { createPrivateWorld } from '../../support/privateWorld';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const cleanups: (() => void)[] = [];
@@ -26,14 +27,14 @@ function scenario() {
   const dir = mkdtempSync(join(tmpdir(), 'crew-rescue-'));
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'world.sqlite');
-  new WorldStore(path).close();
+  createPrivateWorld(path).close();
   const db = new DatabaseSync(path);
   migrateCooperativeWorld(db, legacyWorldDigest(db));
   db.exec('UPDATE cooperative_schema SET activated=1');
   db.close();
   let elapsed = 0;
   const clock = new ServerClock({ wallNow: () => 100_000, monotonicNow: () => elapsed });
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   cleanups.push(() => store.close());
   const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => engine.stopGameLoop());

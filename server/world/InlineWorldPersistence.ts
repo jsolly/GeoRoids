@@ -38,7 +38,8 @@ export class InlineWorldPersistence implements WorldPersistence {
         batch.sectors,
         batch.pilots,
         batch.economy,
-        batch.cooperative
+        batch.cooperative,
+        batch.exploration
       );
     } catch (error) {
       this.fail(

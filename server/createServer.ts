@@ -37,6 +37,7 @@ import {
   handleTestResetWorld,
 } from './testHttpHandlers';
 import { openWorldPersistence } from './world/openWorldPersistence';
+import type { WorldOpenIntent } from './world/worldPersistence';
 
 type CreateServerOptions = {
   port?: number;
@@ -45,6 +46,8 @@ type CreateServerOptions = {
   nodeEnv?: string;
   seed?: number;
   worldPath?: string;
+  /** Only isolated callers may explicitly create an empty private expedition. */
+  worldOpenIntent?: WorldOpenIntent;
   localPlayground?: boolean;
   /** Built client directory served from this origin; set only for preview environments. */
   serveClientFrom?: string;
@@ -355,7 +358,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   const persistence =
     options.worldPath != null && options.worldPath !== ''
-      ? openWorldPersistence(options.worldPath)
+      ? openWorldPersistence(options.worldPath, { intent: options.worldOpenIntent ?? 'existing' })
       : undefined;
   const gameEngine = new GameEngine(
     options.seed,

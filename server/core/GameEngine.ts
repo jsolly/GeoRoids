@@ -104,7 +104,6 @@ import type {
   BotRole,
   CivicModule,
   CrewAction,
-  ExplorationTile,
   FurnaceDelivery,
   LootCollected,
   LootData,
@@ -128,14 +127,10 @@ import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import { CooperativeCampaign } from '../world/CooperativeCampaign';
 import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
+import type { SavedWorld } from '../world/savedWorld';
 import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import { WorldRemains } from '../world/WorldRemains';
-import {
-  type PersistentPilot,
-  type RestorableFlight,
-  restorableFlight,
-  type SavedWorld,
-} from '../world/WorldStore';
+import { type PersistentPilot, type RestorableFlight, restorableFlight } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import {
   type AsteroidHitCause,
@@ -253,7 +248,6 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
   asteroidBelt: readonly BeltSlotState[];
-  exploration: ExplorationTile[];
   civicModules: readonly CivicModule[];
   startedAt: number;
 }
@@ -264,6 +258,7 @@ export class GameEngine {
     | { settlement: SettlementState; pointRevision: number; botCargo: boolean }
     | undefined;
   private exploration = new ExplorationMap();
+  private replaceExplorationPending = false;
   private mapAssets = new MapAssets(this.exploration);
   private readonly remains = new WorldRemains();
   private readonly glowtoys: GlowtoyManager;
@@ -411,15 +406,10 @@ export class GameEngine {
     private readonly localPlayground = false
   ) {
     // The saved world is read exactly once, here, before the loop starts.
-    let loaded = persistence?.load();
+    const loaded = persistence?.load();
     const saved = loaded?.world;
     if (persistence && saved && saved.generation !== WORLD.generation) {
-      logger.warn('WORLD', 'Saved world generation does not match; resetting world', {
-        savedGeneration: saved.generation,
-        currentGeneration: WORLD.generation,
-      });
-      persistence.reset();
-      loaded = undefined;
+      throw new Error('Saved world generation is incompatible; refusing to reset player progress');
     }
     this.cooperative = new CooperativeCampaign(loaded?.cooperative);
     this.worldSeed = loaded?.world?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
@@ -433,7 +423,7 @@ export class GameEngine {
     if (loaded?.world) {
       this.furnaces.replaceLit(loaded.world.civicModules ?? []);
       this.settlement = loaded.economy?.settlement ?? emptySettlement();
-      this.exploration.restore(loaded.world.exploration);
+      this.exploration.restore(loaded.exploration);
     }
     for (const pilot of loaded?.pilots ?? []) {
       this.pilots.set(pilot.id, pilot);
@@ -898,6 +888,7 @@ export class GameEngine {
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
+    this.replaceExplorationPending = true;
     this.mapAssets.reset();
     this.clearTown();
     this.rngService.reset();
@@ -922,6 +913,7 @@ export class GameEngine {
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
+    this.replaceExplorationPending = false;
     this.mapAssets.reset();
     this.clearTown();
     this.playerMotion.reset();
@@ -1330,6 +1322,7 @@ export class GameEngine {
         }
       }
       const worldRow = this.worldRowIfChanged();
+      const tiles = this.exploration.checkpoint();
       const botCargo = this.bots.savedCargo(this.getServerTime());
       const economyChanged =
         this.lastSavedEconomy?.settlement !== this.settlement ||
@@ -1348,12 +1341,19 @@ export class GameEngine {
             }
           : {}),
         ...(worldRow ? { world: worldRow.world } : {}),
+        ...(tiles.size > 0 || this.replaceExplorationPending
+          ? { exploration: { kind: this.replaceExplorationPending ? 'replace' : 'patch', tiles } }
+          : {}),
         // Custom diagnostic belts do not belong to regional activation or sleep bookkeeping.
         sectors: this.managedField
           ? this.regionalField.checkpoint(this.asteroidManager)
           : new Map(),
         pilots,
       });
+      // Ownership transfers only after synchronous clone/inline commit accepts.
+      // An ambiguous asynchronous commit failure is fatal, never retried here.
+      this.exploration.accepted(tiles);
+      this.replaceExplorationPending = false;
       if (worldRow) {
         this.lastFlushedWorldRow = worldRow.builtFrom;
       }
@@ -1374,14 +1374,11 @@ export class GameEngine {
   }
 
   /**
-   * The world row carries the whole exploration grid, so it is only rebuilt
-   * and sent when one of its inputs changed since the last flush. The
-   * exploration snapshot keeps its identity until a cell is revealed.
+   * Metadata is independent of dirty tile checkpoints and network atlas encoding.
    */
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
       asteroidBelt: this.regionalField.beltState(),
-      exploration: this.exploration.snapshot(),
       civicModules: this.furnaces.litModules(),
       startedAt: this.worldStartedAt,
     };
@@ -1389,7 +1386,6 @@ export class GameEngine {
     if (
       last &&
       last.asteroidBelt === builtFrom.asteroidBelt &&
-      last.exploration === builtFrom.exploration &&
       last.civicModules === builtFrom.civicModules &&
       last.startedAt === builtFrom.startedAt
     ) {
@@ -1402,7 +1398,6 @@ export class GameEngine {
         startedAt: this.worldStartedAt,
         generation: WORLD.generation,
         writtenReleaseId: SERVER_RELEASE_ID,
-        exploration: builtFrom.exploration,
         civicModules: [...this.furnaces.litModules()],
       },
       builtFrom,

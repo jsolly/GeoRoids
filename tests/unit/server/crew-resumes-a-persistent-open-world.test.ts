@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 function database(path: string): WorldStore {
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   stores.push(store);
   return store;
 }
@@ -154,7 +154,6 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
-        exploration: [],
       },
       field.checkpoint(manager),
       []

@@ -1,5 +1,19 @@
-import type { AsteroidData, CooperativeRecord, CooperativeWorld } from '../../shared-types';
-import type { PersistentPilot, SavedEconomy, SavedWorld } from './WorldStore';
+import type {
+  AsteroidData,
+  CooperativeRecord,
+  CooperativeWorld,
+  ExplorationTile,
+} from '../../shared-types';
+import type { SavedWorld } from './savedWorld';
+import type { PersistentPilot, SavedEconomy } from './WorldStore';
+
+/** File creation and empty-world startup are explicit private lifecycle choices. */
+export type WorldOpenIntent = 'existing' | 'private';
+
+export type ExplorationCheckpoint = {
+  kind: 'patch' | 'replace';
+  tiles: ReadonlyMap<string, string>;
+};
 
 /** Everything the engine changed since the last flush, handed over as one transaction. */
 export interface WorldCheckpoint {
@@ -7,6 +21,7 @@ export interface WorldCheckpoint {
   economy?: SavedEconomy;
   /** The world row, only when something in it changed since the last flush. */
   world?: SavedWorld;
+  exploration?: ExplorationCheckpoint;
   sectors: ReadonlyMap<string, AsteroidData[]>;
   pilots: readonly PersistentPilot[];
 }
@@ -16,6 +31,7 @@ export interface LoadedWorld {
   cooperative?: CooperativeWorld;
   economy?: SavedEconomy;
   world: SavedWorld | undefined;
+  exploration: ExplorationTile[];
   sectors: Map<string, AsteroidData[]>;
   pilots: PersistentPilot[];
 }
@@ -58,6 +74,7 @@ export interface WorldPersistenceDiagnostics {
  */
 export interface WorldPersistence {
   load(): LoadedWorld;
+  /** Return only after synchronous clone/inline commit accepts ownership; not a durable ACK. */
   persist(batch: WorldCheckpoint): void;
   /** Erase the saved world. Ordered after any batch handed over before it. */
   reset(): void;

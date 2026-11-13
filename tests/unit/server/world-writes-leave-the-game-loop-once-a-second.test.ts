@@ -12,6 +12,7 @@ import type {
   WorldPersistenceDiagnostics,
 } from '../../../server/world/worldPersistence';
 import { GAME } from '../../../shared/constants/gameplay';
+import { ExplorationMap } from '../../../shared/exploration';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -113,7 +114,7 @@ class InFlightPersistence implements WorldPersistence {
   rejectNextBatchWith: Error | undefined;
   private readonly idleWaiters: Array<() => void> = [];
   load(): LoadedWorld {
-    return { world: undefined, sectors: new Map(), pilots: [] };
+    return { world: undefined, exploration: [], sectors: new Map(), pilots: [] };
   }
   persist(batch: WorldCheckpoint): void {
     if (this.rejectNextBatchWith) {
@@ -153,6 +154,21 @@ class InFlightPersistence implements WorldPersistence {
   }
 }
 
+test('a synchronously refused batch never accepts dirty exploration and fails the engine', () => {
+  const persistence = new InFlightPersistence();
+  const { engine } = world(persistence);
+  engine.revealArea({ x: 50_062.5, y: 62.5 }, 1);
+  const accepted = vi.spyOn(ExplorationMap.prototype, 'accepted');
+  persistence.rejectNextBatchWith = new Error('fixture handover refusal');
+  expect(() => engine.checkpointWorld()).toThrow('Persistent world checkpoint failed');
+  const source = engine.getExplorationSource();
+  assert(source instanceof ExplorationMap);
+  expect(source.checkpoint().get('55,30')).toBe(`01${'00'.repeat(31)}`);
+  expect(accepted).not.toHaveBeenCalled();
+  expect(engine.isPersistenceHealthy()).toBe(false);
+  expect(() => engine.advanceOneFrame()).toThrow('Persistent world checkpoint failed');
+});
+
 test('a commit still in flight defers the next flush, which then carries everything that changed meanwhile', async () => {
   const persistence = new InFlightPersistence();
   const { engine, miner, frame } = world(persistence);
@@ -163,8 +179,8 @@ test('a commit still in flight defers the next flush, which then carries everyth
     frame();
   }
   expect(persistence.batches).toHaveLength(1);
-  // The first flush carries the world row with the pilot's discoveries.
-  expect(persistence.batches[0]?.world?.exploration.length).toBeGreaterThan(0);
+  // The first flush carries only changed discovery tiles beside metadata.
+  expect(persistence.batches[0]?.exploration?.tiles.size).toBeGreaterThan(0);
   expect(persistence.batches[0]?.sectors.get('0,0')?.map((rock) => rock.id)).toEqual([target.id]);
 
   // The worker is still committing: this second's cadence passes without a
@@ -177,6 +193,10 @@ test('a commit still in flight defers the next flush, which then carries everyth
     frame();
   }
   expect(persistence.batches).toHaveLength(1);
+
+  engine.revealArea({ x: 50_062.5, y: 62.5 }, 1);
+  engine.revealArea({ x: 50_187.5, y: 62.5 }, 1);
+  expect(persistence.batches[0]?.exploration?.tiles.has('55,30')).toBe(false);
 
   // Explicit flushes coalesce too: the last pilot leaving and a repeated
   // request add nothing while the writer is busy...
@@ -197,6 +217,10 @@ test('a commit still in flight defers the next flush, which then carries everyth
   expect(deferred.sectors.get('0,0')).toEqual([]);
   expect(deferred.pilots.map((pilot) => [pilot.id, pilot.score])).toEqual([[miner.id, 123]]);
   expect(deferred.world).toBeUndefined();
+  expect(deferred.exploration).toEqual({
+    kind: 'patch',
+    tiles: new Map([['55,30', `03${'00'.repeat(31)}`]]),
+  });
   expect(engine.getDiagnostics().persistence).toMatchObject({ mode: 'worker', pendingBatches: 0 });
 });
 

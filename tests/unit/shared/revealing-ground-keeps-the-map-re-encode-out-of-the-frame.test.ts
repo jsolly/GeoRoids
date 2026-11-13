@@ -1,6 +1,24 @@
 import { expect, test, vi } from 'vitest';
 import { ExplorationMap, isCellExplored, validExploration } from '../../../shared/exploration';
 
+test('persistence acceptance retains newer discoveries in the same tile', () => {
+  const map = new ExplorationMap();
+  map.reveal({ x: 62.5, y: 62.5 }, 1);
+  const first = map.checkpoint();
+  expect([...first]).toEqual([['30,30', `01${'00'.repeat(31)}`]]);
+  map.reveal({ x: 187.5, y: 62.5 }, 1);
+  map.accepted(first);
+  const next = map.checkpoint();
+  expect([...first]).toEqual([['30,30', `01${'00'.repeat(31)}`]]);
+  expect([...next]).toEqual([['30,30', `03${'00'.repeat(31)}`]]);
+  map.accepted(next);
+  expect(map.checkpoint().size).toBe(0);
+  map.reveal({ x: 187.5, y: 62.5 }, 1);
+  expect(map.checkpoint().size).toBe(0);
+  map.reset();
+  expect(map.checkpoint().size).toBe(0);
+});
+
 /**
  * `reveal` runs inside the 60 Hz tick, once per exploring pilot. Re-encoding the
  * whole tile map there is O(explored world) and grows for the life of the save, so

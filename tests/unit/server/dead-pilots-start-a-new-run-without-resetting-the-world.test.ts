@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
+import type { ExplorationTile } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('a dead pilot resumes the countdown and preserves bank and exploration', () => {
@@ -40,7 +41,10 @@ test('a dead pilot resumes the countdown and preserves bank and exploration', ()
     assert(resumed.ok);
     expect(resumed.actor.score).toBe(1200);
     expect(resumed.actor.health).toBe(0);
-    expect(restarted.getGameState().exploration).toEqual(revealed);
+    // Storage reload order may differ; retain exact tile content without sorting cached arrays.
+    const byId = (left: ExplorationTile, right: ExplorationTile) =>
+      left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+    expect(restarted.getGameState().exploration.toSorted(byId)).toEqual(revealed.toSorted(byId));
   } finally {
     store.close();
   }

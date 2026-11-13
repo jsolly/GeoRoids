@@ -1,12 +1,12 @@
 # Persistent world operations
 
-GeoRoids has one cooperative world with a 60,000-unit radius. It survives empty sessions and server restarts until someone changes `WORLD.generation`. That change resets saved progress on the next server start so a new expedition can begin. A UTC month boundary does not.
+GeoRoids has one cooperative world with a 60,000-unit radius. It survives empty sessions, UTC month boundaries and server restarts. An incompatible saved generation stops startup without resetting progress; starting a replacement expedition requires a separate authorized data operation.
 
 ## Active regions
 
-The server generates deterministic ore deposits in 2,000-unit sectors. It activates sectors around connected pilots and pauses distant sectors. Each client receives asteroids inside its minimap radar plus a small margin (`WORLD.asteroidInterestRadius`), nearby loot and projectile rows, the shared crew roster, and exploration changes. Harvested deposits regrow out of sight (see below). Saved worlds store a generation number; a mismatch resets the database instead of loading stale progress.
+The server generates deterministic ore deposits in 2,000-unit sectors. It activates sectors around connected pilots and pauses distant sectors. Each client receives asteroids inside its minimap radar plus a small margin (`WORLD.asteroidInterestRadius`), nearby loot and projectile rows, the shared crew roster, and exploration changes. Harvested deposits regrow out of sight (see below). Saved worlds must have the current generation to load.
 
-The local radar spans 3,600 units. Its 125-unit survey cells are permanent shared discoveries. Town Square is the only hearth that starts lit. Dark furnace foundations stay on the universe map, and on the local radar while they are inside it. Lit hearths appear on the local radar after the crew reveals them. Built furnaces keep the Scout's name and the public id of the pilot who paid. They survive death, reconnects, and server restarts; changing `WORLD.generation` clears them on the next start. Scouts pay for a furnace with their own score. Every delivery contributor receives the same size-scaled material reward. The Town Square store sells placeholder receipts for banked points, gated by shared settlement level. Scouts passively explore farther and can scan a larger area. Scanned cargo records its Scout contributors until consumption.
+The local radar spans 3,600 units. Its 125-unit survey cells are permanent shared discoveries. Town Square is the only hearth that starts lit. Dark furnace foundations stay on the universe map, and on the local radar while they are inside it. Lit hearths appear on the local radar after the crew reveals them. Built furnaces keep the Scout's name and the public id of the pilot who paid. They survive death, reconnects, and server restarts. Scouts pay for a furnace with their own score. Every delivery contributor receives the same size-scaled material reward. The Town Square store sells placeholder receipts for banked points, gated by shared settlement level. Scouts passively explore farther and can scan a larger area. Scanned cargo records its Scout contributors until consumption.
 
 ## Database and credentials
 
@@ -52,7 +52,7 @@ loses or duplicates a rock.
 
 Furnace IDs retain their historical `street-<ring>-<slot>` addresses so existing saved sites and pipe routes stay intact. Builder names and public IDs remain construction attribution; they do not affect rewards.
 
-Older world rows without `civicModules` load with only Town Square burning. A leftover `townCredit` value is ignored and dropped on the next world write. A leftover `builtFurnaces` key is ignored and dropped on the next world write. A leftover `scoreSeason` key is ignored and dropped on the next world write. An illegal set of named furnaces fails startup rather than silently dropping them. A present `builderId` must be a short public pilot id; omitting it leaves an older unnamed furnace valid. Pilots may store `hullColor` only when it is a catalog paint hex. A non-string value rejects the pilot row. An unknown string is ignored. Purchased paint stays with the pilot across restarts. Building a furnace spends that Scout's score and changes memory only; the existing worker checkpoint writes the world row. A spatial index bounds local intake, spider-safety, and guidance lookups instead of scanning every saved structure.
+Older world rows without `civicModules` load with only Town Square burning. Leftover `townCredit`, `builtFurnaces` and `scoreSeason` values are ignored by gameplay and retained as unowned metadata on checkpoint writes. An illegal set of named furnaces fails startup rather than silently dropping them. A present `builderId` must be a short public pilot id; omitting it leaves an older unnamed furnace valid. Pilots may store `hullColor` only when it is a catalog paint hex. A non-string value rejects the pilot row. An unknown string is ignored. Purchased paint stays with the pilot across restarts. Building a furnace spends that Scout's score and changes memory only; the existing worker checkpoint writes the world row. A spatial index bounds local intake, spider-safety, and guidance lookups instead of scanning every saved structure.
 
 A private bearer token restores banked points, cargo, purchase receipts, and
 saved identity across reconnects and restarts. Recent healthy flights restore
@@ -62,7 +62,7 @@ values become banked points without a reset. Absent cargo and receipts default
 to zero and an empty list. Old owned paint remains readable; lives are no longer
 read or written. Unknown legacy JSON fields are harmless and no data is purged.
 
-Hazard hits eject recoverable cargo before damaging hull health. Death discards any remaining carried points without an extra stash and schedules another respawn; banked points, shared discoveries, deposits, furnaces, and already owned hull paint remain. A UTC month boundary does not clear them. Changing `WORLD.generation` resets sectors, pilots, economy, paint, and banked points on the next start.
+Hazard hits eject recoverable cargo before damaging hull health. Death discards any remaining carried points without an extra stash and schedules another respawn; banked points, shared discoveries, deposits, furnaces, and already owned hull paint remain. A UTC month boundary does not clear them. Changing `WORLD.generation` stops an incompatible saved world from loading and never authorizes erasing it.
 
 The full-screen universe map shows shared exploration and revealed landmarks across the world. Detailed asteroid geometry stays near each pilot. Furnaces and exploration survive restarts. Point drops persist in the economy checkpoint with their original expiry time. Other loot and satellite pickups remain transient session objects, so their map markers expire when those objects disappear or the server restarts.
 
@@ -95,6 +95,21 @@ and retain at most 16 MiB after a checkpoint can reset it. Those settings do not
 cap an active transaction or guarantee space while another reader holds the WAL.
 
 Private off-volume S3 backups are disabled until configured. Review the [backup setup and restore rehearsal](world-backups.md) before provisioning resources, granting access or changing the active volume. Keep Railway volume backups as well.
+
+## Exploration tile checkpoints
+
+The active runtime stores discoveries in `exploration(id,bits)` rows. Once a
+second it sends only changed tile values with the existing atomic worker batch;
+a tile-only batch never rewrites world metadata. Metadata updates retain unknown
+JSON values and existing row identity. Network atlas snapshots keep their current
+representation and lazy snapshot identity.
+
+Existing legacy, prepared, stale or malformed storage fails startup before
+writable setup. A missing production file also fails instead of creating a new
+world. Deliberate development/test sessions and the validated Railway preview
+environment may create a new private world; that intent never bypasses saved-data
+validation. Follow the [separate rollout and recovery review](exploration-runtime-rollout.md)
+before publishing the active-only runtime.
 
 ## Asteroid belt recovery
 

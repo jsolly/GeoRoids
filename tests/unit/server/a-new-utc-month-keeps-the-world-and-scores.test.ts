@@ -4,11 +4,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
-import { type SavedWorld, WorldStore } from '../../../server/world/WorldStore';
+import { WorldStore } from '../../../server/world/WorldStore';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { WORLD } from '../../../shared/world';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -66,22 +66,18 @@ test('a UTC month boundary keeps scores, exploration, and the live ship', () => 
   }
 });
 
-test('a saved world from an older month restores its ore and drops the season key', () => {
+test('a saved world from an older month restores ore and retains unknown legacy metadata', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-season-'));
   const path = join(directory, 'world.sqlite');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   try {
-    store.checkpoint(
-      {
-        seed: 1,
-        startedAt: 1,
-        generation: WORLD.generation,
-        exploration: [],
-        scoreSeason: '2020-01',
-      } as SavedWorld,
-      new Map([['0,0', [staleOre]]]),
-      []
-    );
+    const legacyMetadata = {
+      seed: 1,
+      startedAt: 1,
+      generation: WORLD.generation,
+      scoreSeason: '2020-01',
+    };
+    store.checkpoint(legacyMetadata, new Map([['0,0', [staleOre]]]), []);
     const engine = new GameEngine(99, undefined, new InlineWorldPersistence(store));
     expect(engine.getTerrainSeed()).toBe(1);
     expect(store.loadSector('0,0')?.some((rock) => rock.id === 'stale-ore')).toBe(true);
@@ -91,7 +87,7 @@ test('a saved world from an older month restores its ore and drops the season ke
     const db = new DatabaseSync(path);
     const row = db.prepare('SELECT json FROM world WHERE id=1').get() as { json: string };
     db.close();
-    expect(JSON.parse(row.json)).not.toHaveProperty('scoreSeason');
+    expect(JSON.parse(row.json).scoreSeason).toBe('2020-01');
     expect(JSON.parse(row.json).seed).toBe(1);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -106,7 +102,6 @@ test('a saved world without a score season restores its ore', () => {
         seed: 1,
         startedAt: 1,
         generation: WORLD.generation,
-        exploration: [],
       },
       new Map([['0,0', [staleOre]]]),
       []
@@ -120,24 +115,28 @@ test('a saved world without a score season restores its ore', () => {
   }
 });
 
-test('a different world generation still starts a fresh expedition', () => {
+test('an adapter returning a different saved generation cannot reset player progress', () => {
   const store = new WorldStore(':memory:');
   try {
     store.checkpoint(
       {
         seed: 1,
         startedAt: 1,
-        generation: WORLD.generation + 1,
-        exploration: [],
+        generation: WORLD.generation,
       },
       new Map([['0,0', [staleOre]]]),
       []
     );
-    const engine = new GameEngine(99, undefined, new InlineWorldPersistence(store));
-    expect(engine.getTerrainSeed()).toBe(99);
-    expect(store.loadWorld()).toBeUndefined();
-    expect(store.loadSector('0,0')).toBeUndefined();
-    engine.stopGameLoop();
+    const persistence = new InlineWorldPersistence(store);
+    vi.spyOn(persistence, 'load').mockImplementation(() => ({
+      ...store.load(),
+      world: { seed: 1, startedAt: 1, generation: WORLD.generation + 1 },
+    }));
+    const reset = vi.spyOn(persistence, 'reset');
+    expect(() => new GameEngine(99, undefined, persistence)).toThrow('generation');
+    expect(reset).not.toHaveBeenCalled();
+    expect(store.loadSector('0,0')?.some((rock) => rock.id === 'stale-ore')).toBe(true);
+    vi.restoreAllMocks();
   } finally {
     store.close();
   }

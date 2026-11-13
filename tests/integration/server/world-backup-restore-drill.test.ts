@@ -21,21 +21,17 @@ async function artifact() {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-restore-drill-'));
   directories.push(directory);
   const worldPath = join(directory, 'fixture.sqlite');
-  const store = new WorldStore(worldPath);
+  const store = new WorldStore(worldPath, { intent: 'private' });
   try {
-    store.checkpoint(
-      { seed: 83, startedAt: 10000, generation: WORLD.generation, exploration: [] },
-      new Map(),
-      [
-        {
-          id: 'saved-pilot',
-          name: 'Saved pilot',
-          tokenHash: 'a'.repeat(64),
-          score: 7300,
-          cargo: 715,
-        },
-      ]
-    );
+    store.checkpoint({ seed: 83, startedAt: 10000, generation: WORLD.generation }, new Map(), [
+      {
+        id: 'saved-pilot',
+        name: 'Saved pilot',
+        tokenHash: 'a'.repeat(64),
+        score: 7300,
+        cargo: 715,
+      },
+    ]);
   } finally {
     store.close();
   }

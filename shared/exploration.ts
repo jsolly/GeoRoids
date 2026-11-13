@@ -199,6 +199,7 @@ export function validExploration(value: unknown): value is ExplorationTile[] {
 /** Changed sectors travel as snapshot collection deltas; remote discoveries remain durable. */
 export class ExplorationMap {
   private tiles = new Map<string, string>();
+  private readonly dirty = new Map<string, string>();
   // These indexes contain identity/revision only. The tile Map alone owns bits.
   private readonly slotIds: string[] = [];
   private readonly tileSlots = new Map<string, number>();
@@ -240,6 +241,7 @@ export class ExplorationMap {
 
   private writeRevealedTile(id: string, bits: string): void {
     this.tiles.set(id, bits);
+    this.dirty.set(id, bits);
     this.encodedStale = true;
     this.indexTile(id);
   }
@@ -332,6 +334,19 @@ export class ExplorationMap {
     this.epoch++;
   }
 
+  /** Immutable tile values detach a persistence batch from subsequent discoveries. */
+  checkpoint(): ReadonlyMap<string, string> {
+    return new Map(this.dirty);
+  }
+
+  accepted(checkpoint: ReadonlyMap<string, string>): void {
+    for (const [id, bits] of checkpoint) {
+      if (this.dirty.get(id) === bits) {
+        this.dirty.delete(id);
+      }
+    }
+  }
+
   snapshot(): ExplorationTile[] {
     if (this.encodedStale) {
       this.encoded = Array.from(this.tiles, ([id, bits]) => ({ id, bits }));
@@ -344,6 +359,7 @@ export class ExplorationMap {
       throw new Error('Invalid saved exploration grid');
     }
     this.tiles = new Map(tiles.map((tile) => [tile.id, tile.bits]));
+    this.dirty.clear();
     this.clearAtlasIndex();
     for (const id of this.tiles.keys()) {
       this.indexTile(id);
@@ -353,6 +369,7 @@ export class ExplorationMap {
   }
   reset(): void {
     this.tiles.clear();
+    this.dirty.clear();
     this.clearAtlasIndex();
     this.encoded = [];
     this.encodedStale = false;

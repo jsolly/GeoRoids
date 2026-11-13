@@ -1,4 +1,5 @@
 import process from 'node:process';
+import type { WorldOpenIntent } from './world/worldPersistence';
 
 /** The single Railway environment allowed to serve the built client from the game server. */
 const PREVIEW_ENVIRONMENT = 'preview';
@@ -8,6 +9,7 @@ export function readServerConfiguration(env: NodeJS.ProcessEnv = process.env): {
   nodeEnv: string;
   localPlayground: boolean;
   previewClient: boolean;
+  worldOpenIntent: WorldOpenIntent;
 } {
   const rawPort = env['PORT'];
   const port = rawPort === undefined || rawPort === '' ? 3001 : Number(rawPort);
@@ -30,5 +32,7 @@ export function readServerConfiguration(env: NodeJS.ProcessEnv = process.env): {
     localPlayground:
       !previewClient && nodeEnv === 'development' && env['GEOROIDS_LOCAL_PLAYGROUND'] === '1',
     previewClient,
+    worldOpenIntent:
+      previewClient || nodeEnv === 'development' || nodeEnv === 'test' ? 'private' : 'existing',
   };
 }

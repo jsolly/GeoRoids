@@ -1,15 +1,14 @@
-import { mkdirSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { validCooperativeRecord } from '../../shared/cooperativeWorld';
 import { validExploration } from '../../shared/exploration';
 import { flightReturnWindowOpen } from '../../shared/playerMotion';
 import { isShipKitId } from '../../shared/shipKits';
-import { parseSectorId } from '../../shared/world';
+import { parseSectorId, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
   EquipmentId,
-  ExplorationTile,
   Position,
   SavedPointLoot,
   SettlementState,
@@ -17,9 +16,15 @@ import type {
   Velocity,
 } from '../../shared-types';
 import { readCooperativeWorld } from './cooperativeSchema';
-import { readSavedWorld, type SavedWorld as SavedWorldMetadata } from './savedWorld';
+import { readExplorationStorage } from './explorationSchema';
+import { readSavedWorld, type SavedWorld } from './savedWorld';
 import { readSavedEconomy, readSavedPilot, readSavedSector } from './worldDataValidation';
-import type { LoadedWorld, WorldCheckpoint } from './worldPersistence';
+import type {
+  ExplorationCheckpoint,
+  LoadedWorld,
+  WorldCheckpoint,
+  WorldOpenIntent,
+} from './worldPersistence';
 
 /** Browser credential plus the saved score and optional recent flight. */
 export interface PersistentPilot {
@@ -75,11 +80,6 @@ export interface SavedEconomy {
   pointLoot: SavedPointLoot[];
 }
 
-/** The legacy runtime still requires its atlas until an explicitly stopped transition. */
-export interface SavedWorld extends SavedWorldMetadata {
-  exploration: ExplorationTile[];
-}
-
 export function restorableFlight(
   pilot: PersistentPilot,
   now: number
@@ -117,8 +117,8 @@ export function restorableFlight(
  * Single-writer SQLite transactions keep cargo consumption, shared scores and
  * discoveries together.
  *
- * Opening the database parses and validates every saved sector once so the
- * write path can refuse duplicate asteroids across sectors. The store itself
+ * Opening validates saved progress before writable setup and indexes sectors so
+ * the write path can refuse duplicate asteroids across sectors. The store itself
  * is synchronous; a `WorldPersistence` adapter decides which thread it runs on.
  */
 export class WorldStore {
@@ -132,22 +132,107 @@ export class WorldStore {
   private openedSectors: Map<string, AsteroidData[]> | undefined;
   private worldJson: string | undefined;
 
-  constructor(path: string) {
-    if (path !== ':memory:') {
+  constructor(path: string, options: { intent?: WorldOpenIntent } = {}) {
+    const intent = options.intent ?? (path === ':memory:' ? 'private' : 'existing');
+    const fresh = path === ':memory:' || (intent === 'private' && !existsSync(path));
+    if (fresh && path !== ':memory:') {
       mkdirSync(dirname(path), { recursive: true });
+      closeSync(openSync(path, 'wx', 0o600));
+    }
+    if (!fresh) {
+      // Refuse incompatible saved progress before writable setup can change even
+      // journal mode. A missing production file never creates an empty world.
+      const preflight = new DatabaseSync(path, { readOnly: true });
+      try {
+        preflight.exec('BEGIN');
+        this.validateRuntimeStorage(preflight, intent);
+      } finally {
+        if (preflight.isTransaction) {
+          preflight.exec('ROLLBACK');
+        }
+        preflight.close();
+      }
     }
     this.db = new DatabaseSync(path);
     try {
+      if (fresh) {
+        this.db.exec(`CREATE TABLE world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
+          CREATE TABLE sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+          CREATE TABLE economy (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
+          CREATE TABLE pilots (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+          CREATE TABLE exploration (id TEXT PRIMARY KEY, bits TEXT NOT NULL);`);
+      } else {
+        this.validateRuntimeStorage(this.db, intent);
+      }
       this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
-        PRAGMA wal_autocheckpoint=256; PRAGMA journal_size_limit=16777216;
-        CREATE TABLE IF NOT EXISTS world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS economy (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS pilots (id TEXT PRIMARY KEY, json TEXT NOT NULL);`);
+        PRAGMA wal_autocheckpoint=256; PRAGMA journal_size_limit=16777216;`);
       this.openedSectors = this.indexPersistedSectors();
     } catch (error) {
       this.db.close();
       throw error;
+    }
+  }
+
+  private validateRuntimeStorage(db: DatabaseSync, intent: WorldOpenIntent): void {
+    for (const table of ['world', 'sectors', 'economy', 'pilots']) {
+      const columns = db.prepare(`PRAGMA table_xinfo(${table})`).all();
+      if (
+        !columns.some(
+          (c) =>
+            c['name'] === 'id' &&
+            c['pk'] === 1 &&
+            c['type'] === (table === 'world' || table === 'economy' ? 'INTEGER' : 'TEXT')
+        ) ||
+        !columns.some((c) => c['name'] === 'json' && c['type'] === 'TEXT' && c['notnull'] === 1)
+      ) {
+        throw new Error('Unsupported saved world schema');
+      }
+    }
+    const storage = readExplorationStorage(db);
+    if (storage.state !== 'active') {
+      throw new Error(
+        `Exploration storage activation required: ${storage.state}; use the reviewed stopped-world transition`
+      );
+    }
+    if (storage.world && storage.world.generation !== WORLD.generation) {
+      throw new Error('Saved world generation is incompatible; refusing to reset player progress');
+    }
+    const cooperative = readCooperativeWorld(db);
+    const rockIds = new Set<string>();
+    let rows = 0;
+    for (const row of db.prepare('SELECT id,json FROM sectors').iterate()) {
+      if (typeof row['id'] !== 'string') {
+        throw new Error('Invalid saved sector identity');
+      }
+      for (const rock of readSavedSector(row['id'], JSON.parse(String(row['json'])))) {
+        if (rockIds.has(rock.id)) {
+          throw new Error(`Saved asteroid ${rock.id} appears in sectors more than once`);
+        }
+        rockIds.add(rock.id);
+      }
+      rows++;
+    }
+    for (const row of db.prepare('SELECT id,json FROM pilots').iterate()) {
+      const pilot = readSavedPilot(JSON.parse(String(row['json'])));
+      if (!pilot || pilot.id !== row['id']) {
+        throw new Error('Saved pilot is invalid; refusing to replace player progress');
+      }
+      rows++;
+    }
+    const economy = db.prepare('SELECT id,json FROM economy').all();
+    if (economy.length > 1 || (economy[0] && economy[0]['id'] !== 1)) {
+      throw new Error('Invalid saved economy identity');
+    }
+    readSavedEconomy(economy[0] ? JSON.parse(String(economy[0]['json'])) : {});
+    if (
+      !storage.world &&
+      (intent !== 'private' ||
+        rows > 0 ||
+        economy.length > 0 ||
+        storage.exploration.length > 0 ||
+        cooperative !== undefined)
+    ) {
+      throw new Error('Saved progress has no world identity; refusing to create an empty world');
     }
   }
 
@@ -227,17 +312,11 @@ export class WorldStore {
       return undefined;
     }
     this.worldJson = String(row['json']);
-    const value: unknown = JSON.parse(this.worldJson);
-    const metadata = readSavedWorld(value);
-    if (
-      value === null ||
-      typeof value !== 'object' ||
-      !('exploration' in value) ||
-      !validExploration(value.exploration)
-    ) {
-      throw new Error('Saved world is invalid; refusing to replace player progress');
+    const storage = readExplorationStorage(this.db);
+    if (storage.state !== 'active') {
+      throw new Error('Exploration storage activation required');
     }
-    return { ...metadata, exploration: value.exploration };
+    return storage.world;
   }
 
   loadPilots(): PersistentPilot[] {
@@ -272,10 +351,19 @@ export class WorldStore {
     const saved: unknown = row ? JSON.parse(String(row['json'])) : {};
     const cooperative = readCooperativeWorld(this.db);
     const economy = readSavedEconomy(saved);
+    const storage = readExplorationStorage(this.db);
+    if (storage.state !== 'active') {
+      throw new Error('Exploration storage activation required');
+    }
+    this.worldJson = this.db
+      .prepare('SELECT json FROM world WHERE id=1')
+      .get()
+      ?.['json']?.toString();
     return {
       ...(cooperative ? { cooperative } : {}),
       economy,
-      world: this.loadWorld(),
+      world: storage.world,
+      exploration: storage.exploration,
       pilots: this.loadPilots(),
       sectors: this.loadSectors(),
     };
@@ -308,8 +396,19 @@ export class WorldStore {
     sectors: ReadonlyMap<string, AsteroidData[]>,
     pilots: readonly PersistentPilot[],
     economy?: SavedEconomy,
-    cooperative?: WorldCheckpoint['cooperative']
+    cooperative?: WorldCheckpoint['cooperative'],
+    exploration?: ExplorationCheckpoint
   ): void {
+    const tiles = exploration ? Array.from(exploration.tiles, ([id, bits]) => ({ id, bits })) : [];
+    if (!validExploration(tiles)) {
+      throw new Error('Invalid exploration checkpoint');
+    }
+    if (world) {
+      readSavedWorld(world);
+      if ('exploration' in world || world.generation !== WORLD.generation) {
+        throw new Error('Invalid world metadata checkpoint');
+      }
+    }
     const validatedSectors = [...sectors].map(([id, rocks]): [string, AsteroidData[]] => [
       id,
       readSavedSector(id, rocks),
@@ -351,8 +450,41 @@ export class WorldStore {
           remove.run(id);
         }
       }
-      if (worldJson !== undefined && this.worldJson !== worldJson) {
-        this.db.prepare('INSERT OR REPLACE INTO world(id,json) VALUES(1,?)').run(worldJson);
+      if (world && worldJson !== undefined && this.worldJson !== worldJson) {
+        if (this.db.prepare('SELECT 1 FROM world WHERE id=1').get()) {
+          // SQLite edits only owned paths; opaque integers/overflow numbers and
+          // extra columns never round-trip through JavaScript or REPLACE.
+          const owned = [
+            'seed',
+            'startedAt',
+            'generation',
+            'civicModules',
+            'asteroidBelt',
+            'writtenReleaseId',
+          ];
+          const present = owned.filter((key) => Object.hasOwn(world, key));
+          const absent = owned.filter((key) => !Object.hasOwn(world, key));
+          let expression = `json_set(json,${present.map((key) => `'$.${key}',json_extract(?,'$.${key}')`).join(',')})`;
+          if (absent.length > 0) {
+            expression = `json_remove(${expression},${absent.map((key) => `'$.${key}'`).join(',')})`;
+          }
+          this.db
+            .prepare(`UPDATE world SET json=${expression} WHERE id=1`)
+            .run(...present.map(() => worldJson));
+        } else {
+          this.db.prepare('INSERT INTO world(id,json) VALUES(1,?)').run(worldJson);
+        }
+      }
+      if (exploration?.kind === 'replace') {
+        this.db.exec('DELETE FROM exploration');
+      }
+      if (tiles.length > 0) {
+        const write = this.db.prepare(
+          'INSERT INTO exploration(id,bits) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET bits=excluded.bits'
+        );
+        for (const tile of tiles) {
+          write.run(tile.id, tile.bits);
+        }
       }
       if (economy) {
         this.db
@@ -392,7 +524,7 @@ export class WorldStore {
         this.db.exec('DELETE FROM cooperative_records; UPDATE cooperative_schema SET activated=0;');
       }
       this.db.exec(
-        'DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; DELETE FROM economy;'
+        'DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; DELETE FROM economy; DELETE FROM exploration;'
       );
       this.db.exec('COMMIT');
     } catch (error) {

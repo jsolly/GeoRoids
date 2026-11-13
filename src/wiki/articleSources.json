@@ -735,6 +735,14 @@
     "server/core/CooperativeContourBridges.ts",
     "shared/aiShips.ts",
     "server/core/BotFleet.ts",
-    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts",
+    "server/world/explorationSchema.ts",
+    "server/world/openWorldPersistence.ts",
+    "server/world/worldPersistence.ts",
+    "server/world/InlineWorldPersistence.ts",
+    "server/world/WorkerWorldPersistence.ts",
+    "server/world/worldStoreWorker.ts",
+    "server/world/worldStoreWorkerProtocol.ts",
+    "tests/unit/server/exploration-tiles-survive-checkpoints.test.ts"
   ]
 }

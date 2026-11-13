@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
-    "server/communication/MessageHandler.ts": "sha256:fb8438e146628447c5ba1c753c0a3467136e3ec356f18f7788e2ba4f3837ca7e",
+    "server/communication/MessageHandler.ts": "sha256:244425256ff48f55cc0acdf84ca884032744506cb2dbe281fd3ede790ff7c54a",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:9b449bab5cdab7ca39ea9cef64f55305b294fbb7bf285cf4fc4765201f9e6d43",
     "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:4b23f9a2e05741d9aa923ac1a46124d29c7f493480b76c05641219e8be28986d",
+    "server/core/GameEngine.ts": "sha256:9deee4ccc2d4e32495d85a7b12ca2aaa57f04751798cce5e4063186e395dac0d",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -444,7 +444,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:a468ae13630d62357fa5b38fc8d1f1263517d1a4415c253e3cf9dd891b3037be",
+    "src/wiki/articleSources.json": "sha256:9eb174cf5482e8a6839dde80dfe3b69010ab84f20cd8402e39837fb92cbd2f9d",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
@@ -527,7 +527,7 @@
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:37f22f4a6e4eef4ca436dbd6378d003134774517ab0ee25af44833dfccdd9ec0",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:0808cc5c78a0d4df335585469d57b16d2b8f3c65337072e234c260a60c6caa2a",
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:a211f6c8c0c593b809dde90c6f053e37e39963550b6d84d9552ebed8159e01ee",
-    "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:88a7a22fe6feb765c078a330f02e175db549bd47bad8a0dce29ad9f2e84fb413",
+    "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:5bf0710c1f770f3314d55afb50e4e20b61d41205739d2e4bda55b40efe2aa96f",
     "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:841204221cb271a54cad51dc6fa5498937a2dad2437ba0d1e5ef847b7a2bc585",
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts": "sha256:e05382b1eb1fbb5d5482e540c08e305f672a24b7523e3a244b7db0d1a2a85c78",
     "tests/unit/server/contour-lock-keeps-pilots-on-the-selected-rail.test.ts": "sha256:6dbb64e0affbaefd7d93c371f10a3ba7ea50a0ef508ada51710bd9b7d8e09f83",
@@ -539,7 +539,7 @@
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:e6b50f2bb529ef1436b88e4836829991fd6e7976528a941fb21b65d251d6e841",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
-    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:f04050e1acda95086edf91bd890c55fae47cf2a26af9224bba11e97fc5855ff7",
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:bff0c60fc4f68500ace3a6c0b71bde08ddfee861f71448661f9e413412696316",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:72be43233e9d5135fd7ad6fecb8f50fed04082cc7513274f9795ec897a290b56",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:7396ba9a8763fd29dc74172de3933d6fd81bd0d3f4708032899a8a6812fea49e",
@@ -588,7 +588,8 @@
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
-    "tests/unit/components/universe-map-controls.test.ts": "sha256:ca8295f97d4249bd03be8a0ed4a63f883912f1f3b705c69ebeb533d5e4c720c6"
+    "tests/unit/components/universe-map-controls.test.ts": "sha256:ca8295f97d4249bd03be8a0ed4a63f883912f1f3b705c69ebeb533d5e4c720c6",
+    "server/core/ChargedWeaponManager.ts": "sha256:51ca4cb8a3492c36246980b494432cfb70eb76e80e5c585bf30e9e32480d0232"
   },
   "reviews": [
     {
@@ -8683,6 +8684,34 @@
       ],
       "topics": ["controls", "field-manual", "hud-network", "satellites", "scout", "teamwork"],
       "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed actual-main charged-weapon ownership, all eleven mapped articles, three media declarations and generator functions, and Scout/Hauler/Cargo posters. Charge timing, ordinary shot admission, cancellation, cooldown and media rules remain unchanged. Actual 75 focused cases, 9 real socket integration cases, strict types, scoped lint and unused checks passed; all five causal defects failed intended runtime assertions and were restored. Defining charge source is now cited by Controls and Combat. Full gate, independent review and production release remain pending; no fresh physical-device or browser-rendering claim.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/ChargedWeaponManager.ts",
+        "server/core/GameEngine.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts",
+        "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
       "owners": {
         "src/wiki/articleSources.json": "field-manual"
       }

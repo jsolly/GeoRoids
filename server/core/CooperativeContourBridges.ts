@@ -1,14 +1,73 @@
+import { SHIP } from '../../shared/constants/gameplay';
 import { CONTOUR_BRIDGE } from '../../shared/contourBridge';
+import { contourLockVelocity } from '../../shared/contourLock';
 import { sampleGradient, sampleHeight } from '../../shared/heightfield';
 import { getTerrainField } from '../../shared/terrainField';
 import { WORLD } from '../../shared/world';
 import type { ContourBridge, ContourLockState, Position } from '../../shared-types';
-import type { GameEntity } from './EntityManager';
+import type { EntityManager, GameEntity } from './EntityManager';
+import type { PlayerMotionService } from './PlayerMotionService';
 
 type Entry = { bridge: ContourBridge; created: number; expires: number; used: Set<string> };
+interface ContourBridgeInputs {
+  readonly actors: Pick<EntityManager, 'getAllEntities'>;
+  readonly motion: Pick<PlayerMotionService, 'handoffActor' | 'finishContourBridge'>;
+}
+
 export class CooperativeContourBridges {
   private readonly entries = new Map<string, Entry>();
   private nextId = 0;
+
+  constructor(private readonly inputs: ContourBridgeInputs) {}
+
+  advance(frame: number, now: number): void {
+    this.expire(frame);
+    for (const actor of this.inputs.actors.getAllEntities()) {
+      if (
+        actor.health <= 0 ||
+        actor.exploding ||
+        actor.overlayHold === true ||
+        actor.furnaceTransit
+      ) {
+        delete actor.contourTransit;
+        continue;
+      }
+      if (!actor.contourTransit) {
+        const bridge = this.catch(actor, frame);
+        if (!bridge) {
+          continue;
+        }
+        this.inputs.motion.handoffActor(actor.id, now);
+        actor.contourTransit = {
+          from: { ...actor.position },
+          to: { ...bridge.to },
+          target: { ...bridge.target },
+          frame: 0,
+        };
+      }
+      const transit = actor.contourTransit;
+      const t = Math.min(1, ++transit.frame / CONTOUR_BRIDGE.transitFrames);
+      actor.position = {
+        x: transit.from.x + (transit.to.x - transit.from.x) * t,
+        y: transit.from.y + (transit.to.y - transit.from.y) * t,
+      };
+      if (t < 1) {
+        continue;
+      }
+      actor.contourLock = transit.target;
+      actor.contourDraftFrames = CONTOUR_BRIDGE.draftFrames;
+      const velocity = contourLockVelocity(
+        actor.position,
+        transit.target,
+        SHIP.MAX_VELOCITY * CONTOUR_BRIDGE.draftMultiplier
+      );
+      actor.velocity = velocity ?? { x: 0, y: 0 };
+      actor.angle = Math.atan2(-actor.velocity.y, actor.velocity.x);
+      actor.thrusting = true;
+      delete actor.contourTransit;
+      this.inputs.motion.finishContourBridge(actor.id, now);
+    }
+  }
 
   noteHop(
     ownerId: string,
@@ -96,7 +155,7 @@ export class CooperativeContourBridges {
     return undefined;
   }
 
-  expire(frame: number): void {
+  private expire(frame: number): void {
     for (const [id, entry] of this.entries) {
       if (entry.expires <= frame) {
         this.entries.delete(id);

@@ -25,9 +25,9 @@ async function productionService(): Promise<ServiceNode> {
     .flat()
     .filter(
       (resource): resource is ServiceNode =>
-        resource.type === 'service' && resource.name === 'geoasteroids'
+        resource.type === 'service' && resource.name === 'Georoids'
     );
-  assert.equal(services.length, 1, '.railway/railway.ts must define the geoasteroids service once');
+  assert.equal(services.length, 1, '.railway/railway.ts must define the Georoids service once');
   const [service] = services;
   assert.ok(service);
   return service;

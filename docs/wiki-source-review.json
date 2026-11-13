@@ -93,11 +93,11 @@
     "server/configuration.ts": "sha256:8c31383fb0c11922ffec139e30fe0b09b2461b541113152da5052e7bb2c5d88f",
     "server/core/AsteroidManager.ts": "sha256:e536e0b0a44d8d4ab24fb5618210f3ab2648e516ec7c954c31e1073e54d2d959",
     "server/core/BeltCrawlerManager.ts": "sha256:fe4a9e6b0a622452a633d016f0d76ae57ce7a9e2b464fe25bda3b7614afb55c7",
-    "server/core/BotFleet.ts": "sha256:a2254518b0c71cd3a1c65b999bca38b03dd5296504a9233c5f5ec632563ea0af",
+    "server/core/BotFleet.ts": "sha256:689e5e160eba8e5730312205aa1aa3f145a7f287066b6abd7e0e11b85795c0e2",
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:43af061d9b921cf8f7c98ac1a4fc5e741d653a0191c9e0f14cd50c984eea3226",
+    "server/core/GameEngine.ts": "sha256:156fe1fdea7a129502bbd1a991049e34f8bc5d8eced07d09373c98a68c785996",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -128,6 +128,7 @@
     "server/world/depositLayout.ts": "sha256:5fe2e83866fe5cd843e4187e753839b22b840170d90de855b02efb2129d5d0c5",
     "server/world/explorationSchema.ts": "sha256:bd1f3c15f6ffc36e02e8d94d3d65a77ca52ef287598d2bffdab9b5ee1aab7b2a",
     "server/world/openWorldPersistence.ts": "sha256:3aed1f7650463bc093af50086c120568c49a959d6bbd486f5611a729b9a0ecde",
+    "server/world/savedWorld.ts": "sha256:5c77353275e1277e97b99c826f53a52f914eb377ca5797821d82a32f744e61c1",
     "server/world/spatialQueryBounds.ts": "sha256:5b1ff4fd81460be2a0dd6bb4ea00ebf63873587cb5613abd041bd0c87f4083f8",
     "server/world/sqliteSnapshot.ts": "sha256:9d0c02c9bb57acf35eab8af67e7d415ca483f7c65811a056430e127573dab8ec",
     "server/world/worldDataValidation.ts": "sha256:f73c03da614d6195a951f94d5079e79b168c3b95881ebbb6581c08e13b894356",
@@ -535,7 +536,7 @@
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:e6b50f2bb529ef1436b88e4836829991fd6e7976528a941fb21b65d251d6e841",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
-    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:e1f3b9bdfacf8d81d22ca2ad3b6d9b528ee39dac1e61d99b2c2e62378ed05a63",
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:92fa50c27c7cecb4838d6502bceb00fa183b77637dd4ae26d6b1d2702a69add2",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:72be43233e9d5135fd7ad6fecb8f50fed04082cc7513274f9795ec897a290b56",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:7396ba9a8763fd29dc74172de3933d6fd81bd0d3f4708032899a8a6812fea49e",
@@ -583,8 +584,7 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
-    "server/world/savedWorld.ts": "sha256:5c77353275e1277e97b99c826f53a52f914eb377ca5797821d82a32f744e61c1"
+    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8"
   },
   "reviews": [
     {
@@ -8367,6 +8367,29 @@
       "owners": {
         "package.json": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed BotFleet ownership extraction on merged main 50a268a. The existing eligible-human filter, local queries, spawning and authoritative fire requests moved to BotFleet; normal departures still recover cargo and report departed IDs, while world reset directly removes bot registry rows without cargo or departure events. Read all declared articles and the scout, hauler and cargo demonstration definitions, and inspected their existing posters. No player behavior, controls, scan, towing, deposit, world, rendering, article or media change; no regeneration needed. Native canvas import, strict TypeScript and scoped Biome passed. Four focused scenario files passed 39 tests; admission-bypass and reset-spill mutants each failed, were restored byte-for-byte, and all 39 tests passed again. Full gate, build and independent review remain pending with the root agent; no browser or device verification is claimed.",
+      "sources": [
+        "server/core/BotFleet.ts",
+        "server/core/GameEngine.ts",
+        "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
     },
     {
       "note": "Reviewed offline exploration transition tooling and metadata parsing. The deployed legacy reader and writer are unchanged. Seven real SQLite/CLI scenarios cover prepared-reader compatibility, current-discovery rollback, stale inspections, verified WAL backups, write failure rollback and table-bound fingerprint records. Player controls, rules and demonstrations are unchanged.",

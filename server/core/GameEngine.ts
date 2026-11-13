@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
-import { AI_SHIPS, inBotSanctuary } from '../../shared/aiShips';
+import { inBotSanctuary } from '../../shared/aiShips';
 import type { BeltSlotState } from '../../shared/asteroidBelt';
 import { boostOwnerIds, removeBoostOwner } from '../../shared/asteroidBoost';
 import { asteroidShardMass } from '../../shared/asteroidMaterials';
@@ -430,7 +430,7 @@ export class GameEngine {
     });
   }
 
-  private readonly bots = new BotFleet();
+  private readonly bots: BotFleet;
 
   constructor(
     rngSeed?: number,
@@ -476,6 +476,18 @@ export class GameEngine {
       );
     });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
+    this.bots = new BotFleet({
+      actors: this.entityManager,
+      loot: this.lootManager,
+      rocks: this.asteroidManager,
+      furnaces: this.furnaces,
+      removePlayer: (id) => {
+        this.removePlayer(id);
+        this.departedPlayers.push(id);
+      },
+      spawnPlayerLaser: (ownerId, start, velocity) =>
+        this.spawnPlayerLaser(ownerId, start, velocity),
+    });
     this.lootManager.restorePoints(loaded?.economy?.pointLoot ?? []);
     this.glowtoys = new GlowtoyManager({
       actors: this.entityManager,
@@ -681,36 +693,7 @@ export class GameEngine {
       this.removePlayer(id);
       this.departedPlayers.push(id);
     }
-    this.bots.advance({
-      humans: this.getAllPlayers().filter(
-        (actor) => actor.ws !== undefined && actor.playerMotion !== undefined
-      ),
-      frame: this.gameTime,
-      spawn: (id, role, position) => this.entityManager.addBot(id, role, position),
-      remove: (id) => {
-        this.removePlayer(id);
-        this.departedPlayers.push(id);
-      },
-      lootNear: (position) => this.lootManager.queryCircle(position, AI_SHIPS.workRadius),
-      rocksNear: (position) =>
-        this.asteroidManager
-          .spatialIndex()
-          .query(spatialQueryBounds(position, AI_SHIPS.avoidRadius)),
-      furnaceNear: (position) => this.furnaces.nearest(position),
-      fire: (actor) => {
-        const dx = Math.cos(actor.angle);
-        const dy = -Math.sin(actor.angle);
-        const reach = (4 / 3) * hullRadiusForKit(actor.kitId);
-        this.spawnPlayerLaser(
-          actor.id,
-          { x: actor.position.x + dx * reach, y: actor.position.y + dy * reach },
-          {
-            x: actor.velocity.x + (dx * LASER.SPEED) / GAME.FPS,
-            y: actor.velocity.y + (dy * LASER.SPEED) / GAME.FPS,
-          }
-        );
-      },
-    });
+    this.bots.advance(this.gameTime);
     for (const pilot of this.entityManager.getAllEntities()) {
       const began = this.weaponCharges.get(pilot);
       if (
@@ -803,10 +786,7 @@ export class GameEngine {
     if (playerCount === 0 && !this.isPaused) {
       this.isPaused = true;
       // Spill transient holds before the final-human checkpoint.
-      this.bots.clear((id) => {
-        this.removePlayer(id);
-        this.departedPlayers.push(id);
-      });
+      this.bots.clear();
       logger.info('🔄 Game paused - no players online');
       this.lasers = [];
       this.clearPendingFeedback();
@@ -957,7 +937,7 @@ export class GameEngine {
     this.mapAssets.reset();
     this.clearTown();
     this.playerMotion.reset();
-    this.bots.clear((id) => this.entityManager.removeEntity(id));
+    this.bots.reset();
     this.entityManager.clearAll();
 
     // Keep gameTime monotonic for the process lifetime. Zeroing it when the

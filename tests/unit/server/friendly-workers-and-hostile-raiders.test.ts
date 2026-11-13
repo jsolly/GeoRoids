@@ -220,7 +220,7 @@ test('opposing direct shots damage hulls while crew shots pass through friendlie
 });
 
 test('a raider aims and fires through the real authoritative shot path', () => {
-  const { pilot, frame, bot } = world();
+  const { engine, pilot, frame, bot } = world();
   const raider = bot('raider');
   pilot.position = { x: 5000, y: 4000 };
   pilot.overlayHold = false;
@@ -230,8 +230,33 @@ test('a raider aims and fires through the real authoritative shot path', () => {
   delete raider.spawnProtectionTimer;
   // Keep this scenario focused on firing, away from the worker.
   bot('worker').position = { x: 4000, y: 4000 };
+  engine.chargeWeapon(raider.id, 'start');
+  frame(AI_SHIPS.shotIntervalFrames + 20);
+  expect(pilot.health).toBe(pilot.maxHealth);
+  expect(engine.drainShotSounds()).toEqual([]);
+  engine.chargeWeapon(raider.id, 'cancel');
   frame(AI_SHIPS.shotIntervalFrames + Math.ceil(300 / (LASER.SPEED / GAME.FPS)) + 20);
+  expect(engine.drainShotSounds().map((shot) => shot.ownerId)).toContain(raider.id);
   expect(pilot.health).toBeLessThan(pilot.maxHealth);
+});
+
+test('a worker beyond the tether returns cargo and departs before its next-frame replacement', () => {
+  const { engine, frame, bot } = world();
+  const worker = bot('worker');
+  worker.position = { x: 10_000, y: 0 };
+  worker.cargo = 37;
+  frame();
+  expect(engine.getPlayer(worker.id)).toBeUndefined();
+  expect(engine.drainDepartedPlayers()).toEqual([worker.id]);
+  expect(engine.getLoot().filter((drop) => drop.points === 37)).toMatchObject([
+    { position: { x: 10_000, y: 0 } },
+  ]);
+  expect(engine.getSnapshotState().entities.filter((actor) => actor.botRole === 'worker')).toEqual(
+    []
+  );
+  frame();
+  expect(bot('worker').id).not.toBe(worker.id);
+  expect(engine.drainDepartedPlayers()).toEqual([]);
 });
 
 test('bot death respawns outside town, and final human removal spills holds before checkpoint', () => {
@@ -255,9 +280,29 @@ test('bot death respawns outside town, and final human removal spills holds befo
   expect(engine.isGamePaused()).toBe(true);
   expect(engine.getSnapshotState().entities).toEqual([]);
   expect(engine.getLoot().some((drop) => drop.points === 42)).toBe(true);
+  expect(engine.drainDepartedPlayers()).toEqual([worker.id, raider.id]);
   expect(store.loadPilots().some((entry) => entry.id === worker.id)).toBe(false);
   const restored = restart();
   expect(restored.getLoot().some((drop) => drop.points === 42)).toBe(true);
+});
+
+test('world reset discards bot holds and restarts the full inhabited spawn delay', () => {
+  const { engine, frame, bot } = world();
+  const oldIds = [bot('worker').id, bot('raider').id];
+  bot('worker').cargo = 42;
+  engine.resetForTesting();
+  expect(engine.getSnapshotState().entities).toEqual([]);
+  expect(engine.getLoot()).toEqual([]);
+  expect(engine.drainDepartedPlayers()).toEqual([]);
+  const socket = new RecordingSocket();
+  const pilot = engine.addPlayer('new-pilot', 'New pilot', socket, { x: 0, y: 0 });
+  assert(engine.registerPilot(pilot, socket).ok);
+  engine.createAsteroids(0);
+  frame(AI_SHIPS.spawnDelayFrames - 1);
+  expect(engine.getSnapshotState().entities.filter((actor) => actor.botRole)).toEqual([]);
+  frame();
+  const newIds = [bot('worker').id, bot('raider').id];
+  expect(newIds.some((id) => oldIds.includes(id))).toBe(false);
 });
 
 test('worker hold checkpoints refresh only recovery deadlines on the engine clock and retain them through restart', () => {
@@ -342,11 +387,16 @@ test('decoded snapshots retain distant humans while bot geometry enters and leav
 
 test('a dropped human transport stops both bots during reconnect grace and recovers the worker hold', () => {
   const { engine, socket, bot, frame } = world();
+  const oldIds = [bot('worker').id, bot('raider').id];
+  // A connected actor without an admitted pose session cannot keep a fleet inhabited.
+  const pending = engine.addPlayer('pending', 'Pending', new RecordingSocket());
+  expect(pending.playerMotion).toBeUndefined();
   bot('worker').cargo = 25;
   expect(engine.transportClosed(socket)).toBe(true);
   frame();
   expect(engine.getSnapshotState().entities.filter((entry) => entry.botRole)).toEqual([]);
   expect(engine.getLoot().some((drop) => drop.points === 25)).toBe(true);
+  expect(engine.drainDepartedPlayers()).toEqual(oldIds);
   frame(AI_SHIPS.spawnDelayFrames);
   expect(engine.getSnapshotState().entities.filter((entry) => entry.botRole)).toEqual([]);
 });

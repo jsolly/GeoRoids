@@ -1,3 +1,4 @@
+import { readBitmapBudget } from '../rendering/bitmapBudget';
 import type { GpuFrameStats } from '../rendering/gpuRearRenderer';
 import { getClientReleaseId } from '../utils/buildInfo';
 import { logger } from '../utils/Logger';
@@ -644,6 +645,7 @@ export class ClientPerformanceMetrics {
       messageCounts: Object.fromEntries(this.messageCounts),
       graphicsSettings: { ...this.graphicsSettings },
       graphicsPolicyChanges: this.graphicsPolicyChanges,
+      bitmapBudget: readBitmapBudget(),
       presentation: this.presentation ? { ...this.presentation, stage: this.scanStage } : null,
       presentationStates: {
         observedCount: this.presentationStateCount,

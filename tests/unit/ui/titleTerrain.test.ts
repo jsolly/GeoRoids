@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { readBitmapBudget } from '../../../src/rendering/bitmapBudget';
 
 import { initTitleTerrain } from '../../../src/rendering/titleTerrain';
 
@@ -46,7 +47,9 @@ test.each([
     if (!canvas) {
       throw new Error('Title canvas missing');
     }
+    const before = readBitmapBudget().liveBytes;
     stop = initTitleTerrain(canvas);
+    expect(readBitmapBudget().liveBytes).toBe(before + canvas.width * canvas.height * 4);
     expect(stroke.mock.calls.length).toBeGreaterThan(10);
     expect(labels).not.toHaveBeenCalled();
     expect(arc).not.toHaveBeenCalled();
@@ -70,5 +73,8 @@ test.each([
     expect(resizedMove[0]).toBeCloseTo(originalMove[0] / 2, 5);
     expect(resizedMove[1]).toBeCloseTo(originalMove[1] / 2, 5);
     expect(stroke.mock.calls.length).toBe(paintCount * 2);
+    expect(readBitmapBudget().liveBytes).toBe(before + canvas.width * canvas.height * 4);
+    stop();
+    expect(readBitmapBudget().liveBytes).toBe(before);
   }
 );

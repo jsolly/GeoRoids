@@ -9,7 +9,6 @@ import {
   isCellExplored,
 } from '../../shared/exploration';
 import { frontierSitesNear } from '../../shared/frontier';
-
 import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
 import { isAsteroidLit } from '../../shared/glowtoy';
 import { RICOCHET_COURT } from '../../shared/ricochetCourt';
@@ -24,6 +23,7 @@ import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOut
 import { getWorldCampaign } from '../network/worldCampaign';
 import { getWorldExploration, getWorldMapAssets, worldFurnaces } from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
+import { releaseBitmap, resizeBitmap } from '../rendering/bitmapBudget';
 import { strokeFurnaceFireTrail } from '../rendering/furnaceRenderer';
 import {
   drawFoundationMapMark,
@@ -122,6 +122,7 @@ type MapLegendKind = (typeof MAP_LEGEND_KINDS)[number];
 const LOCATION_PAGE_SIZE = 24;
 
 type ExplorationRaster = {
+  path: Path2D | null;
   source: readonly ExplorationTile[] | null;
   canvas: HTMLCanvasElement | null;
   context: CanvasRenderingContext2D | null;
@@ -134,6 +135,7 @@ export function bindUniverseMapField(source: () => readonly Roid[]): void {
 }
 
 const explorationRaster: ExplorationRaster = {
+  path: null,
   source: null,
   canvas: null,
   context: null,
@@ -177,68 +179,96 @@ function isNearbyZoom(zoom: number): boolean {
   return Math.round(zoom * 100) === Math.round(UNIVERSE_MAP_ZOOM.initial * 100);
 }
 
-export function paintMapLegend(canvas: HTMLCanvasElement, kind: MapLegendKind): void {
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    ctx.scale(2, 2);
-    if (kind === 'You' || kind === 'Crew') {
-      ctx.strokeStyle = kind === 'You' ? PALETTE.LOCAL : WIRE_PALETTE.REMOTE;
-      ctx.lineWidth = 1;
-      const player =
-        kind === 'You'
-          ? PlayerManager.getInstance().getLocalPlayer()
-          : PlayerManager.getInstance().getNonLocalPlayers()[0];
-      const hull = getKitHullOutline(player?.ship.kitId ?? 'scout');
-      if (traceMapPolyline(ctx, projectHullPolyline(8, 8, 6, Math.PI / 2, hull.hull), true)) {
-        ctx.stroke();
+export function paintMapLegend(canvas: HTMLCanvasElement, kind: MapLegendKind): () => void {
+  resizeBitmap(canvas, 32, 32, 'map-legend', 'presentation', true);
+  try {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(2, 2);
+      if (kind === 'You' || kind === 'Crew') {
+        ctx.strokeStyle = kind === 'You' ? PALETTE.LOCAL : WIRE_PALETTE.REMOTE;
+        ctx.lineWidth = 1;
+        const player =
+          kind === 'You'
+            ? PlayerManager.getInstance().getLocalPlayer()
+            : PlayerManager.getInstance().getNonLocalPlayers()[0];
+        const hull = getKitHullOutline(player?.ship.kitId ?? 'scout');
+        if (traceMapPolyline(ctx, projectHullPolyline(8, 8, 6, Math.PI / 2, hull.hull), true)) {
+          ctx.stroke();
+        }
+      } else if (kind === 'Furnace') {
+        drawFurnaceMapMark(ctx, 8, 8, 6);
+      } else if (kind === 'Court') {
+        drawCourtMapMark(ctx, 8, 8, 7);
+      } else if (kind === 'Resources') {
+        drawResourceMapMark(ctx, 'asteroid', 8, 8, 5, PALETTE.ROID);
+      } else if (kind === 'Nest') {
+        drawResourceMapMark(ctx, 'nest', 8, 8, 6, PALETTE.DANGER);
+      } else {
+        ctx.fillStyle = '#050914';
+        ctx.fillRect(3, 3, 10, 10);
+        ctx.strokeStyle = PALETTE.HUD_MUTED;
+        ctx.strokeRect(3, 3, 10, 10);
       }
-    } else if (kind === 'Furnace') {
-      drawFurnaceMapMark(ctx, 8, 8, 6);
-    } else if (kind === 'Court') {
-      drawCourtMapMark(ctx, 8, 8, 7);
-    } else if (kind === 'Resources') {
-      drawResourceMapMark(ctx, 'asteroid', 8, 8, 5, PALETTE.ROID);
-    } else if (kind === 'Nest') {
-      drawResourceMapMark(ctx, 'nest', 8, 8, 6, PALETTE.DANGER);
-    } else {
-      ctx.fillStyle = '#050914';
-      ctx.fillRect(3, 3, 10, 10);
-      ctx.strokeStyle = PALETTE.HUD_MUTED;
-      ctx.strokeRect(3, 3, 10, 10);
     }
+    return () => releaseBitmap(canvas);
+  } catch (error) {
+    releaseBitmap(canvas);
+    throw error;
   }
 }
 
 function rebuildExplorationRaster(tiles: readonly ExplorationTile[]): void {
   if (!explorationRaster.canvas) {
     explorationRaster.canvas = document.createElement('canvas');
-    explorationRaster.canvas.width = MAP_RASTER_SIZE;
-    explorationRaster.canvas.height = MAP_RASTER_SIZE;
-    explorationRaster.context = explorationRaster.canvas.getContext('2d');
+    if (
+      !resizeBitmap(
+        explorationRaster.canvas,
+        MAP_RASTER_SIZE,
+        MAP_RASTER_SIZE,
+        'map-exploration',
+        'cache'
+      )
+    ) {
+      explorationRaster.canvas = null;
+    }
+    explorationRaster.context = explorationRaster.canvas?.getContext('2d') ?? null;
   }
   const context = explorationRaster.context;
-  if (!context) {
-    explorationRaster.source = tiles;
-    return;
+  explorationRaster.path = context ? null : new Path2D();
+  context?.clearRect(0, 0, MAP_RASTER_SIZE, MAP_RASTER_SIZE);
+  if (context) {
+    context.fillStyle = hexToRgba(WIRE_PALETTE.REMOTE, 0.14);
+    context.imageSmoothingEnabled = false;
   }
-
-  context.clearRect(0, 0, MAP_RASTER_SIZE, MAP_RASTER_SIZE);
-  context.fillStyle = hexToRgba(WIRE_PALETTE.REMOTE, 0.14);
-  context.imageSmoothingEnabled = false;
 
   // Decode each immutable snapshot once; open-map frames reuse the raster.
   for (const cell of exploredCells(tiles)) {
     const bounds = cellWorldBounds(cell);
-    context.fillRect(
+    explorationRaster.path?.rect(bounds.x, bounds.y, bounds.size, bounds.size);
+    context?.fillRect(
       (bounds.x + WORLD.radius) * RASTER_SCALE,
       (bounds.y + WORLD.radius) * RASTER_SCALE,
       bounds.size * RASTER_SCALE + 0.5,
       bounds.size * RASTER_SCALE + 0.5
     );
   }
+  if (!context && explorationRaster.canvas) {
+    releaseBitmap(explorationRaster.canvas);
+    explorationRaster.canvas = null;
+  }
   explorationRaster.source = tiles;
+}
+
+/** Shared by spawn and map painters; runtime detach also retires a spawn-only cache. */
+export function clearMapArtwork(): void {
+  if (explorationRaster.canvas) {
+    releaseBitmap(explorationRaster.canvas);
+  }
+  explorationRaster.path = null;
+  explorationRaster.source = null;
+  explorationRaster.canvas = null;
+  explorationRaster.context = null;
 }
 
 function getExplorationRaster(): HTMLCanvasElement | null {
@@ -298,6 +328,9 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   if (raster) {
     context.imageSmoothingEnabled = false;
     context.drawImage(raster, -WORLD.radius, -WORLD.radius, WORLD_DIAMETER, WORLD_DIAMETER);
+  } else if (explorationRaster.path) {
+    context.fillStyle = hexToRgba(WIRE_PALETTE.REMOTE, 0.14);
+    context.fill(explorationRaster.path);
   }
 
   context.strokeStyle = hexToRgba(PALETTE.HUD_MUTED, 0.17);
@@ -719,6 +752,7 @@ export function mountUniverseMap(
   canvas: HTMLCanvasElement,
   onChrome: (chrome: UniverseMapChrome) => void
 ): UniverseMapController {
+  resizeBitmap(canvas, canvas.width, canvas.height, 'map');
   const listenerScope = new AbortController();
   const { signal } = listenerScope;
   let disposed = false;
@@ -839,8 +873,7 @@ export function mountUniverseMap(
     ) {
       return;
     }
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    resizeBitmap(canvas, Math.round(width * dpr), Math.round(height * dpr), 'map');
     dimensions = { width, height, dpr };
     setViewCenter(view.center);
   }
@@ -1156,23 +1189,42 @@ export function mountUniverseMap(
     ev.preventDefault();
   }
 
-  canvas.addEventListener('pointerdown', onPointerDown, { signal });
-  canvas.addEventListener('pointermove', onPointerMove, { signal });
-  canvas.addEventListener('pointerup', onPointerUp, { signal });
-  canvas.addEventListener('pointercancel', onPointerUp, { signal });
-  canvas.addEventListener('lostpointercapture', onPointerUp, { signal });
-  canvas.addEventListener('wheel', onWheel, { passive: false, signal });
-  const observer = new ResizeObserver(() => {
-    if (!disposed) {
-      renderMap();
+  let observer: ResizeObserver | undefined;
+  const dispose = () => {
+    if (disposed) {
+      return;
     }
-  });
-  observer.observe(canvas);
-  window.addEventListener('resize', renderMap, { signal });
-  resizeCanvas();
-  setViewCenter(view.center);
-  renderMap();
-  startRenderLoop();
+    disposed = true;
+    listenerScope.abort();
+    observer?.disconnect();
+    stopRenderLoop();
+    releaseMapPointers();
+    occlusions = [];
+    releaseBitmap(canvas);
+    clearMapArtwork();
+  };
+  try {
+    canvas.addEventListener('pointerdown', onPointerDown, { signal });
+    canvas.addEventListener('pointermove', onPointerMove, { signal });
+    canvas.addEventListener('pointerup', onPointerUp, { signal });
+    canvas.addEventListener('pointercancel', onPointerUp, { signal });
+    canvas.addEventListener('lostpointercapture', onPointerUp, { signal });
+    canvas.addEventListener('wheel', onWheel, { passive: false, signal });
+    observer = new ResizeObserver(() => {
+      if (!disposed) {
+        renderMap();
+      }
+    });
+    observer.observe(canvas);
+    window.addEventListener('resize', renderMap, { signal });
+    resizeCanvas();
+    setViewCenter(view.center);
+    renderMap();
+    startRenderLoop();
+  } catch (error) {
+    dispose();
+    throw error;
+  }
   return {
     center() {
       if (!disposed) {
@@ -1196,19 +1248,6 @@ export function mountUniverseMap(
         occlusions = rectangles;
       }
     },
-    dispose() {
-      if (disposed) {
-        return;
-      }
-      disposed = true;
-      listenerScope.abort();
-      observer.disconnect();
-      stopRenderLoop();
-      releaseMapPointers();
-      occlusions = [];
-      explorationRaster.source = null;
-      explorationRaster.canvas = null;
-      explorationRaster.context = null;
-    },
+    dispose,
   };
 }

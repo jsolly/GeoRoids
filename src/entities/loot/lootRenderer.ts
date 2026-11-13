@@ -83,6 +83,16 @@ interface OrdinaryLootSprites {
 
 let ordinaryLootSprites: OrdinaryLootSprites | null = null;
 
+export function clearLootArtwork(): void {
+  for (const sprite of ordinaryLootSprites?.styles.values() ?? []) {
+    discardRasterSurface(sprite);
+  }
+  for (const surface of ordinaryLootSprites?.pending ?? []) {
+    discardRasterSurface(surface);
+  }
+  ordinaryLootSprites = null;
+}
+
 function isOrdinaryLootKind(kind: LootData['kind']): kind is OrdinaryLootKind {
   return kind === 'points' || kind === 'shard' || kind === 'silk';
 }
@@ -99,7 +109,10 @@ function prepareOrdinaryLootSprites(ctx: CanvasRenderingContext2D): OrdinaryLoot
       dpr,
       glow,
       styles: new Map(),
-      pending: [...(ordinaryLootSprites?.styles.values() ?? [])],
+      pending: [
+        ...(ordinaryLootSprites?.pending ?? []),
+        ...(ordinaryLootSprites?.styles.values() ?? []),
+      ],
     };
   }
   return ordinaryLootSprites;
@@ -142,32 +155,40 @@ function ordinaryLootSprite(
   denseShard: boolean,
   halfPixels: number,
   cache: OrdinaryLootSprites
-): OrdinaryLootSprite {
+): OrdinaryLootSprite | undefined {
   const surface = prepareRasterSurface(
     halfPixels * 2,
     halfPixels * 2,
     cache.pending.pop(),
     'Loot artwork canvas context unavailable'
   );
+  if (!surface) {
+    return undefined;
+  }
   const { canvas, context: ctx } = surface;
   const origin = halfPixels / cache.dpr;
-  ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
-  const trace = (): void => {
-    ctx.beginPath();
-    if (kind === 'silk') {
-      addResourceMapPath(ctx, 'silk', origin, origin, radius);
-      return;
-    }
-    traceDiamond(ctx, origin, origin, radius);
-    if (kind === 'shard') {
-      traceDiamond(ctx, origin, origin, radius * VISUAL.LOOT_SHARD_INNER);
-      if (denseShard) {
-        traceDiamond(ctx, origin, origin, radius * VISUAL.LOOT_SHARD_DENSE_INNER);
+  try {
+    ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
+    const trace = (): void => {
+      ctx.beginPath();
+      if (kind === 'silk') {
+        addResourceMapPath(ctx, 'silk', origin, origin, radius);
+        return;
       }
-    }
-  };
-  strokeLootShape(ctx, trace, VISUAL.LOOT_GLOW);
-  return { canvas, context: ctx, origin };
+      traceDiamond(ctx, origin, origin, radius);
+      if (kind === 'shard') {
+        traceDiamond(ctx, origin, origin, radius * VISUAL.LOOT_SHARD_INNER);
+        if (denseShard) {
+          traceDiamond(ctx, origin, origin, radius * VISUAL.LOOT_SHARD_DENSE_INNER);
+        }
+      }
+    };
+    strokeLootShape(ctx, trace, VISUAL.LOOT_GLOW);
+    return { canvas, context: ctx, origin };
+  } catch (error) {
+    discardRasterSurface(surface);
+    throw error;
+  }
 }
 
 function drawOrdinaryLoot(
@@ -192,17 +213,42 @@ function drawOrdinaryLoot(
     usedStyles.get(key) ??
     cache.styles.get(key) ??
     ordinaryLootSprite(kind, radius, denseShard, halfPixels, cache);
+  if (!sprite) {
+    ctx.save();
+    const trace = () => {
+      ctx.beginPath();
+      if (kind === 'silk') {
+        addResourceMapPath(ctx, 'silk', x, y, radius);
+      } else {
+        traceDiamond(ctx, x, y, radius);
+        if (kind === 'shard') {
+          traceDiamond(ctx, x, y, radius * VISUAL.LOOT_SHARD_INNER);
+          if (denseShard) {
+            traceDiamond(ctx, x, y, radius * VISUAL.LOOT_SHARD_DENSE_INNER);
+          }
+        }
+      }
+    };
+    strokeLootShape(ctx, trace, VISUAL.LOOT_GLOW);
+    ctx.restore();
+    return;
+  }
   usedStyles.set(key, sprite);
+  // Keep ownership even if the destination blit fails before the batch commits.
+  cache.styles.set(key, sprite);
   ctx.save();
-  ctx.shadowBlur = 0;
-  ctx.drawImage(
-    sprite.canvas,
-    x - sprite.origin,
-    y - sprite.origin,
-    sprite.canvas.width / cache.dpr,
-    sprite.canvas.height / cache.dpr
-  );
-  ctx.restore();
+  try {
+    ctx.shadowBlur = 0;
+    ctx.drawImage(
+      sprite.canvas,
+      x - sprite.origin,
+      y - sprite.origin,
+      sprite.canvas.width / cache.dpr,
+      sprite.canvas.height / cache.dpr
+    );
+  } finally {
+    ctx.restore();
+  }
 }
 
 /** Cream diamond pickups — void understroke so they read on slate contours. */
@@ -231,13 +277,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
   }
 
   if (loot.length === 0) {
-    for (const sprite of ordinaryLootSprites?.styles.values() ?? []) {
-      discardRasterSurface(sprite);
-    }
-    for (const surface of ordinaryLootSprites?.pending ?? []) {
-      discardRasterSurface(surface);
-    }
-    ordinaryLootSprites = null;
+    clearLootArtwork();
     return;
   }
 

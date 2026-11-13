@@ -1,6 +1,7 @@
 import { WORLD } from '../../shared/world';
 import { PALETTE } from '../constants';
 import { PlayerManager } from '../entities/player/PlayerManager';
+import { releaseBitmap, resizeBitmap } from '../rendering/bitmapBudget';
 import { hexToRgba } from '../utils/colorUtils';
 import { drawSpawnChart } from './universeMap';
 
@@ -52,6 +53,9 @@ export function stopSpawnFlyIn(): void {
     window.cancelAnimationFrame(frameRequest);
     frameRequest = null;
   }
+  if (overlay) {
+    releaseBitmap(overlay);
+  }
   visibilityChanged?.(false);
   window.removeEventListener('keydown', skipSpawnFlyIn, true);
   window.removeEventListener('pointerdown', skipSpawnFlyIn, true);
@@ -96,8 +100,7 @@ export function playSpawnFlyIn(): void {
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
+      resizeBitmap(canvas, Math.round(width * dpr), Math.round(height * dpr), 'spawn-fly-in');
     }
 
     const worldScale = (Math.min(width, height) * 0.92) / (WORLD.radius * 2);

@@ -11,6 +11,7 @@ import {
   worldFurnaces,
 } from '../../../src/network/worldExploration';
 import { setSpiderField } from '../../../src/physics/terrain/spiderSession';
+import { readBitmapBudget, releaseBitmap, resizeBitmap } from '../../../src/rendering/bitmapBudget';
 import { configureRenderQuality } from '../../../src/rendering/renderQuality';
 import { setPlayView } from '../../../src/ui/uiUtils';
 import {
@@ -387,4 +388,80 @@ test('universe chart hides an unlit glow crystal and shows its charged mark in e
   crystal.glowtoy.charge = 0.8;
   const lit = paint([ordinary, crystal]);
   expect(lit.some((value, i) => value !== control[i])).toBe(true);
+});
+
+test('an exhausted bitmap budget preserves explored ground with one retained vector path and releases the map on close', () => {
+  class ExplorationPath {
+    static created: ExplorationPath[] = [];
+    readonly rectangles: number[][] = [];
+    constructor() {
+      ExplorationPath.created.push(this);
+    }
+    rect(x: number, y: number, width: number, height: number) {
+      this.rectangles.push([x, y, width, height]);
+    }
+  }
+  const { open, canvas, ctx } = mountUniverseMap();
+  vi.stubGlobal('Path2D', ExplorationPath);
+  const reserve = document.createElement('canvas');
+  const before = readBitmapBudget().liveBytes;
+  resizeBitmap(reserve, 4096, 4096, 'map-budget-test');
+  const exploration = new ExplorationMap();
+  exploration.reveal({ x: 0, y: 0 }, 1000);
+  setWorldExploration(exploration.snapshot());
+  const fill = ctx.fill.bind(ctx);
+  const rectangles = vi.spyOn(ctx, 'fillRect');
+  vi.spyOn(ctx, 'fill').mockImplementation(
+    (...args: Parameters<CanvasRenderingContext2D['fill']>) => {
+      const path = args[0];
+      if (path instanceof ExplorationPath) {
+        for (const rectangle of path.rectangles) {
+          const [x, y, width, height] = rectangle;
+          if (x === undefined || y === undefined || width === undefined || height === undefined) {
+            throw new Error('Incomplete rectangle');
+          }
+          ctx.fillRect(x, y, width, height);
+        }
+      } else {
+        Reflect.apply(fill, ctx, args);
+      }
+    }
+  );
+  try {
+    const images = vi.spyOn(ctx, 'drawImage');
+    open();
+    expect(readBitmapBudget().owners['map-exploration']).toBeUndefined();
+    expect(ExplorationPath.created).toHaveLength(1);
+    const path = ExplorationPath.created[0];
+    expect(path?.rectangles.length).toBeGreaterThan(0);
+    expect(
+      rectangles.mock.calls.some(([, , width, height]) => width === 125 && height === 125)
+    ).toBe(true);
+    expect(images).not.toHaveBeenCalled();
+    window.dispatchEvent(new Event('resize'));
+    expect(ExplorationPath.created).toEqual([path]);
+    closeMap();
+    expect(canvas.width).toBe(0);
+    expect(readBitmapBudget().liveBytes).toBe(before + 4096 * 4096 * 4);
+  } finally {
+    releaseBitmap(reserve);
+  }
+  expect(readBitmapBudget().liveBytes).toBe(before);
+});
+
+test('an initial chart paint failure releases both its visible and exploration bitmaps before retry', () => {
+  const { open, canvas, ctx } = mountUniverseMap();
+  const before = readBitmapBudget().liveBytes;
+  const images = vi.spyOn(ctx, 'drawImage').mockImplementationOnce(() => {
+    throw new Error('Initial chart paint failed');
+  });
+  expect(open).toThrow('Initial chart paint failed');
+  expect(canvas.width).toBe(0);
+  expect(readBitmapBudget().liveBytes).toBe(before);
+  expect(readBitmapBudget().owners['map-exploration']).toBeUndefined();
+  images.mockRestore();
+  open();
+  expect(canvas.width).toBeGreaterThan(0);
+  closeMap();
+  expect(readBitmapBudget().liveBytes).toBe(before);
 });

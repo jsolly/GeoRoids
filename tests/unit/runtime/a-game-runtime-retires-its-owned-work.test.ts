@@ -5,12 +5,15 @@ import * as audioRuntime from '../../../src/audio/audioRuntime';
 import * as feedbackSounds from '../../../src/audio/feedbackSounds';
 import { GameController } from '../../../src/core/gameController';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
+import { drawLootRelative } from '../../../src/entities/loot/lootRenderer';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
+import { drawLaserBolts } from '../../../src/entities/ship/shipRenderer';
 import { controlSources } from '../../../src/input/controlSources';
 import { getPressedKeysForPlayer } from '../../../src/input/keybindings';
 import * as playfieldSelection from '../../../src/input/playfieldSelection';
 import * as touchControls from '../../../src/input/touchControls';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
+import { readBitmapBudget } from '../../../src/rendering/bitmapBudget';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import {
   createGameRuntime,
@@ -20,6 +23,7 @@ import {
 import { getOpenGameOverlay } from '../../../src/runtime/overlayState';
 import type { GamePresentation } from '../../../src/runtime/uiTypes';
 import { setPlayView } from '../../../src/ui/uiUtils';
+import { drawSpawnChart } from '../../../src/ui/universeMap';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 // Logging transport is external to the gameplay runtime under test.
@@ -119,6 +123,7 @@ afterEach(() => {
 });
 
 test('a failed canvas initialization retires its work and permits a fresh runtime on the same supplied canvases', () => {
+  const before = readBitmapBudget().liveBytes;
   const context = vi.spyOn(hosts.canvas, 'getContext').mockReturnValue(null);
   expect(() => createGameRuntime(hosts, scope.signal)).toThrow('rendering context');
   expect(document.querySelectorAll('canvas')).toHaveLength(3);
@@ -126,6 +131,7 @@ test('a failed canvas initialization retires its work and permits a fresh runtim
   expect(frames.size).toBe(0);
   expect(canvasManager.getCanvas()).toBeNull();
   expect(vi.getTimerCount()).toBe(0);
+  expect(readBitmapBudget().liveBytes).toBe(before);
   context.mockRestore();
   current = mountRuntime(scope.signal);
   expect(canvasManager.getCanvas()).toBe(hosts.canvas);
@@ -882,4 +888,25 @@ test('wall-clock poses survive recovery and stop when play ends', async () => {
   await vi.advanceTimersByTimeAsync(100);
   expect(retryState).not.toHaveBeenCalled();
   expect(updates(retry)).toHaveLength(3);
+});
+
+test('unmounting the real runtime releases presentation, pickup, laser and spawn-chart bitmap owners', async () => {
+  const before = readBitmapBudget().liveBytes;
+  await joinWithAcceptedWorld();
+  const pilot = GameController.getInstance().getCurrPlayer();
+  if (!pilot) {
+    throw new Error('Expected joined pilot');
+  }
+  const position = pilot.ship.position;
+  drawLootRelative(pilot.ship, [
+    { id: 'runtime-drop', position, kind: 'points', radius: 14, mass: 0 },
+  ]);
+  drawLaserBolts([{ position, velocity: { x: 1, y: 0 }, explodeTime: 0 }], '#abc123', position);
+  drawSpawnChart(canvasManager.requireContext(), 800, 600, position, 0.01);
+  const live = readBitmapBudget();
+  expect(live.owners['Loot artwork canvas context unavailable']).toBeGreaterThan(0);
+  expect(live.owners['Laser bolt canvas context unavailable']).toBeGreaterThan(0);
+  expect(live.owners['map-exploration']).toBeGreaterThan(0);
+  current?.dispose();
+  expect(readBitmapBudget().liveBytes).toBe(before);
 });

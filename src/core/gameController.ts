@@ -18,12 +18,14 @@ import { bindGameAudio, resetGameAudio } from '../audio/spatialAudio';
 import { mountSpiderScore } from '../audio/spiderScore';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { LootField } from '../entities/loot/LootField';
+import { clearLootArtwork } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { advanceRemotePlayerShips } from '../entities/player/remoteLasers';
 import { Roid, RoidBelt } from '../entities/roid/Roid';
 import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/roidRenderer';
 import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
+import { clearLaserBoltArtwork } from '../entities/ship/shipRenderer';
 import { noteFurnacePipePulse, resetFurnacePipePulses } from '../fx/furnacePipePulse';
 import { playLocalHaptic } from '../fx/haptics';
 import { tickTouchControls } from '../input/touchControls';
@@ -46,7 +48,7 @@ import { mountFurnaceTravelPrompt, syncFurnaceTravelPrompt } from '../ui/furnace
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
 import { playSpawnFlyIn } from '../ui/spawnFlyIn';
 import { setPlayView } from '../ui/uiUtils';
-import { bindUniverseMapField } from '../ui/universeMap';
+import { bindUniverseMapField, clearMapArtwork } from '../ui/universeMap';
 import { logger } from '../utils/Logger';
 import { GameStateManager } from './services/GameStateManager';
 import { InputManager } from './services/InputManager';
@@ -143,6 +145,10 @@ export class GameController {
   detachRuntime(): void {
     clearStaticFurnaceArtwork();
     clearStaticCourtArtwork();
+    clearAsteroidShatters();
+    clearLootArtwork();
+    clearLaserBoltArtwork();
+    clearMapArtwork();
     this.joinGeneration++;
     this.gameStateManager.setIsGameRunning(false);
     this.runtimeListeners?.abort();

@@ -494,6 +494,9 @@ export class ConnectionManager {
     const serverReleaseId = this.serverReleaseId;
     const lastAcceptedSnapshotSequence = this.lastAcceptedSnapshotSequence;
     this.motionReconciliation.transportClosed();
+    for (const player of this.allPlayers.values()) {
+      player.resetMotionPresentation();
+    }
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
       localShip.releaseContourLock();
@@ -933,6 +936,9 @@ export class ConnectionManager {
       ...readStoredResumeProvenance(),
     });
     this.motionReconciliation.awaitAuthoritativePose();
+    for (const player of this.allPlayers.values()) {
+      player.resetMotionPresentation();
+    }
     this.armJoinCompletionTimer();
     if (!this.sendPayload(joinMessage)) {
       this.failJoinCompletion(new Error('Failed to send join message'), true);

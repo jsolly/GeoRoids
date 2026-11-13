@@ -439,8 +439,8 @@ export class GameController {
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
 
-    // Remote pose remains server-driven; their projectiles and lifecycle
-    // advance on the same simulation clock as the local ship.
+    // Remote snapshot projection, projectiles and lifecycle share the local
+    // ship's simulation clock.
     const allPlayers = this.networkManager.getAllPlayers();
     advanceRemotePlayerShips(allPlayers);
 

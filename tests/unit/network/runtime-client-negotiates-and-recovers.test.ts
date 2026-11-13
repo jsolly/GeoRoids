@@ -17,6 +17,7 @@ import { LootField } from '../../../src/entities/loot/LootField';
 import { createPlayer } from '../../../src/entities/player/createPlayer';
 import type { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
 import { Roid } from '../../../src/entities/roid/Roid';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
@@ -131,6 +132,83 @@ describe('actual ConnectionManager WebSocket message path', () => {
       resumeToken,
     });
   }
+
+  test('decoded human and bot snapshots move between packets and removal discards their baseline', async () => {
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    const ws = await connect();
+    acknowledge(ws);
+    const state = captureSnapshot(snapshotFixture());
+    state.entities = state.entities.slice(0, 2);
+    const human = state.entities[0];
+    const bot = state.entities[1];
+    assert.ok(human && bot);
+    human.playerMotion = { epoch: 1, ack: 0, mode: 'free' };
+    bot.botRole = 'worker';
+    for (const row of state.entities) {
+      row.position = { x: 100, y: 200 };
+      row.velocity = { x: 1, y: 0 };
+    }
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+    const players = manager.getAllPlayers();
+    expect(players).toHaveLength(2);
+    advanceRemotePlayerShips(players);
+    for (const player of players) {
+      expect(player.ship.position).toEqual({ x: 101, y: 200 });
+    }
+    const stopped = structuredClone(state);
+    for (const row of stopped.entities) {
+      row.position.x = 99;
+      row.velocity.x = 0;
+    }
+    ws.receive('snapshot', new SnapshotEncoder(stopped).encode(2, { sequence: 1, state }));
+    expect(manager.getAllPlayers()).toBe(players);
+    for (let frame = 0; frame < 6; frame++) {
+      advanceRemotePlayerShips(players);
+      for (const player of players) {
+        expect(player.ship.position.x).toBeGreaterThanOrEqual(99);
+        expect(player.ship.position.x).toBeLessThan(101);
+      }
+    }
+    expect(players.map((player) => player.ship.position.x)).toEqual([99, 99]);
+    const gone = structuredClone(stopped);
+    gone.entities = [];
+    ws.receive('snapshot', new SnapshotEncoder(gone).encode(3, { sequence: 2, state: stopped }));
+    expect(manager.getAllPlayers()).toEqual([]);
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(4, { sequence: 3, state: gone }));
+    const returned = manager.getAllPlayers();
+    expect(returned[0]).not.toBe(players[0]);
+    expect(returned.map((player) => player.ship.position.x)).toEqual([100, 100]);
+    advanceRemotePlayerShips(returned);
+    expect(returned.map((player) => player.ship.position.x)).toEqual([101, 101]);
+  });
+
+  test('transport close freezes retained remotes and rejoin adopts fresh poses without old correction', async () => {
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    let ws = await connect();
+    acknowledge(ws);
+    const state = captureSnapshot(snapshotFixture());
+    state.entities = state.entities.slice(0, 1);
+    const row = state.entities[0];
+    assert.ok(row);
+    row.position = { x: 100, y: 200 };
+    row.velocity = { x: 1, y: 0 };
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+    const remote = manager.getAllPlayers()[0];
+    assert.ok(remote);
+    advanceRemotePlayerShips([remote]);
+    expect(remote.ship.position.x).toBe(101);
+    ws.close();
+    advanceRemotePlayerShips(manager.getAllPlayers());
+    expect(remote.ship.position.x).toBe(101);
+    ws = await connect();
+    acknowledge(ws);
+    row.position.x = 95;
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+    expect(manager.getAllPlayers()[0]).toBe(remote);
+    expect(remote.ship.position.x).toBe(95);
+    advanceRemotePlayerShips(manager.getAllPlayers());
+    expect(remote.ship.position.x).toBe(96);
+  });
 
   test('ability events preserve active effect timers and complete snapshots clear absent timers', async () => {
     const player = createPlayer({

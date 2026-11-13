@@ -32,6 +32,7 @@ import {
   applySharedShipRespawnCue,
   isServerRespawnActive,
 } from '../ship/shipUtils';
+import { RemoteShipMotion } from './remoteMotion';
 
 function copyVec2(dest: { x: number; y: number }, src: { x: number; y: number }): void {
   dest.x = src.x;
@@ -67,6 +68,7 @@ export class Player {
   // While alive it predicts locally and ignores the lagging server echo.
   private adoptServerPosition = false;
   private observedAuthoritativePose = false;
+  private readonly remoteMotion = new RemoteShipMotion();
 
   /** Ship position when death forced server-authoritative movement (respawn latch). */
   private respawnLatchOrigin: Position | null = null;
@@ -155,6 +157,7 @@ export class Player {
     haulerUtility?: HaulerUtilityId;
     scoutUtility?: ScoutUtilityId;
   }): void {
+    const remoteWasBlocked = this.remoteMotionBlocked();
     const wasDowned = this.ship.downedUntil !== null;
     if (data.downedUntil !== undefined) {
       this.ship.downedUntil = data.downedUntil;
@@ -207,7 +210,7 @@ export class Player {
     }
     // The local player predicts its own ship for responsiveness: while alive it
     // owns its position/velocity/angle and must NOT snap to the (lagging) server
-    // echo. Remote players are always server-driven.
+    // echo. Remote display motion follows the authoritative snapshot separately.
     //
     // The exception is the death→respawn window: once the local player dies we
     // latch `adoptServerPosition` so every server update (including the respawn
@@ -230,13 +233,13 @@ export class Player {
     const acceptServerTransform =
       !isLocal || this.adoptServerPosition || wasInTransit || this.ship.furnaceTransit !== null;
 
-    if (data.position && acceptServerTransform) {
+    if (data.position && acceptServerTransform && isLocal) {
       copyVec2(this.ship.position, data.position);
     }
     if (data.velocity && acceptServerTransform) {
       copyVec2(this.ship.velocity, data.velocity);
     }
-    if (data.angle !== undefined && acceptServerTransform) {
+    if (data.angle !== undefined && acceptServerTransform && isLocal) {
       this.ship.angle = data.angle;
     }
 
@@ -347,7 +350,7 @@ export class Player {
         ) {
           this.ship.beginHullAssembly();
 
-          playRespawn(this.ship.position);
+          playRespawn(!isLocal && data.position ? data.position : this.ship.position);
           playLocalHaptic(this.type === 'local', 'pickup');
         }
       }
@@ -420,6 +423,51 @@ export class Player {
     }
     this.soundedTowOutbound = outgoingTow;
     this.soundedHarpoonTarget = target;
+
+    if (!isLocal) {
+      const blocked = this.remoteMotionBlocked() || isServerRespawnActive(data.respawnTimer);
+      if (blocked || remoteWasBlocked) {
+        this.resetMotionPresentation();
+      }
+      if (data.position) {
+        this.remoteMotion.receive(
+          this.ship,
+          {
+            position: data.position,
+            velocity: data.velocity ?? this.ship.velocity,
+            angle: data.angle ?? this.ship.angle,
+          },
+          blocked
+        );
+      } else if (data.angle !== undefined) {
+        this.ship.angle = data.angle;
+      }
+    }
+  }
+
+  private remoteMotionBlocked(): boolean {
+    return (
+      this.ship.health <= 0 ||
+      this.ship.exploding ||
+      this.ship.furnaceTransit !== null ||
+      this.ship.rescue !== null ||
+      (this.ship.downedUntil !== null && this.ship.downedUntil !== 0)
+    );
+  }
+
+  advanceRemoteMotion(): void {
+    if (this.type !== 'remote') {
+      return;
+    }
+    if (this.remoteMotionBlocked()) {
+      this.resetMotionPresentation();
+      return;
+    }
+    this.remoteMotion.advance(this.ship);
+  }
+
+  resetMotionPresentation(): void {
+    this.remoteMotion.reset();
   }
 
   /**
@@ -427,6 +475,7 @@ export class Player {
    * Health/pose come from the next snapshot so a reconnect is not a corpse.
    */
   resetCombatLifecycle(): void {
+    this.resetMotionPresentation();
     this.adoptServerPosition = false;
     this.respawnLatchOrigin = null;
     this.serverSpawnProtectionTimer = 0;

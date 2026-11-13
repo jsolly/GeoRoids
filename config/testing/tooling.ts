@@ -59,6 +59,7 @@ export default defineConfig({
         test: {
           name: 'smoke',
           include: [
+            'scripts/ci-browser-smoke-protocol.test.ts',
             'scripts/server-release-inputs.test.mjs',
             'scripts/production-smoke-scenario.test.ts',
             'scripts/production-health-watch.test.ts',

@@ -75,6 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           candidate_root="$GITHUB_WORKSPACE/candidate"
+          export BROWSER_SMOKE_CANDIDATE_ROOT="$candidate_root"
           mkdir -p "$BROWSER_SMOKE_ARTIFACTS" "$RUNNER_TEMP/browser-world"
           export GEOROIDS_WORLD_PATH="$RUNNER_TEMP/browser-world/world.sqlite"
           export GEOROIDS_DEBUG_REPORTS_ENABLED=0 GEOROIDS_BACKUP_ENABLED=0 VITE_WEBSOCKET_URL=

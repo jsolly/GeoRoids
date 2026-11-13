@@ -65,6 +65,71 @@ function volumeEvidence(value: unknown): VolumeEvidence {
   );
   return { status, sampledAt, freeBytes, databaseBytes, walBytes, warningBytes };
 }
+
+type CampaignEvidence = {
+  activation: 'missing' | 'disabled' | 'active';
+  summary:
+    | { status: 'missing' }
+    | {
+        status: 'available';
+        nearbyHiveCount: number;
+        clearedCount: number;
+        commissionedCount: number;
+        hazard: {
+          phase: 'quiet' | 'warning' | 'active';
+          kind: 'swarm' | 'meteors';
+          startsAt: number;
+          endsAt: number;
+        };
+      };
+};
+
+/** The snapshot decoder owns domain validation; project only bounded public scalars. */
+function campaignEvidence(snapshot: Record<string, unknown>): CampaignEvidence {
+  const active = snapshot['cooperativeActive'];
+  requireEvidence(
+    active === undefined || typeof active === 'boolean',
+    'Malformed public campaign activation'
+  );
+  const activation = active === undefined ? 'missing' : active === true ? 'active' : 'disabled';
+  const campaign = snapshot['campaign'];
+  if (campaign === undefined) {
+    return { activation, summary: { status: 'missing' } };
+  }
+  requireEvidence(isRecord(campaign), 'Malformed public campaign summary');
+  const hives = campaign['hives'];
+  const cleared = campaign['cleared'];
+  const commissioned = campaign['commissioned'];
+  const hazard = campaign['hazard'];
+  requireEvidence(
+    Array.isArray(hives) &&
+      Array.isArray(cleared) &&
+      Array.isArray(commissioned) &&
+      isRecord(hazard),
+    'Malformed public campaign summary'
+  );
+  const phase = hazard['phase'];
+  const kind = hazard['kind'];
+  const startsAt = hazard['startsAt'];
+  const endsAt = hazard['endsAt'];
+  requireEvidence(
+    (phase === 'quiet' || phase === 'warning' || phase === 'active') &&
+      (kind === 'swarm' || kind === 'meteors') &&
+      nonnegativeInteger(startsAt) &&
+      nonnegativeInteger(endsAt),
+    'Malformed public campaign summary'
+  );
+  return {
+    activation,
+    summary: {
+      status: 'available',
+      nearbyHiveCount: hives.length,
+      clearedCount: cleared.length,
+      commissionedCount: commissioned.length,
+      hazard: { phase, kind, startsAt, endsAt },
+    },
+  };
+}
 const protocol: unknown = await tsImport('../shared/snapshotProtocol.ts', import.meta.url);
 requireEvidence(isRecord(protocol), 'Local snapshot protocol module is malformed');
 const capability = protocol['ASTEROID_INTERACTIONS_CAPABILITY'];
@@ -459,6 +524,9 @@ export async function smoke({
               typeof metadata['sequence'] === 'number',
             'Malformed gameplay protocol message'
           );
+          if (evidence.acceptedSnapshots === 0) {
+            observations.push({ source: 'initial-campaign-state', ...campaignEvidence(snapshot) });
+          }
           state = { entities: snapshot['entities'] };
           evidence.acceptedSnapshots++;
           send({ type: 'snapshotAck', data: { sequence: metadata['sequence'] } });

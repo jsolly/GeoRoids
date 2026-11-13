@@ -18,6 +18,13 @@ unavailable samples remain explicit, without invented zero counts or raw health
 details. A successful gameplay smoke alone does not establish available disk
 capacity; inspect the recorded volume samples for that acceptance.
 
+The first accepted snapshot adds one campaign observation with explicit
+activation and summary availability, nearby hive count, cleared and commissioned
+counts, and hazard phase, kind and time bounds. Hives are scoped to the receiving
+pilot's interest range. No hive records, contributors, supply balances or campaign
+arrays are retained. These facts do not verify storms, furnace delivery, crew
+signals or sac interactions; those features still need gameplay acceptance.
+
 Open clients compare their embedded full build identity with static same-origin
 `release.json`, served with `Cache-Control: no-store`. The game, debug page and
 Wiki share a shell-owned notice, with no service worker. Successful checks require

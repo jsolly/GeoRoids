@@ -7,6 +7,7 @@ import { inspect } from 'node:util';
 import { test } from 'vitest';
 import WebSocket from 'ws';
 import { decodeClientCommand } from '../server/communication/clientCommandDecoder.ts';
+import { frontierSite } from '../shared/frontier.ts';
 import { type SnapshotBaseline, SnapshotEncoder } from '../shared/snapshotProtocol.ts';
 import type { Position, ServerEntityData } from '../shared-types.ts';
 import { snapshotFixture } from '../tests/unit/network/snapshotFixture.ts';
@@ -176,7 +177,7 @@ function clientHttp({
     return Promise.resolve(result);
   };
 }
-function codedSocket(outcome = 'accepted') {
+function codedSocket(outcome = 'accepted', initialState: Record<string, unknown> = {}) {
   let socket: ControlledSocket | undefined;
   const sent: Record<string, unknown>[] = [];
   const transportFailure = new Error('Controlled socket transport failure');
@@ -201,7 +202,10 @@ function codedSocket(outcome = 'accepted') {
       const encoder = new SnapshotEncoder(state),
         frame = encoder.encode(++sequence, baseline);
       baseline = { sequence, state: encoder.state };
-      receive('snapshot', frame);
+      receive(
+        'snapshot',
+        frame.kind === 'keyframe' ? { ...frame, state: { ...frame.state, ...initialState } } : frame
+      );
     };
     const send = (body: string): void => {
       const message = parseRecord(body);
@@ -341,9 +345,50 @@ async function fixture(run: (artifacts: string, reports: Error[]) => Promise<voi
   }
 }
 
+function campaignFixture(): Record<string, unknown> {
+  const site = frontierSite('frontier:3,0');
+  assert(site);
+  return {
+    projectValue: 123,
+    supplies: [{ id: 'town-square', value: 500 }],
+    hives: [
+      {
+        kind: 'hive',
+        id: site.id,
+        position: site.position,
+        frontier: site.frontier,
+        queenHealth: 500,
+        birthFramesLeft: 480,
+        clearedAt: null,
+        sacs: [50, 50],
+        sacDeadline: null,
+        sacsCompletedAt: null,
+        restoredValue: 0,
+        contributors: ['private-campaign-contributor'],
+        commissionedAt: null,
+        shieldOpen: false,
+      },
+    ],
+    commissioned: ['frontier:2,0'],
+    cleared: ['frontier:2,0', 'frontier:0,2'],
+    hazard: {
+      phase: 'warning',
+      kind: 'swarm',
+      startsAt: 1800000,
+      endsAt: 1980000,
+      privateDetail: 'private-campaign-detail',
+    },
+    meteors: [{ id: 'private-campaign-meteor', position: { x: 50, y: 50 } }],
+    privateDetail: 'private-campaign-detail',
+  };
+}
+
 test('the deployed HTTP assets and genuine current-protocol gameplay produce a canonical receipt without private credentials', async () => {
   await fixture(async (artifacts, reports) => {
-    const transport = codedSocket(),
+    const transport = codedSocket('accepted', {
+        cooperativeActive: true,
+        campaign: campaignFixture(),
+      }),
       clock = controlledClock();
     const volume = {
       status: 'ok',
@@ -384,6 +429,22 @@ test('the deployed HTTP assets and genuine current-protocol gameplay produce a c
     for (const observation of health) {
       assert.deepEqual(record(observation)['volume'], volume);
     }
+    const campaign = receipt.observations
+      .map(record)
+      .filter((observation) => observation['source'] === 'initial-campaign-state');
+    assert.deepEqual(campaign, [
+      {
+        source: 'initial-campaign-state',
+        activation: 'active',
+        summary: {
+          status: 'available',
+          nearbyHiveCount: 1,
+          clearedCount: 2,
+          commissionedCount: 1,
+          hazard: { phase: 'warning', kind: 'swarm', startsAt: 1800000, endsAt: 1980000 },
+        },
+      },
+    ]);
     assert.equal(clock.pending(), 0);
     assert.equal(transport.socket().readyState, WebSocket.CLOSED);
     assert.ok(transport.sent().filter((message) => message['type'] === 'snapshotAck').length >= 3);
@@ -400,11 +461,99 @@ test('the deployed HTTP assets and genuine current-protocol gameplay produce a c
     const retained = JSON.stringify(receipt) + JSON.stringify(evidence);
     assert.doesNotMatch(
       retained,
-      /private-resume-token|private-github-token|resumeToken|authorization|privateHealthField|private-volume-detail/u
+      /private-resume-token|private-github-token|resumeToken|authorization|privateHealthField|private-volume-detail|private-campaign|frontier:2,0|frontier:0,2|frontier:3,0|projectValue|supplies|contributors/u
     );
     assert.deepEqual(parseJson(await readFile(join(artifacts, 'receipt.json'), 'utf8')), receipt);
   });
 });
+
+for (const [activation, initialState] of [
+  ['missing', {}],
+  ['disabled', { cooperativeActive: false }],
+  ['active', { cooperativeActive: true }],
+] satisfies Array<[string, Record<string, unknown>]>) {
+  test(`initial campaign evidence reports ${activation} activation without inventing progress`, async () => {
+    await fixture(async (artifacts, reports) => {
+      const transport = codedSocket('accepted', initialState);
+      const receipt = await runNetworkSmoke({
+        scenario: { productionUrl, smoke },
+        env,
+        fetcher: clientHttp(),
+        createSocket: transport.createSocket,
+        clock: controlledClock(),
+        artifacts,
+        report: (error) => reports.push(error),
+      });
+      assert.equal(receipt.success, true);
+      assert.deepEqual(
+        receipt.observations
+          .map(record)
+          .filter((observation) => observation['source'] === 'initial-campaign-state'),
+        [{ source: 'initial-campaign-state', activation, summary: { status: 'missing' } }]
+      );
+      assert.equal(reports.length, 0);
+    });
+  });
+}
+
+for (const [label, initialState] of [
+  ['non-boolean activation', { cooperativeActive: 'private-campaign-detail' }],
+  ['null summary', { cooperativeActive: true, campaign: null }],
+  [
+    'non-array hive records',
+    { cooperativeActive: true, campaign: { ...campaignFixture(), hives: {} } },
+  ],
+  [
+    'unknown hazard phase',
+    {
+      cooperativeActive: true,
+      campaign: {
+        ...campaignFixture(),
+        hazard: { phase: 'private-campaign-detail', kind: 'swarm', startsAt: 0, endsAt: 1 },
+      },
+    },
+  ],
+  [
+    'negative hazard start',
+    {
+      cooperativeActive: true,
+      campaign: {
+        ...campaignFixture(),
+        hazard: { phase: 'active', kind: 'meteors', startsAt: -1, endsAt: 1 },
+      },
+    },
+  ],
+] satisfies Array<[string, Record<string, unknown>]>) {
+  test(`invalid public campaign ${label} is rejected before movement or shooting`, async () => {
+    await fixture(async (artifacts, reports) => {
+      const transport = codedSocket('accepted', initialState);
+      const receipt = await runNetworkSmoke({
+        scenario: { productionUrl, smoke },
+        env,
+        fetcher: clientHttp(),
+        createSocket: transport.createSocket,
+        clock: controlledClock(),
+        artifacts,
+        report: (error) => reports.push(error),
+      });
+      assert.equal(receipt.success, false);
+      assert.deepEqual(receipt.errors, ['Gameplay snapshot failed current protocol validation']);
+      assert.equal(
+        transport
+          .sent()
+          .some((command) => command['type'] === 'update' || command['type'] === 'shoot'),
+        false
+      );
+      assert.equal(transport.socket().readyState, WebSocket.CLOSED);
+      assert.doesNotMatch(
+        inspect(reports, { depth: 10 }) +
+          (await readFile(join(artifacts, 'receipt.json'), 'utf8')) +
+          (await readFile(join(artifacts, 'gameplay-server.json'), 'utf8')),
+        /private-campaign/u
+      );
+    });
+  });
+}
 
 for (const outcome of [
   'wrong-player',

@@ -115,6 +115,24 @@ legacy implementation remains solely a frozen test fixture. Revoke explicit appr
 repo.trustedGateBundle`; current reviewed main remains trusted. Changing origin
 invalidates the bundle identity. No environment variable selects another library.
 
+## Dependency release age
+
+Astro remains at the fixed 7.4.7 release. The lockfile keeps Satteri 0.11.6
+(including its matching platform packages) and `mdast-util-to-hast` 13.2.1
+inside their parents' declared ranges. These releases satisfy the seven-day
+minimum; at the November 13 review, the newer Satteri 0.11.7 family and mdast
+13.2.2 did not qualify. Root `.npmrc` sets `min-release-age=7` for future
+resolutions. The setting does not retroactively reject versions in a lockfile.
+Current OSV scans accept the mature graph with only the existing dispositions.
+No package override, advisory exception or expiry extension is added.
+
+## Restore rehearsal transport
+
+The local restore rehearsal keeps its snapshot decoder attached across join,
+movement and firing observations. This retains baselines for frames arriving
+between those phases. Invalid frames and transport failures still fail the drill
+with fixed redacted errors; the existing five-second observation deadline remains.
+
 ## Review and integration
 
 Work from fresh main on an isolated branch. Review the actual final diff for bugs,

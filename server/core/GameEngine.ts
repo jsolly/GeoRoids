@@ -18,7 +18,6 @@ import {
   pointsForRoidSize,
 } from '../../shared/asteroidScale';
 import { checkBoundaryCollision } from '../../shared/boundary';
-import { CHARGED_WEAPON, chargedWeaponEnergy } from '../../shared/chargedWeapon';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
@@ -155,6 +154,7 @@ import {
 } from './AsteroidManager.ts';
 import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { BotFleet } from './BotFleet';
+import { ChargedWeaponManager } from './ChargedWeaponManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
 import { EntityManager, type GameEntity } from './EntityManager';
@@ -336,8 +336,7 @@ export class GameEngine {
   private flushWaitingForIdle = false;
   private lastSimulationAtMs: number | undefined;
   private lasers: ServerLaser[] = [];
-  private readonly weaponCharges = new WeakMap<GameEntity, number>();
-  private readonly weaponCooldowns = new WeakMap<GameEntity, number>();
+  public readonly chargedWeapons: ChargedWeaponManager<ServerLaser>;
   private laserSeq = 0;
   private readonly laserNonce = randomUUID();
   private readonly surveyProbeManager = new SurveyProbeManager();
@@ -468,6 +467,11 @@ export class GameEngine {
     }
     persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
+    this.chargedWeapons = new ChargedWeaponManager({
+      actors: this.entityManager,
+      frame: () => this.gameTime,
+      fire: (ownerId, start, velocity) => this.spawnPlayerLaser(ownerId, start, velocity),
+    });
     this.asteroidManager = new AsteroidManager(this.rngService, this.furnaces, (rock) => {
       this.beltCrawlers.escapeDestroyedHost(
         rock,
@@ -694,19 +698,7 @@ export class GameEngine {
       this.departedPlayers.push(id);
     }
     this.bots.advance(this.gameTime);
-    for (const pilot of this.entityManager.getAllEntities()) {
-      const began = this.weaponCharges.get(pilot);
-      if (
-        began !== undefined &&
-        (pilot.health <= 0 ||
-          pilot.exploding ||
-          pilot.overlayHold === true ||
-          pilot.furnaceTransit ||
-          this.gameTime - began > CHARGED_WEAPON.expiryFrames)
-      ) {
-        this.weaponCharges.delete(pilot);
-      }
-    }
+    this.chargedWeapons.advance(this.gameTime);
     this.advanceContourBridges(serverNow);
     this.advanceFurnaceTravel(serverNow);
     this.tickAbilities();
@@ -938,6 +930,7 @@ export class GameEngine {
     this.clearTown();
     this.playerMotion.reset();
     this.bots.reset();
+    this.chargedWeapons.clear();
     this.entityManager.clearAll();
 
     // Keep gameTime monotonic for the process lifetime. Zeroing it when the
@@ -1176,7 +1169,7 @@ export class GameEngine {
     const live = this.playerMotion.resume(token, socket, this.getServerTime());
     if (live.ok) {
       if (live.supersededSocket) {
-        this.weaponCharges.delete(live.actor);
+        this.chargedWeapons.cancel(live.actor);
       }
       this.rememberClientRelease(live.actor.id, clientReleaseId);
       if (
@@ -1540,7 +1533,7 @@ export class GameEngine {
     }
     const closed = this.playerMotion.transportClosed(ws, this.getServerTime());
     if (closed && actor) {
-      this.weaponCharges.delete(actor);
+      this.chargedWeapons.cancel(actor);
       if (this.cancelArmedBoost(actor.id, actor.harpoonTargetId)) {
         clearHaulerLatch(actor);
       }
@@ -2490,7 +2483,7 @@ export class GameEngine {
   }
 
   private downShip(actor: GameEntity, cause: string): void {
-    this.weaponCharges.delete(actor);
+    this.chargedWeapons.cancel(actor);
     const deadline = Math.floor(this.getServerTime() + COOPERATIVE.downedMs);
     actor.downedUntil = deadline;
     actor.deathCause = cause;
@@ -2589,7 +2582,7 @@ export class GameEngine {
 
   /** One death path: discard carried points and respawn; banked points survive. */
   private applyShipDeath(entity: GameEntity, attackerId: string): void {
-    this.weaponCharges.delete(entity);
+    this.chargedWeapons.cancel(entity);
     entity.navigationAssistFrames = 0;
     entity.contourDraftFrames = 0;
     delete entity.contourTransit;
@@ -2705,7 +2698,7 @@ export class GameEngine {
     const shooter = this.entityManager.getEntity(ownerId);
     if (
       !shooter ||
-      this.weaponCharges.has(shooter) ||
+      this.chargedWeapons.isCharging(shooter) ||
       shooter.furnaceTransit ||
       shooter.health <= 0 ||
       shooter.exploding ||
@@ -2809,62 +2802,6 @@ export class GameEngine {
         (pilot.downedUntil ?? 0) <= 0 &&
         activatePlayerShield(pilot)
     );
-  }
-
-  public chargeWeapon(ownerId: string, action: 'start' | 'release' | 'cancel'): ServerLaser | null {
-    const pilot = this.getPlayer(ownerId);
-    if (!pilot) {
-      return null;
-    }
-    const began = this.weaponCharges.get(pilot);
-    if (action !== 'start') {
-      this.weaponCharges.delete(pilot);
-    }
-    if (
-      action === 'cancel' ||
-      pilot.health <= 0 ||
-      pilot.exploding ||
-      pilot.overlayHold === true ||
-      pilot.furnaceTransit
-    ) {
-      return null;
-    }
-    if (action === 'start') {
-      if (began === undefined && this.gameTime >= (this.weaponCooldowns.get(pilot) ?? 0)) {
-        this.weaponCharges.set(pilot, this.gameTime);
-      }
-      return null;
-    }
-    if (began === undefined) {
-      return null;
-    }
-    const frames = this.gameTime - began;
-    if (frames < CHARGED_WEAPON.minimumFrames || frames > CHARGED_WEAPON.expiryFrames) {
-      return null;
-    }
-    const reach = (4 / 3) * hullRadiusForKit(pilot.kitId);
-    const dx = Math.cos(pilot.angle);
-    const dy = -Math.sin(pilot.angle);
-    const laser = this.spawnPlayerLaser(
-      ownerId,
-      { x: pilot.position.x + dx * reach, y: pilot.position.y + dy * reach },
-      {
-        x: pilot.velocity.x + (dx * LASER.SPEED) / GAME.FPS,
-        y: pilot.velocity.y + (dy * LASER.SPEED) / GAME.FPS,
-      }
-    );
-    if (laser) {
-      laser.charged = true;
-      laser.energy = chargedWeaponEnergy(frames);
-      laser.miningDamage *= laser.energy;
-      this.weaponCooldowns.set(pilot, this.gameTime + CHARGED_WEAPON.cooldownFrames);
-    }
-    return laser;
-  }
-
-  private weaponChargeFrames(pilot: GameEntity): number {
-    const began = this.weaponCharges.get(pilot);
-    return began === undefined ? 0 : Math.min(CHARGED_WEAPON.fullFrames, this.gameTime - began + 1);
   }
 
   /** Spawn a simulated shot for a player `shoot` or a server-authored test. */
@@ -3391,7 +3328,7 @@ export class GameEngine {
             navigationAssistFrames: entity.navigationAssistFrames ?? 0,
             shieldFrames: entity.shieldFrames ?? 0,
             shieldCooldownFrames: entity.shieldCooldownFrames ?? 0,
-            weaponChargeFrames: this.weaponChargeFrames(entity),
+            weaponChargeFrames: this.chargedWeapons.chargeFrames(entity, this.gameTime),
             purchases: [...entity.purchases],
             silk: entity.silk ?? 0,
             health: entity.health,

@@ -230,11 +230,11 @@ test('a raider aims and fires through the real authoritative shot path', () => {
   delete raider.spawnProtectionTimer;
   // Keep this scenario focused on firing, away from the worker.
   bot('worker').position = { x: 4000, y: 4000 };
-  engine.chargeWeapon(raider.id, 'start');
+  engine.chargedWeapons.request(raider.id, 'start');
   frame(AI_SHIPS.shotIntervalFrames + 20);
   expect(pilot.health).toBe(pilot.maxHealth);
   expect(engine.drainShotSounds()).toEqual([]);
-  engine.chargeWeapon(raider.id, 'cancel');
+  engine.chargedWeapons.request(raider.id, 'cancel');
   frame(AI_SHIPS.shotIntervalFrames + Math.ceil(300 / (LASER.SPEED / GAME.FPS)) + 20);
   expect(engine.drainShotSounds().map((shot) => shot.ownerId)).toContain(raider.id);
   expect(pilot.health).toBeLessThan(pilot.maxHealth);

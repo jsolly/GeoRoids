@@ -159,7 +159,7 @@ export class MessageHandler {
         case 'chargeWeapon': {
           const pilot = this.gameEngine.getPlayerBySocket(ws);
           if (pilot?.id === command.id) {
-            const laser = this.gameEngine.chargeWeapon(pilot.id, command.action);
+            const laser = this.gameEngine.chargedWeapons.request(pilot.id, command.action);
             if (laser) {
               this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
             }

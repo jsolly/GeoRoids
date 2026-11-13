@@ -176,7 +176,7 @@ test('a dead ship and the wrong kit spend neither score nor a furnace', () => {
 test('a named furnace and the builder leftover score survive a SQLite restart', () => {
   const directory = mkdtempSync(join(tmpdir(), 'town-raise-'));
   const path = join(directory, 'world.sqlite');
-  const firstStore = new WorldStore(path);
+  const firstStore = new WorldStore(path, { intent: 'private' });
   try {
     const engine = new GameEngine(42, undefined, new InlineWorldPersistence(firstStore));
     const { actor, token } = addScout(engine);
@@ -189,7 +189,7 @@ test('a named furnace and the builder leftover score survive a SQLite restart', 
     engine.removePlayer(actor.id);
     expect(firstStore.loadWorld()?.civicModules).toEqual(lit);
     firstStore.close();
-    const secondStore = new WorldStore(path);
+    const secondStore = new WorldStore(path, { intent: 'private' });
     try {
       const restarted = new GameEngine(99, undefined, new InlineWorldPersistence(secondStore));
       const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout', 'New name');
@@ -218,7 +218,7 @@ test('a named furnace and the builder leftover score survive a SQLite restart', 
 test('an obsolete personal-furnace save does not restore hearths, and a broken module list fails startup', () => {
   const directory = mkdtempSync(join(tmpdir(), 'town-legacy-'));
   const path = join(directory, 'world.sqlite');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   try {
     const now = Date.now();
     store.checkpoint(
@@ -226,7 +226,6 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken m
         seed: 42,
         startedAt: now,
         generation: WORLD.generation,
-        exploration: [],
       },
       new Map(),
       []
@@ -251,7 +250,7 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken m
     saved.townCredit = -1;
     db.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
     db.close();
-    const loaded = new WorldStore(path);
+    const loaded = new WorldStore(path, { intent: 'private' });
     try {
       expect(loaded.loadWorld()?.civicModules).toEqual([]);
       const engine = new GameEngine(42, undefined, new InlineWorldPersistence(loaded));
@@ -264,7 +263,7 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken m
       };
       rewrittenDb.close();
       const next = JSON.parse(rewritten.json) as { townCredit?: unknown; civicModules?: unknown };
-      expect(next).not.toHaveProperty('townCredit');
+      expect(next).toHaveProperty('townCredit', -1);
       expect(next.civicModules).toEqual([]);
     } finally {
       loaded.close();
@@ -273,16 +272,12 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken m
     saved.civicModules = [{ id: child.id, builderName: 'Ada' }];
     childOnly.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
     childOnly.close();
-    const orphan = new WorldStore(path);
-    expect(() => orphan.loadWorld()).toThrow(/furnaces/iu);
-    orphan.close();
+    expect(() => new WorldStore(path)).toThrow(/furnaces/iu);
     const rudeName = new DatabaseSync(path);
     saved.civicModules = [{ id: furnace.id, builderName: 'Ada!' }];
     rudeName.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
     rudeName.close();
-    const rejected = new WorldStore(path);
-    expect(() => rejected.loadWorld()).toThrow(/furnaces/iu);
-    rejected.close();
+    expect(() => new WorldStore(path)).toThrow(/furnaces/iu);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

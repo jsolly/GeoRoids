@@ -19,18 +19,19 @@ import { checkBoundaryCollision } from '../../../shared/boundary';
 import { hullRadiusForKit } from '../../../shared/shipKits';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { WORLD } from '../../../shared/world';
+import { createPrivateWorld } from '../../support/privateWorld';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 /** An engine whose saved world has the cooperative campaign activated. */
 function activatedEngine(): { engine: GameEngine; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'wall-cooperative-'));
   const path = join(dir, 'world.sqlite');
-  new WorldStore(path).close();
+  createPrivateWorld(path, 4242).close();
   const db = new DatabaseSync(path);
   migrateCooperativeWorld(db, legacyWorldDigest(db));
   db.exec('UPDATE cooperative_schema SET activated=1');
   db.close();
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   // Nothing here depends on elapsed time, so the clock is a constant.
   const clock = new ServerClock({ wallNow: () => 0, monotonicNow: () => 0 });
   const engine = new GameEngine(4242, clock, new InlineWorldPersistence(store));

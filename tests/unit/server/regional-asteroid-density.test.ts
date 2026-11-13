@@ -390,7 +390,7 @@ test('the last pilot leaving writes chip damage that periodic flushes defer', ()
   const directory = mkdtempSync(join(tmpdir(), 'georoids-drift-flush-'));
   try {
     const path = join(directory, 'world.sqlite');
-    const store = new WorldStore(path);
+    const store = new WorldStore(path, { intent: 'private' });
     const engine = new GameEngine(SEED, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     engine.addPlayer('miner', 'Miner', socket, { x: 900, y: 900 }, 'scout');
@@ -414,7 +414,7 @@ test('the last pilot leaving writes chip damage that periodic flushes defer', ()
     engine.stopGameLoop();
     store.close();
 
-    const reopened = new WorldStore(path);
+    const reopened = new WorldStore(path, { intent: 'private' });
     expect(reopened.loadSector(home)?.find((rock) => rock.id === chipped.id)?.health).toBe(
       chipped.health
     );

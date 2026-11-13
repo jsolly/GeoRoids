@@ -22,7 +22,12 @@ const reply = (message: WorldStoreWorkerReply): void => {
 };
 
 const path: unknown = workerData?.path;
-if (typeof path !== 'string' || path.length === 0) {
+const intent: unknown = workerData?.intent;
+if (
+  typeof path !== 'string' ||
+  path.length === 0 ||
+  (intent !== 'existing' && intent !== 'private')
+) {
   reply({
     type: 'failed',
     id: undefined,
@@ -32,7 +37,7 @@ if (typeof path !== 'string' || path.length === 0) {
 } else {
   let store: WorldStore;
   try {
-    store = new WorldStore(path);
+    store = new WorldStore(path, { intent });
     // The rows are indexed for duplicate detection; the game thread keeps its own copy.
     store.loadSectors();
     store.loadPilots();
@@ -79,7 +84,8 @@ if (typeof path !== 'string' || path.length === 0) {
             request.sectors,
             request.pilots,
             request.economy,
-            request.cooperative
+            request.cooperative,
+            request.exploration
           );
           break;
         case 'reset':

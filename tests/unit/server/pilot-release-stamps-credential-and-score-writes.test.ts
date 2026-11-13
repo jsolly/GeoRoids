@@ -19,6 +19,7 @@ import { GAME, ROID } from '../../../shared/constants/gameplay';
 import { FURNACES } from '../../../shared/furnaces';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
+import { createPrivateWorld } from '../../support/privateWorld';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const CLIENT_RELEASE = 'c'.repeat(40);
@@ -186,7 +187,7 @@ test('legacy pilots without release stamps still load, and invalid stamps are dr
   const directory = mkdtempSync(join(tmpdir(), 'georoids-release-'));
   temporaryDirectories.push(directory);
   const path = join(directory, 'world.sqlite');
-  const initial = new WorldStore(path);
+  const initial = createPrivateWorld(path);
   initial.close();
   const db = new DatabaseSync(path);
   db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(
@@ -205,7 +206,7 @@ test('legacy pilots without release stamps still load, and invalid stamps are dr
   );
   db.close();
 
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   stores.push(store);
   expect(store.loadPilots()).toEqual([
     {

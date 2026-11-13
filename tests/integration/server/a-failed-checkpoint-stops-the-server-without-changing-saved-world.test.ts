@@ -38,7 +38,12 @@ function asteroid(id: string, position: { x: number; y: number }): AsteroidData 
 test('a mid-checkpoint write failure rolls back the whole world and stops further gameplay', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-rollback-'));
   const path = join(directory, 'world.sqlite');
-  const server = createServerInstance({ port: 0, nodeEnv: 'test', worldPath: path });
+  const server = createServerInstance({
+    worldOpenIntent: 'private',
+    port: 0,
+    nodeEnv: 'test',
+    worldPath: path,
+  });
   server.gameEngine.stopGameLoop();
   server.wsCore.stopPeriodicGameStateBroadcast();
   const port = await server.listening;
@@ -129,7 +134,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
     // Even if the underlying fault clears, this process cannot commit its unacknowledged state.
     db.exec('DROP TRIGGER fail_score');
     await expect(server.close()).rejects.toThrow('Persistent world checkpoint failed');
-    const reopened = new WorldStore(path);
+    const reopened = new WorldStore(path, { intent: 'private' });
     try {
       expect(reopened.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(true);
       expect(reopened.loadPilots().find((row) => row.id === miner.id)?.score).toBe(0);

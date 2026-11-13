@@ -23,6 +23,7 @@ import { litTravelDestinations } from '../../../shared/furnaceTravel';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData, CooperativeRecord } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
+import { createPrivateWorld } from '../../support/privateWorld';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { resolveToolFlights } from '../../support/tool-flight';
 
@@ -36,12 +37,12 @@ function scenario(records: CooperativeRecord[] = []) {
   const dir = mkdtempSync(join(tmpdir(), 'physical-supply-'));
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'world.sqlite');
-  new WorldStore(path).close();
+  createPrivateWorld(path).close();
   const db = new DatabaseSync(path);
   migrateCooperativeWorld(db, legacyWorldDigest(db));
   db.exec('UPDATE cooperative_schema SET activated=1');
   db.close();
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   cleanups.push(() => store.close());
   store.checkpoint(undefined, new Map(), [], undefined, { records, removed: [] });
   const engine = new GameEngine(

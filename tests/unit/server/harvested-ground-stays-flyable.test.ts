@@ -58,13 +58,12 @@ test('an old completed-sector list neither walls harvested ground nor refills it
   let store: WorldStore | undefined;
   let engine: GameEngine | undefined;
   try {
-    const prepared = new WorldStore(path);
+    const prepared = new WorldStore(path, { intent: 'private' });
     prepared.checkpoint(
       {
         seed,
         startedAt: now,
         generation: WORLD.generation,
-        exploration: [],
       },
       new Map([
         ['0,0', [deposit(`deposit-${seed}-0-0-0`)]],
@@ -75,14 +74,14 @@ test('an old completed-sector list neither walls harvested ground nor refills it
     prepared.close();
 
     writeCompletedSectors(path, { bad: true });
-    const malformed = new WorldStore(path);
+    const malformed = new WorldStore(path, { intent: 'private' });
     expect(malformed.loadWorld()?.seed).toBe(seed);
     expect(malformed.loadWorld()).not.toHaveProperty('completedSectors');
     expect(malformed.loadSector('1,0')).toEqual([]);
     malformed.close();
 
     writeCompletedSectors(path, ['1,0']);
-    store = new WorldStore(path);
+    store = new WorldStore(path, { intent: 'private' });
     // A frozen clock keeps regrowth intervals from elapsing on a slow machine.
     const clock = new ServerClock({ wallNow: () => now, monotonicNow: () => 0 });
     engine = new GameEngine(seed, clock, new InlineWorldPersistence(store));
@@ -137,7 +136,7 @@ test('an old completed-sector list neither walls harvested ground nor refills it
     engine = undefined;
     store.close();
     store = undefined;
-    expect(worldJson(path)).not.toHaveProperty('completedSectors');
+    expect(worldJson(path)).toHaveProperty('completedSectors', ['1,0']);
   } finally {
     engine?.stopGameLoop();
     store?.close();

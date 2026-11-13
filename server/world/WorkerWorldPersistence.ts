@@ -5,6 +5,7 @@ import {
   CommitStats,
   type LoadedWorld,
   type WorldCheckpoint,
+  type WorldOpenIntent,
   type WorldPersistence,
   type WorldPersistenceDiagnostics,
   type WorldVolumeDiagnostics,
@@ -79,7 +80,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
 
   constructor(
     private readonly path: string,
-    options: { stallTimeoutMs?: number } = {}
+    private readonly options: { stallTimeoutMs?: number; intent?: WorldOpenIntent } = {}
   ) {
     if (path === ':memory:') {
       throw new Error('An in-memory world cannot be shared with a worker thread');
@@ -93,7 +94,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
    * cannot open the database before the first player joins.
    */
   load(): LoadedWorld {
-    const store = new WorldStore(this.path);
+    const store = new WorldStore(this.path, this.options);
     let loaded: LoadedWorld;
     try {
       loaded = store.load();
@@ -111,6 +112,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
       world: batch.world,
       economy: batch.economy,
       cooperative: batch.cooperative,
+      exploration: batch.exploration,
       sectors: batch.sectors,
       pilots: [...batch.pilots],
     });
@@ -211,7 +213,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
     // the same way the entrypoint is loaded, under Node and under Vitest.
     const worker = new Worker(new URL('./worldStoreWorker.ts', import.meta.url), {
       name: 'world-store',
-      workerData: { path: this.path },
+      workerData: { path: this.path, intent: this.options.intent ?? 'existing' },
       execArgv: ['--import', 'tsx'],
     });
     worker.on('message', (reply: WorldStoreWorkerReply) => this.receive(reply));

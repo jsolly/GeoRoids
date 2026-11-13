@@ -26,7 +26,7 @@ afterEach(async () => {
 
 test('health reports real off-thread volume samples without accessing the filesystem on the game thread', async () => {
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   shutDownAfter(persistence);
   const engine = new GameEngine(7, undefined, persistence);
   expect(buildHealthResponse(engine, {}).body.world.persistence?.volume).toEqual({
@@ -82,7 +82,6 @@ function batch(sectors: ReadonlyMap<string, AsteroidData[]>, score: number): Wor
       seed: 7,
       startedAt: 1,
       generation: WORLD.generation,
-      exploration: [],
     },
     sectors,
     pilots: [{ id: 'pilot', tokenHash: 'a'.repeat(64), name: 'Pilot', score }],
@@ -90,7 +89,7 @@ function batch(sectors: ReadonlyMap<string, AsteroidData[]>, score: number): Wor
 }
 
 function reopen(path: string): WorldStore {
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   cleanups.push(() => store.close());
   return store;
 }
@@ -107,10 +106,11 @@ function expectFailedShutdownAfter(persistence: WorkerWorldPersistence, message:
 
 test('batches handed to the worker are committed in order and survive a reopen', async () => {
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   shutDownAfter(persistence);
   expect(persistence.load()).toEqual({
     world: undefined,
+    exploration: [],
     sectors: new Map(),
     pilots: [],
     economy: { settlement: emptySettlement(), pointLoot: [] },
@@ -137,7 +137,7 @@ test('batches handed to the worker are committed in order and survive a reopen',
 
 test('shutdown commits the batch still in flight before releasing the database', async () => {
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   persistence.load();
   persistence.persist(batch(new Map([['1,0', [deposit('late-ore', { x: 2_100, y: 20 })]]]), 40));
   await persistence.shutdown();
@@ -149,7 +149,7 @@ test('shutdown commits the batch still in flight before releasing the database',
 
 test('a reset queued behind a batch erases it, and a batch queued behind the reset survives', async () => {
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   shutDownAfter(persistence);
   persistence.load();
   persistence.persist(batch(new Map([['0,0', [deposit('doomed', { x: 20, y: 20 })]]]), 10));
@@ -169,7 +169,7 @@ test('a reset queued behind a batch erases it, and a batch queued behind the res
 
 test('a batch the worker cannot commit fails the adapter once, and nothing queued behind it lands', async () => {
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   expectFailedShutdownAfter(persistence, 'Saved sector 0,0');
   persistence.load();
   const failures: Error[] = [];
@@ -207,7 +207,10 @@ test('a worker that stops answering fails the adapter instead of leaving the loo
     vi.useRealTimers();
   });
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path, { stallTimeoutMs: 1_000 });
+  const persistence = new WorkerWorldPersistence(path, {
+    intent: 'private',
+    stallTimeoutMs: 1_000,
+  });
   expectFailedShutdownAfter(persistence, 'World store worker unresponsive');
   const failures: Error[] = [];
   persistence.onFailure((error) => failures.push(error));
@@ -223,7 +226,7 @@ test('a worker that stops answering fails the adapter instead of leaving the loo
 
 test('handing over more batches than the writer could ever be behind by fails closed', () => {
   const path = worldFile();
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   expectFailedShutdownAfter(persistence, 'not keeping up');
   const failures: Error[] = [];
   persistence.onFailure((error) => failures.push(error));

@@ -121,10 +121,12 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
-        exploration: exploration.snapshot(),
       },
       new Map(),
-      []
+      [],
+      undefined,
+      undefined,
+      { kind: 'patch', tiles: new Map(exploration.snapshot().map(({ id, bits }) => [id, bits])) }
     );
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
@@ -148,7 +150,11 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
     };
     const applied = completeAtlas();
     const decoded = applied.state;
-    expect(decoded.exploration).toEqual(exploration.snapshot());
+    const canonicalAtlas = exploration
+      .snapshot()
+      .slice()
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    expect(decoded.exploration).toEqual(canonicalAtlas);
     expect(decoded.mapAssets.filter((asset) => asset.kind === 'furnace')).toContainEqual(
       expect.objectContaining({ id: `furnace:${TOWN_HEARTH.id}` })
     );

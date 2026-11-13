@@ -36,7 +36,7 @@ function legacyFixture() {
   const dir = mkdtempSync(join(tmpdir(), 'georoids-cooperative-'));
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'world.sqlite');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   const rock = snapshotFixture().asteroids[0];
   if (!rock) {
     throw new Error('Fixture asteroid missing');
@@ -46,7 +46,7 @@ function legacyFixture() {
       seed: 83,
       generation: WORLD.generation,
       startedAt: 10_000,
-      exploration: [{ id: '30,30', bits: `03${'00'.repeat(31)}` }],
+
       civicModules: CIVIC_LOTS.map((lot) => ({ id: lot.id, builderName: 'Crew' })),
     },
     new Map([
@@ -91,6 +91,13 @@ function legacyFixture() {
           ejectFramesLeft: 12,
         },
       ],
+    },
+    undefined,
+    {
+      kind: 'patch',
+      tiles: new Map(
+        [{ id: '30,30', bits: `03${'00'.repeat(31)}` }].map(({ id, bits }) => [id, bits])
+      ),
     }
   );
   store.close();
@@ -114,11 +121,11 @@ test('additive migration preserves exact legacy rows, stays inactive and reruns 
   expect(legacyRows(db)).toEqual(before);
   expect(legacyWorldDigest(db)).toBe(digest);
   expect(readCooperativeWorld(db)).toEqual({ schemaVersion: 1, activated: false, records: [] });
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   try {
     const loaded = store.load();
     expect(loaded.pilots[0]).toMatchObject({ cargo: 715, score: 7300 });
-    expect(loaded.world?.exploration).toEqual([{ id: '30,30', bits: `03${'00'.repeat(31)}` }]);
+    expect(loaded.exploration).toEqual([{ id: '30,30', bits: `03${'00'.repeat(31)}` }]);
     expect(loaded.world?.civicModules).toEqual(
       CIVIC_LOTS.map((lot) => ({ id: lot.id, builderName: 'Crew' }))
     );
@@ -161,7 +168,7 @@ test('campaign progress and pilot credit commit atomically and invalid rows neve
   const { db, path } = legacyFixture();
   migrateCooperativeWorld(db, legacyWorldDigest(db));
   db.exec('UPDATE cooperative_schema SET activated=1');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   try {
     const pilot = store.loadPilots()[0];
     if (!pilot) {
@@ -183,7 +190,7 @@ test('campaign progress and pilot credit commit atomically and invalid rows neve
     );
     expect(() =>
       store.checkpoint(
-        savedBeforeFailure.world ? { ...savedBeforeFailure.world, exploration: [] } : undefined,
+        savedBeforeFailure.world,
         new Map([['0,0', []]]),
         [{ ...pilot, score: 7900 }],
         { settlement: savedEconomy.settlement, pointLoot: [] },
@@ -277,7 +284,7 @@ test('worker commits campaign and pilot changes atomically and restores them aft
   const { path, db } = legacyFixture();
   migrateCooperativeWorld(db, legacyWorldDigest(db));
   db.exec('UPDATE cooperative_schema SET activated=1');
-  const writer = new WorkerWorldPersistence(path);
+  const writer = new WorkerWorldPersistence(path, { intent: 'private' });
   const loaded = writer.load();
   const pilot = loaded.pilots[0];
   if (!pilot) {
@@ -296,7 +303,7 @@ test('worker commits campaign and pilot changes atomically and restores them aft
   } finally {
     await writer.shutdown();
   }
-  const restarted = new WorkerWorldPersistence(path);
+  const restarted = new WorkerWorldPersistence(path, { intent: 'private' });
   try {
     const saved = restarted.load();
     expect(saved.pilots[0]?.score).toBe(8000);

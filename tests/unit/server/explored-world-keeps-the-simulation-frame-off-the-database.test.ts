@@ -63,7 +63,6 @@ function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidDa
       seed: SEED,
       startedAt: WALL_ORIGIN_MS,
       generation: WORLD.generation,
-      exploration: [],
     },
     rows,
     []
@@ -86,7 +85,7 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
   const harvested = '3,4';
   const untouched = '5,4';
   {
-    const saving = new WorldStore(path);
+    const saving = new WorldStore(path, { intent: 'private' });
     exploreAndSave(
       saving,
       new Map([
@@ -97,7 +96,7 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
     saving.close();
   }
   // A restarted server opens the saved world cold, exactly as Railway does.
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   cleanups.push(() => store.close());
   expect(store.loadSector(harvested)).toEqual([]);
   expect(store.loadSector(untouched)).toHaveLength(1);

@@ -182,10 +182,12 @@ function measureAtlasResync(fixturePath: string): WindowEvidence[] {
         seed: fixture.seed,
         startedAt: fixture.startedAt,
         generation: WORLD.generation,
-        exploration: fixture.tiles,
       },
       new Map(),
-      []
+      [],
+      undefined,
+      undefined,
+      { kind: 'patch', tiles: new Map(fixture.tiles.map(({ id, bits }) => [id, bits])) }
     );
     engine = new GameEngine(
       fixture.seed,

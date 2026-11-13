@@ -10,6 +10,7 @@ test('an unconfigured server uses production defaults and port 3001', () => {
     nodeEnv: 'production',
     localPlayground: false,
     previewClient: false,
+    worldOpenIntent: 'existing',
   });
 });
 
@@ -19,6 +20,7 @@ test('configured server values select the listener and environment', () => {
     nodeEnv: 'development',
     localPlayground: false,
     previewClient: false,
+    worldOpenIntent: 'private',
   });
   expect(readServerConfiguration({ PORT: '0' }).port).toBe(0);
   expect(readServerConfiguration({ PORT: '', NODE_ENV: '' })).toMatchObject({
@@ -55,7 +57,13 @@ test('the preview environment serves its client and never the local playground',
       GEOROIDS_PREVIEW_CLIENT: '1',
       RAILWAY_ENVIRONMENT_NAME: 'preview',
     })
-  ).toEqual({ port: 3001, nodeEnv: 'production', localPlayground: false, previewClient: true });
+  ).toEqual({
+    port: 3001,
+    nodeEnv: 'production',
+    localPlayground: false,
+    previewClient: true,
+    worldOpenIntent: 'private',
+  });
   expect(
     readServerConfiguration({
       GEOROIDS_PREVIEW_CLIENT: '1',

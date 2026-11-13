@@ -14,7 +14,7 @@ export const WORLD = {
   asteroidInterestRadius: 1_950,
   /** Awake sectors whose rock set is unchanged persist drift every Nth checkpoint. */
   driftFlushCheckpoints: 5,
-  /** Saved worlds with a different generation reset instead of loading stale progress. */
+  /** Existing saved worlds with a different generation fail startup without resetting progress. */
   generation: 1,
   spawnClusterRadius: 150,
   spawnInset: 220,

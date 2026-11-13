@@ -3,7 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { isDeepStrictEqual } from 'node:util';
 import { validExploration } from '../../shared/exploration';
 import type { ExplorationTile } from '../../shared-types';
-import { readSavedWorld } from './savedWorld';
+import { readSavedWorld, type SavedWorld } from './savedWorld';
 import {
   canonicalSqliteTable,
   readSqliteCatalog,
@@ -24,7 +24,7 @@ function hasTileTable(db: DatabaseSync): boolean {
   );
 }
 
-function savedWorldValue(db: DatabaseSync): object | undefined {
+function savedWorldValue(db: DatabaseSync): { value: object; metadata: SavedWorld } | undefined {
   const rows = db.prepare('SELECT id,json,CAST(json AS BLOB) AS bytes FROM world').all();
   if (rows.length > 1 || (rows[0] && rows[0]['id'] !== 1)) {
     throw new Error('Invalid saved world rows');
@@ -46,11 +46,11 @@ function savedWorldValue(db: DatabaseSync): object | undefined {
     throw new Error('Duplicate saved world JSON key');
   }
   const value: unknown = JSON.parse(json);
-  readSavedWorld(value);
+  const metadata = readSavedWorld(value);
   if (value === null || typeof value !== 'object') {
     throw new Error('Invalid saved world');
   }
-  return value;
+  return { value, metadata };
 }
 
 function tileRows(db: DatabaseSync): ExplorationTile[] {
@@ -220,16 +220,28 @@ export function inspectExplorationStorage(db: DatabaseSync): {
   state: ExplorationStorageState;
   tiles: number;
 } {
-  const world = savedWorldValue(db);
+  const storage = readExplorationStorage(db);
+  return { state: storage.state, tiles: storage.exploration.length };
+}
+
+/** One format owner for offline inspection, backup validation and runtime loading. */
+export function readExplorationStorage(db: DatabaseSync): {
+  state: ExplorationStorageState;
+  world: SavedWorld | undefined;
+  exploration: ExplorationTile[];
+} {
+  const saved = savedWorldValue(db);
+  const world = saved?.value;
+  const metadata = saved?.metadata;
   if (!hasTileTable(db)) {
-    return { state: 'legacy', tiles: legacyTiles(world).length };
+    return { state: 'legacy', world: metadata, exploration: legacyTiles(world) };
   }
   const rows = tileRows(db);
   if (
     (world === undefined && rows.length === 0) ||
     (world !== undefined && !('exploration' in world))
   ) {
-    return { state: 'active', tiles: rows.length };
+    return { state: 'active', world: metadata, exploration: rows };
   }
   const atlas = legacyTiles(world);
   if (!world && rows.length > 0) {
@@ -240,7 +252,8 @@ export function inspectExplorationStorage(db: DatabaseSync): {
     rows.length === atlas.length && rows.every(({ id, bits }) => expected.get(id) === bits);
   return {
     state: matches ? 'prepared' : 'stale-preparation',
-    tiles: atlas.length,
+    world: metadata,
+    exploration: atlas,
   };
 }
 
@@ -288,7 +301,7 @@ export function transitionExplorationStorage(
     }
     const protectedFingerprint = explorationStorageFingerprint(db, ['world', 'exploration']);
     const before = inspectExplorationStorage(db);
-    const world = savedWorldValue(db);
+    const world = savedWorldValue(db)?.value;
     // Start from the complete owned state. Each branch changes only its declared
     // result before issuing SQL; one postcondition checks every row and schema.
     const expected = ownedStorage(db);

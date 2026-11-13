@@ -57,6 +57,12 @@ function scorePilot(score: number): PersistentPilot {
   };
 }
 
+function createWorld(path: string): WorldStore {
+  const store = new WorldStore(path, { intent: 'private' });
+  store.checkpoint({ seed: 1, startedAt: 1, generation: WORLD.generation }, new Map(), []);
+  return store;
+}
+
 function joinMessage(position: unknown): unknown {
   return {
     type: 'join',
@@ -88,7 +94,6 @@ test('new deposits and reflective clusters stay inside their saved world sectors
           seed: 82,
           startedAt: 1,
           generation: WORLD.generation,
-          exploration: [],
         },
         field.checkpoint(manager),
         []
@@ -161,7 +166,6 @@ test('checkpoint rejects duplicate asteroid identities before writing sectors', 
           seed: 1,
           startedAt: 1,
           generation: WORLD.generation,
-          exploration: [],
         },
         new Map([['0,0', [first, { ...first }]]]),
         []
@@ -180,7 +184,6 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
         seed: 1,
         startedAt: 1,
         generation: WORLD.generation,
-        exploration: [],
       },
       new Map([
         ['0,0', [asteroid('first', { x: 20, y: 20 })]],
@@ -195,7 +198,6 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
           seed: 1,
           startedAt: 1,
           generation: WORLD.generation,
-          exploration: [],
         },
         new Map([
           ['1,0', [asteroid('first', { x: 2_020, y: 20 })]],
@@ -218,7 +220,6 @@ test('checkpoint refuses a deposit already saved under a sector the batch leaves
       seed: 1,
       startedAt: 1,
       generation: WORLD.generation,
-      exploration: [],
     };
     store.checkpoint(world, new Map([['0,0', [asteroid('ore', { x: 20, y: 20 })]]]), []);
     // Rewriting only 1,0 with the same deposit would duplicate it across rows.
@@ -255,7 +256,6 @@ test('an inline reset that fails latches the adapter and leaves no transaction o
       seed: 1,
       startedAt: 1,
       generation: WORLD.generation,
-      exploration: [],
     };
     persistence.persist({ world, sectors: new Map(), pilots: [scorePilot(5)] });
     const execOriginal = DatabaseSync.prototype.exec;
@@ -291,7 +291,6 @@ test('a commit SQLite has already rolled back reports the disk error, not a phan
       seed: 1,
       startedAt: 1,
       generation: WORLD.generation,
-      exploration: [],
     };
     const execOriginal = DatabaseSync.prototype.exec;
     // A full disk or I/O error ends the transaction inside SQLite before the
@@ -327,7 +326,6 @@ test('a store reused after a checkpoint or reset hands the next load what is on 
       seed: 1,
       startedAt: 1,
       generation: WORLD.generation,
-      exploration: [],
     };
     // Committed before anything was loaded: the rows parsed at open time are stale.
     store.checkpoint(world, new Map([['0,0', [asteroid('early', { x: 20, y: 20 })]]]), []);
@@ -349,7 +347,7 @@ test('a restart refuses invalid asteroid metadata in saved sectors', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-world-validation-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const db = new DatabaseSync(path);
     const malformed: Record<string, unknown> = { ...asteroid('malformed', { x: 20, y: 20 }) };
@@ -357,7 +355,9 @@ test('a restart refuses invalid asteroid metadata in saved sectors', () => {
     db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run('0,0', JSON.stringify([malformed]));
     db.close();
 
-    expect(() => new WorldStore(path)).toThrow(INVALID_SAVED_ASTEROID_PATTERN);
+    expect(() => new WorldStore(path, { intent: 'private' })).toThrow(
+      INVALID_SAVED_ASTEROID_PATTERN
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -367,7 +367,7 @@ test('a restart refuses invalid mining contributor metadata in saved sectors', (
   const directory = mkdtempSync(join(tmpdir(), 'georoids-world-mining-validation-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const db = new DatabaseSync(path);
     const malformed: Record<string, unknown> = { ...asteroid('malformed', { x: 20, y: 20 }) };
@@ -375,7 +375,9 @@ test('a restart refuses invalid mining contributor metadata in saved sectors', (
     db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run('0,0', JSON.stringify([malformed]));
     db.close();
 
-    expect(() => new WorldStore(path)).toThrow(INVALID_SAVED_ASTEROID_PATTERN);
+    expect(() => new WorldStore(path, { intent: 'private' })).toThrow(
+      INVALID_SAVED_ASTEROID_PATTERN
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -385,7 +387,7 @@ test('a restart refuses one asteroid identity stored in two sectors', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-duplicate-sector-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const db = new DatabaseSync(path);
     db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run(
@@ -398,7 +400,9 @@ test('a restart refuses one asteroid identity stored in two sectors', () => {
     );
     db.close();
 
-    expect(() => new WorldStore(path)).toThrow(DUPLICATE_SECTOR_ASTEROID_PATTERN);
+    expect(() => new WorldStore(path, { intent: 'private' })).toThrow(
+      DUPLICATE_SECTOR_ASTEROID_PATTERN
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -408,7 +412,7 @@ test('a restart refuses a saved pilot without a finite saved score', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-validation-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const db = new DatabaseSync(path);
     db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(
@@ -417,12 +421,7 @@ test('a restart refuses a saved pilot without a finite saved score', () => {
     );
     db.close();
 
-    const store = new WorldStore(path);
-    try {
-      expect(() => store.loadPilots()).toThrow(INVALID_SAVED_PILOT_PATTERN);
-    } finally {
-      store.close();
-    }
+    expect(() => new WorldStore(path, { intent: 'private' })).toThrow(INVALID_SAVED_PILOT_PATTERN);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -432,7 +431,7 @@ test('a restart loads a legacy placement record as saved score only', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-legacy-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const db = new DatabaseSync(path);
     db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(
@@ -451,7 +450,7 @@ test('a restart loads a legacy placement record as saved score only', () => {
     );
     db.close();
 
-    const store = new WorldStore(path);
+    const store = new WorldStore(path, { intent: 'private' });
     try {
       const pilots = store.loadPilots();
       expect(pilots).toEqual([{ ...scorePilot(777), cargo: 0, purchases: [] }]);
@@ -460,7 +459,6 @@ test('a restart loads a legacy placement record as saved score only', () => {
           seed: 1,
           startedAt: 1,
           generation: WORLD.generation,
-          exploration: [],
         },
         new Map(),
         pilots
@@ -488,7 +486,7 @@ test('a restart loads a recent flight only when lastSeenAt is present', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-flight-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const flight = {
       ...scorePilot(321),
@@ -506,7 +504,7 @@ test('a restart loads a recent flight only when lastSeenAt is present', () => {
     db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run('pilot', JSON.stringify(flight));
     db.close();
 
-    const store = new WorldStore(path);
+    const store = new WorldStore(path, { intent: 'private' });
     try {
       expect(store.loadPilots()).toEqual([flight]);
     } finally {
@@ -521,7 +519,7 @@ test('a legacy marked deposit and ownerless finite burn normalize together witho
   const directory = mkdtempSync(join(tmpdir(), 'georoids-legacy-boost-'));
   const path = join(directory, 'world.sqlite');
   try {
-    const initial = new WorldStore(path);
+    const initial = createWorld(path);
     initial.close();
     const db = new DatabaseSync(path);
     const legacy = {
@@ -537,7 +535,7 @@ test('a legacy marked deposit and ownerless finite burn normalize together witho
     };
     db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run('0,0', JSON.stringify([legacy]));
     db.close();
-    const restored = new WorldStore(path);
+    const restored = new WorldStore(path, { intent: 'private' });
     try {
       const { isCollabTarget: _retiredFlag, ...retained } = legacy;
       const expected = { ...retained, boost: null };
@@ -590,11 +588,11 @@ test('a pre-rename surveyor row from an old backup keeps its progress and drops 
     health: 75,
   };
   try {
-    new WorldStore(path).close();
+    createWorld(path).close();
     const db = new DatabaseSync(path);
     db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(saved.id, JSON.stringify(saved));
     db.close();
-    const store = new WorldStore(path);
+    const store = new WorldStore(path, { intent: 'private' });
     try {
       expect(store.loadPilots()).toEqual([{ ...scorePilot(777), cargo: 3, purchases: [] }]);
     } finally {
@@ -620,12 +618,12 @@ test('a saved flight drops its retired lives count on load without rewriting the
     health: 75,
   };
   try {
-    new WorldStore(path).close();
+    createWorld(path).close();
     const db = new DatabaseSync(path);
     db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(saved.id, JSON.stringify(saved));
     db.close();
     for (let run = 0; run < 2; run += 1) {
-      const store = new WorldStore(path);
+      const store = new WorldStore(path, { intent: 'private' });
       try {
         const { lives: _legacyLives, ...flight } = saved;
         expect(store.loadPilots()).toEqual([{ ...flight, cargo: 0, purchases: [] }]);

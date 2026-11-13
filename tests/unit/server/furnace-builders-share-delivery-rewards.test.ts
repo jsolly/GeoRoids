@@ -106,7 +106,7 @@ test('building multiple named furnaces keeps delivery payouts equal for all cont
 test('a saved unnamed furnace still pays every contributor the material reward', () => {
   const directory = mkdtempSync(join(tmpdir(), 'town-unnamed-'));
   const path = join(directory, 'world.sqlite');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   try {
     const now = Date.now();
     store.checkpoint(
@@ -114,7 +114,7 @@ test('a saved unnamed furnace still pays every contributor the material reward',
         seed: 42,
         startedAt: now,
         generation: WORLD.generation,
-        exploration: [],
+
         civicModules: [{ id: furnace.id, builderName: '' }],
       },
       new Map(),

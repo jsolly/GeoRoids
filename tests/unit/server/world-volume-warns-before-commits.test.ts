@@ -46,7 +46,7 @@ function worldFile(): string {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-volume-'));
   cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'world.sqlite');
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   cleanups.push(() => store.close());
   return path;
 }
@@ -58,7 +58,7 @@ test('a low volume warns once per episode while commits continue and disk reads 
     .spyOn(fs, 'statfsSync')
     .mockReturnValue({ ...actual, bsize: 1, bavail: 300 * 1024 * 1024 });
   const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   cleanups.push(() => persistence.shutdown());
   expect(persistence.diagnostics().volume).toEqual({ status: 'pending' });
   const commit = (): void => persistence.persist({ sectors: new Map(), pilots: [] });
@@ -95,7 +95,7 @@ test('unavailable disk measurements are explicit, log a bounded error and recove
     throw Object.assign(new Error('private path'), { code: 'EACCES' });
   });
   const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-  const persistence = new WorkerWorldPersistence(path);
+  const persistence = new WorkerWorldPersistence(path, { intent: 'private' });
   cleanups.push(() => persistence.shutdown());
   const commit = (): void => persistence.persist({ sectors: new Map(), pilots: [] });
   commit();
@@ -131,7 +131,7 @@ test('volume samples report the real database and WAL sizes and reject invalid c
 
 test('world writes checkpoint the WAL before it grows to the SQLite default threshold', () => {
   const path = worldFile();
-  const store = new WorldStore(path);
+  const store = new WorldStore(path, { intent: 'private' });
   try {
     store.checkpoint(
       undefined,

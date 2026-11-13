@@ -48,7 +48,8 @@ wrote the bank, plus the server times of those writes. Server-only bank writes
 omit a client identity. Those stamps do not replace the snapshot-v3 join gate.
 A brief reconnect keeps the current pose; carrying cargo preserves that field
 position even after a longer absence. Death discards carried points and always schedules a respawn. Banked points survive. Bank balances and
-the shared world stay until `WORLD.generation` changes.
+the shared world survive restarts. An incompatible saved generation stops startup
+without clearing that progress.
 
 ## Updating open clients
 

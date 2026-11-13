@@ -34,6 +34,7 @@ const server = createServerInstance({
   nodeEnv: configuration.nodeEnv,
   localPlayground: configuration.localPlayground,
   worldPath,
+  worldOpenIntent: configuration.worldOpenIntent,
   ...(configuration.previewClient
     ? { serveClientFrom: fileURLToPath(new URL('./dist/', import.meta.url)) }
     : {}),

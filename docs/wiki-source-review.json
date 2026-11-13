@@ -126,8 +126,11 @@
     "server/world/WorldStore.ts": "sha256:affed8c8f40e493fc28f7bccfad165293aeab61a01aafbafef71e51a7ebd2624",
     "server/world/cooperativeSchema.ts": "sha256:6cec4cad8874b7ec0e23bfb6e612ac80726696fd21e97cf5da9713324ddd8e00",
     "server/world/depositLayout.ts": "sha256:5fe2e83866fe5cd843e4187e753839b22b840170d90de855b02efb2129d5d0c5",
+    "server/world/explorationSchema.ts": "sha256:bd1f3c15f6ffc36e02e8d94d3d65a77ca52ef287598d2bffdab9b5ee1aab7b2a",
     "server/world/openWorldPersistence.ts": "sha256:3aed1f7650463bc093af50086c120568c49a959d6bbd486f5611a729b9a0ecde",
+    "server/world/savedWorld.ts": "sha256:d2aa2225ba2338a2d11507e39d1846561c57bf6149f63396851a4983aa5a0fce",
     "server/world/spatialQueryBounds.ts": "sha256:5b1ff4fd81460be2a0dd6bb4ea00ebf63873587cb5613abd041bd0c87f4083f8",
+    "server/world/sqliteSnapshot.ts": "sha256:9d0c02c9bb57acf35eab8af67e7d415ca483f7c65811a056430e127573dab8ec",
     "server/world/worldPersistence.ts": "sha256:64d8794262d1f1059033ebc1e3c77357d4a564f455324047aa5abd91ceac3302",
     "server/world/worldStoreWorker.ts": "sha256:d051dfb86ede3da4eb82f6eeac4cf8aba57a04f55a32e9a48de6d7dd0b17955f",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:8864d0c2925d0d3f574477e3de84fd29b69211a86e4ab30223c234f4a4b776da",
@@ -8362,6 +8365,35 @@
       "media": [],
       "owners": {
         "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed offline exploration transition tooling and metadata parsing. The deployed legacy reader and writer are unchanged. Seven real SQLite/CLI scenarios cover prepared-reader compatibility, current-discovery rollback, stale inspections, verified WAL backups, write failure rollback and table-bound fingerprint records. Player controls, rules and demonstrations are unchanged.",
+      "sources": ["server/world/explorationSchema.ts", "server/world/savedWorld.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "server/world/explorationSchema.ts": "field-manual",
+        "server/world/savedWorld.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the offline transition effect contract. Fourteen real SQLite/CLI scenarios pass. A single expected-state postcondition preserves complete world and discovery rows/schema, with a separate fingerprint for other data. Activation deletion/rewrite regressions fail the preceding world-only guard. Deployed runtime, player rules and demonstrations remain unchanged.",
+      "sources": ["server/world/explorationSchema.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "server/world/explorationSchema.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed offline transition tooling against 30 passing focused cases, including stale CLI receipts, complete trigger rollback, exact SQLite storage classes/int64/raw bytes/rowids, unsupported-state rejection, opaque JSON number preservation and duplicate-key refusal. Production runtime, player controls and gameplay rules are unchanged; no gameplay demonstration affected.",
+      "sources": ["server/world/explorationSchema.ts", "server/world/sqliteSnapshot.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "server/world/explorationSchema.ts": "field-manual",
+        "server/world/sqliteSnapshot.ts": "field-manual"
       }
     }
   ]

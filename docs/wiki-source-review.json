@@ -97,9 +97,9 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:b51af0352a9792d79d0f00bb999d66a95626dece39f7220544a1621dc96d3105",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:4dd2b84d9cbc58e574aa18b334b4294ddb5d78160163ae8cfc5a9fb3bda08a49",
+    "server/core/GameEngine.ts": "sha256:43af061d9b921cf8f7c98ac1a4fc5e741d653a0191c9e0f14cd50c984eea3226",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
-    "server/core/GlowtoyManager.ts": "sha256:dca22cc3ad151102337f856aae9f7f259c46a4432dca097322b28b9af72effd5",
+    "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
     "server/core/LootManager.ts": "sha256:bad0eaa4e555d9853b5054ebc9ec7e32aae26fed2a9d78b902d6c63925568a5e",
     "server/core/PlayerMotionService.ts": "sha256:3d95224c2191c6a3ac263e3c0e6b3b495e7ae23d192546612132f06a138ec3c4",
@@ -534,7 +534,7 @@
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:e1f3b9bdfacf8d81d22ca2ad3b6d9b528ee39dac1e61d99b2c2e62378ed05a63",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
-    "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:377940687704e60d6cf1a4a04df6cc6216ca6b2944751fbfe4c7d95b40d4c74e",
+    "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:72be43233e9d5135fd7ad6fecb8f50fed04082cc7513274f9795ec897a290b56",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:7396ba9a8763fd29dc74172de3933d6fd81bd0d3f4708032899a8a6812fea49e",
     "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts": "sha256:f62bd0a2f570de471877161a22a4635eb27a527aae137a5af660dde94fce28c0",
     "tests/unit/server/hauler-extracts-silk-and-tows-living-spiders.test.ts": "sha256:2c3b4c3b4b3fae16227e8b7c5767ce3599d1524af992178acf3ff8e0bb415bb9",
@@ -8322,6 +8322,29 @@
       "owners": {
         "package.json": "field-manual"
       }
+    },
+    {
+      "note": "Moved glowtoy cadence, local light queries, cache dirty signaling and transient reset into their owner. Charging, rewards, spider attraction, player controls and demonstrations are unchanged. Canonical cache/SQLite and frame-work invariants pass; cadence, dirty-signal and stale-light mutants fail the intended assertions. Strict TypeScript, unused-code checks and scoped lint pass.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/GlowtoyManager.ts",
+        "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
     },
     {
       "note": "Reviewed the strict tooling-contract project and its package command; existing application, build, frontend and benchmark scopes remain unchanged. Player rules and demonstrations are unchanged.",

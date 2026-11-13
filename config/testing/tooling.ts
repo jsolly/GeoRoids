@@ -50,6 +50,7 @@ export default defineConfig({
             'scripts/review-receipt-contract.test.mjs',
             'scripts/preview-comment.test.ts',
             'scripts/railpack-build.test.ts',
+            'scripts/railway-version-pin.test.ts',
           ],
         },
       },

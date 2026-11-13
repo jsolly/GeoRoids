@@ -1,5 +1,6 @@
 import { EXPLORATION_VERSION } from '../../shared/atlasTransport';
 import { isContourLockState } from '../../shared/contourLock';
+import { PLAYER_ID_MAX_BYTES } from '../../shared/player';
 import { readReleaseId } from '../../shared/releaseId';
 import { isShipKitId } from '../../shared/shipKits';
 import { isHaulerUtilityId, isScoutUtilityId } from '../../shared/shipUtilities';
@@ -222,7 +223,7 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       if (
         !id ||
         !name ||
-        Buffer.byteLength(id) > 128 ||
+        Buffer.byteLength(id) > PLAYER_ID_MAX_BYTES ||
         Buffer.byteLength(name) > 64 ||
         [...id, ...name].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
       ) {

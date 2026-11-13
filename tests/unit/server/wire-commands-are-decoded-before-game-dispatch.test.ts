@@ -241,6 +241,7 @@ test('joins without the asteroid interaction capability ask the client to refres
           position: { x: 0, y: 0 },
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions,
+          explorationVersion: 1,
         },
       })
     ).toEqual({

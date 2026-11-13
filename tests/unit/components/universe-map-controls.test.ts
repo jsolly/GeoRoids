@@ -10,6 +10,7 @@ let component: ReturnType<typeof mount> | undefined;
 const initial: UniverseMapChrome = {
   frame: { x: 25, y: 35, size: 400 },
   centered: true,
+  atlasSyncing: true,
   locations: ['Town Hearth: X +0, Y +0'],
   locationPage: 0,
   locationPages: 2,
@@ -156,6 +157,24 @@ test('pilots open an accessible Svelte map with canvas, North compass, full lege
     new KeyboardEvent('keydown', { code: 'Home', bubbles: true, cancelable: true })
   );
   expect(controller.keydown).toHaveBeenCalledTimes(1);
+});
+
+test('chart syncing and completion are announced without moving focus or losing locations', async () => {
+  await start();
+  const status = element('#universe-map-sync-status', HTMLParagraphElement);
+  expect(status.getAttribute('role')).toBe('status');
+  expect(status.getAttribute('aria-atomic')).toBe('true');
+  expect(status.textContent).toContain('Chart syncing');
+  const focused = document.activeElement;
+  publish({ ...initial, atlasSyncing: false });
+  await settle();
+  expect(status.textContent).toContain('Chart synced');
+  expect(document.activeElement).toBe(focused);
+  expect(document.querySelector('#universe-map-locations')?.textContent).toContain('Town Hearth');
+  publish({ ...initial, atlasSyncing: true });
+  await settle();
+  expect(status.textContent).toContain('Chart syncing');
+  expect(document.activeElement).toBe(focused);
 });
 
 test('Close and Escape request controlled dismissal, retire the canvas and restore the connected opener', async () => {

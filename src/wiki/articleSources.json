@@ -451,6 +451,8 @@
     "tests/unit/rendering/radar-exploration-is-solid-fog-or-ground.test.ts",
     "src/rendering/hud/hudLayout.ts",
     "src/ui/universeMap.ts",
+    "src/components/game/UniverseMap.svelte",
+    "tests/unit/components/universe-map-controls.test.ts",
     "src/ui/universeMapLabels.ts",
     "src/ui/viewportChrome.ts",
     "src/entities/ship/hullOutlines.ts",

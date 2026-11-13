@@ -32,6 +32,7 @@ import {
   unbindAsteroidFieldApply,
 } from '../../../src/network/services/asteroidFieldSync';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
+import * as clientIdentity from '../../../src/network/services/clientIdentity';
 import { readStoredResumeToken } from '../../../src/network/services/resumeCredential';
 import { cooperativeActive, getWorldCampaign } from '../../../src/network/worldCampaign';
 import {
@@ -2338,65 +2339,103 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(isAtlasSyncing()).toBe(false);
   });
 
-  test('an expired saved pilot keeps its genuinely rotated token while rejecting an older atlas server', async () => {
-    let monotonic = 0;
-    const engine = new GameEngine(
-      82,
-      new ServerClock({ wallNow: () => 1_700_000_000_000, monotonicNow: () => monotonic })
-    );
-    const broadcaster = new GameStateBroadcaster(engine);
-    const handler = new MessageHandler(engine, broadcaster);
-    const serverSocket = new RecordingSocket();
-    try {
-      let ws = await connect();
-      // This story starts a real new pilot, independent of other singleton cases.
-      ws.receive('sessionExpired', {});
-      const firstJoin = ws.sent.filter((message) => message.type === 'join').at(-1);
-      assert(firstJoin);
-      handler.handleMessage(firstJoin, serverSocket);
-      const original = serverSocket.lastReceived('joined')?.data;
-      assert(
-        original !== null &&
-          typeof original === 'object' &&
-          'resumeToken' in original &&
-          typeof original.resumeToken === 'string'
+  test.each(['stored-pilot', 'a'.repeat(65), 'a'.repeat(128), 'é'.repeat(64)])(
+    'an expired saved pilot keeps its genuinely rotated token while rejecting an older atlas server: %s',
+    async (id) => {
+      let monotonic = 0;
+      const engine = new GameEngine(
+        82,
+        new ServerClock({ wallNow: () => 1_700_000_000_000, monotonicNow: () => monotonic })
       );
-      ws.receive('joined', original);
-      const prior = original.resumeToken;
-      expect(readStoredResumeToken() === prior).toBe(true);
-      manager.disconnect();
-      engine.transportClosed(serverSocket);
-      monotonic = 3000;
-      engine.advanceOneFrame();
-      ws = await connect();
-      const resumedSocket = new RecordingSocket();
-      const resume = ws.sent.filter((message) => message.type === 'join').at(-1);
-      assert(resume);
-      handler.handleMessage(resume, resumedSocket);
-      const actual = resumedSocket.lastReceived('joined')?.data;
-      assert(
-        actual !== null &&
-          typeof actual === 'object' &&
-          'resumeToken' in actual &&
-          typeof actual.resumeToken === 'string' &&
-          'explorationVersion' in actual
-      );
-      expect(actual.resumeToken !== prior).toBe(true);
-      const { explorationVersion: _olderServer, ...oldAcknowledgment } = actual;
-      ws.receive('joined', oldAcknowledgment);
-      expect(manager.isConnected).toBe(false);
-      expect(readStoredResumeToken() === actual.resumeToken).toBe(true);
-      expect(ws.sent.some((message) => message.type === 'snapshotAck')).toBe(false);
-      expect(ws.sent.some((message) => message.type === 'setScoutUtility')).toBe(false);
-      ws = await connect();
-      expect(
-        ws.sent.find((message) => message.type === 'join')?.data?.resumeToken === actual.resumeToken
-      ).toBe(true);
-    } finally {
-      broadcaster.stopPeriodicBroadcast();
-      engine.stopGameLoop();
+      const broadcaster = new GameStateBroadcaster(engine);
+      const handler = new MessageHandler(engine, broadcaster);
+      const serverSocket = new RecordingSocket();
+      try {
+        let ws = await connect();
+        // This story starts a real new pilot, independent of other singleton cases.
+        vi.spyOn(clientIdentity, 'replaceStoredClientId').mockReturnValueOnce(id);
+        ws.receive('sessionExpired', {});
+        const firstJoin = ws.sent.filter((message) => message.type === 'join').at(-1);
+        assert(firstJoin);
+        expect(firstJoin.id).toBe(id);
+        handler.handleMessage(firstJoin, serverSocket);
+        const original = serverSocket.lastReceived('joined')?.data;
+        assert(
+          original !== null &&
+            typeof original === 'object' &&
+            'resumeToken' in original &&
+            typeof original.resumeToken === 'string'
+        );
+        ws.receive('joined', original);
+        const prior = original.resumeToken;
+        expect(readStoredResumeToken() === prior).toBe(true);
+        manager.disconnect();
+        engine.transportClosed(serverSocket);
+        monotonic = 3000;
+        engine.advanceOneFrame();
+        ws = await connect();
+        const resumedSocket = new RecordingSocket();
+        const resume = ws.sent.filter((message) => message.type === 'join').at(-1);
+        assert(resume);
+        handler.handleMessage(resume, resumedSocket);
+        const actual = resumedSocket.lastReceived('joined')?.data;
+        assert(
+          actual !== null &&
+            typeof actual === 'object' &&
+            'resumeToken' in actual &&
+            typeof actual.resumeToken === 'string' &&
+            'explorationVersion' in actual
+        );
+        expect(actual.resumeToken !== prior).toBe(true);
+        const { explorationVersion: _olderServer, ...oldAcknowledgment } = actual;
+        ws.receive('joined', oldAcknowledgment);
+        expect(manager.isConnected).toBe(false);
+        expect(readStoredResumeToken() === actual.resumeToken).toBe(true);
+        expect(ws.sent.some((message) => message.type === 'snapshotAck')).toBe(false);
+        expect(ws.sent.some((message) => message.type === 'setScoutUtility')).toBe(false);
+        ws = await connect();
+        expect(
+          ws.sent.find((message) => message.type === 'join')?.data?.resumeToken ===
+            actual.resumeToken
+        ).toBe(true);
+      } finally {
+        broadcaster.stopPeriodicBroadcast();
+        engine.stopGameLoop();
+      }
     }
-  });
+  );
+
+  test.each(['a'.repeat(129), 'é'.repeat(65)])(
+    'server and browser reject an over-128-byte pilot ID: %s',
+    async (id) => {
+      const engine = new GameEngine(82);
+      const broadcaster = new GameStateBroadcaster(engine);
+      const handler = new MessageHandler(engine, broadcaster);
+      const serverSocket = new RecordingSocket();
+      try {
+        const ws = await connect();
+        vi.spyOn(clientIdentity, 'replaceStoredClientId').mockReturnValueOnce(id);
+        ws.receive('sessionExpired', {});
+        const join = ws.sent.filter((message) => message.type === 'join').at(-1);
+        assert(join);
+        expect(join.id).toBe(id);
+        handler.handleMessage(join, serverSocket);
+        expect(engine.getPlayerCount()).toBe(0);
+        expect(serverSocket.lastReceived('error')?.data).toBe(
+          'Player ID or name is missing or invalid'
+        );
+        // Even a matching response with all capabilities cannot admit this ID.
+        acknowledge(ws);
+        expect(manager.isConnected).toBe(false);
+        expect(readStoredResumeToken()).toBeUndefined();
+        expect(ws.sent.some((message) => message.type === 'snapshotAck')).toBe(false);
+      } finally {
+        manager.disconnect({ newSession: true });
+        broadcaster.stopPeriodicBroadcast();
+        engine.stopGameLoop();
+      }
+    }
+  );
 
   test.each([
     { id: 'different-pilot' },

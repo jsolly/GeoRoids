@@ -97,6 +97,7 @@ type MapView = {
 export type UniverseMapChrome = Readonly<{
   frame: Readonly<Pick<MapFrame, 'x' | 'y' | 'size'>>;
   centered: boolean;
+  atlasSyncing: boolean;
   locations: readonly string[];
   locationPage: number;
   locationPages: number;
@@ -790,6 +791,7 @@ export function mountUniverseMap(
     const chrome: UniverseMapChrome = {
       frame: { x: frame.x, y: frame.y, size: frame.size },
       centered: isNearbyLocalView(),
+      atlasSyncing: isAtlasSyncing(),
       locations: locations.slice(
         locationPage * LOCATION_PAGE_SIZE,
         (locationPage + 1) * LOCATION_PAGE_SIZE

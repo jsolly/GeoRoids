@@ -86,7 +86,7 @@
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
     "server/communication/MessageHandler.ts": "sha256:fb8438e146628447c5ba1c753c0a3467136e3ec356f18f7788e2ba4f3837ca7e",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
-    "server/communication/clientCommandDecoder.ts": "sha256:9de49e59c5aa3e24ea719acaf10c83186574c7f621020c1da617ca9a40f5bfab",
+    "server/communication/clientCommandDecoder.ts": "sha256:9b449bab5cdab7ca39ea9cef64f55305b294fbb7bf285cf4fc4765201f9e6d43",
     "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
     "server/communication/messageBudget.ts": "sha256:2fb41f10f624428212246737a3b67a554143c9b393ede8ed449be17a739e9a69",
@@ -175,7 +175,7 @@
     "shared/lootBlast.ts": "sha256:b00e8cc4b12642f2ab3132a3fd7fade797a20714598e279a4a24b7efe643c193",
     "shared/navigationSalvage.ts": "sha256:9df1c8bac1be8ee5b92840fb94ccd0cfe26c0457164ac1e23c0944081dc704dc",
     "shared/passages.ts": "sha256:681c1117dca8b8086c8a494830f75376d1850d03969f41e6be81ef8586ae3cb4",
-    "shared/player.ts": "sha256:c40c18c6e37e6f67e3dde550deea80f88a4449580d8d1aa55a1209136cdf8118",
+    "shared/player.ts": "sha256:28b6b854045126ba14cbfae23c680ba1ff29bbf061dd288c45f240a1a6bf408f",
     "shared/playerMotion.ts": "sha256:dfdbb62c8d095e10265b3c806ba9c06c8208bab57be143ada268e112e9f7bc84",
     "shared/playerShield.ts": "sha256:c718f47b5532ce83d74fac1ce0ba28f836a96b1ece8dd66ecf165ba0b30b9859",
     "shared/queryRedaction.ts": "sha256:7fe5f52cf3ce74487e8f41cbc89c57db2c07b635caed6a4a1e47cdf71e40ccbb",
@@ -240,7 +240,7 @@
     "src/components/game/ShipPicker.svelte": "sha256:29c2db62ea90f64c5dfd97ab45ce6992570973d4c4b2c2b17800cfbd4165199a",
     "src/components/game/StartScreen.svelte": "sha256:ef9db1046a05c73c544c681ebf663e5c3742dce971718f13d7a15a3e4d35854c",
     "src/components/game/TownPanel.svelte": "sha256:533b3410a4a81a0260d41d36095a30d5106118abe9a30fe6b91b60566513b258",
-    "src/components/game/UniverseMap.svelte": "sha256:3345bef54807c88dde95b36965515c2dc7902900370c52e17a922ada27852682",
+    "src/components/game/UniverseMap.svelte": "sha256:6f37efa897035b8ee2c090d9dc5876ad804b62d15b103a351512a271d988418b",
     "src/components/ui/button/button.svelte": "sha256:9225943b80347ddad9a06c5b00138d271294f5dac05e5d2f01ed436474d63f28",
     "src/components/ui/checkbox/checkbox.svelte": "sha256:9848aacf63ece5f501165a3906b1ca33c4fe29283d242d14bebd060d2a52cc99",
     "src/components/ui/dialog/dialog-close.svelte": "sha256:872e8c20bb05f41e85c0eebe43dad63637cc35d46a629f3a66210de0972a2c26",
@@ -326,7 +326,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92da23874d99b5ee851f042f2797ea618fec29137d5c06ef9af80eb3a8849991",
-    "src/network/services/ConnectionManager.ts": "sha256:af77373521a33d4588df25790cd779eb75aa3f1d1b044ed6b25d163e6b5c0456",
+    "src/network/services/ConnectionManager.ts": "sha256:c6bf68543d674987bdd7decd0bbab72cf282c9a2b30f7aee652d19afb7e60bba",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -426,7 +426,7 @@
     "src/ui/schematicEquipHint.ts": "sha256:fa1e1828e171f8c1094f23a27e9357a195d728cb47bffcb6c1d21e7f735c3bc4",
     "src/ui/spawnFlyIn.ts": "sha256:ae05d70281f1ddcf7cc2dc02254c152d3fbbf103e6fd11e30f04fd647f15626f",
     "src/ui/uiUtils.ts": "sha256:25528132dfa526865ead56e8075471f9c67d2aaf21593eaa34b5e206fd3f6fdc",
-    "src/ui/universeMap.ts": "sha256:20d9680aa335c83ee9c6d342d0af5ce212dee7777e61f3f6e5effd5faeec9a9c",
+    "src/ui/universeMap.ts": "sha256:626267ca2cfcf41962b523b622f0066348f00cd772deea11e1917226b6155666",
     "src/ui/universeMapLabels.ts": "sha256:d7eeef12743c6ce0d73c4c894cf4bb5386839f6c52167ce9793b78514e7be6a2",
     "src/ui/viewportChrome.ts": "sha256:582159cb92905d7ea0b7e2d83da2d8dbfa0a17735272321adf11e43bd9f79284",
     "src/utils/Logger.ts": "sha256:93400bbebdf63e6706d74b2dfb563211ae1a08aef2d2713151592978225a6e81",
@@ -444,7 +444,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:c26153cbc06d9471217575034d5db966c2ef65298ed5600cf7a3a20b119fc4b6",
+    "src/wiki/articleSources.json": "sha256:a468ae13630d62357fa5b38fc8d1f1263517d1a4415c253e3cf9dd891b3037be",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
@@ -584,10 +584,11 @@
     "tests/unit/ui/schematicEquipHint.test.ts": "sha256:89ba653d324c15783c067180f7a246b4391bb475c673c876e4771cc8d15b8a44",
     "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts": "sha256:ca28fa02c697e2c1dff76e9ad564bd6c1d78fa927a5b57d27884411d376c50af",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:fb4a56f524c9e9bf52e69d5d8ddfc0a84b92e47a41ea7ee3261704690dbb6871",
-    "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
+    "tests/unit/ui/universeMap.test.ts": "sha256:612101bf332ec0445eb1ee95e6d4208cbddf14367326e0b1c771d6b07a8965ce",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8"
+    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
+    "tests/unit/components/universe-map-controls.test.ts": "sha256:ca8295f97d4249bd03be8a0ed4a63f883912f1f3b705c69ebeb533d5e4c720c6"
   },
   "reviews": [
     {
@@ -8667,6 +8668,24 @@
       "topics": ["asteroids", "combat-survival", "hauler", "teamwork"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed the eight actual changed sources, six mapped articles and demonstration source declarations. Shared 128-byte UTF-8 pilot IDs preserve server admission and private correlated credential recovery; no player rule or demonstration geometry changes. The map now exposes syncing and completion through its real chrome producer and a polite DOM status without moving focus; Controls documents that accessible state and HUD sources cite the component and canonical scenario. Corrected negative fixtures negotiate current capabilities and assert exact rejection reasons. Five focused files passed 105 cases and strict types; four deliberate capacity, case-name, asteroid-capability and client upper-bound defects failed actual runtime assertions, with all eleven source hashes restored and final 105 cases green. Scoped Biome and Svelte formatting passed. No media source or generator changed; exact-head hosted desktop/mobile and remote browser evidence remains pending before PR readiness, not claimed here.",
+      "sources": [
+        "server/communication/clientCommandDecoder.ts",
+        "shared/player.ts",
+        "src/components/game/UniverseMap.svelte",
+        "src/network/services/ConnectionManager.ts",
+        "src/ui/universeMap.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/components/universe-map-controls.test.ts",
+        "tests/unit/ui/universeMap.test.ts"
+      ],
+      "topics": ["controls", "field-manual", "hud-network", "satellites", "scout", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
+      }
     }
   ]
 }

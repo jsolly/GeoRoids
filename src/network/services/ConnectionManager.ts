@@ -1,4 +1,4 @@
-import { sanitizePlayerName } from '../../../shared/player';
+import { PLAYER_ID_MAX_BYTES, sanitizePlayerName } from '../../../shared/player';
 import { readReleaseId, releaseField } from '../../../shared/releaseId';
 import { setScoutUtilityOnHost } from '../../../shared/shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, isShipKitId } from '../../../shared/shipKits';
@@ -192,8 +192,7 @@ function readJoined(value: unknown, identity: JoinIdentity): JoinedRead {
     fields['asteroidInteractions'] !== ASTEROID_INTERACTIONS_CAPABILITY ||
     typeof id !== 'string' ||
     id.length === 0 ||
-    id.length > 64 ||
-    new TextEncoder().encode(id).length > 64 ||
+    new TextEncoder().encode(id).length > PLAYER_ID_MAX_BYTES ||
     hasJoinControlCharacters(id) ||
     typeof name !== 'string' ||
     name.length === 0 ||

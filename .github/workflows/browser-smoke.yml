@@ -9,6 +9,15 @@ run-name: Browser smoke ${{ inputs.commit_sha }}
         description: Exact reviewed commit; keep UI PRs draft until verified
         required: true
         type: string
+      focus:
+        description: Brief manual exercise; inspect its retained evidence
+        required: true
+        type: choice
+        default: basic
+        options:
+          - basic
+          - remote-motion
+          - phone-diagnostics
 
 permissions:
   contents: read
@@ -19,11 +28,16 @@ jobs:
     timeout-minutes: 15
     env:
       REQUESTED_SHA: ${{ inputs.commit_sha }}
+      BROWSER_SMOKE_FOCUS: ${{ inputs.focus }}
     steps:
       - name: Validate candidate identity
         run: |
           set -euo pipefail
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          case "$BROWSER_SMOKE_FOCUS" in
+            basic|remote-motion|phone-diagnostics) ;;
+            *) exit 1 ;;
+          esac
           printf 'PLAYWRIGHT_BROWSERS_PATH=%s/browser-binaries\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Check out the workflow's verification code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0

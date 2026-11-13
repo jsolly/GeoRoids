@@ -159,7 +159,7 @@ import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthori
 import { CooperativeContourBridges } from './CooperativeContourBridges';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
-import { advanceGlowtoys } from './GlowtoyManager';
+import { GlowtoyManager } from './GlowtoyManager';
 import { HiveEncounters } from './HiveEncounters';
 
 import { LootManager } from './LootManager';
@@ -293,7 +293,7 @@ export class GameEngine {
   private exploration = new ExplorationMap();
   private mapAssets = new MapAssets(this.exploration);
   private readonly remains = new WorldRemains();
-  private glowSources: Position[] = [];
+  private readonly glowtoys: GlowtoyManager;
   private readonly rolyPolys = new RolyPolyManager();
   private readonly furnaces = new FurnaceField();
   private readonly regionalField: RegionalAsteroidField;
@@ -477,6 +477,12 @@ export class GameEngine {
     });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
     this.lootManager.restorePoints(loaded?.economy?.pointLoot ?? []);
+    this.glowtoys = new GlowtoyManager({
+      actors: this.entityManager,
+      field: this.asteroidManager.spatialIndex(),
+      points: this.lootManager,
+      markFieldDirty: () => this.regionalField.requestFullFlush(),
+    });
     this.mapAssets.primeInitialLoot();
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
     this.spiderManager = new TerrainSpiderManager(
@@ -741,18 +747,7 @@ export class GameEngine {
       })),
       this.gameTime
     );
-    if (this.gameTime % GLOWTOY.tickFrames === 0) {
-      const lights = this.entityManager
-        .getAllEntities()
-        .filter((pilot) => pilot.health > 0 && !pilot.exploding);
-      const nearby = this.asteroidManager
-        .spatialIndex()
-        .queryMany(lights.map((pilot) => spatialQueryBounds(pilot.position, WORLD.interestRadius)));
-      this.glowSources = advanceGlowtoys(nearby, lights, (position) => {
-        this.lootManager.spawnPoints(position, GLOWTOY.cachePoints);
-        this.regionalField.requestFullFlush();
-      });
-    }
+    this.glowtoys.advance(this.gameTime);
 
     this.advanceSpiderField();
     this.tickToolFlights(toolStartPositions);
@@ -917,7 +912,7 @@ export class GameEngine {
     this.remains.clear();
     this.rolyPolys.clear();
     this.contourBridges.clear();
-    this.glowSources = [];
+    this.glowtoys.clear();
     this.lasers = [];
     this.surveyProbeManager.clear();
     this.departedPlayers = [];
@@ -1665,7 +1660,7 @@ export class GameEngine {
     const attacks = this.spiderManager.advance({
       towedIds,
       spiderTows,
-      lightSources: this.glowSources,
+      lightSources: this.glowtoys.lightSources(),
       releaseTow: (ownerId, spiderId) => {
         const owner = this.entityManager.getEntity(ownerId);
         if (owner?.harpoonTargetId === spiderId && isTowCableUtility(owner)) {

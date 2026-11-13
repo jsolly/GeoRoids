@@ -1,0 +1,65 @@
+---
+name: Railway version pin
+'on':
+  push:
+    branches: [main]
+    paths:
+      - .railway/**
+      - scripts/railway-version-pin*.ts
+      - .github/workflows/railway-version-pin.yml
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Plan only, or apply after separate production apply authorization
+        required: true
+        type: choice
+        default: plan-only
+        options: [plan-only, apply]
+permissions:
+  contents: read
+concurrency:
+  group: railway-production-version-pin
+  cancel-in-progress: false
+jobs:
+  pin:
+    # HARD DISABLED. Enabling requires John's separate approval, a reviewed edit
+    # here, verified live plan/staged semantics, and the dedicated production token.
+    if: >-
+      github.repository == 'jsolly/GeoRoids' &&
+      github.repository == 'DISABLED/REQUIRES-APPROVAL' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: railway-production-config
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Install reviewed dependencies
+        run: npm ci --ignore-scripts
+      - name: Install checksum-pinned official Railway CLI
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/railway-cli"
+          mkdir -m 700 "$work"
+          curl --fail --silent --show-error --location \
+            https://github.com/railwayapp/cli/releases/download/v5.50.2/railway-v5.50.2-x86_64-unknown-linux-musl.tar.gz \
+            --output "$work/railway.tar.gz"
+          echo "16a3ead7ce37fcdd2349f27a26d56b4914e47d6c6b83bd416e218d6afa680960  $work/railway.tar.gz" | sha256sum --check --status
+          tar -xzf "$work/railway.tar.gz" -C "$work" railway
+          echo "b0919b175c72cd829f9124caa9cf6d1a116741d847ef7be72abed14c70d3f43a  $work/railway" | sha256sum --check --status
+          echo "RAILWAY_CONFIG_CLI=$work/railway" >> "$GITHUB_ENV"
+      - name: Plan or apply the reviewed pin
+        env:
+          RAILWAY_CONFIG_TOKEN: ${{ secrets.RAILWAY_CONFIG_TOKEN }}
+          RAILWAY_CONFIG_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (vars.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'apply' || 'plan-only') }}
+          RAILWAY_CONFIG_APPLY_ENABLED: ${{ vars.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'version-pin-only' || 'disabled' }}
+        run: |
+          umask 077
+          node --import tsx scripts/railway-version-pin-entry.ts --workflow-mode

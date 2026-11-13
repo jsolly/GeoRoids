@@ -15,5 +15,6 @@
     "shared",
     "shared-types.ts",
     ".astro/types.d.ts"
-  ]
+  ],
+  "exclude": ["scripts/gate-contract.test.ts", "scripts/fixtures/gate-interop.ts"]
 }

@@ -2,7 +2,7 @@ import { defineRailway, github, preserve, project, service, volume } from 'railw
 
 export default defineRailway(() => {
   const worldData = volume('world-data', { region: 'iad', sizeMB: 1024 });
-  const geoasteroids = service('geoasteroids', {
+  const georoids = service('Georoids', {
     source: github('jsolly/GeoRoids', { branch: 'main' }),
     build: {
       builder: 'RAILPACK',
@@ -33,6 +33,6 @@ export default defineRailway(() => {
   });
 
   return project('GeoRoids', {
-    resources: [worldData, geoasteroids],
+    resources: [worldData, georoids],
   });
 });

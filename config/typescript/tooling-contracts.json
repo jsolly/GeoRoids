@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true
+  },
+  "files": ["../../scripts/gate-contract.test.ts", "../../scripts/fixtures/gate-interop.ts"],
+  "include": []
+}

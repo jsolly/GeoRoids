@@ -22,9 +22,10 @@ retry an unacknowledged batch against newer live state.
 `SavedWorld` contains world metadata. `LoadedWorld.exploration` is loaded once
 from `exploration(id TEXT PRIMARY KEY, bits TEXT NOT NULL)`. The worker protocol
 carries `WorldCheckpoint.exploration`, a read-only map of tile id to hex string.
-Snapshot encoding still uses `ExplorationMap.snapshot()` and the existing atlas
-collection/delta protocol. Client behavior and generation reset rules do not
-change. The database reset clears tile rows in the same transaction as the rest
+Atlas transport uses its own bounded revision/index port on the same authoritative
+`ExplorationMap`; persistence dirty acceptance never consumes network progress.
+Complete diagnostics and the legacy writer retain the lazy `snapshot()` view.
+The database reset clears tile rows in the same transaction as the rest
 of the expedition. Diagnostic world replacement sends an explicit
 `resetExploration` command, which clears rows in the worker transaction before
 applying that checkpoint's new discoveries.
@@ -43,7 +44,7 @@ The alternatives considered for this change were:
   This is the implemented design.
 
 Commit `885acc22` explains why `snapshot()` lazily rebuilds the atlas rather than
-`reveal()` doing it on every pilot's frame. This change preserves that network
-contract and removes the persistence reader that previously requested that
+`reveal()` doing it on every pilot's frame. Phase 2 preserves that lazy diagnostic
+view and removes the persistence reader that previously requested that
 whole atlas once a second. `docs/persistent-world.md` owns the existing fatal
 commit, backup, generation and single-writer constraints.

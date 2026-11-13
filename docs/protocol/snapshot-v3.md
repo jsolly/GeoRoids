@@ -1,7 +1,7 @@
 # Snapshots v3
 
 Gameplay uses snapshot v3 with reflective asteroid support. Every join must offer
-`snapshotVersion:3` and `asteroidInteractions:1`; the server acknowledges both
+`snapshotVersion:3`, `asteroidInteractions:1`, and `explorationVersion:1`; the server acknowledges all three
 and provides a private resume token before the client starts play. Missing or
 unsupported capabilities fail explicitly. There is no full-state `gameState`
 transport, disabled-offer build, or legacy-client mode.
@@ -25,8 +25,8 @@ both deployments finish. Pilot resume credentials are retained. A version
 mismatch fails explicitly rather than starting gameplay with incomplete or
 incompatible state.
 
-Gameplay WebSocket URLs must include `snapshotVersion=3` and
-`asteroidInteractions=1`. Missing or unsupported offers receive HTTP 426 before
+Gameplay WebSocket URLs must include `snapshotVersion=3`,
+`asteroidInteractions=1`, and `explorationVersion=1`. Missing or unsupported offers receive HTTP 426 before
 upgrade. The join message is validated again, so URL parameters alone do not
 grant access. The client rejects an unsupported server acknowledgment. The log
 WebSocket remains a separate version-1 diagnostic protocol.
@@ -46,13 +46,71 @@ Omission means unlocked. Lock state is transient and is not persisted.
 The envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
 `version:3`, positive integer `sequence`, and either:
 
-- `kind:"keyframe", state:<complete ServerGameSnapshot>`.
+- `kind:"keyframe", state:<complete LiveGameSnapshot>`.
 - `kind:"delta", baseline:<previous sequence>, patch:{set?,clear?,collections?,objects?}`.
 
 Top-level `set` replaces a value; `clear` deletes named optional fields. An
 omitted field is unchanged, and omitted operation lists are empty. Unknown
 valid JSON fields still use ordinary replacement patches. Complete empty
 arrays represent complete empty collections.
+
+## Shared atlas channel
+
+The moving-world DTO excludes `exploration`. A reserved legacy exploration field
+in either a keyframe or reconstructed delta is rejected. An optional `atlas`
+field beside `state` or `patch` carries at most 8192 bytes and 64 tile fragments.
+It shares that snapshot's sequence, byte credit, applied acknowledgment, timeout,
+and recovery reserve. No URL, join flag, or client setting selects a legacy atlas.
+Pure complete-world codec diagnostics require explicit diagnostic decoder mode.
+
+The map owns immutable tile strings, stable slot identities and a bounded numeric
+revision index. Broadcasts read changed tiles directly, including MapAssets cell
+visibility; they never ask for the complete atlas. Legacy persistence keeps its
+existing complete snapshot and writer. Persistence acceptance never consumes
+network progress.
+
+Atlas segments identify an epoch and socket transfer. Each pass captures its
+starting revision and end slot, reads current monotonic tile values, then completes
+only through that starting revision. Mutations behind its cursor and appended
+tiles therefore remain due in the next pass. Exact stored IDs survive bounded
+fragments, including accepted leading-zero addresses. They are never normalized.
+The supported atlas content budget remains one MiB, inherited from the previous
+complete keyframe's effective wire ceiling. Receiver content plus its one partial
+ID is charged to that budget. Transactional staging retains at most one bounded
+incoming segment and its replacement partial string; it never clones a full atlas.
+
+World resync after visibility return retains acknowledged atlas knowledge. An
+explicit `snapshotResync` body `{atlas:"reset"}` additionally requests a baseline.
+A new physical socket or joined acknowledgment resets client atlas authority even
+if the process-local epoch number repeats. Reset or replacement changes the map
+epoch. Stale callbacks and ACKs cannot install a newer transfer's cursor.
+
+The client validates both world and atlas candidates before advancing its decoder
+baseline, then ACKs after consumers apply them. Replayed fragments compare exact
+ID bytes and completed same-epoch tiles merge monotonically. A partial initial
+chart displays "Chart syncing" until its baseline completes. The moving world and
+local prediction do not wait for full chart completion.
+
+### Coordinated code release
+
+This capability changes compatibility while snapshot version remains 3. The
+matching Railway server and Vercel client deploy independently from the same main
+merge; that release path does not guarantee their ordering. Verify both actual
+releases and assess the intermediate protocol skew.
+Old clients receive HTTP 426 before actor creation on the new server. A new client
+rejects an old server's missing acknowledgment rather than accepting a broken
+first frame. Existing tabs use the consent-based update notice. Refresh cannot
+complete the other host's pending deployment; Enter Game may need another attempt
+once both hosts support the capability. This code release does not activate or
+migrate the exploration database.
+
+During accidental new-client/old-server skew, a completely validated base-v3
+joined response for the currently pending socket can retain its rotated private
+credential before atlas negotiation is rejected. Identity mismatch, malformed
+fields, unsolicited responses and retired sockets cannot replace credentials.
+This grants no gameplay readiness, applies no world state and sends no applied
+ACK. An unsupported response cannot establish a previously unknown resume-owner
+identity. Refreshing a client does not authorize a different server identity.
 
 Every complete world includes finite `serverTime`, `civicModules`, `spiderField`,
 and `beltRecovery`. Empty collections are explicit; deleting one of these fields
@@ -222,10 +280,10 @@ and baseline are never treated as successful delivery. These bounds cannot make
 an indivisible large keyframe arrive faster than the connection can transfer it.
 Excluded recipients keep their own baseline. Each recipient receives nearby
 asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
-The crew roster, shared exploration, and revealed `mapAssets` remain global.
+The crew roster, streamed shared exploration, and revealed `mapAssets` remain global.
 These lightweight furnace and valuable-drop markers supply the universe map;
-they do not require distant asteroid geometry. The outbound budget accommodates
-a fully explored 120,000-unit-wide atlas on late joins and resynchronization.
+they do not require distant asteroid geometry. Late joins stream the atlas within
+bounded segments; acknowledged same-socket world recovery does not repeat it.
 Each detached view has
 its own encoder; no baseline points at mutable game engine state.
 

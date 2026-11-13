@@ -1,4 +1,6 @@
+import { EXPLORATION_VERSION } from '../../shared/atlasTransport';
 import { isContourLockState } from '../../shared/contourLock';
+import { PLAYER_ID_MAX_BYTES } from '../../shared/player';
 import { readReleaseId } from '../../shared/releaseId';
 import { isShipKitId } from '../../shared/shipKits';
 import { isHaulerUtilityId, isScoutUtilityId } from '../../shared/shipUtilities';
@@ -48,7 +50,7 @@ export type ClientCommand =
   | { type: 'travelFurnace'; id: string; destinationId: string }
   | { type: 'equipSatellite'; id: string; pickupId: string }
   | { type: 'leave' }
-  | { type: 'snapshotResync' }
+  | { type: 'snapshotResync'; atlasReset: boolean }
   | ({ type: 'snapshotAck' } & SnapshotAcknowledgement)
   | { type: 'crewAction'; id: string; action: CrewAction }
   | { type: 'useAbility'; id: string }
@@ -221,7 +223,7 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       if (
         !id ||
         !name ||
-        Buffer.byteLength(id) > 128 ||
+        Buffer.byteLength(id) > PLAYER_ID_MAX_BYTES ||
         Buffer.byteLength(name) > 64 ||
         [...id, ...name].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
       ) {
@@ -238,6 +240,7 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       const rawToken = message['resumeToken'] ?? payload['resumeToken'];
       if (
         snapshotOffer !== SNAPSHOT_VERSION ||
+        (message['explorationVersion'] ?? payload['explorationVersion']) !== EXPLORATION_VERSION ||
         asteroidInteractionsOffer !== ASTEROID_INTERACTIONS_CAPABILITY
       ) {
         return invalid(type, 'Client update required; refresh GeoRoids');
@@ -272,8 +275,12 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         ? { ok: true, command: { type, sequence } }
         : invalid(type, 'Invalid applied snapshot acknowledgment');
     }
-    case 'leave':
     case 'snapshotResync':
+      if (fields['atlas'] !== undefined && fields['atlas'] !== 'reset') {
+        return invalid(type, 'Invalid atlas recovery request');
+      }
+      return { ok: true, command: { type, atlasReset: fields['atlas'] === 'reset' } };
+    case 'leave':
       return { ok: true, command: { type } };
     case 'ping': {
       const probeId = message['probeId'];

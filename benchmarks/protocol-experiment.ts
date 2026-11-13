@@ -158,8 +158,14 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     warmupTicks: input.warmupTicks,
     measuredTicks: input.measuredTicks,
   };
-  const decoders = { keyframe: new SnapshotDecoder(), delta: new SnapshotDecoder() };
-  const timedDecoders = { keyframe: new SnapshotDecoder(), delta: new SnapshotDecoder() };
+  const decoders = {
+    keyframe: new SnapshotDecoder('diagnostic'),
+    delta: new SnapshotDecoder('diagnostic'),
+  };
+  const timedDecoders = {
+    keyframe: new SnapshotDecoder('diagnostic'),
+    delta: new SnapshotDecoder('diagnostic'),
+  };
   for (const [tick, current] of history.entries()) {
     const measured = tick >= input.warmupTicks;
     const world = worlds[tick];

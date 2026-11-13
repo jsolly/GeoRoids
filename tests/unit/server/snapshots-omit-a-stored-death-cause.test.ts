@@ -37,7 +37,7 @@ test('an older snapshot that still carries a death cause decodes the pilot', () 
   Object.assign(pilot, { deathCause: 'asteroid' });
   expect(() => validateSnapshotDto(world)).not.toThrow();
   const decoded = decodeSnapshotMessage(
-    new SnapshotDecoder(),
+    new SnapshotDecoder('diagnostic'),
     snapshotMessage(new SnapshotEncoder(world).encode(1))
   );
   const row = decoded.entities.find((entity) => entity.id === pilot.id);

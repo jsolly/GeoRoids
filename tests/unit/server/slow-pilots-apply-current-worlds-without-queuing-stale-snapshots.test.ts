@@ -52,7 +52,7 @@ beforeEach(() => {
   broadcaster = new GameStateBroadcaster(engine);
   handler = new MessageHandler(engine, broadcaster);
   socket = new RecordingSocket();
-  decoder = new SnapshotDecoder();
+  decoder = new SnapshotDecoder('live');
   cursor = 0;
   handler.handleMessage(
     {
@@ -62,6 +62,7 @@ beforeEach(() => {
         name: 'Pilot',
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
       },
     },
     socket
@@ -80,10 +81,12 @@ afterEach(() => {
 test('a non-applying pilot cannot stay connected forever by receiving pongs', () => {
   const now = globalThis.performance.now();
   const clock = vi.spyOn(globalThis.performance, 'now').mockReturnValue(now);
+  const prepare = vi.spyOn(engine, 'getBroadcastState');
   broadcaster.broadcastGameState();
+  expect(prepare).toHaveBeenCalledOnce();
+  prepare.mockClear();
   applyReceived(false);
   clock.mockReturnValue(now + 751);
-  const prepare = vi.spyOn(engine, 'getSnapshotState');
   broadcaster.broadcastGameState();
   expect(prepare).not.toHaveBeenCalled();
   expect(socket.readyState).toBe(socket.OPEN);

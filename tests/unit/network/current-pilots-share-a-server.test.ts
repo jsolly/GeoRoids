@@ -31,7 +31,7 @@ type SendData = Parameters<RecordingSocket['send']>[0];
 class DelayedRecordingSocket extends RecordingSocket {
   defer = false;
   fail = false;
-  readonly decoder = new SnapshotDecoder();
+  readonly decoder = new SnapshotDecoder('live');
   readonly appliedStates: ServerGameSnapshot[] = [];
   readIndex = 0;
 
@@ -185,6 +185,7 @@ describe('current pilots share the production handler and broadcaster', () => {
           position: { x: 100, y: 100 },
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           ...(resumeToken != null && resumeToken !== '' ? { resumeToken } : {}),
         },
       },
@@ -204,6 +205,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       data: {
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
         // The client refuses an ack without the seed of the world it is about to apply.
         terrainSeed: baseline.terrainSeed,
         resumeToken: expect.stringMatching(RESUME_TOKEN_PATTERN),
@@ -504,9 +506,9 @@ describe('current pilots share the production handler and broadcaster', () => {
     joinPilot(handler, second.ws, 'second');
     applySnapshots(first, handler);
     applySnapshots(second, handler);
-    const broken = engine.getSnapshotState();
+    const broken = engine.getBroadcastState();
     Object.assign(broken, { badField: broken });
-    vi.spyOn(engine, 'getSnapshotState').mockReturnValue(broken);
+    vi.spyOn(engine, 'getBroadcastState').mockReturnValue(broken);
     first.close.mockImplementation(() => {
       throw new Error('close failure');
     });

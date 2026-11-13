@@ -32,7 +32,7 @@ test('a snapshot v3 client rejects patches to the retired spider consumption col
   world.spiderField = Object.assign(world.spiderField ?? { spiders: [], nests: [] }, {
     consumed: [{ id: 'old-spider', position: { x: 2, y: 3 }, furnaceId: 'hearth', frame: 4 }],
   });
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   decodeSnapshotMessage(decoder, snapshotMessage(new SnapshotEncoder(world).encode(1)));
   const consumed = { id: 'old-spider', position: { x: 2, y: 3 }, furnaceId: 'hearth', frame: 5 };
   expect(() =>
@@ -66,7 +66,7 @@ test.each(['serverTime', 'civicModules', 'spiderField', 'beltRecovery'])(
     Reflect.deleteProperty(missing, field);
     expect(() => validateSnapshotDto(missing)).toThrow('Incomplete or invalid public snapshot DTO');
     expect(() => new SnapshotEncoder(missing)).toThrow();
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const first = new SnapshotEncoder(world);
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     expect(() =>

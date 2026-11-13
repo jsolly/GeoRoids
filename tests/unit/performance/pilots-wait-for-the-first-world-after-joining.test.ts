@@ -3,7 +3,8 @@ import { once } from 'node:events';
 import { expect, test, vi } from 'vitest';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { Pilot } from '../../../benchmarks/pilot';
-import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 test.each([false, true])(
@@ -39,6 +40,7 @@ test.each([false, true])(
             id: pilot.id,
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
+            explorationVersion: 1,
             resumeToken: 'a'.repeat(64),
           },
         })

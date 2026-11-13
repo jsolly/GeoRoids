@@ -41,7 +41,15 @@ function clearAsteroidField(engine: GameEngine): void {
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
   core.handleClientMessage(
-    { type: 'join', data: { ...data, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 } },
+    {
+      type: 'join',
+      data: {
+        ...data,
+        snapshotVersion: SNAPSHOT_VERSION,
+        asteroidInteractions: 1,
+        explorationVersion: 1,
+      },
+    },
     socket
   );
 }

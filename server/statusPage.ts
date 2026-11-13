@@ -319,7 +319,7 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
             }
 
             addLog('Connecting to game WebSocket...', 'info');
-            gameWs = createStatusSocket(\`\${wsBase}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}\`, 'Game', {
+            gameWs = createStatusSocket(\`\${wsBase}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}&explorationVersion=1\`, 'Game', {
                 onopen: function(socket) {
                     if (gameWs !== socket) return;
                     addLog('Game WebSocket connected', 'info');

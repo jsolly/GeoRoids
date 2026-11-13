@@ -17,11 +17,11 @@ test('a real pilot receives both bot factions and cannot steer or claim either s
     server.gameEngine.stopGameLoop();
     const wire = new WireClient(
       new WebSocket(
-        `ws://127.0.0.1:${server.getPort()}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+        `ws://127.0.0.1:${server.getPort()}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
       )
     );
     clients.push(wire);
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('live');
     const snapshots: ServerGameSnapshot[] = [];
     wire.ws.on('message', (raw) => {
       try {
@@ -47,6 +47,7 @@ test('a real pilot receives both bot factions and cannot steer or claim either s
         kitId: 'scout',
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
       },
     });
     await wire.waitFor(

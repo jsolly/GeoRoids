@@ -34,8 +34,8 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
   engine.updatePlayer(observer.id, { position: { ...pickup.position } });
   broadcaster.negotiateSnapshot(socket);
   broadcaster.negotiateSnapshot(observerSocket);
-  const decoder = new SnapshotDecoder();
-  const observerDecoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('live');
+  const observerDecoder = new SnapshotDecoder('live');
   const apply = (target: RecordingSocket, packetDecoder: SnapshotDecoder, raw: string) => {
     const result = packetDecoder.readMessage(raw, { acceptSnapshots: true });
     assert.ok(result.kind === 'snapshot');

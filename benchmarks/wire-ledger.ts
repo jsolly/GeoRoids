@@ -7,17 +7,15 @@ import { WebSocketCore } from '../server/communication/WebSocketCore';
 import { GameEngine } from '../server/core/GameEngine';
 import { ServerClock } from '../server/core/ServerClock';
 import { GAME, LASER } from '../shared/constants/gameplay';
-import { canCollectEquipment, isEquipmentId } from '../shared/equipment';
 import { GAME_TICK_MS } from '../shared/gameClock';
-import { validateSnapshotDto } from '../shared/snapshotDto';
-import { quantizeSnapshotKinematics } from '../shared/snapshotPrecision';
 import { SNAPSHOT_VERSION, SnapshotDecoder } from '../shared/snapshotProtocol';
 import { isActiveScanner } from '../shared/surveyScan';
-import { nearbyAsteroidRows, nearbyWorldRows } from '../shared/world';
 import type { ServerGameSnapshot } from '../shared-types';
 import { ownBenchmarkIdentity } from './benchmark-identity';
 import { createOwnedLoopback, type OwnedLoopback } from './owned-loopback';
 import { canonicalJson, type Measurement } from './results';
+import { recipientSnapshotOracle } from './snapshot-oracle';
+import { websocketTextHeaderBytes } from './websocket-frame-bytes';
 
 const CLOCK_START_MS = 1_700_000_000_000;
 const DRAIN_TIMEOUT_MS = 5_000;
@@ -58,15 +56,6 @@ function jsonBytes(value: unknown): number {
 
 function propertyBytes(name: string, value: unknown): number {
   return jsonBytes(name) + 1 + jsonBytes(value);
-}
-
-/** Exact for a single unmasked, uncompressed, FIN text frame, checked against native TCP totals. */
-export function websocketTextHeaderBytes(payloadBytes: number): 2 | 4 | 10 {
-  assert(
-    Number.isSafeInteger(payloadBytes) && payloadBytes >= 0,
-    'Invalid WebSocket payload bytes'
-  );
-  return payloadBytes <= 125 ? 2 : payloadBytes <= 65_535 ? 4 : 10;
 }
 
 export interface SnapshotBytePartition {
@@ -240,40 +229,6 @@ export function partitionSnapshotBytes(text: string): SnapshotBytePartition {
   return { kind, sequence, baseline, payloadBytes, parts };
 }
 
-/** The oracle reads public engine state, never the broadcaster's prepared or retained baseline. */
-function recipientSnapshotOracle(engine: GameEngine, id: string): ServerGameSnapshot {
-  const player = engine.getPlayer(id);
-  assert(player, 'Oracle pilot is missing');
-  const common = engine.getSnapshotState();
-  const asteroids = nearbyAsteroidRows(
-    engine.getAllAsteroids(),
-    player.position,
-    isActiveScanner(player)
-  );
-  const source = {
-    ...common,
-    asteroids,
-    loot: nearbyWorldRows(engine.getLoot(), player.position).filter(
-      (drop) => !isEquipmentId(drop.kind) || canCollectEquipment(player, drop.kind)
-    ),
-    satellitePickups: [
-      ...common.satellitePickups.filter((pickup) => pickup.ownerId === id),
-      ...nearbyWorldRows(
-        common.satellitePickups.filter(
-          (pickup) => pickup.ownerId !== id && pickup.state !== 'stored'
-        ),
-        player.position
-      ),
-    ],
-    playerProjectiles: nearbyWorldRows(engine.getPlayerProjectiles(), player.position),
-  } satisfies ServerGameSnapshot;
-  // Independent JSON ownership copy preserves undefined omission and negative-zero wire semantics.
-  const owned: unknown = JSON.parse(JSON.stringify(source));
-  validateSnapshotDto(owned);
-  quantizeSnapshotKinematics(owned);
-  return owned;
-}
-
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
@@ -321,7 +276,10 @@ interface CapturedMessage {
 }
 
 /** Replay actual text, including events, rather than trusting a prepared encoder frame. */
-export function replayWireLedger(messages: readonly CapturedMessage[]): number {
+export function replayWireLedger(
+  messages: readonly CapturedMessage[],
+  mode: 'live' | 'diagnostic' = 'live'
+): number {
   const decoders = new Map<
     string,
     {
@@ -342,7 +300,7 @@ export function replayWireLedger(messages: readonly CapturedMessage[]): number {
     let stream = decoders.get(message.pilot);
     if (!stream) {
       stream = {
-        decoder: new SnapshotDecoder(),
+        decoder: new SnapshotDecoder(mode),
         sequence: 0,
         normalizedHash: runtimeStateHasher(),
       };
@@ -656,7 +614,7 @@ export async function runWireLedgerSample(
         id,
         client,
         peer,
-        decoder: new SnapshotDecoder(),
+        decoder: new SnapshotDecoder('live'),
         submitted: [],
         received: [],
         oracle: [],

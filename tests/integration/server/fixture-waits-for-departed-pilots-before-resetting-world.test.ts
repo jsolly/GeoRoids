@@ -82,6 +82,7 @@ test('a prepared fixture returns the authoritative placed motion epoch', async (
           position: { x: 100, y: 100 },
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
         },
       },
       transport

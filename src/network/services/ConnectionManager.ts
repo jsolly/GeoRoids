@@ -1,6 +1,7 @@
-import { releaseField } from '../../../shared/releaseId';
+import { PLAYER_ID_MAX_BYTES, sanitizePlayerName } from '../../../shared/player';
+import { readReleaseId, releaseField } from '../../../shared/releaseId';
 import { setScoutUtilityOnHost } from '../../../shared/shipAbilities';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../../shared/shipKits';
+import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, isShipKitId } from '../../../shared/shipKits';
 import { isTowCableUtility, scoutUtilityOf } from '../../../shared/shipUtilities';
 import { isAsteroidDto, isLootKind } from '../../../shared/snapshotDto';
 import {
@@ -74,7 +75,9 @@ import { setClientLogContext } from '../../utils/clientLogContext';
 import { logger } from '../../utils/Logger';
 import { setWorldCampaign } from '../worldCampaign';
 import {
+  resetAtlasState,
   resetWorldExploration,
+  setAtlasSyncing,
   setWorldExploration,
   setWorldMapAssets,
   worldFurnaces,
@@ -107,6 +110,7 @@ import {
 import {
   clearResumeCredential,
   isValidResumeToken,
+  readStoredResumeName,
   readStoredResumeProvenance,
   readStoredResumeToken,
   storeResumeCredential,
@@ -148,6 +152,124 @@ function isFinitePosition(value: unknown): value is Position {
     typeof value.y === 'number' &&
     Number.isFinite(value.y)
   );
+}
+
+type JoinIdentity =
+  | { kind: 'new'; id: string; name: string }
+  | {
+      kind: 'resume';
+      id: string;
+      knownId: string | null;
+      name: string;
+      previousName: string | null;
+    };
+type JoinedRead =
+  | { kind: 'supported'; data: PlayerJoin }
+  | { kind: 'unsupported-exploration'; data: Omit<PlayerJoin, 'explorationVersion'> }
+  | { kind: 'invalid' };
+function hasJoinControlCharacters(value: string): boolean {
+  return [...value].some(
+    (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
+  );
+}
+
+/** One boundary parser for gameplay admission and skew-safe credential retention. */
+function readJoined(value: unknown, identity: JoinIdentity): JoinedRead {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { kind: 'invalid' };
+  }
+  const fields: Record<string, unknown> = Object.fromEntries(Object.entries(value));
+  const id = fields['id'];
+  const name = fields['name'];
+  const position = fields['position'];
+  const color = fields['color'];
+  const token = fields['resumeToken'];
+  const terrainSeed = fields['terrainSeed'];
+  const kit = fields['kitId'];
+  const charge = fields['chargedWeapons'];
+  if (
+    fields['snapshotVersion'] !== SNAPSHOT_VERSION ||
+    fields['asteroidInteractions'] !== ASTEROID_INTERACTIONS_CAPABILITY ||
+    typeof id !== 'string' ||
+    id.length === 0 ||
+    new TextEncoder().encode(id).length > PLAYER_ID_MAX_BYTES ||
+    hasJoinControlCharacters(id) ||
+    typeof name !== 'string' ||
+    name.length === 0 ||
+    sanitizePlayerName(name) !== name ||
+    !isFinitePosition(position) ||
+    typeof color !== 'string' ||
+    color.length === 0 ||
+    color.length > 64 ||
+    hasJoinControlCharacters(color) ||
+    !isValidResumeToken(token) ||
+    typeof terrainSeed !== 'number' ||
+    !Number.isFinite(terrainSeed) ||
+    (kit !== undefined && !isShipKitId(kit)) ||
+    (charge !== undefined && charge !== 1)
+  ) {
+    return { kind: 'invalid' };
+  }
+  const knownIdentity =
+    identity.kind === 'new'
+      ? id === identity.id && name === identity.name
+      : id === (identity.knownId ?? identity.id) &&
+        (name === identity.name || name === identity.previousName);
+  // A supported server can restore an old token whose owner predates this tab.
+  // An unsupported server may retain credentials only for a correlated identity.
+  if (fields['explorationVersion'] !== 1 && !knownIdentity) {
+    return { kind: 'invalid' };
+  }
+  if (
+    fields['explorationVersion'] === 1 &&
+    id !== identity.id &&
+    (identity.kind === 'new' || (identity.knownId !== null && id !== identity.knownId))
+  ) {
+    return { kind: 'invalid' };
+  }
+  for (const key of [
+    'serverReleaseId',
+    'credentialReleaseId',
+    'credentialClientReleaseId',
+    'scoreReleaseId',
+    'scoreClientReleaseId',
+  ]) {
+    if (fields[key] !== undefined && readReleaseId(fields[key]) === undefined) {
+      return { kind: 'invalid' };
+    }
+  }
+  const issued = fields['credentialIssuedAt'];
+  const scored = fields['scoreUpdatedAt'];
+  if (
+    (issued !== undefined &&
+      (typeof issued !== 'number' || !Number.isSafeInteger(issued) || issued < 0)) ||
+    (scored !== undefined &&
+      (typeof scored !== 'number' || !Number.isSafeInteger(scored) || scored < 0))
+  ) {
+    return { kind: 'invalid' };
+  }
+  const base: Omit<PlayerJoin, 'explorationVersion'> = {
+    id,
+    name,
+    position: { ...position },
+    color,
+    resumeToken: token,
+    terrainSeed,
+    snapshotVersion: SNAPSHOT_VERSION,
+    asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+    ...(kit === undefined ? {} : { kitId: kit }),
+    ...(charge === 1 ? { chargedWeapons: 1 } : {}),
+    ...releaseField('serverReleaseId', fields['serverReleaseId']),
+    ...releaseField('credentialReleaseId', fields['credentialReleaseId']),
+    ...releaseField('credentialClientReleaseId', fields['credentialClientReleaseId']),
+    ...releaseField('scoreReleaseId', fields['scoreReleaseId']),
+    ...releaseField('scoreClientReleaseId', fields['scoreClientReleaseId']),
+    ...(issued === undefined ? {} : { credentialIssuedAt: issued }),
+    ...(scored === undefined ? {} : { scoreUpdatedAt: scored }),
+  };
+  return fields['explorationVersion'] === 1
+    ? { kind: 'supported', data: { ...base, explorationVersion: 1 } }
+    : { kind: 'unsupported-exploration', data: base };
 }
 
 function isLootCollectedEvent(value: unknown): value is LootCollected {
@@ -204,13 +326,18 @@ function captureClientPlayerState(player: Player) {
 export class ConnectionManager {
   private static instance: ConnectionManager;
   private state: ConnectionState;
-  private readonly snapshotDecoder = new SnapshotDecoder();
+  private readonly snapshotDecoder = new SnapshotDecoder('live');
   // A same-socket rejoin may receive already-queued current snapshots before
   // its new joined acknowledgment. This records the protocol established by
   // the prior acknowledgment without reopening compatibility fallback.
   private currentProtocolReady: boolean = false;
   private chargedWeapons = false;
   private resumeToken?: string;
+  private resumeOwnerId: string | null = null;
+  private joinGeneration = 0;
+  private pendingJoin:
+    | { socket: WebSocket; generation: number; identity: JoinIdentity }
+    | undefined;
   private readonly motionReconciliation = new PlayerMotionReconciliation();
   private snapshotResyncPending: boolean = false;
 
@@ -354,6 +481,7 @@ export class ConnectionManager {
         const computedUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
         const wsEndpoint = new URL(import.meta.env.VITE_WEBSOCKET_URL || computedUrl);
         wsEndpoint.searchParams.set('snapshotVersion', String(SNAPSHOT_VERSION));
+        wsEndpoint.searchParams.set('explorationVersion', '1');
         wsEndpoint.searchParams.set(
           'asteroidInteractions',
           String(ASTEROID_INTERACTIONS_CAPABILITY)
@@ -459,7 +587,7 @@ export class ConnectionManager {
                 result.timings.decodeMs
               );
             }
-            this.handleSnapshot(result.state, result.metadata, receivedAt);
+            this.handleSnapshot(result.state, result.metadata, receivedAt, result.atlasSyncing);
           } catch (error) {
             logger.error(
               'NETWORK',
@@ -700,10 +828,11 @@ export class ConnectionManager {
 
   private armJoinCompletionTimer(): void {
     this.clearJoinCompletionTimer();
+    const generation = ++this.joinGeneration;
     this.joinCompletionPending = true;
     this.joinAcknowledged = false;
     this.joinCompletionTimer = setTimeout(() => {
-      if (!this.joinCompletionPending) {
+      if (!this.joinCompletionPending || generation !== this.joinGeneration) {
         return;
       }
       this.failJoinCompletion(
@@ -919,6 +1048,7 @@ export class ConnectionManager {
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+        explorationVersion: 1,
         cooperativeVersion: 1,
         worldRemains: 1,
 
@@ -940,6 +1070,20 @@ export class ConnectionManager {
       player.resetMotionPresentation();
     }
     this.armJoinCompletionTimer();
+    this.pendingJoin = {
+      socket: this.state.socket,
+      generation: this.joinGeneration,
+      identity:
+        this.resumeToken !== undefined
+          ? {
+              kind: 'resume',
+              id: this.clientId,
+              knownId: this.resumeOwnerId,
+              name: sanitizePlayerName(this.localPlayerName),
+              previousName: readStoredResumeName() ?? null,
+            }
+          : { kind: 'new', id: this.clientId, name: sanitizePlayerName(this.localPlayerName) },
+    };
     if (!this.sendPayload(joinMessage)) {
       this.failJoinCompletion(new Error('Failed to send join message'), true);
     }
@@ -1019,6 +1163,7 @@ export class ConnectionManager {
         // The server explicitly rejected this credential; discard it so the
         // next menu join creates a fresh pilot instead of retrying forever.
         delete this.resumeToken;
+        this.resumeOwnerId = null;
         clearResumeCredential();
         this.motionReconciliation.reset();
         this.joinAcknowledged = false;
@@ -1029,7 +1174,7 @@ export class ConnectionManager {
         break;
       }
       case 'joined':
-        this.handleJoined(data as PlayerJoin);
+        this.handleJoined(data);
         break;
       case 'playerLeft':
         this.handlePlayerLeft(data as PlayerLeave);
@@ -1101,6 +1246,9 @@ export class ConnectionManager {
   }
 
   private resetSnapshotSession(): void {
+    this.pendingJoin = undefined;
+    this.joinGeneration++;
+    resetAtlasState();
     resetResourceMusic();
     stopSatelliteOrbit();
     this.playedLootCollectionIds.clear();
@@ -1172,14 +1320,18 @@ export class ConnectionManager {
     }
   }
 
-  sendSnapshotResync(): boolean {
-    if (!this.currentProtocolReady || this.snapshotResyncPending) {
+  sendSnapshotResync(options?: { atlas: 'reset' }): boolean {
+    if (!this.currentProtocolReady || (this.snapshotResyncPending && !options)) {
       return false;
     }
     // A rejected world queued before same-socket rejoin must be able to
     // request recovery while the new join keeps gameplay commands gated.
-    const sent = this.sendPayload({ type: 'snapshotResync', data: {} });
+    const sent = this.sendPayload({ type: 'snapshotResync', data: options ?? {} });
     if (sent) {
+      if (options) {
+        this.snapshotDecoder.resetAtlas();
+        resetAtlasState();
+      }
       this.snapshotResyncPending = true;
       clientPerformance.count('resyncs');
     }
@@ -1189,7 +1341,8 @@ export class ConnectionManager {
   private handleSnapshot(
     state: ServerGameSnapshot,
     metadata: SnapshotMetadata,
-    receivedAt: number
+    receivedAt: number,
+    atlasSyncing: boolean
   ): void {
     const appliedSocket = this.state.socket;
     try {
@@ -1199,6 +1352,7 @@ export class ConnectionManager {
       } else {
         this.applyReceivedSnapshot(state);
       }
+      setAtlasSyncing(atlasSyncing);
       this.lastAcceptedSnapshotSequence = metadata.sequence;
       // TCP acceptance cannot prove the world was applied. Release the server's
       // bounded pipeline only after all snapshot consumers completed above.
@@ -1561,25 +1715,42 @@ export class ConnectionManager {
     );
   }
 
-  private handleJoined(data: PlayerJoin): void {
+  private handleJoined(value: unknown): void {
+    const pending = this.pendingJoin;
+    if (
+      !pending ||
+      pending.socket !== this.state.socket ||
+      pending.generation !== this.joinGeneration ||
+      !this.joinCompletionPending
+    ) {
+      return;
+    }
+    const joined = readJoined(value, pending.identity);
+    this.pendingJoin = undefined;
+    if (joined.kind === 'invalid') {
+      this.failCurrentProtocol(new Error('Joined acknowledgment is invalid for the pending join'));
+      return;
+    }
+    const data = joined.data;
+    // Preserve a genuine rotated credential even when the other host is older.
+    // This grants no gameplay readiness and emits no applied snapshot ACK.
+    this.resumeToken = data.resumeToken;
+    this.resumeOwnerId = data.id;
+    storeResumeCredential(data.resumeToken, data.name, {
+      ...releaseField('credentialReleaseId', data.credentialReleaseId ?? data.serverReleaseId),
+      ...releaseField('scoreReleaseId', data.scoreReleaseId),
+      ...releaseField('clientReleaseId', getClientReleaseId()),
+    });
+    if (joined.kind === 'unsupported-exploration') {
+      this.failCurrentProtocol(new Error('Server update required for the shared atlas protocol'));
+      return;
+    }
     AuthoritativeProjectileField.getInstance().clear();
     this.snapshotDecoder.reset();
+    resetAtlasState();
     this.cargoDepositBaseline = null;
     clientPerformance.resetSnapshotWitness();
     this.snapshotResyncPending = false;
-    if (
-      data.snapshotVersion !== SNAPSHOT_VERSION ||
-      data.asteroidInteractions !== ASTEROID_INTERACTIONS_CAPABILITY ||
-      !isValidResumeToken(data.resumeToken) ||
-      !Number.isFinite(data.terrainSeed)
-    ) {
-      this.failCurrentProtocol(
-        new Error(
-          'Joined acknowledgment is missing the current snapshot, motion, resume token, or terrain seed'
-        )
-      );
-      return;
-    }
     // A restored pilot keeps its ID but starts a new motion epoch. The joined
     // acknowledgment is the boundary after which old movement counters expire.
     this.motionReconciliation.reset();
@@ -1587,12 +1758,6 @@ export class ConnectionManager {
     this.joinAcknowledged = true;
     this.chargedWeapons = data.chargedWeapons === 1;
     this.currentProtocolReady = true;
-    this.resumeToken = data.resumeToken;
-    storeResumeCredential(data.resumeToken, data.name, {
-      ...releaseField('credentialReleaseId', data.credentialReleaseId ?? data.serverReleaseId),
-      ...releaseField('scoreReleaseId', data.scoreReleaseId),
-      ...releaseField('clientReleaseId', getClientReleaseId()),
-    });
     if (data.serverReleaseId != null && data.serverReleaseId !== '') {
       this.serverReleaseId = data.serverReleaseId;
     } else {

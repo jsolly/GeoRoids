@@ -1947,7 +1947,7 @@ function verifyCrewToolDemonstrations(): void {
     for (const socket of [scoutSocket, haulerSocket]) {
       const raw = socket.sent.at(-1);
       invariant(raw !== undefined, 'crew demonstration recipient received no snapshot');
-      const decoded = new SnapshotDecoder().readMessage(raw, { acceptSnapshots: true });
+      const decoded = new SnapshotDecoder('live').readMessage(raw, { acceptSnapshots: true });
       invariant(decoded.kind === 'snapshot', 'crew demonstration snapshot was rejected');
       const received = decoded.state.asteroids.find((row) => row.id === rock.id);
       invariant(

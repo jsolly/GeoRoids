@@ -147,7 +147,7 @@ try {
   const ready = await waitMessage('ready');
   assert('port' in ready && typeof ready.port === 'number');
   const url = new URL(
-    `ws://127.0.0.1:${ready.port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}`
+    `ws://127.0.0.1:${ready.port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}&explorationVersion=1`
   );
   const pilotOptions = { url, measuring: () => measuring, fail, aimAtAsteroids: true };
   for (let index = 0; index < participants; index++) {

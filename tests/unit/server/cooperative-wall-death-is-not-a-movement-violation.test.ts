@@ -62,6 +62,7 @@ test('a cooperative wall death is recorded as gameplay, not as a movement violat
           position: rim,
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           // An activated campaign refuses a join that does not declare it.
           cooperativeVersion: 1,
         },

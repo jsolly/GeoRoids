@@ -56,6 +56,7 @@ interface JoinedAcknowledgment {
   resumeToken: string;
   snapshotVersion: typeof SNAPSHOT_VERSION;
   asteroidInteractions: 1;
+  explorationVersion: 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,6 +85,7 @@ function readJoinedAcknowledgment(socket: RecordingSocket): JoinedAcknowledgment
     resumeToken: data['resumeToken'],
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
   };
 }
 
@@ -93,7 +95,7 @@ type SendOptions = { mask?: boolean; binary?: boolean; compress?: boolean; fin?:
 
 /** Application state survives clearing the fixture's transport recording. */
 class ScenarioSocket extends RecordingSocket {
-  private readonly decoder = new SnapshotDecoder();
+  private readonly decoder = new SnapshotDecoder('live');
   private protocolReady = false;
   private ownerId: string | undefined;
   private appliedWorld: ServerGameSnapshot | undefined;
@@ -262,6 +264,7 @@ export class GameServerWorld {
           kitId: options.kitId,
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           cooperativeVersion: 1,
           ...(options.worldRemains ? { worldRemains: options.worldRemains } : {}),
 

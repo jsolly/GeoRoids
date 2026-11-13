@@ -84,7 +84,10 @@ export class MessageHandler {
         case 'snapshotResync':
           if (this.gameEngine.getPlayerBySocket(ws)) {
             this.logSnapshotResync(ws, Date.now(), this.gameEngine.getServerTime());
-            this.broadcaster.requestSnapshotKeyframe(ws, { recovery: true });
+            this.broadcaster.requestSnapshotKeyframe(ws, {
+              recovery: true,
+              atlasReset: command.atlasReset,
+            });
           }
           break;
 
@@ -291,6 +294,7 @@ export class MessageHandler {
         position: player.position,
         resumeToken,
         asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+        explorationVersion: 1,
         chargedWeapons: 1,
         color: player.color,
         kitId: player.kitId,

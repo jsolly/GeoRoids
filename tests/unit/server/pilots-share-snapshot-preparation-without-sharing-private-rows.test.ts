@@ -43,8 +43,8 @@ test.each(['tow', 'probe'] as const)(
       owner.utilityFlight = launchUtilityFlight(owner, kind, 20, 700);
       broadcaster.negotiateSnapshot(ownerSocket);
       broadcaster.negotiateSnapshot(observerSocket);
-      const ownerDecoder = new SnapshotDecoder();
-      const observerDecoder = new SnapshotDecoder();
+      const ownerDecoder = new SnapshotDecoder('live');
+      const observerDecoder = new SnapshotDecoder('live');
       const ownerRow = (socket: RecordingSocket, decoder: SnapshotDecoder) => {
         const raw = socket.sent.at(-1);
         assert(raw);
@@ -95,8 +95,8 @@ test('pilots receive only nearby loot, loose pickups and projectiles after movin
     assert(shot);
     broadcaster.negotiateSnapshot(westSocket);
     broadcaster.negotiateSnapshot(eastSocket);
-    const westDecoder = new SnapshotDecoder();
-    const eastDecoder = new SnapshotDecoder();
+    const westDecoder = new SnapshotDecoder('live');
+    const eastDecoder = new SnapshotDecoder('live');
     const rows = (socket: RecordingSocket, decoder: SnapshotDecoder) => {
       const raw = socket.sent.at(-1);
       assert(raw);

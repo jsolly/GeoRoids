@@ -7,11 +7,8 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { networkProfiles } from '../../../benchmarks/network-profiles';
 import { startTcpProxy } from '../../../benchmarks/tcp-proxy';
 import { readBenchmarkCompression } from '../../../benchmarks/websocket-compression';
-import {
-  type SnapshotBaseline,
-  SnapshotDecoder,
-  SnapshotEncoder,
-} from '../../../shared/snapshotProtocol';
+import { type SnapshotBaseline, SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { WireClient } from '../../support/wireClient';
 import { snapshotFixture } from '../network/snapshotFixture';
 
@@ -95,7 +92,7 @@ test.each(['clean', 'degraded'] as const)(
       expect(peer.extensions).toBe('permessage-deflate');
       expect(client.ws.extensions).toBe('permessage-deflate');
 
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('live');
       const applied: number[] = [];
       const acknowledged: number[] = [];
       let baseline: SnapshotBaseline | undefined;
@@ -132,7 +129,9 @@ test.each(['clean', 'degraded'] as const)(
         const result = decoder.readMessage(text, { acceptSnapshots: true });
         assert(result.kind === 'snapshot');
         expect(result.metadata.sequence).toBe(sequence);
-        expect(result.state).toEqual(JSON.parse(JSON.stringify(encoder.state)));
+        expect(result.state).toEqual(
+          JSON.parse(JSON.stringify({ ...encoder.state, exploration: world.exploration }))
+        );
         applied.push(result.metadata.sequence);
 
         // Receipt follows complete decode/application; only that frontier becomes a baseline.

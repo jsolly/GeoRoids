@@ -3303,8 +3303,15 @@ export class GameEngine {
   }
 
   public getSnapshotState(): Omit<ServerGameState, 'asteroids' | 'loot'> {
+    return { ...this.getBroadcastState(), exploration: this.exploration.snapshot() };
+  }
+
+  public getExplorationSource(): Pick<ExplorationMap, 'atlasIdentity' | 'nextAtlasTile'> {
+    return this.exploration;
+  }
+
+  public getBroadcastState(): Omit<ServerGameState, 'asteroids' | 'loot' | 'exploration'> {
     const allEntities = this.entityManager.getAllEntities();
-    const exploration = this.exploration.snapshot();
     const satellitePickups = this.satellitePickupManager.getAllPickups();
     const moduleNames = new Map(
       this.furnaces.litModules().map((module) => [module.id, this.furnaces.displayName(module.id)])
@@ -3358,7 +3365,6 @@ export class GameEngine {
           })),
         ...this.remains.snapshot(this.gameTime),
       ],
-      exploration,
       entities: allEntities.map(
         (entity) =>
           ({
@@ -3419,7 +3425,7 @@ export class GameEngine {
       terrainSeed: getTerrainSeed(),
       spiderField: this.getSpiderField(),
       beltRecovery: this.regionalField.recoveryWarnings(this.getServerTime()),
-    } satisfies Omit<ServerGameState, 'asteroids' | 'loot'>;
+    } satisfies Omit<ServerGameState, 'asteroids' | 'loot' | 'exploration'>;
 
     return gameState;
   }

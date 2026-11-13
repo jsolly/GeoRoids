@@ -201,7 +201,7 @@ function validateHistory(
   assert.equal(history.length, fixtureWorlds.length, 'Incomplete codec wire history');
   const state = Array.from({ length: recipientCount }, () => ({
     sequence: 0,
-    decoder: new SnapshotDecoder(),
+    decoder: new SnapshotDecoder('diagnostic'),
   }));
   const stats = { messages: 0, keyframes: 0, deltas: 0, bytes: 0, validatedMessages: 0 };
   const frameTrace: FrameTrace[][] = [];
@@ -279,7 +279,7 @@ function timedParseDecode(
   options: CodecSampleOptions,
   recipientCount: number
 ) {
-  const decoders = Array.from({ length: recipientCount }, () => new SnapshotDecoder());
+  const decoders = Array.from({ length: recipientCount }, () => new SnapshotDecoder('diagnostic'));
   const parseDecode = (batch: readonly WireMessage[]): void => {
     for (const message of batch) {
       const decoder = decoders[message.recipient];

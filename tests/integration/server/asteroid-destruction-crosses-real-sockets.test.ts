@@ -69,10 +69,10 @@ describe('Asteroid destruction over real sockets', () => {
       server.wsCore.stopPeriodicGameStateBroadcast();
       port = await server.listening;
 
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('live');
       const states: ServerGameSnapshot[] = [];
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+        `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
       );
       const wire = new WireClient(ws);
       client = wire;
@@ -114,6 +114,7 @@ describe('Asteroid destruction over real sockets', () => {
             position: { x: 800, y: 800 },
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
+            explorationVersion: 1,
           },
         })
       );

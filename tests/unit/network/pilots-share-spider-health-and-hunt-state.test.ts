@@ -31,7 +31,7 @@ test('both pilots receive spider damage and removal through snapshots', () => {
   const world = snapshotFixture();
   world.spiderField = structuredClone(field);
   const encoder = new SnapshotEncoder(world);
-  const decoders = [new SnapshotDecoder(), new SnapshotDecoder()];
+  const decoders = [new SnapshotDecoder('diagnostic'), new SnapshotDecoder('diagnostic')];
   for (const decoder of decoders) {
     expect(decodeSnapshotMessage(decoder, snapshotMessage(encoder.encode(1))).spiderField).toEqual(
       field

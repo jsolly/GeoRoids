@@ -33,7 +33,7 @@ describe('Server scoring via automatic satellite pickup collection', () => {
     server = createServerInstance({ port: 0, nodeEnv: 'test' });
     const port = await server.listening;
     const ws = new WebSocket(
-      `ws://localhost:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      `ws://localhost:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
     );
     client = new WireClient(ws);
     await client.open();
@@ -45,6 +45,7 @@ describe('Server scoring via automatic satellite pickup collection', () => {
       name: 'Collector',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     });
     await client.barrier();
     expect(client.messages.find((message) => message.type === 'joined')?.data).toMatchObject({

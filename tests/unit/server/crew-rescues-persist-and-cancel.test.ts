@@ -191,6 +191,7 @@ test('an activated campaign refuses unsupported clients before creating a pilot'
     kitId: 'scout',
     snapshotVersion: 3,
     asteroidInteractions: 1,
+    explorationVersion: 1,
   };
   handler.handleMessage({ type: 'join', id: 'newcomer', data }, socket);
   expect(engine.getPlayerBySocket(socket)).toBeUndefined();

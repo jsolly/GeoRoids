@@ -16,7 +16,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
   const failures: unknown[] = [];
   const pilot = new Pilot(0, {
     url: new URL(
-      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
     ),
     measuring: () => false,
     fail: (error) => failures.push(error),

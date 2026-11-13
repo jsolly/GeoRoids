@@ -21,7 +21,12 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
 import { getWorldCampaign } from '../network/worldCampaign';
-import { getWorldExploration, getWorldMapAssets, worldFurnaces } from '../network/worldExploration';
+import {
+  getWorldExploration,
+  getWorldMapAssets,
+  isAtlasSyncing,
+  worldFurnaces,
+} from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
 import { releaseBitmap, resizeBitmap } from '../rendering/bitmapBudget';
 import { strokeFurnaceFireTrail } from '../rendering/furnaceRenderer';
@@ -92,6 +97,7 @@ type MapView = {
 export type UniverseMapChrome = Readonly<{
   frame: Readonly<Pick<MapFrame, 'x' | 'y' | 'size'>>;
   centered: boolean;
+  atlasSyncing: boolean;
   locations: readonly string[];
   locationPage: number;
   locationPages: number;
@@ -785,6 +791,7 @@ export function mountUniverseMap(
     const chrome: UniverseMapChrome = {
       frame: { x: frame.x, y: frame.y, size: frame.size },
       centered: isNearbyLocalView(),
+      atlasSyncing: isAtlasSyncing(),
       locations: locations.slice(
         locationPage * LOCATION_PAGE_SIZE,
         (locationPage + 1) * LOCATION_PAGE_SIZE
@@ -958,7 +965,9 @@ export function mountUniverseMap(
     context.textAlign = 'right';
     context.textBaseline = 'top';
     context.fillText(
-      `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
+      isAtlasSyncing()
+        ? 'Chart syncing'
+        : `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
       frame.x + frame.size - 8,
       frame.y + 8
     );

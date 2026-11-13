@@ -66,6 +66,7 @@ function joinMessage(position: unknown): unknown {
       position,
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     },
   };
 }

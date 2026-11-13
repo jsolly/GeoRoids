@@ -45,6 +45,7 @@ async function join(
     position,
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
   });
   await client.barrier();
   const joined = messageAt(client, 'joined', start);
@@ -57,7 +58,7 @@ const activeClients: WireClient[] = [];
 async function connect(server: TestServer): Promise<WireClient> {
   const client = new WireClient(
     new WebSocket(
-      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
     )
   );
   activeClients.push(client);

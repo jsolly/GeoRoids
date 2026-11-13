@@ -8,8 +8,9 @@ import { test } from 'vitest';
 import WebSocket from 'ws';
 import { decodeClientCommand } from '../server/communication/clientCommandDecoder.ts';
 import { frontierSite } from '../shared/frontier.ts';
-import { type SnapshotBaseline, SnapshotEncoder } from '../shared/snapshotProtocol.ts';
+import type { SnapshotBaseline } from '../shared/snapshotProtocol.ts';
 import type { Position, ServerEntityData } from '../shared-types.ts';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../tests/support/liveSnapshotFixture';
 import { snapshotFixture } from '../tests/unit/network/snapshotFixture.ts';
 import { runNetworkSmoke, SmokeFailure } from './production-smoke-network.mjs';
 import type { SmokeSocket, SmokeSocketEvents } from './production-smoke-network.mts';
@@ -184,7 +185,7 @@ function codedSocket(outcome = 'accepted', initialState: Record<string, unknown>
   const createSocket = (url: string, options: WebSocket.ClientOptions) => {
     assert.equal(
       url,
-      'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=3&asteroidInteractions=1'
+      'wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=3&asteroidInteractions=1&explorationVersion=1'
     );
     assert.equal(options.origin, new URL(productionUrl).origin);
     assert.equal(options.handshakeTimeout, 15000);
@@ -241,6 +242,7 @@ function codedSocket(outcome = 'accepted', initialState: Record<string, unknown>
           id: outcome === 'wrong-player' ? 'other' : id,
           snapshotVersion: outcome === 'old-protocol' ? 2 : 3,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           resumeToken: 'private-resume-token',
           serverReleaseId: outcome === 'stale-server' ? oldRelease : release,
         });

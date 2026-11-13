@@ -5,6 +5,7 @@ import type {
   AsteroidPhenomenon,
   AsteroidProbe,
   FurnaceTransit,
+  LiveGameSnapshot,
   LootData,
   LootKind,
   MapAsset,
@@ -486,6 +487,20 @@ const world = shape<ServerGameSnapshot>({
   ...worldRules,
   playerProjectiles: array(playerProjectile),
 });
+const { exploration: _explorationRule, ...liveRules } = worldRules;
+const liveWorld = shape<LiveGameSnapshot>({
+  ...liveRules,
+  playerProjectiles: array(playerProjectile),
+});
+
+export function validateLiveSnapshotDto(value: unknown): asserts value is LiveGameSnapshot {
+  if (
+    !liveWorld(value) ||
+    (value !== null && typeof value === 'object' && Object.hasOwn(value, 'exploration'))
+  ) {
+    throw new Error('Incomplete or invalid live snapshot DTO');
+  }
+}
 /** Validate one persisted asteroid with the same metadata rules used on the wire. */
 export function isAsteroidDto(value: unknown): value is AsteroidData {
   return asteroid(value);

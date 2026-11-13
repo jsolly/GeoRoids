@@ -25,6 +25,8 @@ export function bindRegionalPilotOwner(data: unknown, previousOwner: string | un
     data.snapshotVersion !== SNAPSHOT_VERSION ||
     !('asteroidInteractions' in data) ||
     data.asteroidInteractions !== ASTEROID_INTERACTIONS_CAPABILITY ||
+    !('explorationVersion' in data) ||
+    data.explorationVersion !== 1 ||
     !('resumeToken' in data) ||
     typeof data.resumeToken !== 'string' ||
     data.resumeToken.length === 0

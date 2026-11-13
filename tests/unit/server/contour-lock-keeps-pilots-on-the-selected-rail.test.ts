@@ -900,6 +900,17 @@ test('three accepted adjacent hops charge one crew bridge, followers glide acros
   const epoch = followerActor.playerMotion?.epoch;
   for (let frame = 0; frame < 12; frame++) {
     world.engine.advanceOneFrame();
+    if (frame < 11) {
+      expect(followerActor.contourTransit?.frame).toBe(frame + 1);
+      expect(followerActor.position.x).toBeCloseTo(
+        charged.from.x + ((charged.to.x - charged.from.x) * (frame + 1)) / 12
+      );
+      expect(followerActor.position.y).toBeCloseTo(
+        charged.from.y + ((charged.to.y - charged.from.y) * (frame + 1)) / 12
+      );
+      expect(followerActor.contourLock).toBeNull();
+      expect(followerActor.playerMotion?.mode).toBe('handoff');
+    }
   }
   expect(followerActor.contourTransit).toBeUndefined();
   expect(followerActor.contourLock).toEqual(charged.target);
@@ -1041,7 +1052,10 @@ test.each([0, 1200])(
 
 test('crew bridges cap population, refuse their owner, refresh for different followers and expire at a fixed maximum', () => {
   const { actor, state } = railPilot();
-  const bridges = new CooperativeContourBridges();
+  const bridges = new CooperativeContourBridges({
+    actors: world.engine.entityManager,
+    motion: world.engine.playerMotion,
+  });
   const target = { ...state, height: state.height - TERRAIN.CONTOUR_INTERVAL };
   bridges.noteHop(actor.id, actor.position, state, target, 3, 0);
   const bridge = bridges.snapshot(0)[0];
@@ -1063,8 +1077,12 @@ test('crew bridges cap population, refuse their owner, refresh for different fol
     bridges.noteHop(actor.id, actor.position, state, target, 3, 1200);
   }
   expect(bridges.snapshot(1200)).toHaveLength(CONTOUR_BRIDGE.maximum);
+  const previousIds = [bridge.id, ...bridges.snapshot(1200).map((entry) => entry.id)];
   bridges.clear();
   expect(bridges.snapshot(1200)).toEqual([]);
+  bridges.noteHop(actor.id, actor.position, state, target, 3, 1200);
+  expect(bridges.snapshot(1200)).toHaveLength(1);
+  expect(previousIds).not.toContain(bridges.snapshot(1200)[0]?.id);
 });
 
 test('a loaded follower leaves a crew bridge at the same draft speed as an empty hold', () => {

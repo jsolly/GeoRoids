@@ -272,7 +272,7 @@
     "src/constants/user-preferences.ts": "sha256:16869d59950f02e95cf15b57724883bff4b24463e43f82176d0461e2d9e3caff",
     "src/content.config.ts": "sha256:36cd5fa9c536571a40d5464019e6572e98904b0d335bb849389df299a5deef77",
     "src/core/eventLoop.ts": "sha256:84377f7ccf49339bd0a7f78bfe77236776c42971e9ca3cdd788137a37f058f47",
-    "src/core/gameController.ts": "sha256:af64b9d2c50f3ceb6e7e5bfbea4073b04b7252ff76c5524e9f681affa1deb228",
+    "src/core/gameController.ts": "sha256:059e0a8c8f213343eb57d97eaa61bbd0851b001be753e5b3ba740de77d7ea6ea",
     "src/core/services/GameStateManager.ts": "sha256:f7558f319c4164fe7e008b526556e61e65a89cd13bb81637c4582842cf8fd8a7",
     "src/core/services/InputManager.ts": "sha256:4bda2decc191b6a716d58fac1a7c3d0ce67476eb3666bc65d81de2660e8b7d43",
     "src/diagnostics/clientDiagnostics.ts": "sha256:5b8d08eb3a461ff0530108f7abaf01bf8dafd8598a23c24434be5a7fa6eab371",
@@ -288,11 +288,12 @@
     "src/entities/laser/laserUtils.ts": "sha256:e7e20a0c5f6f6cb577898bb0f531b19866c833c44a090d56da833d1c71c97b01",
     "src/entities/loot/LootField.ts": "sha256:696cc5e32f6ba4c925861543d00f4863576785bac82bb0908b8595e615d7f2a9",
     "src/entities/loot/lootRenderer.ts": "sha256:2ffa3a00b95fd3b8290a0d8450358f0f41f452743ad14cb6992a0201823d58fc",
-    "src/entities/player/Player.ts": "sha256:92770adb44419cb00a855c2f8d6b00094c7cebf0a58003e5da2486fc9e5cda48",
+    "src/entities/player/Player.ts": "sha256:75470fdb2d68c13244fbd178ec33a8b83008832aff9b2088bef5707aa942d732",
     "src/entities/player/PlayerManager.ts": "sha256:53e0d6731ca2004cd283b62690646f808aa01a6b096041493d185a74c44fd116",
     "src/entities/player/createPlayer.ts": "sha256:76b46eaf958627ebcecfea73ae28ae9064ea669894a38433ce3f3a0700025f17",
     "src/entities/player/playerNetworkPort.ts": "sha256:246be082754cfbc4da4b6386815029f34b891f32411f76b0132a3b750a73a46a",
-    "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
+    "src/entities/player/remoteLasers.ts": "sha256:0069b02b181bd7570a827cd33781526b96ae83b539dc9da97883560ed080f7ab",
+    "src/entities/player/remoteMotion.ts": "sha256:dfeed0bf25a2f279f4df4e41a5c0e4c1f43419acb0ec689edda941745c51d468",
     "src/entities/roid/Roid.ts": "sha256:6ece79416cef7d83527273d650d2d53c477daf622d1ce5b189d4ce6d112a558b",
     "src/entities/roid/latchShudder.ts": "sha256:016855ebe48fdbe349677c8b742c8af1c684253ac8af454c5366865c102d1154",
     "src/entities/roid/materialArt.ts": "sha256:e60a0bc53a0d2a914a3b52f1bcdf1a07f6b5c869e152b7acb175eee8a8a2bd75",
@@ -324,7 +325,7 @@
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:06700bc6fcee05b0a2f3163092cc73d6a10dee5f6cec86acc01fca02802e4c92",
     "src/input/touchControls.ts": "sha256:92da23874d99b5ee851f042f2797ea618fec29137d5c06ef9af80eb3a8849991",
-    "src/network/services/ConnectionManager.ts": "sha256:761e5e7dacdbe3758b7c612d04acd684c8c5a5e6cbca2465bc3e698b107043c5",
+    "src/network/services/ConnectionManager.ts": "sha256:c242b2cd1c5b28bff346a0b55c20a73e91f2eff537cc1803f2dbbc7aa24cf53c",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:a13a7eb3c813fc97bd4ac9c757735f0712065a1b12ba8c1f889ea662ada808e1",
     "src/network/services/asteroidFieldSync.ts": "sha256:4e6a002c4e6340547bd12b005730a6ab26f9c8d289a2c0836992357687bd7cd0",
     "src/network/services/clientIdentity.ts": "sha256:6e5e8ae1c32a257f7fe2c26ceb2e5cdb59134182a3771b520bc355dff659d79d",
@@ -442,7 +443,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:5e8cafa46c4acae3478911a5fb05abe164c1ef5162e387ecfcfb91a7aff73bcd",
+    "src/wiki/articleSources.json": "sha256:c26153cbc06d9471217575034d5db966c2ef65298ed5600cf7a3a20b119fc4b6",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
@@ -8399,6 +8400,23 @@
       }
     },
     {
+      "note": "Reviewed remote snapshot projection and lifecycle resets against the field manual, Hauler, teamwork and network articles. Added the brief-motion and stale-update limitation to the network article. Existing controls, gameplay rules and demonstrations are unchanged. Focused production-path tests pass; exact-head hosted browser exercise remains pending.",
+      "sources": [
+        "src/core/gameController.ts",
+        "src/entities/player/Player.ts",
+        "src/entities/player/remoteLasers.ts",
+        "src/entities/player/remoteMotion.ts",
+        "src/network/services/ConnectionManager.ts",
+        "src/wiki/articleSources.json"
+      ],
+      "topics": ["field-manual", "hauler", "hud-network", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/entities/player/remoteMotion.ts": "hud-network",
+        "src/wiki/articleSources.json": "hud-network"
+      }
+    },
+    {
       "note": "Reviewed shared canvas RGBA dimension accounting, optional cache denial with native painters, explicit bitmap retirement on resize/failure/runtime detach, and bounded recording worker evidence. Updated HUD diagnostics and mobile incident runbook; no gameplay values, controls or demonstration rules change. Source review, changed-TypeScript Biome, Markdown, Knip and TypeScript checks passed. Focused suites cover native cache fallback, preserved artwork/reuse, independent sender versus main receipt clocks, failures, export and runtime teardown; all three deliberate causal mutants were rejected and restored. Inspected existing Scout, Hauler and Loot posters and confirmed the media generator uses unchanged hull/scan, furnace artwork and loot-radius helpers, so no demonstration regeneration is needed. This records focused source checks only. Full repository gate, exact-head hosted browser feature smoke and physical iPhone freeze acceptance remain pending; canvas estimates and worker gaps do not prove OS memory pressure or suspension.",
       "sources": [
         "docs/diagnostics.md",
@@ -8548,6 +8566,13 @@
         "package.json": "field-manual",
         "server/world/savedWorld.ts": "field-manual"
       }
+    },
+    {
+      "note": "Reviewed the combined published Canvas cleanup and remote-motion simulation call in GameController. Read the complete combined source, field-manual and HUD/network articles and demonstration source inventory. Canvas cache retirement remains intact; local prediction, fixed-step ordering and controls remain unchanged, while bounded remote display projection is documented. No demonstration cites this source and no generator or media bytes change. Native canvas pixel/PNG preflight, all 77 focused remote/lifecycle/reconnect cases, strict TypeScript and scoped Biome passed on this integrated source. Full repository gate, independent whole reviews and exact-head hosted browser evidence remain pending.",
+      "sources": ["src/core/gameController.ts"],
+      "topics": ["field-manual", "hud-network"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

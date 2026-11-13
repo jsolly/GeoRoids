@@ -414,6 +414,9 @@
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
   ],
   "hud-network": [
+    "src/entities/player/Player.ts",
+    "src/entities/player/remoteLasers.ts",
+    "src/entities/player/remoteMotion.ts",
     "src/components/UpdateNotice.svelte",
     "src/release/clientReleaseEntry.ts",
     "src/release/clientReleaseWatcher.ts",

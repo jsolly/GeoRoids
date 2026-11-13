@@ -191,6 +191,77 @@ test('online snapshot includes committed WAL, every auxiliary table and a resuma
   }
 });
 
+test('online snapshots retain sparse row identities, opaque storage classes and sequence state without receipt leaks', async () => {
+  const { directory, path, db, token } = fixture();
+  db.exec(`
+    CREATE TABLE sqliteAux (value);
+    INSERT INTO sqliteAux(rowid,value) VALUES
+      (11,NULL),(42,1),(43,1.0),(44,9223372036854775806),(45,9223372036854775807),
+      (46,CAST(X'610062' AS TEXT)),(47,CAST(X'ff' AS TEXT)),(48,X'ff'),(49,1e999);
+    CREATE TABLE future_sequence (id INTEGER PRIMARY KEY AUTOINCREMENT, private TEXT);
+    INSERT INTO future_sequence(id,private) VALUES(91,'private-sequence-marker');
+    DELETE FROM future_sequence;
+  `);
+  const sourceBefore = explorationStorageFingerprint(db);
+  const destination = join(directory, 'opaque.sqlite');
+  const receipt = await createSnapshot(path, destination);
+  expect(explorationStorageFingerprint(db)).toBe(sourceBefore);
+  const copy = new DatabaseSync(destination);
+  try {
+    expect(explorationStorageFingerprint(copy)).toBe(sourceBefore);
+    expect(
+      copy
+        .prepare(
+          'SELECT rowid,typeof(value) AS kind,hex(CAST(value AS BLOB)) AS bytes FROM sqliteAux ORDER BY rowid'
+        )
+        .all()
+    ).toEqual([
+      { rowid: 11, kind: 'null', bytes: '' },
+      { rowid: 42, kind: 'integer', bytes: '31' },
+      { rowid: 43, kind: 'real', bytes: '312E30' },
+      { rowid: 44, kind: 'integer', bytes: '39323233333732303336383534373735383036' },
+      { rowid: 45, kind: 'integer', bytes: '39323233333732303336383534373735383037' },
+      { rowid: 46, kind: 'text', bytes: '610062' },
+      { rowid: 47, kind: 'text', bytes: 'FF' },
+      { rowid: 48, kind: 'blob', bytes: 'FF' },
+      { rowid: 49, kind: 'real', bytes: '496E66' },
+    ]);
+    expect(
+      copy.prepare('SELECT seq FROM sqlite_sequence WHERE name=?').get('future_sequence')
+    ).toEqual({ seq: 91 });
+    const fingerprints = new Set<string>();
+    for (const scalar of [
+      'NULL',
+      '1',
+      '1.0',
+      '9223372036854775806',
+      '9223372036854775807',
+      "CAST(X'610062' AS TEXT)",
+      "CAST(X'ff' AS TEXT)",
+      "X'ff'",
+      '1e999',
+    ]) {
+      copy.exec(`UPDATE sqliteAux SET value=${scalar} WHERE rowid=42`);
+      fingerprints.add(explorationStorageFingerprint(copy));
+    }
+    expect(fingerprints.size).toBe(9);
+  } finally {
+    copy.close();
+  }
+  expect(Object.keys(receipt).sort((left, right) => left.localeCompare(right))).toEqual([
+    'bytes',
+    'cooperativeRecords',
+    'explorationTiles',
+    'generation',
+    'pilots',
+    'sectors',
+    'sha256',
+    'worldIdentity',
+  ]);
+  expect(JSON.stringify(receipt)).not.toContain(token);
+  expect(JSON.stringify(receipt)).not.toContain('private-sequence-marker');
+});
+
 test('SQLite integrity alone cannot accept a malformed credential row or a reset-on-boot generation', async () => {
   const { directory, path, db } = fixture();
   db.prepare('UPDATE pilots SET json=?').run(

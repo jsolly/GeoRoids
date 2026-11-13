@@ -343,16 +343,23 @@ procedure.
 
 ## Local verification and integration
 
-The implementation was prepared against the legacy-atlas baseline. When
-integrating after exploration phase two, retain one defining world parser in
-`server/world/savedWorld.ts`. Replace the backup module's baseline atlas adapter
-with `inspectExplorationStorage` and `assertExplorationDatabaseIntegrity` from
-`explorationSchema.ts`; preserve stale-preparation as a valid legacy state.
-Remove the duplicate baseline `readSavedWorld` parser while migrating its
-callers. Keep shared sector/pilot/economy parsers in `worldDataValidation.ts`.
-Re-run focused backup fixtures in legacy, prepared, stale-preparation and active
-states, then the complete local gate on the combined branch. Do not treat this
-integration note as permission to publish incompatible intermediate readers.
+The backup inspector shares the metadata parser in
+`server/world/savedWorld.ts` with the legacy runtime and exploration transition
+tooling. The legacy runtime validates its required atlas at its actual reader.
+The inspector uses `inspectExplorationStorage` and
+`assertExplorationDatabaseIntegrity` from `explorationSchema.ts`. Legacy,
+prepared and stale-preparation backups count the authoritative legacy atlas;
+active backups count the tile rows. Inspection never supplies an empty atlas or
+rewrites the saved format.
+
+Focused backup fixtures cover all four storage states, exact source preservation,
+committed WAL content, sparse implicit rowids, sequence counters and opaque
+SQLite storage classes. The shared fingerprint distinguishes INTEGER, REAL,
+NULL, raw TEXT and BLOB values, including adjacent int64 values and malformed
+UTF-8 in unrelated private tables. Snapshot receipts contain only identity hashes,
+file metadata and aggregate counts. Run the complete local gate on the combined
+branch before publication. A local fixture is not an actual off-volume backup
+or a production restore drill.
 
 No in-game Wiki page changes: this is operator-only backup tooling and changes
 no player controls or gameplay rules. The full gate and integrated rollout proof

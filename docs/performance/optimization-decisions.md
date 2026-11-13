@@ -57,7 +57,8 @@ gains do not establish phone or deployed capacity acceptance.
 | OffscreenCanvas and WebGL | Reject adoption. The current renderer depends on managers, DOM layout and effects; a transfer boundary, fallback and new renderer would add substantial complexity without a demonstrated bottleneck. |
 | Monotonic clock and bounded debt | Implemented. Scheduling uses a monotonic clock, excess simulation debt beyond one second is counted and discarded, and simulated entity motion receives the actual simulation-frame delta. Wall-clock reconnect grace retains its meaning. Controlled defects confirmed that repeated debt replay fails the regression tests. |
 | Collision index | Reject the tested grid. All 800 seeded worlds preserved outcomes, but the grid was 12.9–342.5 times slower. The [circle experiment](collision-experiment.md) excludes swept projectiles; no projectile-index claim is made. |
-| AI searches and tick-local views | Retain current ownership. Repeated entity arrays and snapshot views in `GameEngine`, `EntityManager` and the broadcaster are potential allocation sites, not demonstrated dominant costs. A loaded CPU/allocation profile is the prerequisite for changing them. |
+| AI searches and tick-local views | Retain current entity-array ownership. The [loaded server profiles](loaded-server-profile.md) attribute only 0.023–0.034% of estimated allocation to `EntityManager.getAllEntities`. No live-array cache is justified by this ten-pilot load. Unrepresented AI/world shapes remain outside that observation. |
+| Per-player snapshot filtering | Retain local visibility and private recipient ownership. Generic interest helpers each use less than 0.25% of sampled wall time in the [loaded profiles](loaded-server-profile.md); snapshot capture/copy/diff and specific loot-query work are larger targets for separate experiments. No broad filtering rewrite is justified. |
 | Outbound pressure | Implemented a bounded policy for every gameplay class, including snapshots and gameplay events. Snapshot pressure requires recoverable keyframes; nonrecoverable or permanently oversized writes close explicitly. Enhanced resume tokens survive pressure closure and event-write failure. Metrics distinguish queued acceptance from delivery, which the real clients validate separately. |
 | Existing JSON deltas | Retain them. The [Unicode protocol experiment](protocol-experiment.md) validates round trips and shows 75.04% fewer application bytes than full legacy JSON in its fixture. Shared canonical preparation and negotiated recovery already exist. |
 | Lower snapshot cadence | Reject adoption without correction-distance, interpolation and response measurements. A lower rate changes visible motion and recovery; a smaller byte count alone cannot validate it. Simulation stays at 60 Hz and snapshots at 30 Hz. |
@@ -65,12 +66,22 @@ gains do not establish phone or deployed capacity acceptance.
 | Binary protocol and interest management | Reject adoption. There is no demonstrated end-to-end bottleneck requiring a new wire format or visibility contract. Interest management must preserve offscreen combat, HUD completeness and recovery semantics. |
 | Extra replicas and room routing | Retain one authoritative process per world. Additional replicas need explicit world placement and reconnect routing. With no users and no demonstrated capacity shortfall, those systems would add complexity without an established benefit. |
 | Region and admission reserve | No production configuration change. The read-only Railway inventory records one `iad` replica and an existing staged operation. Local loopback timing cannot choose a player-facing region or justify an admission limit. |
+| Player ceiling | Retain `MAX_PLAYERS=100` as a provisional hard admission ceiling, without a human-concurrency certification. In the [local worker-persistence staircase](loaded-server-profile.md#local-capacity-observation-and-its-cause), 10 pilots met delivery references and 25 delivered about 15.3 states/s with a fully busy server event loop. That is a local throughput concern, not sufficient evidence for a replacement production cap. |
 | Aggregate diagnostics | Implemented bounded opt-in client samples and server histograms, GC, event-loop, memory and outbound observations. Keep them opt-in until overhead is calibrated. Coalesced pending snapshots and send-completion latency are not separately attributed; actual state gaps remain in load reports. |
 | Developer/test performance | Retain the repository-owned serialized integration runner and existing static gate. Required smoke dependency, scheduled full integration and separate coverage are implemented. Do not add integration workers or migrate test runners without measured maintenance benefit and isolation proof. |
 | Baseline calibration and regression gating | Keep raw samples, failures, workload witnesses and input hashes. No numeric performance CI threshold or supported-device claim is enabled without unchanged-control noise measurements and target-device calibration. |
 | Field dashboards, soaks and rollout | Not accepted by local tests. Physical-device runs, remote workload staircases, 30-minute boundary soaks, two-player deployment verification remain release-acceptance work. No deployment or remote load was performed. |
 
 ## Evidence and limits
+
+The [2026-11-12 loaded-server follow-up](loaded-server-profile.md) captures four
+CPU/allocation profiles, two unprofiled ten-pilot observations and bounded 10/25
+worker-persistence steps on clean source `b741509c`. It settles the live-array,
+recipient-filtering and player-ceiling code decisions above. Its synthetic
+80-initial-rock scenes include both ordinary destruction/fragmentation and a
+declared metal/endurance companion. They do not certify human or production
+capacity. The measurements below remain historical evidence from their recorded
+revision.
 
 The five-pilot loopback workload (one legacy, four negotiated) completed 30 seconds
 of warmup and 180 seconds of measurement. All five pilots completed, delivering
@@ -96,10 +107,9 @@ intentional game-over disconnects classified as warnings. The corrected touch
 lifecycle then passed 60 seconds and two natural rejoins with no browser errors
 or warnings. Final sustained client results are recorded in implementation status.
 
-Independent reviewers found no demonstrated additional optimization to adopt.
-They identified two useful measurement questions if a real performance problem
-appears: target-phone HUD/terrain/harpoon CPU and allocation cost, and an actual
-loaded server profile of temporary entity views and snapshot preparation. Neither
-question is a verified performance defect. Adding the proposed caches, pools,
-renderer or protocol systems before answering those questions would exceed the
-evidence for this application.
+The original independent review found no demonstrated additional optimization to
+adopt and identified target-phone work and a loaded server profile as useful
+measurement questions. The loaded profile is now recorded above. It demonstrates
+substantial broadcast allocation and a local state-rate boundary, but does not
+demonstrate a benefit from the proposed live-array cache or broad filtering
+rewrite. Target-phone HUD/terrain/harpoon cost remains a separate question.

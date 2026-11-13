@@ -48,6 +48,8 @@
     "test:coverage": "node scripts/validation-admission.mjs unit -- vitest run --config config/testing/vitest.ts --project unit --project components --coverage",
     "benchmark:realtime": "./scripts/test-runner.sh --benchmark-client",
     "benchmark:load": "./scripts/test-runner.sh --benchmark-load",
+    "benchmark:loaded": "node scripts/validation-admission.mjs runner -- node --import tsx benchmarks/loaded-battle.ts",
+    "benchmark:loaded-summary": "node --import tsx benchmarks/loaded-battle-summary.ts",
     "smoke:production": "node --import tsx scripts/production-smoke-entry.mjs",
     "smoke:scenario-contract": "vitest run --config config/testing/tooling.ts --project smoke",
     "check:frontend": "astro check --config config/app/astro.ts --tsconfig ./tsconfig.frontend.json --minimumFailingSeverity warning && svelte-check --config ./config/app/svelte.ts --tsconfig ./tsconfig.frontend.json --fail-on-warnings",
@@ -69,7 +71,7 @@
     "node": "^26.0.0"
   },
   "dependencies": {
-    "@astrojs/svelte": "9.0.1",
+    "@astrojs/svelte": "9.1.2",
     "@aws-sdk/client-s3": "3.1167.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.6",

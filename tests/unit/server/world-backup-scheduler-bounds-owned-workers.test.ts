@@ -67,7 +67,12 @@ test('restart starts immediately, verified IPC schedules the next UTC day, and s
   };
   first(workers).emit('message', {
     kind: 'verified',
-    receipt: { day: '2026-11-12', daily: receipt, weekly: receipt },
+    receipt: {
+      day: '2026-11-12',
+      daily: { ...receipt, privateRow: 'private-daily-marker' },
+      weekly: { ...receipt, credentials: 'private-weekly-marker' },
+      rawError: 'private-report-marker',
+    },
   });
   first(workers).emit('close', 0);
   expect(report).toHaveBeenCalledWith({

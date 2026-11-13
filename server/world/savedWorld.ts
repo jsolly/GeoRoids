@@ -3,7 +3,7 @@ import { validCivicModules } from '../../shared/furnaces';
 import { releaseField } from '../../shared/releaseId';
 import type { CivicModule } from '../../shared-types';
 
-interface SavedWorld {
+export interface SavedWorld {
   asteroidBelt?: BeltSlotState[];
   /** Furnaces a Scout paid for. Absent on older rows. */
   civicModules?: CivicModule[];

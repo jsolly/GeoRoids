@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:e7f9f7853221d7b55f393e5f9dd99bd89ec367002ebb8f048451130a54f52449",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:29ff2102993d0f375661782e77e9288cc3906444d56ef71409b3b3f6f0322a31",
+    "package.json": "sha256:75d80b438cd19a0b8590b839d3329259e49f9daafbd1530cd70b7f2214562f78",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -83,7 +83,7 @@
     "scripts/wiki-media.ts": "sha256:00ce2e5ca0078e0d4c75d189bd37624ab3bbbf259d5d3be9a5a261599170d01b",
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
-    "server.ts": "sha256:59210b7720b95338cebbb531e6f2548f60c6b8dee86847eec65c8d5b86347b5e",
+    "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
     "server/communication/MessageHandler.ts": "sha256:d9d5c9369cce8ac5eab6f779bffa55ea2afa402aefd7ed6fcd1c052d7e853710",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:8e8326a9071f261d14bc1e55a8aff8173755325f12b9b13fdd060b5d51911e56",
@@ -112,7 +112,7 @@
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/createServer.ts": "sha256:df33d393615b9b178c590947d32f93d622096f5340cd71b987656c2440c64094",
+    "server/createServer.ts": "sha256:f2e828b8aa14a7baac737d9056b010e726b08781ec85204c6aa054057a253c23",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:3000a6e2efca48148b5697873852128f276846a923276840c3348694e07c39e7",
     "server/staticClient.ts": "sha256:e68a7c48e159fbae08ef8428bccb87f396ca967b9e3b04e6dac82188ec143dac",
@@ -123,14 +123,14 @@
     "server/world/RegionalAsteroidField.ts": "sha256:acac5f455055955bf824acfaf5ad435a5c0aa871b2edf50b81dc9c19d2bbcca4",
     "server/world/WorkerWorldPersistence.ts": "sha256:62c36d2ce77968ceef89e92a6f8387287cf1e957399354bb95ed1eacd8d01074",
     "server/world/WorldRemains.ts": "sha256:c33b88806c9504fd5727e08a44ebf92d4718b92043369bb0ce685b6f72390110",
-    "server/world/WorldStore.ts": "sha256:affed8c8f40e493fc28f7bccfad165293aeab61a01aafbafef71e51a7ebd2624",
-    "server/world/cooperativeSchema.ts": "sha256:6cec4cad8874b7ec0e23bfb6e612ac80726696fd21e97cf5da9713324ddd8e00",
+    "server/world/WorldStore.ts": "sha256:185fd0aa6fdc86bfb98dc76f6fd5b17d54041ed99d676d1fa89262e4345c82ee",
+    "server/world/cooperativeSchema.ts": "sha256:7f28ba0f44dac3430127dca245cbb0c08f87caf22292bbe0cad5af20d7697307",
     "server/world/depositLayout.ts": "sha256:5fe2e83866fe5cd843e4187e753839b22b840170d90de855b02efb2129d5d0c5",
     "server/world/explorationSchema.ts": "sha256:bd1f3c15f6ffc36e02e8d94d3d65a77ca52ef287598d2bffdab9b5ee1aab7b2a",
     "server/world/openWorldPersistence.ts": "sha256:3aed1f7650463bc093af50086c120568c49a959d6bbd486f5611a729b9a0ecde",
-    "server/world/savedWorld.ts": "sha256:d2aa2225ba2338a2d11507e39d1846561c57bf6149f63396851a4983aa5a0fce",
     "server/world/spatialQueryBounds.ts": "sha256:5b1ff4fd81460be2a0dd6bb4ea00ebf63873587cb5613abd041bd0c87f4083f8",
     "server/world/sqliteSnapshot.ts": "sha256:9d0c02c9bb57acf35eab8af67e7d415ca483f7c65811a056430e127573dab8ec",
+    "server/world/worldDataValidation.ts": "sha256:f73c03da614d6195a951f94d5079e79b168c3b95881ebbb6581c08e13b894356",
     "server/world/worldPersistence.ts": "sha256:64d8794262d1f1059033ebc1e3c77357d4a564f455324047aa5abd91ceac3302",
     "server/world/worldStoreWorker.ts": "sha256:d051dfb86ede3da4eb82f6eeac4cf8aba57a04f55a32e9a48de6d7dd0b17955f",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:8864d0c2925d0d3f574477e3de84fd29b69211a86e4ab30223c234f4a4b776da",
@@ -583,7 +583,8 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:0d682c53509551abbdbaa0a715db90ab2b4c5e3afed618a004601a67a35be205",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8"
+    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
+    "server/world/savedWorld.ts": "sha256:5c77353275e1277e97b99c826f53a52f914eb377ca5797821d82a32f744e61c1"
   },
   "reviews": [
     {
@@ -8416,6 +8417,58 @@
       "topics": ["hud-network"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "Reviewed all five affected articles against disabled backup startup/shutdown, loopback restore binding and shared saved-row parsers. Existing restart, credential, discovery, furnace and settlement behavior remains unchanged; the 45-case domain/backup batch and four real storage-format snapshot cases passed. A stale-preparation authority mutation failed with three expected discoveries versus two received, then source was restored. No affected demonstration source or player-facing UI changed, so no GIF regeneration or native UI acceptance is claimed. Operator resource/access/recovery details are in docs/world-backups.md; no production operation was performed.",
+      "sources": [
+        "package.json",
+        "server.ts",
+        "server/createServer.ts",
+        "server/world/WorldStore.ts",
+        "server/world/cooperativeSchema.ts",
+        "server/world/explorationSchema.ts",
+        "server/world/savedWorld.ts",
+        "server/world/worldDataValidation.ts"
+      ],
+      "topics": ["field-manual", "hud-network", "loot-growth", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "server.ts": "field-manual",
+        "server/world/cooperativeSchema.ts": "field-manual",
+        "server/world/explorationSchema.ts": "field-manual",
+        "server/world/savedWorld.ts": "field-manual",
+        "server/world/worldDataValidation.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the frozen exploration format helpers and lossless SQLite collector shared by offline tooling and backup fixtures. Legacy, prepared and stale-preparation backups retain the legacy atlas as authority; active backups count tile rows. The metadata parser remains singular and the legacy reader validates its required atlas. Lint and types passed, 19 focused backup cases passed, and all three real loopback restore integration cases passed with successful cleanup. The old helper failed the new nine-value fingerprint regression; an explicit rowid-loss defect failed source/copy equality. VACUUM INTO survived on the installed SQLite, so no kill is claimed for that mutation. Restored production source retains online backup. No player rule, control or demonstration changed, and no GIF or native UI acceptance is claimed. No production data, resource, access or configuration action occurred.",
+      "sources": ["server/world/explorationSchema.ts", "server/world/sqliteSnapshot.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "server/world/explorationSchema.ts": "field-manual",
+        "server/world/sqliteSnapshot.ts": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the combined manifest after merging verified main 8b142cef. Main's two admitted loaded-benchmark commands remain exact, the fixed Svelte adapter is 9.1.2, and the backup SDK remains pinned to 3.1167.0. The lockfile installed successfully with lifecycle scripts disabled, then the normal canvas rebuild succeeded. Existing backup format authority, row preservation and private IPC fixtures passed before this merge; the normal commit hook will validate the complete combined source. This manifest integration changes no player control, documented gameplay rule or demonstration source, so no GIF regeneration or native UI acceptance is claimed. No production resources, access, configuration or data were changed.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed the combined backup SDK and strict tooling-contract package commands. The shared saved-world parser retains the same validation and metadata semantics; its exported type is consumed by WorldStore. Offline transition commands and disabled backup code share the canonical parser and snapshot helpers. Player rules, controls and demonstrations are unchanged.",
+      "sources": ["package.json", "server/world/savedWorld.ts"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual",
+        "server/world/savedWorld.ts": "field-manual"
+      }
     }
   ]
 }

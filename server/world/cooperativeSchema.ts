@@ -2,10 +2,19 @@ import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
 import { validCooperativeRecord } from '../../shared/cooperativeWorld';
-import type { CooperativeWorld } from '../../shared-types';
+import type { CooperativeRecord, CooperativeWorld } from '../../shared-types';
 
 /** Read-only schema and row inspection. Ordinary startup never creates these tables. */
 export function readCooperativeWorld(db: DatabaseSync): CooperativeWorld | undefined {
+  const activated = readCooperativeSchema(db);
+  if (activated === undefined) {
+    return undefined;
+  }
+  return { schemaVersion: 1, activated, records: [...iterateCooperativeRecords(db)] };
+}
+
+/** Shared read-only marker validation; false means a prepared, inactive schema. */
+export function readCooperativeSchema(db: DatabaseSync): boolean | undefined {
   const tables = db
     .prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('cooperative_schema','cooperative_records')"
@@ -17,7 +26,7 @@ export function readCooperativeWorld(db: DatabaseSync): CooperativeWorld | undef
   if (tables.length !== 2) {
     throw new Error('Incomplete cooperative schema');
   }
-  const markers = db.prepare('SELECT version,activated FROM cooperative_schema').all();
+  const markers = db.prepare('SELECT version,activated FROM cooperative_schema LIMIT 2').all();
   const marker = markers[0];
   if (
     markers.length !== 1 ||
@@ -26,17 +35,18 @@ export function readCooperativeWorld(db: DatabaseSync): CooperativeWorld | undef
   ) {
     throw new Error('Unsupported cooperative schema');
   }
-  const records = db
-    .prepare('SELECT id,json FROM cooperative_records ORDER BY id')
-    .all()
-    .map((row) => {
-      const value: unknown = JSON.parse(String(row['json']));
-      if (!validCooperativeRecord(value) || `${value.kind}:${value.id}` !== row['id']) {
-        throw new Error(`Invalid cooperative record ${String(row['id'])}`);
-      }
-      return value;
-    });
-  return { schemaVersion: 1, activated: marker['activated'] === 1, records };
+  return marker['activated'] === 1;
+}
+
+/** Iterate validation without loading a second campaign into the backup process. */
+export function* iterateCooperativeRecords(db: DatabaseSync): Generator<CooperativeRecord> {
+  for (const row of db.prepare('SELECT id,json FROM cooperative_records ORDER BY id').iterate()) {
+    const value: unknown = JSON.parse(String(row['json']));
+    if (!validCooperativeRecord(value) || `${value.kind}:${value.id}` !== row['id']) {
+      throw new Error(`Invalid cooperative record ${String(row['id'])}`);
+    }
+    yield value;
+  }
 }
 
 /** Fingerprint the exact legacy data, including credentials, without exposing it. */

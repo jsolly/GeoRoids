@@ -40,6 +40,8 @@ import { openWorldPersistence } from './world/openWorldPersistence';
 
 type CreateServerOptions = {
   port?: number;
+  /** Explicit loopback binding for owned local restore rehearsals. */
+  host?: string;
   nodeEnv?: string;
   seed?: number;
   worldPath?: string;
@@ -499,7 +501,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   const listening = new Promise<number>((resolve, reject) => {
     httpServer.once('error', reject);
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, options.host, () => {
       httpServer.off('error', reject);
       const actualPort = getPort();
       logger.info(`✅ Server listening on port ${actualPort}`);

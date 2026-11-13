@@ -94,6 +94,8 @@ the fatal behavior above. World connections auto-checkpoint the WAL at 256 pages
 and retain at most 16 MiB after a checkpoint can reset it. Those settings do not
 cap an active transaction or guarantee space while another reader holds the WAL.
 
+Private off-volume S3 backups are disabled until configured. Review the [backup setup and restore rehearsal](world-backups.md) before provisioning resources, granting access or changing the active volume. Keep Railway volume backups as well.
+
 ## Asteroid belt recovery
 
 The world row stores a finite `asteroidBelt` ledger with a generation and

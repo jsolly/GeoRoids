@@ -191,13 +191,16 @@ export async function runPhoneDiagnostics(exercise: Exercise): Promise<void> {
       name: 'Performance collection',
       exact: true,
     });
-    await collector.getByText('Device and conditions', { exact: true }).click();
+    const metadataToggle = collector.getByText('Device and conditions', { exact: true });
+    await metadataToggle.click();
     await collector
       .getByLabel('Device model and OS', { exact: true })
       .fill('Hosted Chromium mobile viewport');
     await collector
       .getByLabel('Test conditions', { exact: true })
       .fill('Ephemeral CI world; short flight and map; not a physical phone');
+    // Close the metadata disclosure to expose the mobile panel's recording controls.
+    await metadataToggle.click();
     await collector.getByRole('button', { name: 'Start', exact: true }).click();
     await collector.getByRole('status').filter({ hasText: 'Performance: recording' }).waitFor();
     await page

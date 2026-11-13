@@ -34,8 +34,9 @@ registry failure there is handled by re-running the failed jobs. A failure cause
 by a new third-party image or tool release, such as a re-pushed builder tag, needs
 an owner decision rather than a re-run. The other lanes run on arm64.
 
-The required `ci` aggregate succeeds only when all six lanes succeed. Failed,
-cancelled, skipped or absent required evidence cannot pass. Each lane performs
+The required `ci` aggregate succeeds only when all six lanes succeed and, on
+pull requests, the security aggregate succeeds too. Failed, cancelled, skipped
+or absent required evidence cannot pass. Each validation lane performs
 the range secrets scan before considering reusable exact-tree proof. The lanes'
 copy selects the pinned gitleaks archive for its runner architecture, because the
 media and Railpack lanes run on x64; the `ci` job keeps the canonical arm64 step.
@@ -43,13 +44,18 @@ Post-merge CI reuses successful PR evidence only for the identical Git tree and
 matching lane. Missing proof reruns that lane; manual dispatch validates normally.
 Dependabot PRs run the same lanes and `ci`; labels start no runs.
 
-`.github/workflows/security.yml` runs on pull requests and is not part of the
-required `ci` aggregate. It scans full history with the same pinned gitleaks
+The PR security jobs live in `.github/workflows/ci.yml` alongside the six
+validation lanes. The security group scans full history with the same pinned gitleaks
 release, runs Semgrep `p/default --error` against the pull-request base, scans
 `package-lock.json` with osv-scanner, and audits workflows with offline zizmor.
-The `security` job needs those four scanners, runs with `if: always()`, and
-fails unless every one succeeded. That job name is the ruleset check `security`.
-It does not replace the lane secrets scans. Branch protection is unchanged.
+The `security` job needs those four scanners and runs even after a scanner
+fails. It fails unless every one succeeded. Required `ci` waits for it and
+rejects any other result before the aggregate job's checkout. Both `ci` and
+`security` retain their exact check names for auto-merge. Security scanners run
+on every PR, including Dependabot; main pushes and manual runs retain the six
+validation lanes without repeating PR scans. Security results are never reused
+from exact-tree lane proofs. CI checkouts use the existing canonical v7.0.1 pin.
+The lane secrets scans remain, and branch protection is unchanged.
 Non-draft pull requests from `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arm GitHub squash
 auto-merge. Hold one by converting it to a draft or by running
 `gh pr merge --disable-auto`. The 30-minute sweep squash-merges the current

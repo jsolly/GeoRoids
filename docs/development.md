@@ -79,11 +79,8 @@ uv or mypy. No Wiki behavior or media baseline changes.
 The dispatcher lives in this clone's Git common directory, shared only by its
 linked worktrees. It registers pre-commit and pre-push only. Pre-commit keeps the
 staged gitleaks scan and adds an offline zizmor audit. Pre-push runs a ranged
-gitleaks scan, then Semgrep and osv-scanner. Pre-push first probes `https://semgrep.dev/`
-and `https://api.osv.dev/`. A scan whose server refuses or drops the connection (curl
-exits 5, 6, 7, 28, 35 or 56, as behind a cloud session's egress proxy) is skipped with a
-warning, because CI's Security workflow runs it on the pull request. Any HTTP answer runs
-the scan, any other probe failure fails the push, and the gitleaks scan always runs. The complete hook/library/setup
+gitleaks scan only. Semgrep and osv-scanner run in CI and must pass before a pull
+request can merge. Pre-push needs neither scanner nor a network probe. The complete hook/library/setup
 bundle must match current reviewed `origin/main`, or a deliberately approved exact
 bundle digest. Missing files, symlinks, unreviewed modes and a foreign origin fail
 closed. The dispatcher executes a verified snapshot, then runs quality scripts in

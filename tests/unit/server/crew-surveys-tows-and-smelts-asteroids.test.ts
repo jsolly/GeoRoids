@@ -65,7 +65,7 @@ test.each(['mineral_scan', 'survey_probe'] as const)(
     engine.addAsteroid(far);
     const reveal = vi.spyOn(engine, 'revealArea');
 
-    engine.tickAbilities();
+    engine.abilities.advance();
 
     expect(reveal.mock.calls).toEqual([
       [scout.position, 1_200],
@@ -95,7 +95,7 @@ test('a satellite widens Hauler exploration with one reveal and base Scout disco
   engine.addAsteroid(far);
   const reveal = vi.spyOn(engine, 'revealArea');
 
-  engine.tickAbilities();
+  engine.abilities.advance();
 
   expect(reveal.mock.calls).toEqual([
     [scout.position, 650],
@@ -170,7 +170,7 @@ test('towing preserves attachment momentum, follows the moving Hauler, and relea
   for (let frame = 0; frame < 400; frame++) {
     hauler.velocity = { x: 0.8, y: 0 };
     hauler.position.x += hauler.velocity.x;
-    engine.tickAbilities();
+    engine.abilities.advance();
     rock.position.x += rock.velocity.x;
     rock.position.y += rock.velocity.y;
   }
@@ -183,7 +183,7 @@ test('towing preserves attachment momentum, follows the moving Hauler, and relea
   expect(hauler.harpoonTargetId).toBeNull();
   const releasedVelocity = { ...rock.velocity };
   hauler.position.x += 200;
-  engine.tickAbilities();
+  engine.abilities.advance();
   expect(rock.velocity).toEqual(releasedVelocity);
 });
 
@@ -199,7 +199,7 @@ test('an owned player motion session still pulls cargo on the authoritative serv
   resolveToolFlights(engine);
   hauler.position.x += 30;
   hauler.velocity.x = 1;
-  engine.tickAbilities();
+  engine.abilities.advance();
   expect(rock.velocity.x).toBeGreaterThan(0);
 });
 
@@ -234,7 +234,7 @@ test('scans retain map discoveries after expiry without crediting distant Scouts
   expect(engine.useAbility('scout')).toBe(true);
   resolveToolFlights(engine);
   for (let frame = 0; frame < SHIP_ABILITY.SCAN_FRAMES + 1; frame++) {
-    engine.tickAbilities();
+    engine.abilities.advance();
   }
   expect(actor('scout').abilityActiveFrames).toBe(0);
   expect(rock.surveyedBy).toEqual(['scout']);

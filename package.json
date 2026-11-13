@@ -71,7 +71,7 @@
     "node": "^26.0.0"
   },
   "dependencies": {
-    "@astrojs/svelte": "9.0.1",
+    "@astrojs/svelte": "9.1.2",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.6",
     "@types/ws": "^8.18.2",

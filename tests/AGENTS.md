@@ -2,9 +2,10 @@
 
 Tests explain a player or system event and prove its expected behavior. Prefer a
 small, trustworthy suite. Coverage percentage and test count are not goals.
-GeoRoids does not write or run browser tests. All automated tests execute code
-without launching a browser. Do not add Playwright, Cypress, WebDriver or other
-browser correctness suites.
+Automated regression suites execute code without launching a browser. Do not add
+Playwright, Cypress, WebDriver or other broad browser correctness suites. John's
+November 12, 2026 authorization permits the bounded, manually dispatched hosted
+Chromium smoke below when local browser verification is blocked.
 Svelte/jsdom component tests and canvas-call tests execute code in the runner;
 they do not launch a browser. Brief native checks follow [Basic manual browser
 smoke](#basic-manual-browser-smoke).
@@ -177,6 +178,29 @@ Do not build a browser harness, long scenario matrix or multiplayer regression
 workflow. Deterministic code tests own regression coverage. A `/preview` URL
 smoke is the same brief check; cloud-session mechanics live in
 [cloud sessions](../docs/agent-operations.md#cloud-sessions).
+
+## Hosted browser smoke
+
+The manual `Browser smoke` workflow is a scoped alternative to the basic local
+smoke. It uses an ephemeral local world on a hosted runner and takes an exact
+candidate commit. Run its first self-check against its landed `main` commit.
+For a UI change, dispatch from `main`, with the candidate PR kept in draft.
+The verification script comes from the workflow commit, separately from the
+candidate checkout. It checks desktop and mobile Chromium viewports, joins through
+the start screen, sends playfield input, opens and closes the map, visits `/wiki/`
+and `/debug`, and fails on page or console errors. It retains screenshots, short
+videos, the server log and a receipt, including on failures. The receipt also
+records up to 50 console warnings and a dropped-warning count. Inspect every
+warning; a truncated warning inventory cannot establish a clean console.
+
+Read the actual receipt and inspect the images before marking the PR ready for
+the normal auto-merge workflow. A green job alone does not certify appearance.
+Missing, failed or mismatched-commit evidence remains unverified. This workflow
+does not replace the mandatory local code gate, independent review, production
+smoke or physical-device acceptance. Mobile emulation does not establish iPhone
+memory behavior, physical touch, audio or remote-motion quality. Use deterministic
+code tests for regression assertions; keep this a small manual smoke, not a new
+browser scenario matrix.
 
 ## Manual performance and media tools
 

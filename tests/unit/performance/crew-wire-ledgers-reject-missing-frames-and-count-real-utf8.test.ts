@@ -4,9 +4,12 @@ import { expect, test } from 'vitest';
 import { canonicalJson } from '../../../benchmarks/results';
 import { parseArguments } from '../../../benchmarks/run';
 import { sampleOptions } from '../../../benchmarks/sample';
+import { recipientSnapshotOracle } from '../../../benchmarks/snapshot-oracle';
 import { websocketTextHeaderBytes } from '../../../benchmarks/websocket-frame-bytes';
 import { partitionSnapshotBytes, replayWireLedger } from '../../../benchmarks/wire-ledger';
+import { GameEngine } from '../../../server/core/GameEngine';
 import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { RecordingSocket } from '../../support/recordingSocket';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 function hash(text: string): string {
@@ -16,6 +19,25 @@ function hash(text: string): string {
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
+
+test('the independent recipient oracle keeps nearby wildlife and excludes another habitat', () => {
+  const engine = new GameEngine(42);
+  try {
+    engine.addPlayer('local', 'Local', new RecordingSocket(), { x: 0, y: 0 });
+    engine.addPlayer('distant', 'Distant', new RecordingSocket(), { x: 10_000, y: 0 });
+    engine.advanceOneFrame();
+    const allIds = engine.getSnapshotState().rolyPolys?.map((animal) => animal.id);
+    expect(allIds).toContain('roly-poly:0,0');
+    expect(allIds).toContain('roly-poly:8,0');
+    const recipientIds = recipientSnapshotOracle(engine, 'local').rolyPolys?.map(
+      (animal) => animal.id
+    );
+    expect(recipientIds).toContain('roly-poly:0,0');
+    expect(recipientIds).not.toContain('roly-poly:8,0');
+  } finally {
+    engine.stopGameLoop();
+  }
+});
 
 function wireScene() {
   const world = snapshotFixture(0);

@@ -14,6 +14,7 @@ export function recipientSnapshotOracle(engine: GameEngine, id: string): ServerG
   const common = engine.getSnapshotState();
   const source = {
     ...common,
+    rolyPolys: nearbyWorldRows(common.rolyPolys ?? [], player.position),
     asteroids: nearbyAsteroidRows(
       engine.getAllAsteroids(),
       player.position,

@@ -56,7 +56,7 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
 function addScout(engine: GameEngine, id = 'scout', socket = new RecordingSocket()) {
   const actor = engine.addPlayer(id, id, socket, { ...furnace.position }, 'scout');
   actor.position = { ...furnace.position };
-  const pilot = engine.registerPilot(actor, socket);
+  const pilot = engine.pilotSessions.register({ actor: actor, socket: socket });
   assert(pilot.ok);
   actor.abilityCooldownFrames = 0;
   return { actor, socket, token: pilot.resumeToken };
@@ -192,7 +192,12 @@ test('a named furnace and the builder leftover score survive a SQLite restart', 
     const secondStore = new WorldStore(path);
     try {
       const restarted = new GameEngine(99, undefined, new InlineWorldPersistence(secondStore));
-      const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout', 'New name');
+      const resumed = restarted.pilotSessions.resume({
+        token: token,
+        socket: new RecordingSocket(),
+        requestedKit: 'scout',
+        requestedName: 'New name',
+      });
       assert(resumed.ok);
       expect(resumed.actor.score).toBe(leftover);
       expect(restarted.getGameState().civicModules).toEqual(lit);

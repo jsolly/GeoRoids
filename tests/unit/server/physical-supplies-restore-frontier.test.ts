@@ -52,7 +52,7 @@ function scenario(records: CooperativeRecord[] = []) {
   cleanups.push(() => engine.stopGameLoop());
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('hauler', 'Hauler', socket, { x: 0, y: 0 }, 'hauler');
-  engine.registerPilot(pilot, socket);
+  engine.pilotSessions.register({ actor: pilot, socket: socket });
   pilot.haulerUtility = 'tow_cable';
   return { engine, pilot, store, socket };
 }
@@ -393,7 +393,7 @@ test('actual hive state reaches only nearby snapshot recipients and carries shie
     { x: far.position.x + 150, y: far.position.y },
     'scout'
   );
-  engine.registerPilot(remote, remoteSocket);
+  engine.pilotSessions.register({ actor: remote, socket: remoteSocket });
   remote.position = { x: far.position.x + 150, y: far.position.y };
   engine.advanceOneFrame();
   for (const rock of engine.getAllAsteroids()) {

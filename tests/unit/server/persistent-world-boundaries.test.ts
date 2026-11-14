@@ -114,7 +114,7 @@ test('stale transport removal captures a pilot before its private token resumes 
   const engine = new GameEngine(1);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
-  const registered = engine.registerPilot(actor, socket);
+  const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
   if (!registered.ok) {
     throw new Error(registered.error);
   }
@@ -126,7 +126,10 @@ test('stale transport removal captures a pilot before its private token resumes 
   expect(engine.getPlayer('pilot')).toBeUndefined();
   expect(engine.drainDepartedPlayers()).toEqual(['pilot']);
   expect(engine.isGamePaused()).toBe(true);
-  const resumed = engine.resumePilot(registered.resumeToken, new RecordingSocket());
+  const resumed = engine.pilotSessions.resume({
+    token: registered.resumeToken,
+    socket: new RecordingSocket(),
+  });
   expect(resumed.ok).toBe(true);
   if (resumed.ok) {
     expect(engine.getPlayer('pilot')).toBe(resumed.actor);

@@ -24,7 +24,7 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     { x: 10000, y: 0 },
     'scout'
   );
-  const registration = engine.registerPilot(owner, socket);
+  const registration = engine.pilotSessions.register({ actor: owner, socket: socket });
   assert.ok(registration.ok);
   const pickup = engine.getAllSatellitePickups()[0];
   assert.ok(pickup);
@@ -87,7 +87,10 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     expect(engine.transportClosed(socket)).toBe(true);
     now += PLAYER_MOTION.reconnectGraceMs - 1;
     const resumedSocket = new RecordingSocket();
-    const resumed = engine.resumePilot(registration.resumeToken, resumedSocket);
+    const resumed = engine.pilotSessions.resume({
+      token: registration.resumeToken,
+      socket: resumedSocket,
+    });
     assert.ok(resumed.ok);
     expect(engine.getSatellitePickup(pickup.id)).toMatchObject({
       ownerId: owner.id,
@@ -100,7 +103,10 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
       health: equipped.health,
     });
 
-    const again = engine.resumePilot(registration.resumeToken, resumedSocket);
+    const again = engine.pilotSessions.resume({
+      token: registration.resumeToken,
+      socket: resumedSocket,
+    });
     assert.ok(again.ok);
     const dropped = engine.getSatellitePickup(pickup.id);
     assert.ok(dropped);

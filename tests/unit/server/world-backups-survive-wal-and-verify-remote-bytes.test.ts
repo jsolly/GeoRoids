@@ -43,7 +43,7 @@ function fixture() {
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('fixture-pilot', 'Fixture pilot', socket, { x: 0, y: 0 }, 'scout');
-  const registration = engine.registerPilot(pilot, socket);
+  const registration = engine.pilotSessions.register({ actor: pilot, socket: socket });
   if (!registration.ok) {
     throw new Error('Fixture pilot registration failed');
   }
@@ -176,7 +176,7 @@ test('online snapshot includes committed WAL, every auxiliary table and a resuma
   try {
     const engine = new GameEngine(999, undefined, new InlineWorldPersistence(store));
     expect(engine.getTerrainSeed()).toBe(82);
-    const resumed = engine.resumePilot(token, new RecordingSocket());
+    const resumed = engine.pilotSessions.resume({ token: token, socket: new RecordingSocket() });
     expect(resumed.ok).toBe(true);
     if (!resumed.ok) {
       throw new Error('Restored pilot could not resume');

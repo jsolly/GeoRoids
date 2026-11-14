@@ -539,7 +539,7 @@ test('a long absence and a smaller kit preserve cargo at its field position with
   vi.setSystemTime(1000000);
   const engine = new GameEngine(42);
   const { actor, socket } = pilot(engine, 'hauler', 'hauler');
-  const registration = engine.registerPilot(actor, socket);
+  const registration = engine.pilotSessions.register({ actor: actor, socket: socket });
   if (!registration.ok) {
     throw new Error('Registration failed');
   }
@@ -547,7 +547,11 @@ test('a long absence and a smaller kit preserve cargo at its field position with
   actor.score = 70;
   engine.removePlayer(actor.id);
   vi.advanceTimersByTime(60000);
-  const resumed = engine.resumePilot(registration.resumeToken, new RecordingSocket(), 'scout');
+  const resumed = engine.pilotSessions.resume({
+    token: registration.resumeToken,
+    socket: new RecordingSocket(),
+    requestedKit: 'scout',
+  });
   if (!resumed.ok) {
     throw new Error('Resume failed');
   }

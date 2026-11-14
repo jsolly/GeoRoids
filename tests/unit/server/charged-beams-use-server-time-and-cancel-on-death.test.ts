@@ -118,14 +118,17 @@ test('diagnostic world arrangement preserves a live charge while a full reset ad
 
 test('a charge abandoned during transport loss cannot block the resumed pilot from firing', () => {
   const { engine, pilot, socket, advance } = scenario();
-  const registration = engine.registerPilot(pilot, socket);
+  const registration = engine.pilotSessions.register({ actor: pilot, socket: socket });
   if (!registration.ok) {
     throw new Error(registration.error);
   }
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(60);
   expect(engine.transportClosed(socket)).toBe(true);
-  expect(engine.resumePilot(registration.resumeToken, new RecordingSocket()).ok).toBe(true);
+  expect(
+    engine.pilotSessions.resume({ token: registration.resumeToken, socket: new RecordingSocket() })
+      .ok
+  ).toBe(true);
   expect(
     engine.getSnapshotState().entities.find((row) => row.id === pilot.id)?.weaponChargeFrames
   ).toBe(0);
@@ -137,18 +140,23 @@ test('a charge abandoned during transport loss cannot block the resumed pilot fr
 
 test('a replacement socket cancels abandoned charge while repeated joins on the owning socket preserve it', () => {
   const { engine, pilot, socket, advance } = scenario();
-  const registration = engine.registerPilot(pilot, socket);
+  const registration = engine.pilotSessions.register({ actor: pilot, socket: socket });
   if (!registration.ok) {
     throw new Error(registration.error);
   }
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(60);
-  expect(engine.resumePilot(registration.resumeToken, socket).ok).toBe(true);
+  expect(engine.pilotSessions.resume({ token: registration.resumeToken, socket: socket }).ok).toBe(
+    true
+  );
   expect(
     engine.getSnapshotState().entities.find((row) => row.id === pilot.id)?.weaponChargeFrames
   ).toBe(61);
   const replacement = new RecordingSocket();
-  const resumed = engine.resumePilot(registration.resumeToken, replacement);
+  const resumed = engine.pilotSessions.resume({
+    token: registration.resumeToken,
+    socket: replacement,
+  });
   expect(resumed.ok).toBe(true);
   expect(engine.transportClosed(socket)).toBe(false);
   expect(

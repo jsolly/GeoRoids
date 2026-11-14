@@ -47,7 +47,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
     const engine = server.gameEngine;
     const socket = new RecordingSocket();
     const miner = engine.addPlayer('miner', 'Miner', socket, { x: 100, y: 100 });
-    expect(engine.registerPilot(miner, socket).ok).toBe(true);
+    expect(engine.pilotSessions.register({ actor: miner, socket: socket }).ok).toBe(true);
     const target: AsteroidData = {
       ...asteroid('rollback-target', { x: 500, y: 500 }),
       material: 'rubble' as const,

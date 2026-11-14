@@ -11,7 +11,7 @@ import { RecordingSocket } from '../../support/recordingSocket';
 function registerPilot(engine: GameEngine, id: string, position: { x: number; y: number }) {
   const socket = new RecordingSocket();
   const actor = engine.addPlayer(id, id, socket, position, 'scout');
-  const registered = engine.registerPilot(actor, socket);
+  const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
   assert(registered.ok);
   return { actor, token: registered.resumeToken };
 }
@@ -33,7 +33,12 @@ test('a long absence starts a new flight with the saved score', () => {
 
     monotonicMs += PLAYER_MOTION.returnToShipMs + 1;
     const later = new GameEngine(82, clock, new InlineWorldPersistence(store));
-    const resumed = later.resumePilot(original.token, new RecordingSocket(), 'scout', 'Bob');
+    const resumed = later.pilotSessions.resume({
+      token: original.token,
+      socket: new RecordingSocket(),
+      requestedKit: 'scout',
+      requestedName: 'Bob',
+    });
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
       id: 'scout',
@@ -66,7 +71,10 @@ test('a restart inside the return window restores the ship without its transient
 
     elapsed += 500;
     const restarted = new GameEngine(82, clock, new InlineWorldPersistence(store));
-    const resumed = restarted.resumePilot(original.token, new RecordingSocket());
+    const resumed = restarted.pilotSessions.resume({
+      token: original.token,
+      socket: new RecordingSocket(),
+    });
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
       id: 'scout',

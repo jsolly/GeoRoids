@@ -7,6 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import { ServerClock } from '../../../server/core/ServerClock';
 import { sectorDeposits } from '../../../server/world/depositLayout';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
@@ -14,6 +15,7 @@ import { WorldStore } from '../../../server/world/WorldStore';
 import { DEPOSIT_FIELD } from '../../../shared/constants/gameplay';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
+import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { nearbyWorldRows, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -40,7 +42,7 @@ function database(path: string): WorldStore {
 function pilot(engine: GameEngine, id: string, kit: 'scout' | 'hauler', position = { x: 0, y: 0 }) {
   const socket = new RecordingSocket();
   const actor = engine.addPlayer(id, id, socket, position, kit);
-  const registered = engine.registerPilot(actor, socket);
+  const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
   assert(registered.ok);
   return { actor, socket, token: registered.resumeToken };
 }
@@ -105,8 +107,14 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   const second = new GameEngine(999, undefined, new InlineWorldPersistence(database(path)));
   expect(second.getTerrainSeed()).toBe(82);
   expect(second.getGameState().settlement).toEqual(settlement);
-  const resumed = second.resumePilot(scout.token, new RecordingSocket(), undefined, 'Bob');
+  const resumed = second.pilotSessions.resume({
+    token: scout.token,
+    socket: new RecordingSocket(),
+    requestedKit: undefined,
+    requestedName: 'Bob',
+  });
   assert(resumed.ok);
+  expect(resumed.resumeToken).not.toBe(scout.token);
   expect(resumed.actor.id).toBe('scout');
   expect(resumed.actor.name).toBe('Bob');
   expect(resumed.actor.score).toBe(points);
@@ -115,8 +123,12 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   const cell = explorationCellAt({ x: 900, y: 0 });
   assert(cell !== null);
   expect(isCellExplored(second.getGameState().exploration, cell)).toBe(true);
-  expect(second.resumePilot('f'.repeat(64), new RecordingSocket()).ok).toBe(false);
-  expect(second.resumePilot(scout.token, new RecordingSocket()).ok).toBe(false);
+  expect(
+    second.pilotSessions.resume({ token: 'f'.repeat(64), socket: new RecordingSocket() }).ok
+  ).toBe(false);
+  expect(
+    second.pilotSessions.resume({ token: scout.token, socket: new RecordingSocket() }).ok
+  ).toBe(false);
 });
 
 test('travelling far across the world loads local ore and a quick return finds mined deposits still missing', () => {
@@ -192,8 +204,17 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
   const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
   original.actor.score = 450;
   const replacement = new RecordingSocket();
-  const resumed = engine.resumePilot(original.token, replacement, 'hauler', 'Bob');
+  const resumed = engine.pilotSessions.resume({
+    token: original.token,
+    socket: replacement,
+    requestedKit: 'hauler',
+    requestedName: 'Bob',
+  });
   assert(resumed.ok);
+  expect(resumed.resumeToken).toBe(original.token);
+  expect(resumed.supersededSocket).toBe(original.socket);
+  expect(engine.getPlayerBySocket(original.socket)).toBeUndefined();
+  expect(engine.getPlayerBySocket(replacement)).toBe(original.actor);
   expect(resumed.actor).toBe(original.actor);
   expect(resumed.actor).toMatchObject({
     id: 'scout',
@@ -240,7 +261,10 @@ test('resuming during an explosion keeps the pending respawn until the server re
     true
   );
   const remaining = original.actor.respawnTimer;
-  const resumed = engine.resumePilot(original.token, new RecordingSocket());
+  const resumed = engine.pilotSessions.resume({
+    token: original.token,
+    socket: new RecordingSocket(),
+  });
   assert(resumed.ok);
   expect(resumed.actor).toBe(original.actor);
   expect(resumed.actor).toMatchObject({
@@ -272,16 +296,23 @@ test('a restart preserves the damaged pilot recovery wait across saved flight re
   const original = pilot(first, 'damaged', 'scout');
   delete original.actor.spawnProtectionTimer;
   first.handleShipDamage(original.actor.id, 'asteroid', 20);
+  original.actor.shieldFrames = 120;
+  original.actor.shieldCooldownFrames = 600;
   first.removePlayer(original.actor.id);
   first.checkpointWorld();
   firstStore.close();
   stores.splice(stores.indexOf(firstStore), 1);
   const second = new GameEngine(82, undefined, new InlineWorldPersistence(database(path)));
   vi.spyOn(second, 'getServerTime').mockReturnValue(11_000);
-  const resumed = second.resumePilot(original.token, new RecordingSocket());
+  const resumed = second.pilotSessions.resume({
+    token: original.token,
+    socket: new RecordingSocket(),
+  });
   assert(resumed.ok);
   expect(resumed.actor.health).toBe(80);
   expect(resumed.actor.healthRegenTimer).toBe(240);
+  expect(resumed.actor.shieldFrames).toBe(60);
+  expect(resumed.actor.shieldCooldownFrames).toBe(540);
   for (let frame = 0; frame < 240; frame++) {
     second.advanceCombatFrame();
   }
@@ -314,11 +345,64 @@ test('diagnostic rearrangement and last departure preserve saved identity while 
   engine.pilotLedger.capture(replacement.id);
   expect(engine.pilotLedger.has(replacement.id)).toBe(false);
   expect(engine.pilotLedger.checkpointRows()).toEqual([]);
-  const registered = engine.registerPilot(replacement, socket);
+  const registered = engine.pilotSessions.register({ actor: replacement, socket: socket });
   assert(registered.ok);
   expect(registered.resumeToken).not.toBe(original.token);
   engine.checkpointWorld();
   expect(store.loadPilots()).toHaveLength(1);
   expect(store.loadPilots()[0]?.name).toBe('Replacement');
   engine.stopGameLoop();
+});
+
+test('expired transport grace removes and recaptures the latest actor before saved resume without a sweep frame', ({
+  onTestFinished,
+}) => {
+  let elapsed = 0;
+  const clock = new ServerClock({ wallNow: () => 100_000, monotonicNow: () => elapsed });
+  const engine = new GameEngine(82, clock);
+  onTestFinished(() => engine.stopGameLoop());
+  const original = pilot(engine, 'grace', 'scout', { x: 200, y: 300 });
+  expect(engine.transportClosed(original.socket)).toBe(true);
+  original.actor.score = 450;
+  original.actor.cargo = 40;
+  original.actor.position = { x: 2_400, y: 1_800 };
+  elapsed = Math.max(PLAYER_MOTION.reconnectGraceMs, PLAYER_MOTION.returnToShipMs) + 1;
+  const socket = new RecordingSocket();
+  const resumed = engine.pilotSessions.resume({ token: original.token, socket: socket });
+  assert(resumed.ok);
+  expect(resumed.actor).not.toBe(original.actor);
+  expect(resumed.resumeToken).not.toBe(original.token);
+  expect(resumed.actor).toMatchObject({ score: 450, cargo: 40, position: { x: 2_400, y: 1_800 } });
+  expect(engine.getPlayerCount()).toBe(1);
+  expect(engine.getPlayerBySocket(socket)).toBe(resumed.actor);
+  expect(engine.getPlayerBySocket(original.socket)).toBeUndefined();
+});
+
+test('a resumed pilot cannot take another live human name or merge into that human socket', ({
+  onTestFinished,
+}) => {
+  const engine = new GameEngine(82);
+  onTestFinished(() => engine.stopGameLoop());
+  const original = pilot(engine, 'alice', 'scout');
+  original.actor.name = 'Alice';
+  const other = pilot(engine, 'bob', 'scout');
+  other.actor.name = 'Bob';
+  expect(engine.pilotSessions.resume({ token: original.token, socket: other.socket }).ok).toBe(
+    false
+  );
+  expect(engine.getPlayerBySocket(other.socket)).toBe(other.actor);
+  expect(engine.getPlayerBySocket(original.socket)).toBe(original.actor);
+  const replacement = new RecordingSocket();
+  const resumed = engine.pilotSessions.resume({
+    token: original.token,
+    socket: replacement,
+    requestedKit: 'hauler',
+    requestedName: 'BoB',
+  });
+  assert(resumed.ok);
+  expect(resumed.actor).toBe(original.actor);
+  expect(resumed.actor.name).toBe('Alice');
+  expect(resumed.actor.kitId).toBe('hauler');
+  expect(resumed.resumeToken).toBe(original.token);
+  expect(engine.getPlayerCount()).toBe(2);
 });

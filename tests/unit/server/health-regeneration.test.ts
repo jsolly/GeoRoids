@@ -101,7 +101,10 @@ describe('server-authoritative health regeneration', () => {
     const damagedHealth = ship.health;
     const timer = ship.healthRegenTimer;
     world.engine.removePlayer(pilot.id);
-    const resumed = world.engine.resumePilot(pilot.resumeToken, new RecordingSocket());
+    const resumed = world.engine.pilotSessions.resume({
+      token: pilot.resumeToken,
+      socket: new RecordingSocket(),
+    });
     expect(resumed.ok).toBe(true);
     if (!resumed.ok) {
       throw new Error('Expected resumed pilot');
@@ -121,7 +124,10 @@ describe('server-authoritative health regeneration', () => {
     world.engine.handleShipDamage(pilot.id, 'asteroid', 20);
     world.engine.removePlayer(pilot.id);
     clock.mockReturnValue(now + 3000);
-    const resumed = world.engine.resumePilot(pilot.resumeToken, new RecordingSocket());
+    const resumed = world.engine.pilotSessions.resume({
+      token: pilot.resumeToken,
+      socket: new RecordingSocket(),
+    });
     expect(resumed.ok).toBe(true);
     if (!resumed.ok) {
       throw new Error('Expected resumed pilot');

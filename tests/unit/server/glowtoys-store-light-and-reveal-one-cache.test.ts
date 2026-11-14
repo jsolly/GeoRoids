@@ -141,7 +141,7 @@ test('cache reveal and cargo persist in the same next-second batch, even between
   const engine = new GameEngine(123, undefined, new InlineWorldPersistence(store));
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
-  engine.registerPilot(pilot, socket);
+  engine.pilotSessions.register({ actor: pilot, socket: socket });
   pilot.position = { x: 0, y: 0 };
   for (const row of engine.getAllAsteroids()) {
     engine.removeAsteroid(row.id);
@@ -183,7 +183,7 @@ test('cache reveal and cargo persist in the same next-second batch, even between
       x: 0,
       y: 0,
     });
-    restored.registerPilot(resumedPilot, resumedSocket);
+    restored.pilotSessions.register({ actor: resumedPilot, socket: resumedSocket });
     resumedPilot.position = { x: 0, y: 0 };
     expect(restored.getAsteroid(target.id)?.glowtoy?.cacheRevealed).toBe(true);
     expect(restored.getLoot().filter((drop) => drop.kind === 'points')).toEqual([

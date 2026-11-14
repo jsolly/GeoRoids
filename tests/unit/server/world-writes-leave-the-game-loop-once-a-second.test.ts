@@ -12,6 +12,7 @@ import type {
   WorldPersistenceDiagnostics,
 } from '../../../server/world/worldPersistence';
 import { GAME } from '../../../shared/constants/gameplay';
+import { emptySettlement } from '../../../shared/economy';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -152,6 +153,58 @@ class InFlightPersistence implements WorldPersistence {
     };
   }
 }
+
+test('settlement transitions replace queued state and checkpoint neutral intake and diagnostic reset', () => {
+  const persistence = new InFlightPersistence();
+  const { engine, miner } = world(persistence);
+  engine.checkpointWorld();
+  const initial = persistence.batches[0]?.economy?.settlement;
+  assert(initial);
+  expect(initial).toEqual(emptySettlement());
+
+  const ore = metalDeposit('settlement-ore', { x: 0, y: 0 });
+  ore.ore = 'metal';
+  ore.boost = { phase: 'burning', ownerId: miner.id, angle: 0 };
+  engine.addAsteroid(ore);
+  engine.processFurnaceDeliveries();
+  const delivered = engine.getGameState().settlement;
+  expect(delivered).toEqual({
+    level: 1,
+    points: 300,
+    resources: { ice: 0, metal: 10, rubble: 0, crystal: 0 },
+  });
+  expect(delivered).not.toBe(initial);
+  expect(initial).toEqual(emptySettlement());
+  expect(miner.score).toBe(300);
+  engine.checkpointWorld();
+  expect(persistence.batches[1]?.economy?.settlement).toBe(delivered);
+  engine.checkpointWorld();
+  expect(persistence.batches[2]?.economy).toBeUndefined();
+
+  const barren = metalDeposit('neutral-intake', { x: 0, y: 0 });
+  barren.ore = null;
+  barren.boost = { phase: 'burning', ownerId: 'absent-pilot', angle: 0 };
+  engine.addAsteroid(barren);
+  engine.processFurnaceDeliveries();
+  expect(engine.getAsteroid(barren.id)).toBeUndefined();
+  const neutral = engine.getGameState().settlement;
+  expect(neutral).toEqual(delivered);
+  expect(neutral).not.toBe(delivered);
+  expect(miner.score).toBe(300);
+  engine.checkpointWorld();
+  expect(persistence.batches[3]?.economy?.settlement).toBe(neutral);
+
+  engine.prepareDiagnosticWorld('traversal');
+  const reset = engine.getGameState().settlement;
+  expect(reset).toEqual(emptySettlement());
+  expect(reset).not.toBe(neutral);
+  expect(engine.getPlayer(miner.id)).toBe(miner);
+  expect(miner.score).toBe(300);
+  engine.checkpointWorld();
+  expect(persistence.batches[4]?.economy?.settlement).toBe(reset);
+  expect(initial).toEqual(emptySettlement());
+  expect(delivered.resources.metal).toBe(10);
+});
 
 test('a commit still in flight defers the next flush, which then carries everything that changed meanwhile', async () => {
   const persistence = new InFlightPersistence();

@@ -87,6 +87,12 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   hauler.actor.position = { x: station.position.x + 100, y: station.position.y };
   first.processFurnaceDeliveries();
   const points = 300;
+  const settlement = {
+    level: 1,
+    points: points * 2,
+    resources: { ice: 0, metal: 10, rubble: 0, crystal: 0 },
+  };
+  expect(first.getGameState().settlement).toEqual(settlement);
   expect(first.getPlayer('hauler')?.score).toBe(points);
   expect(
     first.drainFurnaceDeliveries()[0]?.rewards.find((reward) => reward.playerId === 'scout')?.points
@@ -98,6 +104,7 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
 
   const second = new GameEngine(999, undefined, new InlineWorldPersistence(database(path)));
   expect(second.getTerrainSeed()).toBe(82);
+  expect(second.getGameState().settlement).toEqual(settlement);
   const resumed = second.resumePilot(scout.token, new RecordingSocket(), undefined, 'Bob');
   assert(resumed.ok);
   expect(resumed.actor.id).toBe('scout');

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import process from 'node:process';
 import { test } from 'vitest';
 import { mergeLedger } from './merge-wiki-ledger.mts';
@@ -145,90 +145,211 @@ test('malformed input is refused with the side named', () => {
   );
 });
 
-test('the resolver reads a real conflict out of the index and resolves the worktree file', () => {
-  const root = mkdtempSync(join(tmpdir(), 'georoids-wiki-ledger-merge-'));
-  const callerIndex = join(root, 'caller-index');
-  const callerIndexContents = 'The caller owns this index.\n';
-  writeFileSync(callerIndex, callerIndexContents);
-  const environment = {
-    ...Object.fromEntries(
-      Object.entries({ ...process.env, GIT_INDEX_FILE: callerIndex }).filter(
-        ([key]) => !key.startsWith('GIT_')
-      )
-    ),
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_SYSTEM: '/dev/null',
-  };
-  const git = (...args: string[]) =>
-    execFileSync('git', args, {
-      cwd: root,
-      encoding: 'utf8',
-      env: environment,
-    });
-  const ledgerPath = join(root, 'docs/wiki-source-review.json');
-  const write = (hashes: Record<string, string>, reviews: ReturnType<typeof batch>[]) =>
-    writeFileSync(ledgerPath, `${JSON.stringify({ note: 'n', hashes, reviews }, null, 2)}\n`);
-  try {
-    git('init', '-q');
-    git('config', 'user.name', 'Ledger merge contract');
-    git('config', 'user.email', 'ledger@example.invalid');
-    execFileSync('mkdir', ['-p', join(root, 'docs')]);
-
-    write({ 'both.ts': BASE_DIGEST, 'ours.ts': BASE_DIGEST }, [batch('r1')]);
-    git('add', '.');
-    git('commit', '-qm', 'base');
-    const base = git('rev-parse', 'HEAD').trim();
-
-    git('checkout', '-q', '-b', 'theirs');
-    write({ 'both.ts': THEIR_DIGEST, 'ours.ts': BASE_DIGEST }, [batch('r1'), batch('theirs')]);
-    git('commit', '-aqm', 'theirs');
-
-    git('checkout', '-q', base);
-    git('checkout', '-q', '-b', 'ours');
-    write({ 'both.ts': OUR_DIGEST, 'ours.ts': OUR_DIGEST }, [batch('r1'), batch('ours')]);
-    git('commit', '-aqm', 'ours');
-
-    // Prove the premise: this really is a conflict git will not resolve itself.
-    let conflicted = false;
+test.each([
+  { form: 'spaced', separateOutput: true },
+  { form: 'equals', separateOutput: true },
+  { form: 'mixed', separateOutput: true },
+  { form: 'spaced', separateOutput: false },
+  { form: 'equals', separateOutput: false },
+  { form: 'mixed', separateOutput: false },
+  { form: 'positional', separateOutput: false },
+])(
+  '$form file arguments merge into the selected output (separate: $separateOutput)',
+  ({ form, separateOutput }) => {
+    const root = mkdtempSync(join(tmpdir(), 'georoids ledger files '));
+    const base = join(root, 'base ledger.json');
+    const ours = join(root, 'ours ledger.json');
+    const theirs = join(root, 'theirs=ledger.json');
+    const out = join(root, 'merged ledger.json');
+    const inputs = {
+      [base]: ledger({ 'ours.ts': BASE_DIGEST, 'theirs.ts': BASE_DIGEST }, [batch('base')]),
+      [ours]: ledger({ 'ours.ts': OUR_DIGEST, 'theirs.ts': BASE_DIGEST }, [
+        batch('base'),
+        batch('ours'),
+      ]),
+      [theirs]: ledger({ 'ours.ts': BASE_DIGEST, 'theirs.ts': THEIR_DIGEST }, [
+        batch('base'),
+        batch('theirs'),
+      ]),
+    };
     try {
-      git('merge', 'theirs');
-    } catch {
-      conflicted = true;
+      for (const [path, contents] of Object.entries(inputs)) {
+        writeFileSync(path, contents);
+      }
+      writeFileSync(out, 'An existing output must be replaced only when selected.\n');
+      const outputBefore = readFileSync(out, 'utf8');
+      const args =
+        form === 'positional'
+          ? [base, ours, theirs]
+          : Object.entries({ base, ours, theirs, ...(separateOutput ? { out } : {}) }).flatMap(
+              ([name, path], index) =>
+                form === 'equals' || (form === 'mixed' && index % 2 === 0)
+                  ? [`--${name}=${path}`]
+                  : [`--${name}`, path]
+            );
+      const result = spawnSync(
+        process.execPath,
+        [join(process.cwd(), 'scripts/merge-wiki-ledger.mjs'), ...args],
+        {
+          cwd: root,
+          encoding: 'utf8',
+        }
+      );
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, result.stderr);
+      const expected = {
+        note: 'n',
+        hashes: { 'ours.ts': OUR_DIGEST, 'theirs.ts': THEIR_DIGEST },
+        reviews: [batch('base'), batch('theirs'), batch('ours')],
+      };
+      assert.deepEqual(JSON.parse(readFileSync(separateOutput ? out : ours, 'utf8')), expected);
+      for (const [path, contents] of Object.entries(inputs)) {
+        if (separateOutput || path !== ours) {
+          assert.equal(readFileSync(path, 'utf8'), contents, `${path} must stay byte-identical`);
+        }
+      }
+      if (!separateOutput) {
+        assert.equal(readFileSync(out, 'utf8'), outputBefore);
+      }
+      assert.deepEqual(
+        readdirSync(root).sort((left, right) => left.localeCompare(right)),
+        [base, ours, theirs, out]
+          .map((path) => basename(path))
+          .sort((left, right) => left.localeCompare(right))
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
-    assert.equal(
-      conflicted,
-      true,
-      'the ledger must actually conflict for this case to mean anything'
-    );
-    assert.match(readFileSync(ledgerPath, 'utf8'), /^<{7}/mu);
+  }
+);
 
-    const output = execFileSync(
+test.each(
+  [
+    ['--base', 'base.json', '--ours', 'ours.json', '--theirs'],
+    ['--base=base.json', '--ours=ours.json'],
+    ['--base=base.json', '--ours=ours.json', '--theirs=theirs.json', '--out='],
+    ['--base=base.json', '--ours=ours.json', '--theirs=theirs.json', 'extra.json'],
+    ['--merge', '--out=out.json'],
+    ['base.json', 'ours.json', 'theirs.json', 'extra.json'],
+    ['--unknown'],
+  ].map((args) => ({ args }))
+)('invalid file arguments fail without modifying files: $args', ({ args }) => {
+  const root = mkdtempSync(join(tmpdir(), 'georoids-ledger-invalid-'));
+  const files = ['base.json', 'ours.json', 'theirs.json', 'out.json', 'extra.json'];
+  const contents = ledger({}, [batch('unchanged')]);
+  try {
+    for (const file of files) {
+      writeFileSync(join(root, file), contents);
+    }
+    const result = spawnSync(
       process.execPath,
-      [join(process.cwd(), 'scripts/merge-wiki-ledger.mjs'), '--merge'],
+      [join(process.cwd(), 'scripts/merge-wiki-ledger.mjs'), ...args],
       {
         cwd: root,
         encoding: 'utf8',
-        env: environment,
       }
     );
-
-    const decoded: unknown = JSON.parse(readFileSync(ledgerPath, 'utf8'));
-    const resolved = object(decoded);
-    const resolvedHashes = object(resolved['hashes']);
-    const resolvedReviews = resolved['reviews'];
-    assert.ok(Array.isArray(resolvedReviews));
-    assert.equal(resolvedHashes['both.ts'], BASE_DIGEST);
-    assert.equal(resolvedHashes['ours.ts'], OUR_DIGEST);
-    assert.deepEqual(
-      resolvedReviews.map((entry: unknown) => object(entry)['note']),
-      ['r1', 'theirs', 'ours']
-    );
-    assert.match(output, /left pending for review \(both sides re-recorded these\): both\.ts/u);
-    assert.equal(readFileSync(callerIndex, 'utf8'), callerIndexContents);
+    assert.ifError(result.error);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Usage:|argument missing|Unknown option/u);
+    assert.deepEqual(readdirSync(root).sort(), [...files].sort());
+    for (const file of files) {
+      assert.equal(readFileSync(join(root, file), 'utf8'), contents);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test.each([[], ['--merge']])(
+  'the resolver reads a real conflict and leaves staging to the caller (%j)',
+  (...args) => {
+    const root = mkdtempSync(join(tmpdir(), 'georoids-wiki-ledger-merge-'));
+    const callerIndex = join(root, 'caller-index');
+    const callerIndexContents = 'The caller owns this index.\n';
+    writeFileSync(callerIndex, callerIndexContents);
+    const environment = {
+      ...Object.fromEntries(
+        Object.entries({ ...process.env, GIT_INDEX_FILE: callerIndex }).filter(
+          ([key]) => !key.startsWith('GIT_')
+        )
+      ),
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_SYSTEM: '/dev/null',
+    };
+    const git = (...gitArgs: string[]) =>
+      execFileSync('git', gitArgs, {
+        cwd: root,
+        encoding: 'utf8',
+        env: environment,
+      });
+    const ledgerPath = join(root, 'docs/wiki-source-review.json');
+    const write = (hashes: Record<string, string>, reviews: ReturnType<typeof batch>[]) =>
+      writeFileSync(ledgerPath, `${JSON.stringify({ note: 'n', hashes, reviews }, null, 2)}\n`);
+    try {
+      git('init', '-q');
+      git('config', 'user.name', 'Ledger merge contract');
+      git('config', 'user.email', 'ledger@example.invalid');
+      execFileSync('mkdir', ['-p', join(root, 'docs')]);
+
+      write({ 'both.ts': BASE_DIGEST, 'ours.ts': BASE_DIGEST }, [batch('r1')]);
+      git('add', '.');
+      git('commit', '-qm', 'base');
+      const base = git('rev-parse', 'HEAD').trim();
+
+      git('checkout', '-q', '-b', 'theirs');
+      write({ 'both.ts': THEIR_DIGEST, 'ours.ts': BASE_DIGEST }, [batch('r1'), batch('theirs')]);
+      git('commit', '-aqm', 'theirs');
+
+      git('checkout', '-q', base);
+      git('checkout', '-q', '-b', 'ours');
+      write({ 'both.ts': OUR_DIGEST, 'ours.ts': OUR_DIGEST }, [batch('r1'), batch('ours')]);
+      git('commit', '-aqm', 'ours');
+
+      // Prove the premise: this really is a conflict git will not resolve itself.
+      let conflicted = false;
+      try {
+        git('merge', 'theirs');
+      } catch {
+        conflicted = true;
+      }
+      assert.equal(
+        conflicted,
+        true,
+        'the ledger must actually conflict for this case to mean anything'
+      );
+      assert.match(readFileSync(ledgerPath, 'utf8'), /^<{7}/mu);
+      const indexBefore = git('ls-files', '--unmerged');
+
+      const output = execFileSync(
+        process.execPath,
+        [join(process.cwd(), 'scripts/merge-wiki-ledger.mjs'), ...args],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: environment,
+        }
+      );
+
+      const decoded: unknown = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+      const resolved = object(decoded);
+      const resolvedHashes = object(resolved['hashes']);
+      const resolvedReviews = resolved['reviews'];
+      assert.ok(Array.isArray(resolvedReviews));
+      assert.equal(resolvedHashes['both.ts'], BASE_DIGEST);
+      assert.equal(resolvedHashes['ours.ts'], OUR_DIGEST);
+      assert.deepEqual(
+        resolvedReviews.map((entry: unknown) => object(entry)['note']),
+        ['r1', 'theirs', 'ours']
+      );
+      assert.match(output, /left pending for review \(both sides re-recorded these\): both\.ts/u);
+      assert.equal(readFileSync(callerIndex, 'utf8'), callerIndexContents);
+      assert.equal(git('ls-files', '--unmerged'), indexBefore);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+);
 
 test('review content canonicalizes nested JSON keys without changing base/theirs/ours ordering', () => {
   const base = JSON.stringify({

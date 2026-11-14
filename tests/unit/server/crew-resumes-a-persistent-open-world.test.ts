@@ -289,3 +289,36 @@ test('a restart preserves the damaged pilot recovery wait across saved flight re
   second.advanceCombatFrame();
   expect(resumed.actor.health).toBeGreaterThan(80);
 });
+
+test('diagnostic rearrangement and last departure preserve saved identity while explicit reset permits a fresh same-ID pilot', () => {
+  const store = database(':memory:');
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
+  const original = pilot(engine, 'persistent', 'scout', { x: 200, y: 300 });
+  original.actor.score = 450;
+  engine.checkpointWorld();
+  const provenance = engine.pilotLedger.provenance(original.actor.id);
+  expect(engine.transportClosed(original.socket)).toBe(true);
+  expect(engine.pilotLedger.has(original.actor.id)).toBe(true);
+  engine.prepareDiagnosticWorld('traversal');
+  expect(engine.pilotLedger.has(original.actor.id)).toBe(true);
+  expect(engine.pilotLedger.provenance(original.actor.id)).toEqual(provenance);
+  engine.removePlayer(original.actor.id);
+  expect(engine.getPlayerCount()).toBe(0);
+  expect(engine.pilotLedger.has(original.actor.id)).toBe(true);
+  expect(store.loadPilots().find((saved) => saved.id === original.actor.id)?.score).toBe(450);
+  engine.resetForTesting();
+  expect(engine.pilotLedger.has(original.actor.id)).toBe(false);
+  expect(engine.pilotLedger.checkpointRows()).toEqual([]);
+  const socket = new RecordingSocket();
+  const replacement = engine.addPlayer(original.actor.id, 'Replacement', socket, { x: 0, y: 0 });
+  engine.pilotLedger.capture(replacement.id);
+  expect(engine.pilotLedger.has(replacement.id)).toBe(false);
+  expect(engine.pilotLedger.checkpointRows()).toEqual([]);
+  const registered = engine.registerPilot(replacement, socket);
+  assert(registered.ok);
+  expect(registered.resumeToken).not.toBe(original.token);
+  engine.checkpointWorld();
+  expect(store.loadPilots()).toHaveLength(1);
+  expect(store.loadPilots()[0]?.name).toBe('Replacement');
+  engine.stopGameLoop();
+});

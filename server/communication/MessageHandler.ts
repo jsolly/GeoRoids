@@ -259,7 +259,7 @@ export class MessageHandler {
         .find(
           (candidate) => candidate.id === id || candidate.name.toLowerCase() === name.toLowerCase()
         );
-      if (conflictingPilot || this.gameEngine.hasSavedPilot(id)) {
+      if (conflictingPilot || this.gameEngine.pilotLedger.has(id)) {
         this.broadcaster.sendError(ws, 'This pilot requires its private resume token');
         return;
       }
@@ -283,7 +283,7 @@ export class MessageHandler {
     }
 
     const snapshotVersion = this.broadcaster.negotiateSnapshot(ws, command.worldRemains === 1);
-    const provenance = this.gameEngine.getPilotReleaseProvenance(id);
+    const provenance = this.gameEngine.pilotLedger.provenance(id);
 
     // Send confirmation to the joining player
     this.broadcaster.sendToWebSocket(ws, {

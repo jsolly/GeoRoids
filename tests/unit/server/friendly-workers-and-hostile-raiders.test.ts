@@ -84,7 +84,7 @@ test('one bot of each role moves without becoming a human, stale socket or saved
   expect(engine.getPlayerCount()).toBe(1);
   expect(engine.getAllPlayers().map((entry) => entry.id)).toEqual(['pilot']);
   expect(engine.getSnapshotState().entities.filter((entry) => entry.botRole)).toHaveLength(2);
-  expect(engine.hasSavedPilot(worker.id)).toBe(false);
+  expect(engine.pilotLedger.has(worker.id)).toBe(false);
 });
 
 test.each([0, 25])(

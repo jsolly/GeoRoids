@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
-    "server/communication/MessageHandler.ts": "sha256:ce6bafb066a742a5664eb113d9aa65ec50d69a8b2a96a74bbb9d60a4a5834a03",
+    "server/communication/MessageHandler.ts": "sha256:b3b95bfbfc32f35bc7fe5a7996e1d00ea6bfc66bb4fb1b95e66ca80e7cb62c06",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:9b449bab5cdab7ca39ea9cef64f55305b294fbb7bf285cf4fc4765201f9e6d43",
     "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:643cd85cb02d576d1d5ef056896f6a5865fd6fbac7d6c053d09843b509d18164",
+    "server/core/GameEngine.ts": "sha256:c8e24da4ed32a9d64ba282661235d01f87867fa68d85fd057e1e7bc86969b916",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -444,7 +444,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:39fc0c5dedfe641c6f977539775ef0deeb8a2538ef1bc2f5c5fd0b4a5255bbe2",
+    "src/wiki/articleSources.json": "sha256:df2d2619391d37ffc6e6744e5a9aa947b6100cb2955344fcfc4bb1756adf8ab6",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:787347143425512717cd9d4ccdf0b90ed04fabacdbac2d1745fc258c2579b3f4",
@@ -535,11 +535,11 @@
     "tests/unit/server/cooperative-frontier-and-hazards.test.ts": "sha256:8d76509f2058bf8a25c2c8b317179e2e804d2c32f7f2707484722f41b6e2e4aa",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:dd8a4eb69e3de45b367bf0790d77c3ed8d63d37a39ac5da5afa3fccf8511659c",
     "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:0199508239e620dc0e7454f36edab8d9fc72fd049e026e404f2a00238258e2f3",
-    "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:6a0c444a61f7d3281fb06b488f5ac828d345d7cbb8081440326cef9f37a6c612",
+    "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:05194f9f03a7d988c52d5bfa8917d3e56d5a6fef11f46d9ad8e7e898db9d73d5",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:93e6d68684930d1ba241fe806dda0f7ebfb16775794bfa8c8c35ac7494f199d2",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
-    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:bff0c60fc4f68500ace3a6c0b71bde08ddfee861f71448661f9e413412696316",
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:5a82ab27a2c5cde64bcc88ba1b4b12249dafd31456042312aef05dd3fcac8988",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:72be43233e9d5135fd7ad6fecb8f50fed04082cc7513274f9795ec897a290b56",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:7396ba9a8763fd29dc74172de3933d6fd81bd0d3f4708032899a8a6812fea49e",
@@ -554,7 +554,7 @@
     "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts": "sha256:e48180121688f0a7b1bee099cab26f7ccf4a19738d191abaaedcf462c1ef9283",
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:9cd701d62f3afec2756cad956721e2a320714d9149b13771727f5985f4171b51",
     "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:319c27c035997fa6366d4088654d0e0fc08faf139f3d1b0a92c831def3b09f58",
-    "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:07701c22cf2a08ebd920c9d2a9bc3fe3f0041da111618d50e067c7790e4b975d",
+    "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:ffdbe982382dea31d2812ec9d08441d7c92b588fdff690f2836eab781d7ccb95",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1d2cb49eb4cd397956de0383853f1952b91ecd3c1338f244d85b3ddcabb314c6",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
     "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:25f0e323b855a37f0dc9ffbf1a29439032299f1553cf218d366397078a0c6c9b",
@@ -598,7 +598,8 @@
     "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
     "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f",
     "server/core/CrewRescueManager.ts": "sha256:a1b0775e969e9578f808374839a2830aa7a645eb9110ef37bf24587af552d5fe",
-    "server/core/types.ts": "sha256:049426b7355a9b991a859d2ca21d3ed972fddb10d654a19050bfc6fd1bd23df6"
+    "server/core/types.ts": "sha256:ed34c272d177f11f1935e90e1a0343936bf49c103eb5410c906b81f727b1fe94",
+    "server/core/PilotLedger.ts": "sha256:4929fc130aa9b8d5309ee33aba58e87d939bd6a0b539d4dccc9db907eb2df393"
   },
   "reviews": [
     {
@@ -9092,6 +9093,47 @@
       ],
       "owners": {
         "src/wiki/articleSources.json": "teamwork"
+      }
+    },
+    {
+      "note": "Reviewed PilotLedger against shipped Crew main891fda8. The real owner holds saved row identity, dirty membership, credential/score provenance, offline/live/bot award rules, snapshot copies, transit arrival and synchronous checkpoint submission. Engine retains session admission/restore and raw credentials; all replaced callers migrate directly without wrappers. New constructor/registration use defining core/types.ts object contracts; hot capture/award and private snapshot stay positional. Four existing topics and the identity coverage row name the owner. Current native/strict types/scoped lint/unused/media checks, initial/final43files430cases and both real socket suites2files7cases passed. All21 deliberate defects failed runtime assertions and22 source/protected/config restorations matched. Original delayed-only acknowledgement probe failed earlier detachment; it remains historical, while the new synchronous-plus-late-clear probe reaches the newer-score assertion after actual worker idle. All11 prose and21 media/manifest files match main, so no appearance change or fresh browser/physical/performance acceptance is claimed. Initial formatting/type failures and their untouched evidence remain separate. Full gate, independent review, CI and production release verification remain pending. No schema/wire/campaign activation change; Storage957 remains held draft.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/GameEngine.ts",
+        "server/core/PilotLedger.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
+        "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts",
+        "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "hud-network"
       }
     }
   ]

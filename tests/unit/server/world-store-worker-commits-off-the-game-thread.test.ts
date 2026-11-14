@@ -15,6 +15,7 @@ import {
 import { emptySettlement } from '../../../shared/economy';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -269,4 +270,59 @@ test('an in-memory world refuses the worker adapter because threads cannot share
   expect(() => new WorkerWorldPersistence(':memory:')).toThrow(
     'An in-memory world cannot be shared with a worker thread'
   );
+});
+
+test('pilot submission detaches the worker batch and a newer dirty score survives its durable acknowledgement', async () => {
+  const path = worldFile();
+  const persistence = new WorkerWorldPersistence(path);
+  shutDownAfter(persistence);
+  const engine = new GameEngine(7, undefined, persistence);
+  cleanups.push(() => engine.stopGameLoop());
+  const socket = new RecordingSocket();
+  const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 200, y: 300 });
+  const registered = engine.registerPilot(actor, socket);
+  if (!registered.ok) {
+    throw new Error(registered.error);
+  }
+  actor.score = 11;
+  actor.equipment = ['resource_tap'];
+  engine.pilotLedger.capture(actor.id);
+  const before = engine.pilotLedger.checkpointRows().find((pilot) => pilot.id === actor.id);
+  if (!before) {
+    throw new Error('Registered pilot was not dirty');
+  }
+  engine.checkpointWorld();
+  expect(persistence.diagnostics().pendingBatches).toBe(1);
+  expect(engine.pilotLedger.checkpointRows()).toEqual([]);
+  actor.purchases.push('placeholder-1');
+  actor.equipment.push('boost_coupling');
+  actor.position.x = 900;
+  expect(engine.pilotLedger.awardPoints(actor.id, 11)).toBe(22);
+  expect(before).toMatchObject({
+    score: 11,
+    purchases: [],
+    equipment: ['resource_tap'],
+    position: { x: 200, y: 300 },
+  });
+  expect(engine.pilotLedger.checkpointRows().find((pilot) => pilot.id === actor.id)).toMatchObject({
+    score: 22,
+    purchases: ['placeholder-1'],
+    equipment: ['resource_tap', 'boost_coupling'],
+    position: { x: 900, y: 300 },
+  });
+  await persistence.whenIdle();
+  expect(engine.pilotLedger.checkpointRows().find((pilot) => pilot.id === actor.id)?.score).toBe(
+    22
+  );
+  await persistence.shutdown();
+  expect(
+    reopen(path)
+      .loadPilots()
+      .find((pilot) => pilot.id === actor.id)
+  ).toMatchObject({
+    score: 11,
+    purchases: [],
+    equipment: ['resource_tap'],
+    position: { x: 200, y: 300 },
+  });
 });

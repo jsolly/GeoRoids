@@ -23,7 +23,6 @@ import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
 import { cargoCapacity, ECONOMY, oreResource, oreYield } from '../../shared/economy';
-import { epochField } from '../../shared/epochField';
 import {
   canEquipUtility,
   EQUIPMENT_DROPS,
@@ -41,7 +40,6 @@ import {
   TOWN_HEARTH,
   townSquareSpawn,
 } from '../../shared/furnaces';
-import { furnaceTravelPose } from '../../shared/furnaceTravel';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { GLOWTOY } from '../../shared/glowtoy';
 import { findLaserSurfaceImpact } from '../../shared/laserSurface';
@@ -54,7 +52,6 @@ import {
 } from '../../shared/lootBlast';
 import { chooseCrewSpawn, sanitizePlayerName } from '../../shared/player';
 import { activatePlayerShield } from '../../shared/playerShield';
-import { readReleaseId, releaseField } from '../../shared/releaseId';
 import {
   activateAbilityOnHost,
   clearHaulerLatch,
@@ -80,12 +77,7 @@ import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { TERRAIN } from '../../shared/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../shared/terrainField';
 import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
-import {
-  insideTownStore,
-  purchasedHullColor,
-  storeOffer,
-  TOWN_STORE_ISSUE,
-} from '../../shared/townStore';
+import { insideTownStore, storeOffer, TOWN_STORE_ISSUE } from '../../shared/townStore';
 import { advanceUtilityFlight } from '../../shared/utilityFlight';
 import { WORLD } from '../../shared/world';
 import { hazardPhase } from '../../shared/worldHazards';
@@ -118,12 +110,7 @@ import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
 import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import { WorldRemains } from '../world/WorldRemains';
-import {
-  type PersistentPilot,
-  type RestorableFlight,
-  restorableFlight,
-  type SavedWorld,
-} from '../world/WorldStore';
+import { type RestorableFlight, restorableFlight, type SavedWorld } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import {
   type AsteroidHitCause,
@@ -146,6 +133,7 @@ import { HiveEncounters } from './HiveEncounters';
 
 import { LootCollectionManager } from './LootCollectionManager';
 import { LootManager } from './LootManager';
+import { PilotLedger } from './PilotLedger';
 import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
 import { RolyPolyManager } from './RolyPolyManager';
@@ -266,7 +254,7 @@ export class GameEngine {
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
   private worldStartedAt: number;
-  private readonly pilots = new Map<string, PersistentPilot>();
+  public readonly pilotLedger: PilotLedger;
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
   private lastFurnaceBuildNotice = '';
@@ -298,8 +286,6 @@ export class GameEngine {
     players: this.getPlayerCount(),
     persistence: this.persistence?.diagnostics(),
   }));
-  /** Pilots whose saved row changed since the last flush; live pilots are captured at flush time. */
-  private readonly dirtyPilots = new Set<string>();
   private lastFlushedWorldRow: FlushedWorldRow | undefined;
   private flushWaitingForIdle = false;
   private lastSimulationAtMs: number | undefined;
@@ -431,11 +417,14 @@ export class GameEngine {
       this.furnaces.replaceLit(loaded.world.civicModules ?? []);
       this.exploration.restore(loaded.world.exploration);
     }
-    for (const pilot of loaded?.pilots ?? []) {
-      this.pilots.set(pilot.id, pilot);
-    }
     persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
+    this.pilotLedger = new PilotLedger({
+      saved: loaded?.pilots ?? [],
+      actors: this.entityManager,
+      now: () => this.getServerTime(),
+      settlementLedger: this.settlementLedger,
+    });
     this.furnaceTravel = new FurnaceTravelManager({
       actors: this.entityManager,
       furnaces: this.furnaces,
@@ -464,13 +453,13 @@ export class GameEngine {
     this.cargoOffload = new CargoOffloadManager({
       actors: this.entityManager,
       furnaces: this.furnaces,
-      awardPilotPoints: (id, points) => this.awardPilotPoints(id, points),
+      awardPilotPoints: (id, points) => this.pilotLedger.awardPoints(id, points),
     });
     this.lootCollection = new LootCollectionManager({
       actors: this.entityManager,
       loot: this.lootManager,
       now: () => this.getServerTime(),
-      capturePilot: (id) => this.capturePilot(id),
+      capturePilot: (id) => this.pilotLedger.capture(id),
       maximumPendingCollections: MAX_PENDING_LOOT_COLLECTIONS,
     });
     this.bots = new BotFleet({
@@ -515,7 +504,7 @@ export class GameEngine {
       now: () => this.getServerTime(),
       cancelCharge: (actor) => this.chargedWeapons.cancel(actor),
       cancelBoost: (id, targetId) => this.cancelArmedBoost(id, targetId),
-      capturePilot: (id) => this.capturePilot(id),
+      capturePilot: (id) => this.pilotLedger.capture(id),
       terminalDeath: (actor, cause) => this.applyShipDeath(actor, cause),
     });
     this.abilities = new ShipAbilityManager({
@@ -939,8 +928,7 @@ export class GameEngine {
     this.crewRescue.reset();
     this.fixtureCombat = undefined;
     this.regionalField.reset();
-    this.pilots.clear();
-    this.dirtyPilots.clear();
+    this.pilotLedger.reset();
     this.lastFlushedWorldRow = undefined;
     this.managedField = true;
     this.clearWorldObjects();
@@ -1006,7 +994,7 @@ export class GameEngine {
       traveler.cargo = 0;
     }
     this.bots.forget(id);
-    this.capturePilot(id);
+    this.pilotLedger.capture(id);
     this.playerMotion.forgetActor(id);
     const departing = this.getPlayer(id);
     if (departing) {
@@ -1018,133 +1006,6 @@ export class GameEngine {
     const entity = this.entityManager.removeEntity(id);
     this.updatePauseState();
     return entity;
-  }
-
-  private snapshotPilot(
-    actor: GameEntity,
-    tokenHash: string,
-    clientReleaseId?: string
-  ): PersistentPilot {
-    const previous = this.pilots.get(actor.id);
-    const lastClientReleaseId = readReleaseId(clientReleaseId) ?? previous?.lastClientReleaseId;
-    const now = this.getServerTime();
-    const arrival = actor.furnaceTransit
-      ? furnaceTravelPose(
-          actor.furnaceTransit,
-          actor.furnaceTransit.startedAt + actor.furnaceTransit.durationMs
-        )
-      : undefined;
-    const flight = {
-      id: actor.id,
-      tokenHash,
-      name: actor.name,
-      score: actor.score,
-      cargo: actor.cargo,
-      purchases: [...actor.purchases],
-      silk: actor.silk ?? 0,
-      equipment: [...(actor.equipment ?? [])],
-      lastSeenAt: now,
-      kitId: actor.kitId,
-      position: arrival?.position ?? { x: actor.position.x, y: actor.position.y },
-      velocity: arrival ? { x: 0, y: 0 } : { x: actor.velocity.x, y: actor.velocity.y },
-      angle: arrival?.angle ?? actor.angle,
-      mass: actor.mass,
-      health: actor.health,
-      healthRegenTimer: actor.healthRegenTimer,
-      shieldFrames: actor.shieldFrames ?? 0,
-      shieldCooldownFrames: actor.shieldCooldownFrames ?? 0,
-      ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
-      ...releaseField('lastClientReleaseId', lastClientReleaseId),
-    };
-    if (previous === undefined) {
-      return {
-        ...flight,
-        credentialReleaseId: SERVER_RELEASE_ID,
-        scoreReleaseId: SERVER_RELEASE_ID,
-        credentialIssuedAt: now,
-        scoreUpdatedAt: now,
-        ...releaseField('credentialClientReleaseId', lastClientReleaseId),
-        ...releaseField('scoreClientReleaseId', lastClientReleaseId),
-      };
-    }
-    const issuedCredential = previous.tokenHash !== tokenHash;
-    const wroteScore = previous.score !== actor.score;
-    return {
-      ...flight,
-      ...(issuedCredential
-        ? {
-            credentialReleaseId: SERVER_RELEASE_ID,
-            credentialIssuedAt: now,
-            ...releaseField('credentialClientReleaseId', lastClientReleaseId),
-          }
-        : {
-            ...releaseField('credentialReleaseId', previous.credentialReleaseId),
-            ...releaseField('credentialClientReleaseId', previous.credentialClientReleaseId),
-            ...epochField('credentialIssuedAt', previous.credentialIssuedAt),
-          }),
-      ...(wroteScore
-        ? {
-            scoreReleaseId: SERVER_RELEASE_ID,
-            scoreUpdatedAt: now,
-            ...releaseField('scoreClientReleaseId', lastClientReleaseId),
-          }
-        : {
-            ...releaseField('scoreReleaseId', previous.scoreReleaseId),
-            ...releaseField('scoreClientReleaseId', previous.scoreClientReleaseId),
-            ...epochField('scoreUpdatedAt', previous.scoreUpdatedAt),
-          }),
-    };
-  }
-
-  private rememberClientRelease(id: string, clientReleaseId?: string): void {
-    const releaseId = readReleaseId(clientReleaseId);
-    const saved = this.pilots.get(id);
-    if (!saved || releaseId === undefined) {
-      return;
-    }
-    this.setPilot({ ...saved, lastClientReleaseId: releaseId });
-  }
-
-  private writePilotScore(pilot: PersistentPilot, score: number): PersistentPilot {
-    const next: PersistentPilot = {
-      ...pilot,
-      score,
-      scoreReleaseId: SERVER_RELEASE_ID,
-      scoreUpdatedAt: this.getServerTime(),
-    };
-    delete next.scoreClientReleaseId;
-    return next;
-  }
-
-  public getPilotReleaseProvenance(id: string): {
-    credentialReleaseId?: string;
-    credentialClientReleaseId?: string;
-    credentialIssuedAt?: number;
-    scoreReleaseId?: string;
-    scoreClientReleaseId?: string;
-    scoreUpdatedAt?: number;
-  } {
-    const saved = this.pilots.get(id);
-    if (!saved) {
-      return {};
-    }
-    return {
-      ...releaseField('credentialReleaseId', saved.credentialReleaseId),
-      ...releaseField('credentialClientReleaseId', saved.credentialClientReleaseId),
-      ...epochField('credentialIssuedAt', saved.credentialIssuedAt),
-      ...releaseField('scoreReleaseId', saved.scoreReleaseId),
-      ...releaseField('scoreClientReleaseId', saved.scoreClientReleaseId),
-      ...epochField('scoreUpdatedAt', saved.scoreUpdatedAt),
-    };
-  }
-
-  private capturePilot(id: string): void {
-    const previous = this.pilots.get(id);
-    const actor = this.getPlayer(id);
-    if (!previous || !actor) {
-      return;
-    }
-    this.setPilot(this.snapshotPilot(actor, previous.tokenHash));
   }
 
   public registerPilot(
@@ -1159,18 +1020,12 @@ export class GameEngine {
     if (!result.ok) {
       return result;
     }
-    this.setPilot(
-      this.snapshotPilot(
-        actor,
-        createHash('sha256').update(result.resumeToken).digest('hex'),
-        clientReleaseId
-      )
-    );
+    this.pilotLedger.recordRegistration({
+      actor,
+      tokenHash: createHash('sha256').update(result.resumeToken).digest('hex'),
+      clientReleaseId,
+    });
     return result;
-  }
-
-  public hasSavedPilot(id: string): boolean {
-    return this.pilots.has(id);
   }
 
   public resumePilot(
@@ -1184,13 +1039,13 @@ export class GameEngine {
       return { ok: false, error: 'Invalid pilot resume token' };
     }
     const hash = createHash('sha256').update(token).digest('hex');
-    let saved = [...this.pilots.values()].find((pilot) => pilot.tokenHash === hash);
+    let saved = this.pilotLedger.findByTokenHash(hash);
     const live = this.playerMotion.resume(token, socket, this.getServerTime());
     if (live.ok) {
       if (live.supersededSocket) {
         this.chargedWeapons.cancel(live.actor);
       }
-      this.rememberClientRelease(live.actor.id, clientReleaseId);
+      this.pilotLedger.rememberClientRelease(live.actor.id, clientReleaseId);
       this.crewRescue.finishIfExpired(live.actor);
       if (
         live.actor.downedUntil == null ||
@@ -1207,7 +1062,7 @@ export class GameEngine {
     // Expired transport grace may still own an actor until the next simulation tick.
     if (this.getPlayer(saved.id)) {
       this.removePlayer(saved.id);
-      saved = this.pilots.get(saved.id) ?? saved;
+      saved = this.pilotLedger.saved(saved.id) ?? saved;
     }
     const savedDowned = this.cooperative.get('downed', saved.id);
     const flight = restorableFlight(saved, this.getServerTime());
@@ -1218,7 +1073,7 @@ export class GameEngine {
       flight?.position,
       savedDowned != null ? saved.kitId : (requestedKit ?? flight?.kitId)
     );
-    if (saved.hullColor) {
+    if (saved.hullColor != null && saved.hullColor !== '') {
       actor.color = saved.hullColor;
     }
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
@@ -1241,7 +1096,7 @@ export class GameEngine {
       actor.health = 0;
       this.entityManager.scheduleShipRespawn(actor);
     }
-    this.capturePilot(actor.id);
+    this.pilotLedger.capture(actor.id);
     return { ok: true, actor, resumeToken: registered.resumeToken };
   }
 
@@ -1323,15 +1178,9 @@ export class GameEngine {
     }
     try {
       for (const actor of this.getAllPlayers()) {
-        this.capturePilot(actor.id);
+        this.pilotLedger.capture(actor.id);
       }
-      const pilots: PersistentPilot[] = [];
-      for (const id of this.dirtyPilots) {
-        const pilot = this.pilots.get(id);
-        if (pilot) {
-          pilots.push(pilot);
-        }
-      }
+      const pilots = this.pilotLedger.checkpointRows();
       const worldRow = this.worldRowIfChanged();
       const botCargo = this.bots.savedCargo(this.getServerTime());
       const economyChanged =
@@ -1365,7 +1214,7 @@ export class GameEngine {
         pointRevision: this.lootManager.pointRevision,
         botCargo: botCargo.length > 0,
       };
-      this.dirtyPilots.clear();
+      this.pilotLedger.submitted();
       this.cooperative.saved();
       if (this.managedField) {
         this.regionalField.saved();
@@ -1506,11 +1355,6 @@ export class GameEngine {
         `World writer did not drain within ${SHUTDOWN_IDLE_WAIT_MS} ms; the final flush was skipped`
       );
     }
-  }
-
-  private setPilot(pilot: PersistentPilot): void {
-    this.pilots.set(pilot.id, pilot);
-    this.dirtyPilots.add(pilot.id);
   }
 
   public isPersistenceHealthy(): boolean {
@@ -1996,7 +1840,7 @@ export class GameEngine {
       existing.cargo -= spilled;
       this.spillCargo(existing, spilled);
       existing.healthRegenTimer = calculateHealthRegenDelayFrames();
-      this.capturePilot(existing.id);
+      this.pilotLedger.capture(existing.id);
     }
     const hullDamage = Math.max(0, damage - spilled / ECONOMY.cargoPointsPerHp);
     const damaged = this.entityManager.damageEntity(targetId, hullDamage);
@@ -2314,7 +2158,7 @@ export class GameEngine {
     this.satellitePickupManager.releaseOwner(entity.id);
     entity.cargo = 0;
     this.entityManager.scheduleShipRespawn(entity);
-    this.capturePilot(entity.id);
+    this.pilotLedger.capture(entity.id);
   }
 
   private miningDamage(playerId: string): number {
@@ -3264,7 +3108,7 @@ export class GameEngine {
     }
     pilot.score -= offer.cost;
     pilot.purchases.push(offer.id);
-    this.capturePilot(pilot.id);
+    this.pilotLedger.capture(pilot.id);
     return undefined;
   }
 
@@ -3288,7 +3132,7 @@ export class GameEngine {
     }
     const builderName = sanitizePlayerName(scout.name);
     scout.score -= lot.cost;
-    this.capturePilot(scout.id);
+    this.pilotLedger.capture(scout.id);
     this.furnaces.light(lot.id, builderName, scout.id);
     this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
     return true;
@@ -3567,11 +3411,14 @@ export class GameEngine {
     const rewards: FurnaceDelivery['rewards'] = [];
     for (const playerId of recipients) {
       const player = this.getPlayer(playerId);
-      if (this.awardPilotPoints(playerId, points) === undefined) {
+      if (this.pilotLedger.awardPoints(playerId, points) === undefined) {
         continue;
       }
-      const saved = this.pilots.get(playerId);
-      rewards.push({ playerId, playerName: player?.name ?? saved?.name ?? '', points });
+      rewards.push({
+        playerId,
+        playerName: player?.name ?? this.pilotLedger.savedName(playerId) ?? '',
+        points,
+      });
     }
     this.releaseTowsAttachedTo(rock.id);
     return {
@@ -3660,27 +3507,6 @@ export class GameEngine {
     return this.lootManager.spawnShard(position, this.gameTime, mass);
   }
 
-  /** Award a score to a live actor or to its saved offline pilot record. */
-  private awardPilotPoints(entityId: string, points: number): number | undefined {
-    const entity = this.getPlayer(entityId);
-    if (entity) {
-      if (entity.botRole === undefined) {
-        entity.score += points;
-      }
-      this.settlementLedger.addPoints(points);
-      this.capturePilot(entityId);
-      return entity.score;
-    }
-    const saved = this.pilots.get(entityId);
-    if (saved) {
-      const next = this.writePilotScore(saved, saved.score + points);
-      this.setPilot(next);
-      this.settlementLedger.addPoints(points);
-      return next.score;
-    }
-    return undefined;
-  }
-
   /** Recoverable hit spills launch beyond magnet range before collection resumes. */
   private spillCargo(entity: GameEntity, points: number): void {
     const count = Math.min(8, Math.max(1, Math.ceil(points / 100)));
@@ -3705,7 +3531,7 @@ export class GameEngine {
     const accepted = Math.min(points, Math.max(0, cargoCapacity(entity.kitId) - entity.cargo));
     entity.cargo += accepted;
     this.lootManager.spawnPoints(entity.position, points - accepted);
-    this.capturePilot(entity.id);
+    this.pilotLedger.capture(entity.id);
   }
 
   private fitCargo(entity: GameEntity): void {

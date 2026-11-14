@@ -89,7 +89,7 @@ test('a real pilot receives both bot factions and cannot steer or claim either s
     await wire.barrier();
     expect(actor.position).toEqual(before);
     expect(actor.ws).toBeUndefined();
-    expect(server.gameEngine.hasSavedPilot(worker.id)).toBe(false);
+    expect(server.gameEngine.pilotLedger.has(worker.id)).toBe(false);
     expect(server.gameEngine.getPlayerCount()).toBe(1);
     wire.assertHealthy();
   } finally {

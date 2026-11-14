@@ -444,7 +444,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:bd44722c92d0c7df64d7e0b84a3642916eafacab12a6584f7f556294d58ec29f",
+    "src/wiki/articleSources.json": "sha256:39fc0c5dedfe641c6f977539775ef0deeb8a2538ef1bc2f5c5fd0b4a5255bbe2",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:787347143425512717cd9d4ccdf0b90ed04fabacdbac2d1745fc258c2579b3f4",
@@ -597,7 +597,8 @@
     "server/core/CargoOffloadManager.ts": "sha256:5cb45d5069856a749c7e40612f0bee6d91616ec58195722f8c0d027a1710f8d8",
     "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
     "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f",
-    "server/core/CrewRescueManager.ts": "sha256:363e3a223c47bb56e640fc1a044431989cdfe4eb0aedb404f1403a9cec2ef9d1"
+    "server/core/CrewRescueManager.ts": "sha256:a1b0775e969e9578f808374839a2830aa7a645eb9110ef37bf24587af552d5fe",
+    "server/core/types.ts": "sha256:049426b7355a9b991a859d2ca21d3ed972fddb10d654a19050bfc6fd1bd23df6"
   },
   "reviews": [
     {
@@ -9027,6 +9028,42 @@
         "server/core/GameEngine.ts",
         "src/wiki/articleSources.json",
         "tests/unit/server/crew-rescues-persist-and-cancel.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork"
+      }
+    },
+    {
+      "note": "Crew public contract types now live in their defining server/core/types.ts module, following the user TypeScript ownership rule. CrewRescueManager imports these types directly; no forwarding/re-export or runtime dependency is introduced. Its complete TypeScript6 ES2022/ESNext emitted runtime is byte-identical before/after; source proof records the hash. The same two contracts retain all existing Pick ports and discriminated action exclusion. Five existing source lists now name the defining type module. This is a type-only correction after the first Crew gate and preserves all prior Wiki batches, player prose and media. Prior37file381case/sixsocket/fifteen intended failure/one capture-survivor evidence describes the runtime-identical implementation; corrected-tree type/scoped lint and full gate are separately required before review/publication. No new gameplay, persistence, activation, UI, physical/performance or production-operation claim. Storage957 remains held draft.",
+      "sources": [
+        "server/core/CrewRescueManager.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json"
       ],
       "topics": [
         "asteroids",

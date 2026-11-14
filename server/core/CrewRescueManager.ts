@@ -1,23 +1,9 @@
 import { SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
-import type { CrewAction, Position } from '../../shared-types';
-import type { CooperativeCampaign } from '../world/CooperativeCampaign';
-import type { EntityManager, GameEntity } from './EntityManager';
-import type { PlayerMotionService } from './PlayerMotionService';
-
-type RescueAction = Exclude<CrewAction, { kind: 'withdraw-supply' }>;
-
-type CrewRescueInputs = {
-  readonly actors: Pick<EntityManager, 'getEntity' | 'getAllEntities'>;
-  readonly campaign: Pick<CooperativeCampaign, 'activated' | 'get' | 'set' | 'removeDowned'>;
-  readonly motion: Pick<PlayerMotionService, 'invalidateLife'>;
-  readonly now: () => number;
-  readonly cancelCharge: (actor: GameEntity) => void;
-  readonly cancelBoost: (id: string, targetId: GameEntity['harpoonTargetId']) => boolean;
-  readonly capturePilot: (id: string) => void;
-  readonly terminalDeath: (actor: GameEntity, cause: string) => void;
-};
+import type { Position } from '../../shared-types';
+import type { GameEntity } from './EntityManager';
+import type { CrewRescueInputs, RescueAction } from './types';
 
 /** Owns rescue holds, downed transitions and crew signals; never commits storage. */
 export class CrewRescueManager {

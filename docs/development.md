@@ -79,11 +79,8 @@ uv or mypy. No Wiki behavior or media baseline changes.
 The dispatcher lives in this clone's Git common directory, shared only by its
 linked worktrees. It registers pre-commit and pre-push only. Pre-commit keeps the
 staged gitleaks scan and adds an offline zizmor audit. Pre-push runs a ranged
-gitleaks scan, then Semgrep and osv-scanner. Pre-push first probes `https://semgrep.dev/`
-and `https://api.osv.dev/`. A scan whose server refuses or drops the connection (curl
-exits 5, 6, 7, 28, 35 or 56, as behind a cloud session's egress proxy) is skipped with a
-warning, because CI's Security workflow runs it on the pull request. Any HTTP answer runs
-the scan, any other probe failure fails the push, and the gitleaks scan always runs. The complete hook/library/setup
+gitleaks scan only. Semgrep and osv-scanner run in CI and must pass before a pull
+request can merge. Pre-push needs neither scanner nor a network probe. The complete hook/library/setup
 bundle must match current reviewed `origin/main`, or a deliberately approved exact
 bundle digest. Missing files, symlinks, unreviewed modes and a foreign origin fail
 closed. The dispatcher executes a verified snapshot, then runs quality scripts in
@@ -117,6 +114,24 @@ authorizing the replacement; ordinary `approve` cannot bypass that check. The
 legacy implementation remains solely a frozen test fixture. Revoke explicit approvals with `git config --local --unset-all
 repo.trustedGateBundle`; current reviewed main remains trusted. Changing origin
 invalidates the bundle identity. No environment variable selects another library.
+
+## Dependency release age
+
+Astro remains at the fixed 7.4.7 release. The lockfile keeps Satteri 0.11.6
+(including its matching platform packages) and `mdast-util-to-hast` 13.2.1
+inside their parents' declared ranges. These releases satisfy the seven-day
+minimum; at the November 13 review, the newer Satteri 0.11.7 family and mdast
+13.2.2 did not qualify. Root `.npmrc` sets `min-release-age=7` for future
+resolutions. The setting does not retroactively reject versions in a lockfile.
+Current OSV scans accept the mature graph with only the existing dispositions.
+No package override, advisory exception or expiry extension is added.
+
+## Restore rehearsal transport
+
+The local restore rehearsal keeps its snapshot decoder attached across join,
+movement and firing observations. This retains baselines for frames arriving
+between those phases. Invalid frames and transport failures still fail the drill
+with fixed redacted errors; the existing five-second observation deadline remains.
 
 ## Review and integration
 

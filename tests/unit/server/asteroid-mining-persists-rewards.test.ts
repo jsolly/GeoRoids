@@ -117,8 +117,8 @@ test('a flush that cannot save every delivered score rolls the whole batch back 
       "CREATE TRIGGER fail_second_score BEFORE INSERT ON pilots WHEN NEW.id = 'second-hauler' BEGIN SELECT RAISE(ABORT, 'injected second score failure'); END"
     );
     // The deliveries land in memory; the failing flush is what stops the world.
-    engine.processFurnaceDeliveries();
-    expect(engine.drainFurnaceDeliveries()).toHaveLength(2);
+    engine.furnaceDeliveries.advance();
+    expect(engine.furnaceDeliveries.drainDeliveries()).toHaveLength(2);
     expect(() => engine.checkpointWorld()).toThrow('Persistent world checkpoint failed');
     expect(engine.isPersistenceHealthy()).toBe(false);
     expect(() => engine.advanceOneFrame()).toThrow('Persistent world checkpoint failed');

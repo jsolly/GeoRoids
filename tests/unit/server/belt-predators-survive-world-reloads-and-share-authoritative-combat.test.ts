@@ -7,7 +7,9 @@ import { WorldStore } from '../../../server/world/WorldStore';
 import { beltSlotForAsteroid, beltSlotPosition } from '../../../shared/asteroidBelt';
 import { BELT_CRAWLER } from '../../../shared/beltCrawler';
 import { DAMAGE } from '../../../shared/constants/gameplay';
+import { TOWN_HEARTH } from '../../../shared/furnaces';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
+import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -266,5 +268,83 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     engine.stopGameLoop();
     restarted?.stopGameLoop();
     store.close();
+  }
+});
+
+test('furnace consumption clears the attached probe and retires its identified crawler host before feedback', () => {
+  const engine = new GameEngine(82);
+  try {
+    const hauler = engine.addPlayer(
+      'intake-hauler',
+      'Intake Hauler',
+      new RecordingSocket(),
+      { x: 10000, y: 10000 },
+      'hauler'
+    );
+    for (const row of engine.getAllAsteroids()) {
+      engine.asteroidLifecycle.remove(row.id);
+    }
+    engine.clearSpiderField();
+    const host: AsteroidData = {
+      id: 'belt-82-0-0',
+      position: { x: 10000, y: 10000 },
+      velocity: { x: 0, y: 0 },
+      size: 100,
+      material: 'metal',
+      ore: 'metal',
+      health: 150,
+      maxHealth: 150,
+      rotation: 0,
+      angularVelocity: 0,
+      jaggedness: 0,
+      vertices: 4,
+      offsets: [1, 1, 1, 1],
+    };
+    engine.asteroidLifecycle.insert(host);
+    engine.advanceCombatFrame();
+    const crawler = engine.getSpiderField().spiders.find((row) => row.crawler?.hostId === host.id);
+    assert(crawler?.crawler);
+    const now = engine.getServerTime();
+    engine.asteroidLifecycle.update(host.id, {
+      position: { ...TOWN_HEARTH.position },
+      probe: {
+        id: 'furnace-host-probe',
+        ownerId: hauler.id,
+        health: SURVEY_PROBE.MAX_HEALTH,
+        maxHealth: SURVEY_PROBE.MAX_HEALTH,
+        attachedAt: now,
+        expiresAt: now + SURVEY_PROBE.LIFETIME_MS,
+        angle: 0,
+        radialOffset: 105,
+      },
+    });
+    hauler.position = { x: 80, y: 0 };
+    engine.advanceCombatFrame();
+    expect(host.probe?.id).toBe('furnace-host-probe');
+    expect(engine.getSpiderField().spiders).toContainEqual(
+      expect.objectContaining({
+        id: crawler.id,
+        crawler: expect.objectContaining({ hostId: host.id }),
+      })
+    );
+    hauler.harpoonTargetId = host.id;
+    hauler.harpoonLatchPos = { ...host.position };
+
+    engine.furnaceDeliveries.advance();
+
+    expect(engine.getAsteroid(host.id)).toBeUndefined();
+    expect(host.probe).toBeNull();
+    expect(
+      engine
+        .getSpiderField()
+        .spiders.some((row) => row.id === crawler.id && row.crawler?.hostId === host.id)
+    ).toBe(false);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(hauler.harpoonLatchPos).toBeUndefined();
+    expect(engine.furnaceDeliveries.drainDeliveries()).toContainEqual(
+      expect.objectContaining({ asteroidId: host.id, furnaceId: TOWN_HEARTH.id })
+    );
+  } finally {
+    engine.stopGameLoop();
   }
 });

@@ -166,7 +166,7 @@ test('settlement transitions replace queued state and checkpoint neutral intake 
   ore.ore = 'metal';
   ore.boost = { phase: 'burning', ownerId: miner.id, angle: 0 };
   engine.asteroidLifecycle.insert(ore);
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   const delivered = engine.getGameState().settlement;
   expect(delivered).toEqual({
     level: 1,
@@ -185,7 +185,7 @@ test('settlement transitions replace queued state and checkpoint neutral intake 
   barren.ore = null;
   barren.boost = { phase: 'burning', ownerId: 'absent-pilot', angle: 0 };
   engine.asteroidLifecycle.insert(barren);
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(barren.id)).toBeUndefined();
   const neutral = engine.getGameState().settlement;
   expect(neutral).toEqual(delivered);

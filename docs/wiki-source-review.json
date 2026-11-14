@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:59e98b4e934467c8a23fdc3265806701e7169160b8a1dd082641c82ed7292913",
+    "server/core/GameEngine.ts": "sha256:9973d484d2a111fab34dce949166c7b091a3d0c227e1d46c0a81dd393076cf1d",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -114,7 +114,7 @@
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
-    "server/services/GameStateBroadcaster.ts": "sha256:821b0a5266b4c2aae96e413d4c88db5bb5da9a0bf0ee51393baf1706b2df4c9c",
+    "server/services/GameStateBroadcaster.ts": "sha256:700258287bc6f6e8529c5d08c6a71882999594acac8b2a6e3c17eb3b96c082e7",
     "server/staticClient.ts": "sha256:e68a7c48e159fbae08ef8428bccb87f396ca967b9e3b04e6dac82188ec143dac",
     "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
@@ -444,7 +444,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:cf2e154503221099cab1a0f78241305d4b650b0641e243490aa0a463423cd928",
+    "src/wiki/articleSources.json": "sha256:11bdfeb4c89007d31be7bfaaa0e66ef5e543112c6764e860fe95248ba07e32a0",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
@@ -454,7 +454,7 @@
     "src/wiki/shipScorecard.ts": "sha256:df06f04db9394ca431cafe6fbd590ad475d118acd26c558a1d3037538ab63055",
     "tests/integration/server/a-failed-checkpoint-stops-the-server-without-changing-saved-world.test.ts": "sha256:f5194a4d57ba2c45f63b03a1ea9271e46ae4dedba0033bbf07950c8366f1f64c",
     "tests/integration/server/pilots-observe-first-hit-asteroid-destruction.test.ts": "sha256:9cbb2361032f5b96910df96d080c58df826138cb47abfe42b71425eb310f6b2e",
-    "tests/integration/server/satellite-pickup-scoring.test.ts": "sha256:fd96fec3846b8dfe48ca6589c4f9be905bb32a1ee9e68d312ea961c5ec0df2fb",
+    "tests/integration/server/satellite-pickup-scoring.test.ts": "sha256:1980215bd994eb20ab94196e01c3cfbacc0d6d4de4ab9c2cd2316c34782fd7e9",
     "tests/unit/audio/title-and-play-loop-music-beds.test.ts": "sha256:5b117d30340357b3d24641a8690be93e5b79b6875dd04d4f965301a3098e6e6d",
     "tests/unit/audio/travel-route-music-requires-moving-through-a-real-passage.test.ts": "sha256:ad5c0bc7221f2ea0d0b8ea5443c15a96bed0b910360e6e28d02d4f8085385c4a",
     "tests/unit/components/debug-controls.test.ts": "sha256:f630bcae8b900129e9d6a1c21453de02d4e9d937af358ebea7b78d0c54811149",
@@ -475,7 +475,7 @@
     "tests/unit/entities/roidScore.test.ts": "sha256:553a3a4dea2221e81978c0acc22e0d4234520bfbe513caba25f54ba0c97d0669",
     "tests/unit/entities/satellite-pickups-follow-authoritative-health.test.ts": "sha256:8482599dca947f904286cb6f3fdc796a1c1d15a4a795fd21f79e84365b0801ae",
     "tests/unit/entities/satellitePickupMath.test.ts": "sha256:b025d6e8b049666d58937e7bad146f19044f5c24d98af675deafc37ac7f78de2",
-    "tests/unit/entities/satellitePickups.test.ts": "sha256:9479699b754ea79de5785adac34141d177573ebef41fa723befdd5fc1da60a96",
+    "tests/unit/entities/satellitePickups.test.ts": "sha256:3bba650ffb5c23a3bdfb83541aa223c22f7ca9b466f2da9bb9ce689019d7234e",
     "tests/unit/entities/scout-identifies-nearby-minerals.test.ts": "sha256:afd3d847acf25004904668739b2bfe5894f96a31c0b21d409e0786f8931d1775",
     "tests/unit/entities/scout-scan-vfx.test.ts": "sha256:aa86405ab1f8af15c59e803fabed97220ee732f400bcbe30c25049783cf22627",
     "tests/unit/entities/shipAbilities.test.ts": "sha256:2a6590e209b144b899d71a2aee162834782b682c9623b092326ea5e226cfed95",
@@ -519,7 +519,7 @@
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts": "sha256:325cb07a53da887485fad1f986e5ef54658acc29973c6aa2e0eca7c6ccbb2d5e",
     "tests/unit/scenarios/combat/hauler-hull-collides-farther-than-scout.test.ts": "sha256:13285c5ed47dbf549b5cd9d5bcb3787504a7a3b07fd6c22158d23d89bd7720d6",
     "tests/unit/scenarios/combat/wall-or-roid-hit-explodes-then-respawns-without-freeze.test.ts": "sha256:ea08b6fd093091b99a6bcfcc719ceee69d093dcdb30c89ef673ef4e511aa0988",
-    "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:57a98c39546a62319b123349ecf852e2d3b37ff47607293cd209b5cd0894f8f4",
+    "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:2197365411729dee548530a71a2a8275baad23f4374367c8557d69ac9e81221e",
     "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-cargo-and-bank.test.ts": "sha256:f599eff926157f07fc6ddcb3c0f8300a149656027467471bdbc1b6001424c0ea",
     "tests/unit/server/a-new-utc-month-keeps-the-world-and-scores.test.ts": "sha256:918640016895e0e34ad0fbdefd752cecb09668adc166f3dc0b830af4ebce3460",
     "tests/unit/server/authoritative-combat.test.ts": "sha256:4f0d3bc9d9979025f8ab3460494bac4b0cada907725917c8002f300c37bdf87b",
@@ -537,7 +537,7 @@
     "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:105cff48a7ebc79c6957843f927a59426749447d3878a994d0cd29e942224501",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:8c8da9cc78f26bab1c688dc4453b5da78da1288cf61a22d078697fa933cfe363",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
-    "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:0893cd9bca2762061ec1446e9616922c7b2a424c9c5e04cd9d59ae96642783db",
+    "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:93e6d68684930d1ba241fe806dda0f7ebfb16775794bfa8c8c35ac7494f199d2",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:bff0c60fc4f68500ace3a6c0b71bde08ddfee861f71448661f9e413412696316",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:e2b23366c22cff0d4c73fb7bd339f6c14a9dc17eac377e7e7e47057f94f78fbe",
@@ -592,7 +592,8 @@
     "server/core/ChargedWeaponManager.ts": "sha256:51ca4cb8a3492c36246980b494432cfb70eb76e80e5c585bf30e9e32480d0232",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
     "server/core/ShipAbilityManager.ts": "sha256:e9627a0d340830b407be3ab0d2ee86ddaaf26bf0ac0fb3bdd86227c32977d573",
-    "server/core/LootCollectionManager.ts": "sha256:aed4bcd007069707710844a4257b4dc76d3e5b01fca0f26317554e5cd26babba"
+    "server/core/LootCollectionManager.ts": "sha256:aed4bcd007069707710844a4257b4dc76d3e5b01fca0f26317554e5cd26babba",
+    "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6"
   },
   "reviews": [
     {
@@ -8832,6 +8833,36 @@
       "media": ["cargo", "hauler", "scout"],
       "owners": {
         "src/wiki/articleSources.json": "loot-growth"
+      }
+    },
+    {
+      "note": "Reviewed SatellitePickupField on actual merged Collection maine584 owning real satellite advance, collection and bounded transient feedback. Hardware lifecycle and bounded cargo command remain unchanged. Fresh separate human projections, pause fast-path, per-pickup capacity eligibility, distance/ID tie, successful transition before credit, copied events, cap32, destructive drain and clear preserve both kits and recipient privacy. Engine wrappers/queue are removed. Collection/Ability/Furnace/Contour/Charged/Bot/Glow owners, tool-origin placement, five budgets and Atlas remain. Current native pixel/PNG,24unitfiles242cases,real one-socket case,strict types,nine-path lint and unused checks passed. Seven independent defects hit intended loose state, zulu tie, worker claim, stale eligibility six-first allocation, stale Terra news, refused-transition cargo50vs0 and repeated Landsat event; allnine/protected1317/config restored eighttimes. Initial current typecheck unused SATELLITE_PICKUP import corrected only; original242case pass/typefailure retained. All eleven articles and Scout/Hauler/Cargo/Satellites/Pickups declarations remain accurate;13media/declaration/generator hashes equal landedmain. Root inspected satellite/pickup posters and six GIF samples; predecessor kit/cargo demonstrations remain byte-identical. No article/UI/media behavior change. Full gate, independent review, CI and production acceptance pending; no physical/performance claim.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/SatellitePickupField.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/wiki/articleSources.json",
+        "tests/integration/server/satellite-pickup-scoring.test.ts",
+        "tests/unit/entities/satellitePickups.test.ts",
+        "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts",
+        "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "pickups", "satellites", "scout"],
+      "owners": {
+        "src/wiki/articleSources.json": "satellites"
       }
     }
   ]

@@ -68,7 +68,7 @@ describe('Server scoring via automatic satellite pickup collection', () => {
       position: { x: pickup.position.x + 110, y: pickup.position.y },
       spawnProtectionTimer: 0,
     });
-    server.gameEngine.tickSatellitePickups();
+    server.gameEngine.satelliteField.advance();
 
     expect(server.gameEngine.getPlayer(playerId)?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(server.gameEngine.getSatellitePickup(pickup.id)?.ownerId).toBe(playerId);

@@ -228,6 +228,7 @@
   ],
   "satellites": [
     "shared/eoSatellites.ts",
+    "server/core/SatellitePickupField.ts",
     "server/core/SatellitePickupManager.ts",
     "src/constants/index.ts",
     "shared/constants/gameplay.ts",

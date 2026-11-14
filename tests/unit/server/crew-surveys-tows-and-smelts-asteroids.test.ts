@@ -85,7 +85,7 @@ test('a satellite widens Hauler exploration with one reveal and base Scout disco
   const pickup = engine.getAllSatellitePickups()[0];
   assert(pickup);
   hauler.position = { ...pickup.position };
-  engine.tickSatellitePickups();
+  engine.satelliteField.advance();
   expect(engine.equipSatellite(hauler.id, pickup.id)).toBe(true);
   scout.position = { x: 10_000, y: 10_000 };
   hauler.position = { x: 16_000, y: 10_000 };

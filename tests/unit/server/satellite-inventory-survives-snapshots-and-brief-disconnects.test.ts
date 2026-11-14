@@ -29,7 +29,7 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
   const pickup = engine.getAllSatellitePickups()[0];
   assert.ok(pickup);
   engine.updatePlayer(owner.id, { position: { x: pickup.position.x + 110, y: pickup.position.y } });
-  engine.tickSatellitePickups();
+  engine.satelliteField.advance();
   // The observer can see this world location, but must not see stored inventory.
   engine.updatePlayer(observer.id, { position: { ...pickup.position } });
   broadcaster.negotiateSnapshot(socket);
@@ -76,7 +76,7 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     engine.updatePlayer(observer.id, { position: { ...owner.position } });
     expect(engine.equipSatellite(owner.id, pickup.id)).toBe(true);
     engine.handleSatellitePickupDamage(pickup.id, 25);
-    engine.tickSatellitePickups();
+    engine.satelliteField.advance();
     const equipped = engine.getSatellitePickup(pickup.id);
     assert.ok(equipped);
     expect(read().owner.satellitePickups.find((row) => row.id === pickup.id)).toMatchObject({
@@ -105,7 +105,7 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     const dropped = engine.getSatellitePickup(pickup.id);
     assert.ok(dropped);
     engine.updatePlayer(owner.id, { position: { ...dropped.position } });
-    engine.tickSatellitePickups();
+    engine.satelliteField.advance();
     expect(engine.getSatellitePickup(pickup.id)?.state).toBe('stored');
     expect(engine.transportClosed(resumedSocket)).toBe(true);
     now += PLAYER_MOTION.reconnectGraceMs + 1;

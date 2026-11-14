@@ -232,8 +232,10 @@ Start `npm run dev`; verify at origin `http://127.0.0.1:5173/` (routes `/`, `/de
 ## Verified-tree CI
 
 PRs run static checks, runner contracts, Actions contracts, the complete server integration suites, Wiki media verification and the Railpack server build concurrently.
-The final `ci` job requires all six lanes to succeed; failed, cancelled, or skipped
-lanes fail the aggregate. Each lane has its own exact-tree proof.
+The final `ci` job requires all six lanes to succeed and, on pull requests, the
+four security scanners and their `security` aggregate. Failed, cancelled or
+skipped required results fail `ci`. The six validation lanes remain parallel;
+each has its own exact-tree proof. PR security scans are never reused.
 Full unit and server integration checks run locally in the review gate. Manual performance measurements remain outside it. Post-merge CI reuses each successful PR lane only
 when its recorded checkout tree exactly matches the landed tree, using
 the repository-owned `scripts/ci-verified-tree.sh`. Missing proof runs that CI lane;
@@ -270,9 +272,7 @@ and a separate verified PR in each affected repository.
 This repo owns `gate/gate-lib.sh` and `scripts/repo-hooks.py`. Run reviewed
 `scripts/setup-agent-environment.sh` on main to install its outside-worktree
 dispatcher. That dispatcher registers pre-commit and pre-push only. Pre-push is
-the ranged gitleaks scan plus Semgrep and osv-scanner; it skips Semgrep or
-osv-scanner with a warning only when that scan's server is unreachable, leaving it
-to CI. Never set hooksPath to
+the ranged gitleaks scan only. Semgrep and osv-scanner run in required PR CI. Never set hooksPath to
 `.git-hooks`: a branch could then register executable hooks. See
 [development and release](docs/development.md).
 

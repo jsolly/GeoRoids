@@ -4,12 +4,9 @@ import { isAbsolute, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { WebSocket } from 'ws';
 import { EXPLORATION_VERSION } from '../../shared/atlasTransport';
-import {
-  ASTEROID_INTERACTIONS_CAPABILITY,
-  SNAPSHOT_VERSION,
-  SnapshotDecoder,
-} from '../../shared/snapshotProtocol';
+import { ASTEROID_INTERACTIONS_CAPABILITY, SNAPSHOT_VERSION } from '../../shared/snapshotProtocol';
 import { createServerInstance } from '../createServer';
+import { RestoreGameplayMessages } from './RestoreGameplayMessages';
 import { createSnapshot, inspectSnapshot, type SnapshotReceipt } from './snapshot';
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -53,6 +50,7 @@ export async function rehearseRestore(options: {
   await mkdir(options.scratchDirectory, { mode: 0o700 });
   let server: ReturnType<typeof createServerInstance> | undefined;
   let socket: WebSocket | undefined;
+  let messages: RestoreGameplayMessages | undefined;
   try {
     const path = join(options.scratchDirectory, 'rehearsal.sqlite');
     await createSnapshot(options.artifact, path);
@@ -70,61 +68,20 @@ export async function rehearseRestore(options: {
     }
     const engine = server.gameEngine;
     const id = `drill-${randomUUID()}`;
-    const decoder = new SnapshotDecoder('live');
-    let joinedAccepted = false;
     socket = new WebSocket(
       `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}&explorationVersion=${EXPLORATION_VERSION}`
     );
     const connection = socket;
+    const gameplay = new RestoreGameplayMessages(connection);
+    messages = gameplay;
     function send(type: string, data: Record<string, unknown>): void {
       connection.send(JSON.stringify({ type, data }));
-    }
-    function waitFor(
-      read: (value: ReturnType<SnapshotDecoder['readMessage']>) => boolean,
-      trigger: () => void
-    ): Promise<void> {
-      return new Promise<void>((resolve, reject) => {
-        const deadline = setTimeout(
-          () => finish(new Error('Restore gameplay contract timed out')),
-          5000
-        );
-        const failed = () => finish(new Error('Restore gameplay transport failed'));
-        const received = (raw: WebSocket.RawData) => {
-          try {
-            const value = decoder.readMessage(String(raw), {
-              acceptSnapshots: joinedAccepted,
-            });
-            if (value.kind === 'snapshot-rejected') {
-              throw value.error;
-            }
-            if (value.kind === 'snapshot') {
-              send('snapshotAck', { sequence: value.metadata.sequence });
-            }
-            if (read(value)) {
-              finish();
-            }
-          } catch {
-            finish(new Error('Restore gameplay message failed validation'));
-          }
-        };
-        function finish(error?: Error): void {
-          clearTimeout(deadline);
-          connection.off('message', received);
-          connection.off('error', failed);
-          connection.off('close', failed);
-          error ? reject(error) : resolve();
-        }
-        connection.on('message', received);
-        connection.once('error', failed);
-        connection.once('close', failed);
-        trigger();
-      });
     }
     await new Promise<void>((resolve, reject) => {
       connection.once('open', resolve);
       connection.once('error', reject);
     });
-    await waitFor(
+    await gameplay.waitFor(
       (value) => {
         const accepted =
           value.kind === 'message' &&
@@ -137,8 +94,7 @@ export async function rehearseRestore(options: {
           value.message['data']['asteroidInteractions'] === ASTEROID_INTERACTIONS_CAPABILITY &&
           value.message['data']['explorationVersion'] === EXPLORATION_VERSION;
         if (accepted) {
-          decoder.reset();
-          joinedAccepted = true;
+          gameplay.acceptJoin();
         }
         return accepted;
       },
@@ -159,7 +115,7 @@ export async function rehearseRestore(options: {
       throw new Error('Restored server refused join');
     }
     const target = { x: actor.position.x + 1, y: actor.position.y };
-    await waitFor(
+    await gameplay.waitFor(
       (value) =>
         value.kind === 'snapshot' &&
         value.state.entities.some(
@@ -183,7 +139,7 @@ export async function rehearseRestore(options: {
     if (engine.getPlayer(id)?.position.x !== target.x) {
       throw new Error('Restored server refused movement');
     }
-    await waitFor(
+    await gameplay.waitFor(
       (value) => {
         if (!record(value) || value['kind'] !== 'message' || !record(value['message'])) {
           return false;
@@ -204,6 +160,7 @@ export async function rehearseRestore(options: {
           requestId: 'restore-drill',
         })
     );
+    gameplay.finish();
     connection.terminate();
     await server.close();
     server = undefined;
@@ -224,6 +181,7 @@ export async function rehearseRestore(options: {
       persistence: true,
     };
   } finally {
+    messages?.dispose();
     socket?.terminate();
     try {
       await server?.close();

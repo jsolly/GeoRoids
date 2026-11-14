@@ -74,6 +74,28 @@ function ore(id: string): AsteroidData {
   };
 }
 
+function clearedHive(id: string): Extract<CooperativeRecord, { kind: 'hive' }> {
+  const site = frontierSite(id);
+  if (!site) {
+    throw new Error('Site missing');
+  }
+  return {
+    kind: 'hive',
+    id: site.id,
+    position: site.position,
+    frontier: site.frontier,
+    queenHealth: 0,
+    birthFramesLeft: 480,
+    clearedAt: 1,
+    sacs: [0, 0],
+    sacDeadline: null,
+    sacsCompletedAt: 1,
+    restoredValue: 0,
+    contributors: [],
+    commissionedAt: null,
+  };
+}
+
 test('physical ore funds scanner once per consumed rock, preserves payouts and places overflow in supply stock', () => {
   const { engine, pilot, store } = scenario();
   const original = pilot.score;
@@ -122,19 +144,9 @@ test('inward physical supply commissions once, accounts overflow and restores ev
     throw new Error('Site missing');
   }
   const hive: CooperativeRecord = {
-    kind: 'hive',
-    id: site.id,
-    position: site.position,
-    frontier: site.frontier,
-    queenHealth: 0,
-    birthFramesLeft: 480,
-    clearedAt: 1,
-    sacs: [0, 0],
-    sacDeadline: null,
-    sacsCompletedAt: 1,
+    ...clearedHive(site.id),
     restoredValue: 9500,
-    contributors: [],
-    commissionedAt: null,
+    contributors: ['prior-builder'],
   };
   const { engine, pilot, store } = scenario([
     hive,
@@ -147,12 +159,20 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   if (!rock) {
     throw new Error('Supply missing');
   }
+  expect(id).toBe(`supply:${TOWN_HEARTH.id}:0`);
+  rock.surveyedBy = ['surveyor', pilot.id, 'prior-builder'];
   pilot.position = { ...site.position };
   engine.advanceOneFrame();
+  const atlasCell = explorationCellAt({ x: site.position.x + 900, y: site.position.y });
+  if (atlasCell === null) {
+    throw new Error('Commissioning atlas cell is outside the world');
+  }
+  expect(isCellExplored(engine.getGameState().exploration ?? [], atlasCell)).toBe(false);
   rock.position = { ...site.position };
   rock.velocity = { x: 0, y: 0 };
   pilot.harpoonTargetId = id;
-  engine.processFurnaceDeliveries();
+  engine.advanceOneFrame();
+  expect(engine.getAsteroid(id)).toBeUndefined();
   engine.processFurnaceDeliveries();
   expect(engine.getAsteroid(id)).toBeUndefined();
   const state = engine.getGameState();
@@ -160,13 +180,14 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   expect(isCellExplored(state.exploration ?? [], explorationCellAt(site.position) ?? -1)).toBe(
     true
   );
+  expect(isCellExplored(state.exploration ?? [], atlasCell)).toBe(true);
   engine.checkpointWorld();
   const rows = store.load().cooperative?.records;
   expect(rows).toContainEqual(
     expect.objectContaining({
       kind: 'hive',
       restoredValue: COOPERATIVE.restoreValue,
-      contributors: [pilot.id],
+      contributors: ['prior-builder', pilot.id, 'surveyor'],
       commissionedAt: 500_000,
     })
   );
@@ -207,6 +228,104 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   expect(engine.furnaceTravel.start(pilot.id, TOWN_HEARTH.id)).toBeUndefined();
   expect(pilot.furnaceTransit).toMatchObject({ sourceId: site.id, destinationId: TOWN_HEARTH.id });
   expect(litTravelDestinations(TOWN_HEARTH.id, field).some((f) => f.id === site.id)).toBe(true);
+
+  engine.stopGameLoop();
+  const restarted = new GameEngine(
+    82,
+    new ServerClock({ wallNow: () => 500_001, monotonicNow: () => 0 }),
+    new InlineWorldPersistence(store)
+  );
+  cleanups.push(() => restarted.stopGameLoop());
+  expect(restarted.getGameState().campaign?.commissioned).toEqual([site.id]);
+  expect(restarted.getGameState().mapAssets).toContainEqual({
+    id: site.id,
+    kind: 'furnace',
+    name: site.name,
+    position: site.position,
+  });
+  const returning = restarted.addPlayer(
+    'returning',
+    'Returning',
+    new RecordingSocket(),
+    { ...site.position },
+    'hauler'
+  );
+  returning.haulerUtility = 'tow_cable';
+  const resumedOre = ore('restarted-frontier-ore');
+  resumedOre.position = { ...site.position };
+  restarted.addAsteroid(resumedOre);
+  returning.harpoonTargetId = resumedOre.id;
+  restarted.processFurnaceDeliveries();
+  expect(restarted.getAsteroid(resumedOre.id)).toBeUndefined();
+  expect(returning.score).toBe(300);
+  restarted.prepareDiagnosticWorld('traversal');
+  expect(restarted.getGameState().campaign?.commissioned).toEqual([site.id]);
+  expect(restarted.getGameState().mapAssets.some((asset) => asset.id === site.id)).toBe(true);
+  restarted.resetForTesting();
+  expect(restarted.getGameState().campaign).toBeUndefined();
+  expect(restarted.getGameState().mapAssets.some((asset) => asset.id === site.id)).toBe(false);
+  const freshPilot = restarted.addPlayer(
+    'fresh',
+    'Fresh',
+    new RecordingSocket(),
+    { ...site.position },
+    'hauler'
+  );
+  freshPilot.haulerUtility = 'tow_cable';
+  const resetOre = ore('reset-frontier-ore');
+  resetOre.position = { ...site.position };
+  restarted.addAsteroid(resetOre);
+  freshPilot.harpoonTargetId = resetOre.id;
+  restarted.processFurnaceDeliveries();
+  expect(restarted.getAsteroid(resetOre.id)).toBeDefined();
+  expect(freshPilot.score).toBe(0);
+});
+
+test('physical supply rejects dark, equal-radius, inward and same-site sources without consuming cargo', () => {
+  const destination = clearedHive('frontier:3,0');
+  const commissioned = ['frontier:0,3', 'frontier:3,1'].map((id) => ({
+    ...clearedHive(id),
+    restoredValue: COOPERATIVE.restoreValue,
+    commissionedAt: 1,
+  }));
+  const { engine, pilot, store } = scenario([destination, ...commissioned]);
+  pilot.position = { ...destination.position };
+  engine.advanceOneFrame();
+  const beforeScore = pilot.score;
+  for (const [index, sourceId] of [
+    destination.id,
+    'frontier:0,3',
+    'frontier:3,1',
+    'frontier:2,0',
+  ].entries()) {
+    const rock = ore(`refused-supply-${index}`);
+    rock.position = { ...destination.position };
+    rock.ore = null;
+    rock.supply = { sourceId, value: 100 };
+    engine.addAsteroid(rock);
+    pilot.harpoonTargetId = rock.id;
+    engine.processFurnaceDeliveries();
+    expect(engine.getAsteroid(rock.id)?.supply).toEqual({ sourceId, value: 100 });
+    expect(pilot.harpoonTargetId).toBe(rock.id);
+    expect(engine.drainFurnaceDeliveries()).toEqual([]);
+  }
+  expect(pilot.score).toBe(beforeScore);
+  expect(engine.getGameState().campaign?.commissioned).toEqual(commissioned.map((h) => h.id));
+  const valid = ore('outward-town-supply');
+  valid.position = { ...destination.position };
+  valid.ore = null;
+  valid.supply = { sourceId: TOWN_HEARTH.id, value: 100 };
+  engine.addAsteroid(valid);
+  pilot.harpoonTargetId = valid.id;
+  engine.processFurnaceDeliveries();
+  expect(engine.getAsteroid(valid.id)).toBeUndefined();
+  expect(pilot.score).toBe(beforeScore);
+  engine.checkpointWorld();
+  expect(store.load().cooperative?.records).toContainEqual({
+    ...destination,
+    restoredValue: 100,
+    contributors: [pilot.id],
+  });
 });
 
 test('a launched Tow Cable pins the queen and real swept laser contact damages her shielded body', () => {

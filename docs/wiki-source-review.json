@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:21135c72dac1b1f02e98676422cf1ec01885b4f594e881d93b6d5caf98a3d520",
+    "server/core/GameEngine.ts": "sha256:e488259a361c7f46513d2655d8ffcc77c8fb9f660ba1d8da8be0ca21b37fbd55",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -444,10 +444,10 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:b0060a47bdbad802c85a2be071bfbc0299ded59fb701e111e422532d6458e170",
+    "src/wiki/articleSources.json": "sha256:5f186bb99465fd132b7fbe76bfd7038b15191c6d51076a66ced7247e7d9c5fdd",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
-    "src/wiki/media.ts": "sha256:757db97caa447b100032fbd1e60590a6d4e91fdbb51a2584969a1bc6796a8e6e",
+    "src/wiki/media.ts": "sha256:787347143425512717cd9d4ccdf0b90ed04fabacdbac2d1745fc258c2579b3f4",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
     "src/wiki/scrollMemory.ts": "sha256:ccbbe47812fc19f4c2048eb3db605d5351e070cab3257269bee95478fcc9df39",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
@@ -553,7 +553,7 @@
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts": "sha256:d9f9246b8cace56695ca00aacebf786abdd804ce2130af1f2bf5c46ab2b4cd4d",
     "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts": "sha256:e48180121688f0a7b1bee099cab26f7ccf4a19738d191abaaedcf462c1ef9283",
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:9cd701d62f3afec2756cad956721e2a320714d9149b13771727f5985f4171b51",
-    "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:6c465370b8ccf30a2345ed7fb8f0e2493c9c4ce55aadbbeeea90742df23b9077",
+    "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:319c27c035997fa6366d4088654d0e0fc08faf139f3d1b0a92c831def3b09f58",
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:07701c22cf2a08ebd920c9d2a9bc3fe3f0041da111618d50e067c7790e4b975d",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1d2cb49eb4cd397956de0383853f1952b91ecd3c1338f244d85b3ddcabb314c6",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
@@ -595,7 +595,8 @@
     "server/core/LootCollectionManager.ts": "sha256:aed4bcd007069707710844a4257b4dc76d3e5b01fca0f26317554e5cd26babba",
     "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6",
     "server/core/CargoOffloadManager.ts": "sha256:5cb45d5069856a749c7e40612f0bee6d91616ec58195722f8c0d027a1710f8d8",
-    "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e"
+    "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
+    "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f"
   },
   "reviews": [
     {
@@ -8975,6 +8976,45 @@
         "terrain"
       ],
       "owners": {
+        "src/wiki/media.ts": "teamwork"
+      }
+    },
+    {
+      "note": "Reviewed CooperativeSupplyRestoration on actual shipped Settlement main2a811d1f. It owns physical stock debit/shipment serial, commissioned identities/furnace indexing/load/reset, strict supply-source admission, project/ruin/overflow handover and map projection. Engine retains complete rock removal then supply record then settlement/award ordering, fullframe intake, activation and pause semantics, prior owners/toolorder/fivebudgets. New defining module is cited in five original campaign topics plus Hauler; actual Hauler demo enters permitsDelivery, so its source declaration now names this owner. All prior Settlement mapping entries/history remain. Root reviewed actual supply/ruin/frontier/scanner/furnace prose; all11articles and all21media/manifest bytes equal actual Settlement main. Current native pixel/PNG, initial/final34files349cases, stricttypes/scopedlint/unused, six real socket cases and twice-render all10GIFs+10posters with Pillow12.3.0 passed. Nine fresh deliberate defects failed intended equal-radius/dark-source consumption, stock debit, serial, durable hive handover, constructor/reset indexing, hidden-cell commissioning reveal and production fullframe intake assertions. Ten exact restorations matched3sources1328protectedpaths/commonconfig; final clean checks green. Earlier historical reveal omission survivor and classifier limitation remain disclosed; current strengthened hidden900-offset cell distinguishes ambient exploration and fails when real reveal is omitted. No skips/retries/tolerance/deadline weakening, new schema/wire format/activation or player-visible rule change. Fullgate, independent reviews, CI/merge/hosts/smoke remain pending; storage957 held draft and no physical/performance acceptance.",
+      "sources": [
+        "server/core/CooperativeSupplyRestoration.ts",
+        "server/core/GameEngine.ts",
+        "src/wiki/articleSources.json",
+        "src/wiki/media.ts",
+        "tests/unit/server/physical-supplies-restore-frontier.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork",
         "src/wiki/media.ts": "teamwork"
       }
     }

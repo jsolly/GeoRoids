@@ -52,12 +52,12 @@ describe('satellite pickups intercept physical damage', () => {
     engine.updatePlayer('owner', {
       position: { x: pickup.position.x + 110, y: pickup.position.y },
     });
-    engine.tickSatellitePickups();
+    engine.satelliteField.advance();
     expect(engine.getSatellitePickup(pickup.id)?.state).toBe('stored');
     expect(engine.equipSatellite('owner', pickup.id)).toBe(true);
     expect(engine.getSatellitePickup(pickup.id)?.state).toBe('orbiting');
     engine.updatePlayer('owner', { position: { x: 0, y: 0 } });
-    engine.tickSatellitePickups();
+    engine.satelliteField.advance();
     return pickup.id;
   }
 

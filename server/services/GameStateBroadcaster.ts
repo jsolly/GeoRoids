@@ -663,7 +663,7 @@ export class GameStateBroadcaster {
   }
 
   private flushSatellitePickupCollections(): void {
-    for (const event of this.gameEngine.drainSatellitePickupCollections()) {
+    for (const event of this.gameEngine.satelliteField.drainCollections()) {
       this.broadcastSatellitePickupCollected(event);
     }
   }

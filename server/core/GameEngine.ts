@@ -19,7 +19,7 @@ import {
 } from '../../shared/asteroidScale';
 import { checkBoundaryCollision } from '../../shared/boundary';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
-import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../shared/constants/gameplay';
+import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
 import {
@@ -70,7 +70,7 @@ import {
   setScoutUtilityOnHost,
   tickTowLine,
 } from '../../shared/shipAbilities';
-import { canCollectLoot, GROWTH } from '../../shared/shipGrowth';
+import { GROWTH } from '../../shared/shipGrowth';
 import {
   applyShipKitStats,
   getShipKit,
@@ -109,7 +109,6 @@ import type {
   PlayerProjectileState,
   PlayerShotFired,
   Position,
-  SatellitePickupCollected,
   SatellitePickupData,
   ServerEntityData,
   ServerGameState,
@@ -156,6 +155,7 @@ import { LootManager } from './LootManager';
 import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
 import { RolyPolyManager } from './RolyPolyManager';
+import { SatellitePickupField } from './SatellitePickupField';
 import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 import { markSurveyedAsteroids, ShipAbilityManager } from './ShipAbilityManager';
@@ -223,7 +223,6 @@ export const PLAYER_SHOOT_POSE_ALLOWANCE_MS = 250;
 const PLAYER_SHOOT_MUZZLE_SLOP = 8;
 /** Stationary/counter-thrust shots must not remain in the authoritative list forever. */
 export const PLAYER_LASER_MAX_LIFETIME_MS = Math.ceil(5000 / GAME.MOTION_SCALE);
-const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 const MAX_PENDING_LOOT_COLLECTIONS = 256;
 /** World changes leave the loop once per second; a crash loses at most that window. */
 const WORLD_FLUSH_FRAMES = GAME.FPS;
@@ -279,6 +278,7 @@ export class GameEngine {
   private asteroidManager: AsteroidManager;
   private lootManager: LootManager;
   private satellitePickupManager: SatellitePickupManager;
+  public readonly satelliteField: SatellitePickupField;
   private spiderManager: TerrainSpiderManager;
   private readonly beltCrawlers = new BeltCrawlerManager((id) => this.getAsteroid(id));
   private rngService: RNGService;
@@ -329,7 +329,6 @@ export class GameEngine {
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private persistenceFailure: Error | undefined;
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
-  private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
   private pendingSpiderAttacks: SpiderAttack[] = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly laserExpiry = new WeakMap<ServerLaser, number>();
@@ -492,6 +491,13 @@ export class GameEngine {
     });
     this.mapAssets.primeInitialLoot();
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
+    this.satelliteField = new SatellitePickupField({
+      actors: this.entityManager,
+      pickups: this.satellitePickupManager,
+      addCargo: (actor, points) => this.addCargo(actor, points),
+      paused: () => this.isPaused,
+      now: () => this.getServerTime(),
+    });
     this.spiderManager = new TerrainSpiderManager(
       () => this.rngService.random(),
       this.furnaces,
@@ -707,7 +713,7 @@ export class GameEngine {
     this.tickSurveyProbes(serverNow);
     this.entityManager.updateHealthRegeneration();
     this.lootCollection.advance(this.gameTime);
-    this.tickSatellitePickups();
+    this.satelliteField.advance();
     const toolStartPositions = this.captureToolStartPositions();
     this.asteroidManager.updateMotion(
       this.entityManager.getAllEntities().some((pilot) => pilot.utilityFlight?.phase === 'outbound')
@@ -873,7 +879,7 @@ export class GameEngine {
     this.lootCollection.clearPendingFeedback();
     this.abilities.clearPendingFeedback();
     this.pendingShotSounds = [];
-    this.pendingSatellitePickupCollections = [];
+    this.satelliteField.clearPendingFeedback();
     this.pendingFurnaceDeliveries = [];
   }
 
@@ -1939,21 +1945,6 @@ export class GameEngine {
     return this.satellitePickupManager.createPickups();
   }
 
-  public tickSatellitePickups(): void {
-    if (this.isPaused) {
-      return;
-    }
-    const owners = this.getAllPlayers().map((entity) => ({
-      id: entity.id,
-      position: entity.position,
-      radius: hullRadiusForKit(entity.kitId),
-      health: entity.health,
-      exploding: entity.exploding,
-    }));
-    this.satellitePickupManager.update(owners);
-    this.collectNearbySatellitePickups();
-  }
-
   public equipSatellite(entityId: string, pickupId: string): boolean {
     const owner = this.entityManager.getEntity(entityId);
     if (!owner || owner.furnaceTransit || owner.respawnTimer !== undefined || this.isPaused) {
@@ -1968,77 +1959,6 @@ export class GameEngine {
         exploding: owner.exploding,
       }) !== null
     );
-  }
-
-  private collectNearbySatellitePickups(): void {
-    const players = this.getAllPlayers()
-      .filter(
-        (entity) =>
-          entity.health > 0 &&
-          !entity.exploding &&
-          entity.respawnTimer === undefined &&
-          entity.overlayHold !== true
-      )
-      .sort((a, b) => a.id.localeCompare(b.id));
-
-    const loosePickups = this.satellitePickupManager
-      .getAllPickups()
-      .filter((pickup) => pickup.state === 'loose' && pickup.health > 0)
-      .sort((a, b) => a.id.localeCompare(b.id));
-
-    for (const pickup of loosePickups) {
-      const collector = players
-        .filter((entity) => canCollectLoot(entity))
-        .map((entity) => ({
-          entity,
-          distance: Math.hypot(
-            pickup.position.x - entity.position.x,
-            pickup.position.y - entity.position.y
-          ),
-        }))
-        .filter(({ distance }) => distance <= SATELLITE_PICKUP.AUTO_COLLECT_RANGE)
-        .sort(
-          (a, b) => a.distance - b.distance || a.entity.id.localeCompare(b.entity.id)
-        )[0]?.entity;
-      if (!collector) {
-        continue;
-      }
-
-      const collected = this.satellitePickupManager.collect(pickup.id, {
-        id: collector.id,
-        position: collector.position,
-        radius: hullRadiusForKit(collector.kitId),
-        health: collector.health,
-        exploding: collector.exploding,
-      });
-      if (!collected) {
-        continue;
-      }
-
-      this.addCargo(collector, SATELLITE_PICKUP.SCORE_BONUS);
-      collector.lastUpdate = this.getServerTime();
-      this.queueSatellitePickupCollected({
-        position: { ...pickup.position },
-        pickupId: collected.id,
-        playerId: collector.id,
-        playerName: collector.name,
-        pickupName: collected.name,
-        scoreBonus: SATELLITE_PICKUP.SCORE_BONUS,
-      });
-    }
-  }
-
-  private queueSatellitePickupCollected(event: SatellitePickupCollected): void {
-    if (this.pendingSatellitePickupCollections.length >= MAX_PENDING_SATELLITE_PICKUP_EVENTS) {
-      this.pendingSatellitePickupCollections.shift();
-    }
-    this.pendingSatellitePickupCollections.push(event);
-  }
-
-  public drainSatellitePickupCollections(): SatellitePickupCollected[] {
-    const events = this.pendingSatellitePickupCollections;
-    this.pendingSatellitePickupCollections = [];
-    return events;
   }
 
   /** Apply one authoritative physical hit to a live satellite pickup. */

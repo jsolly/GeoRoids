@@ -60,7 +60,7 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
       throw new Error('Ace joined without a loose satellite pickup');
     }
     world.engine.parkSatellitePickups(origin);
-    world.engine.tickSatellitePickups();
+    world.engine.satelliteField.advance();
     expect(world.entity(ace).score).toBe(0);
     expect(world.engine.getSatellitePickup(parkedPickup.id)?.state).toBe('loose');
 

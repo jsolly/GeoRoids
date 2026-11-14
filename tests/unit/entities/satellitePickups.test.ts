@@ -50,7 +50,7 @@ describe('Satellite pickups', () => {
     addPilot('departed');
     gameEngine.removePlayer('departed');
     const project = vi.spyOn(SatellitePickupManager.prototype, 'getAllPickups');
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(project).not.toHaveBeenCalled();
 
     const pilot = addPilot();
@@ -59,7 +59,7 @@ describe('Satellite pickups', () => {
     moveNearPickup(pilot.id, pickup.id);
     project.mockClear();
 
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
 
     expect(project).toHaveBeenCalledTimes(1);
     expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
@@ -67,24 +67,24 @@ describe('Satellite pickups', () => {
       ownerId: pilot.id,
       health: SATELLITE_PICKUP.HEALTH,
     });
-    expect(gameEngine.drainSatellitePickupCollections()).toContainEqual(
+    expect(gameEngine.satelliteField.drainCollections()).toContainEqual(
       expect.objectContaining({ pickupId: pickup.id, playerId: pilot.id })
     );
     expect(gameEngine.equipSatellite(pilot.id, pickup.id)).toBe(true);
     project.mockClear();
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(project).toHaveBeenCalledTimes(1);
     expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBeCloseTo(
       SATELLITE_PICKUP.HEALTH - SATELLITE_PICKUP.HEALTH / SATELLITE_PICKUP.LIFETIME_FRAMES
     );
-    expect(gameEngine.drainSatellitePickupCollections()).toEqual([]);
+    expect(gameEngine.satelliteField.drainCollections()).toEqual([]);
   });
 
   function collectNearest(playerId = 'pilot', distance = 110, equip = true) {
     const pickup = gameEngine.getAllSatellitePickups()[0];
     assert.ok(pickup, 'a pickup exists');
     moveNearPickup(playerId, pickup.id, distance);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     if (equip) {
       expect(gameEngine.equipSatellite(playerId, pickup.id)).toBe(true);
     }
@@ -130,7 +130,7 @@ describe('Satellite pickups', () => {
     assert.ok(pickup);
     expect(gameEngine.handleSatellitePickupDamage(pickup.id, 1000)).toBeNull();
     for (let frame = 0; frame < 180; frame += 1) {
-      gameEngine.tickSatellitePickups();
+      gameEngine.satelliteField.advance();
     }
     expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
       state: 'loose',
@@ -154,7 +154,7 @@ describe('Satellite pickups', () => {
     expect(attached.health).toBe(SATELLITE_PICKUP.HEALTH);
 
     gameEngine.updatePlayer('pilot', { position: { x: 80, y: 40 } });
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     const later = gameEngine.getSatellitePickup(attached.id);
     assert.ok(later);
     const dist = Math.hypot(later.position.x - 80, later.position.y - 40);
@@ -169,14 +169,111 @@ describe('Satellite pickups', () => {
     moveNearPickup('first', pickup.id, 80);
     moveNearPickup('second', pickup.id, 120);
 
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
 
     expect(gameEngine.getSatellitePickup(pickup.id)?.ownerId).toBe('first');
     expect(gameEngine.getPlayer('first')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getPlayer('first')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
+  });
+
+  test('equidistant human collectors use pilot ID while a closer worker cannot take hardware', () => {
+    const zulu = addPilot('zulu');
+    const alpha = addPilot('alpha');
+    const pickup = gameEngine.getAllSatellitePickups()[0];
+    assert.ok(pickup);
+    moveNearPickup(zulu.id, pickup.id, 80);
+    moveNearPickup(alpha.id, pickup.id, 80);
+    const worker = gameEngine.entityManager.addBot('worker', 'worker', { ...pickup.position });
+
+    gameEngine.satelliteField.advance();
+
+    expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
+      state: 'stored',
+      ownerId: alpha.id,
+    });
+    expect(alpha.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(zulu.cargo).toBe(0);
+    expect(worker.cargo).toBe(0);
+    expect(gameEngine.satelliteField.drainCollections()).toEqual([
+      {
+        pickupId: pickup.id,
+        playerId: alpha.id,
+        playerName: alpha.name,
+        pickupName: pickup.name,
+        position: pickup.position,
+        scoreBonus: SATELLITE_PICKUP.SCORE_BONUS,
+      },
+    ]);
+    expect(gameEngine.satelliteField.drainCollections()).toEqual([]);
+  });
+
+  test('a refused hardware transition cannot credit cargo or announce a collection', () => {
+    const pilot = addPilot();
+    const pickup = gameEngine.getAllSatellitePickups()[0];
+    assert.ok(pickup);
+    moveNearPickup(pilot.id, pickup.id);
+    vi.spyOn(SatellitePickupManager.prototype, 'collect').mockReturnValue(null);
+
+    gameEngine.satelliteField.advance();
+
+    expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
+      state: 'loose',
+      ownerId: null,
+    });
+    expect(pilot.cargo).toBe(0);
+    expect(gameEngine.satelliteField.drainCollections()).toEqual([]);
+  });
+
+  test('only the full simulation frame collects nearby hardware', () => {
+    const pilot = addPilot();
+    const pickup = gameEngine.getAllSatellitePickups()[0];
+    assert.ok(pickup);
+    moveNearPickup(pilot.id, pickup.id);
+    for (const rock of gameEngine.getAllAsteroids()) {
+      gameEngine.removeAsteroid(rock.id);
+    }
+    gameEngine.clearSpiderField();
+
+    gameEngine.advanceCombatFrame();
+    expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');
+    expect(pilot.cargo).toBe(0);
+    gameEngine.advanceOneFrame();
+
+    expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
+      state: 'stored',
+      ownerId: pilot.id,
+    });
+    expect(pilot.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.satelliteField.drainCollections()).toContainEqual(
+      expect.objectContaining({ pickupId: pickup.id, playerId: pilot.id })
+    );
+  });
+
+  test('last-human departure discards pending pickup news before a later arrival', () => {
+    const pilot = addPilot();
+    const [first, second] = gameEngine.getAllSatellitePickups();
+    assert.ok(first && second);
+    moveNearPickup(pilot.id, first.id);
+    gameEngine.satelliteField.advance();
+    expect(gameEngine.satelliteField.drainCollections()).toContainEqual(
+      expect.objectContaining({ pickupId: first.id, playerId: pilot.id })
+    );
+    moveNearPickup(pilot.id, second.id);
+    gameEngine.satelliteField.advance();
+    expect(gameEngine.getSatellitePickup(second.id)?.ownerId).toBe(pilot.id);
+    expect(pilot.cargo).toBe(2 * SATELLITE_PICKUP.SCORE_BONUS);
+
+    gameEngine.removePlayer(pilot.id);
+    addPilot('later');
+
+    expect(gameEngine.satelliteField.drainCollections()).toEqual([]);
+    expect(gameEngine.getSatellitePickup(second.id)).toMatchObject({
+      state: 'loose',
+      ownerId: null,
+    });
   });
 
   test('a satellite fills the nearest hold and the next satellite goes to another eligible pilot in the same tick', () => {
@@ -185,7 +282,7 @@ describe('Satellite pickups', () => {
     gameEngine.parkSatellitePickups(first.position);
     first.cargo = ECONOMY.scoutCapacity - SATELLITE_PICKUP.SCORE_BONUS;
     second.cargo = ECONOMY.scoutCapacity - SATELLITE_PICKUP.SCORE_BONUS;
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     const pickups = gameEngine.getAllSatellitePickups();
     const collected = pickups.filter((pickup) => pickup.state === 'stored');
     expect(
@@ -204,15 +301,15 @@ describe('Satellite pickups', () => {
     assert.ok(first);
     assert.ok(second);
     moveNearPickup('pilot', first.id);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     moveNearPickup('pilot', second.id);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(first.id)?.state).toBe('stored');
     expect(gameEngine.getSatellitePickup(second.id)?.state).toBe('stored');
     expect(gameEngine.handleSatellitePickupDamage(first.id, 1000)).toBeNull();
     expect(gameEngine.equipSatellite('other', first.id)).toBe(false);
     expect(gameEngine.equipSatellite('pilot', first.id)).toBe(true);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.equipSatellite('pilot', first.id)).toBe(false);
     expect(gameEngine.equipSatellite('pilot', second.id)).toBe(false);
     expect(gameEngine.getSatellitePickup(first.id)?.health).toBeCloseTo(
@@ -220,7 +317,7 @@ describe('Satellite pickups', () => {
     );
     expect(gameEngine.getSatellitePickup(second.id)?.health).toBe(SATELLITE_PICKUP.HEALTH);
     gameEngine.updatePlayer('pilot', { health: 0 });
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(first.id)?.state).toBe('loose');
     expect(gameEngine.getSatellitePickup(second.id)?.state).toBe('loose');
     expect(gameEngine.equipSatellite('pilot', second.id)).toBe(false);
@@ -263,14 +360,14 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getAsteroid('far')?.surveyedBy).toBeUndefined();
     expect(pilot.abilityActiveFrames).toBe(0);
     for (let frame = 0; frame < SATELLITE_PICKUP.LIFETIME_FRAMES - 1; frame++) {
-      gameEngine.tickSatellitePickups();
+      gameEngine.satelliteField.advance();
     }
     expect(gameEngine.getSatellitePickup(stored.id)?.state).toBe('orbiting');
     expect(gameEngine.getSatellitePickup(stored.id)?.health).toBeCloseTo(
       SATELLITE_PICKUP.HEALTH / SATELLITE_PICKUP.LIFETIME_FRAMES,
       8
     );
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(stored.id)).toMatchObject({
       state: 'broken',
       ownerId: null,
@@ -290,14 +387,14 @@ describe('Satellite pickups', () => {
     gameEngine.handleSatellitePickupDamage(pickup.id, SATELLITE_PICKUP.HEALTH / 2);
     expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBe(SATELLITE_PICKUP.HEALTH / 2);
     for (let frame = 0; frame < SATELLITE_PICKUP.LIFETIME_FRAMES / 2 - 1; frame++) {
-      gameEngine.tickSatellitePickups();
+      gameEngine.satelliteField.advance();
     }
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('orbiting');
     expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBeCloseTo(
       SATELLITE_PICKUP.HEALTH / SATELLITE_PICKUP.LIFETIME_FRAMES,
       8
     );
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({ state: 'broken', health: 0 });
   });
 
@@ -317,10 +414,10 @@ describe('Satellite pickups', () => {
 
     gameEngine.updatePlayer('pilot', { position: { x: 0, y: 0 } });
     for (let frame = 0; frame < SATELLITE_PICKUP.RESPAWN_FRAMES - 1; frame += 1) {
-      gameEngine.tickSatellitePickups();
+      gameEngine.satelliteField.advance();
     }
     expect(gameEngine.getSatellitePickup(attached.id)?.state).toBe('broken');
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
 
     const respawned = gameEngine.getSatellitePickup(attached.id);
     expect(respawned?.state).toBe('loose');
@@ -348,7 +445,7 @@ describe('Satellite pickups', () => {
     expect(released?.health).toBe(SATELLITE_PICKUP.HEALTH - DAMAGE_PER_SHOT);
     expect(gameEngine.handleSatellitePickupDamage(attached.id, 1000)).toBeNull();
     for (let frame = 0; frame < 60; frame += 1) {
-      gameEngine.tickSatellitePickups();
+      gameEngine.satelliteField.advance();
     }
     expect(gameEngine.getSatellitePickup(attached.id)).toEqual(released);
   });
@@ -378,7 +475,7 @@ describe('Satellite pickups', () => {
     assert.ok(bargePickup);
     moveNearPickup('scout', scoutPickup.id, 110);
     moveNearPickup('barge', bargePickup.id, 110);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
 
     expect(gameEngine.equipSatellite('scout', scoutPickup.id)).toBe(true);
     expect(gameEngine.equipSatellite('barge', bargePickup.id)).toBe(true);
@@ -415,14 +512,14 @@ describe('Satellite pickups', () => {
     addPilot();
     const pickup = gameEngine.getAllSatellitePickups()[0];
     assert.ok(pickup);
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');
 
     gameEngine.updatePlayer('pilot', {
       position: { ...pickup.position },
       health: 0,
     });
-    gameEngine.tickSatellitePickups();
+    gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');
     expect(gameEngine.getPlayer('pilot')?.cargo).toBe(0);
   });

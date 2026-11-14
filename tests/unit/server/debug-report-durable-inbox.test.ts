@@ -260,7 +260,9 @@ interface FakeTodoist {
   comments: FakeComment[];
   loseCreateResponse: boolean;
   failCommentOnce: boolean;
-  accountEmail: string;
+  user: { id: string; email: string };
+  project: { id: string; is_archived: boolean };
+  section: { id: string; project_id: string; name: string; is_archived: boolean };
   rateLimitOnce: number;
   syncErrorOnce: Record<string, unknown> | null;
   commandCalls: Map<string, number>;
@@ -272,7 +274,14 @@ async function fakeTodoist(): Promise<FakeTodoist> {
     comments: [],
     loseCreateResponse: false,
     failCommentOnce: false,
-    accountEmail: 'todoist@jsolly.com',
+    user: { id: '17333018', email: 'todoist@jsolly.com' },
+    project: { id: 'project-one', is_archived: false },
+    section: {
+      id: 'section-one',
+      project_id: 'project-one',
+      name: 'Debug reports',
+      is_archived: false,
+    },
     rateLimitOnce: 0,
     syncErrorOnce: null,
     commandCalls: new Map(),
@@ -290,15 +299,15 @@ async function fakeTodoist(): Promise<FakeTodoist> {
       return;
     }
     if (url.pathname.endsWith('/user')) {
-      send({ id: '17333018', email: state.accountEmail });
+      send(state.user);
       return;
     }
     if (url.pathname.includes('/projects/')) {
-      send({ id: 'project-one', is_archived: false });
+      send(state.project);
       return;
     }
     if (url.pathname.includes('/sections/')) {
-      send({ id: 'section-one', project_id: 'project-one', name: 'Debug reports' });
+      send(state.section);
       return;
     }
     if (url.pathname.endsWith('/tasks')) {
@@ -454,6 +463,87 @@ async function fakeTodoist(): Promise<FakeTodoist> {
 }
 
 describe('Todoist delivery reconciles real HTTP responses with the durable queue', () => {
+  test('delivers the saved report after its configured intake section is renamed', async () => {
+    const remote = await fakeTodoist();
+    const config = configuration({ testApiOrigin: remote.origin });
+    const db = store(config);
+    const report = submission();
+    db.accept(report, 'pilot', {});
+    const saved = db.next();
+    if (!saved) {
+      throw new Error('Expected durable report');
+    }
+    remote.section.name = 'Unverified client reports';
+
+    await new TodoistDelivery(config).deliver(saved, db);
+
+    expect(db.status(report.id, report.receiptToken)?.state).toBe('delivered');
+    expect(remote.tasks).toHaveLength(1);
+    const task = remote.tasks[0];
+    if (!task) {
+      throw new Error('Expected delivered task');
+    }
+    expect(task.project_id).toBe(config.projectId);
+    expect(task.section_id).toBe(config.sectionId);
+    expect(task.content).toContain('verified ready');
+    expect(readDebugReport({ description: task.description, comments: remote.comments })).toEqual(
+      JSON.parse(saved.bundle)
+    );
+  });
+
+  test.each([
+    {
+      name: 'a different project ID',
+      mutate(remote: FakeTodoist) {
+        remote.project.id = 'another-project';
+      },
+    },
+    {
+      name: 'an archived project',
+      mutate(remote: FakeTodoist) {
+        remote.project.is_archived = true;
+      },
+    },
+    {
+      name: 'a different section ID',
+      mutate(remote: FakeTodoist) {
+        remote.section.id = 'another-section';
+      },
+    },
+    {
+      name: 'a section in another project',
+      mutate(remote: FakeTodoist) {
+        remote.section.project_id = 'another-project';
+      },
+    },
+    {
+      name: 'an archived section',
+      mutate(remote: FakeTodoist) {
+        remote.section.is_archived = true;
+      },
+    },
+  ])('retains the report without publishing to $name', async ({ mutate }) => {
+    const remote = await fakeTodoist();
+    mutate(remote);
+    const config = configuration({ testApiOrigin: remote.origin });
+    const db = store(config);
+    const report = submission();
+    db.accept(report, 'pilot', {});
+    const saved = db.next();
+    if (!saved) {
+      throw new Error('Expected durable report');
+    }
+
+    await expect(new TodoistDelivery(config).deliver(saved, db)).rejects.toMatchObject({
+      blocked: true,
+    });
+
+    expect(remote.commandCalls.size).toBe(0);
+    expect(remote.tasks).toHaveLength(0);
+    expect(remote.comments).toHaveLength(0);
+    expect(db.status(report.id, report.receiptToken)?.state).toBe('pending');
+  });
+
   test('recovers after task creation acknowledgement loss and partial comments without duplicates', async () => {
     const remote = await fakeTodoist();
     const config = configuration({ testApiOrigin: remote.origin });
@@ -601,9 +691,12 @@ describe('Todoist delivery reconciles real HTTP responses with the durable queue
     expect(db.status(report.id, report.receiptToken)?.state).toBe('delivered');
   });
 
-  test('refuses to send diagnostic content to a mismatched account', async () => {
+  test.each([
+    { id: 'another-user', email: 'todoist@jsolly.com' },
+    { id: '17333018', email: 'someone-else@example.com' },
+  ])('refuses to send diagnostic content to a mismatched account: %j', async (user) => {
     const remote = await fakeTodoist();
-    remote.accountEmail = 'someone-else@example.com';
+    remote.user = user;
     const config = configuration({ testApiOrigin: remote.origin });
     const db = store(config);
     const report = submission();

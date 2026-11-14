@@ -137,6 +137,7 @@ import { ChargedWeaponManager } from './ChargedWeaponManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
 import { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
+import { CrewRescueManager } from './CrewRescueManager';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { FurnaceTravelManager } from './FurnaceTravelManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
@@ -291,7 +292,7 @@ export class GameEngine {
   private readonly hives: HiveEncounters;
   private readonly hazards: WorldHazards;
   private readonly supplyRestoration: CooperativeSupplyRestoration;
-  private readonly lastCrewSignalAt = new Map<string, number>();
+  public readonly crewRescue: CrewRescueManager;
   private clockPrimed: boolean = false;
   private readonly loopHealth = new GameLoopHealth(() => ({
     players: this.getPlayerCount(),
@@ -507,6 +508,16 @@ export class GameEngine {
     );
     this.hives = new HiveEncounters(this.cooperative, this.spiderManager);
     this.hazards = new WorldHazards(this.spiderManager);
+    this.crewRescue = new CrewRescueManager({
+      actors: this.entityManager,
+      campaign: this.cooperative,
+      motion: this.playerMotion,
+      now: () => this.getServerTime(),
+      cancelCharge: (actor) => this.chargedWeapons.cancel(actor),
+      cancelBoost: (id, targetId) => this.cancelArmedBoost(id, targetId),
+      capturePilot: (id) => this.capturePilot(id),
+      terminalDeath: (actor, cause) => this.applyShipDeath(actor, cause),
+    });
     this.abilities = new ShipAbilityManager({
       actors: this.entityManager,
       rocks: this.asteroidManager,
@@ -693,7 +704,7 @@ export class GameEngine {
       throw this.persistenceFailure;
     }
     this.gameTime++;
-    this.advanceRescues(serverNow);
+    this.crewRescue.advance(serverNow);
     this.advanceHazards(serverNow);
     if (this.isPaused) {
       return;
@@ -757,7 +768,7 @@ export class GameEngine {
   /** Combat pair + clock — scenario tests drive death→respawn without moving the belt. */
   public advanceCombatFrame(): void {
     this.gameTime++;
-    this.advanceRescues(this.getServerTime());
+    this.crewRescue.advance(this.getServerTime());
     if (this.isPaused) {
       return;
     }
@@ -925,7 +936,7 @@ export class GameEngine {
     this.hives.reset();
     this.hazards.reset();
     this.supplyRestoration.reset();
-    this.lastCrewSignalAt.clear();
+    this.crewRescue.reset();
     this.fixtureCombat = undefined;
     this.regionalField.reset();
     this.pilots.clear();
@@ -985,8 +996,7 @@ export class GameEngine {
   }
 
   public removePlayer(id: string): GameEntity | undefined {
-    this.cancelRescue(id);
-    this.lastCrewSignalAt.delete(id);
+    this.crewRescue.forget(id);
     const traveler = this.getPlayer(id);
     if (traveler?.furnaceTransit) {
       this.furnaceTravel.finish(traveler, this.getServerTime());
@@ -1181,14 +1191,7 @@ export class GameEngine {
         this.chargedWeapons.cancel(live.actor);
       }
       this.rememberClientRelease(live.actor.id, clientReleaseId);
-      if (
-        live.actor.downedUntil != null &&
-        live.actor.downedUntil !== 0 &&
-        !Number.isNaN(live.actor.downedUntil) &&
-        live.actor.downedUntil <= this.getServerTime()
-      ) {
-        this.finishDowned(live.actor);
-      }
+      this.crewRescue.finishIfExpired(live.actor);
       if (
         live.actor.downedUntil == null ||
         live.actor.downedUntil === 0 ||
@@ -1234,20 +1237,7 @@ export class GameEngine {
       return registered;
     }
     this.seedAsteroidInteractions();
-    const downed = this.cooperative.get('downed', actor.id);
-    if (downed != null) {
-      actor.position = { ...downed.position };
-      actor.health = 0;
-      actor.downedUntil = downed.deadline;
-      actor.deathCause = downed.cause;
-      actor.exploding = false;
-      actor.velocity = { x: 0, y: 0 };
-      delete actor.spawnProtectionTimer;
-      if (this.getServerTime() >= downed.deadline) {
-        this.finishDowned(actor);
-      }
-      this.playerMotion.invalidateLife(actor.id, this.getServerTime());
-    } else if (saved.health === 0) {
+    if (!this.crewRescue.restoreDowned(actor) && saved.health === 0) {
       actor.health = 0;
       this.entityManager.scheduleShipRespawn(actor);
     }
@@ -1533,12 +1523,7 @@ export class GameEngine {
       this.furnaceTravel.finish(actor, this.getServerTime());
     }
     if (actor) {
-      this.cancelRescue(actor.id);
-      for (const rescuer of this.getAllPlayers()) {
-        if (rescuer.rescue?.targetId === actor.id) {
-          this.cancelRescue(rescuer.id);
-        }
-      }
+      this.crewRescue.transportClosed(actor.id);
     }
     const closed = this.playerMotion.transportClosed(ws, this.getServerTime());
     if (closed && actor) {
@@ -1763,7 +1748,7 @@ export class GameEngine {
     }
     const wasHeld = entity.overlayHold === true;
     if (held) {
-      this.cancelRescue(id);
+      this.crewRescue.cancel(id);
       entity.contourLock = null;
       entity.overlayHold = true;
       entity.velocity = { x: 0, y: 0 };
@@ -2004,7 +1989,7 @@ export class GameEngine {
     if (!Number.isFinite(damage) || damage <= 0) {
       return { applied: false, isDestroyed: false };
     }
-    this.cancelRescue(existing.id);
+    this.crewRescue.cancel(existing.id);
     const healthBefore = existing.health;
     const spilled = Math.min(existing.cargo, Math.ceil(damage * ECONOMY.cargoPointsPerHp));
     if (spilled > 0) {
@@ -2027,7 +2012,7 @@ export class GameEngine {
     }
 
     if (this.cooperative.activated && damaged.botRole === undefined) {
-      this.downShip(damaged, attackerId);
+      this.crewRescue.down(damaged, attackerId);
     } else {
       this.applyShipDeath(damaged, attackerId);
     }
@@ -2303,196 +2288,15 @@ export class GameEngine {
   }
 
   public crewAction(id: string, action: CrewAction): boolean {
+    if (action.kind !== 'withdraw-supply') {
+      return this.crewRescue.act(id, action);
+    }
     const actor = this.getPlayer(id);
     if (!this.cooperative.activated || !actor?.ws || actor.furnaceTransit) {
       return false;
     }
-    const now = this.getServerTime();
-    if (action.kind === 'withdraw-supply') {
-      return this.supplyRestoration.withdraw(actor);
-    }
-    if (action.kind === 'release') {
-      this.cancelRescue(id);
-      return true;
-    }
-    if (action.kind === 'give-up') {
-      if (actor.downedUntil == null || actor.downedUntil === 0 || Number.isNaN(actor.downedUntil)) {
-        return false;
-      }
-      this.finishDowned(actor);
-      return true;
-    }
-    if (action.kind === 'signal') {
-      if (
-        (actor.health <= 0 &&
-          (actor.downedUntil == null ||
-            actor.downedUntil === 0 ||
-            Number.isNaN(actor.downedUntil))) ||
-        actor.exploding ||
-        now - (this.lastCrewSignalAt.get(id) ?? -Infinity) < COOPERATIVE.signalCooldownMs ||
-        Math.hypot(action.position.x - actor.position.x, action.position.y - actor.position.y) >
-          COOPERATIVE.signalRadius
-      ) {
-        return false;
-      }
-      actor.crewSignal = {
-        kind: action.signal,
-        position: { ...action.position },
-        expiresAt: Math.floor(now + COOPERATIVE.signalLifetimeMs),
-      };
-      this.lastCrewSignalAt.set(id, now);
-      return true;
-    }
-    const target = this.getPlayer(action.targetId);
-    if (
-      !target?.ws ||
-      target.downedUntil == null ||
-      target.downedUntil === 0 ||
-      Number.isNaN(target.downedUntil) ||
-      target.downedUntil <= now ||
-      target.id === id ||
-      actor.health <= 0 ||
-      actor.exploding ||
-      actor.overlayHold === true ||
-      (actor.downedUntil != null && actor.downedUntil !== 0 && !Number.isNaN(actor.downedUntil)) ||
-      Math.hypot(actor.position.x - target.position.x, actor.position.y - target.position.y) >
-        COOPERATIVE.reviveRadius
-    ) {
-      return false;
-    }
-    if (actor.rescue?.targetId === target.id) {
-      return true;
-    }
-    actor.rescue = { targetId: target.id, completesAt: Math.floor(now + COOPERATIVE.reviveMs) };
-    actor.velocity = { x: 0, y: 0 };
-    actor.thrusting = false;
-    actor.contourLock = null;
-    actor.knockbackVelocityLimit = 0;
-    this.playerMotion.invalidateLife(actor.id, now);
-    return true;
-  }
-
-  public cancelRescueOnMovement(
-    id: string,
-    position?: Position,
-    velocity?: Position,
-    angle?: number
-  ): void {
-    const actor = this.getPlayer(id);
-    if (
-      actor?.rescue &&
-      ((position &&
-        Math.hypot(position.x - actor.position.x, position.y - actor.position.y) > 0.5) ||
-        (velocity && Math.hypot(velocity.x, velocity.y) > 0.01) ||
-        (angle !== undefined && Math.abs(angle - actor.angle) > 0.01))
-    ) {
-      this.cancelRescue(id);
-    }
-  }
-
-  private cancelRescue(id: string): void {
-    const actor = this.getPlayer(id);
-    if (actor?.rescue) {
-      actor.rescue = null;
-    }
-  }
-
-  private downShip(actor: GameEntity, cause: string): void {
-    this.chargedWeapons.cancel(actor);
-    const deadline = Math.floor(this.getServerTime() + COOPERATIVE.downedMs);
-    actor.downedUntil = deadline;
-    actor.deathCause = cause;
-    actor.exploding = false;
-    delete actor.explodeTime;
-    actor.velocity = { x: 0, y: 0 };
-    actor.thrusting = false;
-    actor.contourLock = null;
-    this.cancelArmedBoost(actor.id, actor.harpoonTargetId);
-    actor.harpoonTargetId = null;
-    actor.utilityFlight = null;
-    actor.abilityActiveFrames = 0;
-    this.cooperative.set({
-      kind: 'downed',
-      id: actor.id,
-      position: { ...actor.position },
-      deadline,
-      cause,
-    });
-    this.playerMotion.invalidateLife(actor.id, this.getServerTime());
-    this.capturePilot(actor.id);
-  }
-
-  private finishDowned(actor: GameEntity): void {
-    if (actor.downedUntil == null || actor.downedUntil === 0 || Number.isNaN(actor.downedUntil)) {
-      return;
-    }
-    actor.downedUntil = null;
-    // Downed clients stop sending poses; the respawn is fresh authoritative activity.
-    actor.lastUpdate = this.getServerTime();
-    this.cooperative.removeDowned(actor.id);
-    actor.exploding = true;
-    actor.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
-    this.applyShipDeath(actor, actor.deathCause ?? 'asteroid');
-  }
-
-  private advanceRescues(now: number): void {
-    if (!this.cooperative.activated) {
-      return;
-    }
-    const players = this.getAllPlayers();
-    for (const actor of players) {
-      if (actor.crewSignal && actor.crewSignal.expiresAt <= now) {
-        actor.crewSignal = null;
-      }
-      if (
-        actor.downedUntil != null &&
-        actor.downedUntil !== 0 &&
-        !Number.isNaN(actor.downedUntil) &&
-        actor.downedUntil <= now
-      ) {
-        this.finishDowned(actor);
-      }
-    }
-    for (const actor of players) {
-      const rescue = actor.rescue;
-      if (!rescue) {
-        continue;
-      }
-      const target = this.getPlayer(rescue.targetId);
-      if (
-        !actor.ws ||
-        actor.health <= 0 ||
-        actor.exploding ||
-        actor.overlayHold === true ||
-        actor.furnaceTransit ||
-        !target?.ws ||
-        target.downedUntil == null ||
-        target.downedUntil === 0 ||
-        Number.isNaN(target.downedUntil) ||
-        Math.hypot(actor.position.x - target.position.x, actor.position.y - target.position.y) >
-          COOPERATIVE.reviveRadius ||
-        Math.hypot(actor.velocity.x, actor.velocity.y) > 0.01
-      ) {
-        this.cancelRescue(actor.id);
-        continue;
-      }
-      actor.velocity = { x: 0, y: 0 };
-      actor.thrusting = false;
-      if (now < rescue.completesAt) {
-        continue;
-      }
-      target.downedUntil = null;
-      target.lastUpdate = now;
-      target.health = target.maxHealth * COOPERATIVE.reviveHealthFraction;
-      target.healthRegenTimer = calculateHealthRegenDelayFrames();
-      target.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
-      target.exploding = false;
-      delete target.deathCause;
-      this.cooperative.removeDowned(target.id);
-      this.playerMotion.invalidateLife(target.id, now);
-      this.capturePilot(target.id);
-      this.cancelRescue(actor.id);
-    }
+    this.getServerTime();
+    return this.supplyRestoration.withdraw(actor);
   }
 
   /** One death path: discard carried points and respawn; banked points survive. */

@@ -108,7 +108,7 @@ test.each(['release', 'movement', 'overlay', 'damage', 'disconnect'] as const)(
         engine.crewAction(rescuer.id, { kind: 'release' });
         break;
       case 'movement':
-        engine.cancelRescueOnMovement(rescuer.id, { x: 2301, y: 2200 });
+        engine.crewRescue.cancelOnMovement(rescuer.id, { x: 2301, y: 2200 });
         break;
       case 'overlay':
         engine.setOverlayHold(rescuer.id, true);
@@ -124,6 +124,7 @@ test.each(['release', 'movement', 'overlay', 'damage', 'disconnect'] as const)(
         throw new Error(unhandled);
       }
     }
+    expect(rescuer.rescue).toBeNull();
     tick(3000);
     expect(downed.health).toBe(0);
     expect(rescuer.rescue).toBeNull();
@@ -268,9 +269,13 @@ test('bleed-out wins when a revive would complete exactly at the downed deadline
 });
 
 test('bleed-out remains connected through the real frame stale-pilot sweep and respawns', () => {
-  const { engine, downed, tick } = scenario();
+  const { engine, downed, setElapsed } = scenario();
   // A downed browser sends no movement poses for the full thirty-second rescue window.
-  tick(30_001);
+  for (const rock of engine.getAllAsteroids()) {
+    engine.removeAsteroid(rock.id);
+  }
+  engine.createAsteroids(0);
+  setElapsed(30_001);
   engine.advanceOneFrame();
   expect(engine.getPlayer(downed.id)).toBe(downed);
   expect(downed.downedUntil).toBeNull();
@@ -323,5 +328,74 @@ test('a saved downed pilot expiring offline finalizes on resume and stays finali
     again.getSnapshotState().mapAssets.filter((asset) => asset.kind === 'ship-remains')
   ).toEqual([]);
   again.checkpointWorld();
+  expect(store.load().cooperative?.records.some((row) => row.kind === 'downed')).toBe(false);
+});
+
+test('the full always frame completes a stationary rescue without a combat-only step', () => {
+  const { engine, downed, rescuer, setElapsed, store } = scenario();
+  expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+  const completion = rescuer.rescue?.completesAt;
+  setElapsed(1000);
+  expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+  expect(rescuer.rescue?.completesAt).toBe(completion);
+  setElapsed(3000);
+  engine.advanceOneFrame();
+  expect(downed.health).toBe(downed.maxHealth * 0.35);
+  expect(downed.downedUntil).toBeNull();
+  expect(rescuer.rescue).toBeNull();
+  engine.checkpointWorld();
+  expect(store.load().cooperative?.records.some((row) => row.kind === 'downed')).toBe(false);
+});
+
+test('diagnostic rearrangement preserves signal cooldown while removal retires its identity', () => {
+  const { engine, rescuer, rescuerSocket } = scenario();
+  const signal = { kind: 'signal', signal: 'help', position: { ...rescuer.position } } as const;
+  expect(engine.crewAction(rescuer.id, signal)).toBe(true);
+  engine.prepareDiagnosticWorld('traversal');
+  expect(engine.crewAction(rescuer.id, signal)).toBe(false);
+  const position = { ...rescuer.position };
+  engine.removePlayer(rescuer.id);
+  const rejoined = engine.addPlayer(rescuer.id, 'Rescuer', rescuerSocket, position, 'scout');
+  expect(engine.crewAction(rejoined.id, { ...signal, position: { ...rejoined.position } })).toBe(
+    true
+  );
+  engine.resetForTesting();
+  expect(engine.getAllPlayers()).toEqual([]);
+  expect(engine.cooperativeEnabled()).toBe(false);
+});
+
+test('sub-threshold movement preserves the hold and a turn beyond the existing threshold cancels it', () => {
+  const { engine, downed, rescuer, tick } = scenario();
+  expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+  const completion = rescuer.rescue?.completesAt;
+  engine.crewRescue.cancelOnMovement(
+    rescuer.id,
+    { x: rescuer.position.x + 0.5, y: rescuer.position.y },
+    { x: 0.01, y: 0 },
+    rescuer.angle
+  );
+  expect(rescuer.rescue?.completesAt).toBe(completion);
+  engine.crewRescue.cancelOnMovement(rescuer.id, undefined, undefined, rescuer.angle + 0.02);
+  tick(3000);
+  expect(downed.health).toBe(0);
+  expect(rescuer.rescue).toBeNull();
+});
+
+test('an expired downed live session finalizes on socket takeover without waiting for a frame', () => {
+  const { engine, downed, token, setElapsed, store } = scenario();
+  downed.cargo = 250;
+  setElapsed(30_001);
+  const resumed = engine.resumePilot(token, new RecordingSocket());
+  if (!resumed.ok) {
+    throw new Error(resumed.error);
+  }
+  expect(resumed.actor).toBe(downed);
+  expect(downed).toMatchObject({ health: 0, downedUntil: null, cargo: 0, kitId: 'hauler' });
+  expect(downed.respawnTimer).toBeGreaterThan(0);
+  const timer = downed.respawnTimer;
+  const again = engine.resumePilot(resumed.resumeToken, new RecordingSocket());
+  expect(again.ok).toBe(true);
+  expect(downed.respawnTimer).toBe(timer);
+  engine.checkpointWorld();
   expect(store.load().cooperative?.records.some((row) => row.kind === 'downed')).toBe(false);
 });

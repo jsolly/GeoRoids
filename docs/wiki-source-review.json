@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
-    "server/communication/MessageHandler.ts": "sha256:1efc109f6267a1890e04086c75c24574a2ad92479c7897db02ecf9c390f7928f",
+    "server/communication/MessageHandler.ts": "sha256:ce6bafb066a742a5664eb113d9aa65ec50d69a8b2a96a74bbb9d60a4a5834a03",
     "server/communication/WebSocketCore.ts": "sha256:824dcee22c88aadaaa97a372aaf955ac4094374d6dc7e48af7455d6caadaecf8",
     "server/communication/clientCommandDecoder.ts": "sha256:9b449bab5cdab7ca39ea9cef64f55305b294fbb7bf285cf4fc4765201f9e6d43",
     "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:e488259a361c7f46513d2655d8ffcc77c8fb9f660ba1d8da8be0ca21b37fbd55",
+    "server/core/GameEngine.ts": "sha256:643cd85cb02d576d1d5ef056896f6a5865fd6fbac7d6c053d09843b509d18164",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -444,7 +444,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:5f186bb99465fd132b7fbe76bfd7038b15191c6d51076a66ced7247e7d9c5fdd",
+    "src/wiki/articleSources.json": "sha256:bd44722c92d0c7df64d7e0b84a3642916eafacab12a6584f7f556294d58ec29f",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:787347143425512717cd9d4ccdf0b90ed04fabacdbac2d1745fc258c2579b3f4",
@@ -534,7 +534,7 @@
     "tests/unit/server/contour-riding-rocks-drop-navigation-crystals.test.ts": "sha256:bac294d107876ca053de51802167966eb7f9aa740840adf92723c6b12e1f1086",
     "tests/unit/server/cooperative-frontier-and-hazards.test.ts": "sha256:8d76509f2058bf8a25c2c8b317179e2e804d2c32f7f2707484722f41b6e2e4aa",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:dd8a4eb69e3de45b367bf0790d77c3ed8d63d37a39ac5da5afa3fccf8511659c",
-    "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:105cff48a7ebc79c6957843f927a59426749447d3878a994d0cd29e942224501",
+    "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:0199508239e620dc0e7454f36edab8d9fc72fd049e026e404f2a00238258e2f3",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:6a0c444a61f7d3281fb06b488f5ac828d345d7cbb8081440326cef9f37a6c612",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:93e6d68684930d1ba241fe806dda0f7ebfb16775794bfa8c8c35ac7494f199d2",
@@ -596,7 +596,8 @@
     "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6",
     "server/core/CargoOffloadManager.ts": "sha256:5cb45d5069856a749c7e40612f0bee6d91616ec58195722f8c0d027a1710f8d8",
     "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
-    "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f"
+    "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f",
+    "server/core/CrewRescueManager.ts": "sha256:363e3a223c47bb56e640fc1a044431989cdfe4eb0aedb404f1403a9cec2ef9d1"
   },
   "reviews": [
     {
@@ -9016,6 +9017,44 @@
       "owners": {
         "src/wiki/articleSources.json": "teamwork",
         "src/wiki/media.ts": "teamwork"
+      }
+    },
+    {
+      "note": "Reviewed CrewRescueManager on actual shipped Supply main d9f648b4. The real owner holds signal cooldowns, action admission, downing/revival/deadline transitions, movement/damage/overlay/transport cancellation, live/saved resume expiry and removal/reset rules. Engine preserves full/combat frame positions before the existing pause gate, actual chargedWeapons cancellation, supply withdrawal clock read, prior owners, actor projections and five spider-budget refresh sites. MessageHandler calls the real movement cancellation owner; replaced Engine implementations and callers are removed together. Source references in five existing rescue topics and the two coverage rows name the new owner. Player rules, all11 prose articles and all21 media/manifest bytes remain unchanged. Current initial/final 37 files/381 cases, native pixel/PNG, strict types, scoped lint, unused checks, six real socket cases and twice-render all10GIFs+10posters with Pillow12.3.0 passed. Fifteen deliberate defects failed their intended full/combat frame, exact deadline precedence, repeated-hold deadline, four immediate cancellation paths, durable downed record/remove, fresh activity, cooldown retention/removal and live/saved expiry consequences. The separate downing-capture omission probe SURVIVED four selected scenarios because checkpoint recaptures; this is retained as a coverage limit, not a kill, and production capture remains intact. All17 restorations matched four source hashes, protected tracked files and common Git configuration; final clean checks passed. No assertion/retry/tolerance/deadline weakening, stored schema/wire/activation change, physical-device or performance acceptance. Full gate, bundled reviews, CI/merge and production verification remain pending. Storage957 remains held draft.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/CrewRescueManager.ts",
+        "server/core/GameEngine.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/crew-rescues-persist-and-cancel.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork"
       }
     }
   ]

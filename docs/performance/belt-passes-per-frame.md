@@ -55,8 +55,8 @@ cleared, and `boostedAsteroids()` prunes those as it yields. Only a missing
 entry is a defect, and each way a boost can appear has a home:
 
 - **Admitted mid-burn** — a saved world, a supply shipment or a split arrives
-  with `boost` already set. `addAsteroid` notes it. This is what the roughly
-  25 standalone `processFurnaceDeliveries()` call sites in
+  with `boost` already set. `addAsteroid` notes it. This is what the
+  standalone `engine.furnaceDeliveries.advance()` call sites in
   `tests/unit/server/` depend on: they never run a motion pass.
 - **Armed or ignited in place** — `shared/shipAbilities.ts` writes `boost`
   onto a live row. Its one production caller is `GameEngine.useAbility`, which
@@ -134,7 +134,7 @@ since that pass already calls `tickAsteroidBoost` on every rock. It fails on
 both consumers rather than one. `tickAbilities` runs *before* `updateMotion`
 in `advanceOneFrameInternal`, so it would read a one-frame-stale list, and
 `advanceCombatFrame` skips `updateMotion` entirely to drive death and respawn
-without moving the belt. `processFurnaceDeliveries` runs after the motion pass
+without moving the belt. `FurnaceDeliveryManager.advance` runs after the motion pass
 but is called on its own by scenario tests, which would then see no list at
 all. A set maintained at each mutation point has no frame ordering to get
 wrong, which is why it replaced the per-frame collection.

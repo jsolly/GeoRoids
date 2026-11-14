@@ -103,8 +103,8 @@ test('physical ore funds scanner once per consumed rock, preserves payouts and p
     const rock = ore(`ore-${i}`);
     engine.asteroidLifecycle.insert(rock);
     pilot.harpoonTargetId = rock.id;
-    engine.processFurnaceDeliveries();
-    engine.processFurnaceDeliveries();
+    engine.furnaceDeliveries.advance();
+    engine.furnaceDeliveries.advance();
   }
   expect(engine.getGameState().campaign?.projectValue).toBe(10_000);
   expect(pilot.score - original).toBe(10_200);
@@ -132,7 +132,7 @@ test('physical ore funds scanner once per consumed rock, preserves payouts and p
     throw new Error('Supply missing');
   }
   supply.position = { x: 0, y: 0 };
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(supply.id)).toBeDefined();
   expect(engine.getGameState().campaign?.projectValue).toBe(10_000);
   expect(pilot.score - original).toBe(10_200);
@@ -173,7 +173,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   pilot.harpoonTargetId = id;
   engine.advanceOneFrame();
   expect(engine.getAsteroid(id)).toBeUndefined();
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(id)).toBeUndefined();
   const state = engine.getGameState();
   expect(state.campaign?.commissioned).toEqual([site.id]);
@@ -214,7 +214,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   engine.asteroidLifecycle.insert(localOre);
   pilot.harpoonTargetId = localOre.id;
   const beforeLocalReward = pilot.score;
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(localOre.id)).toBeUndefined();
   expect(pilot.score).toBe(beforeLocalReward + 300);
   engine.checkpointWorld();
@@ -255,7 +255,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   resumedOre.position = { ...site.position };
   restarted.asteroidLifecycle.insert(resumedOre);
   returning.harpoonTargetId = resumedOre.id;
-  restarted.processFurnaceDeliveries();
+  restarted.furnaceDeliveries.advance();
   expect(restarted.getAsteroid(resumedOre.id)).toBeUndefined();
   expect(returning.score).toBe(300);
   restarted.prepareDiagnosticWorld('traversal');
@@ -276,7 +276,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   resetOre.position = { ...site.position };
   restarted.asteroidLifecycle.insert(resetOre);
   freshPilot.harpoonTargetId = resetOre.id;
-  restarted.processFurnaceDeliveries();
+  restarted.furnaceDeliveries.advance();
   expect(restarted.getAsteroid(resetOre.id)).toBeDefined();
   expect(freshPilot.score).toBe(0);
 });
@@ -304,10 +304,10 @@ test('physical supply rejects dark, equal-radius, inward and same-site sources w
     rock.supply = { sourceId, value: 100 };
     engine.asteroidLifecycle.insert(rock);
     pilot.harpoonTargetId = rock.id;
-    engine.processFurnaceDeliveries();
+    engine.furnaceDeliveries.advance();
     expect(engine.getAsteroid(rock.id)?.supply).toEqual({ sourceId, value: 100 });
     expect(pilot.harpoonTargetId).toBe(rock.id);
-    expect(engine.drainFurnaceDeliveries()).toEqual([]);
+    expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
   }
   expect(pilot.score).toBe(beforeScore);
   expect(engine.getGameState().campaign?.commissioned).toEqual(commissioned.map((h) => h.id));
@@ -317,7 +317,7 @@ test('physical supply rejects dark, equal-radius, inward and same-site sources w
   valid.supply = { sourceId: TOWN_HEARTH.id, value: 100 };
   engine.asteroidLifecycle.insert(valid);
   pilot.harpoonTargetId = valid.id;
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(valid.id)).toBeUndefined();
   expect(pilot.score).toBe(beforeScore);
   engine.checkpointWorld();

@@ -160,7 +160,7 @@ export class GameStateBroadcaster {
       this.broadcastPlayerLeft(id);
     }
     this.flushSatellitePickupCollections();
-    for (const delivery of this.gameEngine.drainFurnaceDeliveries()) {
+    for (const delivery of this.gameEngine.furnaceDeliveries.drainDeliveries()) {
       this.broadcastAsteroidDestruction(delivery.asteroidId, { consumedBy: 'furnace' });
       this.broadcastToAll({ type: 'furnaceDelivery', data: delivery, timestamp: Date.now() });
     }

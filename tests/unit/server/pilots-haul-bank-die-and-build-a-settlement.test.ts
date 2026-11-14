@@ -442,8 +442,8 @@ test('refining counts ore once and banks both the hauler and scout rewards', () 
   ore.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
   ore.surveyedBy = [scout.id, scout.id];
   engine.asteroidLifecycle.insert(ore);
-  engine.processFurnaceDeliveries();
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
+  engine.furnaceDeliveries.advance();
   expect(engine.getGameState().settlement.resources.crystal).toBe(10);
   expect(hauler.score).toBe(600);
   expect(scout.score).toBe(600);
@@ -451,7 +451,7 @@ test('refining counts ore once and banks both the hauler and scout rewards', () 
   const barren = rock('barren', null);
   barren.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
   engine.asteroidLifecycle.insert(barren);
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getGameState().settlement.resources).toEqual({
     ice: 0,
     metal: 0,

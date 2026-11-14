@@ -46,7 +46,7 @@ function deliver(engine: GameEngine, id: string, haulerId: string, scoutId: stri
   rock.boost = { phase: 'burning', ownerId: haulerId, angle: 0 };
   rock.surveyedBy = [scoutId];
   engine.asteroidLifecycle.insert(rock);
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   return furnaceReward(rock);
 }
 
@@ -96,6 +96,14 @@ test('building multiple named furnaces keeps delivery payouts equal for all cont
   const offlineScore = scout.score;
   engine.removePlayer(scout.id);
   const offlineReward = deliver(engine, 'offline-haul', hauler.id, scout.id);
+  const offlineDelivery = engine.furnaceDeliveries
+    .drainDeliveries()
+    .find((event) => event.asteroidId === 'offline-haul');
+  expect(offlineDelivery?.rewards).toContainEqual({
+    playerId: scout.id,
+    playerName: 'New name',
+    points: 300,
+  });
   const resumed = engine.pilotSessions.resume({
     token: registered.resumeToken,
     socket: new RecordingSocket(),

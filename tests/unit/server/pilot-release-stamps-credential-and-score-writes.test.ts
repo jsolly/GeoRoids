@@ -352,7 +352,7 @@ test('offline delivery credit restamps the server score without copying the last
   assert(station);
   rock.position = { ...station.position };
   hauler.position = { x: station.position.x + 100, y: station.position.y };
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'scout');

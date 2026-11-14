@@ -110,14 +110,25 @@ test('a satellite widens Hauler exploration with one reveal and base Scout disco
 
 test('a Scout identifies cargo and both pilots receive the full furnace reward exactly once', () => {
   const rock = deposit();
+  rock.ore = 'metal';
   engine.asteroidLifecycle.insert(rock);
   const initial = { scout: actor('scout').score, hauler: actor('hauler').score };
   expect(engine.useAbility('scout')).toBe(true);
   resolveToolFlights(engine);
   expect(rock.surveyedBy).toEqual(['scout']);
+  const downedTow = engine.addPlayer(
+    'downed-tow',
+    'Downed tow',
+    new RecordingSocket(),
+    { x: 0, y: 0 },
+    'hauler'
+  );
+  downedTow.health = 0;
   expect(engine.useAbility('hauler')).toBe(true);
   resolveToolFlights(engine);
   expect(actor('hauler').harpoonTargetId).toBe(rock.id);
+  downedTow.harpoonTargetId = rock.id;
+  downedTow.harpoonLatchPos = { ...rock.position };
   const furnace = FURNACES[0];
   const darkFoundation = CIVIC_LOTS[0];
   assert(furnace);
@@ -127,34 +138,94 @@ test('a Scout identifies cargo and both pilots receive the full furnace reward e
     x: darkFoundation.position.x + 100,
     y: darkFoundation.position.y,
   };
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(rock.id)).toBe(rock);
   expect(actor('hauler').score).toBe(initial.hauler);
   expect(actor('scout').score).toBe(initial.scout);
-  expect(engine.drainFurnaceDeliveries()).toEqual([]);
+  expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
 
-  // Arrange arrival; processFurnaceDeliveries performs consumption and scoring.
+  // Arrange arrival; FurnaceDeliveryManager.advance performs consumption and scoring.
   actor('hauler').position = { x: furnace.position.x + 100, y: furnace.position.y };
   rock.position = { x: furnace.position.x + furnace.radius + 1, y: furnace.position.y };
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(rock.id)).toBe(rock);
   expect(actor('hauler').score).toBe(initial.hauler);
   expect(actor('scout').score).toBe(initial.scout);
-  expect(engine.drainFurnaceDeliveries()).toEqual([]);
+  expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
 
   rock.position.x = furnace.position.x + furnace.radius;
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   const points = 300;
   expect(actor('hauler').score).toBe(initial.hauler + points);
   expect(actor('scout').score).toBe(initial.scout + points);
   expect(actor('hauler').harpoonTargetId).toBeNull();
+  expect(downedTow.harpoonTargetId).toBeNull();
+  expect(downedTow.harpoonLatchPos).toBeUndefined();
+  expect(downedTow.score).toBe(0);
   expect(engine.getAsteroid(rock.id)).toBeUndefined();
-  const deliveries = engine.drainFurnaceDeliveries();
+  const deliveries = engine.furnaceDeliveries.drainDeliveries();
   expect(deliveries).toHaveLength(1);
   expect(deliveries[0]?.rewards.map((reward) => reward.points)).toEqual([points, points]);
-  engine.processFurnaceDeliveries();
-  expect(engine.drainFurnaceDeliveries()).toEqual([]);
+  expect(deliveries[0]?.rewards.map((reward) => reward.playerId)).toEqual(['hauler', 'scout']);
+  expect(deliveries[0]?.position).toEqual(furnace.position);
+  expect(deliveries[0]?.position).not.toBe(furnace.position);
+  expect(engine.getGameState().settlement.resources).toEqual({
+    ice: 0,
+    metal: 10,
+    rubble: 0,
+    crystal: 0,
+  });
+  engine.furnaceDeliveries.advance();
+  expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
   expect(actor('scout').score).toBe(initial.scout + points);
+});
+
+test('a towed burning rock pays the tow crew once instead of substituting its distinct launcher', () => {
+  const rock = deposit('shared-intake');
+  rock.ore = 'metal';
+  engine.asteroidLifecycle.insert(rock);
+  expect(engine.useAbility('hauler')).toBe(true);
+  resolveToolFlights(engine);
+  const hauler = actor('hauler');
+  expect(hauler.harpoonTargetId).toBe(rock.id);
+  const launcher = engine.addPlayer(
+    'launcher',
+    'Launcher',
+    new RecordingSocket(),
+    { x: 100, y: 100 },
+    'hauler'
+  );
+  const furnace = FURNACES[0];
+  assert(furnace);
+  rock.surveyedBy = ['scout', 'hauler', 'scout'];
+  hauler.position = { x: furnace.position.x + 100, y: furnace.position.y };
+  engine.asteroidLifecycle.update(rock.id, {
+    position: { x: furnace.position.x + furnace.radius, y: furnace.position.y },
+    boost: { phase: 'burning', ownerId: launcher.id, angle: 0 },
+  });
+
+  engine.furnaceDeliveries.advance();
+
+  expect(engine.getAsteroid(rock.id)).toBeUndefined();
+  expect(hauler.harpoonTargetId).toBeNull();
+  expect(hauler.score).toBe(300);
+  expect(actor('scout').score).toBe(300);
+  expect(launcher.score).toBe(0);
+  expect(engine.getGameState().settlement.resources.metal).toBe(10);
+  expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([
+    expect.objectContaining({
+      asteroidId: rock.id,
+      rewards: [
+        { playerId: 'hauler', playerName: 'Hauler', points: 300 },
+        { playerId: 'scout', playerName: 'Scout', points: 300 },
+      ],
+    }),
+  ]);
+  engine.furnaceDeliveries.advance();
+  expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
+  expect(hauler.score).toBe(300);
+  expect(actor('scout').score).toBe(300);
+  expect(launcher.score).toBe(0);
 });
 
 test('towing preserves attachment momentum, follows the moving Hauler, and releases on E', () => {
@@ -221,9 +292,9 @@ test('a second Hauler cannot steal attached cargo and loose rocks do not pay at 
   assert(furnace);
   const loose = deposit('loose', { ...furnace.position });
   engine.asteroidLifecycle.insert(loose);
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   expect(engine.getAsteroid(loose.id)).toBe(loose);
-  expect(engine.drainFurnaceDeliveries()).toEqual([]);
+  expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
 });
 
 test('scans retain map discoveries after expiry without crediting distant Scouts', () => {

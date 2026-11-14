@@ -80,7 +80,7 @@
     "scripts/wiki-media-fonts/fonts.conf": "sha256:b3c6fea66eca880155393fca06b4a36526aa310d4a194bf4256edd32adcaa39b",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
     "scripts/wiki-media-requirements.txt": "sha256:5dd5a7db938c69c025039265a023c0253f450704efd947dd579e6958a14c964d",
-    "scripts/wiki-media.ts": "sha256:297b1c21dba7ad9a73f9492f1d0fab7fe3c458dd840a2ae196592ab57a9744f4",
+    "scripts/wiki-media.ts": "sha256:b754bee7eb8e44eed61108340bd8b811377906266858cf90d1aaf0ad2dc7832d",
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:9fabd838659ac013c3d7fd27d53b1901f753e77518923ba263726d93e1696f7d",
+    "server/core/GameEngine.ts": "sha256:6288b64bdebad26d902900c828f2a7376cd1b06e971a62c92c010eaac9c3d657",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -114,7 +114,7 @@
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
-    "server/services/GameStateBroadcaster.ts": "sha256:700258287bc6f6e8529c5d08c6a71882999594acac8b2a6e3c17eb3b96c082e7",
+    "server/services/GameStateBroadcaster.ts": "sha256:8f39f9961d8057c6e66d2273eec5d8f3a8274ef2f5a8408982a8407a46578a58",
     "server/staticClient.ts": "sha256:e68a7c48e159fbae08ef8428bccb87f396ca967b9e3b04e6dac82188ec143dac",
     "server/world/AsteroidSpatialIndex.ts": "sha256:603bee78266ffa2b84352ba94a0fad84eee482b577a6f4ce39b3a89be8cda5a9",
     "server/world/CooperativeCampaign.ts": "sha256:14d21667bb3631e86f54a173ab95a4be1f42ea8b758beaba5769c88cee463e0f",
@@ -444,10 +444,10 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:c6c6bf8b16a9946782b4b003fd3e3cc25c6a06e0032c826a7a1b05d8dc616a5d",
+    "src/wiki/articleSources.json": "sha256:2360a0ddd4d526248c5a19e45fafd9907b429e6a1fb030589e29f4ae399ddc00",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
-    "src/wiki/media.ts": "sha256:ba0f6949a1099c678a4ca4eb04c3d2be4ecbeaf670d37af16e9efedfaf9e853c",
+    "src/wiki/media.ts": "sha256:f87318fef3cdbb15448d7d07a71abdafced68173f8290114cd840b488df88239",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
     "src/wiki/scrollMemory.ts": "sha256:ccbbe47812fc19f4c2048eb3db605d5351e070cab3257269bee95478fcc9df39",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
@@ -535,15 +535,15 @@
     "tests/unit/server/cooperative-frontier-and-hazards.test.ts": "sha256:8d76509f2058bf8a25c2c8b317179e2e804d2c32f7f2707484722f41b6e2e4aa",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:dd8a4eb69e3de45b367bf0790d77c3ed8d63d37a39ac5da5afa3fccf8511659c",
     "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:b6a075d7ae5ba1bc07f86ae4cae832000e4e5d3ecd150e5818693eb5b66962db",
-    "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:eecf81ad9773e4192b1768d4d3bf81810009cbbcbddfdc16d57bce076b2bf9aa",
+    "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:3b2c0dc5f30a66d2eb10c513c0c064c3b4f08b73805bba807e2ae95206747f4e",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:c139e1a1aa01ecf926d3df29af8b417e248775b12acc13fbdf8b4710a9c75afe",
-    "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:0f22c42cf9e2f20aff6556c4f39d2035b9d14fffabfa7568354d0ffb71c7ff21",
+    "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:d6eb1fe20487cb033b9322bf5a996f2557da59d8f5a51bb193cd97ddf474e43b",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:d82ac3b2b06d661adb21b6e41334a76ec6f087f9d62c04748909653dda9c7e8c",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:823dfb893b5b2a848469a7092d44a6d206142786ccaec1b23404b208e07aeaf0",
-    "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:ba329688cf383372b59affa7ab3abcaf961cc7c44397945e7d32c8809157c111",
+    "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:17936b41b9f7d447ebf1d260c4b673bdc68add50cd73404f3431db09516c495d",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts": "sha256:040a23e5f54b9be4debd6b6173621f945043d7e404fa97c0f967a91f2d25f595",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:7396ba9a8763fd29dc74172de3933d6fd81bd0d3f4708032899a8a6812fea49e",
-    "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts": "sha256:08407c61fd9ceb9d8fe51cd99bfec8dc25f13461ce5eb4b705b99cc055e00034",
+    "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts": "sha256:0bf388cb92ffeeecfb898b27d538ef8a9f47de1b92df041427d1f28f4158793f",
     "tests/unit/server/hauler-extracts-silk-and-tows-living-spiders.test.ts": "sha256:2c3b4c3b4b3fae16227e8b7c5767ce3599d1524af992178acf3ff8e0bb415bb9",
     "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts": "sha256:0ffe1ff3930f2bae70a33498046bf83d21bee1168ffa584ccf0c16595b188008",
     "tests/unit/server/health-regeneration.test.ts": "sha256:3abf737c55fa5e8294ffbb92719b5d35d5276ce9ab9247dfc028ad19049b41f3",
@@ -553,11 +553,11 @@
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts": "sha256:d9f9246b8cace56695ca00aacebf786abdd804ce2130af1f2bf5c46ab2b4cd4d",
     "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts": "sha256:e48180121688f0a7b1bee099cab26f7ccf4a19738d191abaaedcf462c1ef9283",
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:9bacc162065135ccd0e57d8a83f0320db881dd6492b856c38e5b147de4ca6668",
-    "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:f5ad6e5b172b1055e984b3e5259ed9b338c9498994d53ede6f243f89abe6181f",
-    "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:e770135805cc4d2de6167ac5058f28595cc31f3e7cc36222698785db8fae9ba2",
+    "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:d5eda452fb33579efabc711c035cec8774a8b2758e1b937aa4e384e32af8cb79",
+    "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:5a68a40d09dec9bb61acd09abd351e3b5b2da61cde5a7cfd93009c6185864cbb",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:5fafb1b436c62543c9c5c68099becb1b850d16ae18991c710436e6e17d4afb77",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:6f7f0c038b3f8ce3a12ed7a340cbe72d49a2e949033ef668913aaef05a64c236",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:b9527771ca21f6d5b4ef9cd83b60fe52cd933c4c294d83400e2cd0b691253569",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:af71ad084b80a9481c27acbde6b00e89079a1f9b9f06f15ed7cf67da5c690c2e",
     "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:4083da653117026679f9ea2ca8f8e6c2002ee8167ae7eb6791c1f551a87ca449",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:167068e1748b4642591a95067d7571acb24298c606bcc7f541555fc65f46339a",
@@ -565,7 +565,7 @@
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts": "sha256:a014fb3cc93e36091aa5b9cd17f25640270e08d9d63e9a102debceb69305b622",
     "tests/unit/server/regional-asteroid-density.test.ts": "sha256:6f4e28afddacf040e24c4adba92aa365c06d38bc49cb98ba41bfa20cf4f3016b",
     "tests/unit/server/remains-stay-local-and-expire-without-awarding-loot.test.ts": "sha256:d9068ad99ce5f69e18a6e63b7ac7ee4cc56db22becc246411398841d60d75d9b",
-    "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:e4c5db7b53779ae722257784abde1d1e35fd120d004b8e3ead0b5532acd66134",
+    "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:e948ec139f99eb4b596de79ab3ac7a691779a3580bcf0747df1dabd3e65c84d1",
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:735f3bb17320fe5f22be0e688b6a13fb00e737c01ff9904bc3204a5046e792f3",
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts": "sha256:c1d08572c3ae0c9fa85107fbbb2d86192102bdea10a9c017837a7135ee4048b5",
     "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts": "sha256:15a683e29b00ec9045c9ebea5e5f65435ab2eb5ea9ec84f872d81542c664d6c4",
@@ -598,11 +598,12 @@
     "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
     "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f",
     "server/core/CrewRescueManager.ts": "sha256:a1b0775e969e9578f808374839a2830aa7a645eb9110ef37bf24587af552d5fe",
-    "server/core/types.ts": "sha256:af1e83ab38918a8a48b5d0b72bfa530aa659feb4448b36af069453afafa8f9b3",
+    "server/core/types.ts": "sha256:0985d9b55e11cc03c9ee9410e82bf7af7d520750eb4d1e49104f6d776bda907b",
     "server/core/PilotLedger.ts": "sha256:4929fc130aa9b8d5309ee33aba58e87d939bd6a0b539d4dccc9db907eb2df393",
     "server/core/PilotSessionLifecycle.ts": "sha256:980205610dbb29ef3738ffd8396568c30209dcfe907d4f0ac37828c501b3d284",
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
-    "server/core/AsteroidLifecycle.ts": "sha256:ca46580a01f5ce3a419ab20a037ba29f5ac97a5daa3ac164bb60e6c36f8bf4a2"
+    "server/core/AsteroidLifecycle.ts": "sha256:ca46580a01f5ce3a419ab20a037ba29f5ac97a5daa3ac164bb60e6c36f8bf4a2",
+    "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180"
   },
   "reviews": [
     {
@@ -9269,6 +9270,103 @@
         "src/wiki/articleSources.json": "asteroids",
         "src/wiki/media.ts": "asteroids"
       }
+    },
+    {
+      "note": "Reviewed FurnaceDeliveryManager from actual shipped Asteroid mainbbb1b8fd. Six complete current GameEngine bodies and its uncapped feedback queue move to the real owner;49 actual typed Engine receivers migrate. Intake stays after tool contact and before authoritative combat, absent from combat-only stepping. Tracked burning membership, tow eligibility/distance, lit-intake precedence, Supply admission/transition, complete AsteroidLifecycle removal, one Settlement ore transition, ordered deduplicated full awards through PilotLedger including offline names/zero-point supply, every attached latch release, copied position and destroy→delivery→snapshot ordering remain. Feedback drain and pause/diagnostic/reset clears move with the queue. Inputs live in defining core/types.ts; no saved token capability, forwarding methods, new cache/schema/configuration/activation or performance claim. Initial/final18files179cases, native/types/lint/unused/media, two socketfiles3cases and thirteen intended runtime AssertionError defects passed with fourteen full source/protected/config restorations. Root inspected every consequence. Supplemental30808 late-intake SURVIVED due intentional own-tow immunity; strengthened canonical fixture uses a separate critical-health Scout and the final thirteen-defect run includes the real late-combat failure. Original74702exit1 and177passes/two fixture failures are preserved: stale latch blocked real harpoon acquisition and unspecified ore paid10. Fixtures now arrange stale latch after actual acquisition and explicit metal ore; no production source or existing assertion/runner/deadline weakened. Source maps and Scout/Hauler media metadata cite the owner; all11 article and21 media bytes equal actualmain. Full gate, independent review, CI and production verification remain pending. Storage957 held draft/versionpin938 disabled; no fresh UI/physical acceptance.",
+      "sources": [
+        "scripts/wiki-media.ts",
+        "server/core/FurnaceDeliveryManager.ts",
+        "server/core/GameEngine.ts",
+        "server/core/types.ts",
+        "server/services/GameStateBroadcaster.ts",
+        "src/wiki/articleSources.json",
+        "src/wiki/media.ts",
+        "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
+        "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts",
+        "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts",
+        "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts",
+        "tests/unit/server/physical-supplies-restore-frontier.test.ts",
+        "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts",
+        "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+        "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "scripts/wiki-media.ts": "teamwork",
+        "src/wiki/articleSources.json": "teamwork",
+        "src/wiki/media.ts": "teamwork"
+      }
+    },
+    {
+      "note": "Reviewed FurnaceDelivery ownership mappings for all six delivery-related articles, adding direct coverage for refining, expedition score and delivery feedback. Player rules, article prose and media bytes remain unchanged. Restored the unboosted Scout-only-survey tow rim scenario; overlapping tow and powered intake now has a separate identified launcher, and the frame-order story launches a real outbound harpoon. Both canonical files pass all 16 cases; four current controlled defects fail intended health, rim-credit, tow-credit and duplicate-credit assertions with exact restoration of all 1338 tracked sources. TypeScript and scoped lint pass. Historical 13-defect evidence remains distinct. Full corrected-tree gate and fresh bundled review remain pending; first review window was invalidated by a parent metadata edit.",
+      "sources": [
+        "src/wiki/articleSources.json",
+        "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts",
+        "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts"
+      ],
+      "topics": ["asteroids", "field-manual", "hauler", "hud-network", "scout", "teamwork"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork"
+      }
+    },
+    {
+      "note": "Completed valid full seven-lens R2 review with no Critical or Important findings. Accepted all five unique Minor improvements: remove duplicated socket counts and reset clears, reuse the canonical metal fixture, narrow the private delivery destination to id and position, and retain forty ordered receipts across two nonempty intake frames before drain. Canonical sixteen cases pass; five controlled defects fail their intended assertions, including replacement of accumulated feedback with only the latest batch. Every tracked source restores exactly after each. Six moved method bodies still match original main after declared receiver substitutions. Reviewed affected source mappings and unchanged player article/media bytes; no rendered, touch, audio or physical-device acceptance claimed. Full final-tree gate and affected independent re-review follow.",
+      "sources": [
+        "server/core/FurnaceDeliveryManager.ts",
+        "server/core/GameEngine.ts",
+        "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {}
     }
   ]
 }

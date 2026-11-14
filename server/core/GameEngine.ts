@@ -22,7 +22,7 @@ import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../share
 import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
-import { cargoCapacity, ECONOMY, oreResource, oreYield } from '../../shared/economy';
+import { cargoCapacity, ECONOMY } from '../../shared/economy';
 import {
   canEquipUtility,
   EQUIPMENT_DROPS,
@@ -36,7 +36,6 @@ import {
   civicLot,
   civicLotAt,
   civicModuleName,
-  furnaceReward,
   TOWN_HEARTH,
   townSquareSpawn,
 } from '../../shared/furnaces';
@@ -82,7 +81,6 @@ import type {
   CivicModule,
   CrewAction,
   ExplorationTile,
-  FurnaceDelivery,
   LootData,
   PlayerProjectileState,
   PlayerShotFired,
@@ -122,6 +120,7 @@ import { CooperativeContourBridges } from './CooperativeContourBridges';
 import { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import { CrewRescueManager } from './CrewRescueManager';
 import { EntityManager, type GameEntity } from './EntityManager';
+import { FurnaceDeliveryManager } from './FurnaceDeliveryManager';
 import { FurnaceTravelManager } from './FurnaceTravelManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { GlowtoyManager } from './GlowtoyManager';
@@ -252,7 +251,7 @@ export class GameEngine {
   public readonly pilotLedger: PilotLedger;
   public readonly pilotSessions: PilotSessionLifecycle;
   private managedField: boolean = true;
-  private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
+  public readonly furnaceDeliveries: FurnaceDeliveryManager;
   private lastFurnaceBuildNotice = '';
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
@@ -525,6 +524,18 @@ export class GameEngine {
       revealArea: (position, range) => this.revealArea(position, range),
     });
 
+    this.furnaceDeliveries = new FurnaceDeliveryManager({
+      actors: this.entityManager,
+      rocks: this.asteroidManager,
+      furnaces: this.furnaces,
+      hives: this.hives,
+      supply: this.supplyRestoration,
+      lifecycle: this.asteroidLifecycle,
+      settlement: this.settlementLedger,
+      awardPilotPoints: (id, points) => this.pilotLedger.awardPoints(id, points),
+      savedPilotName: (id) => this.pilotLedger.savedName(id),
+    });
+
     this.pilotSessions = new PilotSessionLifecycle({
       actors: this.entityManager,
       motion: this.playerMotion,
@@ -750,7 +761,7 @@ export class GameEngine {
 
     this.advanceSpiderField();
     this.tickToolFlights(toolStartPositions);
-    this.processFurnaceDeliveries();
+    this.furnaceDeliveries.advance();
     if (this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
     }
@@ -897,7 +908,7 @@ export class GameEngine {
     this.abilities.clearPendingFeedback();
     this.pendingShotSounds = [];
     this.satelliteField.clearPendingFeedback();
-    this.pendingFurnaceDeliveries = [];
+    this.furnaceDeliveries.clearPendingFeedback();
   }
 
   // Clear ambient entities and pending combat without replacing player sessions.
@@ -924,7 +935,6 @@ export class GameEngine {
   /** Atomic between-tick arrangement for the benchmark process's private control socket. */
   public prepareDiagnosticWorld(scenario: 'traversal' | 'combat'): void {
     this.clearWorldObjects();
-    this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
     this.clearTown();
@@ -946,7 +956,6 @@ export class GameEngine {
     this.lastFlushedWorldRow = undefined;
     this.managedField = true;
     this.clearWorldObjects();
-    this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
     this.clearTown();
@@ -1932,14 +1941,6 @@ export class GameEngine {
     return bumperKeys;
   }
 
-  private releaseTowsAttachedTo(asteroidId: string): void {
-    for (const player of this.entityManager.getAllEntities()) {
-      if (player.harpoonTargetId === asteroidId) {
-        clearHaulerLatch(player);
-      }
-    }
-  }
-
   private applyDirectedHit(
     targetId: string,
     attackerId: string,
@@ -2012,7 +2013,7 @@ export class GameEngine {
         : this.asteroidManager.registerLaserHit(asteroidId, playerId, miningDamage);
 
     if (result.outcome === 'destroyed') {
-      this.releaseTowsAttachedTo(asteroidId);
+      this.furnaceDeliveries.releaseTowsAttachedTo(asteroidId);
       if (cause === 'laser' && result.destroyed.contourRider) {
         this.lootManager.spawnTap(
           result.destroyed.position,
@@ -3157,115 +3158,6 @@ export class GameEngine {
     }
     target.boost = removeBoostOwner(target.boost, ownerId);
     return true;
-  }
-
-  private towCrewOf(asteroidId: string): string[] {
-    const ids: string[] = [];
-    for (const entity of this.entityManager.getAllEntities()) {
-      if (
-        isTowCableUtility(entity) &&
-        entity.harpoonTargetId === asteroidId &&
-        !entity.exploding &&
-        entity.health > 0 &&
-        entity.respawnTimer === undefined
-      ) {
-        ids.push(entity.id);
-      }
-    }
-    return ids;
-  }
-
-  private deliveryFurnaceAt(position: Position) {
-    return (
-      this.furnaces.intakeAt(position) ??
-      this.hives
-        .ruinsNear(position)
-        .find(
-          (site) =>
-            Math.hypot(position.x - site.position.x, position.y - site.position.y) <= site.radius
-        )
-    );
-  }
-
-  /** Furnace intake accepts towed or self-guided cargo once; loose rocks remain. */
-  public processFurnaceDeliveries(): void {
-    const deliveries: FurnaceDelivery[] = [];
-    for (const hauler of this.entityManager.getAllEntities()) {
-      if (
-        hauler.kitId !== 'hauler' ||
-        !isTowCableUtility(hauler) ||
-        hauler.harpoonTargetId == null ||
-        hauler.harpoonTargetId === '' ||
-        hauler.exploding ||
-        hauler.health <= 0 ||
-        hauler.respawnTimer !== undefined
-      ) {
-        continue;
-      }
-      const rock = this.getAsteroid(hauler.harpoonTargetId);
-      if (!rock || rock.health <= 0) {
-        continue;
-      }
-      const furnace = this.deliveryFurnaceAt(rock.position);
-      if (
-        !furnace ||
-        Math.hypot(hauler.position.x - furnace.position.x, hauler.position.y - furnace.position.y) >
-          furnace.radius + SHIP_ABILITY.HARPOON_RANGE * SHIP_ABILITY.HARPOON_SLACK
-      ) {
-        continue;
-      }
-      if (this.supplyRestoration.permitsDelivery(rock, furnace.id)) {
-        deliveries.push(this.deliverAsteroid(rock, furnace, this.towCrewOf(rock.id)));
-      }
-    }
-    for (const rock of this.asteroidManager.boostedAsteroids()) {
-      if (rock.health <= 0 || rock.boost?.phase !== 'burning') {
-        continue;
-      }
-      const furnace = this.deliveryFurnaceAt(rock.position);
-      if (furnace && this.supplyRestoration.permitsDelivery(rock, furnace.id)) {
-        deliveries.push(this.deliverAsteroid(rock, furnace, boostOwnerIds(rock.boost)));
-      }
-    }
-    this.pendingFurnaceDeliveries.push(...deliveries);
-  }
-
-  private deliverAsteroid(
-    rock: AsteroidData,
-    furnace: ReturnType<FurnaceField['nearest']>,
-    ownerIds: readonly string[]
-  ): FurnaceDelivery {
-    this.asteroidLifecycle.remove(rock.id);
-    this.supplyRestoration.recordDelivery(rock, furnace.id, ownerIds);
-    const launchers = new Set(ownerIds);
-    const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);
-    const resource = oreResource(rock);
-    this.settlementLedger.addOre(resource, resource ? oreYield(rock) : 0);
-    const points = rock.supply ? 0 : furnaceReward(rock);
-    const rewards: FurnaceDelivery['rewards'] = [];
-    for (const playerId of recipients) {
-      const player = this.getPlayer(playerId);
-      if (this.pilotLedger.awardPoints(playerId, points) === undefined) {
-        continue;
-      }
-      rewards.push({
-        playerId,
-        playerName: player?.name ?? this.pilotLedger.savedName(playerId) ?? '',
-        points,
-      });
-    }
-    this.releaseTowsAttachedTo(rock.id);
-    return {
-      furnaceId: furnace.id,
-      asteroidId: rock.id,
-      position: { ...furnace.position },
-      material: rock.material ?? 'rubble',
-      rewards,
-    };
-  }
-
-  public drainFurnaceDeliveries(): FurnaceDelivery[] {
-    return this.pendingFurnaceDeliveries.splice(0);
   }
 
   public dropEquipmentAt(

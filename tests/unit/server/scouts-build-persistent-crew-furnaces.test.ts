@@ -90,13 +90,13 @@ test('a furnace delivery pays each contributor', () => {
   rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
   rock.surveyedBy = [scout.actor.id, 'offline'];
   engine.asteroidLifecycle.insert(rock);
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   const reward = furnaceReward(rock);
   expect(hauler.score).toBe(reward);
   expect(scout.actor.score).toBe(reward);
   expect(engine.getGameState().civicModules).toEqual([]);
-  engine.processFurnaceDeliveries();
-  expect(engine.drainFurnaceDeliveries()).toHaveLength(1);
+  engine.furnaceDeliveries.advance();
+  expect(engine.furnaceDeliveries.drainDeliveries()).toHaveLength(1);
   expect(hauler.score).toBe(reward);
 });
 

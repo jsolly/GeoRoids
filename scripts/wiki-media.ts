@@ -1964,7 +1964,7 @@ function verifyCrewToolDemonstrations(): void {
     rock.position = { ...furnace.position };
     hauler.position = { x: furnace.position.x + 100, y: furnace.position.y };
     const before = [scout.score, hauler.score] as const;
-    engine.processFurnaceDeliveries();
+    engine.furnaceDeliveries.advance();
     invariant(
       scout.score === before[0] + 540 && hauler.score === before[1] + 540,
       'authoritative furnace did not pay both pilots the illustrated 540 points'
@@ -1972,14 +1972,14 @@ function verifyCrewToolDemonstrations(): void {
     invariant(engine.getAsteroid(rock.id) === undefined, 'delivery did not consume the rock');
     invariant(hauler.harpoonTargetId === null, 'delivery did not release the tow');
     invariant(
-      engine.drainFurnaceDeliveries().length === 1,
+      engine.furnaceDeliveries.drainDeliveries().length === 1,
       'delivery receipt was not emitted once'
     );
-    engine.processFurnaceDeliveries();
+    engine.furnaceDeliveries.advance();
     invariant(
       scout.score === before[0] + 540 &&
         hauler.score === before[1] + 540 &&
-        engine.drainFurnaceDeliveries().length === 0,
+        engine.furnaceDeliveries.drainDeliveries().length === 0,
       'the same illustrated arrival paid twice'
     );
   } finally {

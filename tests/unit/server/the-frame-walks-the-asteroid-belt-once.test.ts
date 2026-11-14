@@ -140,7 +140,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     world.engine.asteroidLifecycle.insert(rock);
 
     probe.reset();
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
 
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
     expect(probe.snapshot()).toMatchObject({ beltPasses: 0, rowsVisited: 0, beltCopies: 0 });
@@ -274,7 +274,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
       boost: { phase: 'burning', ownerId: hauler.id, angle: 0 },
     });
 
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
 
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
   });

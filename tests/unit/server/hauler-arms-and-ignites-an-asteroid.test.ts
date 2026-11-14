@@ -182,24 +182,24 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     const before = world.entity(alice).score;
     const points = furnaceReward(rock);
     rock.position = { x: furnace.position.x + furnace.radius + 1, y: furnace.position.y };
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
     expect(world.engine.getAsteroid(rock.id)).toBe(rock);
     expect(world.entity(alice).score).toBe(before);
-    expect(world.engine.drainFurnaceDeliveries()).toEqual([]);
+    expect(world.engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
 
     rock.position.x = furnace.position.x + furnace.radius;
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
     expect(world.entity(alice).score).toBe(before + points);
-    const deliveries = world.engine.drainFurnaceDeliveries();
+    const deliveries = world.engine.furnaceDeliveries.drainDeliveries();
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0]).toMatchObject({
       furnaceId: furnace.id,
       asteroidId: rock.id,
       rewards: [{ playerId: alice.id, points }],
     });
-    world.engine.processFurnaceDeliveries();
-    expect(world.engine.drainFurnaceDeliveries()).toEqual([]);
+    world.engine.furnaceDeliveries.advance();
+    expect(world.engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
     expect(world.entity(alice).score).toBe(before + points);
   });
 

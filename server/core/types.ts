@@ -1,12 +1,16 @@
 import type { WebSocket } from 'ws';
+import type { FurnaceField } from '../../shared/furnaceField';
 import type { CrewAction, Position, ShipKitId } from '../../shared-types';
 import type { CooperativeCampaign } from '../world/CooperativeCampaign';
 import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
+import type { AsteroidLifecycle } from './AsteroidLifecycle';
 import type { AsteroidManager } from './AsteroidManager';
 import type { BeltCrawlerManager } from './BeltCrawlerManager';
+import type { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
+import type { HiveEncounters } from './HiveEncounters';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
 import type { SettlementLedger } from './SettlementLedger';
@@ -86,4 +90,16 @@ export type AsteroidLifecycleInputs = {
   readonly probes: Pick<SurveyProbeManager, 'registerAsteroid' | 'unregister'>;
   readonly crawlers: Pick<BeltCrawlerManager, 'escapeDestroyedHost'>;
   readonly currentFrame: () => number;
+};
+
+export type FurnaceDeliveryInputs = {
+  readonly actors: Pick<EntityManager, 'getAllEntities' | 'getEntity'>;
+  readonly rocks: Pick<AsteroidManager, 'getAsteroid' | 'boostedAsteroids'>;
+  readonly furnaces: Pick<FurnaceField, 'intakeAt'>;
+  readonly hives: Pick<HiveEncounters, 'ruinsNear'>;
+  readonly supply: Pick<CooperativeSupplyRestoration, 'permitsDelivery' | 'recordDelivery'>;
+  readonly lifecycle: Pick<AsteroidLifecycle, 'remove'>;
+  readonly settlement: Pick<SettlementLedger, 'addOre'>;
+  readonly awardPilotPoints: PilotLedger['awardPoints'];
+  readonly savedPilotName: PilotLedger['savedName'];
 };

@@ -87,7 +87,7 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   assert(station);
   rock.position = { ...station.position };
   hauler.actor.position = { x: station.position.x + 100, y: station.position.y };
-  first.processFurnaceDeliveries();
+  first.furnaceDeliveries.advance();
   const points = 300;
   const settlement = {
     level: 1,
@@ -97,7 +97,9 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   expect(first.getGameState().settlement).toEqual(settlement);
   expect(first.getPlayer('hauler')?.score).toBe(points);
   expect(
-    first.drainFurnaceDeliveries()[0]?.rewards.find((reward) => reward.playerId === 'scout')?.points
+    first.furnaceDeliveries
+      .drainDeliveries()[0]
+      ?.rewards.find((reward) => reward.playerId === 'scout')?.points
   ).toBe(points);
   first.removePlayer('hauler');
   expect(first.isGamePaused()).toBe(true);

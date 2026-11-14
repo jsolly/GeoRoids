@@ -80,7 +80,7 @@
     "scripts/wiki-media-fonts/fonts.conf": "sha256:b3c6fea66eca880155393fca06b4a36526aa310d4a194bf4256edd32adcaa39b",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
     "scripts/wiki-media-requirements.txt": "sha256:5dd5a7db938c69c025039265a023c0253f450704efd947dd579e6958a14c964d",
-    "scripts/wiki-media.ts": "sha256:f23560808ef2cd79b457a33f10043b74e9222d59c8b62e05a546b4eae16030c8",
+    "scripts/wiki-media.ts": "sha256:cb5e169f3db5c2e265fbd98b7678b50630a789c6c43461b6c234f14a8c42bc45",
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:9973d484d2a111fab34dce949166c7b091a3d0c227e1d46c0a81dd393076cf1d",
+    "server/core/GameEngine.ts": "sha256:a12ece8fc52df4d98d41c073983612002a5dc15f8403c4a8ceefa80a2e1a00d3",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -444,10 +444,10 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:11bdfeb4c89007d31be7bfaaa0e66ef5e543112c6764e860fe95248ba07e32a0",
+    "src/wiki/articleSources.json": "sha256:95b4f31f4e0e3b92c829de922e5e917e02fc1d0ad20958ce20bc31207cc0b213",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
-    "src/wiki/media.ts": "sha256:b1d7b17920ead1c425ede0fc432b57651210681edd425f0a653a665c1f14fc30",
+    "src/wiki/media.ts": "sha256:39401767dbcd09d7bd0ef64d33123a334da3035d429f226fffae6910c8fceb66",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
     "src/wiki/scrollMemory.ts": "sha256:ccbbe47812fc19f4c2048eb3db605d5351e070cab3257269bee95478fcc9df39",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
@@ -557,7 +557,7 @@
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:07701c22cf2a08ebd920c9d2a9bc3fe3f0041da111618d50e067c7790e4b975d",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1d2cb49eb4cd397956de0383853f1952b91ecd3c1338f244d85b3ddcabb314c6",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:ad20573bae09477c9d880d615b63ded0633e5e63e217b08dcc8534e49349e097",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:b7cf56498fdc91a27aebfb2a7acd1f23a04644ffa54fd2fb2d629752e1189642",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:da19d3ebc883fe2a9066392d511c28628a0bea890bc4cd055abd9adda9bd5884",
     "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:922d64babb97f5bcd5ff8533ea2a09c1c280c00343702e61a7ac969846a31f22",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:4fea90c41c1d7a41e8b76b2ce96acd236de973c6601c0e3c608812bd6a571178",
@@ -593,7 +593,8 @@
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
     "server/core/ShipAbilityManager.ts": "sha256:e9627a0d340830b407be3ab0d2ee86ddaaf26bf0ac0fb3bdd86227c32977d573",
     "server/core/LootCollectionManager.ts": "sha256:aed4bcd007069707710844a4257b4dc76d3e5b01fca0f26317554e5cd26babba",
-    "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6"
+    "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6",
+    "server/core/CargoOffloadManager.ts": "sha256:5cb45d5069856a749c7e40612f0bee6d91616ec58195722f8c0d027a1710f8d8"
   },
   "reviews": [
     {
@@ -8863,6 +8864,47 @@
       "media": ["cargo", "hauler", "pickups", "satellites", "scout"],
       "owners": {
         "src/wiki/articleSources.json": "satellites"
+      }
+    },
+    {
+      "note": "Reviewed CargoOffloadManager on actual merged Satellite main 9ddc2577. It owns the real object-keyed WeakMap and offload transition through live actors, furnace intake and the existing award command. The full frame retains offloading after authoritative combat; combat-only frames do not bank. Eligibility and furnace changes restart the 12-step cadence, each pulse moves at most 25 points, and debit, bank and award order is preserved. Diagnostic clearing retains actor cadence; replacement actors cannot inherit it. No reset API, actor cache or extra pause decision is shipped. All prior owners, tool order and five spider budgets remain. Native pixel/PNG, 25 unit files with 263 cases, six real socket cases, strict types, scoped lint and unused checks passed. Ten deliberate defects failed intended early-payment, six interruption, furnace identity, death/separation, combat-only, diagnostic reset, actor replacement, stale roster and missing/duplicate award assertions; eleven complete source/protected/config restorations matched. Two deterministic renders verified all 10 GIFs and 10 posters using pinned Pillow 12.3.0; all 21 committed asset/manifest files equal landed main. Root inspected the Cargo poster and first/middle/final GIF samples. The generator only changes its real offload entrypoint; the source map and coverage now name the defining owner. All eleven mapped articles keep their player rules and prose. Full gate, independent reviews, CI and production acceptance remain pending. No physical or performance claim.",
+      "sources": [
+        "scripts/wiki-media.ts",
+        "server/core/CargoOffloadManager.ts",
+        "server/core/GameEngine.ts",
+        "src/wiki/articleSources.json",
+        "src/wiki/media.ts",
+        "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "scripts/wiki-media.ts": "loot-growth",
+        "src/wiki/articleSources.json": "loot-growth",
+        "src/wiki/media.ts": "loot-growth"
       }
     }
   ]

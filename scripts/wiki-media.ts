@@ -665,7 +665,7 @@ function makeCargoDemo(): Demo {
       const now = (frame * 1000) / FPS;
       const before = pilot.bankedCargo ?? 0;
       if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME, () => engine.depositCargo());
+        runSimulationTicks(SIM_TICKS_PER_FRAME, () => engine.cargoOffload.advance());
       }
       const accepted = (pilot.bankedCargo ?? 0) - before;
       if (accepted > 0) {

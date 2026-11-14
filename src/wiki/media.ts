@@ -84,6 +84,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'Controlled demonstration: a Scout unloads 400 cargo through the authoritative deposit cadence. Steering away would keep the remainder aboard.',
     sources: [
       'server/core/GameEngine.ts',
+      'server/core/CargoOffloadManager.ts',
       'shared/economy.ts',
       'shared/furnaceField.ts',
       'src/rendering/cargoOffloadRenderer.ts',

@@ -307,10 +307,10 @@ gate_secrets_scan_log() { # [revision-range]
       printf '✗ gitleaks cannot read a merge with three or more parents in %s\n' "$range" >&2
       return 1
     fi
-    "$gl" git --no-banner --no-color --redact --verbose --log-opts="--text --diff-merges=remerge --no-color --no-textconv ${range}"
+    "$gl" git --no-banner --no-color --redact --verbose --log-opts="--root --text --diff-merges=remerge --no-color --no-textconv ${range}"
     return
   fi
-  "$gl" git --no-banner --no-color --redact --verbose --log-opts="--text --diff-merges=remerge --no-color --no-textconv"
+  "$gl" git --no-banner --no-color --redact --verbose --log-opts="--root --text --diff-merges=remerge --no-color --no-textconv"
 }
 
 # Markdown lint when any path on stdin (added/changed, one per line) is authored

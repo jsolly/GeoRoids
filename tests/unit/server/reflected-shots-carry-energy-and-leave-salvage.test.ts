@@ -145,11 +145,11 @@ describe('reflected shots remain authoritative across snapshots and resource col
     engine.handleAsteroidHit(reflector.id, pilot.id);
     expect(pilot.cargo).toBe(score);
     pilot.position = { ...shard.position };
-    engine.collectLoot();
+    engine.lootCollection.collect();
     expect(engine.getLoot().some((drop) => drop.id === shard.id)).toBe(false);
     const collectedScore = pilot.cargo;
     expect(collectedScore).toBeGreaterThan(score);
-    engine.collectLoot();
+    engine.lootCollection.collect();
     expect(pilot.cargo).toBe(collectedScore);
     for (let index = 0; index < 7; index++) {
       expect(engine.spawnLaser(pilot.id, { x: 500, y: 500 }, { x: 1, y: 0 })?.energy).toBe(1);

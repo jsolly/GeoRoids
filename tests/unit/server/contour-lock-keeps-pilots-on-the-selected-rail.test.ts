@@ -160,8 +160,8 @@ test.each([
     );
     const points = world.engine.getLoot().find((drop) => drop.kind === 'points');
     expect(points).toBeDefined();
-    world.engine.collectLoot();
-    expect(world.engine.drainLootCollections()).toContainEqual(
+    world.engine.lootCollection.collect();
+    expect(world.engine.lootCollection.drainCollections()).toContainEqual(
       expect.objectContaining({ collectorId: actor.id, lootId: points?.id, kind: 'points' })
     );
     expect(actor.cargo).toBeGreaterThan(0);
@@ -423,8 +423,8 @@ test('equipment loot preserves the contour lock and current motion epoch', () =>
   const epoch = actor.playerMotion?.epoch;
   const mass = actor.mass;
   const drop = world.engine.dropEquipmentAt(actor.position, 'survey_probe');
-  world.engine.collectLoot();
-  expect(world.engine.drainLootCollections()).toEqual([
+  world.engine.lootCollection.collect();
+  expect(world.engine.lootCollection.drainCollections()).toEqual([
     expect.objectContaining({ collectorId: actor.id, lootId: drop.id, kind: 'survey_probe' }),
   ]);
   expect(actor.equipment).toContain('survey_probe');

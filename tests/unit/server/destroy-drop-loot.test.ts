@@ -51,7 +51,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     expect(player.score).toBe(0);
   });
 
-  test('collecting a shard awards cargo without changing hull mass or health', () => {
+  test('a frame collects a shard as cargo without changing hull mass or health', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
@@ -62,14 +62,19 @@ describe('destroying asteroids drops shared shards into game state', () => {
 
     const drops = engine.getLoot();
     expect(drops).toHaveLength(2);
-    expect(engine.collectLoot()).toBeUndefined();
+    engine.advanceOneFrame();
     expect(player.mass).toBe(beforeMass);
     expect(player).toMatchObject(beforeHealth);
     expect(player.cargo).toBe(ROID.POINTS_SMALL + GROWTH.SHARD_SCORE);
-    expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
+    expect(
+      engine.getLoot().filter((drop) => drops.some((original) => original.id === drop.id))
+    ).toEqual([]);
     const broadcaster = new GameStateBroadcaster(engine);
+    broadcaster.negotiateSnapshot(ws);
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
+    expect(engine.getPlayer(player.id)).toBe(player);
+    expect(player.ws).toBe(ws);
     const notifications = ws.inbox.filter((message) => message.type === 'lootCollected');
     expect(notifications).toHaveLength(2);
     expect(notifications.map((message) => message.data)).toEqual(
@@ -83,7 +88,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
         }))
       )
     );
-    expect(engine.drainLootCollections()).toEqual([]);
+    expect(engine.lootCollection.drainCollections()).toEqual([]);
   });
 
   test('returning for the same points drop creates a distinct collection receipt', () => {
@@ -95,15 +100,19 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const points = engine.getLoot().find((drop) => drop.kind === 'points');
     assert.ok(points && typeof points.points === 'number');
     player.position = { ...points.position };
-    engine.collectLoot();
-    const first = engine.drainLootCollections().find((event) => event.lootId === points.id);
+    engine.lootCollection.collect();
+    const first = engine.lootCollection
+      .drainCollections()
+      .find((event) => event.lootId === points.id);
     assert.ok(first);
     expect(player.cargo).toBe(cargoCapacity(player.kitId));
     expect(engine.getLoot().find((drop) => drop.id === points.id)?.points).toBe(points.points - 1);
     expect(first).toMatchObject({ collectorId: player.id, lootId: points.id, kind: 'points' });
     player.cargo = 0;
-    engine.collectLoot();
-    const second = engine.drainLootCollections().find((event) => event.lootId === points.id);
+    engine.lootCollection.collect();
+    const second = engine.lootCollection
+      .drainCollections()
+      .find((event) => event.lootId === points.id);
     assert.ok(second);
     expect(second).toMatchObject({ collectorId: player.id, lootId: points.id, kind: 'points' });
     expect(player.cargo).toBe(points.points - 1);
@@ -113,15 +122,29 @@ describe('destroying asteroids drops shared shards into game state', () => {
     expect(second.eventId).not.toBe(first.eventId);
   });
 
-  test('ending a world discards pickup sounds that have not been broadcast', () => {
-    const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 30 });
-    addSmallAsteroid(engine, 'roid-1');
-    engine.handleAsteroidHit('roid-1', player.id, 'laser');
-    engine.collectLoot();
-    expect(engine.getLoot()).toEqual([]);
-    engine.resetForTesting();
-    expect(engine.drainLootCollections()).toEqual([]);
-  });
+  test.each(['last pilot leaves', 'world reset'] as const)(
+    '%s discards pickup feedback before another pilot joins',
+    (ending) => {
+      const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 30 });
+      addSmallAsteroid(engine, 'roid-1');
+      engine.handleAsteroidHit('roid-1', player.id, 'laser');
+      engine.lootCollection.collect();
+      expect(engine.getLoot()).toEqual([]);
+      if (ending === 'last pilot leaves') {
+        engine.removePlayer(player.id);
+        expect(engine.isGamePaused()).toBe(true);
+      } else {
+        engine.resetForTesting();
+      }
+      const nextSocket = new RecordingSocket();
+      engine.addPlayer('next', 'Next', nextSocket, { x: 0, y: 0 });
+      const broadcaster = new GameStateBroadcaster(engine);
+      broadcaster.negotiateSnapshot(nextSocket);
+      broadcaster.broadcastGameState();
+      expect(nextSocket.received('lootCollected')).toEqual([]);
+      expect(engine.lootCollection.drainCollections()).toEqual([]);
+    }
+  );
 
   test('shooting a shard detonates it while preserving every crew hull', () => {
     const ws = new RecordingSocket();

@@ -46,7 +46,7 @@ test('a clock step that arrives seconds late is counted on /health and logged on
   try {
     engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     expect(engine.stepClock()).toBe(0);
     expect(engine.getDiagnostics().loop).toEqual({

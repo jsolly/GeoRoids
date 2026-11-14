@@ -28,7 +28,7 @@ function enhancedMotionWorld() {
   const world = new GameEngine(99);
   const socket = new RecordingSocket();
   const asteroid = motionAsteroid();
-  world.addAsteroid(asteroid);
+  world.asteroidLifecycle.insert(asteroid);
   const actor = world.addPlayer('hauler', 'Hauler', socket, { x: 100, y: 0 }, 'hauler');
   actor.spawnProtectionTimer = 0;
   actor.abilityCooldownFrames = 0;

@@ -76,7 +76,7 @@ test('the real activated engine reserves twelve swarm slots before admitting cro
     const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 5000, y: 5000 });
     pilot.position = { x: 5000, y: 5000 };
     for (const rock of hosts()) {
-      engine.addAsteroid(rock);
+      engine.asteroidLifecycle.insert(rock);
     }
     // Hazards run before ordinary spawners; each frame admits at most one event actor.
     for (let second = 0; second < 12; second++) {

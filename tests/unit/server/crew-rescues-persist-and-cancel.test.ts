@@ -276,7 +276,7 @@ test('bleed-out remains connected through the real frame stale-pilot sweep and r
   const { engine, downed, setElapsed } = scenario();
   // A downed browser sends no movement poses for the full thirty-second rescue window.
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.createAsteroids(0);
   setElapsed(30_001);

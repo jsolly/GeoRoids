@@ -247,7 +247,7 @@ export async function startFixtureControl(
           for (const [index, position] of positions.entries()) {
             const asteroid = engine.getAllAsteroids()[index];
             assert(asteroid);
-            engine.updateAsteroid(asteroid.id, { position, size: 30 });
+            engine.asteroidLifecycle.update(asteroid.id, { position, size: 30 });
           }
         }
         if (request.scenario === 'dense-combat') {
@@ -305,7 +305,7 @@ export async function startFixtureControl(
             assert(slot, 'Dense combat layout cannot place every asteroid safely');
             occupied.push({ position: slot, radius });
             for (const rock of group) {
-              engine.updateAsteroid(rock.id, {
+              engine.asteroidLifecycle.update(rock.id, {
                 position: {
                   x: slot.x + rock.position.x - center.x,
                   y: slot.y + rock.position.y - center.y,
@@ -337,7 +337,7 @@ export async function startFixtureControl(
           if (!clearsHulls()) {
             assert(request.scenario !== 'dense-combat', 'Dense combat asteroid overlaps a hull');
             const angle = index * 2.399963229728653;
-            engine.updateAsteroid(asteroid.id, {
+            engine.asteroidLifecycle.update(asteroid.id, {
               position: { x: Math.cos(angle) * 900, y: Math.sin(angle) * 900 },
             });
           }

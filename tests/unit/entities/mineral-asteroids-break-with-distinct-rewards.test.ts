@@ -53,8 +53,8 @@ describe('mineral asteroids break with distinct rewards', () => {
 
   test('metal takes three hits and drops three times the ice shard mass', () => {
     const engine = new GameEngine(42);
-    engine.addAsteroid(mineral('ice'));
-    engine.addAsteroid(mineral('metal'));
+    engine.asteroidLifecycle.insert(mineral('ice'));
+    engine.asteroidLifecycle.insert(mineral('metal'));
     engine.handleAsteroidHit('ice', 'pilot', 'laser');
     expect(engine.applyLaserAsteroidHit('metal', 'pilot', 'laser')).toMatchObject({
       applied: true,
@@ -96,7 +96,7 @@ describe('mineral asteroids break with distinct rewards', () => {
 
   test('one pilot breaking rubble creates three fragments', () => {
     const engine = new GameEngine(42);
-    engine.addAsteroid(mineral('rubble'));
+    engine.asteroidLifecycle.insert(mineral('rubble'));
     const result = engine.applyLaserAsteroidHit('rubble', 'pilot');
     expect(result.applied).toBe(true);
     expect(result.newAsteroids).toHaveLength(3);

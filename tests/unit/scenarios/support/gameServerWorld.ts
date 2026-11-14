@@ -347,7 +347,7 @@ export class GameServerWorld {
 
   hitAsteroid(pilot: Pilot): void {
     const ship = this.entity(pilot);
-    this.engine.addAsteroid(
+    this.engine.asteroidLifecycle.insert(
       scenarioAsteroid({
         id: `scenario-roid-${pilot.id}`,
         position: { x: ship.position.x, y: ship.position.y },
@@ -401,9 +401,9 @@ export class GameServerWorld {
   /** Remove the production-seeded belt when a scenario isolates ship combat. */
   clearAsteroids(): void {
     for (const asteroid of this.engine.getAllAsteroids()) {
-      this.engine.removeAsteroid(asteroid.id);
+      this.engine.asteroidLifecycle.remove(asteroid.id);
     }
-    this.engine.addAsteroid(
+    this.engine.asteroidLifecycle.insert(
       scenarioAsteroid({
         id: 'scenario-combat-buffer',
         position: { x: 2000, y: 2000 },

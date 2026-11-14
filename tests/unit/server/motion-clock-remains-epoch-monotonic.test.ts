@@ -60,7 +60,7 @@ describe('server motion clock', () => {
     const socket = {} as WebSocket;
     const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
     for (const asteroid of engine.getAllAsteroids()) {
-      engine.removeAsteroid(asteroid.id);
+      engine.asteroidLifecycle.remove(asteroid.id);
     }
 
     const laser = engine.spawnPlayerLaser(pilot.id, pilot.position, { x: 0, y: 0 });

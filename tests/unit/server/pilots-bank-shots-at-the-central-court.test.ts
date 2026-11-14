@@ -21,7 +21,7 @@ function courtCrew() {
   shooter.spawnProtectionTimer = 0;
   target.spawnProtectionTimer = 0;
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   return { engine, shooter, target };
 }
@@ -139,7 +139,7 @@ test('a fast shot can cross several panels in one tick without losing travel dis
 test('a rock before a court panel absorbs the shot before it can bank into a pilot', () => {
   const { engine, shooter, target } = courtCrew();
   const health = target.health;
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     id: 'court-approach-rock',
     position: { x: 980, y: -860 },
     velocity: { x: 0, y: 0 },

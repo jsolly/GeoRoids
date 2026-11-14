@@ -20,7 +20,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
   });
 
   function addRock(): void {
-    world.engine.addAsteroid({
+    world.engine.asteroidLifecycle.insert({
       id: 'tap-rock',
       position: { x: 80, y: 0 },
       velocity: { x: 0, y: 0 },

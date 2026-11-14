@@ -243,7 +243,7 @@ test.each(['death', 'separation'] as const)(
       }
       const impact = rock('banking-impact', null, outcome === 'death' ? 25 : 500);
       impact.position = { x: actor.position.x - 1, y: 0 };
-      engine.addAsteroid(impact);
+      engine.asteroidLifecycle.insert(impact);
 
       engine.advanceOneFrame();
 
@@ -441,7 +441,7 @@ test('refining counts ore once and banks both the hauler and scout rewards', () 
   const ore = rock('ore', 'crystal');
   ore.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
   ore.surveyedBy = [scout.id, scout.id];
-  engine.addAsteroid(ore);
+  engine.asteroidLifecycle.insert(ore);
   engine.processFurnaceDeliveries();
   engine.processFurnaceDeliveries();
   expect(engine.getGameState().settlement.resources.crystal).toBe(10);
@@ -450,7 +450,7 @@ test('refining counts ore once and banks both the hauler and scout rewards', () 
   expect(engine.getGameState().settlement.points).toBe(1200);
   const barren = rock('barren', null);
   barren.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
-  engine.addAsteroid(barren);
+  engine.asteroidLifecycle.insert(barren);
   engine.processFurnaceDeliveries();
   expect(engine.getGameState().settlement.resources).toEqual({
     ice: 0,
@@ -469,7 +469,7 @@ test('most old rocks are barren and breaking mineral rocks sacrifices harvest wh
   const engine = new GameEngine(42);
   const ore = rock('large-ore', 'metal', 500);
   ore.surveyedBy = ['scout'];
-  engine.addAsteroid(ore);
+  engine.asteroidLifecycle.insert(ore);
   ore.health = 0;
   const result = engine.handleAsteroidHit(ore.id, 'scout', 'laser');
   expect(result.newAsteroids.length).toBeGreaterThan(0);

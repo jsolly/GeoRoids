@@ -54,7 +54,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
       size: 50,
     };
     delete target.phenomenon;
-    engine.addAsteroid(target);
+    engine.asteroidLifecycle.insert(target);
     engine.checkpointWorld();
     await engine.whenPersistenceIdle();
     const read = () => ({

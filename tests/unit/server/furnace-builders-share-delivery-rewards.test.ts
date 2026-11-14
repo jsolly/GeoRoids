@@ -40,12 +40,12 @@ function cargo(id: string): AsteroidData {
 
 function deliver(engine: GameEngine, id: string, haulerId: string, scoutId: string): number {
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const rock = cargo(id);
   rock.boost = { phase: 'burning', ownerId: haulerId, angle: 0 };
   rock.surveyedBy = [scoutId];
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   engine.processFurnaceDeliveries();
   return furnaceReward(rock);
 }

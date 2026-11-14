@@ -29,9 +29,9 @@ function asteroidAt(
 
 function isolateAsteroid(engine: GameEngine, asteroid: AsteroidData): void {
   for (const existing of engine.getAllAsteroids()) {
-    engine.removeAsteroid(existing.id);
+    engine.asteroidLifecycle.remove(existing.id);
   }
-  engine.addAsteroid(asteroid);
+  engine.asteroidLifecycle.insert(asteroid);
 }
 
 function mediumAsteroid(id: string, position = { x: 400, y: 300 }): AsteroidData {
@@ -47,9 +47,9 @@ describe('Server laser↔asteroid authority', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     for (const asteroid of engine.getAllAsteroids()) {
-      engine.removeAsteroid(asteroid.id);
+      engine.asteroidLifecycle.remove(asteroid.id);
     }
-    engine.addAsteroid(mediumAsteroid('roid-once'));
+    engine.asteroidLifecycle.insert(mediumAsteroid('roid-once'));
 
     const first = engine.applyLaserAsteroidHit('roid-once', 'p1');
     const second = engine.applyLaserAsteroidHit('roid-once', 'p1');
@@ -73,7 +73,7 @@ describe('Server laser↔asteroid authority', () => {
     engine.addPlayer('miner-a', 'Miner A', {} as never, { x: 0, y: 0 });
     engine.addPlayer('miner-b', 'Miner B', {} as never, { x: 10, y: 0 });
     engine.addPlayer('scout', 'Scout', {} as never, { x: 20, y: 0 });
-    engine.addAsteroid(largeAsteroid('roid-reward-contributors', { x: 400, y: 300 }));
+    engine.asteroidLifecycle.insert(largeAsteroid('roid-reward-contributors', { x: 400, y: 300 }));
     const target = engine.getAsteroid('roid-reward-contributors');
     assert.ok(target);
     target.surveyedBy = ['scout', 'miner-a', 'scout'];
@@ -141,7 +141,7 @@ describe('Server laser↔asteroid authority', () => {
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     engine.addPlayer('p2', 'Two', {} as never, { x: 40, y: 0 });
 
-    engine.addAsteroid(mediumAsteroid('roid-shared'));
+    engine.asteroidLifecycle.insert(mediumAsteroid('roid-shared'));
     const firstHit = engine.applyLaserAsteroidHit('roid-shared', 'p2');
     const playerHit = engine.applyLaserAsteroidHit('roid-shared', 'p1');
 

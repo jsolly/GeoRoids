@@ -32,7 +32,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     actor.velocity = { x: 0, y: 0 };
     actor.angle = 0;
     for (const rock of server.gameEngine.getAllAsteroids()) {
-      server.gameEngine.removeAsteroid(rock.id);
+      server.gameEngine.asteroidLifecycle.remove(rock.id);
     }
     server.gameEngine.parkSatellitePickups({ x: -2400, y: -2400 });
     const barrier = async () => {
@@ -56,7 +56,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     await barrier();
     // Broadcasting can replenish the field; isolate the actual shot corridor again.
     for (const rock of server.gameEngine.getAllAsteroids()) {
-      server.gameEngine.removeAsteroid(rock.id);
+      server.gameEngine.asteroidLifecycle.remove(rock.id);
     }
     pilot.drive(10);
     await barrier();

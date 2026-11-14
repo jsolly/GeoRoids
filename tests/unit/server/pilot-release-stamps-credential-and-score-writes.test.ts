@@ -338,10 +338,10 @@ test('offline delivery credit restamps the server score without copying the last
     }).ok
   );
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const rock = cargo('delivery', { x: 180, y: 0 });
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   expect(engine.useAbility(scout.id)).toBe(true);
   resolveToolFlights(engine);
   expect(rock.surveyedBy).toEqual(['scout']);

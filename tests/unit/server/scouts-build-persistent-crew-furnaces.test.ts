@@ -64,7 +64,7 @@ function addScout(engine: GameEngine, id = 'scout', socket = new RecordingSocket
 
 function clearRocks(engine: GameEngine): void {
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
 }
 
@@ -89,7 +89,7 @@ test('a furnace delivery pays each contributor', () => {
   const rock = cargo('shared', { x: 0, y: 0 });
   rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
   rock.surveyedBy = [scout.actor.id, 'offline'];
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   engine.processFurnaceDeliveries();
   const reward = furnaceReward(rock);
   expect(hauler.score).toBe(reward);
@@ -396,7 +396,7 @@ test('construction keeps nest guards attached to their home', () => {
   clearRocks(engine);
   engine.parkSatellitePickups();
   actor.position = { x: furnace.position.x + 2000, y: furnace.position.y };
-  engine.addAsteroid(cargo('nest-ore', furnace.position));
+  engine.asteroidLifecycle.insert(cargo('nest-ore', furnace.position));
   engine.advanceCombatFrame();
   const guards = engine.getSpiderField().spiders;
   expect(guards).toHaveLength(10);

@@ -1920,14 +1920,14 @@ function verifyCrewToolDemonstrations(): void {
     scout.spawnProtectionTimer = 0;
     hauler.spawnProtectionTimer = 0;
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.parkSatellitePickups();
     const rock: AsteroidData = {
       ...makeAsteroid('media-ore', { x: 200, y: 0 }, 34, 'metal'),
       ore: 'metal',
     };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     const resolveFlight = () => {
       for (let frame = 0; frame < 100; frame++) {
         if (![scout, hauler].some((pilot) => pilot.utilityFlight?.phase === 'outbound')) {

@@ -23,7 +23,7 @@ function crew() {
   shooter.spawnProtectionTimer = 0;
   teammate.spawnProtectionTimer = 0;
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   return { engine, shooter, teammate };
 }
@@ -100,7 +100,7 @@ test('a reflective bounce arms the returning shot against a hull in its path', (
     material: 'metal',
     phenomenon: { kind: 'reflective', clusterId: 'cluster', energy: 0, maxEnergy: 6 },
   };
-  engine.addAsteroid(reflector);
+  engine.asteroidLifecycle.insert(reflector);
   const health = teammate.health;
   const shot = engine.spawnLaser(shooter.id, { x: -50, y: 0 }, { x: 40, y: 0 });
   assert(shot);

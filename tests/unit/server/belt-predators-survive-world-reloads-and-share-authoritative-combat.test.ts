@@ -68,7 +68,7 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
     const player = addPilot(engine);
     engine.observeFixtureShots('test', [player.id]);
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.clearSpiderField();
     const rock: AsteroidData = {
@@ -84,7 +84,7 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
       vertices: 4,
       offsets: [1, 1, 1, 1],
     };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     player.position = { x: 10500, y: 10000 };
     engine.advanceCombatFrame();
     const crawler = engine
@@ -124,7 +124,7 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
   try {
     const player = addPilot(engine);
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.clearSpiderField();
     const rock: AsteroidData = {
@@ -140,7 +140,7 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
       vertices: 4,
       offsets: [1, 1, 1, 1],
     };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     player.position = { x: 10165, y: 9990 };
     for (let frame = 0; frame < BELT_CRAWLER.WINDUP_FRAMES + 10; frame++) {
       engine.advanceCombatFrame();
@@ -149,7 +149,7 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
       engine.getSpiderField().spiders.some((spider) => spider.crawler?.phase === 'lunging')
     ).toBe(true);
     const health = player.health;
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
     engine.resolveAuthoritativeCombat();
     expect(player.health).toBe(health);
     engine.advanceCombatFrame();
@@ -171,7 +171,7 @@ test('the last miner leaving immediately after removing a belt rock saves its re
       .find((rock) => beltSlotForAsteroid(rock.id) !== undefined);
     assert(host);
     const slot = beltSlotForAsteroid(host.id);
-    engine.removeAsteroid(host.id);
+    engine.asteroidLifecycle.remove(host.id);
     engine.removePlayer(player.id);
     const savedSlot = store.load().world?.asteroidBelt?.find((entry) => entry.slot === slot);
     expect(savedSlot?.recoverAt).toEqual(expect.any(Number));
@@ -189,7 +189,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
   try {
     const player = addPilot(engine);
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.clearSpiderField();
     const home = beltSlotPosition(60);
@@ -215,8 +215,8 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       health: 150,
     };
     delete destination.beltCrawlerHealth;
-    engine.addAsteroid(rock);
-    engine.addAsteroid(destination);
+    engine.asteroidLifecycle.insert(rock);
+    engine.asteroidLifecycle.insert(destination);
     player.position = { x: home.x - 500, y: home.y };
     engine.advanceCombatFrame();
     const before = engine.getSpiderField().spiders.find((body) => body.crawler?.hostId === rock.id);
@@ -244,6 +244,24 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       playerProjectiles: restarted.getPlayerProjectiles(),
     };
     expect(() => captureSnapshot(snapshot)).not.toThrow();
+    for (const candidate of restarted.getAllAsteroids()) {
+      if (candidate.id !== destination.id) {
+        restarted.asteroidLifecycle.remove(candidate.id);
+      }
+    }
+    restarted.asteroidLifecycle.update(destination.id, { material: 'rubble', size: 50 });
+    const shattered = restarted.handleAsteroidHit(destination.id, player.id, 'laser');
+    expect(shattered.outcome).toBe('destroyed');
+    expect(shattered.newAsteroids).toHaveLength(3);
+    const escaping = restarted.getSpiderField().spiders.find((body) => body.id === before.id);
+    assert(escaping?.crawler);
+    expect(escaping.crawler.phase).toBe('escaping');
+    expect(shattered.newAsteroids.map((fragment) => fragment.id)).toContain(
+      escaping.crawler.hostId
+    );
+    expect(restarted.getAsteroidSpatialIndex().get(escaping.crawler.hostId)).toBe(
+      restarted.getAsteroid(escaping.crawler.hostId)
+    );
   } finally {
     engine.stopGameLoop();
     restarted?.stopGameLoop();

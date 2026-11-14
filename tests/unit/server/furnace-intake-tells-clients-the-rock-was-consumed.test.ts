@@ -28,7 +28,7 @@ test('furnace intake tells every client the rock was consumed so they play the r
       offsets: [1, 1, 1, 1],
       material: 'metal' as const,
     };
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     world.send(hauler, {
       type: 'setHaulerUtility',
       id: hauler.id,

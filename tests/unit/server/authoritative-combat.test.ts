@@ -35,7 +35,7 @@ function clearProtection(engine: GameEngine, id: string): void {
 
 function clearAsteroidField(engine: GameEngine): void {
   for (const asteroid of engine.getAllAsteroids()) {
-    engine.removeAsteroid(asteroid.id);
+    engine.asteroidLifecycle.remove(asteroid.id);
   }
 }
 
@@ -71,7 +71,7 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     clearProtection(engine, 'p1');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid());
+    engine.asteroidLifecycle.insert(testAsteroid());
 
     const results = engine.resolveAuthoritativeCombat();
     const player = engine.getPlayer('p1');
@@ -86,7 +86,7 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
@@ -104,13 +104,13 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     expect(hauler.harpoonTargetId).toBe('attached');
-    engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'unrelated', position: { x: 0, y: 0 } }));
     const healthBefore = hauler.health;
     engine.resolveAuthoritativeCombat();
 
@@ -123,8 +123,8 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 28, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: -28, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 28, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'unrelated', position: { x: -28, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
@@ -143,8 +143,8 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 80, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'field-rock', position: { x: 80, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
@@ -164,8 +164,8 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
@@ -186,8 +186,8 @@ describe('server-authoritative combat', () => {
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'pilot');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
@@ -212,8 +212,8 @@ describe('server-authoritative combat', () => {
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'hauler-2');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'other-cargo', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'other-cargo', position: { x: 0, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     attachTowForScenario(engine, 'hauler-2', 'other-cargo');
@@ -240,8 +240,8 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 400, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'loose-a', position: { x: 0, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'loose-b', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'loose-a', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'loose-b', position: { x: 0, y: 0 } }));
 
     engine.resolveAuthoritativeCombat();
 
@@ -255,7 +255,7 @@ describe('server-authoritative combat', () => {
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'pilot');
     clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.asteroidLifecycle.insert(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
 
     attachTowForScenario(engine, 'hauler', 'attached');
     const hauler = engine.getPlayer('hauler');
@@ -278,7 +278,9 @@ describe('server-authoritative combat', () => {
     engine.entityManager.updateEntity('p2', {
       spawnProtectionTimer: 0,
     });
-    engine.addAsteroid(testAsteroid({ id: 'server-asteroid-partner', position: { x: 10, y: 0 } }));
+    engine.asteroidLifecycle.insert(
+      testAsteroid({ id: 'server-asteroid-partner', position: { x: 10, y: 0 } })
+    );
 
     engine.resolveAuthoritativeCombat();
     expect(engine.getPlayer('p2')?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.ASTEROID_COLLISION);
@@ -287,7 +289,7 @@ describe('server-authoritative combat', () => {
 
   test('spawn protection blocks server ram for players', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
-    engine.addAsteroid(testAsteroid());
+    engine.asteroidLifecycle.insert(testAsteroid());
 
     engine.resolveAuthoritativeCombat();
     expect(engine.getPlayer('p1')?.health).toBe(SHIP.MAX_HEALTH);
@@ -379,7 +381,7 @@ describe('server-authoritative combat', () => {
     });
     const expectedServerOwnedHealth = serverOwnedAsteroid.health;
     const expectedServerOwnedPosition = { ...serverOwnedAsteroid.position };
-    engine.addAsteroid(serverOwnedAsteroid);
+    engine.asteroidLifecycle.insert(serverOwnedAsteroid);
     wsCore.handleClientMessage(
       {
         type: 'asteroidUpdate',

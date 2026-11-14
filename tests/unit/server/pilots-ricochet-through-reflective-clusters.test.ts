@@ -82,10 +82,10 @@ test('an external pilot shot ricochets through the seeded cluster in GameEngine 
   const cluster = seededCluster(center);
   const engine = new GameEngine(419);
   for (const asteroid of engine.getAllAsteroids()) {
-    engine.removeAsteroid(asteroid.id);
+    engine.asteroidLifecycle.remove(asteroid.id);
   }
   for (const asteroid of cluster) {
-    engine.addAsteroid(asteroid);
+    engine.asteroidLifecycle.insert(asteroid);
   }
 
   const lane = externalLane(center);

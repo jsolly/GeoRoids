@@ -175,7 +175,7 @@ describe('spiders carry Scout probes', () => {
     const engine = new GameEngine(42);
     const scout = engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     scout.position = { x: 0, y: 0 };
     scout.angle = 0;

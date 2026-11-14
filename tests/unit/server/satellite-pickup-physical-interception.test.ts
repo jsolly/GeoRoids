@@ -9,7 +9,7 @@ import { RecordingSocket } from '../../support/recordingSocket';
 
 function clearAsteroids(engine: GameEngine): void {
   for (const asteroid of engine.getAllAsteroids()) {
-    engine.removeAsteroid(asteroid.id);
+    engine.asteroidLifecycle.remove(asteroid.id);
   }
 }
 
@@ -119,7 +119,7 @@ describe('satellite pickups intercept physical damage', () => {
     addOwner();
     const pickup = engine.getAllSatellitePickups()[0];
     assert.ok(pickup);
-    engine.addAsteroid(asteroidAt('pickup-rock', pickup.position));
+    engine.asteroidLifecycle.insert(asteroidAt('pickup-rock', pickup.position));
     engine.resolveAuthoritativeCombat();
     engine.resolveAuthoritativeCombat();
     expect(engine.getSatellitePickup(pickup.id)).toEqual(pickup);
@@ -144,7 +144,7 @@ describe('satellite pickups intercept physical damage', () => {
     const id = attachFirstPickup();
     const pickup = engine.getSatellitePickup(id);
     assert.ok(pickup);
-    engine.addAsteroid(asteroidAt('pickup-rock', pickup.position));
+    engine.asteroidLifecycle.insert(asteroidAt('pickup-rock', pickup.position));
     const allRocks = vi.spyOn(AsteroidManager.prototype, 'getAllAsteroids');
     try {
       engine.resolveAuthoritativeCombat();

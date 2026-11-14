@@ -403,7 +403,7 @@ test('the last pilot leaving writes chip damage that periodic flushes defer', ()
       throw new Error('The field needs an intact metal deposit');
     }
     const home = sectorAt(chipped.position).id;
-    engine.updateAsteroid(chipped.id, { health: chipped.health - 25 });
+    engine.asteroidLifecycle.update(chipped.id, { health: chipped.health - 25 });
     // The next periodic flush is not a drift flush, so the chip would wait.
     engine.checkpointWorld();
     expect(store.loadSector(home)?.find((rock) => rock.id === chipped.id)?.health).toBe(

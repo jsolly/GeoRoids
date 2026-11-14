@@ -11,11 +11,11 @@ test('the last pilot disconnecting preserves a wounded resource guard and its sl
   const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 13_000, y: 5_000 });
   engine.prepareDiagnosticWorld('traversal');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.parkSatellitePickups();
   pilot.position = { x: 13_000, y: 5_000 };
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     id: 'guarded-metal',
     position: { x: 15_000, y: 5_000 },
     velocity: { x: 0, y: 0 },

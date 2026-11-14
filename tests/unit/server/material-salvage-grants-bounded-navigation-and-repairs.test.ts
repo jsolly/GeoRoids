@@ -15,7 +15,7 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
       actor.health = 80;
       actor.equipment = ['resource_tap'];
       world.clearAsteroids();
-      world.engine.addAsteroid({
+      world.engine.asteroidLifecycle.insert({
         id: 'tap-material',
         material: material as AsteroidMaterial,
         position: { x: 80, y: 0 },

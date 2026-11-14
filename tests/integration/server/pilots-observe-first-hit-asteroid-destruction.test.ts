@@ -84,7 +84,7 @@ async function startWorld(
   await Promise.all(clients.map((client) => client.barrier()));
 
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
-    server.gameEngine.removeAsteroid(asteroid.id);
+    server.gameEngine.asteroidLifecycle.remove(asteroid.id);
   }
   server.gameEngine.parkSatellitePickups({ x: -2_400, y: -2_400 });
   expect(server.gameEngine.getLoot()).toEqual([]);
@@ -174,7 +174,7 @@ describe('Pilots observe first-hit asteroid destruction', () => {
     const [first, second] = clients;
     assert.ok(first && second);
     const target = largeIceAsteroid('wire-first-hit', { x: 100, y: 0 });
-    server.gameEngine.addAsteroid(target);
+    server.gameEngine.asteroidLifecycle.insert(target);
     for (const client of clients) {
       client.resetMessages();
     }

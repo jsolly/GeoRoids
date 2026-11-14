@@ -8,7 +8,7 @@ import { GROWTH } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function addSmallAsteroid(engine: GameEngine, id: string, size = 12): void {
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     id,
     position: { x: 20, y: 30 },
     velocity: { x: 2, y: -1 },
@@ -170,7 +170,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const ws = new RecordingSocket();
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'seed-roid',
       position: { x: 0, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -183,7 +183,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
       vertices: 8,
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'small-1',
       position: { x: 10, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -196,7 +196,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
       vertices: 8,
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'big-1',
       position: { x: 12, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -232,7 +232,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     const place = (id: string, x: number, size: number) => {
-      engine.addAsteroid({
+      engine.asteroidLifecycle.insert({
         id,
         position: { x, y: 0 },
         velocity: { x: 0, y: 0 },

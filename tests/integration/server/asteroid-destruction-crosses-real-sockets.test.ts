@@ -34,9 +34,9 @@ function asteroidAt(
 
 function isolateAsteroid(engine: GameEngine, asteroid: AsteroidData): void {
   for (const existing of engine.getAllAsteroids()) {
-    engine.removeAsteroid(existing.id);
+    engine.asteroidLifecycle.remove(existing.id);
   }
-  engine.addAsteroid(asteroid);
+  engine.asteroidLifecycle.insert(asteroid);
 }
 
 describe('Asteroid destruction over real sockets', () => {
@@ -137,7 +137,7 @@ describe('Asteroid destruction over real sockets', () => {
       const target = asteroidAt('solo-ice', radius, { ...targetPosition }, { material: 'ice' });
       isolateAsteroid(server.gameEngine, target);
       const untouched = asteroidAt('untouched-ice', 20, { x: 0, y: -900 }, { material: 'ice' });
-      server.gameEngine.addAsteroid(untouched);
+      server.gameEngine.asteroidLifecycle.insert(untouched);
       const scoreBefore = pilot.score;
       const now = Date.now();
       const clock = vi.spyOn(server.gameEngine, 'getServerTime').mockReturnValue(now);

@@ -23,7 +23,7 @@ function crew() {
   shooter.spawnProtectionTimer = 0;
   teammate.spawnProtectionTimer = 0;
   for (const fieldRock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(fieldRock.id);
+    engine.asteroidLifecycle.remove(fieldRock.id);
   }
   return { engine, shooter, teammate };
 }
@@ -100,7 +100,7 @@ test('a reflected crew shot mines the asteroid on its returning path exactly onc
   const { engine, shooter, teammate } = crew();
   teammate.position.y = 300;
   const target = rock('returning-path', WORLD.radius - 70);
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   assert(engine.spawnLaser(shooter.id, { x: WORLD.radius - 10, y: 0 }, { x: 100, y: 0 }));
   const hits = engine.advanceLasersAndResolveHits();
   expect(hits).toHaveLength(1);
@@ -119,7 +119,7 @@ test('a reflected crew shot mines the asteroid on its returning path exactly onc
 test('an asteroid before the wall absorbs the shot before any boundary reflection', () => {
   const { engine, shooter } = crew();
   const target = rock('outgoing-path', WORLD.radius - 50);
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   const shot = engine.spawnLaser(shooter.id, { x: WORLD.radius - 100, y: 0 }, { x: 120, y: 0 });
   assert(shot);
   expect(engine.advanceLasersAndResolveHits()[0]?.asteroidId).toBe(target.id);

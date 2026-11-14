@@ -39,14 +39,14 @@ while the surviving deterministic cases define the automated proof.
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/runtime/inventory.ts, src/ui/schematicEquipHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
 | How do I buy a placeholder at Town Square? | controls, teamwork | shared/townStore.ts, src/runtime/townStore.ts, GameEngine buyStoreItem, town store tests |
-| How do I launch, follow, or shoot down a probe beacon? | scout, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
+| How do I launch, follow, or shoot down a probe beacon? | scout, controls, teamwork, hud-network | shared/surveyProbe.ts, AsteroidLifecycle.ts probe host commands, SurveyProbeManager.ts, GameEngine.ts launch, src/entities/roid/surveyProbeRenderer.ts |
 | How do I build furnaces and repel spiders? | scout, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, escape construction and living spider retreat, and scan-defense tests |
 | Which of the two kits fits my next flight? | Each ship article | shared/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do shards and mined cargo work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
-| Where is the rich belt, how do crawlers attack, and when do mined deposits return? | asteroids, terrain | shared/asteroidBelt.ts, shared/beltCrawler.ts, RegionalAsteroidField.ts, BeltCrawlerManager.ts, belt scenario tests |
-| Why did an asteroid break, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, mining/reflection tests |
+| Where is the rich belt, how do crawlers attack, and when do mined deposits return? | asteroids, terrain | shared/asteroidBelt.ts, shared/beltCrawler.ts, AsteroidLifecycle.ts destruction/escape, RegionalAsteroidField.ts raw unload, BeltCrawlerManager.ts, belt scenario tests |
+| Why did an asteroid break, fragment, reflect, or award a score? | asteroids | AsteroidManager.ts splitting, AsteroidLifecycle.ts explicit commands and post-fragment escape, shared asteroid helpers, mining/reflection tests |
 | Why won't this huge rock tow, ignite, or break from a ram? | asteroids, hauler, teamwork | shared/asteroidScale.ts, GameEngine.ts, colossal crew tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | shared/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |
 | How do I arm, ignite, and cancel an asteroid thruster? | hauler, controls, asteroids, teamwork | shared/asteroidBoost.ts, shipAbilities.ts, GameEngine.ts, boost lifecycle and persistence tests |

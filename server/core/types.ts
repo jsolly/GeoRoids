@@ -3,11 +3,14 @@ import type { CrewAction, Position, ShipKitId } from '../../shared-types';
 import type { CooperativeCampaign } from '../world/CooperativeCampaign';
 import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
+import type { AsteroidManager } from './AsteroidManager';
+import type { BeltCrawlerManager } from './BeltCrawlerManager';
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
 import type { SettlementLedger } from './SettlementLedger';
+import type { SurveyProbeManager } from './SurveyProbeManager';
 
 export type RescueAction = Exclude<CrewAction, { kind: 'withdraw-supply' }>;
 
@@ -73,4 +76,14 @@ export type PilotSessionResume = {
   readonly requestedKit?: ShipKitId | undefined;
   readonly requestedName?: string | undefined;
   readonly clientReleaseId?: string | undefined;
+};
+
+export type AsteroidLifecycleInputs = {
+  readonly rocks: Pick<
+    AsteroidManager,
+    'addAsteroid' | 'updateAsteroid' | 'removeAsteroid' | 'spatialIndex'
+  >;
+  readonly probes: Pick<SurveyProbeManager, 'registerAsteroid' | 'unregister'>;
+  readonly crawlers: Pick<BeltCrawlerManager, 'escapeDestroyedHost'>;
+  readonly currentFrame: () => number;
 };

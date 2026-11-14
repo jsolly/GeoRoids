@@ -57,7 +57,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
       offsets: [1, 1, 1, 1],
       material: 'metal',
     };
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     world.entity(alice).angle = 0;
     equip(alice, 'boost_coupling');
     equip(bob, 'boost_coupling');
@@ -139,7 +139,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     const bobActor = world.entity(bob);
     equip(bob, 'tow_cable');
     const towed = { ...rock, id: 'other-cargo', boost: null, position: { x: 0, y: 250 } };
-    world.engine.addAsteroid(towed);
+    world.engine.asteroidLifecycle.insert(towed);
     bobActor.angle = Math.atan2(
       bobActor.position.y - towed.position.y,
       towed.position.x - bobActor.position.x

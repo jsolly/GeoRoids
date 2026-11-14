@@ -194,13 +194,13 @@ for (const kind of ['tow', 'probe'] as const) {
         kind === 'tow' ? 'hauler' : 'scout'
       );
       for (const asteroid of engine.getAllAsteroids()) {
-        engine.removeAsteroid(asteroid.id);
+        engine.asteroidLifecycle.remove(asteroid.id);
       }
       engine.parkSatellitePickups();
       const target = rock('moving-away', kind === 'tow' ? 20 : 22);
       target.size = 12;
       target.velocity.x = 2;
-      engine.addAsteroid(target);
+      engine.asteroidLifecycle.insert(target);
       pilot.utilityFlight = {
         kind,
         phase: 'outbound',

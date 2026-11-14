@@ -142,7 +142,7 @@ test.each([
       thrusting: true,
       contourLock: { ...state },
     };
-    world.engine.addAsteroid({
+    world.engine.asteroidLifecycle.insert({
       id: 'pickup-race-rock',
       position: { ...actor.position },
       velocity: { x: 0, y: 0 },

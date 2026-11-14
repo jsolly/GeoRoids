@@ -24,7 +24,7 @@ beforeEach(() => {
   socket = new RecordingSocket();
   engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'scout');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
 });
 
@@ -58,7 +58,7 @@ function chip(asteroidId: string): AppliedAsteroidHit {
 }
 
 test('a surviving deposit reports each chip and only its shatter reports destruction', () => {
-  engine.addAsteroid(deposit('ore'));
+  engine.asteroidLifecycle.insert(deposit('ore'));
 
   expect(chip('ore').outcome).toBe('damaged');
   expect(socket.received('asteroidHit').map((message) => message.data)).toEqual([
@@ -80,7 +80,7 @@ test('a surviving deposit reports each chip and only its shatter reports destruc
 test('a chip reaches pilots who could hear it and no one else', () => {
   const distant = new RecordingSocket();
   engine.addPlayer('distant', 'Distant', distant, { x: 10000, y: 0 }, 'scout');
-  engine.addAsteroid(deposit('ore'));
+  engine.asteroidLifecycle.insert(deposit('ore'));
 
   expect(chip('ore').outcome).toBe('damaged');
   expect(socket.received('asteroidHit').map((message) => message.data)).toEqual([
@@ -100,7 +100,7 @@ test('a chip reaches pilots who could hear it and no one else', () => {
 
 test('an ordinary rock shatters on its first hit and never reports a chip', () => {
   const rock = deposit('ice-rock');
-  engine.addAsteroid({ ...rock, material: 'ice', health: 40, maxHealth: 40 });
+  engine.asteroidLifecycle.insert({ ...rock, material: 'ice', health: 40, maxHealth: 40 });
 
   expect(chip('ice-rock').outcome).toBe('destroyed');
   expect(socket.received('asteroidHit')).toEqual([]);
@@ -114,7 +114,7 @@ test('a hit that never applied stays silent', () => {
 
   // A deposit inside a burning boost ignores the shot, so nothing sounds.
   const burning = deposit('burning');
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     ...burning,
     boost: { phase: 'burning', ownerId: 'pilot', angle: 0 },
   });

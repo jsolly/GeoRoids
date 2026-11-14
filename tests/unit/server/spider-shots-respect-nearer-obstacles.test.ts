@@ -11,12 +11,12 @@ test('a nearer asteroid takes the shot before a spider, and an unobstructed shot
   const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 2800, y: 3000 });
   engine.prepareDiagnosticWorld('traversal');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.parkSatellitePickups();
   const spider = engine.spawnTerrainSpider({ x: 3000, y: 3000 });
   assert(spider);
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     id: 'obstacle',
     position: { x: 2940, y: 3000 },
     velocity: { x: 0, y: 0 },
@@ -54,7 +54,7 @@ test('killing the spider before combat resolves cancels the pending bite', () =>
   const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
   engine.prepareDiagnosticWorld('traversal');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.parkSatellitePickups();
   const spider = engine.spawnTerrainSpider({ x: 2200, y: 2200 });
@@ -82,7 +82,7 @@ test.each(
     const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.prepareDiagnosticWorld('traversal');
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.parkSatellitePickups();
     const spider = engine.spawnTerrainSpider({ x: 2200, y: 2200 });

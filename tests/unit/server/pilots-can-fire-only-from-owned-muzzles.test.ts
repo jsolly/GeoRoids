@@ -28,7 +28,7 @@ describe('server-authoritative player shooting', () => {
     socket = new RecordingSocket();
     engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'scout');
     for (const asteroid of engine.getAllAsteroids()) {
-      engine.removeAsteroid(asteroid.id);
+      engine.asteroidLifecycle.remove(asteroid.id);
     }
   });
   afterEach(() => {

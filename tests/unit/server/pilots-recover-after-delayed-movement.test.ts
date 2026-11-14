@@ -154,9 +154,9 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
     f.engine.spawnPlayerLaser(f.actor.id, laser.position, laser.velocity, f.clock.now())
   ).not.toBeNull();
   for (const rock of f.engine.getAllAsteroids()) {
-    f.engine.removeAsteroid(rock.id);
+    f.engine.asteroidLifecycle.remove(rock.id);
   }
-  f.engine.addAsteroid({
+  f.engine.asteroidLifecycle.insert({
     id: 'impact-rock',
     position: { ...f.ship.position },
     velocity: { x: 0, y: 0 },
@@ -230,7 +230,7 @@ test.each([200, 400, 900])(
 /** Ambient rocks must not hit the pilot while the clock replays a blocked second. */
 function clearAmbientField(f: ReturnType<typeof flight>): void {
   for (const rock of f.engine.getAllAsteroids()) {
-    f.engine.removeAsteroid(rock.id);
+    f.engine.asteroidLifecycle.remove(rock.id);
   }
 }
 

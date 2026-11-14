@@ -233,7 +233,7 @@ describe('Satellite pickups', () => {
     assert.ok(pickup);
     moveNearPickup(pilot.id, pickup.id);
     for (const rock of gameEngine.getAllAsteroids()) {
-      gameEngine.removeAsteroid(rock.id);
+      gameEngine.asteroidLifecycle.remove(rock.id);
     }
     gameEngine.clearSpiderField();
 
@@ -327,7 +327,7 @@ describe('Satellite pickups', () => {
     const pilot = addPilot('pilot', { x: 0, y: 0 }, 'hauler');
     const stored = collectNearest('pilot', 110, false);
     for (const asteroid of gameEngine.getAllAsteroids()) {
-      gameEngine.removeAsteroid(asteroid.id);
+      gameEngine.asteroidLifecycle.remove(asteroid.id);
     }
     const template = {
       velocity: { x: 0, y: 0 },
@@ -350,8 +350,8 @@ describe('Satellite pickups', () => {
       id: 'far',
       position: { x: near.position.x + 1, y: pilot.position.y },
     };
-    gameEngine.addAsteroid(near);
-    gameEngine.addAsteroid(far);
+    gameEngine.asteroidLifecycle.insert(near);
+    gameEngine.asteroidLifecycle.insert(far);
     gameEngine.abilities.advance();
     expect(gameEngine.getAsteroid('near')?.surveyedBy).toBeUndefined();
     expect(gameEngine.equipSatellite('pilot', stored.id)).toBe(true);

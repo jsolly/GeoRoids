@@ -52,7 +52,7 @@ function world(persistence: WorldPersistence) {
   const miner = engine.addPlayer('miner', 'Miner', socket, { x: 0, y: 0 }, 'hauler');
   assert(engine.pilotSessions.register({ actor: miner, socket: socket }).ok);
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const frame = () => {
     elapsed += 1000 / GAME.FPS;
@@ -67,7 +67,7 @@ test('a mining break and a changed score reach the database on the next one-seco
   const commits = vi.spyOn(WorldStore.prototype, 'checkpoint');
   const { engine, miner, frame } = world(new InlineWorldPersistence(store));
   const target = metalDeposit('flush-target');
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   // Storage starts out holding the intact deposit and a score of zero.
   engine.checkpointWorld();
   expect(store.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(true);
@@ -165,7 +165,7 @@ test('settlement transitions replace queued state and checkpoint neutral intake 
   const ore = metalDeposit('settlement-ore', { x: 0, y: 0 });
   ore.ore = 'metal';
   ore.boost = { phase: 'burning', ownerId: miner.id, angle: 0 };
-  engine.addAsteroid(ore);
+  engine.asteroidLifecycle.insert(ore);
   engine.processFurnaceDeliveries();
   const delivered = engine.getGameState().settlement;
   expect(delivered).toEqual({
@@ -184,7 +184,7 @@ test('settlement transitions replace queued state and checkpoint neutral intake 
   const barren = metalDeposit('neutral-intake', { x: 0, y: 0 });
   barren.ore = null;
   barren.boost = { phase: 'burning', ownerId: 'absent-pilot', angle: 0 };
-  engine.addAsteroid(barren);
+  engine.asteroidLifecycle.insert(barren);
   engine.processFurnaceDeliveries();
   expect(engine.getAsteroid(barren.id)).toBeUndefined();
   const neutral = engine.getGameState().settlement;
@@ -210,7 +210,7 @@ test('a commit still in flight defers the next flush, which then carries everyth
   const persistence = new InFlightPersistence();
   const { engine, miner, frame } = world(persistence);
   const target = metalDeposit('deferred-target', { x: 40, y: 0 });
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   expect(persistence.batches).toHaveLength(0);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
@@ -257,7 +257,7 @@ test('the last pilot leaving behind a busy writer still writes deferred chip dam
   const persistence = new InFlightPersistence();
   const { engine, miner, frame } = world(persistence);
   const chipped = metalDeposit('chipped-metal', { x: 40, y: 0 });
-  engine.addAsteroid(chipped);
+  engine.asteroidLifecycle.insert(chipped);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
   }
@@ -289,7 +289,7 @@ test('shutdown flushes the final state once the writer is idle and then releases
   const persistence = new InFlightPersistence();
   const { engine, miner, frame } = world(persistence);
   const chipped = metalDeposit('shutdown-chipped', { x: 40, y: 0 });
-  engine.addAsteroid(chipped);
+  engine.asteroidLifecycle.insert(chipped);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
   }
@@ -358,10 +358,10 @@ test('a persistence flush never parks a custom diagnostic belt in dormant region
   const { engine, miner, frame } = world(new InlineWorldPersistence(store));
   engine.prepareDiagnosticWorld('traversal');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const target = metalDeposit('diagnostic-nest-deposit', { x: 15_000, y: 5_000 });
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   expect(
     engine.playerMotion.placeActorForTesting(miner.id, { x: 13_000, y: 5_000 }, WALL_ORIGIN_MS)
   ).toBe(true);

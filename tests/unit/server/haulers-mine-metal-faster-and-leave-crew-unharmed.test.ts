@@ -41,8 +41,8 @@ test('Hauler breaks metal in two shots while Scout needs three and teammate lase
     { x: 100, y: 0 },
     'scout'
   );
-  engine.addAsteroid(metal('heavy-mining'));
-  engine.addAsteroid(metal('light-mining'));
+  engine.asteroidLifecycle.insert(metal('heavy-mining'));
+  engine.asteroidLifecycle.insert(metal('light-mining'));
   expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('damaged');
   expect(engine.getAsteroid('heavy-mining')?.health).toBe(25);
   expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('destroyed');
@@ -50,7 +50,7 @@ test('Hauler breaks metal in two shots while Scout needs three and teammate lase
   expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('damaged');
   expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('destroyed');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   hauler.spawnProtectionTimer = 0;
   scout.spawnProtectionTimer = 0;
@@ -65,9 +65,9 @@ test('a Hauler laser retains mining strength after its owner leaves', () => {
   engine.addPlayer('observer', 'Observer', new RecordingSocket(), { x: -1000, y: -1000 }, 'scout');
   engine.addPlayer('departing-hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
-  engine.addAsteroid(metal('in-flight-metal'));
+  engine.asteroidLifecycle.insert(metal('in-flight-metal'));
   expect(
     engine.spawnLaser('departing-hauler', { x: 950, y: 1000 }, { x: 80, y: 0 })
   ).not.toBeNull();
@@ -81,7 +81,7 @@ test.each(['scout', 'hauler'] as const)(
   (kit) => {
     engine.addPlayer('miner', 'Miner', new RecordingSocket(), { x: 0, y: 0 }, kit);
     for (const material of ['ice', 'crystal'] as const) {
-      engine.addAsteroid({
+      engine.asteroidLifecycle.insert({
         ...metal(material),
         material,
         size: ROID.LARGE_MIN_SIZE,

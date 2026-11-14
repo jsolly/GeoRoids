@@ -164,6 +164,7 @@
     "tests/unit/scenarios/combat/hauler-hull-collides-farther-than-scout.test.ts",
     "tests/unit/entities/shipAbilities.test.ts",
     "server/core/AsteroidManager.ts",
+    "server/core/AsteroidLifecycle.ts",
     "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts",
     "tests/unit/server/authoritative-combat.test.ts",
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts",
@@ -194,6 +195,7 @@
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
+    "server/core/AsteroidLifecycle.ts",
     "shared/asteroidMaterials.ts",
     "shared/asteroidPhenomena.ts",
     "shared/asteroidReflection.ts",
@@ -605,6 +607,7 @@
     "src/entities/ship/scoutUtility.ts",
     "shared/shipUtilities.ts",
     "server/core/SurveyProbeManager.ts",
+    "server/core/AsteroidLifecycle.ts",
     "src/runtime/inventory.ts",
     "src/ui/schematicEquipHint.ts",
     "src/rendering/hud/resourceMapMark.ts",

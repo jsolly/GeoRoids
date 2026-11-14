@@ -46,7 +46,7 @@ test('a stripped active field does not refill within the next frame', () => {
   expect(engine.isGamePaused()).toBe(false);
 
   for (const asteroid of firstField) {
-    engine.removeAsteroid(asteroid.id);
+    engine.asteroidLifecycle.remove(asteroid.id);
   }
   expect(engine.getAsteroidCount()).toBe(0);
 
@@ -77,7 +77,7 @@ test('a stripped field does not refill across the last departure and an immediat
     expect(joinedField.some((rock) => rock.phenomenon?.kind === 'reflective')).toBe(true);
 
     for (const rock of initial) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     expect(engine.getAllAsteroids()).toEqual([]);
 

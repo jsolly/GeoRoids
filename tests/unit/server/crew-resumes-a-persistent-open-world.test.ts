@@ -73,10 +73,10 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   const scout = pilot(first, 'scout', 'scout');
   const hauler = pilot(first, 'hauler', 'hauler', { x: 80, y: 0 });
   for (const rock of first.getAllAsteroids()) {
-    first.removeAsteroid(rock.id);
+    first.asteroidLifecycle.remove(rock.id);
   }
   const rock = cargo('delivery', { x: 180, y: 0 });
-  first.addAsteroid(rock);
+  first.asteroidLifecycle.insert(rock);
   expect(first.useAbility(scout.actor.id)).toBe(true);
   resolveToolFlights(first);
   expect(rock.surveyedBy).toEqual(['scout']);
@@ -138,7 +138,7 @@ test('travelling far across the world loads local ore and a quick return finds m
     .getAllAsteroids()
     .find((rock) => Math.abs(rock.position.x) < 1_000 && Math.abs(rock.position.y) < 1_000);
   assert(original);
-  engine.removeAsteroid(original.id);
+  engine.asteroidLifecycle.remove(original.id);
   traveller.actor.position = { x: 40_000, y: 24_000 };
   engine.ensureAsteroidField();
   expect(engine.getAllAsteroids().length).toBeLessThan(25 * DEPOSIT_FIELD.PEAK_DEPOSITS);

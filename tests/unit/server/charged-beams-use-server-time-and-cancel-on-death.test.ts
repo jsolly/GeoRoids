@@ -246,9 +246,9 @@ test('wire clients cannot forge charge time or act for a different socket owner'
 test('a full beam applies exactly four ordinary mining hits of damage once to a durable deposit', () => {
   const { engine, pilot, advance } = scenario();
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     id: 'durable-target',
     position: { x: 100, y: 0 },
     velocity: { x: 0, y: 0 },

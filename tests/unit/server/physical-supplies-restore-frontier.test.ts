@@ -101,7 +101,7 @@ test('physical ore funds scanner once per consumed rock, preserves payouts and p
   const original = pilot.score;
   for (let i = 0; i < 34; i++) {
     const rock = ore(`ore-${i}`);
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     pilot.harpoonTargetId = rock.id;
     engine.processFurnaceDeliveries();
     engine.processFurnaceDeliveries();
@@ -211,7 +211,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   expect(field.nearest(site.position).id).toBe(site.id);
   const localOre = ore('local-frontier-ore');
   localOre.position = { ...site.position };
-  engine.addAsteroid(localOre);
+  engine.asteroidLifecycle.insert(localOre);
   pilot.harpoonTargetId = localOre.id;
   const beforeLocalReward = pilot.score;
   engine.processFurnaceDeliveries();
@@ -253,7 +253,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   returning.haulerUtility = 'tow_cable';
   const resumedOre = ore('restarted-frontier-ore');
   resumedOre.position = { ...site.position };
-  restarted.addAsteroid(resumedOre);
+  restarted.asteroidLifecycle.insert(resumedOre);
   returning.harpoonTargetId = resumedOre.id;
   restarted.processFurnaceDeliveries();
   expect(restarted.getAsteroid(resumedOre.id)).toBeUndefined();
@@ -274,7 +274,7 @@ test('inward physical supply commissions once, accounts overflow and restores ev
   freshPilot.haulerUtility = 'tow_cable';
   const resetOre = ore('reset-frontier-ore');
   resetOre.position = { ...site.position };
-  restarted.addAsteroid(resetOre);
+  restarted.asteroidLifecycle.insert(resetOre);
   freshPilot.harpoonTargetId = resetOre.id;
   restarted.processFurnaceDeliveries();
   expect(restarted.getAsteroid(resetOre.id)).toBeDefined();
@@ -302,7 +302,7 @@ test('physical supply rejects dark, equal-radius, inward and same-site sources w
     rock.position = { ...destination.position };
     rock.ore = null;
     rock.supply = { sourceId, value: 100 };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     pilot.harpoonTargetId = rock.id;
     engine.processFurnaceDeliveries();
     expect(engine.getAsteroid(rock.id)?.supply).toEqual({ sourceId, value: 100 });
@@ -315,7 +315,7 @@ test('physical supply rejects dark, equal-radius, inward and same-site sources w
   valid.position = { ...destination.position };
   valid.ore = null;
   valid.supply = { sourceId: TOWN_HEARTH.id, value: 100 };
-  engine.addAsteroid(valid);
+  engine.asteroidLifecycle.insert(valid);
   pilot.harpoonTargetId = valid.id;
   engine.processFurnaceDeliveries();
   expect(engine.getAsteroid(valid.id)).toBeUndefined();
@@ -338,7 +338,7 @@ test('a launched Tow Cable pins the queen and real swept laser contact damages h
   pilot.angle = Math.PI;
   engine.advanceOneFrame();
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.parkSatellitePickups();
   const before = engine.getGameState().campaign?.hives.find((h) => h.id === site.id);
@@ -397,7 +397,7 @@ test('actual hive state reaches only nearby snapshot recipients and carries shie
   remote.position = { x: far.position.x + 150, y: far.position.y };
   engine.advanceOneFrame();
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.parkSatellitePickups();
   expect(engine.getSnapshotState().campaign?.hives.map((hive) => hive.id)).toEqual(

@@ -311,7 +311,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     joinPilot(handler, peer.ws, 'peer');
     applySnapshots(recovery, handler);
     applySnapshots(peer, handler);
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'reflector-rock',
       position: { x: 500, y: 500 },
       velocity: { x: 0, y: 0 },
@@ -686,7 +686,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       offsets: [1, 0.76, 1.08, 0.84, 1, 0.72],
       material: 'ice' as const,
     };
-    engine.addAsteroid(edge);
+    engine.asteroidLifecycle.insert(edge);
     const latestRockIds = () =>
       applySnapshots(scout, handler)
         .at(-1)

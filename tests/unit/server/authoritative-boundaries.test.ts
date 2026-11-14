@@ -23,7 +23,7 @@ function addRubble(engine: GameEngine): AsteroidData {
     vertices: 8,
     offsets: [1, 1, 1, 1, 1, 1, 1, 1],
   };
-  engine.addAsteroid(rubble);
+  engine.asteroidLifecycle.insert(rubble);
   return rubble;
 }
 
@@ -80,7 +80,7 @@ describe('server authority boundaries', () => {
     const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     delete pilot.spawnProtectionTimer;
     for (const asteroid of engine.getAllAsteroids()) {
-      engine.removeAsteroid(asteroid.id);
+      engine.asteroidLifecycle.remove(asteroid.id);
     }
     const rubble = addRubble(engine);
 

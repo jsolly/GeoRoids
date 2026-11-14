@@ -16,7 +16,9 @@ test('a departed pilot leaves the diagnostic world untouched until it rejoins', 
   try {
     await server.listening;
     server.gameEngine.stopGameLoop();
-    server.gameEngine.addAsteroid(asteroidRow({ x: 100, y: 100 }, 25, 'preserved-rock'));
+    server.gameEngine.asteroidLifecycle.insert(
+      asteroidRow({ x: 100, y: 100 }, 25, 'preserved-rock')
+    );
     const socket = join(directory, 'fixture.sock');
     closeControl = await startFixtureControl(server, socket, 42);
     const before = JSON.stringify(server.gameEngine.getAllAsteroids());

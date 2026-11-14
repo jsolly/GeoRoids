@@ -17,7 +17,7 @@ function arena() {
   delete pilot.spawnProtectionTimer;
   engine.ensureAsteroidField();
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const reflector: AsteroidData = {
     id: 'reflector',
@@ -34,7 +34,7 @@ function arena() {
     material: 'metal',
     phenomenon: { kind: 'reflective', clusterId: 'cluster', energy: 0, maxEnergy: 6 },
   };
-  engine.addAsteroid(reflector);
+  engine.asteroidLifecycle.insert(reflector);
   return { engine, pilot, ws, reflector };
 }
 
@@ -84,7 +84,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
     };
     delete blocker.phenomenon;
     // This tiny rock is on the false start/end chord, outside both actual legs.
-    engine.addAsteroid(blocker);
+    engine.asteroidLifecycle.insert(blocker);
     const before = structuredClone(shot);
     const charge = reflector.phenomenon?.energy;
     const handler = new MessageHandler(engine, new GameStateBroadcaster(engine));

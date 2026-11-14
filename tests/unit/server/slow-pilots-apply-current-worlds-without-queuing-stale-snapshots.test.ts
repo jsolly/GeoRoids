@@ -47,7 +47,7 @@ beforeEach(() => {
   engine = new GameEngine(72);
   // The scenarios isolate application credit from changing terrain membership.
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   broadcaster = new GameStateBroadcaster(engine);
   handler = new MessageHandler(engine, broadcaster);

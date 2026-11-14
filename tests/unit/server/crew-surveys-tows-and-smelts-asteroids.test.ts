@@ -15,7 +15,7 @@ beforeEach(() => {
   engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 }, 'scout');
   engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 100, y: 0 }, 'hauler');
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   engine.parkSatellitePickups();
   for (const player of engine.getAllPlayers()) {
@@ -61,8 +61,8 @@ test.each(['mineral_scan', 'survey_probe'] as const)(
     hauler.position = { x: 16_000, y: 10_000 };
     const near = deposit('near', { x: 10_900, y: 10_000 });
     const far = deposit('far', { x: 11_300, y: 10_000 });
-    engine.addAsteroid(near);
-    engine.addAsteroid(far);
+    engine.asteroidLifecycle.insert(near);
+    engine.asteroidLifecycle.insert(far);
     const reveal = vi.spyOn(engine, 'revealArea');
 
     engine.abilities.advance();
@@ -91,8 +91,8 @@ test('a satellite widens Hauler exploration with one reveal and base Scout disco
   hauler.position = { x: 16_000, y: 10_000 };
   const near = deposit('satellite-survey', { x: 16_450, y: 10_000 });
   const far = deposit('satellite-far', { x: 16_700, y: 10_000 });
-  engine.addAsteroid(near);
-  engine.addAsteroid(far);
+  engine.asteroidLifecycle.insert(near);
+  engine.asteroidLifecycle.insert(far);
   const reveal = vi.spyOn(engine, 'revealArea');
 
   engine.abilities.advance();
@@ -110,7 +110,7 @@ test('a satellite widens Hauler exploration with one reveal and base Scout disco
 
 test('a Scout identifies cargo and both pilots receive the full furnace reward exactly once', () => {
   const rock = deposit();
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   const initial = { scout: actor('scout').score, hauler: actor('hauler').score };
   expect(engine.useAbility('scout')).toBe(true);
   resolveToolFlights(engine);
@@ -160,7 +160,7 @@ test('a Scout identifies cargo and both pilots receive the full furnace reward e
 test('towing preserves attachment momentum, follows the moving Hauler, and releases on E', () => {
   const hauler = actor('hauler');
   const rock = deposit('cargo', { x: 0, y: 0 });
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   hauler.angle = Math.PI;
   const original = structuredClone(rock);
   expect(engine.useAbility('hauler')).toBe(true);
@@ -193,7 +193,7 @@ test('an owned player motion session still pulls cargo on the authoritative serv
   assert(ws);
   expect(engine.playerMotion.register(hauler, ws, engine.getServerTime()).ok).toBe(true);
   const rock = deposit('cargo', { x: 0, y: 0 });
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   hauler.angle = Math.PI;
   expect(engine.useAbility('hauler')).toBe(true);
   resolveToolFlights(engine);
@@ -206,10 +206,10 @@ test('an owned player motion session still pulls cargo on the authoritative serv
 test('a second Hauler cannot steal attached cargo and loose rocks do not pay at a furnace', () => {
   engine.addPlayer('other', 'Other', new RecordingSocket(), { x: 110, y: 0 }, 'hauler');
   for (const ambient of engine.getAllAsteroids()) {
-    engine.removeAsteroid(ambient.id);
+    engine.asteroidLifecycle.remove(ambient.id);
   }
   const rock = deposit();
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   expect(engine.useAbility('hauler')).toBe(true);
   resolveToolFlights(engine);
   expect(engine.useAbility('other')).toBe(true);
@@ -220,7 +220,7 @@ test('a second Hauler cannot steal attached cargo and loose rocks do not pay at 
   const furnace = FURNACES[0];
   assert(furnace);
   const loose = deposit('loose', { ...furnace.position });
-  engine.addAsteroid(loose);
+  engine.asteroidLifecycle.insert(loose);
   engine.processFurnaceDeliveries();
   expect(engine.getAsteroid(loose.id)).toBe(loose);
   expect(engine.drainFurnaceDeliveries()).toEqual([]);
@@ -228,9 +228,9 @@ test('a second Hauler cannot steal attached cargo and loose rocks do not pay at 
 
 test('scans retain map discoveries after expiry without crediting distant Scouts', () => {
   const rock = deposit();
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   const far = deposit('far', { x: SHIP_ABILITY.SCAN_RANGE + 10, y: 0 });
-  engine.addAsteroid(far);
+  engine.asteroidLifecycle.insert(far);
   expect(engine.useAbility('scout')).toBe(true);
   resolveToolFlights(engine);
   for (let frame = 0; frame < SHIP_ABILITY.SCAN_FRAMES + 1; frame++) {

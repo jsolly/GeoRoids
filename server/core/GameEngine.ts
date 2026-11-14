@@ -107,6 +107,7 @@ import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import { WorldRemains } from '../world/WorldRemains';
 import type { SavedWorld } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
+import { AsteroidLifecycle } from './AsteroidLifecycle';
 import {
   type AsteroidHitCause,
   type AsteroidHitOutcome,
@@ -255,6 +256,7 @@ export class GameEngine {
   private lastFurnaceBuildNotice = '';
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
+  public readonly asteroidLifecycle: AsteroidLifecycle;
   private lootManager: LootManager;
   private satellitePickupManager: SatellitePickupManager;
   public readonly satelliteField: SatellitePickupField;
@@ -438,11 +440,13 @@ export class GameEngine {
       fire: (ownerId, start, velocity) => this.spawnPlayerLaser(ownerId, start, velocity),
     });
     this.asteroidManager = new AsteroidManager(this.rngService, this.furnaces, (rock) => {
-      this.beltCrawlers.escapeDestroyedHost(
-        rock,
-        this.asteroidManager.spatialIndex(),
-        this.gameTime
-      );
+      this.asteroidLifecycle.afterDestruction(rock);
+    });
+    this.asteroidLifecycle = new AsteroidLifecycle({
+      rocks: this.asteroidManager,
+      probes: this.surveyProbeManager,
+      crawlers: this.beltCrawlers,
+      currentFrame: () => this.gameTime,
     });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
     this.cargoOffload = new CargoOffloadManager({
@@ -517,7 +521,7 @@ export class GameEngine {
       campaign: this.cooperative,
       furnaces: this.furnaces,
       clock: this.serverClock,
-      insertAsteroid: (rock) => this.addAsteroid(rock),
+      insertAsteroid: (rock) => this.asteroidLifecycle.insert(rock),
       revealArea: (position, range) => this.revealArea(position, range),
     });
 
@@ -1472,40 +1476,6 @@ export class GameEngine {
       return;
     }
     entity.overlayHold = false;
-  }
-
-  // Asteroid operations
-  public addAsteroid(asteroid: AsteroidData): void {
-    this.asteroidManager.addAsteroid(asteroid);
-    this.surveyProbeManager.registerAsteroid(asteroid);
-  }
-
-  public removeAsteroid(asteroidId: string): AsteroidData | undefined {
-    const removed = this.asteroidManager.removeAsteroid(asteroidId);
-    if (removed) {
-      this.beltCrawlers.escapeDestroyedHost(
-        removed,
-        this.asteroidManager.spatialIndex(),
-        this.gameTime
-      );
-    }
-    this.surveyProbeManager.unregister(asteroidId);
-    if (removed?.probe) {
-      removed.probe = null;
-    }
-    return removed;
-  }
-
-  public updateAsteroid(
-    asteroidId: string,
-    updates: Partial<AsteroidData>
-  ): AsteroidData | undefined {
-    const updated = this.asteroidManager.updateAsteroid(asteroidId, updates);
-    if (!updated) {
-      return undefined;
-    }
-    this.surveyProbeManager.registerAsteroid(updated);
-    return updated;
   }
 
   public getAsteroid(asteroidId: string): AsteroidData | undefined {
@@ -3265,7 +3235,7 @@ export class GameEngine {
     furnace: ReturnType<FurnaceField['nearest']>,
     ownerIds: readonly string[]
   ): FurnaceDelivery {
-    this.removeAsteroid(rock.id);
+    this.asteroidLifecycle.remove(rock.id);
     this.supplyRestoration.recordDelivery(rock, furnace.id, ownerIds);
     const launchers = new Set(ownerIds);
     const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);

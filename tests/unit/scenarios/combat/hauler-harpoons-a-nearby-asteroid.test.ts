@@ -18,7 +18,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
   });
 
   function addRock(id = 'haul-rock', velocity = { x: 0, y: 0 }): void {
-    world.engine.addAsteroid({
+    world.engine.asteroidLifecycle.insert({
       id,
       position: { x: 80, y: 0 },
       velocity,
@@ -89,7 +89,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
   test('towing a rock into another asteroid breaks both and drops the cable', () => {
     world.clearAsteroids();
     addRock();
-    world.engine.addAsteroid({
+    world.engine.asteroidLifecycle.insert({
       id: 'field-rock',
       position: { x: 80, y: 0 },
       velocity: { x: 0, y: 0 },

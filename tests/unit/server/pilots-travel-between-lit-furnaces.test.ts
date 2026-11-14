@@ -67,7 +67,7 @@ test('travelling releases an armed coupling and disconnecting completes the ride
     offsets: [1, 1, 1, 1],
     vertices: 4,
   };
-  world.engine.addAsteroid(cargo);
+  world.engine.asteroidLifecycle.insert(cargo);
   actor.kitId = 'hauler';
   actor.equipment = ['boost_coupling'];
   actor.haulerUtility = 'boost_coupling';

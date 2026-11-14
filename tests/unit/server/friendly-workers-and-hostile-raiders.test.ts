@@ -37,7 +37,7 @@ function world(store?: WorldStore) {
   assert(engine.pilotSessions.register({ actor: pilot, socket: socket }).ok);
   engine.createAsteroids(0);
   for (const asteroid of engine.getAllAsteroids()) {
-    engine.removeAsteroid(asteroid.id);
+    engine.asteroidLifecycle.remove(asteroid.id);
   }
   engine.clearSpiderField();
   function frame(count = 1) {

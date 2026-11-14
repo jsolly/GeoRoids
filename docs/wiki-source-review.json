@@ -11,7 +11,7 @@
     "docs/protocol/snapshot-v3.md": "sha256:f0acbde122e7979e7ab1b88c3436bd8f043de71326d0d42fa9a9747b2f822fc2",
     "docs/sounds.md": "sha256:e1ba73957bfee66bf16a062a9ad58690884bfa51eaa40ce57dd8f618e7ba8bd2",
     "index.css": "sha256:6f758f11ca56b4b312836cc3d3330633e8d904de918be510d7498cba00abbb4c",
-    "package.json": "sha256:75d80b438cd19a0b8590b839d3329259e49f9daafbd1530cd70b7f2214562f78",
+    "package.json": "sha256:0d489b12d28707c2eeec631323c3afafc2944f3ef1672d7fedf93f9554cf5d02",
     "public/music/README.md": "sha256:4fe5586c0f903329e343427a33538bda6e301ff577b89976e15e4ba7684bcc8d",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",
@@ -9268,6 +9268,15 @@
         "scripts/wiki-media.ts": "asteroids",
         "src/wiki/articleSources.json": "asteroids",
         "src/wiki/media.ts": "asteroids"
+      }
+    },
+    {
+      "note": "Reviewed the explicit maintenance:world operator entrypoint. It starts no game, world writer, backups or reports; player rules, Wiki controls and demonstration media are unchanged. Disposable-world loopback scenarios prove maintenance rejection, shutdown and separate read-only inspection. Production maintenance deployment and migration remain unverified and held.",
+      "sources": ["package.json"],
+      "topics": ["field-manual"],
+      "media": [],
+      "owners": {
+        "package.json": "field-manual"
       }
     }
   ]

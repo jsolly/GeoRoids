@@ -236,12 +236,15 @@ Never point this workflow at production, apply `.railway/railway.ts` to `preview
 
 ## Debug report operations
 
-The **Debug reports** section already exists in Todoist project
-`6hWp83X3jfHJpW8v`, section `6hmMfqqQ4rwgJFGv`. Runtime delivery requires
+The **Unverified client reports** intake section already exists in Todoist project
+`6hWp83X3jfHJpW8v`, section `6hmMfqqQ4rwgJFGv`. Delivery identifies the section
+by its stable ID and project membership, not its editable name. The worker still
+verifies the exact owner account, project and section IDs and rejects archived
+destinations before publishing. Renaming the section does not redirect reports.
+Runtime delivery requires
 John to configure `TODOIST_API_TOKEN` as a Railway server secret for account
 `17333018`, `todoist@jsolly.com`. The connected chat's Todoist login cannot
-supply credentials to the running game. The worker verifies the account,
-project and section before publishing. Do not expose the token through client
+supply credentials to the running game. Do not expose the token through client
 environment variables, logs or source. A personal API token grants access to
 its account; protect and rotate it as a server credential.
 

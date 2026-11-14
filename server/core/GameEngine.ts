@@ -31,7 +31,6 @@ import {
   isEquipmentId,
 } from '../../shared/equipment';
 import { ExplorationMap } from '../../shared/exploration';
-import { frontierSite } from '../../shared/frontier';
 import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import {
   CIVIC_LOTS,
@@ -81,7 +80,6 @@ import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { TERRAIN } from '../../shared/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../shared/terrainField';
 import { SPIDER, spiderHitRadius } from '../../shared/terrainSpider';
-import { attachTowCable } from '../../shared/towCable';
 import {
   insideTownStore,
   purchasedHullColor,
@@ -138,6 +136,7 @@ import { CargoOffloadManager } from './CargoOffloadManager';
 import { ChargedWeaponManager } from './ChargedWeaponManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
+import { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { FurnaceTravelManager } from './FurnaceTravelManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
@@ -291,7 +290,7 @@ export class GameEngine {
   private readonly cooperative: CooperativeCampaign;
   private readonly hives: HiveEncounters;
   private readonly hazards: WorldHazards;
-  private readonly commissioned = new Set<string>();
+  private readonly supplyRestoration: CooperativeSupplyRestoration;
   private readonly lastCrewSignalAt = new Map<string, number>();
   private clockPrimed: boolean = false;
   private readonly loopHealth = new GameLoopHealth(() => ({
@@ -519,12 +518,13 @@ export class GameEngine {
       revealArea: (position, range) => this.revealArea(position, range),
       maximumPendingEjections: MAX_PENDING_LOOT_COLLECTIONS,
     });
-    for (const row of this.cooperative.all()) {
-      if (row.kind === 'hive' && row.commissionedAt !== null) {
-        this.commissioned.add(row.id);
-      }
-    }
-    this.furnaces.replaceFrontier([...this.commissioned]);
+    this.supplyRestoration = new CooperativeSupplyRestoration({
+      campaign: this.cooperative,
+      furnaces: this.furnaces,
+      clock: this.serverClock,
+      insertAsteroid: (rock) => this.addAsteroid(rock),
+      revealArea: (position, range) => this.revealArea(position, range),
+    });
 
     ensureTerrain(this.worldSeed);
     if (this.localPlayground) {
@@ -924,8 +924,7 @@ export class GameEngine {
     this.cooperative.reset();
     this.hives.reset();
     this.hazards.reset();
-    this.commissioned.clear();
-    this.furnaces.replaceFrontier([]);
+    this.supplyRestoration.reset();
     this.lastCrewSignalAt.clear();
     this.fixtureCombat = undefined;
     this.regionalField.reset();
@@ -2310,7 +2309,7 @@ export class GameEngine {
     }
     const now = this.getServerTime();
     if (action.kind === 'withdraw-supply') {
-      return this.withdrawSupply(actor);
+      return this.supplyRestoration.withdraw(actor);
     }
     if (action.kind === 'release') {
       this.cancelRescue(id);
@@ -3187,7 +3186,7 @@ export class GameEngine {
                 return row != null ? [{ id, value: row.availableValue }] : [];
               }),
               hives: this.hives.snapshot(this.getServerTime()),
-              commissioned: [...this.commissioned],
+              commissioned: this.supplyRestoration.commissionedIds(),
               cleared: this.hives.clearedIds(),
               hazard: hazardPhase(this.getServerTime()),
               meteors: this.hazards.snapshot(),
@@ -3201,12 +3200,7 @@ export class GameEngine {
       civicModules: [...this.furnaces.litModules()],
       mapAssets: [
         ...this.mapAssets.snapshot(satellitePickups, moduleNames),
-        ...[...this.commissioned].flatMap((id) => {
-          const site = frontierSite(id);
-          return site
-            ? [{ id, kind: 'furnace' as const, name: site.name, position: site.position }]
-            : [];
-        }),
+        ...this.supplyRestoration.furnaceMapAssets(),
         ...this.hives
           .snapshot(this.getServerTime())
           .filter((h) => h.clearedAt !== null && h.commissionedAt === null)
@@ -3738,7 +3732,7 @@ export class GameEngine {
       ) {
         continue;
       }
-      if (this.canSupply(rock, furnace.id)) {
+      if (this.supplyRestoration.permitsDelivery(rock, furnace.id)) {
         deliveries.push(this.deliverAsteroid(rock, furnace, this.towCrewOf(rock.id)));
       }
     }
@@ -3747,142 +3741,11 @@ export class GameEngine {
         continue;
       }
       const furnace = this.deliveryFurnaceAt(rock.position);
-      if (furnace && this.canSupply(rock, furnace.id)) {
+      if (furnace && this.supplyRestoration.permitsDelivery(rock, furnace.id)) {
         deliveries.push(this.deliverAsteroid(rock, furnace, boostOwnerIds(rock.boost)));
       }
     }
     this.pendingFurnaceDeliveries.push(...deliveries);
-  }
-
-  private canSupply(rock: AsteroidData, destinationId: string): boolean {
-    if (!rock.supply) {
-      return !destinationId.startsWith('frontier:') || this.furnaces.isLit(destinationId);
-    }
-    if (!destinationId.startsWith('frontier:')) {
-      return false;
-    }
-    const site = frontierSite(destinationId);
-    const source = rock.supply
-      ? (frontierSite(rock.supply.sourceId) ??
-        civicLot(rock.supply.sourceId) ??
-        (rock.supply.sourceId === TOWN_HEARTH.id ? TOWN_HEARTH : undefined))
-      : undefined;
-    return Boolean(
-      site &&
-        source &&
-        rock.supply &&
-        this.furnaces.isLit(source.id) &&
-        source.id !== site.id &&
-        Math.hypot(source.position.x, source.position.y) <
-          Math.hypot(site.position.x, site.position.y)
-    );
-  }
-
-  private withdrawSupply(actor: GameEntity): boolean {
-    if (
-      actor.health <= 0 ||
-      actor.exploding ||
-      actor.overlayHold === true ||
-      actor.rescue ||
-      actor.kitId !== 'hauler' ||
-      !isTowCableUtility(actor) ||
-      (actor.harpoonTargetId != null && actor.harpoonTargetId !== '')
-    ) {
-      return false;
-    }
-    const source = this.furnaces.intakeAt(actor.position);
-    const ledger = source ? this.cooperative.get('supply', source.id) : undefined;
-    if (!source || ledger == null || ledger.availableValue <= 0) {
-      return false;
-    }
-    const value = Math.min(COOPERATIVE.shipmentValue, ledger.availableValue);
-    const id = `supply:${source.id}:${ledger.nextShipment}`;
-    const position = { x: source.position.x + source.radius + 55, y: source.position.y };
-    const shipment: AsteroidData = {
-      id,
-      position,
-      velocity: { x: 0, y: 0 },
-      size: 35,
-      jaggedness: 0,
-      rotation: 0,
-      angularVelocity: 0,
-      health: 100,
-      maxHealth: 100,
-      vertices: 6,
-      offsets: [1, 1, 1, 1, 1, 1],
-      material: 'metal',
-      ore: null,
-      supply: { sourceId: source.id, value },
-    };
-    this.addAsteroid(shipment);
-
-    this.cooperative.set({
-      ...ledger,
-      availableValue: ledger.availableValue - value,
-      nextShipment: ledger.nextShipment + 1,
-    });
-    actor.harpoonTargetId = id;
-    actor.harpoonLatchPos = { ...position };
-    attachTowCable(actor, shipment);
-    return true;
-  }
-
-  private recordPhysicalDelivery(
-    rock: AsteroidData,
-    destinationId: string,
-    contributors: readonly string[]
-  ): void {
-    if (!this.cooperative.activated) {
-      return;
-    }
-    let value = rock.supply?.value ?? (oreResource(rock) ? furnaceReward(rock) : 0);
-    if (value <= 0) {
-      return;
-    }
-    if (destinationId === TOWN_HEARTH.id) {
-      const project = this.cooperative.get('project', 'deep-scanner') ?? {
-        kind: 'project' as const,
-        id: 'deep-scanner' as const,
-        deliveredValue: 0,
-        completedAt: null,
-      };
-      const accepted = Math.min(value, COOPERATIVE.scannerValue - project.deliveredValue);
-      value -= accepted;
-      const deliveredValue = project.deliveredValue + accepted;
-      this.cooperative.set({
-        ...project,
-        deliveredValue,
-        completedAt:
-          deliveredValue === COOPERATIVE.scannerValue
-            ? (project.completedAt ?? Math.floor(this.getServerTime()))
-            : null,
-      });
-    }
-    const hive = this.cooperative.get('hive', destinationId);
-    if (hive != null && hive.clearedAt !== null && hive.commissionedAt === null) {
-      const accepted = Math.min(value, COOPERATIVE.restoreValue - hive.restoredValue);
-      value -= accepted;
-      hive.restoredValue += accepted;
-      hive.contributors = [
-        ...new Set([...hive.contributors, ...contributors, ...(rock.surveyedBy ?? [])]),
-      ];
-      if (hive.restoredValue === COOPERATIVE.restoreValue) {
-        hive.commissionedAt = Math.floor(this.getServerTime());
-        this.commissioned.add(hive.id);
-        this.furnaces.replaceFrontier([...this.commissioned]);
-        this.revealArea(hive.position, COOPERATIVE.atlasRadius);
-      }
-      this.cooperative.set(hive);
-    }
-    if (value > 0) {
-      const ledger = this.cooperative.get('supply', destinationId) ?? {
-        kind: 'supply' as const,
-        id: destinationId,
-        availableValue: 0,
-        nextShipment: 0,
-      };
-      this.cooperative.set({ ...ledger, availableValue: ledger.availableValue + value });
-    }
   }
 
   private deliverAsteroid(
@@ -3891,7 +3754,7 @@ export class GameEngine {
     ownerIds: readonly string[]
   ): FurnaceDelivery {
     this.removeAsteroid(rock.id);
-    this.recordPhysicalDelivery(rock, furnace.id, ownerIds);
+    this.supplyRestoration.recordDelivery(rock, furnace.id, ownerIds);
     const launchers = new Set(ownerIds);
     const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);
     const resource = oreResource(rock);

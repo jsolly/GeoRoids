@@ -43,6 +43,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'shared/furnaces.ts',
       'src/rendering/furnaceRenderer.ts',
       'server/core/GameEngine.ts',
+      'server/core/CooperativeSupplyRestoration.ts',
     ],
   },
   movement: {

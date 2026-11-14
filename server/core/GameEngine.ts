@@ -22,14 +22,7 @@ import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../share
 import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { COOPERATIVE } from '../../shared/cooperativeRules';
-import {
-  advanceSettlement,
-  cargoCapacity,
-  ECONOMY,
-  emptySettlement,
-  oreResource,
-  oreYield,
-} from '../../shared/economy';
+import { cargoCapacity, ECONOMY, oreResource, oreYield } from '../../shared/economy';
 import { epochField } from '../../shared/epochField';
 import {
   canEquipUtility,
@@ -159,6 +152,7 @@ import { RolyPolyManager } from './RolyPolyManager';
 import { SatellitePickupField } from './SatellitePickupField';
 import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
+import { SettlementLedger } from './SettlementLedger';
 import { markSurveyedAsteroids, ShipAbilityManager } from './ShipAbilityManager';
 import { SurveyProbeManager } from './SurveyProbeManager';
 import { spiderResources } from './spiderResources';
@@ -258,7 +252,7 @@ interface FlushedWorldRow {
 }
 
 export class GameEngine {
-  private settlement = emptySettlement();
+  private readonly settlementLedger: SettlementLedger;
   private lastSavedEconomy:
     | { settlement: SettlementState; pointRevision: number; botCargo: boolean }
     | undefined;
@@ -421,6 +415,9 @@ export class GameEngine {
       persistence.reset();
       loaded = undefined;
     }
+    this.settlementLedger = new SettlementLedger(
+      loaded?.world ? loaded.economy?.settlement : undefined
+    );
     this.cooperative = new CooperativeCampaign(loaded?.cooperative);
     this.worldSeed = loaded?.world?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
     this.worldStartedAt = loaded?.world?.startedAt ?? this.serverClock.now();
@@ -432,7 +429,6 @@ export class GameEngine {
     );
     if (loaded?.world) {
       this.furnaces.replaceLit(loaded.world.civicModules ?? []);
-      this.settlement = loaded.economy?.settlement ?? emptySettlement();
       this.exploration.restore(loaded.world.exploration);
     }
     for (const pilot of loaded?.pilots ?? []) {
@@ -1350,7 +1346,7 @@ export class GameEngine {
       const worldRow = this.worldRowIfChanged();
       const botCargo = this.bots.savedCargo(this.getServerTime());
       const economyChanged =
-        this.lastSavedEconomy?.settlement !== this.settlement ||
+        this.lastSavedEconomy?.settlement !== this.settlementLedger.current() ||
         this.lastSavedEconomy?.pointRevision !== this.lootManager.pointRevision ||
         botCargo.length > 0 ||
         this.lastSavedEconomy?.botCargo === true;
@@ -1360,7 +1356,7 @@ export class GameEngine {
         ...(economyChanged
           ? {
               economy: {
-                settlement: this.settlement,
+                settlement: this.settlementLedger.current(),
                 pointLoot: [...this.lootManager.savedPoints(), ...botCargo],
               },
             }
@@ -1376,7 +1372,7 @@ export class GameEngine {
         this.lastFlushedWorldRow = worldRow.builtFrom;
       }
       this.lastSavedEconomy = {
-        settlement: this.settlement,
+        settlement: this.settlementLedger.current(),
         pointRevision: this.lootManager.pointRevision,
         botCargo: botCargo.length > 0,
       };
@@ -3201,7 +3197,7 @@ export class GameEngine {
       rolyPolys: this.rolyPolys.snapshot(),
       contourBridges: this.contourBridges.snapshot(this.gameTime),
 
-      settlement: this.settlement,
+      settlement: this.settlementLedger.current(),
       civicModules: [...this.furnaces.litModules()],
       mapAssets: [
         ...this.mapAssets.snapshot(satellitePickups, moduleNames),
@@ -3462,7 +3458,7 @@ export class GameEngine {
     if (pilot.purchases.includes(offer.id)) {
       return 'Already purchased. This placeholder grants no upgrade.';
     }
-    if (this.settlement.level < offer.level) {
+    if (this.settlementLedger.current().level < offer.level) {
       return `Requires settlement level ${offer.level}`;
     }
     if (pilot.score < offer.cost) {
@@ -3479,7 +3475,7 @@ export class GameEngine {
   }
 
   private clearTown(): void {
-    this.settlement = emptySettlement();
+    this.settlementLedger.reset();
     this.furnaces.replaceLit([]);
   }
 
@@ -3899,11 +3895,7 @@ export class GameEngine {
     const launchers = new Set(ownerIds);
     const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);
     const resource = oreResource(rock);
-    const resources = { ...this.settlement.resources };
-    if (resource) {
-      resources[resource] += oreYield(rock);
-    }
-    this.settlement = advanceSettlement({ ...this.settlement, resources });
+    this.settlementLedger.addOre(resource, resource ? oreYield(rock) : 0);
     const points = rock.supply ? 0 : furnaceReward(rock);
     const rewards: FurnaceDelivery['rewards'] = [];
     for (const playerId of recipients) {
@@ -4008,10 +4000,7 @@ export class GameEngine {
       if (entity.botRole === undefined) {
         entity.score += points;
       }
-      this.settlement = advanceSettlement({
-        ...this.settlement,
-        points: this.settlement.points + points,
-      });
+      this.settlementLedger.addPoints(points);
       this.capturePilot(entityId);
       return entity.score;
     }
@@ -4019,10 +4008,7 @@ export class GameEngine {
     if (saved) {
       const next = this.writePilotScore(saved, saved.score + points);
       this.setPilot(next);
-      this.settlement = advanceSettlement({
-        ...this.settlement,
-        points: this.settlement.points + points,
-      });
+      this.settlementLedger.addPoints(points);
       return next.score;
     }
     return undefined;

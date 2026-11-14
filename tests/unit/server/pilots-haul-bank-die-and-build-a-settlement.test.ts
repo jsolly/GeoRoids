@@ -5,6 +5,7 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
+import { SettlementLedger } from '../../../server/core/SettlementLedger';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
 import {
@@ -412,12 +413,25 @@ test('points wait for every material and all excess survives multi-tier advancem
   state.points = 7000;
   state.resources = { ice: 140, metal: 200, rubble: 250, crystal: 0 };
   expect(advanceSettlement(state).level).toBe(1);
-  state.resources.crystal = 70;
-  expect(advanceSettlement(state)).toEqual({
+  const ledger = new SettlementLedger(state);
+  expect(ledger.current()).toBe(state);
+  ledger.addPoints(0);
+  const afterPoints = ledger.current();
+  expect(afterPoints).not.toBe(state);
+  expect(afterPoints).toEqual(state);
+  ledger.addOre(null, 0);
+  const beforeCrystal = ledger.current();
+  expect(beforeCrystal).not.toBe(afterPoints);
+  expect(beforeCrystal.resources).not.toBe(afterPoints.resources);
+  expect(beforeCrystal).toEqual(state);
+  ledger.addOre('crystal', 70);
+  expect(ledger.current()).toEqual({
     level: 3,
     points: 1000,
     resources: { ice: 20, metal: 20, rubble: 10, crystal: 10 },
   });
+  expect(state.resources.crystal).toBe(0);
+  expect(beforeCrystal.resources.crystal).toBe(0);
 });
 
 test('refining counts ore once and banks both the hauler and scout rewards', () => {

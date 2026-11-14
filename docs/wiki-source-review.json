@@ -97,7 +97,7 @@
     "server/core/CollisionAuthority.ts": "sha256:d32d9e22b8efc7a922ebd9bf399bf71f773a4a8b372e879a288795771d93cfdc",
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
-    "server/core/GameEngine.ts": "sha256:a12ece8fc52df4d98d41c073983612002a5dc15f8403c4a8ceefa80a2e1a00d3",
+    "server/core/GameEngine.ts": "sha256:21135c72dac1b1f02e98676422cf1ec01885b4f594e881d93b6d5caf98a3d520",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -444,10 +444,10 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:95b4f31f4e0e3b92c829de922e5e917e02fc1d0ad20958ce20bc31207cc0b213",
+    "src/wiki/articleSources.json": "sha256:b0060a47bdbad802c85a2be071bfbc0299ded59fb701e111e422532d6458e170",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
-    "src/wiki/media.ts": "sha256:39401767dbcd09d7bd0ef64d33123a334da3035d429f226fffae6910c8fceb66",
+    "src/wiki/media.ts": "sha256:757db97caa447b100032fbd1e60590a6d4e91fdbb51a2584969a1bc6796a8e6e",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
     "src/wiki/scrollMemory.ts": "sha256:ccbbe47812fc19f4c2048eb3db605d5351e070cab3257269bee95478fcc9df39",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
@@ -535,7 +535,7 @@
     "tests/unit/server/cooperative-frontier-and-hazards.test.ts": "sha256:8d76509f2058bf8a25c2c8b317179e2e804d2c32f7f2707484722f41b6e2e4aa",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts": "sha256:dd8a4eb69e3de45b367bf0790d77c3ed8d63d37a39ac5da5afa3fccf8511659c",
     "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:105cff48a7ebc79c6957843f927a59426749447d3878a994d0cd29e942224501",
-    "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:8c8da9cc78f26bab1c688dc4453b5da78da1288cf61a22d078697fa933cfe363",
+    "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:6a0c444a61f7d3281fb06b488f5ac828d345d7cbb8081440326cef9f37a6c612",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:5adc66a6185c7a274eb6f6c676a14885152d66a0e24b51780fa1663845483967",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:93e6d68684930d1ba241fe806dda0f7ebfb16775794bfa8c8c35ac7494f199d2",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:3c4cc8a3a33311568c05c177a2b0b6702227ffddc5615665f385b73b9b905513",
@@ -557,7 +557,7 @@
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:07701c22cf2a08ebd920c9d2a9bc3fe3f0041da111618d50e067c7790e4b975d",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:1d2cb49eb4cd397956de0383853f1952b91ecd3c1338f244d85b3ddcabb314c6",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:b7cf56498fdc91a27aebfb2a7acd1f23a04644ffa54fd2fb2d629752e1189642",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:25f0e323b855a37f0dc9ffbf1a29439032299f1553cf218d366397078a0c6c9b",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:da19d3ebc883fe2a9066392d511c28628a0bea890bc4cd055abd9adda9bd5884",
     "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:922d64babb97f5bcd5ff8533ea2a09c1c280c00343702e61a7ac969846a31f22",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:4fea90c41c1d7a41e8b76b2ce96acd236de973c6601c0e3c608812bd6a571178",
@@ -594,7 +594,8 @@
     "server/core/ShipAbilityManager.ts": "sha256:e9627a0d340830b407be3ab0d2ee86ddaaf26bf0ac0fb3bdd86227c32977d573",
     "server/core/LootCollectionManager.ts": "sha256:aed4bcd007069707710844a4257b4dc76d3e5b01fca0f26317554e5cd26babba",
     "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6",
-    "server/core/CargoOffloadManager.ts": "sha256:5cb45d5069856a749c7e40612f0bee6d91616ec58195722f8c0d027a1710f8d8"
+    "server/core/CargoOffloadManager.ts": "sha256:5cb45d5069856a749c7e40612f0bee6d91616ec58195722f8c0d027a1710f8d8",
+    "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e"
   },
   "reviews": [
     {
@@ -8905,6 +8906,76 @@
         "scripts/wiki-media.ts": "loot-growth",
         "src/wiki/articleSources.json": "loot-growth",
         "src/wiki/media.ts": "loot-growth"
+      }
+    },
+    {
+      "note": "Reviewed real SettlementLedger against actual Cargo main e7d4f13c. It owns restored/default shared settlement state, current checkpoint identity, point and ore transitions, and full town reset. Engine live/offline awards, physical ore, checkpoint/snapshot reads and store level gating use this owner; existing immutable identity semantics including zero/neutral transitions remain. This event-driven owner adds no fake frame stage. All prior owners, tool ordering, pause decision and five spider budgets remain. Root reviewed settlement, offload, HUD and store paragraphs; all eleven article prose files and all21 media/manifest files match actual Cargo main. New defining-source mapping covers Teamwork, Loot, HUD and Controls and coverage names SettlementLedger. Current native pixel/PNG, initial/final31files321cases, six real socket cases, strict types/scoped lint/unused and deterministic all10GIFs+10posters with Pillow12.3.0 passed. Nine deliberate defects failed intended state-identity, neutral/zero transition, missing ore, live/offline award, current clone, loaded-state and reset assertions. Ten complete restorations matched five sources,1325 protected paths and common config; no surviving or incidental failure. Eleven prior Cargo cases retained. No schema, migration, wire-format, production data/config/resource or visual rule change. Full gate, independent reviews, CI/merge and production smoke remain pending; storage957 held draft, no physical/performance acceptance.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/SettlementLedger.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
+        "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork"
+      }
+    },
+    {
+      "note": "Completed the defining-source annotation for the existing Cargo demonstration: BANK and SETTLEMENT use the actual SettlementLedger through Engine state, so src/wiki/media.ts now names that owner beside CargoOffloadManager. The generator, rendered rules, caption, alt text and all21 asset/manifest bytes are unchanged. Current deterministic two-render check of all10GIFs+10posters with Pillow12.3.0, native pixel/PNG,31unitfiles321cases,sixreal socket cases,strict types/scoped lint/unused and nine intended causal failures with ten exact restorations already passed before this metadata-only annotation. Root inspected the unchanged Cargo poster/first-middle-final samples during actual Cargo release and compared current media bytes to that landed baseline. All11 articles retain their accepted player prose. The earlier five-source Settlement acceptance is preserved; this batch only records the additional defining-source metadata. Full gate, independent review and release remain pending; no physical/performance acceptance or production data/config/resources/storage activation.",
+      "sources": ["src/wiki/media.ts"],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/media.ts": "teamwork"
       }
     }
   ]

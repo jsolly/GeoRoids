@@ -85,6 +85,7 @@ export const media: Record<string, WikiMediaEntry> = {
     sources: [
       'server/core/GameEngine.ts',
       'server/core/CargoOffloadManager.ts',
+      'server/core/SettlementLedger.ts',
       'shared/economy.ts',
       'shared/furnaceField.ts',
       'src/rendering/cargoOffloadRenderer.ts',

@@ -6,7 +6,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { SHIP } from '../../../shared/constants/gameplay';
+import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
 import {
   advanceSettlement,
   ECONOMY,
@@ -102,35 +102,35 @@ test.each(['scout', 'hauler'] as const)(
     actor.cargo = 400;
     actor.position = { x: rim + 1, y: 0 };
     for (let frame = 0; frame < ECONOMY.offloadIntervalFrames; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.score).toBe(0);
     actor.position = { x: rim - 1, y: 0 };
     for (let frame = 0; frame < ECONOMY.offloadIntervalFrames - 1; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.cargo).toBe(400);
-    engine.depositCargo();
+    engine.cargoOffload.advance();
     expect(actor.score).toBe(25);
     expect(actor.bankedCargo).toBe(25);
     expect(actor.cargo).toBe(375);
     actor.position = { x: 1000, y: 1000 };
     for (let frame = 0; frame < 60; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.cargo).toBe(375);
     actor.position = { ...TOWN_HEARTH.position };
     for (let frame = 0; frame < 15 * ECONOMY.offloadIntervalFrames; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
-    engine.depositCargo();
+    engine.cargoOffload.advance();
     expect(actor.score).toBe(400);
     expect(actor.cargo).toBe(0);
     expect(engine.getGameState().settlement.points).toBe(400);
     actor.cargo = 30;
     actor.health = 0;
     for (let frame = 0; frame < 60; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.cargo).toBe(30);
   }
@@ -142,20 +142,20 @@ test('offload waits for a fresh full pulse after interruption and rejects inacti
   actor.cargo = 28;
   actor.position = { ...TOWN_HEARTH.position };
   for (let frame = 0; frame < 11; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   actor.exploding = true;
-  engine.depositCargo();
+  engine.cargoOffload.advance();
   actor.exploding = false;
   for (let frame = 0; frame < 11; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(28);
-  engine.depositCargo();
+  engine.cargoOffload.advance();
   expect(actor.cargo).toBe(3);
   actor.respawnTimer = 5;
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(3);
   delete actor.respawnTimer;
@@ -166,7 +166,7 @@ test('offload waits for a fresh full pulse after interruption and rejects inacti
     durationMs: 1000,
   };
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(3);
   actor.furnaceTransit = null;
@@ -176,16 +176,235 @@ test('offload waits for a fresh full pulse after interruption and rejects inacti
   }
   actor.position = { ...dark.position };
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(3);
   actor.position = { ...TOWN_HEARTH.position };
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(0);
   expect(actor.bankedCargo).toBe(28);
   expect(engine.getGameState().settlement.points).toBe(28);
+});
+
+test('full frames bank exact pulses while the smaller combat-only frame leaves the cadence alone', () => {
+  const engine = new GameEngine(42);
+  try {
+    const { actor } = pilot(engine);
+    engine.createAsteroids(0);
+    actor.position = { ...TOWN_HEARTH.position };
+    actor.cargo = 28;
+    for (let frame = 0; frame < 11; frame++) {
+      engine.advanceOneFrame();
+    }
+    expect(actor.cargo).toBe(28);
+    expect(actor.score).toBe(0);
+    for (let frame = 0; frame < 20; frame++) {
+      engine.advanceCombatFrame();
+    }
+    expect(actor.cargo).toBe(28);
+    expect(actor.bankedCargo ?? 0).toBe(0);
+    expect(engine.getGameState().settlement.points).toBe(0);
+    engine.advanceOneFrame();
+    expect(actor.cargo).toBe(3);
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    expect(engine.getGameState().settlement.points).toBe(25);
+    for (let frame = 0; frame < 12; frame++) {
+      engine.advanceOneFrame();
+    }
+    expect(actor.cargo).toBe(0);
+    expect(actor.score).toBe(28);
+    expect(actor.bankedCargo).toBe(28);
+    expect(engine.getGameState().settlement.points).toBe(28);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test.each(['death', 'separation'] as const)(
+  'full-frame %s resolves before a due cargo pulse',
+  (outcome) => {
+    const engine = new GameEngine(42);
+    try {
+      const { actor } = pilot(engine);
+      engine.createAsteroids(0);
+      const rim = TOWN_HEARTH.radius + hullRadiusForKit(actor.kitId);
+      actor.position = { x: rim - 1, y: 0 };
+      actor.velocity = { x: 0, y: 0 };
+      actor.cargo = outcome === 'death' ? 1 : 400;
+      if (outcome === 'death') {
+        actor.health = 1;
+      }
+      for (let frame = 0; frame < 11; frame++) {
+        engine.cargoOffload.advance();
+      }
+      const impact = rock('banking-impact', null, outcome === 'death' ? 25 : 500);
+      impact.position = { x: actor.position.x - 1, y: 0 };
+      engine.addAsteroid(impact);
+
+      engine.advanceOneFrame();
+
+      expect(actor.score).toBe(0);
+      expect(actor.bankedCargo ?? 0).toBe(0);
+      expect(engine.getGameState().settlement.points).toBe(0);
+      if (outcome === 'death') {
+        expect(actor.health).toBe(0);
+        expect(actor.cargo).toBe(0);
+      } else {
+        expect(engine.getAsteroid(impact.id)).toBeDefined();
+        expect(actor.health).toBe(actor.maxHealth);
+        expect(actor.position.x).toBeGreaterThan(rim);
+        expect(actor.cargo).toBe(400 - DAMAGE.ASTEROID_COLLISION * ECONOMY.cargoPointsPerHp);
+        actor.position = { ...TOWN_HEARTH.position };
+        for (let frame = 0; frame < 11; frame++) {
+          engine.cargoOffload.advance();
+        }
+        expect(actor.score).toBe(0);
+        engine.cargoOffload.advance();
+        expect(actor.score).toBe(25);
+      }
+    } finally {
+      engine.stopGameLoop();
+    }
+  }
+);
+
+test.each(['health', 'explosion', 'respawn', 'empty', 'transit', 'outside'] as const)(
+  '%s interruption retires the prior eleven eligible cargo steps',
+  (interruption) => {
+    const engine = new GameEngine(42);
+    try {
+      const { actor } = pilot(engine);
+      actor.position = { ...TOWN_HEARTH.position };
+      actor.cargo = 28;
+      for (let frame = 0; frame < 11; frame++) {
+        engine.cargoOffload.advance();
+      }
+      switch (interruption) {
+        case 'health':
+          actor.health = 0;
+          break;
+        case 'explosion':
+          actor.exploding = true;
+          break;
+        case 'respawn':
+          actor.respawnTimer = 0;
+          break;
+        case 'empty':
+          actor.cargo = 0;
+          break;
+        case 'transit':
+          actor.furnaceTransit = {
+            sourceId: TOWN_HEARTH.id,
+            destinationId: 'street-1-0',
+            startedAt: 0,
+            durationMs: 1000,
+          };
+          break;
+        case 'outside':
+          actor.position = { x: 1000, y: 1000 };
+          break;
+        default: {
+          const exhaustive: never = interruption;
+          throw new Error(`Unknown cargo interruption: ${exhaustive}`);
+        }
+      }
+      engine.cargoOffload.advance();
+      actor.health = actor.maxHealth;
+      actor.exploding = false;
+      delete actor.respawnTimer;
+      actor.cargo = 28;
+      actor.furnaceTransit = null;
+      actor.position = { ...TOWN_HEARTH.position };
+      for (let frame = 0; frame < 11; frame++) {
+        engine.cargoOffload.advance();
+      }
+      expect(actor.cargo).toBe(28);
+      expect(actor.score).toBe(0);
+      expect(actor.bankedCargo ?? 0).toBe(0);
+      engine.cargoOffload.advance();
+      expect(actor.cargo).toBe(3);
+      expect(actor.score).toBe(25);
+      expect(actor.bankedCargo).toBe(25);
+      expect(engine.getGameState().settlement.points).toBe(25);
+    } finally {
+      engine.stopGameLoop();
+    }
+  }
+);
+
+test('moving between two lit furnaces begins a fresh cargo pulse', () => {
+  const engine = new GameEngine(42);
+  try {
+    const { actor } = pilot(engine);
+    const outer = civicLot('street-1-0');
+    if (!outer) {
+      throw new Error('Missing outer furnace');
+    }
+    actor.position = { ...outer.position };
+    actor.score = outer.cost;
+    actor.abilityCooldownFrames = 0;
+    expect(engine.useAbility(actor.id)).toBe(true);
+    actor.cargo = 28;
+    actor.position = { ...TOWN_HEARTH.position };
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    actor.position = { ...outer.position };
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    expect(actor.cargo).toBe(28);
+    expect(actor.score).toBe(0);
+    engine.cargoOffload.advance();
+    expect(actor.cargo).toBe(3);
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    expect(engine.getGameState().settlement.points).toBe(25);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test('diagnostic clearing keeps retained-actor cadence while full replacement cannot inherit it', () => {
+  const engine = new GameEngine(42);
+  try {
+    const { actor } = pilot(engine);
+    actor.position = { ...TOWN_HEARTH.position };
+    actor.cargo = 28;
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    engine.prepareDiagnosticWorld('combat');
+    expect(engine.getPlayer(actor.id)).toBe(actor);
+    engine.cargoOffload.advance();
+    expect(actor.cargo).toBe(3);
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    engine.resetForTesting();
+    const replacement = pilot(engine, actor.id).actor;
+    expect(replacement).not.toBe(actor);
+    replacement.position = { ...TOWN_HEARTH.position };
+    replacement.cargo = 28;
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    expect(replacement.cargo).toBe(28);
+    expect(replacement.score).toBe(0);
+    expect(actor.cargo).toBe(3);
+    engine.cargoOffload.advance();
+    expect(replacement.cargo).toBe(3);
+    expect(replacement.score).toBe(25);
+    expect(replacement.bankedCargo).toBe(25);
+    expect(engine.getGameState().settlement.points).toBe(25);
+  } finally {
+    engine.stopGameLoop();
+  }
 });
 
 test('points wait for every material and all excess survives multi-tier advancement', () => {

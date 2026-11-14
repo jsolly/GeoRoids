@@ -613,6 +613,7 @@
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts"
   ],
   "loot-growth": [
+    "server/core/CargoOffloadManager.ts",
     "shared/shipGrowth.ts",
     "shared/lootBlast.ts",
     "shared/asteroidReflection.ts",

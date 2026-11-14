@@ -141,6 +141,7 @@ import {
 } from './AsteroidManager.ts';
 import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { BotFleet } from './BotFleet';
+import { CargoOffloadManager } from './CargoOffloadManager';
 import { ChargedWeaponManager } from './ChargedWeaponManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
@@ -265,6 +266,7 @@ export class GameEngine {
   private mapAssets = new MapAssets(this.exploration);
   private readonly remains = new WorldRemains();
   private readonly glowtoys: GlowtoyManager;
+  public readonly cargoOffload: CargoOffloadManager;
   private readonly rolyPolys = new RolyPolyManager();
   private readonly furnaces = new FurnaceField();
   private readonly regionalField: RegionalAsteroidField;
@@ -463,6 +465,11 @@ export class GameEngine {
       );
     });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
+    this.cargoOffload = new CargoOffloadManager({
+      actors: this.entityManager,
+      furnaces: this.furnaces,
+      awardPilotPoints: (id, points) => this.awardPilotPoints(id, points),
+    });
     this.lootCollection = new LootCollectionManager({
       actors: this.entityManager,
       loot: this.lootManager,
@@ -739,7 +746,7 @@ export class GameEngine {
     }
     this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
     this.resolveAuthoritativeCombat();
-    this.depositCargo();
+    this.cargoOffload.advance();
     // Activate newly reached sectors and regrow harvested slots out of sight.
     if (this.gameTime % 60 === 0) {
       this.ensureAsteroidField();
@@ -4050,42 +4057,6 @@ export class GameEngine {
 
   private fitCargo(entity: GameEntity): void {
     entity.cargo = Math.min(entity.cargo, cargoCapacity(entity.kitId));
-  }
-
-  private readonly cargoOffloadTicks = new WeakMap<
-    GameEntity,
-    { furnaceId: string; frames: number }
-  >();
-
-  public depositCargo(): void {
-    for (const pilot of this.entityManager.getAllEntities()) {
-      if (
-        pilot.health <= 0 ||
-        pilot.exploding ||
-        pilot.respawnTimer !== undefined ||
-        pilot.cargo <= 0 ||
-        pilot.furnaceTransit
-      ) {
-        this.cargoOffloadTicks.delete(pilot);
-        continue;
-      }
-      const furnace = this.furnaces.intakeAt(pilot.position, hullRadiusForKit(pilot.kitId));
-      if (!furnace) {
-        this.cargoOffloadTicks.delete(pilot);
-        continue;
-      }
-      const previous = this.cargoOffloadTicks.get(pilot);
-      const frames = previous?.furnaceId === furnace.id ? previous.frames + 1 : 1;
-      if (frames < ECONOMY.offloadIntervalFrames) {
-        this.cargoOffloadTicks.set(pilot, { furnaceId: furnace.id, frames });
-        continue;
-      }
-      this.cargoOffloadTicks.delete(pilot);
-      const points = Math.min(pilot.cargo, ECONOMY.offloadPoints);
-      pilot.cargo -= points;
-      pilot.bankedCargo = (pilot.bankedCargo ?? 0) + points;
-      this.awardPilotPoints(pilot.id, points);
-    }
   }
 
   public getTerrainSeed(): number {

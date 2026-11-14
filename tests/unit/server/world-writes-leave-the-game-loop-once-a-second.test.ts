@@ -50,7 +50,7 @@ function world(persistence: WorldPersistence) {
   cleanups.push(() => engine.stopGameLoop());
   const socket = new RecordingSocket();
   const miner = engine.addPlayer('miner', 'Miner', socket, { x: 0, y: 0 }, 'hauler');
-  assert(engine.registerPilot(miner, socket).ok);
+  assert(engine.pilotSessions.register({ actor: miner, socket: socket }).ok);
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
   }

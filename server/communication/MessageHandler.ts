@@ -231,13 +231,13 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
         return;
       }
-      const resumed = this.gameEngine.resumePilot(
-        command.resumeToken ?? '',
-        ws,
-        command.kitId,
-        name,
-        command.clientReleaseId
-      );
+      const resumed = this.gameEngine.pilotSessions.resume({
+        token: command.resumeToken ?? '',
+        socket: ws,
+        requestedKit: command.kitId,
+        requestedName: name,
+        clientReleaseId: command.clientReleaseId,
+      });
       if (!resumed.ok) {
         this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
         return;
@@ -272,7 +272,11 @@ export class MessageHandler {
           ? command.position
           : undefined;
       player = this.gameEngine.addPlayer(id, name, ws, arrival, command.kitId);
-      const registered = this.gameEngine.registerPilot(player, ws, command.clientReleaseId);
+      const registered = this.gameEngine.pilotSessions.register({
+        actor: player,
+        socket: ws,
+        clientReleaseId: command.clientReleaseId,
+      });
       if (!registered.ok) {
         this.gameEngine.removePlayer(player.id);
         this.broadcaster.sendError(ws, registered.error);

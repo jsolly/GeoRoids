@@ -84,7 +84,11 @@ test('registering a pilot stamps the current server and joining client on the cr
   const engine = engineWithStore(store, frozenClock(issuedAt));
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('scout', 'Bob', socket, { x: 200, y: 300 });
-  const registered = engine.registerPilot(actor, socket, CLIENT_RELEASE);
+  const registered = engine.pilotSessions.register({
+    actor: actor,
+    socket: socket,
+    clientReleaseId: CLIENT_RELEASE,
+  });
   assert(registered.ok);
   engine.checkpointWorld();
 
@@ -117,7 +121,10 @@ test('a later score write updates score provenance without rotating the credenti
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('miner', 'Miner', socket, { x: 0, y: 0 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   const issuedAt = engine.getServerTime();
   monotonicMs += 5_000;
   actor.score = ROID.POINTS_LARGE;
@@ -139,7 +146,10 @@ test('death preserves bank provenance and keeps the issued credential', () => {
   const engine = engineWithStore(store);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 400, y: 0 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   actor.score = 1200;
   actor.spawnProtectionTimer = 0;
   engine.checkpointWorld();
@@ -168,7 +178,10 @@ test('a new UTC month leaves the saved score and its credential stamps alone', (
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Bob', socket, { x: 4_000, y: 1_200 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   actor.score = 880;
   engine.checkpointWorld();
   const before = store.loadPilots().find((pilot) => pilot.id === 'pilot');
@@ -310,8 +323,20 @@ test('offline delivery credit restamps the server score without copying the last
   const haulerSocket = new RecordingSocket();
   const scout = engine.addPlayer('scout', 'Scout', scoutSocket, { x: 0, y: 0 }, 'scout');
   const hauler = engine.addPlayer('hauler', 'Hauler', haulerSocket, { x: 80, y: 0 }, 'hauler');
-  assert(engine.registerPilot(scout, scoutSocket, CLIENT_RELEASE).ok);
-  assert(engine.registerPilot(hauler, haulerSocket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({
+      actor: scout,
+      socket: scoutSocket,
+      clientReleaseId: CLIENT_RELEASE,
+    }).ok
+  );
+  assert(
+    engine.pilotSessions.register({
+      actor: hauler,
+      socket: haulerSocket,
+      clientReleaseId: CLIENT_RELEASE,
+    }).ok
+  );
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
   }
@@ -347,7 +372,10 @@ test('zero awards preserve live score stamps but restamp offline scores, while b
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 200, y: 300 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   engine.checkpointWorld();
   const score = actor.score;
   const original = engine.pilotLedger.provenance(actor.id);
@@ -398,20 +426,24 @@ test('saved resume rotates credential provenance without restamping an unchanged
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 200, y: 300 });
-  const registered = engine.registerPilot(actor, socket, CLIENT_RELEASE);
+  const registered = engine.pilotSessions.register({
+    actor: actor,
+    socket: socket,
+    clientReleaseId: CLIENT_RELEASE,
+  });
   assert(registered.ok);
   engine.checkpointWorld();
   const before = store.loadPilots().find((pilot) => pilot.id === actor.id);
   assert(before);
   engine.removePlayer(actor.id);
   elapsed = 2_000;
-  const resumed = engine.resumePilot(
-    registered.resumeToken,
-    new RecordingSocket(),
-    undefined,
-    undefined,
-    PRIOR_RELEASE
-  );
+  const resumed = engine.pilotSessions.resume({
+    token: registered.resumeToken,
+    socket: new RecordingSocket(),
+    requestedKit: undefined,
+    requestedName: undefined,
+    clientReleaseId: PRIOR_RELEASE,
+  });
   assert(resumed.ok);
   engine.checkpointWorld();
   const saved = store.loadPilots().find((pilot) => pilot.id === actor.id);
@@ -434,7 +466,11 @@ test('a transit checkpoint saves the furnace arrival without moving the live hul
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('traveler', 'Traveler', socket, { x: 0, y: 0 }, 'scout');
-  const registered = engine.registerPilot(actor, socket, CLIENT_RELEASE);
+  const registered = engine.pilotSessions.register({
+    actor: actor,
+    socket: socket,
+    clientReleaseId: CLIENT_RELEASE,
+  });
   assert(registered.ok);
   const street = civicLot('street-1-0');
   assert(street);
@@ -451,7 +487,10 @@ test('a transit checkpoint saves the furnace arrival without moving the live hul
   expect(saved.position).toEqual(street.position);
   expect(saved.velocity).toEqual({ x: 0, y: 0 });
   const restored = engineWithStore(store, clock);
-  const resumed = restored.resumePilot(registered.resumeToken, new RecordingSocket());
+  const resumed = restored.pilotSessions.resume({
+    token: registered.resumeToken,
+    socket: new RecordingSocket(),
+  });
   assert(resumed.ok);
   expect(resumed.actor.position).toEqual(street.position);
   expect(resumed.actor.furnaceTransit).toBeUndefined();

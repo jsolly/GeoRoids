@@ -280,7 +280,7 @@ test('pilot submission detaches the worker batch and a newer dirty score survive
   cleanups.push(() => engine.stopGameLoop());
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 200, y: 300 });
-  const registered = engine.registerPilot(actor, socket);
+  const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
   if (!registered.ok) {
     throw new Error(registered.error);
   }

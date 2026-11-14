@@ -34,7 +34,7 @@ function world(store?: WorldStore) {
   const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'scout');
   pilot.position = { x: 0, y: 0 };
   pilot.overlayHold = true;
-  assert(engine.registerPilot(pilot, socket).ok);
+  assert(engine.pilotSessions.register({ actor: pilot, socket: socket }).ok);
   engine.createAsteroids(0);
   for (const asteroid of engine.getAllAsteroids()) {
     engine.removeAsteroid(asteroid.id);
@@ -76,7 +76,9 @@ test('one bot of each role moves without becoming a human, stale socket or saved
   expect(inBotSanctuary(bot('raider').position)).toBe(false);
   expect(worker.ws).toBeUndefined();
   expect(worker.playerMotion).toBeUndefined();
-  expect(engine.registerPilot(worker, new RecordingSocket()).ok).toBe(false);
+  expect(engine.pilotSessions.register({ actor: worker, socket: new RecordingSocket() }).ok).toBe(
+    false
+  );
   worker.lastUpdate = -100_000;
   frame(120);
   expect(engine.getPlayer(worker.id)).toBe(worker);
@@ -296,7 +298,7 @@ test('world reset discards bot holds and restarts the full inhabited spawn delay
   expect(engine.drainDepartedPlayers()).toEqual([]);
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('new-pilot', 'New pilot', socket, { x: 0, y: 0 });
-  assert(engine.registerPilot(pilot, socket).ok);
+  assert(engine.pilotSessions.register({ actor: pilot, socket: socket }).ok);
   engine.createAsteroids(0);
   frame(AI_SHIPS.spawnDelayFrames - 1);
   expect(engine.getSnapshotState().entities.filter((actor) => actor.botRole)).toEqual([]);

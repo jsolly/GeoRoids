@@ -12,7 +12,7 @@ test('a dead pilot resumes the countdown and preserves bank and exploration', ()
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('old-run', 'Pilot', socket, { x: 4000, y: 0 });
-    const registered = engine.registerPilot(actor, socket);
+    const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
     assert(registered.ok);
     actor.score = 1200;
     actor.spawnProtectionTimer = 0;
@@ -21,12 +21,12 @@ test('a dead pilot resumes the countdown and preserves bank and exploration', ()
     expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
     expect(actor.score).toBe(1200);
 
-    const continued = engine.resumePilot(
-      registered.resumeToken,
-      new RecordingSocket(),
-      undefined,
-      'Bob'
-    );
+    const continued = engine.pilotSessions.resume({
+      token: registered.resumeToken,
+      socket: new RecordingSocket(),
+      requestedKit: undefined,
+      requestedName: 'Bob',
+    });
     assert(continued.ok);
     expect(continued.actor.score).toBe(1200);
     expect(continued.actor.name).toBe('Bob');
@@ -36,10 +36,14 @@ test('a dead pilot resumes the countdown and preserves bank and exploration', ()
     // A graceful restart flushes the new credential before the database is reopened.
     engine.checkpointWorld();
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
-    const resumed = restarted.resumePilot(continued.resumeToken, new RecordingSocket());
+    const resumed = restarted.pilotSessions.resume({
+      token: continued.resumeToken,
+      socket: new RecordingSocket(),
+    });
     assert(resumed.ok);
     expect(resumed.actor.score).toBe(1200);
     expect(resumed.actor.health).toBe(0);
+    expect(resumed.actor.respawnTimer).toBeGreaterThan(0);
     expect(restarted.getGameState().exploration).toEqual(revealed);
   } finally {
     store.close();

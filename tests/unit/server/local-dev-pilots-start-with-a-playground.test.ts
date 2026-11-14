@@ -68,12 +68,12 @@ test('a local restart preserves builder ownership and larger balances while live
     scout.position = { ...lot.position };
     scout.score = lot.cost + 200;
     expect(first.useAbility(scout.id)).toBe(true);
-    const low = first.registerPilot(scout, scoutSocket);
+    const low = first.pilotSessions.register({ actor: scout, socket: scoutSocket });
     assert(low.ok);
     const richSocket = new RecordingSocket();
     const rich = first.addPlayer('rich', 'Rich', richSocket);
     rich.score = 9_000;
-    const high = first.registerPilot(rich, richSocket);
+    const high = first.pilotSessions.register({ actor: rich, socket: richSocket });
     assert(high.ok);
     first.removePlayer(scout.id);
     first.removePlayer(rich.id);
@@ -84,13 +84,22 @@ test('a local restart preserves builder ownership and larger balances while live
       builderName: 'Ada',
       builderId: 'builder',
     });
-    const lowResume = restored.resumePilot(low.resumeToken, new RecordingSocket());
-    const highResume = restored.resumePilot(high.resumeToken, new RecordingSocket());
+    const lowResume = restored.pilotSessions.resume({
+      token: low.resumeToken,
+      socket: new RecordingSocket(),
+    });
+    const highResume = restored.pilotSessions.resume({
+      token: high.resumeToken,
+      socket: new RecordingSocket(),
+    });
     assert(lowResume.ok && highResume.ok);
     expect(lowResume.actor.score).toBe(5_000);
     expect(highResume.actor.score).toBe(9_000);
     lowResume.actor.score = 300;
-    const live = restored.resumePilot(lowResume.resumeToken, new RecordingSocket());
+    const live = restored.pilotSessions.resume({
+      token: lowResume.resumeToken,
+      socket: new RecordingSocket(),
+    });
     assert(live.ok);
     expect(live.actor).toBe(lowResume.actor);
     expect(live.actor.score).toBe(300);

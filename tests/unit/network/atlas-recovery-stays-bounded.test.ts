@@ -206,7 +206,7 @@ test('missing or unsupported atlas joins fail before creating or resuming any pi
   const engine = new GameEngine(82);
   const broadcaster = new GameStateBroadcaster(engine);
   const handler = new MessageHandler(engine, broadcaster);
-  const resume = vi.spyOn(engine, 'resumePilot');
+  const resume = vi.spyOn(engine.pilotSessions, 'resume');
   try {
     for (const offer of [undefined, 0, 2]) {
       const socket = new RecordingSocket();

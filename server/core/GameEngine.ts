@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { inBotSanctuary } from '../../shared/aiShips';
@@ -60,12 +60,7 @@ import {
   tickTowLine,
 } from '../../shared/shipAbilities';
 import { GROWTH } from '../../shared/shipGrowth';
-import {
-  applyShipKitStats,
-  getShipKit,
-  hullRadiusForKit,
-  SHIP_ABILITY,
-} from '../../shared/shipKits';
+import { getShipKit, hullRadiusForKit, SHIP_ABILITY } from '../../shared/shipKits';
 import {
   haulerUtilityOf,
   isResourceTapUtility,
@@ -110,7 +105,7 @@ import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
 import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import { WorldRemains } from '../world/WorldRemains';
-import { type RestorableFlight, restorableFlight, type SavedWorld } from '../world/WorldStore';
+import type { SavedWorld } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import {
   type AsteroidHitCause,
@@ -134,6 +129,7 @@ import { HiveEncounters } from './HiveEncounters';
 import { LootCollectionManager } from './LootCollectionManager';
 import { LootManager } from './LootManager';
 import { PilotLedger } from './PilotLedger';
+import { PilotSessionLifecycle } from './PilotSessionLifecycle';
 import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
 import { RolyPolyManager } from './RolyPolyManager';
@@ -146,8 +142,6 @@ import { SurveyProbeManager } from './SurveyProbeManager';
 import { spiderResources } from './spiderResources';
 import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
 import { WorldHazards } from './WorldHazards';
-
-const PILOT_RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 
 interface ServerLaser {
   attackerRole?: BotRole;
@@ -255,6 +249,7 @@ export class GameEngine {
   private readonly worldSeed: number;
   private worldStartedAt: number;
   public readonly pilotLedger: PilotLedger;
+  public readonly pilotSessions: PilotSessionLifecycle;
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
   private lastFurnaceBuildNotice = '';
@@ -524,6 +519,21 @@ export class GameEngine {
       clock: this.serverClock,
       insertAsteroid: (rock) => this.addAsteroid(rock),
       revealArea: (position, range) => this.revealArea(position, range),
+    });
+
+    this.pilotSessions = new PilotSessionLifecycle({
+      actors: this.entityManager,
+      motion: this.playerMotion,
+      ledger: this.pilotLedger,
+      campaign: this.cooperative,
+      rescue: this.crewRescue,
+      now: () => this.getServerTime(),
+      localPlayground: this.localPlayground,
+      addActor: ({ id, name, socket, position, kitId }) =>
+        this.addPlayer(id, name, socket, position, kitId),
+      removeActor: (id) => this.removePlayer(id),
+      seedInteractions: () => this.seedAsteroidInteractions(),
+      cancelCharge: (actor) => this.chargedWeapons.cancel(actor),
     });
 
     ensureTerrain(this.worldSeed);
@@ -1006,152 +1016,6 @@ export class GameEngine {
     const entity = this.entityManager.removeEntity(id);
     this.updatePauseState();
     return entity;
-  }
-
-  public registerPilot(
-    actor: GameEntity,
-    socket: WebSocket,
-    clientReleaseId?: string
-  ): ReturnType<PlayerMotionService['register']> {
-    if (actor.botRole !== undefined) {
-      return { ok: false, error: 'AI ships cannot register pilot credentials' };
-    }
-    const result = this.playerMotion.register(actor, socket, this.getServerTime());
-    if (!result.ok) {
-      return result;
-    }
-    this.pilotLedger.recordRegistration({
-      actor,
-      tokenHash: createHash('sha256').update(result.resumeToken).digest('hex'),
-      clientReleaseId,
-    });
-    return result;
-  }
-
-  public resumePilot(
-    token: string,
-    socket: WebSocket,
-    requestedKit?: ShipKitId,
-    requestedName?: string,
-    clientReleaseId?: string
-  ): ReturnType<PlayerMotionService['resume']> {
-    if (!PILOT_RESUME_TOKEN_PATTERN.test(token)) {
-      return { ok: false, error: 'Invalid pilot resume token' };
-    }
-    const hash = createHash('sha256').update(token).digest('hex');
-    let saved = this.pilotLedger.findByTokenHash(hash);
-    const live = this.playerMotion.resume(token, socket, this.getServerTime());
-    if (live.ok) {
-      if (live.supersededSocket) {
-        this.chargedWeapons.cancel(live.actor);
-      }
-      this.pilotLedger.rememberClientRelease(live.actor.id, clientReleaseId);
-      this.crewRescue.finishIfExpired(live.actor);
-      if (
-        live.actor.downedUntil == null ||
-        live.actor.downedUntil === 0 ||
-        Number.isNaN(live.actor.downedUntil)
-      ) {
-        this.applyRequestedPilotIdentity(live.actor, requestedKit, requestedName, true);
-      }
-      return live;
-    }
-    if (!saved || this.getPlayerBySocket(socket)) {
-      return live;
-    }
-    // Expired transport grace may still own an actor until the next simulation tick.
-    if (this.getPlayer(saved.id)) {
-      this.removePlayer(saved.id);
-      saved = this.pilotLedger.saved(saved.id) ?? saved;
-    }
-    const savedDowned = this.cooperative.get('downed', saved.id);
-    const flight = restorableFlight(saved, this.getServerTime());
-    const actor = this.addPlayer(
-      saved.id,
-      saved.name,
-      socket,
-      flight?.position,
-      savedDowned != null ? saved.kitId : (requestedKit ?? flight?.kitId)
-    );
-    if (saved.hullColor != null && saved.hullColor !== '') {
-      actor.color = saved.hullColor;
-    }
-    this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
-    actor.score = this.localPlayground ? Math.max(5_000, saved.score) : saved.score;
-    actor.cargo = saved.cargo ?? 0;
-    actor.purchases = [...(saved.purchases ?? [])];
-    this.fitCargo(actor);
-    actor.silk = saved.silk ?? 0;
-    actor.equipment = [...(saved.equipment ?? [])];
-    if (flight && savedDowned == null) {
-      this.restoreRecentFlight(actor, flight, requestedKit);
-    }
-    const registered = this.registerPilot(actor, socket, clientReleaseId);
-    if (!registered.ok) {
-      this.removePlayer(actor.id);
-      return registered;
-    }
-    this.seedAsteroidInteractions();
-    if (!this.crewRescue.restoreDowned(actor) && saved.health === 0) {
-      actor.health = 0;
-      this.entityManager.scheduleShipRespawn(actor);
-    }
-    this.pilotLedger.capture(actor.id);
-    return { ok: true, actor, resumeToken: registered.resumeToken };
-  }
-
-  private applyRequestedPilotIdentity(
-    actor: GameEntity,
-    requestedKit: ShipKitId | undefined,
-    requestedName: string | undefined,
-    invalidateMotionOnKitChange: boolean
-  ): void {
-    if (requestedKit && requestedKit !== actor.kitId) {
-      applyShipKitStats(actor, requestedKit);
-      this.fitCargo(actor);
-      actor.harpoonTargetId = null;
-      delete actor.harpoonLatchPos;
-      if (invalidateMotionOnKitChange) {
-        this.playerMotion.invalidateLife(actor.id, this.getServerTime());
-      }
-    }
-    const name = sanitizePlayerName(requestedName ?? '');
-    if (!name || name === actor.name) {
-      return;
-    }
-    const taken = this.getAllPlayers().some(
-      (candidate) =>
-        candidate.id !== actor.id && candidate.name.toLowerCase() === name.toLowerCase()
-    );
-    if (taken) {
-      return;
-    }
-    actor.name = name;
-  }
-
-  private restoreRecentFlight(
-    actor: GameEntity,
-    flight: RestorableFlight,
-    requestedKit: ShipKitId | undefined
-  ): void {
-    const shieldElapsed = Math.floor(
-      (Math.max(0, this.getServerTime() - flight.lastSeenAt) * GAME.FPS) / 1000
-    );
-    actor.shieldFrames = Math.max(0, (flight.shieldFrames ?? 0) - shieldElapsed);
-    actor.shieldCooldownFrames = Math.max(0, (flight.shieldCooldownFrames ?? 0) - shieldElapsed);
-    actor.angle = flight.angle;
-    if (!requestedKit || requestedKit === flight.kitId) {
-      actor.mass = flight.mass;
-      actor.health = flight.health > 0 ? Math.min(flight.health, actor.maxHealth) : actor.maxHealth;
-      const elapsedFrames = Math.floor(
-        (Math.max(0, this.getServerTime() - flight.lastSeenAt) * GAME.FPS) / 1000
-      );
-      actor.healthRegenTimer = Math.max(0, (flight.healthRegenTimer ?? 0) - elapsedFrames);
-    }
-    if (flight.velocity) {
-      actor.velocity = { x: flight.velocity.x, y: flight.velocity.y };
-    }
-    delete actor.spawnProtectionTimer;
   }
 
   /**
@@ -3532,10 +3396,6 @@ export class GameEngine {
     entity.cargo += accepted;
     this.lootManager.spawnPoints(entity.position, points - accepted);
     this.pilotLedger.capture(entity.id);
-  }
-
-  private fitCargo(entity: GameEntity): void {
-    entity.cargo = Math.min(entity.cargo, cargoCapacity(entity.kitId));
   }
 
   public getTerrainSeed(): number {

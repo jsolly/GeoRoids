@@ -227,7 +227,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const miner = engine.addPlayer('miner', 'Miner', socket, { x: 0, y: 0 }, 'hauler');
-    expect(engine.registerPilot(miner, socket).ok).toBe(true);
+    expect(engine.pilotSessions.register({ actor: miner, socket: socket }).ok).toBe(true);
     for (const existing of engine.getAllAsteroids()) {
       engine.removeAsteroid(existing.id);
     }

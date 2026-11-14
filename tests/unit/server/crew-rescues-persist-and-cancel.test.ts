@@ -39,7 +39,7 @@ function scenario() {
   cleanups.push(() => engine.stopGameLoop());
   const socket = new RecordingSocket();
   const downed = engine.addPlayer('downed', 'Downed', socket, { x: 2200, y: 2200 }, 'hauler');
-  const joined = engine.registerPilot(downed, socket);
+  const joined = engine.pilotSessions.register({ actor: downed, socket: socket });
   if (!joined.ok) {
     throw new Error('Fixture registration failed');
   }
@@ -51,7 +51,7 @@ function scenario() {
     { x: 2300, y: 2200 },
     'scout'
   );
-  engine.registerPilot(rescuer, rescuerSocket);
+  engine.pilotSessions.register({ actor: rescuer, socket: rescuerSocket });
   downed.position = { x: 2200, y: 2200 };
   rescuer.position = { x: 2300, y: 2200 };
   downed.spawnProtectionTimer = 0;
@@ -214,7 +214,11 @@ test('restart before the deadline restores cargo and kit, then connected bleed-o
   engine.stopGameLoop();
   const restarted = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => restarted.stopGameLoop());
-  const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout');
+  const resumed = restarted.pilotSessions.resume({
+    token: token,
+    socket: new RecordingSocket(),
+    requestedKit: 'scout',
+  });
   if (!resumed.ok) {
     throw new Error(resumed.error);
   }
@@ -296,7 +300,11 @@ test('a saved downed pilot expiring offline finalizes on resume and stays finali
   const restarted = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => restarted.stopGameLoop());
   const schedule = vi.spyOn(restarted.entityManager, 'scheduleShipRespawn');
-  const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout');
+  const resumed = restarted.pilotSessions.resume({
+    token: token,
+    socket: new RecordingSocket(),
+    requestedKit: 'scout',
+  });
   if (!resumed.ok) {
     throw new Error(resumed.error);
   }
@@ -318,7 +326,10 @@ test('a saved downed pilot expiring offline finalizes on resume and stays finali
   restarted.stopGameLoop();
   const again = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => again.stopGameLoop());
-  const restored = again.resumePilot(resumed.resumeToken, new RecordingSocket());
+  const restored = again.pilotSessions.resume({
+    token: resumed.resumeToken,
+    socket: new RecordingSocket(),
+  });
   if (!restored.ok) {
     throw new Error(restored.error);
   }
@@ -385,7 +396,7 @@ test('an expired downed live session finalizes on socket takeover without waitin
   const { engine, downed, token, setElapsed, store } = scenario();
   downed.cargo = 250;
   setElapsed(30_001);
-  const resumed = engine.resumePilot(token, new RecordingSocket());
+  const resumed = engine.pilotSessions.resume({ token: token, socket: new RecordingSocket() });
   if (!resumed.ok) {
     throw new Error(resumed.error);
   }
@@ -393,7 +404,10 @@ test('an expired downed live session finalizes on socket takeover without waitin
   expect(downed).toMatchObject({ health: 0, downedUntil: null, cargo: 0, kitId: 'hauler' });
   expect(downed.respawnTimer).toBeGreaterThan(0);
   const timer = downed.respawnTimer;
-  const again = engine.resumePilot(resumed.resumeToken, new RecordingSocket());
+  const again = engine.pilotSessions.resume({
+    token: resumed.resumeToken,
+    socket: new RecordingSocket(),
+  });
   expect(again.ok).toBe(true);
   expect(downed.respawnTimer).toBe(timer);
   engine.checkpointWorld();

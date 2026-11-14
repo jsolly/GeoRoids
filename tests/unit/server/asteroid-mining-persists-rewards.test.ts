@@ -60,7 +60,7 @@ function pilot(
 ) {
   const socket = new RecordingSocket();
   const actor = engine.addPlayer(id, id, socket, position, kit);
-  const registered = engine.registerPilot(actor, socket);
+  const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
   assert(registered.ok);
   return actor;
 }

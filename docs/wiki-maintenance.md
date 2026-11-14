@@ -104,6 +104,12 @@ collide in it routinely. Resolve it with `npm run wiki:merge` during the
 conflicted merge; it reads the three conflict stages Git already holds, writes
 the resolution, and leaves staging to you.
 
+For separate files, run `node scripts/merge-wiki-ledger.mjs --base base.json --ours ours.json --theirs theirs.json --out merged.json`
+from the repository root. Each file flag also accepts `--name=value`, and the two
+forms can be mixed. An explicit `--out` writes only that file; omitting it writes
+back to `ours`. Named file flags cannot be combined with positional files or
+`--merge`. The positional merge-driver form below also writes back to `ours`.
+
 Do not resolve it by hand, and do not resolve it with `--accept`. The obvious
 resolution is the union of both sides, and that is correct only while the two
 sides re-recorded disjoint sources. When both sides re-recorded the same source,

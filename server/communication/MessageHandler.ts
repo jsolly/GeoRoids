@@ -354,7 +354,12 @@ export class MessageHandler {
     }
 
     if (command.motionEpoch === socketPlayer.playerMotion?.epoch) {
-      this.gameEngine.cancelRescueOnMovement(id, update.position, update.velocity, update.angle);
+      this.gameEngine.crewRescue.cancelOnMovement(
+        id,
+        update.position,
+        update.velocity,
+        update.angle
+      );
     }
     this.gameEngine.setOverlayHold(id, update.overlayHold === true);
 
@@ -478,7 +483,7 @@ export class MessageHandler {
 
   /** Returns true when the hit ended the target's life: destroyed outright, or
    * downed into a cooperative rescue window. `handleShipDamage` reports
-   * `isDestroyed: false` for a cooperative down (`GameEngine.downShip` sets a
+   * `isDestroyed: false` for a cooperative down (`CrewRescueManager.down` sets a
    * positive `downedUntil`), so reading that flag alone would log a wall death
    * as a movement violation in exactly the mode the game is usually played in. */
   private emitShipDamage(

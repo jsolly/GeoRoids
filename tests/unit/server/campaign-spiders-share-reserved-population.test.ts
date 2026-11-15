@@ -7,6 +7,7 @@ import { expect, test, vi } from 'vitest';
 import { BeltCrawlerManager } from '../../../server/core/BeltCrawlerManager';
 import { EntityManager } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { HiveEncounters } from '../../../server/core/HiveEncounters';
 import { RNGService } from '../../../server/core/RNGService';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { SpiderPopulationBudget } from '../../../server/core/SpiderPopulationBudget';
@@ -24,6 +25,7 @@ import { logger } from '../../../setup/serverLogger';
 import { AI_SHIPS } from '../../../shared/aiShips';
 import { GAME } from '../../../shared/constants/gameplay';
 import { COOPERATIVE } from '../../../shared/cooperativeRules';
+import { frontierSite } from '../../../shared/frontier';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { spiderAdvanceFixture } from '../../support/spiderAdvanceFixture';
@@ -88,7 +90,8 @@ test('an inactive campaign leaves awake belt occupants and ordinary spiders at t
   const campaign = new CooperativeCampaign();
   const budget = new SpiderPopulationBudget({ campaign, spiders, crawlers });
   const actors = new EntityManager(new RNGService(82));
-  actors.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 5000, y: 5000 });
+  actors.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 12_500, y: 2500 });
+  const hives = new HiveEncounters({ campaign, population: budget, spiders, actors });
   const reads = vi.spyOn(actors, 'getAllEntities');
   const hazards = new WorldHazards({
     campaign,
@@ -103,6 +106,7 @@ test('an inactive campaign leaves awake belt occupants and ordinary spiders at t
   try {
     budget.refresh();
     hazards.advance(0);
+    hives.advance(1, 0);
 
     expect(crawlers.snapshot().map((body) => body.id)).toEqual(occupants);
     expect(spiders.snapshot().spiders.map((body) => body.id)).toEqual(guards);
@@ -112,11 +116,14 @@ test('an inactive campaign leaves awake belt occupants and ordinary spiders at t
     }
     spiders.removeSpider(released);
     hazards.advance(1000);
+    hives.advance(61, 1000);
     expect(hazards.swarmCount()).toBe(0);
     expect(spiders.snapshot().spiders.map((body) => body.id)).toEqual(
       guards.filter((id) => id !== released)
     );
     hazards.advance(1_800_000);
+    hives.advance(121, 1_800_000);
+    expect(hives.snapshot(1_800_000)).toEqual([]);
     expect(hazards.snapshot()).toEqual([]);
     // The real registry allocates its full actor array on every read, even with no event.
     expect(reads).not.toHaveBeenCalled();
@@ -178,6 +185,52 @@ test('a crowded belt keeps ordinary guards and swarm capacity as both population
   expect(spiders.spawnSpider({ x: 5400, y: 5000 }, 0, true)).not.toBeNull();
 });
 
+test('hive births respect the refreshed shared budget before consuming an ordinary slot', () => {
+  const site = frontierSite('frontier:2,0');
+  if (!site) {
+    throw new Error('The initial frontier is missing');
+  }
+  const actors = new EntityManager(new RNGService(82));
+  actors.addPlayer('pilot', 'Pilot', new RecordingSocket(), site.position);
+  const campaign = new CooperativeCampaign({ schemaVersion: 1, activated: true, records: [] });
+  const spiders = new TerrainSpiderManager(() => 0.5);
+  const crawlers = new BeltCrawlerManager();
+  const population = new SpiderPopulationBudget({ campaign, spiders, crawlers });
+  const hives = new HiveEncounters({ campaign, spiders, population, actors });
+  hives.advance(1, 1000);
+  const hive = campaign.get('hive', site.id);
+  if (hive === undefined) {
+    throw new Error('The connected pilot did not wake its hive');
+  }
+  hive.birthFramesLeft = 1;
+  campaign.set(hive);
+  const ordinary = new Set<string>();
+  for (let count = 0; count < 12; count++) {
+    const spider = spiders.spawnSpider({ x: 5000 + count, y: 5000 });
+    if (!spider) {
+      throw new Error('The ordinary field filled before its twelve guards');
+    }
+    ordinary.add(spider.id);
+  }
+  const rocks = hosts();
+  crawlers.setPopulationLimit(96);
+  crawlers.advance({
+    index: new AsteroidSpatialIndex(rocks),
+    hosts: rocks,
+    players: [],
+    nowFrame: 1,
+  });
+  spiders.setPopulationLimit(48, 48);
+  expect(crawlers.population).toBe(96);
+  expect(spiders.ordinaryCount()).toBe(12);
+
+  hives.advance(2, 1017);
+
+  expect(crawlers.population).toBe(24);
+  expect(new Set(spiders.getBodies().map((spider) => spider.id))).toEqual(ordinary);
+  expect(campaign.get('hive', site.id)?.birthFramesLeft).toBe(0);
+});
+
 function withActivatedEngine(run: (engine: GameEngine, elapsed: { value: number }) => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'campaign-budget-'));
   const path = join(dir, 'world.sqlite');
@@ -207,6 +260,54 @@ function withActivatedEngine(run: (engine: GameEngine, elapsed: { value: number 
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+test('the full campaign stage waits for its refresh frame and skips combat-only and paused frames', () => {
+  withActivatedEngine((engine, elapsed) => {
+    const site = frontierSite('frontier:2,0');
+    if (!site) {
+      throw new Error('The initial frontier is missing');
+    }
+    const socket = new RecordingSocket();
+    const pilot = engine.addPlayer('pilot', 'Pilot', socket, site.position);
+    pilot.overlayHold = true;
+    expect(engine.pilotSessions.register({ actor: pilot, socket }).ok).toBe(true);
+    engine.advanceCombatFrame();
+    expect(engine.getBroadcastState().campaign?.hives).toEqual([]);
+    for (let frame = 2; frame <= 60; frame++) {
+      elapsed.value += 1000 / GAME.FPS;
+      pilot.lastUpdate = elapsed.value;
+      engine.advanceOneFrame();
+    }
+    expect(engine.getBroadcastState().campaign?.hives).toEqual([]);
+
+    elapsed.value += 1000 / GAME.FPS;
+    engine.advanceOneFrame();
+    expect(
+      engine.getBroadcastState().campaign?.hives.find((hive) => hive.id === site.id)
+        ?.birthFramesLeft
+    ).toBe(COOPERATIVE.birthFrames - 1);
+    engine.advanceCombatFrame();
+    expect(
+      engine.getBroadcastState().campaign?.hives.find((hive) => hive.id === site.id)
+        ?.birthFramesLeft
+    ).toBe(COOPERATIVE.birthFrames - 1);
+    elapsed.value += 1000 / GAME.FPS;
+    engine.advanceOneFrame();
+    expect(
+      engine.getBroadcastState().campaign?.hives.find((hive) => hive.id === site.id)
+        ?.birthFramesLeft
+    ).toBe(COOPERATIVE.birthFrames - 2);
+
+    engine.removePlayer(pilot.id);
+    expect(engine.isGamePaused()).toBe(true);
+    elapsed.value += 1000 / GAME.FPS;
+    engine.advanceOneFrame();
+    expect(
+      engine.getBroadcastState().campaign?.hives.find((hive) => hive.id === site.id)
+        ?.birthFramesLeft
+    ).toBe(COOPERATIVE.birthFrames - 2);
+  });
+});
 
 test('only the full frame creates meteors and clears them after the last pilot leaves', () => {
   withActivatedEngine((engine, elapsed) => {

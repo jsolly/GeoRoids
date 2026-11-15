@@ -523,25 +523,19 @@ test('a converged retry verifies its existing successful deployment without appl
   );
 });
 
-test('workflow is hard-disabled, production serialized, and secrets reach only the guarded runner', () => {
+test('workflow permits only manual main planning and cannot select production apply', () => {
   const workflow = parse(
     readFileSync(new URL('../.github/workflows/railway-version-pin.yml', import.meta.url), 'utf8')
   );
   assert.equal(
     workflow.jobs.pin.if,
-    "github.repository == 'jsolly/GeoRoids' && github.repository == 'DISABLED/REQUIRES-APPROVAL' && github.ref == 'refs/heads/main'"
+    "github.repository == 'jsolly/GeoRoids' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'"
   );
   assert.equal(workflow.concurrency.group, 'railway-production-version-pin');
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.deepEqual(workflow.permissions, { contents: 'read' });
   assert.equal(workflow.jobs.pin.environment, 'railway-production-config');
-  assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode, {
-    description: 'Plan only, or apply after separate production apply authorization',
-    required: true,
-    type: 'choice',
-    default: 'plan-only',
-    options: ['plan-only', 'apply'],
-  });
+  assert.deepEqual(workflow.on, { workflow_dispatch: null });
   const steps = workflow.jobs.pin.steps;
   for (const step of steps.filter((candidate: { uses?: string }) => candidate.uses)) {
     assert.match(step.uses, /@[a-f0-9]{40}$/u);
@@ -552,21 +546,14 @@ test('workflow is hard-disabled, production serialized, and secrets reach only t
   assert.equal(secrets.length, 1);
   assert.equal(
     secrets[0].run,
-    'umask 077\nnode --import tsx scripts/railway-version-pin-entry.ts --workflow-mode\n'
+    'umask 077\nnode --import tsx scripts/railway-version-pin-entry.ts --plan-only\n'
   );
   assert.match(secrets[0].env.RAILWAY_CONFIG_TOKEN, /^\$\{\{ secrets.RAILWAY_CONFIG_TOKEN \}\}$/u);
-  assert.match(
-    secrets[0].env.RAILWAY_CONFIG_MODE,
-    /github\.event_name == 'workflow_dispatch' && inputs\.mode/u
+  assert.deepEqual(
+    Object.keys(secrets[0].env).sort((left, right) => left.localeCompare(right)),
+    ['RAILWAY_CONFIG_APPLY_ENABLED', 'RAILWAY_CONFIG_TOKEN']
   );
-  assert.match(
-    secrets[0].env.RAILWAY_CONFIG_MODE,
-    /vars\.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'apply' \|\| 'plan-only'/u
-  );
-  assert.match(
-    secrets[0].env.RAILWAY_CONFIG_APPLY_ENABLED,
-    /vars\.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'version-pin-only' \|\| 'disabled'/u
-  );
+  assert.equal(secrets[0].env.RAILWAY_CONFIG_APPLY_ENABLED, 'disabled');
   const install = steps.find(
     (step: { name?: string }) => step.name === 'Install checksum-pinned official Railway CLI'
   );

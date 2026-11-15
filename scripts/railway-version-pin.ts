@@ -265,19 +265,19 @@ export function reviewPlan(
     'destructive',
     'claim',
   ]);
-  if (
-    plan['kind'] !== 'railway.config.plan' ||
-    plan['version'] !== 1 ||
-    plan['cliVersion'] !== railwayCli.version ||
-    plan['sourceTree'] !== expected.sourceTree ||
-    plan['environmentId'] !== railwayTarget.environment ||
-    plan['configEtag'] !== expected.snapshot.etag ||
-    plan['destructive'] !== false ||
-    (plan['claim'] !== undefined && plan['claim'] !== false)
-  ) {
-    throw new VersionPinError(
-      'Saved Railway plan identity, source or etag differs from the reviewed target'
-    );
+  const checks: ReadonlyArray<readonly [string, boolean]> = [
+    ['kind', plan['kind'] === 'railway.config.plan'],
+    ['format-version', plan['version'] === 1],
+    ['cli-version', plan['cliVersion'] === railwayCli.version],
+    ['source-tree', plan['sourceTree'] === expected.sourceTree],
+    ['environment', plan['environmentId'] === railwayTarget.environment],
+    ['etag', plan['configEtag'] === expected.snapshot.etag],
+    ['destructive', plan['destructive'] === false],
+    ['ownership-claim', plan['claim'] === undefined || plan['claim'] === false],
+  ];
+  const rejected = checks.filter(([, accepted]) => !accepted).map(([label]) => label);
+  if (rejected.length !== 0) {
+    throw new VersionPinError(`Saved Railway plan rejected (${rejected.join(', ')})`);
   }
   if (plan['diff'] !== undefined && typeof plan['diff'] !== 'string') {
     throw new VersionPinError('Saved Railway plan diff has an unsupported shape');

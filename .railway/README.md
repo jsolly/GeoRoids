@@ -100,6 +100,11 @@ The runner also sets the child process's `_` executable path to the verified
 CLI. The TypeScript SDK uses that path for its native-evaluation version check;
 inheriting the workflow's Node launcher makes that check reject planning.
 Failed CLI calls report a fixed phase label while withholding provider output.
+Saved-plan rejection identifies only fixed failed-check labels, including the
+destructive-change guard; it never prints rejected field values. The definition
+preserves the intentionally configured `TODOIST_API_TOKEN` without reading,
+copying, setting or deleting it. Omitted service variables are deletion requests
+in the pinned planner, so human-owned credentials must remain explicitly preserved.
 
 ## Saved-plan and verification contract
 

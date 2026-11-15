@@ -32,8 +32,21 @@ The runner rejects resource creation or deletion, variables, secrets, commands,
 volumes, domains, placement, replicas, runtime changes, ownership claims,
 unknown fields and multiple changes. It compares the entire build before and
 after the proposed update. A harmless-looking summary cannot conceal another
-build setting. Any existing staged object blocks the run; the runner never
+build setting. Only a well-formed empty `STAGED` draft permits planning; the runner never
 applies, discards or rewrites dashboard work.
+
+The pinned API returns a non-null `EnvironmentPatch`, including when its patch
+has no work. The runner checks the exact `id`, `status` and `patch` fields.
+Only absent or empty service, shared-variable, volume and bucket maps, with an
+absent or null private-network toggle, count as empty. Any resource entry,
+variable, toggle, applying/committed/unknown status, unknown field or malformed
+value blocks the run, even if a dashboard summary reports no changes.
+
+When that guard rejects a response, its error reports only fixed status and
+response-shape labels. The staged patch is queried with variable decryption
+disabled; no patch keys, values or identifiers are logged. These labels help
+diagnose provider-contract mismatches without treating a connector's empty
+summary as permission to continue.
 
 ## Prepare an authorized first run
 
@@ -45,8 +58,9 @@ plan-only setup.
 
 1. Review the production staged changes independently. Any pending work must
    be resolved separately and remain untouched by this runner.
-   Verify that `environmentStagedChanges` returns `null` only when no staged work
-   exists, and that concurrent staged changes invalidate the apply etag.
+   Verify the staged patch is empty under the strict draft checks above.
+   Before any separately authorized apply, verify that concurrent staged
+   changes invalidate the apply etag.
 2. Confirm the fixed service ID still has the exact name `Georoids`. An
    authenticated read on 2026-11-13 verified that identity, and the tracked
    definition and runner use `service.Georoids`. Railway derives IaC addresses

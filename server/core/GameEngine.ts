@@ -64,7 +64,6 @@ import { boundedDiagnosticError, captureDiagnosticActorState } from '../../share
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { TERRAIN } from '../../shared/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../shared/terrainField';
-import { SPIDER } from '../../shared/terrainSpider';
 import { insideTownStore, storeOffer, TOWN_STORE_ISSUE } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import { hazardPhase } from '../../shared/worldHazards';
@@ -129,10 +128,10 @@ import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 import { SettlementLedger } from './SettlementLedger';
 import { ShipAbilityManager } from './ShipAbilityManager';
+import { SpiderField } from './SpiderField';
 import { SpiderPopulationBudget } from './SpiderPopulationBudget';
 import { SurveyProbeManager } from './SurveyProbeManager';
-import { spiderResources } from './spiderResources';
-import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
+import { TerrainSpiderManager } from './TerrainSpiderManager';
 import { ToolFlightManager } from './ToolFlightManager';
 import { WorldDiscovery } from './WorldDiscovery';
 import { WorldHazards } from './WorldHazards';
@@ -255,7 +254,7 @@ export class GameEngine {
   private satellitePickupManager: SatellitePickupManager;
   public readonly satelliteField: SatellitePickupField;
   private readonly spiderManager: TerrainSpiderManager;
-  private readonly spiderPopulation: SpiderPopulationBudget;
+  private readonly spiderField: SpiderField;
   private readonly beltCrawlers = new BeltCrawlerManager((id) => this.getAsteroid(id));
   private rngService: RNGService;
   private collisionAuthority = new CollisionAuthority();
@@ -303,7 +302,6 @@ export class GameEngine {
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private persistenceFailure: Error | undefined;
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
-  private pendingSpiderAttacks: SpiderAttack[] = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly laserExpiry = new WeakMap<ServerLaser, number>();
   private readonly damageStateLogs = new WeakMap<GameEntity, number>();
@@ -495,20 +493,31 @@ export class GameEngine {
       this.furnaces,
       (position) => this.remains.add('nest-remains', position, this.gameTime)
     );
-    this.spiderPopulation = new SpiderPopulationBudget({
+    const population = new SpiderPopulationBudget({
       campaign: this.cooperative,
       spiders: this.spiderManager,
       crawlers: this.beltCrawlers,
     });
+    this.spiderField = new SpiderField({
+      actors: this.entityManager,
+      terrain: this.spiderManager,
+      crawlers: this.beltCrawlers,
+      population,
+      rocks: this.asteroidManager,
+      regional: this.regionalField,
+      loot: this.lootManager,
+      satellites: this.satellitePickupManager,
+      glowtoys: this.glowtoys,
+    });
     this.hives = new HiveEncounters({
       campaign: this.cooperative,
-      population: this.spiderPopulation,
+      population,
       spiders: this.spiderManager,
       actors: this.entityManager,
     });
     this.hazards = new WorldHazards({
       campaign: this.cooperative,
-      population: this.spiderPopulation,
+      population,
       spiders: this.spiderManager,
       actors: this.entityManager,
       hit: (id) => this.handleShipDamage(id, 'asteroid', 50),
@@ -788,7 +797,7 @@ export class GameEngine {
     );
     this.glowtoys.advance(this.gameTime);
 
-    this.advanceSpiderField();
+    this.spiderField.advance(this.gameTime);
     this.toolFlights.advance(toolStartPositions);
     this.furnaceDeliveries.advance();
     if (this.gameTime % 60 === 0) {
@@ -818,7 +827,7 @@ export class GameEngine {
     this.entityManager.updateExplosions();
     this.logRespawns(this.entityManager.updateRespawns());
     this.abilities.advance();
-    this.advanceSpiderField();
+    this.spiderField.advance(this.gameTime);
     this.entityManager.updateHealthRegeneration();
   }
 
@@ -847,7 +856,7 @@ export class GameEngine {
       this.lasers = [];
       this.clearPendingFeedback();
       this.spiderManager.suspend();
-      this.pendingSpiderAttacks = [];
+      this.spiderField.clearPendingAttacks();
       // Nothing flushes while paused, so this write carries all deferred drift.
       this.regionalField.requestFullFlush();
       this.checkpointWorld();
@@ -955,7 +964,7 @@ export class GameEngine {
     this.decoratedFieldId = undefined;
     this.clearPendingFeedback();
     this.pendingAsteroidHits = [];
-    this.pendingSpiderAttacks = [];
+    this.spiderField.clearPendingAttacks();
     this.satellitePickupManager.clear();
     this.spiderManager.clear();
     this.beltCrawlers.clear();
@@ -1314,127 +1323,7 @@ export class GameEngine {
   public clearSpiderField(): void {
     this.spiderManager.clear();
     this.beltCrawlers.clear();
-    this.pendingSpiderAttacks = [];
-  }
-
-  private advanceSpiderField(): void {
-    this.spiderPopulation.refresh();
-    const spiderTows = this.entityManager
-      .getAllEntities()
-      .flatMap((entity) =>
-        entity.harpoonTargetId &&
-        isTowCableUtility(entity) &&
-        !entity.exploding &&
-        entity.health > 0
-          ? [{ ownerId: entity.id, spiderId: entity.harpoonTargetId }]
-          : []
-      );
-    const towedIds = new Set(spiderTows.map((tow) => tow.spiderId));
-    const previousIds = new Set(this.spiderManager.getBodies().map((spider) => spider.id));
-    const attacks = this.spiderManager.advance({
-      towedIds,
-      spiderTows,
-      lightSources: this.glowtoys.lightSources(),
-      releaseTow: (ownerId, spiderId) => {
-        const owner = this.entityManager.getEntity(ownerId);
-        if (owner?.harpoonTargetId === spiderId && isTowCableUtility(owner)) {
-          clearHaulerLatch(owner);
-        }
-      },
-      players: this.entityManager
-        .getAllEntities()
-        .filter((entity) => Boolean(entity.ws) || entity.botRole !== undefined)
-        .map((entity) => ({
-          id: entity.id,
-          position: entity.position,
-          health: entity.health,
-          exploding: entity.exploding,
-          ...(entity.respawnTimer !== undefined ? { respawnTimer: entity.respawnTimer } : {}),
-          ...(entity.spawnProtectionTimer !== undefined
-            ? { spawnProtectionTimer: entity.spawnProtectionTimer }
-            : {}),
-          radius: hullRadiusForKit(entity.kitId),
-          cargo: entity.cargo,
-          scanning:
-            entity.kitId === 'scout' &&
-            scoutUtilityOf(entity) === 'mineral_scan' &&
-            entity.abilityActiveFrames > 0,
-        })),
-      nowFrame: this.gameTime,
-      onNestCreated: (nest) => {
-        this.lootManager.spawnNestCache(nest.position, this.gameTime);
-        this.satellitePickupManager.spawnNestPickup(nest.position);
-      },
-      resource: (id, home) => {
-        // The former resource Map let later domains overwrite earlier matching IDs.
-        const pickup = this.satellitePickupManager.getPickup(id);
-        if (pickup && !pickup.nestSalvage && pickup.state === 'loose' && pickup.health > 0) {
-          return spiderResources([], [], [pickup])[0];
-        }
-        const drop = this.lootManager.getNestResource(id);
-        if (drop) {
-          return spiderResources([], [drop], [])[0];
-        }
-        const live = this.asteroidManager.getAsteroid(id);
-        const resource = live ? spiderResources([live], [], [])[0] : undefined;
-        if (resource) {
-          return resource;
-        }
-        const dormant = this.regionalField.dormantAsteroid(id, home);
-        return dormant ? spiderResources([dormant], [], [])[0] : undefined;
-      },
-      resources: (players) => {
-        const positions = players.map((player) => player.position);
-        const rocks = this.asteroidManager
-          .spatialIndex()
-          .queryMany(
-            positions.map((position) => spatialQueryBounds(position, SPIDER.NEST_WAKE_DISTANCE))
-          )
-          .filter((rock) =>
-            positions.some(
-              (position) =>
-                Math.hypot(position.x - rock.position.x, position.y - rock.position.y) <=
-                SPIDER.NEST_WAKE_DISTANCE
-            )
-          );
-        return spiderResources(
-          rocks,
-          this.lootManager.getNestResourcesNear(positions, SPIDER.NEST_WAKE_DISTANCE),
-          this.satellitePickupManager.getNestResources()
-        );
-      },
-    });
-    this.spiderPopulation.refresh();
-    this.pendingSpiderAttacks.push(
-      ...attacks,
-      ...this.beltCrawlers.advance({
-        index: this.asteroidManager.spatialIndex(),
-        hosts: this.asteroidManager.crawlerHostAsteroids(),
-        players: this.entityManager
-          .getAllEntities()
-          .filter((entity) => Boolean(entity.ws) || entity.botRole !== undefined)
-          .map((entity) => ({
-            id: entity.id,
-            position: entity.position,
-            health: entity.health,
-            exploding: entity.exploding,
-            ...(entity.respawnTimer !== undefined ? { respawnTimer: entity.respawnTimer } : {}),
-            radius: hullRadiusForKit(entity.kitId),
-          })),
-        nowFrame: this.gameTime,
-      })
-    );
-    this.spiderPopulation.refresh();
-    for (const entity of this.entityManager.getAllEntities()) {
-      if (
-        entity.harpoonTargetId != null &&
-        entity.harpoonTargetId !== '' &&
-        previousIds.has(entity.harpoonTargetId) &&
-        !this.spiderManager.getBody(entity.harpoonTargetId)
-      ) {
-        clearHaulerLatch(entity);
-      }
-    }
+    this.spiderField.clearPendingAttacks();
   }
 
   public getPlayerCount(): number {
@@ -1829,11 +1718,8 @@ export class GameEngine {
       results.push(result);
     }
 
-    for (const attack of this.pendingSpiderAttacks.splice(0)) {
-      if (
-        !this.spiderManager.isAttackActive(attack) &&
-        !this.beltCrawlers.isAttackActive(attack, this.asteroidManager.spatialIndex())
-      ) {
+    for (const attack of this.spiderField.drainAttacks()) {
+      if (!this.spiderField.isAttackActive(attack)) {
         continue;
       }
       const target = this.entityManager.getEntity(attack.targetId);

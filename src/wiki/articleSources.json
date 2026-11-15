@@ -196,7 +196,10 @@
     "server/world/AsteroidSpatialIndex.ts",
     "tests/unit/entities/launched-tools-hit-or-return.test.ts",
     "shared/navigationSalvage.ts",
-    "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts"
+    "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts",
+    "server/core/SpiderField.ts",
+    "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts",
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts"
   ],
   "asteroids": [
     "server/core/ToolFlightManager.ts",
@@ -246,7 +249,10 @@
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts",
     "tests/unit/rendering/ship-light-casts-wreck-shadows-and-colors-speed.test.ts",
     "server/core/SpiderPopulationBudget.ts",
-    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts",
+    "server/core/SpiderField.ts",
+    "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts",
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",
@@ -375,7 +381,10 @@
     "src/rendering/contourBridgeRenderer.ts",
     "tests/unit/server/contour-riding-rocks-drop-navigation-crystals.test.ts",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts",
-    "server/core/SpiderPopulationBudget.ts"
+    "server/core/SpiderPopulationBudget.ts",
+    "server/core/SpiderField.ts",
+    "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts",
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",

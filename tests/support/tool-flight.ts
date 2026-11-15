@@ -14,7 +14,7 @@ export function resolveToolFlights(engine: GameEngine): void {
     ) {
       return;
     }
-    engine.tickToolFlights();
+    engine.toolFlights.advance();
   }
   throw new Error('Tool flight did not resolve within its launch range');
 }

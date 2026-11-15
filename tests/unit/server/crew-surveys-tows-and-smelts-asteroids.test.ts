@@ -297,6 +297,43 @@ test('a second Hauler cannot steal attached cargo and loose rocks do not pay at 
   expect(engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
 });
 
+test('simultaneous tow arrivals claim cargo once and a later release makes it available again', () => {
+  const other = engine.addPlayer(
+    'other',
+    'Other',
+    new RecordingSocket(),
+    { ...actor('hauler').position },
+    'hauler'
+  );
+  for (const ambient of engine.getAllAsteroids()) {
+    engine.asteroidLifecycle.remove(ambient.id);
+  }
+  const rock = deposit('contested');
+  engine.asteroidLifecycle.insert(rock);
+  actor('hauler').angle = 0;
+  other.angle = 0;
+  expect(engine.useAbility('hauler')).toBe(true);
+  expect(engine.useAbility(other.id)).toBe(true);
+
+  resolveToolFlights(engine);
+
+  expect(actor('hauler').harpoonTargetId).toBe(rock.id);
+  expect(other.harpoonTargetId).toBeNull();
+  expect(other.utilityFlight?.phase).toBe('reeling');
+  expect(engine.useAbility('hauler')).toBe(true);
+  expect(actor('hauler').harpoonTargetId).toBeNull();
+  for (let frame = 0; frame < SHIP_ABILITY.COOLDOWN_FRAMES.hauler; frame++) {
+    engine.abilities.advance();
+    engine.toolFlights.advance();
+  }
+  expect(other.utilityFlight).toBeNull();
+  expect(engine.useAbility(other.id)).toBe(true);
+
+  resolveToolFlights(engine);
+
+  expect(other.harpoonTargetId).toBe(rock.id);
+});
+
 test('scans retain map discoveries after expiry without crediting distant Scouts', () => {
   const rock = deposit();
   engine.asteroidLifecycle.insert(rock);

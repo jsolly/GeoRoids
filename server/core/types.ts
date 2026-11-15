@@ -17,7 +17,9 @@ import type { LootManager } from './LootManager';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
 import type { SettlementLedger } from './SettlementLedger';
+import type { ShipAbilityManager } from './ShipAbilityManager';
 import type { SurveyProbeManager } from './SurveyProbeManager';
+import type { TerrainSpiderManager } from './TerrainSpiderManager';
 
 export type RescueAction = Exclude<CrewAction, { kind: 'withdraw-supply' }>;
 
@@ -111,4 +113,14 @@ export type WorldDiscoveryInputs = {
   readonly exploration: Pick<ExplorationMap, 'reveal'>;
   readonly loot: Pick<LootManager, 'queryExplorationCell'>;
   readonly assets: Pick<MapAssets, 'discovered'>;
+};
+
+export type ToolFlightInputs = {
+  readonly actors: Pick<EntityManager, 'getAllEntities'>;
+  readonly rocks: Pick<AsteroidManager, 'spatialIndex' | 'getAsteroid'>;
+  readonly spiders: Pick<TerrainSpiderManager, 'getBodies'>;
+  readonly hives: Pick<HiveEncounters, 'bodiesNear'>;
+  readonly probes: Pick<SurveyProbeManager, 'advanceFlight' | 'pulseNow'>;
+  readonly abilities: Pick<ShipAbilityManager, 'survey'>;
+  readonly now: () => number;
 };

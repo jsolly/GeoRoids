@@ -1933,7 +1933,7 @@ function verifyCrewToolDemonstrations(): void {
         if (![scout, hauler].some((pilot) => pilot.utilityFlight?.phase === 'outbound')) {
           return;
         }
-        engine.tickToolFlights();
+        engine.toolFlights.advance();
       }
       throw new Error('wiki-media verification failed: tool flight did not resolve');
     };

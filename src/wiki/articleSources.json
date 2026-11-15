@@ -129,6 +129,7 @@
     "shared/contourBridge.ts"
   ],
   "hauler": [
+    "server/core/ToolFlightManager.ts",
     "shared/shipKits.ts",
     "shared/shipAbilities.ts",
     "server/core/ShipAbilityManager.ts",
@@ -197,6 +198,8 @@
     "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts"
   ],
   "asteroids": [
+    "server/core/ToolFlightManager.ts",
+    "server/core/ShipAbilityManager.ts",
     "server/core/AsteroidManager.ts",
     "server/core/AsteroidLifecycle.ts",
     "shared/asteroidMaterials.ts",
@@ -589,6 +592,8 @@
     "server/staticClient.ts"
   ],
   "scout": [
+    "server/core/ToolFlightManager.ts",
+    "server/core/ShipAbilityManager.ts",
     "server/core/WorldDiscovery.ts",
     "shared/shipKits.ts",
     "shared/shipAbilities.ts",
@@ -687,6 +692,8 @@
     "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts"
   ],
   "teamwork": [
+    "server/core/ToolFlightManager.ts",
+    "server/core/ShipAbilityManager.ts",
     "server/core/WorldDiscovery.ts",
     "shared-types.ts",
     "shared/combat.ts",

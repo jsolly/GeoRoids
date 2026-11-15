@@ -27,6 +27,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'server/core/AsteroidLifecycle.ts',
       'shared/exploration.ts',
       'server/core/WorldDiscovery.ts',
+      'server/core/ShipAbilityManager.ts',
     ],
   },
   hauler: {
@@ -49,6 +50,8 @@ export const media: Record<string, WikiMediaEntry> = {
       'server/core/FurnaceDeliveryManager.ts',
       'server/core/AsteroidLifecycle.ts',
       'server/core/CooperativeSupplyRestoration.ts',
+      'server/core/ToolFlightManager.ts',
+      'server/core/ShipAbilityManager.ts',
     ],
   },
   movement: {

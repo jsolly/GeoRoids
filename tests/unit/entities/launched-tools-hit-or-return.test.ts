@@ -10,6 +10,7 @@ import {
   tickTowLine,
 } from '../../../shared/shipAbilities';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
+import { SPIDER, spiderHitRadius } from '../../../shared/terrainSpider';
 import { movingAsteroidContact } from '../../../shared/toolFlightContact';
 import { UTILITY_FLIGHT } from '../../../shared/utilityFlight';
 import { WORLD } from '../../../shared/world';
@@ -218,6 +219,143 @@ for (const kind of ['tow', 'probe'] as const) {
     }
   });
 }
+
+test('a Scan-repelled spider intercepts a tow before its final pose clears the shot', async () => {
+  const { GameEngine } = await import('../../../server/core/GameEngine');
+  const { RecordingSocket } = await import('../../support/recordingSocket');
+  const engine = new GameEngine(42);
+  try {
+    const pilot = engine.addPlayer(
+      'tow-pilot',
+      'Tow pilot',
+      new RecordingSocket(),
+      { x: 4400, y: 0 },
+      'hauler'
+    );
+    engine.parkSatellitePickups();
+    engine.clearSpiderField();
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.asteroidLifecycle.remove(asteroid.id);
+    }
+    pilot.angle = 0;
+    expect(engine.useAbility(pilot.id)).toBe(true);
+    const flight = pilot.utilityFlight;
+    if (flight?.phase !== 'outbound') {
+      throw new Error('Expected the real launched tow');
+    }
+    const tip = { ...flight.position };
+    const radius = spiderHitRadius('spider-1');
+    const spider = engine.spawnTerrainSpider({
+      x: tip.x + flight.velocity.x * 0.6,
+      y: tip.y + radius - SPIDER.HUNT_SPEED * 0.5,
+    });
+    if (spider?.id !== 'spider-1') {
+      throw new Error('Expected the first identified spider in this fresh world');
+    }
+    expect(Math.hypot(spider.position.x - tip.x, spider.position.y - tip.y)).toBeGreaterThan(
+      radius
+    );
+    const scanner = engine.addPlayer(
+      'scanner',
+      'Scanner',
+      new RecordingSocket(),
+      { x: spider.position.x, y: -300 },
+      'scout'
+    );
+    expect(engine.useAbility(scanner.id)).toBe(true);
+    expect(scanner.abilityActiveFrames).toBeGreaterThan(0);
+
+    engine.advanceOneFrame();
+
+    const moved = engine.getSpiderField().spiders.find((body) => body.id === spider.id);
+    if (!moved) {
+      throw new Error('Expected the identified spider to survive the frame');
+    }
+    expect(moved.position.y - tip.y).toBeGreaterThan(radius);
+    expect(pilot.harpoonTargetId).toBe(spider.id);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test('an outbound tow intercepts a drifting rock in a spider-free sector', async () => {
+  const { GameEngine } = await import('../../../server/core/GameEngine');
+  const { RecordingSocket } = await import('../../support/recordingSocket');
+  const engine = new GameEngine(42);
+  try {
+    const pilot = engine.addPlayer(
+      'pilot',
+      'Pilot',
+      new RecordingSocket(),
+      { x: 4400, y: 0 },
+      'hauler'
+    );
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.asteroidLifecycle.remove(asteroid.id);
+    }
+    engine.parkSatellitePickups();
+    engine.clearSpiderField();
+    pilot.angle = 0;
+    expect(engine.useAbility(pilot.id)).toBe(true);
+    const flight = pilot.utilityFlight;
+    if (flight?.phase !== 'outbound') {
+      throw new Error('Expected the real launched tow');
+    }
+    const tip = { ...flight.position };
+    const target = rock('drifting-cargo', tip.x + 6, tip.y + 19);
+    target.velocity.y = 2;
+    engine.asteroidLifecycle.insert(target);
+    expect(engine.getSpiderField().spiders).toHaveLength(0);
+
+    engine.advanceOneFrame();
+
+    expect(target.position.y - tip.y).toBeGreaterThan(target.size);
+    expect(pilot.harpoonTargetId).toBe(target.id);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test('a pilot joining after empty pose capture still flies a tool and claims its target', async () => {
+  const { GameEngine } = await import('../../../server/core/GameEngine');
+  const { RecordingSocket } = await import('../../support/recordingSocket');
+  const engine = new GameEngine(42);
+  try {
+    engine.addPlayer('waiting', 'Waiting', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    engine.clearSpiderField();
+    expect(engine.toolFlights.hasOutboundFlight()).toBe(false);
+    const poses = engine.toolFlights.captureStartPositions();
+    expect(poses.size).toBe(0);
+    const newcomer = engine.addPlayer(
+      'newcomer',
+      'Newcomer',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      'hauler'
+    );
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.asteroidLifecycle.remove(asteroid.id);
+    }
+    const target = rock('newcomer-cargo', 120);
+    engine.asteroidLifecycle.insert(target);
+    newcomer.angle = 0;
+    expect(engine.useAbility(newcomer.id)).toBe(true);
+    expect(engine.toolFlights.hasOutboundFlight()).toBe(true);
+    const launched = newcomer.utilityFlight;
+    if (launched?.phase !== 'outbound') {
+      throw new Error('Expected the newcomer to launch a real tool');
+    }
+    const travelFrames = Math.ceil(launched.remainingDistance / UTILITY_FLIGHT.TOW_SPEED);
+
+    for (let frame = 0; frame < travelFrames; frame++) {
+      engine.toolFlights.advance();
+    }
+
+    expect(newcomer.harpoonTargetId).toBe(target.id);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
 
 test('a tow line uses the asteroid contour rather than an invisible bounding circle', () => {
   const pilot = hauler();

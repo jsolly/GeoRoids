@@ -80,7 +80,7 @@
     "scripts/wiki-media-fonts/fonts.conf": "sha256:b3c6fea66eca880155393fca06b4a36526aa310d4a194bf4256edd32adcaa39b",
     "scripts/wiki-media-node-shim.ts": "sha256:207fc4dd954b499d622d428632ed3b55c196a2f604065a987da1d3fbd20cacae",
     "scripts/wiki-media-requirements.txt": "sha256:5dd5a7db938c69c025039265a023c0253f450704efd947dd579e6958a14c964d",
-    "scripts/wiki-media.ts": "sha256:b754bee7eb8e44eed61108340bd8b811377906266858cf90d1aaf0ad2dc7832d",
+    "scripts/wiki-media.ts": "sha256:c6b842c55e0bbf0e98cc493d7d2d90c4ca31f42ccc9b3458ed58bb761843768c",
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
@@ -104,7 +104,7 @@
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:375e0ee28074f2a161caf5ac408f1a2d094fc3bad8f1cd69a759c0c6ddf45e50",
+    "server/core/GameEngine.ts": "sha256:894a70e79dcf8b150d1a74a5ea3a7c307f2c0d3853caa9db4dbe390513202d92",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -119,7 +119,7 @@
     "server/core/SatellitePickupManager.ts": "sha256:e44b5e648b8490c81fec961a251ef8f8473d78036331ebdac9acb7ce5c83083a",
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
     "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
-    "server/core/ShipAbilityManager.ts": "sha256:e9627a0d340830b407be3ab0d2ee86ddaaf26bf0ac0fb3bdd86227c32977d573",
+    "server/core/ShipAbilityManager.ts": "sha256:15a64888ab7523eaf9637f87cba969f11d4698e4b8f838232255498e3e8150ca",
     "server/core/SurveyProbeManager.ts": "sha256:21e11bb37ea372ad0fb270671fafd708477785aa60f2b0479bbeb21697894e5c",
     "server/core/TerrainSpiderManager.ts": "sha256:f901b1997549a34ab7d499d9f3da513590191250850ebd5af2db94ee0325c52c",
     "server/core/WorldDiscovery.ts": "sha256:a0634b29bbd295bd60183a564c5c66f8dc6b2203452f802e336d1cfa086d5115",
@@ -127,7 +127,7 @@
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/core/types.ts": "sha256:87874690ee7f909d2dc1d5d7191e3bd63401a286b77a63c9ee4641158fe5076e",
+    "server/core/types.ts": "sha256:c9fd176e233bc761fa3cc8d9f714e381ad35aa4abed46fde66b8c2cc84de9253",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:8f39f9961d8057c6e66d2273eec5d8f3a8274ef2f5a8408982a8407a46578a58",
@@ -460,10 +460,10 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:6e84fb6b39134b62cf1017ceafaaf24f1159c7bfc4d13b75894b7767e0722c02",
+    "src/wiki/articleSources.json": "sha256:6288bea58bc7076c762e200c673d7217f1104da307f3e82028f6189eca41dceb",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
-    "src/wiki/media.ts": "sha256:2c0923832f508ac8c24e331ba67bf4cd61cbb8e129201506256791bb31f1b48c",
+    "src/wiki/media.ts": "sha256:1974cd25c3c195b8adaa4de36f281c5b2659d5b57c989f7c06ec41a11d44d9c8",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
     "src/wiki/scrollMemory.ts": "sha256:ccbbe47812fc19f4c2048eb3db605d5351e070cab3257269bee95478fcc9df39",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
@@ -483,7 +483,7 @@
     "tests/unit/entities/haulerHarpoonLatchSync.test.ts": "sha256:116bff491b193fbf94032ce0801c4ad4fe80b5a056fbc64aff6e13464cc901da",
     "tests/unit/entities/haulerUtility.test.ts": "sha256:42490969780ab310da8b788c2ede90159731f08724e863a3c03325324e6d3479",
     "tests/unit/entities/input/keyboardControls.test.ts": "sha256:fdc96b1f99c223eec2ef06dc5de0be9d30bb63633ffefbb55ff582b17fabde8f",
-    "tests/unit/entities/launched-tools-hit-or-return.test.ts": "sha256:c1e9daf6cdde55a2a137453aba525b316a609ced956a12f3e57b5159b6339a67",
+    "tests/unit/entities/launched-tools-hit-or-return.test.ts": "sha256:d92f40f7576b2993b4d7f3169b5049b8a9c47014843814a0f3e5b8709d2420a1",
     "tests/unit/entities/local-ship-haptics.test.ts": "sha256:f8e150e4adf1d03b96bec5cda66918528e75af440f399e9317dfdeaa9594c9ef",
     "tests/unit/entities/menu-stops-flight-and-protects-the-hull.test.ts": "sha256:cf80428c37197ea95aaaf2eaf0dc55dd70ba31bd00c5def3078b91b3c80bce83",
     "tests/unit/entities/mineral-asteroids-break-with-distinct-rewards.test.ts": "sha256:9677e49140c9bcd9a0a1c080d15b9de25d0117cf4159e9740cc2d5a5d2cc88c6",
@@ -554,7 +554,7 @@
     "tests/unit/server/crew-rescues-persist-and-cancel.test.ts": "sha256:b6a075d7ae5ba1bc07f86ae4cae832000e4e5d3ecd150e5818693eb5b66962db",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts": "sha256:3b2c0dc5f30a66d2eb10c513c0c064c3b4f08b73805bba807e2ae95206747f4e",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts": "sha256:c139e1a1aa01ecf926d3df29af8b417e248775b12acc13fbdf8b4710a9c75afe",
-    "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:6659671e7f35af890d540d1ed2e88d1266deb332ec1475f286f2041d714cbc10",
+    "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:0b7c14257920485867c6177e4f9397c4a71988a6f34d664978df4224d38968ca",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:d82ac3b2b06d661adb21b6e41334a76ec6f087f9d62c04748909653dda9c7e8c",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts": "sha256:823dfb893b5b2a848469a7092d44a6d206142786ccaec1b23404b208e07aeaf0",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:17936b41b9f7d447ebf1d260c4b673bdc68add50cd73404f3431db09516c495d",
@@ -604,7 +604,8 @@
     "tests/unit/ui/universeMap.test.ts": "sha256:612101bf332ec0445eb1ee95e6d4208cbddf14367326e0b1c771d6b07a8965ce",
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
-    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8"
+    "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
+    "server/core/ToolFlightManager.ts": "sha256:7bf831b20722454fa047ca177aedfdc3673764903c37183c7a77021efb3b5671"
   },
   "reviews": [
     {
@@ -9451,6 +9452,65 @@
         "terrain"
       ],
       "owners": {}
+    },
+    {
+      "note": "Moved complete tool pose capture, target admission and swept contact into ToolFlightManager, and shared reveal-and-tag effects into ShipAbilityManager.survey. Direct frame, ability, helper and media callers use the owners; capture/contact retain their two positions and fresh actor views. Structural comparison covers six moved bodies, the fresh motion predicate, 119 remaining Engine bodies and unchanged ability/marker behavior. Nine canonical files pass 84 cases. Six controlled defects fail their intended assertions for late capture, lost prior spider poses, stale motion/contact actors, duplicate cargo claims and stale claims after release; all 1342 source and four Git/configuration hashes restore after each. Types, benchmark types and scoped lint pass. Reviewed current ownership references, four topic mappings and Scout/Hauler media source attribution. Before this acceptance, native Chrome checks inspected Hauler, Scout, Asteroids and Teamwork at 1280 and 390 widths with eight canonical screenshots, loaded illustrations and a real related-topic navigation. No console errors or warnings; the lazy-image dimension advisory and one optional tool decode rejection are retained in the browser receipt. Player prose and media bytes match released main. Full gate, independent reviews, Linux media CI and production verification remain pending; no physical-device or performance acceptance is claimed.",
+      "sources": [
+        "scripts/wiki-media.ts",
+        "server/core/GameEngine.ts",
+        "server/core/ShipAbilityManager.ts",
+        "server/core/ToolFlightManager.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "src/wiki/media.ts",
+        "tests/unit/entities/launched-tools-hit-or-return.test.ts",
+        "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "scripts/wiki-media.ts": "hauler",
+        "server/core/ToolFlightManager.ts": "hauler",
+        "src/wiki/articleSources.json": "teamwork",
+        "src/wiki/media.ts": "teamwork"
+      }
+    },
+    {
+      "note": "Restored ShipAbilityManager survey ownership for Asteroids and the Hauler demonstration. The public review workflow now refuses omitted asteroids-topic and hauler-media selectors for a survey-owner change, with the ledger unchanged during the deliberate refusal probe. Added a real-frame, spider-free drifting-asteroid tow scenario; nine focused files pass 85 cases, types and benchmark types pass. Seven controlled defects fail intended assertions, including motion capture wrongly gated by spider poses; all 1342 source and four Git/configuration hashes restore after each. All gameplay, renderer, component, content and media asset bytes match the earlier desktop/mobile candidate: only two non-rendered ownership lists and this scenario differ among 1342 sources. Reused the eight actual canonical four-topic desktop/mobile captures, loaded illustrations and navigation verified before acceptance; their nine-file screenshot manifest including the supplementary pre-load capture still matches. No new browser session, player copy/media change, physical-device or performance acceptance is claimed. Complete-body source comparison remains 130 matches. The previous full gate passed before these review fixes; the new full gate and affected-scope independent re-review remain pending.",
+      "sources": [
+        "src/wiki/articleSources.json",
+        "src/wiki/media.ts",
+        "tests/unit/entities/launched-tools-hit-or-return.test.ts"
+      ],
+      "topics": ["asteroids", "hauler", "scout", "teamwork"],
+      "media": ["hauler", "scout"],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork",
+        "src/wiki/media.ts": "teamwork"
+      }
     }
   ]
 }

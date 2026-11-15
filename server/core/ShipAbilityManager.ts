@@ -44,7 +44,7 @@ function tapLootEjection(
   };
 }
 
-export function markSurveyedAsteroids(
+function markSurveyedAsteroids(
   ownerId: string,
   position: Position,
   asteroids: readonly AsteroidData[],
@@ -70,6 +70,16 @@ export class ShipAbilityManager {
   private pendingTapEjections: TapEjected[] = [];
 
   constructor(private readonly inputs: ShipAbilityInputs) {}
+
+  public survey(
+    ownerId: string,
+    position: Position,
+    asteroids: readonly AsteroidData[],
+    range: number
+  ): void {
+    this.inputs.revealArea(position, range);
+    markSurveyedAsteroids(ownerId, position, asteroids, range);
+  }
 
   advance(): void {
     this.inputs.actors.tickAbilityState();

@@ -4,6 +4,7 @@ import type { FurnaceField } from '../../shared/furnaceField';
 import type { CrewAction, Position, ShipKitId } from '../../shared-types';
 import type { CooperativeCampaign } from '../world/CooperativeCampaign';
 import type { MapAssets } from '../world/MapAssets';
+import type { RegionalAsteroidField } from '../world/RegionalAsteroidField';
 import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
 import type { AsteroidLifecycle } from './AsteroidLifecycle';
@@ -12,10 +13,12 @@ import type { BeltCrawlerManager } from './BeltCrawlerManager';
 import type { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
+import type { GlowtoyManager } from './GlowtoyManager';
 import type { HiveEncounters } from './HiveEncounters';
 import type { LootManager } from './LootManager';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
+import type { SatellitePickupManager } from './SatellitePickupManager';
 import type { SettlementLedger } from './SettlementLedger';
 import type { ShipAbilityManager } from './ShipAbilityManager';
 import type { SpiderPopulationBudget } from './SpiderPopulationBudget';
@@ -151,4 +154,22 @@ export type HiveEncounterInputs = {
   readonly population: Pick<SpiderPopulationBudget, 'refresh'>;
   readonly spiders: Pick<TerrainSpiderManager, 'getBody' | 'spawnSpider' | 'removeSpider'>;
   readonly actors: Pick<EntityManager, 'getAllEntities'>;
+};
+
+export type SpiderFieldInputs = {
+  readonly actors: Pick<EntityManager, 'getAllEntities' | 'getEntity'>;
+  readonly terrain: Pick<
+    TerrainSpiderManager,
+    'advance' | 'getBodies' | 'getBody' | 'isAttackActive'
+  >;
+  readonly crawlers: Pick<BeltCrawlerManager, 'advance' | 'isAttackActive'>;
+  readonly population: Pick<SpiderPopulationBudget, 'refresh'>;
+  readonly rocks: Pick<AsteroidManager, 'spatialIndex' | 'crawlerHostAsteroids' | 'getAsteroid'>;
+  readonly regional: Pick<RegionalAsteroidField, 'dormantAsteroid'>;
+  readonly loot: Pick<LootManager, 'spawnNestCache' | 'getNestResource' | 'getNestResourcesNear'>;
+  readonly satellites: Pick<
+    SatellitePickupManager,
+    'spawnNestPickup' | 'getPickup' | 'getNestResources'
+  >;
+  readonly glowtoys: Pick<GlowtoyManager, 'lightSources'>;
 };

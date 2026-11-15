@@ -104,7 +104,7 @@
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:5b67ae7050fe626193e07e37954911a5f747b390acec8e81e38de463aa42f998",
+    "server/core/GameEngine.ts": "sha256:0cbdfcc820a18c30c7d2e7fbdaa7e899a59442d43e24f3ebeae0028dd2cb3a2b",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:00cabaaa9b6ad0483f51ac095af0c23541341f4034d72fded32b851e7655fb08",
@@ -127,7 +127,7 @@
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/core/types.ts": "sha256:8d85c2ac9d74c1f957796642186ded2f8c109e61f2756da09b53c2e065f1a5bb",
+    "server/core/types.ts": "sha256:45b438021fee8ded34ccabe7b43b23c4d7844838b998e0ac3072797cc18d266d",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:8f39f9961d8057c6e66d2273eec5d8f3a8274ef2f5a8408982a8407a46578a58",
@@ -460,7 +460,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:8bd9205c82c0238baad0864f5765bf69982fb40aa477ecd3f4ee1eef3d9a9525",
+    "src/wiki/articleSources.json": "sha256:654d2eeb4243ad3d7f7f0840cef61f19a8e3a3b19e133c41ef666677c05f5b5a",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:1974cd25c3c195b8adaa4de36f281c5b2659d5b57c989f7c06ec41a11d44d9c8",
@@ -607,7 +607,10 @@
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
     "server/core/ToolFlightManager.ts": "sha256:7bf831b20722454fa047ca177aedfdc3673764903c37183c7a77021efb3b5671",
     "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "sha256:889f389fe9f937ebf833a3808a2cf26e94f38b6672d7381db77427c47f6ffee2",
-    "server/core/SpiderPopulationBudget.ts": "sha256:92b9eea3e8efebe40c5f1ac6397d1e4a7aeecfd61a272fde84ba8e2b9085a62f"
+    "server/core/SpiderPopulationBudget.ts": "sha256:92b9eea3e8efebe40c5f1ac6397d1e4a7aeecfd61a272fde84ba8e2b9085a62f",
+    "server/core/SpiderField.ts": "sha256:81644419ac0a60212d7bfe0a3c4faa711dedfed2711668fa0dce3a1bc247ce29",
+    "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts": "sha256:c5e02f17be9ff9a8c975d21c1dbc517a2aa85a06a8ad260263c0c3028976e615",
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts": "sha256:dd6035dac2aab204f0c2ea7b4a6cdea5df354d3856ea1c164f5fac6f6da4cdb1"
   },
   "reviews": [
     {
@@ -9713,6 +9716,84 @@
       "topics": ["combat-survival", "controls", "hud-network", "teamwork", "terrain"],
       "media": [],
       "owners": {}
+    },
+    {
+      "note": "SpiderField now owns the existing terrain/crawler frame and pending bites through stable narrow inputs. Both Engine frame slots, all three local budget refreshes, distinct live actor projections, local resource precedence, nest rewards, stale-tow cleanup and per-attack late combat validation retain their order. The Engine helper and private queue are removed. A strict 120-comparison AST proof checks the moved body, declared composition/queue changes and other Engine methods; every prior tracked test remains byte-identical. Both complete type suites and twenty focused files with181 cases pass. Twelve new real scenarios cover bite lifetimes, bot/disconnected admission, population failure boundaries, crawler host removal, same-ID satellite precedence/rewards, stale tow release and both frame modes through pause/revisit. Sixteen controlled defects fail their intended assertions in a fresh disposable clone; all1345 real source files and four Git/config files remain unchanged. These probes do not prove every callback or reset site. Read eight related articles and retained the earlier review for the unchanged remaining articles. Fresh Chrome checks cover Terrain, Asteroids and Hauler at desktop and mobile widths with six native captures, decoded illustrations, native content links and expanded crawler values. Console inventories have no errors or warnings and retain the existing lazy-image dimensions issue, counts10-13. An initial mobile Hauler image was still lazy; its final capture followed scrolling and actual image decoding. All59 player article/render/reference/media files are unchanged; only developer source mapping adds the owner and new scenario to three primary topics. All earlier mapping entries remain. Eleven topic and ten media selectors cover Engine citations without claiming eleven browser topics. Owned browser and dev session are stopped. Full gate, independent implementation/shipping reviews and Linux media CI remain pending. No player rule, graphics, controls, audio, physical-device, performance or whole-task completion claim.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/SpiderField.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "terrain",
+        "server/core/SpiderField.ts": "terrain",
+        "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts": "terrain"
+      }
+    },
+    {
+      "note": "Resolved three review findings. The shared population budget is now constructor-local and the same instance still reaches SpiderField, HiveEncounters and WorldHazards; the obsolete Engine field is removed. The stale-spider-tow scenario now retains an actual rock and living connected Hauler outside the departing spider wake range. The canonical nest revisit is parameterized across full and combat-only frames, retaining its wounded guard and slain nestmate, immediate disconnect observation, added paused tick and explicit absence observation; the weaker duplicate scenario is removed. Both complete type suites and twenty focused files with180 cases pass. All four original canonical assertions remain in order. The strict120comparison AST proof covers the exact constructor/field rewrite and previous move. All17 controlled defects reject at intended assertions in a new isolated clone, with all1345real source and4Git/config hashes unchanged after every variant. An incorrect cleanup of the living rock tow fails its real latch observation; both omitted frame calls fail the stronger canonical guard scenario. These checks do not prove every callback or reset site. Exact comparison with the prior reviewed candidate changes only Engine, the two named tests and developer source mapping before this scoped ledger append;1341other sources remain identical. The canonical test now has citations in the same three primary topics, preserving all earlier entries; the checker rejected the first uncited selector without changing the ledger. SpiderField, input types and all9browser evidence files including6native captures remain unchanged. The prior fresh three-primary-topic desktop/mobile Wiki checks carry for unchanged player copy, rules, rendering and media; no new browser check or broader gameplay acceptance is claimed. All377prior review records and unrelated source hashes are preserved. A new full gate and fresh affected reviews remain pending before publication. The whole pipeline task remains open.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts",
+        "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "terrain",
+        "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts": "terrain"
+      }
     }
   ]
 }

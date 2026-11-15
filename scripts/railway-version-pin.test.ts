@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
 import { test } from 'vitest';
 import { parse } from 'yaml';
 import {
   railwayCli,
+  railwayCliEnvironment,
   readSnapshot,
   reviewPlan,
   runVersionPin,
@@ -23,6 +26,62 @@ const production = {
 const tree = 'd0a934bd14a4529689009aca626bba12a61db775d';
 const oldBuild = { builder: 'RAILPACK', buildEnvironment: 'V3', railpackVersion: '0.42.0' };
 const newBuild = { ...oldBuild, railpackVersion: '0.43.0' };
+
+test('native SDK evaluation probes the pinned CLI instead of the workflow launcher', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'railway-sdk-launcher-'));
+  try {
+    // The provider boundary supplies only version text. The installed SDK performs its real probe.
+    const cli = join(directory, 'railway');
+    writeFileSync(cli, '#!/bin/sh\nprintf "railway 5.50.2\\n"\n');
+    chmodSync(cli, 0o700);
+    const inherited = {
+      ...process.env,
+      _: process.execPath,
+      RAILWAY_CONFIG_TOKEN: 'dedicated-test-token',
+      RAILWAY_TOKEN: 'ambient-test-token',
+      RAILWAY_API_TOKEN: 'ambient-api-token',
+      RAILWAY_PROJECT_ID: 'another-project',
+      RAILWAY_CONFIG_CLI: '/another-cli',
+    };
+    // Native CLI 5.50.2's eval flags and source markers activate the SDK's compatibility check.
+    const args = [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '-e',
+      `const mod = await import('railway/iac');
+const partial = mod.partial;
+const graph = {};
+process.stdout.write(JSON.stringify({ partial, project: graph }));`,
+    ];
+    const before = spawnSync(process.execPath, args, {
+      env: inherited,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(before.status, 1);
+    assert.match(before.stderr, /requires Railway CLI/u);
+    const environment = railwayCliEnvironment(inherited, cli);
+    const after = spawnSync(process.execPath, args, {
+      env: environment,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(after.status, 0, after.stderr);
+    assert.deepEqual(JSON.parse(after.stdout), { project: {} });
+    assert.equal(environment['_'], cli);
+    assert.equal(environment['RAILWAY_TOKEN'], 'dedicated-test-token');
+    assert.equal(environment['RAILWAY_PROJECT_ID'], production.project);
+    assert.equal(environment['RAILWAY_ENVIRONMENT_ID'], production.environment);
+    assert.equal(environment['RAILWAY_SERVICE_ID'], production.service);
+    assert.equal(environment['RAILWAY_API_TOKEN'], undefined);
+    assert.equal(environment['RAILWAY_CONFIG_TOKEN'], undefined);
+    assert.equal(environment['RAILWAY_CONFIG_CLI'], undefined);
+    assert.equal(inherited['_'], process.execPath);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 // Synthetic boundary fixtures transcribed from pinned official CLI source:
 // iac/saved_plan.rs, iac/change_set.rs::update/changed_leaf_paths, engine.rs

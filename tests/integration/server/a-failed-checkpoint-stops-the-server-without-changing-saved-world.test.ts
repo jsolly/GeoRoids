@@ -70,7 +70,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
     // The break itself succeeds in memory; the next flush carries it to the
     // worker, whose failed transaction rolls the whole batch back together.
     const errorLog = vi.spyOn(logger, 'error');
-    expect(engine.applyLaserAsteroidHit(target.id, miner.id).outcome).toBe('destroyed');
+    expect(engine.asteroidMining.apply(target.id, miner.id).outcome).toBe('destroyed');
     engine.checkpointWorld();
     await engine.whenPersistenceIdle();
     expect(read()).toEqual(before);

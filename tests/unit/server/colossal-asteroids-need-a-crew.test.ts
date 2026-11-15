@@ -246,12 +246,12 @@ describe('Colossal asteroids need a crew', () => {
     engine.asteroidLifecycle.insert(rock);
     const hits = ROID.COLOSSAL_LASER_HITS;
     for (let shot = 0; shot < hits - 1; shot++) {
-      const damaged = engine.applyLaserAsteroidHit(rock.id, 'p1');
+      const damaged = engine.asteroidMining.apply(rock.id, 'p1');
       expect(damaged.outcome).toBe('damaged');
       expect(engine.getAsteroid(rock.id)).toBeDefined();
     }
     expect(engine.getAsteroid(rock.id)).toBeDefined();
-    const last = engine.applyLaserAsteroidHit(rock.id, 'p1');
+    const last = engine.asteroidMining.apply(rock.id, 'p1');
     expect(last.outcome).toBe('destroyed');
     expect(last.newAsteroids).toHaveLength(2);
     expect(last.newAsteroids.every((fragment) => !isColossalAsteroid(fragment.size))).toBe(true);
@@ -270,9 +270,9 @@ describe('Colossal asteroids need a crew', () => {
     engine.asteroidLifecycle.insert(rock);
     const hits = ROID.COLOSSAL_LASER_HITS / SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER;
     for (let shot = 0; shot < hits - 1; shot++) {
-      expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('damaged');
+      expect(engine.asteroidMining.apply(rock.id, 'h1').outcome).toBe('damaged');
     }
-    expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('destroyed');
+    expect(engine.asteroidMining.apply(rock.id, 'h1').outcome).toBe('destroyed');
   });
 
   test('ramming a colossal deposit damages the ship and leaves the rock', () => {

@@ -471,7 +471,7 @@ test('most old rocks are barren and breaking mineral rocks sacrifices harvest wh
   ore.surveyedBy = ['scout'];
   engine.asteroidLifecycle.insert(ore);
   ore.health = 0;
-  const result = engine.handleAsteroidHit(ore.id, 'scout', 'laser');
+  const result = engine.asteroidMining.hit(ore.id, 'scout', 'laser');
   expect(result.newAsteroids.length).toBeGreaterThan(0);
   expect(
     result.newAsteroids.every(

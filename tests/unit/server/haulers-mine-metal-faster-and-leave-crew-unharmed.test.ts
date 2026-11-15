@@ -43,12 +43,12 @@ test('Hauler breaks metal in two shots while Scout needs three and teammate lase
   );
   engine.asteroidLifecycle.insert(metal('heavy-mining'));
   engine.asteroidLifecycle.insert(metal('light-mining'));
-  expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('damaged');
+  expect(engine.asteroidMining.hit('heavy-mining', hauler.id).outcome).toBe('damaged');
   expect(engine.getAsteroid('heavy-mining')?.health).toBe(25);
-  expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('destroyed');
-  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('damaged');
-  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('damaged');
-  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('destroyed');
+  expect(engine.asteroidMining.hit('heavy-mining', hauler.id).outcome).toBe('destroyed');
+  expect(engine.asteroidMining.hit('light-mining', scout.id).outcome).toBe('damaged');
+  expect(engine.asteroidMining.hit('light-mining', scout.id).outcome).toBe('damaged');
+  expect(engine.asteroidMining.hit('light-mining', scout.id).outcome).toBe('destroyed');
   for (const rock of engine.getAllAsteroids()) {
     engine.asteroidLifecycle.remove(rock.id);
   }
@@ -61,19 +61,41 @@ test('Hauler breaks metal in two shots while Scout needs three and teammate lase
   expect(engine.getServerLasers()).toHaveLength(1);
 });
 
-test('a Hauler laser retains mining strength after its owner leaves', () => {
-  engine.addPlayer('observer', 'Observer', new RecordingSocket(), { x: -1000, y: -1000 }, 'scout');
-  engine.addPlayer('departing-hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
-  for (const rock of engine.getAllAsteroids()) {
-    engine.asteroidLifecycle.remove(rock.id);
+test.each(['leaves', 'changes to Scout'] as const)(
+  'a Hauler laser retains mining strength after its owner %s',
+  (transition) => {
+    engine.addPlayer(
+      'observer',
+      'Observer',
+      new RecordingSocket(),
+      { x: -1000, y: -1000 },
+      'scout'
+    );
+    engine.addPlayer('departing-hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    for (const rock of engine.getAllAsteroids()) {
+      engine.asteroidLifecycle.remove(rock.id);
+    }
+    engine.asteroidLifecycle.insert(metal('in-flight-metal'));
+    expect(
+      engine.spawnLaser('departing-hauler', { x: 950, y: 1000 }, { x: 80, y: 0 })
+    ).not.toBeNull();
+    if (transition === 'leaves') {
+      engine.removePlayer('departing-hauler');
+    } else {
+      engine.entityManager.updateEntity('departing-hauler', { kitId: 'scout' });
+      expect(engine.getPlayer('departing-hauler')?.kitId).toBe('scout');
+    }
+    engine.advanceLasersAndResolveHits();
+    expect(engine.getAsteroid('in-flight-metal')?.health).toBe(25);
   }
-  engine.asteroidLifecycle.insert(metal('in-flight-metal'));
-  expect(
-    engine.spawnLaser('departing-hauler', { x: 950, y: 1000 }, { x: 80, y: 0 })
-  ).not.toBeNull();
-  engine.removePlayer('departing-hauler');
-  engine.advanceLasersAndResolveHits();
-  expect(engine.getAsteroid('in-flight-metal')?.health).toBe(25);
+);
+
+test('an unknown miner uses Scout damage and leaves a surviving deposit unrewarded', () => {
+  engine.asteroidLifecycle.insert(metal('unclaimed-metal'));
+  const result = engine.asteroidMining.hit('unclaimed-metal', 'absent-miner');
+  expect(result.outcome).toBe('damaged');
+  expect(engine.getAsteroid('unclaimed-metal')?.health).toBe(50);
+  expect(engine.getLoot()).toEqual([]);
 });
 
 test.each(['scout', 'hauler'] as const)(
@@ -88,7 +110,7 @@ test.each(['scout', 'hauler'] as const)(
         health: 100,
         maxHealth: 100,
       });
-      expect(engine.handleAsteroidHit(material, 'miner').outcome).toBe('destroyed');
+      expect(engine.asteroidMining.hit(material, 'miner').outcome).toBe('destroyed');
       expect(engine.getAsteroid(material)).toBeUndefined();
     }
   }

@@ -11,9 +11,11 @@ import { RNGService } from '../../../server/core/RNGService';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
+import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
+import { sectorAt, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { fireProbe, resolveToolFlights } from '../../support/tool-flight';
@@ -598,5 +600,35 @@ describe('authoritative Scout probes', () => {
 
     expect(owner.scoutUtility).toBeUndefined();
     expect(host.probe).toBeUndefined();
+  });
+
+  test('a distant attached probe wakes a neighboring sector outside every human pilot view', () => {
+    const { engine, scout } = launchWorld();
+    try {
+      assert.ok(scout);
+      const host = asteroidAt('distant-observer-host', { x: 7_900, y: 7_000 });
+      scout.position = { x: 7_700, y: 7_000 };
+      engine.asteroidLifecycle.insert(host);
+      expect(engine.useAbility(scout.id)).toBe(true);
+      resolveToolFlights(engine);
+      assert.ok(host.probe);
+      scout.position = { x: 0, y: 0 };
+      const target = sectorDeposits(42, 4, 3).find(
+        (row) =>
+          Math.hypot(row.position.x - host.position.x, row.position.y - host.position.y) <
+          WORLD.interestRadius
+      );
+      assert.ok(target, 'Known deposit within the remote observer radius');
+      expect(sectorAt(target.position).id).not.toBe(sectorAt(host.position).id);
+      expect(Math.hypot(target.position.x, target.position.y)).toBeGreaterThan(
+        WORLD.interestRadius
+      );
+      expect(engine.getAsteroid(target.id)).toBeUndefined();
+      const loaded = engine.ensureAsteroidField();
+      expect(loaded.find((row) => row.id === target.id)).toEqual(target);
+      expect(engine.getAsteroid(target.id)).toBe(loaded.find((row) => row.id === target.id));
+    } finally {
+      engine.stopGameLoop();
+    }
   });
 });

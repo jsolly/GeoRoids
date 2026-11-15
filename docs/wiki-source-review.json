@@ -101,10 +101,10 @@
     "server/core/CooperativeContourBridges.ts": "sha256:fa74540a509a2361a3cc787112a91a1b58cb70d0972f77f50de2ea303d145618",
     "server/core/CooperativeSupplyRestoration.ts": "sha256:ff34bc2b273d3d12beae2a1f185068c62f5c5a486b4cc2b833e2bf38946df82f",
     "server/core/CrewRescueManager.ts": "sha256:a1b0775e969e9578f808374839a2830aa7a645eb9110ef37bf24587af552d5fe",
-    "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
+    "server/core/EntityManager.ts": "sha256:a5e9788e74041f9480c6af4a1853cc6641f7f19056a8e1058ab30ce7496b8ac9",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:e1130c1486efa8cbf19d1828cae6c9d6f4401623c2b199f31dae3ec082836894",
+    "server/core/GameEngine.ts": "sha256:f6bca3d0f03e6bea2c496206e579f0ff77ece16a04b1d45e3d10da8c439d3a35",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:00cabaaa9b6ad0483f51ac095af0c23541341f4034d72fded32b851e7655fb08",
@@ -127,7 +127,7 @@
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/core/types.ts": "sha256:45b438021fee8ded34ccabe7b43b23c4d7844838b998e0ac3072797cc18d266d",
+    "server/core/types.ts": "sha256:745a4de41907e27125993125447acb23c60ab080ab7da298bdf0d747bb36faf8",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:8f39f9961d8057c6e66d2273eec5d8f3a8274ef2f5a8408982a8407a46578a58",
@@ -460,7 +460,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:654d2eeb4243ad3d7f7f0840cef61f19a8e3a3b19e133c41ef666677c05f5b5a",
+    "src/wiki/articleSources.json": "sha256:809c21dad624a5a1bd265ff0cdc9708707985cc64621253e794c84055be8e44d",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:1974cd25c3c195b8adaa4de36f281c5b2659d5b57c989f7c06ec41a11d44d9c8",
@@ -576,11 +576,11 @@
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
     "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:b9527771ca21f6d5b4ef9cd83b60fe52cd933c4c294d83400e2cd0b691253569",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:af71ad084b80a9481c27acbde6b00e89079a1f9b9f06f15ed7cf67da5c690c2e",
-    "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:4083da653117026679f9ea2ca8f8e6c2002ee8167ae7eb6791c1f551a87ca449",
+    "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:91737b10884970651d755e0ac5082d914e3c4887264bd78a23d0116ee3a1f26e",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:167068e1748b4642591a95067d7571acb24298c606bcc7f541555fc65f46339a",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts": "sha256:f86b229ab03293478b47d0e86fc1da3a00d2dd0ab25f15bbb2d1dfeefef75809",
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts": "sha256:a014fb3cc93e36091aa5b9cd17f25640270e08d9d63e9a102debceb69305b622",
-    "tests/unit/server/regional-asteroid-density.test.ts": "sha256:6f4e28afddacf040e24c4adba92aa365c06d38bc49cb98ba41bfa20cf4f3016b",
+    "tests/unit/server/regional-asteroid-density.test.ts": "sha256:0f3d75e2ed73594f338d9773a7aed868b2f6a7ef40b8b0e2bb2846cdac81a6e5",
     "tests/unit/server/remains-stay-local-and-expire-without-awarding-loot.test.ts": "sha256:d9068ad99ce5f69e18a6e63b7ac7ee4cc56db22becc246411398841d60d75d9b",
     "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:e948ec139f99eb4b596de79ab3ac7a691779a3580bcf0747df1dabd3e65c84d1",
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:e6759788338e3a571b08d38d2d8cafee63da611bdea8811eb29a36e1a4f56f76",
@@ -606,11 +606,12 @@
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
     "server/core/ToolFlightManager.ts": "sha256:7bf831b20722454fa047ca177aedfdc3673764903c37183c7a77021efb3b5671",
-    "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "sha256:889f389fe9f937ebf833a3808a2cf26e94f38b6672d7381db77427c47f6ffee2",
+    "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "sha256:e6e7c8607fde0f132c6df46a74586b42cf06d262d9b87d16e49572b08fe209a5",
     "server/core/SpiderPopulationBudget.ts": "sha256:92b9eea3e8efebe40c5f1ac6397d1e4a7aeecfd61a272fde84ba8e2b9085a62f",
     "server/core/SpiderField.ts": "sha256:81644419ac0a60212d7bfe0a3c4faa711dedfed2711668fa0dce3a1bc247ce29",
     "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts": "sha256:c5e02f17be9ff9a8c975d21c1dbc517a2aa85a06a8ad260263c0c3028976e615",
-    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts": "sha256:dd6035dac2aab204f0c2ea7b4a6cdea5df354d3856ea1c164f5fac6f6da4cdb1"
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts": "sha256:dd6035dac2aab204f0c2ea7b4a6cdea5df354d3856ea1c164f5fac6f6da4cdb1",
+    "server/core/AsteroidField.ts": "sha256:61b4ea90ebf8b2d4742200c1538bf233b8c524609c6c15458a5c290c46c49eb3"
   },
   "reviews": [
     {
@@ -9832,6 +9833,75 @@
       "note": "The real Scout and Hauler in the canonical wildlife story now have spawn protection cleared before any interaction. This makes the existing no-damage assertion test vulnerable hulls. In a fresh isolated clone, the previous protected fixture passed all seven canonical cases despite an injected one-point authoritative contact-damage fault. The corrected fixture rejects that same fault for both kits, observing 99 instead of 100 health and 139 instead of 140. All 16 earlier defects also fail their intended assertions against the corrected fixture. The real source and Git/configuration hashes remain unchanged after each probe. The damage capability and actor ID used by that fault exist only in the disposable fixture; production wildlife still has its original read-only registry capability. Both type suites and seven focused files with 39 cases pass. All 13 original assertions remain, and the whole Engine and wildlife runtime are unchanged from the previous review. All five browser evidence files, player text, rendering, reference and media bytes remain unchanged; earlier Terrain checks retain their recorded scope. No new browser run or gameplay acceptance is claimed. All 380 prior ledger batches, the original note and unrelated hashes are preserved. The next complete gate and affected reviews are pending. The whole pipeline and final whole-Wiki audit remain open.",
       "sources": ["tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts"],
       "topics": ["terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "AsteroidField now owns regional versus fixture mode, the decoration marker, human and probe observer selection, and the original separate periodic slots. Fixture seeding stays before lasers; regional waking stays after cargo and before checkpoint. Public immediate operations, reset lifetimes, all three persistence mode reads and original guard semantics remain unchanged. Both complete type programs and 15 focused files with 132 cases pass; the actual reset integration passes all four cases. Whole-file AST proof matches the declared ownership rewrites and preserves all 203 original direct Vitest matcher calls in the four edited canonical scenarios. Twenty-two isolated controlled defects fail their intended assertions, including a real hull-crossing laser, last-pilot removal, a launched unattended probe, a remote neighboring-sector deposit, and a same-frame real SQLite checkpoint. All real source and Git/configuration hashes remain unchanged after each probe. Initial probes exposed weak laser and no-human arrangements; those fixtures were strengthened, and the final audit reran every defect against the final type-correct fixtures. Source-only limits remain for empty marker IDs and exact repeated registry/time-read sequencing. Fresh Asteroids and Scout text/source review plus native desktop 1280 and touch 390 inspection confirm decoded reflection media, expanded field and regrowth rules, and working mobile Scout navigation with decoded scan media. Both native captures were displayed and visually inspected. Console has no errors or warnings and retains the existing lazy-image dimension issue, counted 10 on Asteroids and 11 after Scout. All 59 article, rendering, reference and media files are byte-identical to the prior release; other topics and direct Cargo/Hauler/Scout demonstrations retain only their earlier recorded review scope. Asteroids and Scout source lists now name their real field owner, preserving every prior reference. All 11 mapped topics and three direct media selectors are computed from current sources. No player text, media, tuning, wire or persistence format changes. Required Linux media CI remains pending. The owned dev session and browser tab are closed. verify-ui is N/A because no user-facing render path changes. All prior ledger batches, the original note and unrelated hashes are preserved. The full gate and fresh independent publication reviews remain pending. The whole ordered pipeline and final whole-Wiki audit remain open.",
+      "sources": [
+        "server/core/AsteroidField.ts",
+        "server/core/GameEngine.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts",
+        "tests/unit/server/regional-asteroid-density.test.ts",
+        "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
+      }
+    },
+    {
+      "note": "GameEngine and AsteroidField now share EntityManager.getHumanPlayers; the field reads it separately for admission and observer positions. Engine pause, counts and snapshots and AsteroidField admission and observers use that same definition; the field keeps its two fresh reads and live pause short-circuit. Independent review identified the duplicate query, missing per-case spy cleanup, unnecessary file-backed checkpoint fixture and stale periodic-entry references. Those are corrected: the new Scout scenario is inside the existing cleanup suite, the checkpoint story uses a real in-memory SQLite transaction, and the performance guide, repository instructions and traversal-test comment name AsteroidField.advanceRegions while preserving every pass count. Both complete type programs and 15 focused files with 132 cases pass. Whole-source AST proof covers the original extraction plus the query shared by GameEngine and AsteroidField, retains all 203 original direct Vitest matcher calls, and proves the belt test runtime unchanged. All 22 controlled defects fail their intended assertions in a fresh isolated clone against these corrected fixtures, with all real source and Git/configuration hashes unchanged after each probe. The observer-leak fault also violates the narrowed query capability and would be rejected by types; its runtime failure is additional scenario evidence. No broader world-shape or durability claim is made. All 59 article, render, reference and media files and all five earlier native browser evidence files remain byte-identical. The earlier desktop/mobile Asteroids and mobile Scout checks retain their exact recorded scope, including the existing lazy-image issue; no new browser run or gameplay acceptance is claimed. All 382 prior ledger batches, the original note and unrelated source hashes are preserved. The complete gate, fresh affected reviews, required Linux media CI and production verification remain pending. The whole ordered pipeline and final whole-Wiki audit stay open.",
+      "sources": [
+        "server/core/AsteroidField.ts",
+        "server/core/EntityManager.ts",
+        "server/core/GameEngine.ts",
+        "server/core/types.ts",
+        "tests/unit/server/regional-asteroid-density.test.ts",
+        "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "AsteroidField now names its actual AsteroidManager capability directly, avoiding a dependency on the regional updater signature. The old parameter alias and the direct class are the same type; both complete TypeScript programs pass. All executable module and test sources remain unchanged from the previous reviewed candidate, and the four relevant modules emit identical runtime bytes. The expanded private source comparison covers all 231 original assertion sites in the four canonical scenarios, including Node assertions and negated Vitest matchers. The earlier notes now accurately describe their original 203 direct matcher comparisons and limit the shared-query claim to GameEngine and AsteroidField. All 381 published base review batches and the legacy note remain unchanged; only those two new unpublished notes were clarified. The previous 22 controlled faults, 132 focused cases and full gate of 2717 unit and 55 integration cases retain their exact recorded scope, with no new runtime test claimed here. Article, render, reference, media and native browser evidence bytes remain unchanged; the earlier browser limits and existing lazy-image issue still apply. This acceptance updates only the type source digest. The current full gate and fresh affected reviews remain pending. The whole pipeline and final whole-Wiki audit remain open.",
+      "sources": ["server/core/types.ts"],
+      "topics": ["combat-survival", "controls", "hud-network", "teamwork", "terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "The private regional fixture no longer returns the unused regional manager; it still constructs the same manager and passes it to AsteroidField. No production module, scenario assertion or other test statement changes. The canonical density file passes all 16 cases and application TypeScript passes. The strict source comparison verifies the entire scenario differs from the preceding reviewed version only by that unused return key; all 231 original assertion sites remain. Earlier controlled-fault, full-gate and native browser evidence retain their exact recorded scope, with no new fault or browser run claimed. All 384 previous review batches and the legacy note are preserved; acceptance updates only this scenario digest. The full gate and affected fixture and note reviews remain pending. The whole ordered pipeline and final whole-Wiki audit remain open.",
+      "sources": ["tests/unit/server/regional-asteroid-density.test.ts"],
+      "topics": ["asteroids"],
       "media": [],
       "owners": {}
     }

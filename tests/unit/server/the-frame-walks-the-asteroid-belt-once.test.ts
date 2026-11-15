@@ -28,7 +28,7 @@ const BELT_PASSES_PER_FRAME = 1;
 
 /**
  * The once-a-second frame, on the cadence AGENTS.md sanctions for work leaving
- * the loop. Two blocks land on it together: `ensureAsteroidField` copies the
+ * the loop. Two blocks land on it together: `AsteroidField.advanceRegions` copies the
  * belt three times in `RegionalAsteroidField.update`, and `checkpointWorld`
  * copies it four more in `RegionalAsteroidField.checkpoint` — but only when a
  * `WorldPersistence` exists, which production always has. Both counts are

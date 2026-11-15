@@ -91,6 +91,15 @@ export type PilotSessionResume = {
   readonly clientReleaseId?: string | undefined;
 };
 
+export type AsteroidFieldInputs = {
+  readonly actors: Pick<EntityManager, 'getHumanPlayers'>;
+  readonly rocks: AsteroidManager;
+  readonly regional: Pick<RegionalAsteroidField, 'update'>;
+  readonly probes: Pick<SurveyProbeManager, 'observerPositions'>;
+  readonly isPaused: () => boolean;
+  readonly now: () => number;
+};
+
 export type AsteroidLifecycleInputs = {
   readonly rocks: Pick<
     AsteroidManager,

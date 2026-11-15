@@ -121,16 +121,83 @@ describe('authoritative Scout probes', () => {
     });
     engine.asteroidLifecycle.insert(nearby);
     engine.asteroidLifecycle.insert(outside);
-    now.value += SURVEY_PROBE.PULSE_MS - 1;
-    engine.advanceOneFrame(now.value);
+    now.value += SURVEY_PROBE.PULSE_MS;
+    // The clock has reached the deadline, but this frame was admitted one millisecond before it.
+    engine.advanceOneFrame(now.value - 1);
 
     expect(after).not.toEqual(before);
     expect(nearby.surveyedBy).toBeUndefined();
     expect(outside.surveyedBy).toBeUndefined();
-    now.value += 1;
     engine.advanceOneFrame(now.value);
     expect(nearby.surveyedBy).toContain(scout.id);
     expect(outside.surveyedBy).toBeUndefined();
+  });
+
+  test('a due beacon surveys a trailing deposit before its host moves out of range', () => {
+    const { engine, scout, now } = launchWorld();
+    try {
+      assert.ok(scout);
+      engine.parkSatellitePickups();
+      engine.clearSpiderField();
+      const host = asteroidAt('departing-host', { x: 200, y: 0 });
+      engine.asteroidLifecycle.insert(host);
+      expect(engine.useAbility(scout.id)).toBe(true);
+      resolveToolFlights(engine);
+      assert.ok(host.probe);
+      expect(
+        engine.asteroidLifecycle.update(host.id, {
+          position: { x: 4_400, y: 0 },
+          velocity: { x: 2, y: 0 },
+        })
+      ).toBe(host);
+      const before = probePosition(host, host.probe);
+      const trailing = asteroidAt('trailing-deposit', {
+        x: before.x - SURVEY_PROBE.RANGE,
+        y: before.y,
+      });
+      engine.asteroidLifecycle.insert(trailing);
+      expect(trailing.surveyedBy).toBeUndefined();
+      now.value += SURVEY_PROBE.PULSE_MS;
+
+      engine.advanceOneFrame(now.value);
+
+      assert.ok(host.probe);
+      const after = probePosition(host, host.probe);
+      expect(
+        Math.hypot(after.x - trailing.position.x, after.y - trailing.position.y)
+      ).toBeGreaterThan(SURVEY_PROBE.RANGE);
+      expect(trailing.surveyedBy).toContain(scout.id);
+    } finally {
+      engine.stopGameLoop();
+    }
+  });
+
+  test('an expiring beacon disappears without a final survey of a new deposit', () => {
+    const { engine, scout, now } = launchWorld();
+    try {
+      assert.ok(scout);
+      engine.parkSatellitePickups();
+      engine.clearSpiderField();
+      const host = asteroidAt('expired-survey-host', { x: 200, y: 0 });
+      engine.asteroidLifecycle.insert(host);
+      expect(engine.useAbility(scout.id)).toBe(true);
+      resolveToolFlights(engine);
+      assert.ok(host.probe);
+      expect(engine.asteroidLifecycle.update(host.id, { position: { x: 4_400, y: 0 } })).toBe(host);
+      const position = probePosition(host, host.probe);
+      const fresh = asteroidAt('unseen-at-expiry', { x: position.x + 30, y: position.y });
+      engine.asteroidLifecycle.insert(fresh);
+      expect(fresh.surveyedBy).toBeUndefined();
+      now.value = host.probe.expiresAt;
+      scout.lastUpdate = now.value;
+
+      engine.advanceOneFrame(now.value);
+
+      expect(host.probe).toBeNull();
+      expect(fresh.surveyedBy).toBeUndefined();
+    } finally {
+      engine.stopGameLoop();
+    }
   });
 
   test('launch selects the nearest polygon and rejects range and occupied hosts', () => {
@@ -173,10 +240,15 @@ describe('authoritative Scout probes', () => {
       return new AsteroidSpatialIndex([host]);
     };
     const lookup = (asteroidId: string) => (asteroidId === host.id ? host : undefined);
+    const inputs = {
+      rocks: { spatialIndex: source, getAsteroid: lookup },
+      spiders: { getBody: () => undefined },
+      abilities: { survey: () => undefined },
+    };
 
-    manager.tick(1_000 + SURVEY_PROBE.PULSE_MS - 1, source, lookup, () => undefined);
+    manager.advance(1_000 + SURVEY_PROBE.PULSE_MS - 1, inputs);
     expect(materializations).toBe(0);
-    manager.tick(1_000 + SURVEY_PROBE.PULSE_MS, source, lookup, () => undefined);
+    manager.advance(1_000 + SURVEY_PROBE.PULSE_MS, inputs);
     expect(materializations).toBe(1);
   });
 
@@ -189,12 +261,11 @@ describe('authoritative Scout probes', () => {
     let current = host;
     let pulses = 0;
     const tick = (now: number) =>
-      manager.tick(
-        now,
-        () => index,
-        () => current,
-        () => pulses++
-      );
+      manager.advance(now, {
+        rocks: { spatialIndex: () => index, getAsteroid: () => current },
+        spiders: { getBody: () => undefined },
+        abilities: { survey: () => pulses++ },
+      });
 
     tick(4_000);
     expect(pulses).toBe(1);
@@ -284,22 +355,23 @@ describe('authoritative Scout probes', () => {
     let current = host;
     let pulses = 0;
     const tick = (now: number) =>
-      manager.tick(
-        now,
-        () => index,
-        () => current,
-        () => {
-          pulses++;
-          if (pulses === 1) {
-            manager.unregister(host.id);
-            current = replacement;
-            index.add(replacement);
-            manager.registerAsteroid(replacement);
-          } else {
-            manager.clear();
-          }
-        }
-      );
+      manager.advance(now, {
+        rocks: { spatialIndex: () => index, getAsteroid: () => current },
+        spiders: { getBody: () => undefined },
+        abilities: {
+          survey: () => {
+            pulses++;
+            if (pulses === 1) {
+              manager.unregister(host.id);
+              current = replacement;
+              index.add(replacement);
+              manager.registerAsteroid(replacement);
+            } else {
+              manager.clear();
+            }
+          },
+        },
+      });
 
     tick(4_000);
     expect(pulses).toBe(1);

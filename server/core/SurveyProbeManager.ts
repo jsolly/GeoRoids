@@ -21,6 +21,7 @@ import type {
   ToolTargetPose,
 } from '../../shared-types';
 import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
+import type { SurveyProbeFrameInputs } from './types';
 
 interface SurveyProbeLaunchHost {
   id: string;
@@ -231,13 +232,9 @@ export class SurveyProbeManager {
     return { host, probe };
   }
 
-  public tick(
-    now: number,
-    asteroidIndex: () => AsteroidSpatialIndex,
-    lookup: HostLookup,
-    scan: ProbeScan
-  ): void {
-    this.prune(now, lookup);
+  /** Prune and survey attached hosts at the early, pre-motion frame position. */
+  public advance(now: number, inputs: SurveyProbeFrameInputs): void {
+    this.prune(now, (hostId) => inputs.rocks.getAsteroid(hostId) ?? inputs.spiders.getBody(hostId));
     for (const [asteroidId, entry] of this.hosts) {
       const { host, lastPulseAt } = entry;
       const probe = host.probe;
@@ -247,7 +244,9 @@ export class SurveyProbeManager {
       if (now - lastPulseAt < SURVEY_PROBE.PULSE_MS) {
         continue;
       }
-      this.emitPulse(host, probe, asteroidIndex(), scan);
+      this.emitPulse(host, probe, inputs.rocks.spatialIndex(), ({ ownerId, position, asteroids }) =>
+        inputs.abilities.survey(ownerId, position, asteroids, SURVEY_PROBE.RANGE)
+      );
       const current = this.hosts.get(asteroidId);
       if (current) {
         current.lastPulseAt = now;

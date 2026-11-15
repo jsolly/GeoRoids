@@ -104,7 +104,7 @@
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:33527f2794169dac9ff3a325f93fc2d8c41fdd8649c40710fb7c150f3429446b",
+    "server/core/GameEngine.ts": "sha256:6a4c2e958643970051a23334d999cb2fea0fb1f9c9970bfec876e777ba7f0780",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -127,7 +127,7 @@
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/core/types.ts": "sha256:603e1ef11f8aff26dbafe72c05b513c02e5137ae70a16dc27f8ad11bbebd16fb",
+    "server/core/types.ts": "sha256:072e983b21d8fcf8e474b7c520da13913404b3fbbed3ef082d3ecd538c10720a",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:8f39f9961d8057c6e66d2273eec5d8f3a8274ef2f5a8408982a8407a46578a58",
@@ -460,7 +460,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:c655f46d1a3a29064ac6444018d99d44dca0c3e0eedc67549482732410ca00a5",
+    "src/wiki/articleSources.json": "sha256:8bd9205c82c0238baad0864f5765bf69982fb40aa477ecd3f4ee1eef3d9a9525",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:1974cd25c3c195b8adaa4de36f281c5b2659d5b57c989f7c06ec41a11d44d9c8",
@@ -542,7 +542,7 @@
     "tests/unit/server/authoritative-combat.test.ts": "sha256:fbb40521eac8749d250e8f98fdc9bd6ca70a3914cd134d8907246cde1de7b138",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts": "sha256:4b3b3c8211a5e86754017779f12f55b26a82836e82b02e361989efd175a0d8e1",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts": "sha256:c96ecfbe16e8dbba584bd245ded3ac0a9157448ebecde18b574a835c6257698e",
-    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:fbe0df330f99dadbdf3e0164be483ef45dd4af53ef1735d88f5bf4425800b3d5",
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts": "sha256:9c2a0e78f6da3c467560e0e12bfa605b3e516622fb6da96ea6f7f9bf0310f587",
     "tests/unit/server/cargo-spills-protect-hulls-without-losing-points.test.ts": "sha256:a211f6c8c0c593b809dde90c6f053e37e39963550b6d84d9552ebed8159e01ee",
     "tests/unit/server/charged-beams-use-server-time-and-cancel-on-death.test.ts": "sha256:1dc33419bed392e8bf0c4e1a37d7b0b2d536d32f6f769db0da56652ed2bdddfb",
     "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts": "sha256:295f4e49031e3e57edc73c7b4b02071325769908907a9c8e6b26608dc360768d",
@@ -606,7 +606,8 @@
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
     "server/core/ToolFlightManager.ts": "sha256:7bf831b20722454fa047ca177aedfdc3673764903c37183c7a77021efb3b5671",
-    "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "sha256:889f389fe9f937ebf833a3808a2cf26e94f38b6672d7381db77427c47f6ffee2"
+    "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "sha256:889f389fe9f937ebf833a3808a2cf26e94f38b6672d7381db77427c47f6ffee2",
+    "server/core/SpiderPopulationBudget.ts": "sha256:92b9eea3e8efebe40c5f1ac6397d1e4a7aeecfd61a272fde84ba8e2b9085a62f"
   },
   "reviews": [
     {
@@ -9564,6 +9565,58 @@
       "owners": {
         "src/wiki/articleSources.json": "teamwork"
       }
+    },
+    {
+      "note": "SpiderPopulationBudget now owns the unchanged shared ordinary and reserved allocation through stable real campaign, spider and crawler capabilities. All five original refresh positions remain; the Engine helper and allocation equation are removed together. Complete AST proof has 125 comparisons, including all 117 remaining Engine methods after declared substitutions and the single constructor composition. Both type suites and nine focused files / 91 cases pass. Four new canonical scenarios cover inactive capacity, post-trim counts, reserved slots, first-frame swarm admission, same-frame crawler refill and final capacity. Nine of eleven controlled defects fail intended assertions at verified source locations, with all 1,343 source and four Git/configuration hashes restored after each. Before-hive and before-terrain omission variants still survive; no behavioral coverage is claimed for those two sites, which remain under exact source proof for independent test review. Reviewed all eleven manual articles and generated references: actual allocation topics are Asteroids, Terrain and Teamwork, whose expandable reference owns the 48/12 rule. Owner and canonical scenario mappings now cover all three. Native Chrome inspected all three topics at 1280 desktop and 390 mobile/touch before this acceptance, with six route/viewport pairs and seven raw screenshots including a supplemental expanded mobile reference. Both expanded references show 48 spiders including 12 reserved swarm slots. Terrain/Reflection illustrations load at 640x360, the Teamwork content link reaches Terrain, and there is no overflow. All seven console inventories have zero errors/warnings and retain the existing lazy-image dimensions issue with actual counts 10 or 11. Player prose, generated values, rendering and media bytes are unchanged. Actual media generator Engine instances have no saved activated campaign, so allocation behavior remains inactive there; no new media ownership or regeneration is asserted. Conservative Engine selectors cover all eleven topics and ten media while only the actual three topics were manually inspected. Owned page and services stopped; health HTTP200, worker healthy, zero stalls. Full gate, independent implementation/publication review, Linux media CI and both-host release verification remain pending.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/SpiderPopulationBudget.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork"
+      }
+    },
+    {
+      "note": "Added the distinct combat-only ordering scenario following independently confirmed Important TEST-1. The real activated Engine first exposes 36 distant and 12 nearby ordinary spiders by identity, then one combat-only frame leaves neither cohort. Omitting only the pre-terrain refresh now fails with 12 nearby survivors. All previous canonical test bytes and the full-frame crawler-refill scenario are preserved. Both type suites and nine focused files / 92 cases pass. Ten of eleven controlled variants fail at verified intended assertions, with all 1,347 protected source/Git/configuration hashes restored after each. Only the pre-hive omission still survives, and no behavioral coverage is claimed for it; all five original positions remain under the 125-comparison source proof. Production code and fixture helper are unchanged from the valid closed R1 review. Current source parity verifies all 1,342 non-test source files unchanged, including render code, generated references, articles and media. All seven actual Wiki screenshots and every supplied browser evidence file retain their reviewed hashes, so the completed Asteroids/Terrain/Teamwork desktop/mobile check, expanded 48/12 reference, illustrations, navigation and explicit existing console issue remain applicable before this acceptance. No new player or production behavior is introduced. The complete R2 gate and fresh affected-lens/critic review remain pending before publication.",
+      "sources": ["tests/unit/server/campaign-spiders-share-reserved-population.test.ts"],
+      "topics": ["asteroids", "teamwork", "terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "Addressed the deduplicated Minor TEST-2/CQ-1 by reading the existing public spider snapshot directly in all five canonical observations. The same snapshot supplies GameState.spiderField; the tests no longer read unrelated world state or silently turn an absent required field into an empty array. Exact comparison against archived R2 source proves only those five substitutions; every other canonical byte, the fixture helper, production code, Wiki articles, generated references, rendering and media are unchanged. Both type suites and nine focused files / 92 cases pass. Ten of eleven controlled variants again fail at verified intended assertions, including the identified combat-only cohorts and same-frame crawler refill, with all 1,347 protected hashes restored after each. Only the pre-hive omission still survives, explicitly limited to exact source preservation. All ten browser evidence files and seven raw PNGs retain their reviewed hashes, so the completed three-topic desktop/mobile scope, expanded 48/12 reference, loaded illustrations, content navigation and existing console issue remain applicable before acceptance. The preceding Important combat-only finding was resolved by the fresh R2 test review and implementation critic; their valid window closed with all 634 hashes and checkout backstop unchanged. A complete gate and fresh affected review for this assertion simplification remain pending before publication. No player or production behavior changes.",
+      "sources": ["tests/unit/server/campaign-spiders-share-reserved-population.test.ts"],
+      "topics": ["asteroids", "teamwork", "terrain"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

@@ -244,7 +244,9 @@
     "server/core/GlowtoyManager.ts",
     "src/rendering/shipLighting.ts",
     "tests/unit/server/glowtoys-store-light-and-reveal-one-cache.test.ts",
-    "tests/unit/rendering/ship-light-casts-wreck-shadows-and-colors-speed.test.ts"
+    "tests/unit/rendering/ship-light-casts-wreck-shadows-and-colors-speed.test.ts",
+    "server/core/SpiderPopulationBudget.ts",
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",
@@ -372,7 +374,8 @@
     "src/physics/terrain/contourBridgeSession.ts",
     "src/rendering/contourBridgeRenderer.ts",
     "tests/unit/server/contour-riding-rocks-drop-navigation-crystals.test.ts",
-    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts",
+    "server/core/SpiderPopulationBudget.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -798,6 +801,8 @@
     "server/core/CooperativeContourBridges.ts",
     "shared/aiShips.ts",
     "server/core/BotFleet.ts",
-    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
+    "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts",
+    "server/core/SpiderPopulationBudget.ts",
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
   ]
 }

@@ -33,6 +33,11 @@ async function productionService(): Promise<ServiceNode> {
   return service;
 }
 
+test('production planning preserves the intentionally configured report-delivery token', async () => {
+  const service = await productionService();
+  assert.deepEqual(service.variables?.['TODOIST_API_TOKEN'], { type: 'preserve' });
+});
+
 test('CI builds with the Railpack release and start command Railway production uses', async () => {
   const service = await productionService();
   const script = read('scripts/railpack-build.sh');

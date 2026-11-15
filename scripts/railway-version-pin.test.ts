@@ -225,6 +225,33 @@ test('saved artifact identity, source, etag and hash fail closed', () => {
   }
 });
 
+test('saved-plan rejection identifies fixed failed checks without exposing private values', () => {
+  for (const [patch, label] of [
+    [{ kind: 'DO-NOT-LOG-kind' }, 'kind'],
+    [{ version: 2 }, 'format-version'],
+    [{ cliVersion: 'DO-NOT-LOG-version' }, 'cli-version'],
+    [{ sourceTree: 'DO-NOT-LOG-source' }, 'source-tree'],
+    [{ environmentId: 'DO-NOT-LOG-environment' }, 'environment'],
+    [{ configEtag: 'DO-NOT-LOG-etag' }, 'etag'],
+    [{ destructive: true }, 'destructive'],
+    [{ claim: true }, 'ownership-claim'],
+  ] as const) {
+    assert.throws(
+      () => review({ ...artifact(), ...patch }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, `Saved Railway plan rejected (${label})`);
+        assert.equal(error.message.includes('DO-NOT-LOG'), false);
+        return true;
+      }
+    );
+  }
+  assert.throws(
+    () => review({ ...artifact(), configEtag: 'private', destructive: true, claim: true }),
+    /^Error: Saved Railway plan rejected \(etag, destructive, ownership-claim\)$/u
+  );
+});
+
 test('unknown, destructive, unrelated, hidden and stale changes cannot pass as a version update', () => {
   const changes = [
     { ...change(), kind: 'resource.delete' },

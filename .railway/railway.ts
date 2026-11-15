@@ -25,6 +25,7 @@ export default defineRailway(() => {
     env: {
       DEPLOY_TRIGGER: preserve(),
       NODE_ENV: preserve(),
+      TODOIST_API_TOKEN: preserve(),
       GEOROIDS_WORLD_PATH: '/data/world.sqlite',
     },
     volumeMounts: { '/data': worldData },

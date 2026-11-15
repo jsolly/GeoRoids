@@ -7,6 +7,7 @@ import type { MapAssets } from '../world/MapAssets';
 import type { RegionalAsteroidField } from '../world/RegionalAsteroidField';
 import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
+import type { AsteroidHitFeedback } from './AsteroidHitFeedback';
 import type { AsteroidLifecycle } from './AsteroidLifecycle';
 import type { AsteroidHitOutcome, AsteroidManager } from './AsteroidManager';
 import type { AsteroidMining } from './AsteroidMining';
@@ -62,7 +63,7 @@ export type ContactCombatInputs = {
   readonly spiders: Pick<SpiderField, 'drainAttacks' | 'isAttackActive'>;
   readonly paused: () => boolean;
   readonly serverNow: () => number;
-  readonly emitAsteroidHits: (hits: AppliedAsteroidHit[]) => void;
+  readonly asteroidHits: Pick<AsteroidHitFeedback, 'emit'>;
 };
 
 export type ShipDamageOutcome =

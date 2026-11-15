@@ -209,7 +209,7 @@ describe('server-authoritative combat', () => {
     engine.asteroidLifecycle.insert(cargo);
     const healthBefore = hauler.health;
     const breaks: AppliedAsteroidHit[] = [];
-    engine.setOnAsteroidHits((hits) => breaks.push(...hits));
+    engine.asteroidHitFeedback.setListener((hits) => breaks.push(...hits));
 
     const contacts = engine.contactCombat.advance();
 
@@ -291,7 +291,7 @@ describe('server-authoritative combat', () => {
     const partnerHealth = partner.health;
 
     const breaks: AppliedAsteroidHit[] = [];
-    engine.setOnAsteroidHits((hits) => breaks.push(...hits));
+    engine.asteroidHitFeedback.setListener((hits) => breaks.push(...hits));
     engine.contactCombat.advance();
 
     expect(hauler.health).toBe(haulerHealth);

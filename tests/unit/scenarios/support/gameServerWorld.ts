@@ -184,7 +184,7 @@ export class GameServerWorld {
   constructor(seed = 42) {
     this.engine = new GameEngine(seed);
     this.core = new WebSocketCore(this.engine);
-    this.engine.setOnAsteroidHits((hits) => {
+    this.engine.asteroidHitFeedback.setListener((hits) => {
       this.core.getMessageHandler().broadcastAppliedAsteroidHits(hits);
     });
   }

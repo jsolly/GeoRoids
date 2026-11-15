@@ -368,7 +368,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   gameEngine.startGameLoop();
   gameEngine.updatePauseState();
   const wsCore = new WebSocketCore(gameEngine);
-  gameEngine.setOnAsteroidHits((hits) => {
+  gameEngine.asteroidHitFeedback.setListener((hits) => {
     wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
   });
   wsCore.startPeriodicGameStateBroadcast();

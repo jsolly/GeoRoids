@@ -597,7 +597,7 @@ export async function runWireLedgerSample(
     core = new WebSocketCore(engine);
     const activeCore = core;
     const broadcaster = core.getBroadcaster();
-    engine.setOnAsteroidHits((hits) =>
+    engine.asteroidHitFeedback.setListener((hits) =>
       core?.getMessageHandler().broadcastAppliedAsteroidHits(hits)
     );
     for (let index = 0; index < options.players; index++) {

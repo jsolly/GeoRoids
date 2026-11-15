@@ -17,7 +17,6 @@ import { checkBoundaryCollision } from '../../shared/boundary';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
-import { COOPERATIVE } from '../../shared/cooperativeRules';
 import { cargoCapacity, ECONOMY } from '../../shared/economy';
 import {
   canEquipUtility,
@@ -130,6 +129,7 @@ import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 import { SettlementLedger } from './SettlementLedger';
 import { ShipAbilityManager } from './ShipAbilityManager';
+import { SpiderPopulationBudget } from './SpiderPopulationBudget';
 import { SurveyProbeManager } from './SurveyProbeManager';
 import { spiderResources } from './spiderResources';
 import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
@@ -255,6 +255,7 @@ export class GameEngine {
   private satellitePickupManager: SatellitePickupManager;
   public readonly satelliteField: SatellitePickupField;
   private readonly spiderManager: TerrainSpiderManager;
+  private readonly spiderPopulation: SpiderPopulationBudget;
   private readonly beltCrawlers = new BeltCrawlerManager((id) => this.getAsteroid(id));
   private rngService: RNGService;
   private collisionAuthority = new CollisionAuthority();
@@ -494,6 +495,11 @@ export class GameEngine {
       this.furnaces,
       (position) => this.remains.add('nest-remains', position, this.gameTime)
     );
+    this.spiderPopulation = new SpiderPopulationBudget({
+      campaign: this.cooperative,
+      spiders: this.spiderManager,
+      crawlers: this.beltCrawlers,
+    });
     this.hives = new HiveEncounters(this.cooperative, this.spiderManager);
     this.hazards = new WorldHazards(this.spiderManager);
     this.crewRescue = new CrewRescueManager({
@@ -1300,24 +1306,11 @@ export class GameEngine {
     this.pendingSpiderAttacks = [];
   }
 
-  /** Apply the shared budget before every producer, including already awake occupants. */
-  private updateSpiderBudget(): void {
-    if (!this.cooperative.activated) {
-      return;
-    }
-    const ordinary = SPIDER.MAX_ACTIVE - COOPERATIVE.swarmSlots;
-    this.beltCrawlers.setPopulationLimit(ordinary - this.spiderManager.ordinaryCount());
-    this.spiderManager.setPopulationLimit(
-      ordinary - this.beltCrawlers.population,
-      SPIDER.MAX_ACTIVE - this.beltCrawlers.population
-    );
-  }
-
   private advanceHazards(now: number): void {
     if (!this.cooperative.activated) {
       return;
     }
-    this.updateSpiderBudget();
+    this.spiderPopulation.refresh();
     this.hazards.advance(now, this.entityManager.getAllEntities(), (id) =>
       this.handleShipDamage(id, 'asteroid', 50)
     );
@@ -1327,7 +1320,7 @@ export class GameEngine {
     if (!this.cooperative.activated) {
       return;
     }
-    this.updateSpiderBudget();
+    this.spiderPopulation.refresh();
     const players = this.getAllPlayers();
     if (this.gameTime % 60 === 1) {
       this.hives.refresh(players);
@@ -1336,7 +1329,7 @@ export class GameEngine {
   }
 
   private advanceSpiderField(): void {
-    this.updateSpiderBudget();
+    this.spiderPopulation.refresh();
     const spiderTows = this.entityManager
       .getAllEntities()
       .flatMap((entity) =>
@@ -1422,7 +1415,7 @@ export class GameEngine {
         );
       },
     });
-    this.updateSpiderBudget();
+    this.spiderPopulation.refresh();
     this.pendingSpiderAttacks.push(
       ...attacks,
       ...this.beltCrawlers.advance({
@@ -1442,7 +1435,7 @@ export class GameEngine {
         nowFrame: this.gameTime,
       })
     );
-    this.updateSpiderBudget();
+    this.spiderPopulation.refresh();
     for (const entity of this.entityManager.getAllEntities()) {
       if (
         entity.harpoonTargetId != null &&

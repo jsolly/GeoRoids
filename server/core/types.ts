@@ -130,3 +130,9 @@ export type SurveyProbeFrameInputs = {
   readonly spiders: Pick<TerrainSpiderManager, 'getBody'>;
   readonly abilities: Pick<ShipAbilityManager, 'survey'>;
 };
+
+export type SpiderPopulationInputs = {
+  readonly campaign: Pick<CooperativeCampaign, 'activated'>;
+  readonly spiders: Pick<TerrainSpiderManager, 'ordinaryCount' | 'setPopulationLimit'>;
+  readonly crawlers: Pick<BeltCrawlerManager, 'population' | 'setPopulationLimit'>;
+};

@@ -41,6 +41,7 @@ while the surviving deterministic cases define the automated proof.
 | How do I buy a placeholder at Town Square? | controls, teamwork | shared/townStore.ts, src/runtime/townStore.ts, GameEngine buyStoreItem, town store tests |
 | How do I launch, follow, or shoot down a probe beacon? | scout, controls, teamwork, hud-network | shared/surveyProbe.ts, AsteroidLifecycle.ts probe host commands, SurveyProbeManager.ts, GameEngine.ts launch, src/entities/roid/surveyProbeRenderer.ts |
 | How do I build furnaces and repel spiders? | scout, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, escape construction and living spider retreat, and scan-defense tests |
+| How do terrain spiders and belt crawlers leave room for swarms? | terrain, asteroids, teamwork | SpiderPopulationBudget.ts, TerrainSpiderManager.ts, BeltCrawlerManager.ts, campaign-spiders-share-reserved-population.test.ts |
 | Which of the two kits fits my next flight? | Each ship article | shared/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do shards and mined cargo work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |

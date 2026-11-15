@@ -18,6 +18,7 @@ import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
 import type { SettlementLedger } from './SettlementLedger';
 import type { ShipAbilityManager } from './ShipAbilityManager';
+import type { SpiderPopulationBudget } from './SpiderPopulationBudget';
 import type { SurveyProbeManager } from './SurveyProbeManager';
 import type { TerrainSpiderManager } from './TerrainSpiderManager';
 
@@ -135,4 +136,12 @@ export type SpiderPopulationInputs = {
   readonly campaign: Pick<CooperativeCampaign, 'activated'>;
   readonly spiders: Pick<TerrainSpiderManager, 'ordinaryCount' | 'setPopulationLimit'>;
   readonly crawlers: Pick<BeltCrawlerManager, 'population' | 'setPopulationLimit'>;
+};
+
+export type WorldHazardInputs = {
+  readonly campaign: Pick<CooperativeCampaign, 'activated'>;
+  readonly population: Pick<SpiderPopulationBudget, 'refresh'>;
+  readonly spiders: Pick<TerrainSpiderManager, 'getBody' | 'spawnSpider' | 'removeSpider'>;
+  readonly actors: Pick<EntityManager, 'getAllEntities'>;
+  readonly hit: (id: GameEntity['id']) => void;
 };

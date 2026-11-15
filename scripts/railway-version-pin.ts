@@ -279,6 +279,15 @@ export function reviewPlan(
   if (rejected.length !== 0) {
     throw new VersionPinError(`Saved Railway plan rejected (${rejected.join(', ')})`);
   }
+  return reviewPlanChanges(plan, expected);
+}
+
+/** Review all settings independently of ownership admission; this function never applies. */
+export function reviewPlanChanges(
+  value: unknown,
+  expected: { version: string; snapshot: Snapshot }
+): Review {
+  const plan = record(value);
   if (plan['diff'] !== undefined && typeof plan['diff'] !== 'string') {
     throw new VersionPinError('Saved Railway plan diff has an unsupported shape');
   }

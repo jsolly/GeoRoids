@@ -124,3 +124,9 @@ export type ToolFlightInputs = {
   readonly abilities: Pick<ShipAbilityManager, 'survey'>;
   readonly now: () => number;
 };
+
+export type SurveyProbeFrameInputs = {
+  readonly rocks: Pick<AsteroidManager, 'getAsteroid' | 'spatialIndex'>;
+  readonly spiders: Pick<TerrainSpiderManager, 'getBody'>;
+  readonly abilities: Pick<ShipAbilityManager, 'survey'>;
+};

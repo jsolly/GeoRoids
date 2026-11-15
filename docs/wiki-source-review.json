@@ -104,7 +104,7 @@
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:894a70e79dcf8b150d1a74a5ea3a7c307f2c0d3853caa9db4dbe390513202d92",
+    "server/core/GameEngine.ts": "sha256:33527f2794169dac9ff3a325f93fc2d8c41fdd8649c40710fb7c150f3429446b",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:2d8331d8942c1f53f983809c4a0423b8f101c81a6c3084e03277babd65e56975",
@@ -120,14 +120,14 @@
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
     "server/core/SettlementLedger.ts": "sha256:c4a02399a8b7eb3f19f8f23a057614b6ca57847add49aa2f0078cea0664a281e",
     "server/core/ShipAbilityManager.ts": "sha256:15a64888ab7523eaf9637f87cba969f11d4698e4b8f838232255498e3e8150ca",
-    "server/core/SurveyProbeManager.ts": "sha256:21e11bb37ea372ad0fb270671fafd708477785aa60f2b0479bbeb21697894e5c",
+    "server/core/SurveyProbeManager.ts": "sha256:526bb3ed8de8ec2219d1369fcaed49810fe39fcc08028ca5a94bca006151f4c4",
     "server/core/TerrainSpiderManager.ts": "sha256:f901b1997549a34ab7d499d9f3da513590191250850ebd5af2db94ee0325c52c",
     "server/core/WorldDiscovery.ts": "sha256:a0634b29bbd295bd60183a564c5c66f8dc6b2203452f802e336d1cfa086d5115",
     "server/core/WorldHazards.ts": "sha256:0e1c4a3b74895f4880637a8cdb6c94d61ce9475a91eb404d0dedd376280e4016",
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/core/types.ts": "sha256:c9fd176e233bc761fa3cc8d9f714e381ad35aa4abed46fde66b8c2cc84de9253",
+    "server/core/types.ts": "sha256:603e1ef11f8aff26dbafe72c05b513c02e5137ae70a16dc27f8ad11bbebd16fb",
     "server/createServer.ts": "sha256:a735d80d906cc1ccf017d52ec50f585e8adf2f31a79b58f91dca97f613abf3ad",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:8f39f9961d8057c6e66d2273eec5d8f3a8274ef2f5a8408982a8407a46578a58",
@@ -460,7 +460,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:6288bea58bc7076c762e200c673d7217f1104da307f3e82028f6189eca41dceb",
+    "src/wiki/articleSources.json": "sha256:c655f46d1a3a29064ac6444018d99d44dca0c3e0eedc67549482732410ca00a5",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:1974cd25c3c195b8adaa4de36f281c5b2659d5b57c989f7c06ec41a11d44d9c8",
@@ -583,7 +583,7 @@
     "tests/unit/server/regional-asteroid-density.test.ts": "sha256:6f4e28afddacf040e24c4adba92aa365c06d38bc49cb98ba41bfa20cf4f3016b",
     "tests/unit/server/remains-stay-local-and-expire-without-awarding-loot.test.ts": "sha256:d9068ad99ce5f69e18a6e63b7ac7ee4cc56db22becc246411398841d60d75d9b",
     "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:e948ec139f99eb4b596de79ab3ac7a691779a3580bcf0747df1dabd3e65c84d1",
-    "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:735f3bb17320fe5f22be0e688b6a13fb00e737c01ff9904bc3204a5046e792f3",
+    "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:e6759788338e3a571b08d38d2d8cafee63da611bdea8811eb29a36e1a4f56f76",
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts": "sha256:c1d08572c3ae0c9fa85107fbbb2d86192102bdea10a9c017837a7135ee4048b5",
     "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts": "sha256:15a683e29b00ec9045c9ebea5e5f65435ab2eb5ea9ec84f872d81542c664d6c4",
     "tests/unit/shared/furnaces.test.ts": "sha256:40ea09e265e54e6fbaaa6032028e2f72a68488bda7b66b2b7047c6cb004f888f",
@@ -605,7 +605,8 @@
     "tests/unit/utils/player-name.test.ts": "sha256:a59789dd3f31954dd58d8a1ceb3368dabd75522bff56f8d42786003913221cc0",
     "tsconfig.frontend.json": "sha256:0ff24e47ee1b05c42c624560a219b8f100713daae7295d3cf009d4b3ed892848",
     "tsconfig.json": "sha256:8f1936a9c8241fd0d1780d5f4c9d5cf9cead2d27536a0b0f4cb60820f57246a8",
-    "server/core/ToolFlightManager.ts": "sha256:7bf831b20722454fa047ca177aedfdc3673764903c37183c7a77021efb3b5671"
+    "server/core/ToolFlightManager.ts": "sha256:7bf831b20722454fa047ca177aedfdc3673764903c37183c7a77021efb3b5671",
+    "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "sha256:889f389fe9f937ebf833a3808a2cf26e94f38b6672d7381db77427c47f6ffee2"
   },
   "reviews": [
     {
@@ -9510,6 +9511,58 @@
       "owners": {
         "src/wiki/articleSources.json": "teamwork",
         "src/wiki/media.ts": "teamwork"
+      }
+    },
+    {
+      "note": "SurveyProbeManager.advance now owns the complete early attached-host prune and recurring survey operation through narrow actual rock, spider and survey capabilities. Engine calls it with existing serverNow immediately after abilities; late flight contact stays separate. Removed the old Engine helper and public generic tick API together, migrated direct fixtures to actual host identity, and updated developer and five-topic source ownership, including the canonical Scout test source. Types, benchmark types, scoped lint and eight focused files79cases pass. Two initially surviving ordering defects drove real-frame pre-motion and exact-expiry witnesses. Eight controlled defects now fail their intended assertions for late pulse, expired final survey, wrong clock, eager index, stale cadence, stale reentrant entry, missing spider lookup and doubled survey range; all1342source and four Git/configuration hashes restore after each. Complete AST comparison134matches validates original composition, moved loop, all118remaining Engine bodies, unchanged constructor and fields. Before this acceptance, native Chrome reviewed Scout, Hauler, Asteroids, Teamwork and HUD at1280desktop and390mobile/touch with10actualscreenshots, loaded640x360illustrations and native related-Hauler navigation. A dedicated ten-route console pass found zero errors/warnings; the existing lazy-image dimension issue remains recorded. Player prose and media bytes are unchanged; media generators use Mineral Scan rather than attached probes, and their cited dependencies remain intact. Conservative Engine selectors cover all11topics/all10media, while actual affected5topics were manually inspected. Owned page and services stopped, health/persistence healthy, no user or physical/performance acceptance claimed. Full gate, independent critic/publication reviews, Linux media CI and both-host production verification remain pending.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/SurveyProbeManager.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts",
+        "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork",
+        "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts": "scout"
+      }
+    },
+    {
+      "note": "Corrected the confirmed Terrain ownership omission: Terrain now cites SurveyProbeManager and the existing guarded-resource spider scenario. Reviewed the entire eleven-article manual footprint; the six actual affected topics are Scout, Hauler, Asteroids, Teamwork, HUD and Terrain. Native Chrome inspected Terrain at1280desktop and390mobile/touch with two raw screenshots, loaded640x360terrain.gif, actual content Scout navigation at both sizes and zero console errors/warnings; the existing lazy-image issue counts10desktop/11mobile are recorded. The earlier ten screenshots and dedicated console observations for the other five topics remain valid: exact archived-source parity proves1340of1342 sources unchanged before this acceptance, including all runtime, rendering, player prose and media. Earlier private count wording is corrected separately: actual dedicated earlier counts11through13. Strengthened the existing real-frame due-boundary scenario so the admitted frame timestamp differs from the later clock; all nine controlled defects fail intended assertions, including fresh clock resampling, and all1346 protected hashes restore after each. Both type checks and eight focused files79cases pass. Public selector refusal checks now require Terrain for both owner and canonical spider scenario without modifying the ledger. No gameplay prose, media or production code changed after the valid closed R1 review. R2 full gate, independent affected-lens review and release verification remain pending.",
+      "sources": [
+        "src/wiki/articleSources.json",
+        "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts"
+      ],
+      "topics": ["scout", "teamwork", "terrain"],
+      "media": [],
+      "owners": {
+        "src/wiki/articleSources.json": "teamwork"
       }
     }
   ]

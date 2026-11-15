@@ -130,6 +130,7 @@
   ],
   "hauler": [
     "server/core/ToolFlightManager.ts",
+    "server/core/SurveyProbeManager.ts",
     "shared/shipKits.ts",
     "shared/shipAbilities.ts",
     "server/core/ShipAbilityManager.ts",
@@ -199,6 +200,7 @@
   ],
   "asteroids": [
     "server/core/ToolFlightManager.ts",
+    "server/core/SurveyProbeManager.ts",
     "server/core/ShipAbilityManager.ts",
     "server/core/AsteroidManager.ts",
     "server/core/AsteroidLifecycle.ts",
@@ -268,6 +270,8 @@
     "src/entities/satellitePickup/SatellitePickup.ts"
   ],
   "terrain": [
+    "server/core/SurveyProbeManager.ts",
+    "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts",
     "shared/terrainConfig.ts",
     "shared/heightfield.ts",
     "shared/terrainTravel.ts",
@@ -444,6 +448,7 @@
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
   ],
   "hud-network": [
+    "server/core/SurveyProbeManager.ts",
     "server/core/WorldDiscovery.ts",
     "src/entities/player/Player.ts",
     "src/entities/player/remoteLasers.ts",
@@ -626,6 +631,7 @@
     "src/rendering/hud/resourceMapMark.ts",
     "server/core/TerrainSpiderManager.ts",
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts",
+    "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts",
     "shared/furnaceField.ts",
     "shared/furnaces.ts",
     "src/rendering/furnaceRenderer.ts",
@@ -693,6 +699,7 @@
   ],
   "teamwork": [
     "server/core/ToolFlightManager.ts",
+    "server/core/SurveyProbeManager.ts",
     "server/core/ShipAbilityManager.ts",
     "server/core/WorldDiscovery.ts",
     "shared-types.ts",

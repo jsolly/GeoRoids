@@ -748,7 +748,11 @@ export class GameEngine {
     this.contourBridges.advance(this.gameTime, serverNow);
     this.furnaceTravel.advance(this.gameTime, serverNow);
     this.abilities.advance();
-    this.tickSurveyProbes(serverNow);
+    this.surveyProbeManager.advance(serverNow, {
+      rocks: this.asteroidManager,
+      spiders: this.spiderManager,
+      abilities: this.abilities,
+    });
     this.entityManager.updateHealthRegeneration();
     this.lootCollection.advance(this.gameTime);
     this.satelliteField.advance();
@@ -2832,16 +2836,6 @@ export class GameEngine {
       }
     }
     return activation.activated;
-  }
-
-  private tickSurveyProbes(now: number): void {
-    this.surveyProbeManager.tick(
-      now,
-      () => this.asteroidManager.spatialIndex(),
-      (hostId) => this.getAsteroid(hostId) ?? this.spiderManager.getBody(hostId),
-      ({ ownerId, position, asteroids }) =>
-        this.abilities.survey(ownerId, position, asteroids, SURVEY_PROBE.RANGE)
-    );
   }
 
   public furnaceBuildIssue(entityId: string): string | undefined {

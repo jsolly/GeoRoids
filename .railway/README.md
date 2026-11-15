@@ -106,6 +106,81 @@ preserves the intentionally configured `TODOIST_API_TOKEN` without reading,
 copying, setting or deleting it. Omitted service variables are deletion requests
 in the pinned planner, so human-owned credentials must remain explicitly preserved.
 
+## Inspect first ownership without applying
+
+John authorized the separate **Railway ownership plan** workflow on 2026-11-15.
+Dispatch it manually from current `main`, with no inputs. It shares the pin
+workflow's concurrency group, checksum-pinned CLI `5.50.2` and main-restricted
+`railway-production-config` Environment. Its entry point accepts no arguments
+and has no application mode. The pin workflow still rejects ownership claims.
+
+The workflow queries `iacPartials` with the fixed production IDs, verifies the
+existing service and `world-data` volume mapping, its 1024 MB `iad` configuration
+and `/data` mount, and refuses staged work. The pinned native model treats an
+explicit null ownership map as unowned. A missing field, query error, malformed
+map, incomplete mapping or an address outside the two declared resources blocks
+inspection. There is no compatibility query that silently omits ownership.
+
+An initial `owners-observed` JSON line records each exact address and resource
+ID, current owner, intended owner `*` and whether that address needs a claim.
+It has `planVerified: false`; it remains useful if native planning fails but
+does not prove a plan. Foreign named ownership is never transferred.
+
+The workflow plans the unchanged production definition. That definition includes
+the desired Railpack pin, so this is a diagnostic plan, not an ownership-only
+adoption plan. The complete saved artifact must match the pinned format, source
+tree, target, configuration etag, hash and declared resources. Every proposed
+operation receives an ordered inventory row, with fixed kind/address/field
+labels and an unknown-field count. Unrecognized text and all raw operation
+values, summaries, diagnostic messages and variable values stay private.
+Oversized or untrusted artifacts fail explicitly rather than truncating rows.
+
+After inventory, the shared complete settings review determines whether only
+the pin would change. Ownership inspection does not bypass, rewrite or filter
+the saved artifact. Even a policy-blocked inventory must pass a second snapshot,
+current-source and unchanged-byte check before its final receipt is emitted.
+The full masked configuration and ownership map must remain stable. Drift or
+incomplete validation leaves the inventory unverified.
+
+The final JSON receipt contains every row, operation/diagnostic counts, per-address
+ownership, aggregate claim consistency, settings disposition, native change-set
+hash and raw artifact digest. `applicationEnabled` and `liveApprovalReady` are
+always false, with `deploymentId: null`. `pinPolicyAccepted: false` remains
+expected when first ownership is needed; it cannot enable application. Foreign
+owners, inconsistent claim metadata, destructive changes, diagnostics or settings
+outside the pin policy emit the complete sanitized receipt and fail the job.
+Raw plans and query results are never uploaded and temporary files are deleted
+on exit. A failed run is not permission to retry or change production.
+
+### Ownership release is a separate prerequisite
+
+First apply records resource-level ownership even with zero setting changes.
+The current unnamed definition uses owner `*`; it would manage the declared
+service and volume, rather than only `build.railpackVersion`. Future whole-project
+plans can propose deleting omitted services. No ownership adoption is authorized
+by either planning workflow.
+
+CLI `5.50.2` has no `config partials` management command. Official CLI `5.74.0`
+adds list, release and transfer, with etag-bound previews; release and transfer
+require environment ADMIN access and accept named partials. Its named-partial
+parser rejects `*`, so these commands do not establish a rollback for adopting
+the current whole-project owner. This workflow does not upgrade the CLI, probe
+ADMIN access or execute ownership mutations. A source revert alone would not
+undo provider ownership.
+
+Before any adoption, separately decide the owner model, prove a supported release
+procedure and access, review a fresh ownership-only plan with zero setting
+operations and exact existing IDs, and obtain explicit approval for its exact
+digest. The version pin remains a later, independently guarded application.
+Automatic application remains a separate authorization and reviewed change.
+
+Primary sources for ownership inspection and release research:
+
+- [Pinned native owner-map query and null handling](https://github.com/railwayapp/cli/blob/v5.50.2/src/iac/engine.rs)
+- [Pinned ownership predicate and names](https://github.com/railwayapp/cli/blob/v5.50.2/src/iac/partial.rs)
+- [CLI 5.74.0 ownership command requirements](https://github.com/railwayapp/cli/blob/v5.74.0/src/commands/config/partials.rs)
+- [CLI 5.74.0 named ownership and etag checks](https://github.com/railwayapp/cli/blob/v5.74.0/src/iac/ownership.rs)
+
 ## Saved-plan and verification contract
 
 The serialized planning job checks out its exact triggering SHA. The runner

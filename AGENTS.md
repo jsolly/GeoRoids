@@ -12,6 +12,13 @@ Deploy: Vercel Git at <https://www.georoids.com> plus Railway Git at <https://ge
 
 Before deployment operations, read [agent operations](docs/agent-operations.md). Never apply unrelated staged Railway patches; fallback deploys must name the exact merged SHA. World persistence requires the reviewed production volume and `GEOROIDS_WORLD_PATH=/data/world.sqlite`; apply that configuration before server deployment. The game loop never waits for disk writes. Production configuration and destructive data changes remain human-owned. The sole approved automation policy is `build.railpackVersion` on the exact existing production service, using the guarded saved-plan runner in [.railway/README.md](.railway/README.md). The workflow permits only manual plan-only runs from trusted `main` with a dedicated production-scoped token. Production application and automatic triggers remain disabled and require separate authorization and a reviewed workflow change. That policy never authorizes unrelated staged work, variables, secrets, volumes or resource changes.
 
+John separately authorized the manual **Railway ownership plan** diagnostic on
+2026-11-15. It reads exact resource owners and inventories a native saved plan
+without application capability. It preserves the version-pin policy and shares
+its restricted production Environment and concurrency group. No ownership
+adoption, transfer/release, credential change or automatic trigger is authorized.
+See [.railway/README.md](.railway/README.md#inspect-first-ownership-without-applying).
+
 ## Project
 
 GeoRoids — a cooperative open-world multiplayer spaceship game (surveying, asteroid towing, shared furnace deliveries). Astro static pages with Svelte 5 and shadcn-svelte interfaces plus a TypeScript canvas engine (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`, with rules both sides share in `shared/`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^26.0.0`.

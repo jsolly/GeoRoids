@@ -501,7 +501,13 @@ export class GameEngine {
       crawlers: this.beltCrawlers,
     });
     this.hives = new HiveEncounters(this.cooperative, this.spiderManager);
-    this.hazards = new WorldHazards(this.spiderManager);
+    this.hazards = new WorldHazards({
+      campaign: this.cooperative,
+      population: this.spiderPopulation,
+      spiders: this.spiderManager,
+      actors: this.entityManager,
+      hit: (id) => this.handleShipDamage(id, 'asteroid', 50),
+    });
     this.crewRescue = new CrewRescueManager({
       actors: this.entityManager,
       campaign: this.cooperative,
@@ -735,7 +741,7 @@ export class GameEngine {
     }
     this.gameTime++;
     this.crewRescue.advance(serverNow);
-    this.advanceHazards(serverNow);
+    this.hazards.advance(serverNow);
     if (this.isPaused) {
       return;
     }
@@ -1304,16 +1310,6 @@ export class GameEngine {
     this.spiderManager.clear();
     this.beltCrawlers.clear();
     this.pendingSpiderAttacks = [];
-  }
-
-  private advanceHazards(now: number): void {
-    if (!this.cooperative.activated) {
-      return;
-    }
-    this.spiderPopulation.refresh();
-    this.hazards.advance(now, this.entityManager.getAllEntities(), (id) =>
-      this.handleShipDamage(id, 'asteroid', 50)
-    );
   }
 
   private advanceCampaign(now: number): void {

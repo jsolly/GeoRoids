@@ -1,15 +1,19 @@
 /* @vitest-environment node */
 import { afterEach, expect, test } from 'vitest';
+import { BeltCrawlerManager } from '../../../server/core/BeltCrawlerManager';
 import { EntityManager } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { HiveEncounters } from '../../../server/core/HiveEncounters';
 import { RNGService } from '../../../server/core/RNGService';
+import { SpiderPopulationBudget } from '../../../server/core/SpiderPopulationBudget';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { WorldHazards } from '../../../server/core/WorldHazards';
+import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
 import { CooperativeCampaign } from '../../../server/world/CooperativeCampaign';
 import { COOPERATIVE } from '../../../shared/cooperativeRules';
 import { frontierSite, frontierSitesNear, sacPosition } from '../../../shared/frontier';
 import { hazardPhase } from '../../../shared/worldHazards';
+import { asteroidRow } from '../../support/asteroid-row';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const engines: GameEngine[] = [];
@@ -38,7 +42,9 @@ function scene() {
   const spiders = new TerrainSpiderManager(() => 0.5);
   const hives = new HiveEncounters(campaign, spiders);
   hives.refresh([pilot]);
-  return { engine, site, pilot, campaign, spiders, hives };
+  const crawlers = new BeltCrawlerManager();
+  const population = new SpiderPopulationBudget({ campaign, spiders, crawlers });
+  return { engine, site, pilot, campaign, spiders, hives, crawlers, population };
 }
 
 test('shield blocks a lone gun; a solo tow exposes 500 HP and death permanently removes owned births', () => {
@@ -143,78 +149,138 @@ test('UTC warnings and active windows have exact half-hour boundaries', () => {
 });
 
 test('swarm reserves 12 of 48 slots, expires only its actors and never replays offline windows', () => {
-  const { pilot, spiders } = scene();
+  const { pilot, spiders, campaign, population } = scene();
   spiders.setPopulationLimit(36, 48);
   for (let i = 0; i < 40; i++) {
     spiders.spawnSpider({ x: 5000 + i, y: 5000 });
   }
   expect(spiders.snapshot().spiders).toHaveLength(36);
   const ordinary = spiders.snapshot().spiders.map((s) => s.id);
-  const hazards = new WorldHazards(spiders);
-  for (let i = 0; i < 20; i++) {
-    hazards.advance(i * 1000, [pilot], () => {
+  let players = [pilot];
+  const hazards = new WorldHazards({
+    campaign,
+    population,
+    spiders,
+    actors: { getAllEntities: () => players },
+    hit: () => {
       throw new Error('Swarm damage belongs to combat');
-    });
+    },
+  });
+  for (let i = 0; i < 20; i++) {
+    hazards.advance(i * 1000);
   }
   expect(hazards.swarmCount()).toBe(12);
   expect(spiders.snapshot().spiders).toHaveLength(48);
-  hazards.advance(180_000, [pilot], () => {});
+  hazards.advance(180_000);
   expect(spiders.snapshot().spiders.map((s) => s.id)).toEqual(ordinary);
-  hazards.advance(3_600_000, [], () => {});
+  players = [];
+  hazards.advance(3_600_000);
   expect(hazards.swarmCount()).toBe(0);
-  hazards.advance(3_700_000, [pilot], () => {});
+  players = [pilot];
+  hazards.advance(3_700_000);
   expect(hazards.swarmCount()).toBe(1);
-  hazards.advance(3_500_000, [pilot], () => {});
+  hazards.advance(3_500_000);
   expect(hazards.swarmCount()).toBe(0);
 });
 
 test('meteors use normal cargo shielding and expire without changing structures', () => {
-  const { engine, pilot, spiders } = scene();
+  const { engine, pilot, spiders, campaign, population } = scene();
   pilot.spawnProtectionTimer = 0;
   pilot.cargo = 300;
   const before = structuredClone(engine.getGameState().civicModules);
   const health = pilot.health;
-  const hazards = new WorldHazards(spiders);
-  const damage = (id: string) => {
-    engine.handleShipDamage(id, 'asteroid', 50);
-  };
-  hazards.advance(1_800_000, [pilot], damage);
+  const hazards = new WorldHazards({
+    campaign,
+    population,
+    spiders,
+    actors: { getAllEntities: () => [pilot] },
+    hit: (id) => engine.handleShipDamage(id, 'asteroid', 50),
+  });
+  hazards.advance(1_800_000);
   const meteor = hazards.snapshot()[0];
   if (!meteor) {
     throw new Error('Meteor missing');
   }
   pilot.position = { ...meteor.position };
-  hazards.advance(1_800_017, [pilot], damage);
+  hazards.advance(1_800_017);
   expect(pilot.cargo).toBe(0);
   expect(pilot.health).toBe(health - 20);
-  hazards.advance(1_980_000, [pilot], damage);
+  hazards.advance(1_980_000);
   expect(hazards.snapshot()).toEqual([]);
   expect(engine.getGameState().civicModules).toEqual(before);
 });
 
-test('new belt occupants shrink ordinary capacity without stealing the twelve swarm slots', () => {
-  const { pilot, spiders } = scene();
+test('shrinking ordinary capacity preserves the live swarm as belt occupants refill', () => {
+  const { pilot, spiders, campaign, population, crawlers } = scene();
   spiders.setPopulationLimit(36, 48);
+  const ordinaryIds = new Set<string>();
   for (let i = 0; i < 36; i++) {
-    spiders.spawnSpider({ x: 5000 + i, y: 5000 });
+    const guard = spiders.spawnSpider({ x: 5000 + i, y: 5000 });
+    if (!guard) {
+      throw new Error('The ordinary guard did not fit before the swarm arrived');
+    }
+    ordinaryIds.add(guard.id);
   }
-  const hazards = new WorldHazards(spiders);
+  expect(ordinaryIds.size).toBe(36);
+  const hazards = new WorldHazards({
+    campaign,
+    population,
+    spiders,
+    actors: { getAllEntities: () => [pilot] },
+    hit: () => {
+      throw new Error('Swarm damage belongs to combat');
+    },
+  });
   for (let i = 0; i < 12; i++) {
-    hazards.advance(i * 1000, [pilot], () => {});
+    hazards.advance(i * 1000);
   }
+  const reservedIds = new Set(
+    spiders
+      .snapshot()
+      .spiders.filter((body) => !ordinaryIds.has(body.id))
+      .map((body) => body.id)
+  );
+  expect(reservedIds.size).toBe(12);
+  expect(spiders.snapshot().spiders).toHaveLength(48);
+
+  // Keep the original pressure transition: the newer event actors must survive eviction.
   spiders.setPopulationLimit(24, 36);
   expect(spiders.snapshot().spiders).toHaveLength(36);
   expect(hazards.swarmCount()).toBe(12);
-  hazards.advance(12_000, [pilot], () => {});
+  expect(
+    new Set(
+      spiders
+        .snapshot()
+        .spiders.filter((body) => reservedIds.has(body.id))
+        .map((body) => body.id)
+    )
+  ).toEqual(reservedIds);
+  expect(spiders.ordinaryCount()).toBe(24);
+
+  population.refresh();
+  const rocks = Array.from({ length: 12 }, (_, index) => ({
+    ...asteroidRow({ x: 5000 + index * 250, y: 5000 }, 100, `host-${index}`),
+    beltCrawlerIds: [`occupant-${index}`],
+    beltCrawlerHealth: [17],
+  }));
+  crawlers.advance({
+    index: new AsteroidSpatialIndex(rocks),
+    hosts: rocks,
+    players: [],
+    nowFrame: 1,
+  });
+  expect(crawlers.population).toBe(12);
+  population.refresh();
+  hazards.advance(12_000);
   expect(hazards.swarmCount()).toBe(12);
-  hazards.advance(180_000, [pilot], () => {});
+  hazards.advance(180_000);
   expect(spiders.snapshot().spiders).toHaveLength(24);
 });
 
 test.each(['downed', 'exploding', 'disconnected', 'transit'] as const)(
   'meteors pass through %s hulls and hit a live bot behind them',
   (state) => {
-    const { engine, pilot, spiders } = scene();
+    const { engine, pilot, spiders, campaign, population } = scene();
     const inactive = engine.addPlayer('inactive', 'Inactive', new RecordingSocket());
     if (state === 'downed') {
       inactive.health = 0;
@@ -234,18 +300,28 @@ test.each(['downed', 'exploding', 'disconnected', 'transit'] as const)(
       };
     }
     const bot = new EntityManager(new RNGService(82)).addBot('worker', 'worker', { x: 0, y: 0 });
-    const hazards = new WorldHazards(spiders);
     const hits: string[] = [];
-    hazards.advance(1_800_000, [pilot], (id) => hits.push(id));
+    const players = [pilot];
+    const hazards = new WorldHazards({
+      campaign,
+      population,
+      spiders,
+      actors: { getAllEntities: () => players },
+      hit: (id) => {
+        hits.push(id);
+      },
+    });
+    hazards.advance(1_800_000);
     const meteor = hazards.snapshot()[0];
     if (!meteor) {
       throw new Error('Meteor missing');
     }
     inactive.position = { ...meteor.position };
     bot.position = { ...meteor.position };
-    hazards.advance(1_800_017, [pilot, inactive, bot], (id) => hits.push(id));
+    players.push(inactive, bot);
+    hazards.advance(1_800_017);
     expect(hits).toEqual(['worker']);
-    hazards.advance(1_800_034, [pilot, inactive, bot], (id) => hits.push(id));
+    hazards.advance(1_800_034);
     expect(hazards.snapshot()).toEqual([]);
     expect(hits).toEqual(['worker']);
   }

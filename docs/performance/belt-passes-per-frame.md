@@ -10,8 +10,11 @@ leaving the loop. Two blocks land on it together:
 
 | Block | Belt copies | Where |
 | --- | --- | --- |
-| `ensureAsteroidField` | 3 | one in `RegionalAsteroidField.update`, two in `sleepDistantSectors` |
+| `AsteroidField.advanceRegions` | 3 | one in `RegionalAsteroidField.update`, two in `sleepDistantSectors` |
 | `checkpointWorld` | 4 | two in `RegionalAsteroidField.checkpoint`, two in `sleepDistantSectors` |
+
+`GameEngine.ensureAsteroidField` remains the immediate entry point for joins and
+resumes; periodic frames call the field owner directly.
 
 So that frame costs **7 belt copies and 8 passes in production**, and 3 copies
 in a fixture with no `WorldPersistence`, because `checkpointWorld` returns

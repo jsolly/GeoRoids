@@ -8,7 +8,6 @@ import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import {
   ASTEROID_INTERACTIONS,
   advanceReflectionEnergy,
-  seedAsteroidPhenomena,
   segmentCircleContact,
 } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
@@ -95,6 +94,7 @@ import { spatialQueryBounds } from '../world/spatialQueryBounds';
 import { WorldRemains } from '../world/WorldRemains';
 import type { SavedWorld } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
+import { AsteroidField } from './AsteroidField';
 import { AsteroidLifecycle } from './AsteroidLifecycle';
 import {
   type AsteroidHitCause,
@@ -244,7 +244,7 @@ export class GameEngine {
   private worldStartedAt: number;
   public readonly pilotLedger: PilotLedger;
   public readonly pilotSessions: PilotSessionLifecycle;
-  private managedField: boolean = true;
+  private readonly asteroidField: AsteroidField;
   public readonly furnaceDeliveries: FurnaceDeliveryManager;
   private lastFurnaceBuildNotice = '';
   public readonly entityManager: EntityManager;
@@ -291,7 +291,6 @@ export class GameEngine {
   );
   public readonly furnaceTravel: FurnaceTravelManager;
   private departedPlayers: string[] = [];
-  private decoratedFieldId?: string | undefined;
   private pendingLootBlasts: Array<{
     lootId: string;
     position: Position;
@@ -443,6 +442,14 @@ export class GameEngine {
       crawlers: this.beltCrawlers,
       currentFrame: () => this.gameTime,
     });
+    this.asteroidField = new AsteroidField({
+      actors: this.entityManager,
+      rocks: this.asteroidManager,
+      regional: this.regionalField,
+      probes: this.surveyProbeManager,
+      isPaused: () => this.isPaused,
+      now: () => this.getServerTime(),
+    });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
     this.discovery = new WorldDiscovery({
       exploration: this.exploration,
@@ -584,7 +591,7 @@ export class GameEngine {
       addActor: ({ id, name, socket, position, kitId }) =>
         this.addPlayer(id, name, socket, position, kitId),
       removeActor: (id) => this.removePlayer(id),
-      seedInteractions: () => this.seedAsteroidInteractions(),
+      seedInteractions: () => this.asteroidField.seedFixtures(),
       cancelCharge: (actor) => this.chargedWeapons.cancel(actor),
     });
 
@@ -637,7 +644,7 @@ export class GameEngine {
     players: number;
   } {
     return {
-      mode: this.managedField ? 'regional' : 'fixture',
+      mode: this.asteroidField.mode,
       activeSectors: this.regionalField.activeSectorCount(),
       asteroids: this.asteroidManager.getAsteroidCount(),
       players: this.getPlayerCount(),
@@ -792,16 +799,11 @@ export class GameEngine {
     this.spiderField.advance(this.gameTime);
     this.toolFlights.advance(toolStartPositions);
     this.furnaceDeliveries.advance();
-    if (this.gameTime % 60 === 0) {
-      this.seedAsteroidInteractions();
-    }
+    this.asteroidField.advanceFixtureSeeding(this.gameTime);
     this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
     this.resolveAuthoritativeCombat();
     this.cargoOffload.advance();
-    // Activate newly reached sectors and regrow harvested slots out of sight.
-    if (this.gameTime % 60 === 0) {
-      this.ensureAsteroidField();
-    }
+    this.asteroidField.advanceRegions(this.gameTime);
     // Write-behind: everything that changed this second leaves the loop as one
     // batch. A commit still in flight means the next second carries the change.
     if (this.gameTime % WORLD_FLUSH_FRAMES === 0 && this.persistenceIdle()) {
@@ -953,7 +955,7 @@ export class GameEngine {
     this.lasers = [];
     this.surveyProbeManager.clear();
     this.departedPlayers = [];
-    this.decoratedFieldId = undefined;
+    this.asteroidField.forgetFixtureDecoration();
     this.clearPendingFeedback();
     this.pendingAsteroidHits = [];
     this.spiderField.clearPendingAttacks();
@@ -970,7 +972,7 @@ export class GameEngine {
     this.clearTown();
     this.rngService.reset();
     this.createAsteroids(scenario === 'combat' ? 80 : ROID.INITIAL_ROID_COUNT);
-    this.seedAsteroidInteractions();
+    this.asteroidField.seedFixtures();
     this.ensureSatellitePickups();
   }
 
@@ -984,7 +986,7 @@ export class GameEngine {
     this.regionalField.reset();
     this.pilotLedger.reset();
     this.lastFlushedWorldRow = undefined;
-    this.managedField = true;
+    this.asteroidField.restoreRegionalMode();
     this.clearWorldObjects();
     this.exploration.reset();
     this.mapAssets.reset();
@@ -1062,7 +1064,7 @@ export class GameEngine {
    * more than one batch behind the one in flight.
    */
   public checkpointWorld(): void {
-    if (this.managedField) {
+    if (this.asteroidField.mode === 'regional') {
       this.regionalField.reconcileBelt(this.asteroidManager, this.getServerTime());
     }
     if (this.persistenceFailure) {
@@ -1100,9 +1102,10 @@ export class GameEngine {
           : {}),
         ...(worldRow ? { world: worldRow.world } : {}),
         // Custom diagnostic belts do not belong to regional activation or sleep bookkeeping.
-        sectors: this.managedField
-          ? this.regionalField.checkpoint(this.asteroidManager)
-          : new Map(),
+        sectors:
+          this.asteroidField.mode === 'regional'
+            ? this.regionalField.checkpoint(this.asteroidManager)
+            : new Map(),
         pilots,
       });
       if (worldRow) {
@@ -1115,7 +1118,7 @@ export class GameEngine {
       };
       this.pilotLedger.submitted();
       this.cooperative.saved();
-      if (this.managedField) {
+      if (this.asteroidField.mode === 'regional') {
         this.regionalField.saved();
       }
     } catch (cause) {
@@ -1299,7 +1302,7 @@ export class GameEngine {
   }
 
   public getAllPlayers(): GameEntity[] {
-    return this.entityManager.getAllEntities().filter((actor) => actor.botRole === undefined);
+    return this.entityManager.getHumanPlayers();
   }
 
   public getSpiderField() {
@@ -1362,24 +1365,6 @@ export class GameEngine {
     return this.asteroidManager.getAllAsteroids();
   }
 
-  /** Seed phenomena on a fixture field once; the managed regional field seeds its own sectors. */
-  private seedAsteroidInteractions(): void {
-    if (this.managedField) {
-      return;
-    }
-    const rocks = this.getAllAsteroids();
-    const firstRock = rocks[0];
-    if (!firstRock) {
-      return;
-    }
-    if (this.decoratedFieldId == null || this.decoratedFieldId === '') {
-      seedAsteroidPhenomena(rocks);
-      // Phenomena reshape and move live rows in place.
-      this.asteroidManager.refile(rocks);
-      this.decoratedFieldId = firstRock.id;
-    }
-  }
-
   public getPlayerProjectiles(): PlayerProjectileState[] {
     return this.lasers
       .filter((laser) => !laser.hasExploded)
@@ -1422,29 +1407,14 @@ export class GameEngine {
    * Return newly loaded rows so joining pilots can receive them immediately.
    */
   public ensureAsteroidField(): AsteroidData[] {
-    if (this.isPaused || this.getPlayerCount() === 0) {
-      return [];
-    }
-    if (!this.managedField) {
-      this.seedAsteroidInteractions();
-      return [];
-    }
-    return this.regionalField.update(
-      this.asteroidManager,
-      [
-        ...this.getAllPlayers().map((entity) => entity.position),
-        ...this.surveyProbeManager.observerPositions(),
-      ],
-      this.getServerTime()
-    );
+    return this.asteroidField.ensure();
   }
 
   public createAsteroids(
     count: number,
     bounds: { radius: number } = { radius: WORLD.radius }
   ): AsteroidData[] {
-    this.managedField = false;
-    return this.asteroidManager.createAsteroids(count, bounds);
+    return this.asteroidField.createFixtures(count, bounds);
   }
 
   public getSatellitePickup(pickupId: string): SatellitePickupData | undefined {

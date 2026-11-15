@@ -26,6 +26,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'server/core/FurnaceDeliveryManager.ts',
       'server/core/AsteroidLifecycle.ts',
       'shared/exploration.ts',
+      'server/core/WorldDiscovery.ts',
     ],
   },
   hauler: {

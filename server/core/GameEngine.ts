@@ -141,6 +141,7 @@ import { markSurveyedAsteroids, ShipAbilityManager } from './ShipAbilityManager'
 import { SurveyProbeManager } from './SurveyProbeManager';
 import { spiderResources } from './spiderResources';
 import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
+import { WorldDiscovery } from './WorldDiscovery';
 import { WorldHazards } from './WorldHazards';
 
 interface ServerLaser {
@@ -238,8 +239,9 @@ export class GameEngine {
   private lastSavedEconomy:
     | { settlement: SettlementState; pointRevision: number; botCargo: boolean }
     | undefined;
-  private exploration = new ExplorationMap();
-  private mapAssets = new MapAssets(this.exploration);
+  private readonly exploration = new ExplorationMap();
+  private readonly mapAssets = new MapAssets(this.exploration);
+  public readonly discovery: WorldDiscovery;
   private readonly remains = new WorldRemains();
   private readonly glowtoys: GlowtoyManager;
   public readonly cargoOffload: CargoOffloadManager;
@@ -256,7 +258,7 @@ export class GameEngine {
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
   public readonly asteroidLifecycle: AsteroidLifecycle;
-  private lootManager: LootManager;
+  private readonly lootManager: LootManager;
   private satellitePickupManager: SatellitePickupManager;
   public readonly satelliteField: SatellitePickupField;
   private spiderManager: TerrainSpiderManager;
@@ -448,6 +450,11 @@ export class GameEngine {
       currentFrame: () => this.gameTime,
     });
     this.lootManager = new LootManager(this.rngService, () => this.getServerTime(), this.mapAssets);
+    this.discovery = new WorldDiscovery({
+      exploration: this.exploration,
+      loot: this.lootManager,
+      assets: this.mapAssets,
+    });
     this.cargoOffload = new CargoOffloadManager({
       actors: this.entityManager,
       furnaces: this.furnaces,
@@ -513,7 +520,7 @@ export class GameEngine {
       hives: this.hives,
       loot: this.lootManager,
       frame: () => this.gameTime,
-      revealArea: (position, range) => this.revealArea(position, range),
+      revealArea: (position, range) => this.discovery.revealArea(position, range),
       maximumPendingEjections: MAX_PENDING_LOOT_COLLECTIONS,
     });
     this.supplyRestoration = new CooperativeSupplyRestoration({
@@ -521,7 +528,7 @@ export class GameEngine {
       furnaces: this.furnaces,
       clock: this.serverClock,
       insertAsteroid: (rock) => this.asteroidLifecycle.insert(rock),
-      revealArea: (position, range) => this.revealArea(position, range),
+      revealArea: (position, range) => this.discovery.revealArea(position, range),
     });
 
     this.furnaceDeliveries = new FurnaceDeliveryManager({
@@ -986,14 +993,6 @@ export class GameEngine {
     }
     this.updatePauseState();
     return entity;
-  }
-
-  public revealArea(position: Position, range: number): void {
-    for (const cell of this.exploration.reveal(position, range)) {
-      for (const drop of this.lootManager.queryExplorationCell(cell)) {
-        this.mapAssets.discovered(drop.id);
-      }
-    }
   }
 
   private choosePilotSpawn(requested?: Position): Position {
@@ -2861,7 +2860,7 @@ export class GameEngine {
     asteroids: readonly AsteroidData[],
     range: number
   ): void {
-    this.revealArea(position, range);
+    this.discovery.revealArea(position, range);
     markSurveyedAsteroids(ownerId, position, asteroids, range);
   }
 

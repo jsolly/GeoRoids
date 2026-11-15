@@ -123,7 +123,7 @@ test('an old completed-sector list neither walls harvested ground nor refills it
       engine.getAllAsteroids().some((rock) => rock.id.startsWith(`deposit-${seed}-1-0-`))
     ).toBe(false);
     expect(engine.getAsteroid(`deposit-${seed}-0-0-0`)).toBeDefined();
-    engine.revealArea({ x: 2_500, y: 200 }, 100);
+    engine.discovery.revealArea({ x: 2_500, y: 200 }, 100);
     engine.checkpointWorld();
     // Only the additive belt rollout may populate this old harvest tombstone.
     // A restart is not a refill: ordinary slots regrow only as intervals pass.

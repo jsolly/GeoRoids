@@ -500,7 +500,12 @@ export class GameEngine {
       spiders: this.spiderManager,
       crawlers: this.beltCrawlers,
     });
-    this.hives = new HiveEncounters(this.cooperative, this.spiderManager);
+    this.hives = new HiveEncounters({
+      campaign: this.cooperative,
+      population: this.spiderPopulation,
+      spiders: this.spiderManager,
+      actors: this.entityManager,
+    });
     this.hazards = new WorldHazards({
       campaign: this.cooperative,
       population: this.spiderPopulation,
@@ -770,7 +775,7 @@ export class GameEngine {
     this.satelliteField.advance();
     const toolStartPositions = this.toolFlights.captureStartPositions();
     this.asteroidManager.updateMotion(this.toolFlights.hasOutboundFlight());
-    this.advanceCampaign(serverNow);
+    this.hives.advance(this.gameTime, serverNow);
     this.rolyPolys.advance(
       this.entityManager.getAllEntities().map((pilot) => ({
         position: pilot.position,
@@ -1310,18 +1315,6 @@ export class GameEngine {
     this.spiderManager.clear();
     this.beltCrawlers.clear();
     this.pendingSpiderAttacks = [];
-  }
-
-  private advanceCampaign(now: number): void {
-    if (!this.cooperative.activated) {
-      return;
-    }
-    this.spiderPopulation.refresh();
-    const players = this.getAllPlayers();
-    if (this.gameTime % 60 === 1) {
-      this.hives.refresh(players);
-    }
-    this.hives.advance(players, now);
   }
 
   private advanceSpiderField(): void {

@@ -145,3 +145,10 @@ export type WorldHazardInputs = {
   readonly actors: Pick<EntityManager, 'getAllEntities'>;
   readonly hit: (id: GameEntity['id']) => void;
 };
+
+export type HiveEncounterInputs = {
+  readonly campaign: Pick<CooperativeCampaign, 'activated' | 'all' | 'get' | 'set'>;
+  readonly population: Pick<SpiderPopulationBudget, 'refresh'>;
+  readonly spiders: Pick<TerrainSpiderManager, 'getBody' | 'spawnSpider' | 'removeSpider'>;
+  readonly actors: Pick<EntityManager, 'getAllEntities'>;
+};

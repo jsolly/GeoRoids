@@ -4,9 +4,8 @@ import { type AbilityBody, harpoonSurfaceGap } from '../../shared/shipAbilities'
 import { SHIP_ABILITY } from '../../shared/shipKits';
 import { isTowCableUtility } from '../../shared/shipUtilities';
 import type { CampaignSnapshot, CooperativeRecord, Position } from '../../shared-types';
-import type { CooperativeCampaign } from '../world/CooperativeCampaign';
 import type { GameEntity } from './EntityManager';
-import type { TerrainSpiderManager } from './TerrainSpiderManager';
+import type { HiveEncounterInputs } from './types';
 
 type Hive = Extract<CooperativeRecord, { kind: 'hive' }>;
 const ACTIVE_RADIUS = 4200;
@@ -19,11 +18,8 @@ export class HiveEncounters {
   private readonly shieldUntil = new Map<string, number>();
   private pinned = new Set<string>();
 
-  constructor(
-    private readonly campaign: CooperativeCampaign,
-    private readonly spiders: TerrainSpiderManager
-  ) {
-    for (const row of campaign.all()) {
+  constructor(private readonly inputs: HiveEncounterInputs) {
+    for (const row of inputs.campaign.all()) {
       if (row.kind === 'hive' && row.clearedAt !== null) {
         this.cleared.add(row.id);
       }
@@ -45,13 +41,10 @@ export class HiveEncounters {
     return [...this.cleared];
   }
 
-  refresh(players: readonly GameEntity[]): void {
-    if (!this.campaign.activated) {
-      return;
-    }
+  private refresh(players: readonly GameEntity[]): void {
     const expanded =
-      this.campaign.get('project', 'deep-scanner')?.completedAt !== null &&
-      Boolean(this.campaign.get('project', 'deep-scanner'));
+      this.inputs.campaign.get('project', 'deep-scanner')?.completedAt !== null &&
+      Boolean(this.inputs.campaign.get('project', 'deep-scanner'));
     const next = new Map<string, Hive>();
     for (const player of players) {
       if (!player.ws) {
@@ -61,7 +54,7 @@ export class HiveEncounters {
         if (site.frontier === 'expanded' && !expanded) {
           continue;
         }
-        let hive = this.campaign.get('hive', site.id);
+        let hive = this.inputs.campaign.get('hive', site.id);
         if (hive == null) {
           hive = {
             kind: 'hive',
@@ -78,7 +71,7 @@ export class HiveEncounters {
             contributors: [],
             commissionedAt: null,
           };
-          this.campaign.set(hive);
+          this.inputs.campaign.set(hive);
         }
         next.set(hive.id, hive);
       }
@@ -93,7 +86,17 @@ export class HiveEncounters {
     this.active = next;
   }
 
-  advance(players: readonly GameEntity[], now: number): void {
+  advance(frame: number, now: number): void {
+    if (!this.inputs.campaign.activated) {
+      return;
+    }
+    this.inputs.population.refresh();
+    const players = this.inputs.actors
+      .getAllEntities()
+      .filter((actor) => actor.botRole === undefined);
+    if (frame % 60 === 1) {
+      this.refresh(players);
+    }
     this.pinned = new Set(
       players
         .filter(
@@ -122,14 +125,14 @@ export class HiveEncounters {
       if (hive.sacDeadline !== null && now >= hive.sacDeadline) {
         hive.sacs.fill(COOPERATIVE.sacHealth);
         hive.sacDeadline = null;
-        this.campaign.set(hive);
+        this.inputs.campaign.set(hive);
       }
       if (hive.clearedAt !== null) {
         continue;
       }
       const children = this.children.get(hive.id) ?? new Set<string>();
       for (const id of children) {
-        if (!this.spiders.getBody(id)) {
+        if (!this.inputs.spiders.getBody(id)) {
           children.delete(id);
         }
       }
@@ -139,7 +142,7 @@ export class HiveEncounters {
       }
       if (hive.birthFramesLeft === 0 && children.size < COOPERATIVE.childrenPerHive) {
         const theta = children.size * 2.4;
-        const child = this.spiders.spawnSpider({
+        const child = this.inputs.spiders.spawnSpider({
           x: hive.position.x + Math.cos(theta) * 180,
           y: hive.position.y + Math.sin(theta) * 180,
         });
@@ -148,7 +151,7 @@ export class HiveEncounters {
           hive.birthFramesLeft = COOPERATIVE.birthFrames;
         }
       }
-      this.campaign.set(hive);
+      this.inputs.campaign.set(hive);
     }
   }
 
@@ -260,12 +263,12 @@ export class HiveEncounters {
         this.pinned.delete(id);
       }
     }
-    this.campaign.set(hive);
+    this.inputs.campaign.set(hive);
     return true;
   }
   private removeChildren(id: string): void {
     for (const child of this.children.get(id) ?? []) {
-      this.spiders.removeSpider(child);
+      this.inputs.spiders.removeSpider(child);
     }
     this.children.delete(id);
   }

@@ -161,10 +161,12 @@ The IaC package is a development-only dependency and the CLI must be at least
 lane builds every PR with that release, so a change that breaks Railway's
 `mise install` or build fails before merge
 ([Railway IaC](../.railway/README.md)). The pin is live only after a reviewed configuration apply and actual readback.
-The approved version-pin automation policy has a guarded saved-plan runner, but
-its workflow remains hard-disabled until John separately authorizes enabling
-and supplies a dedicated production-scoped token. All other configuration stays
-human-owned. Follow the exact scope and first-run prerequisites in
+The approved version-pin policy has a guarded saved-plan runner. Its workflow
+permits manual plan-only runs from trusted `main` with a dedicated
+production-scoped token. Production application and automatic triggers remain
+disabled. A variable cannot enable application; that requires separate approval
+and a reviewed workflow change. All other configuration stays human-owned.
+Follow the exact scope and first-run prerequisites in
 [Railway production configuration](../.railway/README.md).
 
 Railway stops reading legacy `railway.json` files on **2026-12-01**. The

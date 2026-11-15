@@ -10,13 +10,15 @@ The build pins Railpack at `0.43.0`. Move `build.railpackVersion` and
 same version, while configuration readback and the deployed build log establish
 which version production actually uses.
 
-## Version-pin automation remains disabled
+## Manual planning is enabled; application remains disabled
 
-`.github/workflows/railway-version-pin.yml` has an impossible repository guard,
-`DISABLED/REQUIRES-APPROVAL`. No secret, variable or manual dispatch can enable
-that job. A separately authorized, reviewed change must remove that conjunct
-while preserving the exact `jsolly/GeoRoids` and `main` guards. The separate
-apply control defaults off; enabling the job permits read-only planning first.
+John authorized plan-only setup on 2026-11-14. The **Railway version pin**
+workflow accepts only a manual dispatch from `main` in `jsolly/GeoRoids`.
+It invokes the guarded runner with `--plan-only` and fixes
+`RAILWAY_CONFIG_APPLY_ENABLED` to `disabled`. There is no apply input or push
+trigger. A secret, input or environment variable cannot enable application.
+Production application and automatic triggers require separate authorization
+and a reviewed workflow change.
 
 The approved policy covers only `build.railpackVersion` on the existing service:
 
@@ -35,12 +37,14 @@ applies, discards or rewrites dashboard work.
 
 ## Prepare an authorized first run
 
-These production steps require John's separate authorization. This repository
-change does not create a token, configure secrets, resolve dashboard work,
-enable the workflow or apply production configuration.
+The workflow needs a dedicated token and a protected GitHub Environment before
+its first live plan. This repository change creates neither. John provisions
+the credential through the provider interfaces; never paste it into a chat,
+task, source file or workflow log. No production apply is authorized by the
+plan-only setup.
 
-1. Review the production staged changes independently. The previously observed
-   staged patch contains unrelated work and must remain untouched by this runner.
+1. Review the production staged changes independently. Any pending work must
+   be resolved separately and remain untouched by this runner.
    Verify that `environmentStagedChanges` returns `null` only when no staged work
    exists, and that concurrent staged changes invalidate the apply etag.
 2. Confirm the fixed service ID still has the exact name `Georoids`. An
@@ -48,34 +52,30 @@ enable the workflow or apply production configuration.
    definition and runner use `service.Georoids`. Railway derives IaC addresses
    from exact names. Any later identity drift blocks automation and requires
    review; the runner never renames or replaces a service.
-3. Obtain a real read-only saved plan using official Railway CLI `5.50.2` on the
-   exact clean merged checkout. Review the structured `changeSet`, not its text
-   summary. Check the runner's build payload and target mapping against that
-   output. Never request `--show-values`, `--decrypt-variables` or
-   `--include-variables`. Keep raw JSON private and delete it after review.
-4. Verify the live terminal apply response contract before enabling unattended
-   operation. The pinned public schema declares aggregate `status` as `String`
-   and `diagnostics` as `JSON`. The runner admits only `applied`, empty diagnostic
-   arrays, one applied operation, a deployment ID and no staged patch ID. Unknown
-   or different provider responses fail and require review. Synthetic tests do
-   not prove those live values or staged-work semantics.
-5. Create a new Railway project token scoped only to the exact production
+3. Create a new Railway project token scoped only to the exact production
    environment. Store it as `RAILWAY_CONFIG_TOKEN` in the GitHub Environment
    `railway-production-config`, restricted to `main`. Never copy or reuse the
-   `railway-preview` token, a user token, or a workspace token.
-6. After separate approval, remove the workflow's impossible repository conjunct
-   in a reviewed enabling change, keeping the exact repository and main guards.
-   Keep the GitHub Environment variable `RAILWAY_CONFIG_APPLY_ENABLED` absent or
-   `false`. Dispatch **Railway version pin** from `main` with mode `plan-only`,
-   the default choice. That path already exists and returns `plan-only`, never
-   production proof. No implementation change is needed to select the mode.
-7. After separate apply approval and the preceding checks, set that environment
-   variable to exactly `true`. Merged main changes then select apply. A manual
-   dispatch still defaults to `plan-only`; choosing `apply` also requires the
-   separate apply control. Any other variable value keeps apply disabled.
-   The workflow maps this control to the runner's internal
-   `RAILWAY_CONFIG_APPLY_ENABLED=version-pin-only` flag. Mode text reaches the
-   runner through an environment variable and is validated before use.
+   `railway-preview` token, a user token, or a workspace token. Keep the
+   Environment variable `RAILWAY_CONFIG_APPLY_ENABLED` absent or `false`.
+4. Dispatch **Railway version pin** from `main`. The workflow takes no inputs
+   and uses checksum-pinned official Railway CLI `5.50.2` on the clean current
+   merged checkout. The runner validates the real saved plan's structured
+   `changeSet`, build payload and exact target mapping, rather than its text
+   summary. Unknown provider fields or different live contracts fail and require
+   review. Never request `--show-values`, `--decrypt-variables` or
+   `--include-variables`. Raw JSON stays private and is deleted after the run.
+5. Review the small Actions receipt. It must report `outcome: plan-only`, the
+   intended version and change kind, and `deploymentId: null`. This is planning
+   evidence, never proof that the pin is live. Resolve any failed provider or
+   staged-state check before another run.
+
+Before any future application or unattended operation, obtain separate approval
+and review the workflow change that admits it. Verify the live terminal apply
+response contract: the pinned public schema declares aggregate `status` as
+`String` and `diagnostics` as `JSON`. The runner admits only `applied`, empty
+diagnostic arrays, one applied operation, a deployment ID and no staged patch ID.
+Synthetic tests do not prove those live values or concurrent staged-work
+semantics. Setting a variable to `true` does not enable the current workflow.
 
 Do not run `railway login`, `link`, `config pull --force`, setup installers or
 config cleanup as part of automation. The workflow uses only the dedicated
@@ -84,7 +84,7 @@ source code cannot prove how a supplied token was issued.
 
 ## Saved-plan and verification contract
 
-The serialized production job checks out its exact triggering SHA. The runner
+The serialized planning job checks out its exact triggering SHA. The runner
 requires that SHA to remain the clean current `main` checkout before planning
 and applying. A superseded run fails; it never reverts a newer pin. Action
 versions, the official CLI archive and its extracted binary have separate pins.
@@ -92,7 +92,11 @@ versions, the official CLI archive and its extracted binary have separate pins.
 The runner keeps the raw plan in a private temporary directory with a restrictive
 umask. It validates CLI version, plan format, `.railway/` source tree, change-set
 hash, configuration etag, exact target and the permitted change. It reads staged
-state and the etag again, checks saved bytes, then passes that same file to
+state and the etag again, then returns the plan-only receipt without applying,
+reading build logs or claiming deployment verification.
+
+The guarded runner retains a separately gated apply path for future approval.
+That path checks saved bytes, then passes that same file to
 `railway config apply --plan ... --yes --json`. The CLI independently verifies
 the source tree and hash, recomputes destructive status from the changes and
 passes the expected etag to the provider. There is no destructive confirmation

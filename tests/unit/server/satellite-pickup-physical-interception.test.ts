@@ -103,8 +103,8 @@ describe('satellite pickups intercept physical damage', () => {
     addAttacker();
     const ownerHealth = engine.getPlayer('owner')?.health;
 
-    expect(engine.handleSatellitePickupDamage(pickupId, DAMAGE.LASER_HIT)).not.toBeNull();
-    expect(engine.handleSatellitePickupDamage(pickupId, DAMAGE.LASER_HIT)?.state).toBe('broken');
+    expect(engine.satellitePickupManager.damage(pickupId, DAMAGE.LASER_HIT)).not.toBeNull();
+    expect(engine.satellitePickupManager.damage(pickupId, DAMAGE.LASER_HIT)?.state).toBe('broken');
 
     expect(engine.getSatellitePickup(pickupId)?.state).toBe('broken');
     expect(engine.getSatellitePickup(pickupId)?.health).toBe(0);
@@ -120,8 +120,8 @@ describe('satellite pickups intercept physical damage', () => {
     const pickup = engine.getAllSatellitePickups()[0];
     assert.ok(pickup);
     engine.asteroidLifecycle.insert(asteroidAt('pickup-rock', pickup.position));
-    engine.resolveAuthoritativeCombat();
-    engine.resolveAuthoritativeCombat();
+    engine.contactCombat.advance();
+    engine.contactCombat.advance();
     expect(engine.getSatellitePickup(pickup.id)).toEqual(pickup);
     expect(engine.getAsteroid('pickup-rock')).toBeDefined();
     clearAsteroids(engine);
@@ -147,9 +147,9 @@ describe('satellite pickups intercept physical damage', () => {
     engine.asteroidLifecycle.insert(asteroidAt('pickup-rock', pickup.position));
     const allRocks = vi.spyOn(AsteroidManager.prototype, 'getAllAsteroids');
     try {
-      engine.resolveAuthoritativeCombat();
+      engine.contactCombat.advance();
       expect(engine.getSatellitePickup(id)?.health).toBe(pickup.health - DAMAGE.LASER_HIT);
-      engine.resolveAuthoritativeCombat();
+      engine.contactCombat.advance();
       expect(engine.getSatellitePickup(id)?.state).toBe('broken');
       expect(allRocks).not.toHaveBeenCalled();
     } finally {

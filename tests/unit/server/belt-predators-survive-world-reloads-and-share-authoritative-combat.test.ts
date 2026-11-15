@@ -152,7 +152,7 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
     ).toBe(true);
     const health = player.health;
     engine.asteroidLifecycle.remove(rock.id);
-    engine.resolveAuthoritativeCombat();
+    engine.contactCombat.advance();
     expect(player.health).toBe(health);
     engine.advanceCombatFrame();
     expect(engine.getSpiderField().spiders.filter((spider) => spider.crawler)).toEqual([]);

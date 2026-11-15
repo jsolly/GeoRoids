@@ -12,7 +12,9 @@ export class WebSocketCore {
     this.gameEngine = gameEngine;
     this.broadcaster = new GameStateBroadcaster(gameEngine);
     this.messageHandler = new MessageHandler(gameEngine, this.broadcaster);
-    this.gameEngine.setCombatSink((result) => this.broadcaster.broadcastCombatResult(result));
+    this.gameEngine.contactCombat.setSink((result) =>
+      this.broadcaster.broadcastCombatResult(result)
+    );
   }
 
   public startPeriodicGameStateBroadcast(): void {

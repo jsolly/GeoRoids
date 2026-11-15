@@ -170,7 +170,7 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
     offsets: [1, 1, 1, 1, 1, 1, 1, 1],
   });
   const health = f.actor.health;
-  f.engine.resolveAuthoritativeCombat();
+  f.engine.contactCombat.advance();
   expect(f.actor.health).toBeLessThan(health);
   expect(f.engine.getAsteroid('impact-rock')).toBeUndefined();
 });

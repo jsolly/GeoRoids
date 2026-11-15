@@ -21,7 +21,8 @@ import {
 } from '../../shared/world';
 import type { AsteroidData, AsteroidHitEvent, SatellitePickupCollected } from '../../shared-types';
 import type { GameEntity } from '../core/EntityManager';
-import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
+import type { GameEngine } from '../core/GameEngine';
+import type { CombatBroadcast } from '../core/types';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 
 interface SnapshotFlight {

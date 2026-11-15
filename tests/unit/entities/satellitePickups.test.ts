@@ -128,7 +128,7 @@ describe('Satellite pickups', () => {
     addPilot();
     const pickup = gameEngine.getAllSatellitePickups()[0];
     assert.ok(pickup);
-    expect(gameEngine.handleSatellitePickupDamage(pickup.id, 1000)).toBeNull();
+    expect(gameEngine.satellitePickupManager.damage(pickup.id, 1000)).toBeNull();
     for (let frame = 0; frame < 180; frame += 1) {
       gameEngine.satelliteField.advance();
     }
@@ -306,7 +306,7 @@ describe('Satellite pickups', () => {
     gameEngine.satelliteField.advance();
     expect(gameEngine.getSatellitePickup(first.id)?.state).toBe('stored');
     expect(gameEngine.getSatellitePickup(second.id)?.state).toBe('stored');
-    expect(gameEngine.handleSatellitePickupDamage(first.id, 1000)).toBeNull();
+    expect(gameEngine.satellitePickupManager.damage(first.id, 1000)).toBeNull();
     expect(gameEngine.equipSatellite('other', first.id)).toBe(false);
     expect(gameEngine.equipSatellite('pilot', first.id)).toBe(true);
     gameEngine.satelliteField.advance();
@@ -384,7 +384,7 @@ describe('Satellite pickups', () => {
   test('a half-health impact removes half the lifetime and expires at the shortened deadline', () => {
     addPilot();
     const pickup = collectNearest();
-    gameEngine.handleSatellitePickupDamage(pickup.id, SATELLITE_PICKUP.HEALTH / 2);
+    gameEngine.satellitePickupManager.damage(pickup.id, SATELLITE_PICKUP.HEALTH / 2);
     expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBe(SATELLITE_PICKUP.HEALTH / 2);
     for (let frame = 0; frame < SATELLITE_PICKUP.LIFETIME_FRAMES / 2 - 1; frame++) {
       gameEngine.satelliteField.advance();
@@ -402,11 +402,11 @@ describe('Satellite pickups', () => {
     addPilot();
     const attached = collectNearest();
 
-    expect(gameEngine.handleSatellitePickupDamage(attached.id, DAMAGE_PER_SHOT)).not.toBeNull();
+    expect(gameEngine.satellitePickupManager.damage(attached.id, DAMAGE_PER_SHOT)).not.toBeNull();
     expect(gameEngine.getSatellitePickup(attached.id)?.health).toBe(
       SATELLITE_PICKUP.HEALTH - DAMAGE_PER_SHOT
     );
-    expect(gameEngine.handleSatellitePickupDamage(attached.id, DAMAGE_PER_SHOT)?.state).toBe(
+    expect(gameEngine.satellitePickupManager.damage(attached.id, DAMAGE_PER_SHOT)?.state).toBe(
       'broken'
     );
     expect(gameEngine.getSatellitePickup(attached.id)?.health).toBe(0);
@@ -429,7 +429,7 @@ describe('Satellite pickups', () => {
   test('owner death releases a damaged orbiting pickup while preserving its remaining health', () => {
     addPilot();
     const attached = collectNearest();
-    expect(gameEngine.handleSatellitePickupDamage(attached.id, DAMAGE_PER_SHOT)).not.toBeNull();
+    expect(gameEngine.satellitePickupManager.damage(attached.id, DAMAGE_PER_SHOT)).not.toBeNull();
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
 
@@ -443,7 +443,7 @@ describe('Satellite pickups', () => {
     expect(released?.state).toBe('loose');
     expect(released?.ownerId).toBeNull();
     expect(released?.health).toBe(SATELLITE_PICKUP.HEALTH - DAMAGE_PER_SHOT);
-    expect(gameEngine.handleSatellitePickupDamage(attached.id, 1000)).toBeNull();
+    expect(gameEngine.satellitePickupManager.damage(attached.id, 1000)).toBeNull();
     for (let frame = 0; frame < 60; frame += 1) {
       gameEngine.satelliteField.advance();
     }

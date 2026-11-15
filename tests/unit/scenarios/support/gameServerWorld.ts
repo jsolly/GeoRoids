@@ -353,7 +353,7 @@ export class GameServerWorld {
         position: { x: ship.position.x, y: ship.position.y },
       })
     );
-    this.engine.resolveAuthoritativeCombat();
+    this.engine.contactCombat.advance();
   }
 
   move(pilot: Pilot, position: Position): void {

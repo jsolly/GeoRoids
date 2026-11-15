@@ -150,7 +150,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     bobActor.spawnProtectionTimer = 0;
     towed.position = { ...rock.position };
     const health = bobActor.health;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
     expect(bobActor.health).toBe(health);
     expect(world.engine.getAsteroid(towed.id)).toBe(towed);
     expect(world.engine.getAsteroid(rock.id)).toBe(rock);

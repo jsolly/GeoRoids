@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import type { AppliedAsteroidHit } from '../../../server/core/types';
 import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { beltAsteroid, beltSlots } from '../../../shared/asteroidBelt';
@@ -286,7 +287,7 @@ describe('Colossal asteroids need a crew', () => {
     const healthBefore = actor.health;
     const overlap = { ...actor.position };
     const epoch = actor.playerMotion?.epoch ?? 0;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
     expect(world.engine.getAsteroid(rock.id)).toBeDefined();
     expect(world.entity(alice).health).toBe(healthBefore - DAMAGE.ASTEROID_COLLISION);
     const distance = Math.hypot(
@@ -311,7 +312,7 @@ describe('Colossal asteroids need a crew', () => {
       ).ok
     ).toBe(false);
     const healthAfter = world.entity(alice).health;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
     expect(world.entity(alice).health).toBe(healthAfter);
     expect(world.engine.getAsteroid(rock.id)).toBeDefined();
   });
@@ -345,11 +346,16 @@ describe('Colossal asteroids need a crew', () => {
     world.engine.entityManager.updateEntity(alice.id, { spawnProtectionTimer: 0 });
     world.engine.entityManager.updateEntity(bob.id, { spawnProtectionTimer: 0 });
     const healthBefore = world.entity(alice).health;
-    world.engine.resolveAuthoritativeCombat();
+    const feedback: AppliedAsteroidHit[] = [];
+    world.engine.setOnAsteroidHits((hits) => feedback.push(...hits));
+    world.engine.contactCombat.advance();
     expect(world.entity(alice).health).toBe(healthBefore);
     expect(world.entity(alice).harpoonTargetId).toBe(rock.id);
     expect(world.engine.getAsteroid(rock.id)).toBeDefined();
     expect(world.engine.getAsteroid('field-rock')).toBeUndefined();
+    expect(feedback.map((hit) => [hit.asteroidId, hit.playerId])).toEqual([
+      ['field-rock', alice.id],
+    ]);
   });
 });
 

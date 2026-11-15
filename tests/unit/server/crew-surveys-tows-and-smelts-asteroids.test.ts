@@ -387,7 +387,7 @@ test('player hulls ignore crew lasers and ship overlap while asteroid impacts st
     engine.spawnLaser(shooter.id, { x: -100, y: 0 }, { x: 300, y: 0 });
   }
   engine.advanceLasersAndResolveHits();
-  engine.resolveAuthoritativeCombat();
+  engine.contactCombat.advance();
   expect(players.map((player) => player.health)).toEqual(health);
   expect(engine.shipDamage.apply(hauler.id, 'scout', 100).applied).toBe(false);
   expect(engine.shipDamage.apply(hauler.id, 'asteroid', 25).applied).toBe(true);

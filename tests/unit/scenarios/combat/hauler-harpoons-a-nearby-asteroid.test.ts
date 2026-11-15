@@ -112,7 +112,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
     expect(world.entity(alice).harpoonTargetId).toBe('haul-rock');
 
     const healthBefore = world.entity(alice).health;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
 
     expect(world.entity(alice).health).toBe(healthBefore);
     expect(world.entity(alice).harpoonTargetId).toBeNull();
@@ -137,7 +137,7 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
 
     const aliceHealth = world.entity(alice).health;
     const bobHealth = world.entity(bob).health;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
 
     expect(world.entity(alice).health).toBe(aliceHealth);
     expect(world.entity(alice).harpoonTargetId).toBeNull();

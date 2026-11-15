@@ -82,7 +82,7 @@ test('a pilot can fly through a reflector without collision damage or displaceme
   const health = shooter.health;
   for (const x of [1000, 1010, 1020]) {
     shooter.position = { x, y: -860 };
-    engine.resolveAuthoritativeCombat();
+    engine.contactCombat.advance();
     expect(shooter.position).toEqual({ x, y: -860 });
     expect(shooter.health).toBe(health);
   }

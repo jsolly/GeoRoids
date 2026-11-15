@@ -75,7 +75,7 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     expect(moved.observer.satellitePickups.some((row) => row.id === pickup.id)).toBe(false);
     engine.updatePlayer(observer.id, { position: { ...owner.position } });
     expect(engine.equipSatellite(owner.id, pickup.id)).toBe(true);
-    engine.handleSatellitePickupDamage(pickup.id, 25);
+    engine.satellitePickupManager.damage(pickup.id, 25);
     engine.satelliteField.advance();
     const equipped = engine.getSatellitePickup(pickup.id);
     assert.ok(equipped);

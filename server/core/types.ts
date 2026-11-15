@@ -9,7 +9,9 @@ import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
 import type { AsteroidLifecycle } from './AsteroidLifecycle';
 import type { AsteroidHitOutcome, AsteroidManager } from './AsteroidManager';
+import type { AsteroidMining } from './AsteroidMining';
 import type { BeltCrawlerManager } from './BeltCrawlerManager';
+import type { CollisionAuthority } from './CollisionAuthority';
 import type { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
@@ -23,11 +25,45 @@ import type { RNGService } from './RNGService';
 import type { SatellitePickupManager } from './SatellitePickupManager';
 import type { SettlementLedger } from './SettlementLedger';
 import type { ShipAbilityManager } from './ShipAbilityManager';
+import type { ShipDamage } from './ShipDamage';
+import type { SpiderField } from './SpiderField';
 import type { SpiderPopulationBudget } from './SpiderPopulationBudget';
 import type { SurveyProbeManager } from './SurveyProbeManager';
 import type { TerrainSpiderManager } from './TerrainSpiderManager';
 
 export type RescueAction = Exclude<CrewAction, { kind: 'withdraw-supply' }>;
+
+export interface CombatBroadcast {
+  targetId: string;
+  attackerId: string;
+  damage: number;
+  remainingHealth: number;
+
+  isDestroyed: boolean;
+  targetType: 'player';
+  destroyedAsteroidId?: string;
+  newAsteroids?: AsteroidData[];
+  origin?: { x: number; y: number };
+}
+
+export type CombatSink = (result: CombatBroadcast) => void;
+
+export type ContactCombatInputs = {
+  readonly actors: Pick<EntityManager, 'getEntity' | 'getAllEntities'>;
+  readonly motion: Pick<PlayerMotionService, 'releaseContourLock' | 'applyExternalImpulse'>;
+  readonly rocks: Pick<AsteroidManager, 'spatialIndex' | 'getAsteroid'>;
+  readonly mining: Pick<AsteroidMining, 'hit' | 'apply'>;
+  readonly damage: Pick<ShipDamage, 'apply'>;
+  readonly pickups: Pick<SatellitePickupManager, 'getAllPickups' | 'damage'>;
+  readonly collisions: Pick<
+    CollisionAuthority,
+    'collectAsteroidPickupHits' | 'collectShipAsteroidHits' | 'collectTowedAsteroidHits'
+  >;
+  readonly spiders: Pick<SpiderField, 'drainAttacks' | 'isAttackActive'>;
+  readonly paused: () => boolean;
+  readonly serverNow: () => number;
+  readonly emitAsteroidHits: (hits: AppliedAsteroidHit[]) => void;
+};
 
 export type ShipDamageOutcome =
   | { applied: false; isDestroyed: false; entity?: never }

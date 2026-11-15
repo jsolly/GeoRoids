@@ -11,7 +11,6 @@ import {
 } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
 import { pointsForRoidSize } from '../../shared/asteroidScale';
-import { checkBoundaryCollision } from '../../shared/boundary';
 import { isCombatantImmune, laserDamagesShips } from '../../shared/combat';
 import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
 import { cargoCapacity } from '../../shared/economy';
@@ -95,7 +94,8 @@ import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { BotFleet } from './BotFleet';
 import { CargoOffloadManager } from './CargoOffloadManager';
 import { ChargedWeaponManager } from './ChargedWeaponManager';
-import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
+import { CollisionAuthority } from './CollisionAuthority';
+import { ContactCombat } from './ContactCombat';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
 import { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import { CrewRescueManager } from './CrewRescueManager';
@@ -153,21 +153,6 @@ type LaserAuxiliaryTarget = {
   | { kind: 'surveyProbe'; hostId: string; ownerId: string }
   | { kind: 'ship' | 'satellitePickup' | 'loot' | 'encounter'; ownerId?: string }
 );
-
-export interface CombatBroadcast {
-  targetId: string;
-  attackerId: string;
-  damage: number;
-  remainingHealth: number;
-
-  isDestroyed: boolean;
-  targetType: 'player';
-  destroyedAsteroidId?: string;
-  newAsteroids?: AsteroidData[];
-  origin?: { x: number; y: number };
-}
-
-type CombatSink = (result: CombatBroadcast) => void;
 
 /** 250 ms covers a delayed position packet at 30 Hz plus a brief browser/network hitch. */
 export const PLAYER_SHOOT_POSE_ALLOWANCE_MS = 250;
@@ -229,19 +214,19 @@ export class GameEngine {
   private readonly asteroidField: AsteroidField;
   public readonly furnaceDeliveries: FurnaceDeliveryManager;
   public readonly asteroidMining: AsteroidMining;
+  public readonly contactCombat: ContactCombat;
   private lastFurnaceBuildNotice = '';
   public readonly entityManager: EntityManager;
   private readonly asteroidManager: AsteroidManager;
   public readonly asteroidLifecycle: AsteroidLifecycle;
   private readonly lootManager: LootManager;
-  private satellitePickupManager: SatellitePickupManager;
+  public readonly satellitePickupManager: SatellitePickupManager;
   public readonly satelliteField: SatellitePickupField;
   private readonly spiderManager: TerrainSpiderManager;
   private readonly spiderField: SpiderField;
   private readonly beltCrawlers = new BeltCrawlerManager((id) => this.getAsteroid(id));
   private rngService: RNGService;
   private collisionAuthority = new CollisionAuthority();
-  private combatSink: CombatSink | null = null;
   private gameTime = 0;
   private gameLoopInterval: NodeJS.Timeout | null = null;
   private isPaused: boolean = false; // Track if game is paused due to no players
@@ -583,6 +568,20 @@ export class GameEngine {
       currentFrame: () => this.gameTime,
     });
 
+    this.contactCombat = new ContactCombat({
+      actors: this.entityManager,
+      motion: this.playerMotion,
+      rocks: this.asteroidManager,
+      mining: this.asteroidMining,
+      damage: this.shipDamage,
+      pickups: this.satellitePickupManager,
+      collisions: this.collisionAuthority,
+      spiders: this.spiderField,
+      paused: () => this.isPaused,
+      serverNow: () => this.getServerTime(),
+      emitAsteroidHits: (hits) => this.emitAsteroidHits(hits),
+    });
+
     this.pilotSessions = new PilotSessionLifecycle({
       actors: this.entityManager,
       motion: this.playerMotion,
@@ -623,10 +622,6 @@ export class GameEngine {
       );
     }
     this.satellitePickupManager.createPickups();
-  }
-
-  public setCombatSink(sink: CombatSink | null): void {
-    this.combatSink = sink;
   }
 
   /** Return epoch milliseconds from the process-monotonic server clock. */
@@ -804,7 +799,7 @@ export class GameEngine {
     this.furnaceDeliveries.advance();
     this.asteroidField.advanceFixtureSeeding(this.gameTime);
     this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
-    this.resolveAuthoritativeCombat();
+    this.contactCombat.advance();
     this.cargoOffload.advance();
     this.asteroidField.advanceRegions(this.gameTime);
     // Write-behind: everything that changed this second leaves the loop as one
@@ -1475,11 +1470,6 @@ export class GameEngine {
     );
   }
 
-  /** Apply one authoritative physical hit to a live satellite pickup. */
-  public handleSatellitePickupDamage(pickupId: string, damage: number): SatellitePickupData | null {
-    return this.satellitePickupManager.damage(pickupId, damage);
-  }
-
   private logRespawns(ids: readonly string[]): void {
     for (const playerId of ids) {
       const entity = this.entityManager.getEntity(playerId);
@@ -1494,187 +1484,6 @@ export class GameEngine {
         state: captureDiagnosticActorState(entity),
       });
     }
-  }
-
-  /**
-   * Server-owned ship and asteroid resolution. Asteroid motion already ran in
-   * the game loop (`updateMotion`); this only applies health. Ram uses the tip
-   * collision destroy path independently of mining damage.
-   */
-  public resolveAuthoritativeCombat(): CombatBroadcast[] {
-    if (this.isPaused) {
-      return [];
-    }
-
-    const results: CombatBroadcast[] = [];
-    const entities = this.entityManager.getAllEntities();
-    for (const entity of entities) {
-      const radius = hullRadiusForKit(entity.kitId);
-      if (checkBoundaryCollision(entity.position, radius)) {
-        const result = this.applyDirectedHit(entity.id, 'boundary', entity.health);
-        if (result) {
-          results.push(result);
-        }
-      }
-    }
-
-    const pickupBodyHits = this.collisionAuthority.collectAsteroidPickupHits(
-      this.asteroidManager.spatialIndex(),
-      this.satellitePickupManager.getAllPickups()
-    );
-    for (const hit of pickupBodyHits) {
-      this.handleSatellitePickupDamage(hit.pickupId, DAMAGE.LASER_HIT);
-    }
-
-    const ramHits = this.collisionAuthority.collectShipAsteroidHits(
-      entities,
-      this.asteroidManager.spatialIndex(),
-      (shipId, rock) =>
-        rock.boost?.phase !== 'burning' && !this.isActiveHarpoonTarget(shipId, rock.id)
-    );
-    const destroyedAsteroids = new Set<string>();
-    const bumperKeys = this.resolveTowedAsteroidImpacts(entities, destroyedAsteroids);
-    for (const hit of ramHits) {
-      this.playerMotion.releaseContourLock(hit.shipId, this.getServerTime());
-      if (bumperKeys.has(`${hit.shipId}:${hit.asteroidId}`)) {
-        continue;
-      }
-      const result = this.applyDirectedHit(hit.shipId, 'asteroid', DAMAGE.ASTEROID_COLLISION);
-      if (!result) {
-        continue;
-      }
-      if (!destroyedAsteroids.has(hit.asteroidId)) {
-        const destruction = this.asteroidMining.hit(hit.asteroidId, hit.shipId, 'collision');
-        if (destruction.outcome === 'destroyed') {
-          destroyedAsteroids.add(hit.asteroidId);
-          result.destroyedAsteroidId = hit.asteroidId;
-          result.newAsteroids = destruction.newAsteroids;
-          result.origin = destruction.destroyed.position;
-        }
-      }
-      const remaining = this.asteroidManager.getAsteroid(hit.asteroidId);
-      const rammed = this.entityManager.getEntity(hit.shipId);
-      if (remaining && rammed) {
-        separateShipFromAsteroid(rammed, hullRadiusForKit(rammed.kitId), remaining);
-        this.playerMotion.applyExternalImpulse(rammed.id, this.getServerTime());
-      }
-      results.push(result);
-    }
-
-    for (const attack of this.spiderField.drainAttacks()) {
-      if (!this.spiderField.isAttackActive(attack)) {
-        continue;
-      }
-      const target = this.entityManager.getEntity(attack.targetId);
-      if (!target) {
-        continue;
-      }
-      const result = this.applyDirectedHit(attack.targetId, attack.attackerId, target.health);
-      if (result) {
-        results.push(result);
-      }
-    }
-
-    for (const result of results) {
-      this.combatSink?.(result);
-    }
-    return results;
-  }
-
-  /** An active Hauler harpoon lets its owner pass through that exact rock. */
-  private isActiveHarpoonTarget(shipId: string, asteroidId: string): boolean {
-    const ship = this.entityManager.getEntity(shipId);
-    return ship?.kitId === 'hauler' && ship.harpoonTargetId === asteroidId;
-  }
-
-  /**
-   * Towed cargo that overlaps another rock uses the ordinary collision break
-   * on both bodies and drops the cable. The Hauler is not rammed by a rock
-   * its cargo is already breaking this frame.
-   */
-  private resolveTowedAsteroidImpacts(
-    entities: GameEntity[],
-    destroyedAsteroids: Set<string>
-  ): Set<string> {
-    const towedOwners = new Map<string, string[]>();
-    const towedRocks: AsteroidData[] = [];
-    for (const entity of entities) {
-      if (
-        entity.kitId !== 'hauler' ||
-        !isTowCableUtility(entity) ||
-        entity.harpoonTargetId == null ||
-        entity.harpoonTargetId === ''
-      ) {
-        continue;
-      }
-      const rock = this.asteroidManager.getAsteroid(entity.harpoonTargetId);
-      if (!rock || rock.health <= 0) {
-        continue;
-      }
-      const owners = towedOwners.get(rock.id);
-      if (owners) {
-        owners.push(entity.id);
-      } else {
-        towedOwners.set(rock.id, [entity.id]);
-        towedRocks.push(rock);
-      }
-    }
-    const bumperKeys = new Set<string>();
-    const cargoBreaks: AppliedAsteroidHit[] = [];
-    for (const hit of this.collisionAuthority.collectTowedAsteroidHits(
-      towedRocks,
-      this.asteroidManager.spatialIndex(),
-      (rock) => rock.boost?.phase !== 'burning'
-    )) {
-      const haulerIds = towedOwners.get(hit.towedId);
-      if (haulerIds?.length == null || haulerIds?.length === 0 || Number.isNaN(haulerIds?.length)) {
-        continue;
-      }
-      for (const haulerId of haulerIds) {
-        bumperKeys.add(`${haulerId}:${hit.otherId}`);
-      }
-      for (const otherHaulerId of towedOwners.get(hit.otherId) ?? []) {
-        bumperKeys.add(`${otherHaulerId}:${hit.towedId}`);
-      }
-      const scorerId = haulerIds[0];
-      if (scorerId == null || scorerId === '') {
-        continue;
-      }
-      for (const asteroidId of [hit.towedId, hit.otherId]) {
-        if (destroyedAsteroids.has(asteroidId)) {
-          continue;
-        }
-        const applied = this.asteroidMining.apply(asteroidId, scorerId, 'collision');
-        if (!applied.applied || applied.outcome !== 'destroyed') {
-          continue;
-        }
-        destroyedAsteroids.add(asteroidId);
-        cargoBreaks.push(applied);
-      }
-    }
-    this.emitAsteroidHits(cargoBreaks);
-    return bumperKeys;
-  }
-
-  private applyDirectedHit(
-    targetId: string,
-    attackerId: string,
-    damage: number
-  ): CombatBroadcast | null {
-    const outcome = this.shipDamage.apply(targetId, attackerId, damage);
-    if (!outcome.applied) {
-      return null;
-    }
-    const broadcast: CombatBroadcast = {
-      targetId,
-      attackerId,
-      damage,
-      remainingHealth: outcome.entity.health,
-
-      isDestroyed: outcome.isDestroyed,
-      targetType: outcome.entity.type,
-    };
-    return broadcast;
   }
 
   public cooperativeEnabled(): boolean {
@@ -2079,7 +1888,7 @@ export class GameEngine {
             );
           }
         } else if (auxiliary.kind === 'satellitePickup') {
-          this.handleSatellitePickupDamage(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
+          this.satellitePickupManager.damage(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         } else if (auxiliary.kind === 'loot') {
           const blast = this.handleLootExplode(laser.ownerId, auxiliary.id);
           if (blast.success && blast.origin) {
@@ -2099,13 +1908,13 @@ export class GameEngine {
               : laser.attackerRole === 'raider'
                 ? 'raider'
                 : 'crew-fire';
-          const result = this.applyDirectedHit(
+          const result = this.contactCombat.directedHit(
             auxiliary.id,
             cause,
             DAMAGE.LASER_HIT * laser.energy
           );
           if (result) {
-            this.combatSink?.(result);
+            this.contactCombat.emit(result);
           }
         }
         this.observeFixtureTerminal(

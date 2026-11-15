@@ -16,6 +16,29 @@ export const railwayCli = Object.freeze({
   binarySha256: 'b0919b175c72cd829f9124caa9cf6d1a116741d847ef7be72abed14c70d3f43a',
 });
 
+/** Bind both CLI authentication and the SDK's native-evaluation version probe. */
+export function railwayCliEnvironment(
+  environment: NodeJS.ProcessEnv,
+  cli: string
+): NodeJS.ProcessEnv {
+  const child = { ...environment };
+  for (const key of Object.keys(child)) {
+    if (key.startsWith('RAILWAY_')) {
+      delete child[key];
+    }
+  }
+  return Object.assign(child, {
+    _: cli,
+    RAILWAY_TOKEN: environment['RAILWAY_CONFIG_TOKEN'],
+    RAILWAY_PROJECT_ID: railwayTarget.project,
+    RAILWAY_ENVIRONMENT_ID: railwayTarget.environment,
+    RAILWAY_SERVICE_ID: railwayTarget.service,
+    RAILWAY_CALLER: 'skill:use-railway@1.3.5',
+    RAILWAY_AGENT_SESSION: `georoids-version-pin-${environment['GITHUB_RUN_ID'] ?? 'workflow'}`,
+    CI: 'true',
+  });
+}
+
 type RecordValue = Record<string, unknown>;
 type Build = { builder: 'RAILPACK'; buildEnvironment: 'V3'; railpackVersion: string | undefined };
 type Snapshot = { etag: string; build: Build; deployment: { id: string; status: string } | null };

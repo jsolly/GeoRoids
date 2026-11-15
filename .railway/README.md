@@ -32,8 +32,8 @@ The runner rejects resource creation or deletion, variables, secrets, commands,
 volumes, domains, placement, replicas, runtime changes, ownership claims,
 unknown fields and multiple changes. It compares the entire build before and
 after the proposed update. A harmless-looking summary cannot conceal another
-build setting. Only a well-formed empty `STAGED` draft permits planning; the runner never
-applies, discards or rewrites dashboard work.
+build setting. Only a well-formed empty `STAGED` draft permits planning; the
+runner never applies, discards or rewrites dashboard work.
 
 The pinned API returns a non-null `EnvironmentPatch`, including when its patch
 has no work. The runner checks the exact `id`, `status` and `patch` fields.
@@ -95,6 +95,11 @@ Do not run `railway login`, `link`, `config pull --force`, setup installers or
 config cleanup as part of automation. The workflow uses only the dedicated
 project token and fixed IDs. Token scope is established during provisioning;
 source code cannot prove how a supplied token was issued.
+
+The runner also sets the child process's `_` executable path to the verified
+CLI. The TypeScript SDK uses that path for its native-evaluation version check;
+inheriting the workflow's Node launcher makes that check reject planning.
+Failed CLI calls report a fixed phase label while withholding provider output.
 
 ## Saved-plan and verification contract
 

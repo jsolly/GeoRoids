@@ -51,7 +51,7 @@ while the surviving deterministic cases define the automated proof.
 | Why won't this huge rock tow, ignite, or break from a ram? | asteroids, hauler, teamwork | shared/asteroidScale.ts, GameEngine.ts, ContactCombat.ts, colossal crew tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | shared/shipAbilities.ts, towCable.ts, shared/furnaces.ts, FurnaceDeliveryManager.ts physical intake/credit/feedback, AsteroidLifecycle.ts complete removal, PilotLedger.ts live/offline awards |
 | How do I arm, ignite, and cancel an asteroid thruster? | hauler, controls, asteroids, teamwork | shared/asteroidBoost.ts, shipAbilities.ts, GameEngine.ts, boost lifecycle and persistence tests |
-| What happens when towed cargo hits another rock or ship? | hauler, asteroids, combat-survival | server/core/CollisionAuthority.ts, ContactCombat.ts, authoritative combat tests |
+| What happens when towed cargo hits another rock or ship? | hauler, asteroids, combat-survival | server/core/CollisionAuthority.ts, ContactCombat.ts, AsteroidHitFeedback.ts delivery, authoritative combat tests |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | How do contours give my ship a speed bonus? | terrain | shared/heightfield.ts, shared/terrainTravel.ts, src/physics/terrain/, terrain and contour tests |
 | How do friendly workers help, and how do I fight raiders? | teamwork, combat-survival | shared/aiShips.ts, BotFleet.ts, GameEngine.ts, bot scenario tests |

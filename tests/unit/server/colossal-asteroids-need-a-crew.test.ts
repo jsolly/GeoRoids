@@ -347,7 +347,7 @@ describe('Colossal asteroids need a crew', () => {
     world.engine.entityManager.updateEntity(bob.id, { spawnProtectionTimer: 0 });
     const healthBefore = world.entity(alice).health;
     const feedback: AppliedAsteroidHit[] = [];
-    world.engine.setOnAsteroidHits((hits) => feedback.push(...hits));
+    world.engine.asteroidHitFeedback.setListener((hits) => feedback.push(...hits));
     world.engine.contactCombat.advance();
     expect(world.entity(alice).health).toBe(healthBefore);
     expect(world.entity(alice).harpoonTargetId).toBe(rock.id);

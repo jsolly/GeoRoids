@@ -177,7 +177,7 @@ export class ContactCombat {
         cargoBreaks.push(applied);
       }
     }
-    this.inputs.emitAsteroidHits(cargoBreaks);
+    this.inputs.asteroidHits.emit(cargoBreaks);
     return bumperKeys;
   }
 

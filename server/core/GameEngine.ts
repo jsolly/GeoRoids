@@ -87,6 +87,7 @@ import { WorldRemains } from '../world/WorldRemains';
 import type { SavedWorld } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import { AsteroidField } from './AsteroidField';
+import { AsteroidHitFeedback } from './AsteroidHitFeedback';
 import { AsteroidLifecycle } from './AsteroidLifecycle';
 import { AsteroidManager } from './AsteroidManager.ts';
 import { AsteroidMining } from './AsteroidMining';
@@ -266,8 +267,7 @@ export class GameEngine {
     radius: number;
     shooterId: string;
   }> = [];
-  private onAsteroidHits?: (hits: AppliedAsteroidHit[]) => void;
-  private pendingAsteroidHits: AppliedAsteroidHit[] = [];
+  public readonly asteroidHitFeedback = new AsteroidHitFeedback();
   private persistenceFailure: Error | undefined;
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
@@ -579,7 +579,7 @@ export class GameEngine {
       spiders: this.spiderField,
       paused: () => this.isPaused,
       serverNow: () => this.getServerTime(),
-      emitAsteroidHits: (hits) => this.emitAsteroidHits(hits),
+      asteroidHits: this.asteroidHitFeedback,
     });
 
     this.pilotSessions = new PilotSessionLifecycle({
@@ -798,7 +798,7 @@ export class GameEngine {
     this.toolFlights.advance(toolStartPositions);
     this.furnaceDeliveries.advance();
     this.asteroidField.advanceFixtureSeeding(this.gameTime);
-    this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
+    this.asteroidHitFeedback.emit(this.advanceLasersAndResolveHits(serverNow));
     this.contactCombat.advance();
     this.cargoOffload.advance();
     this.asteroidField.advanceRegions(this.gameTime);
@@ -955,7 +955,7 @@ export class GameEngine {
     this.departedPlayers = [];
     this.asteroidField.forgetFixtureDecoration();
     this.clearPendingFeedback();
-    this.pendingAsteroidHits = [];
+    this.asteroidHitFeedback.clearPending();
     this.spiderField.clearPendingAttacks();
     this.satellitePickupManager.clear();
     this.spiderManager.clear();
@@ -1520,13 +1520,6 @@ export class GameEngine {
     this.pilotLedger.capture(entity.id);
   }
 
-  public setOnAsteroidHits(listener: (hits: AppliedAsteroidHit[]) => void): void {
-    this.onAsteroidHits = listener;
-    if (this.pendingAsteroidHits.length > 0) {
-      listener(this.pendingAsteroidHits.splice(0));
-    }
-  }
-
   /**
    * Untrusted player wire entry point. Tests use spawnLaser for server-authored shots.
    * Aim remains client-predicted, but ownership alone is not proof of a valid muzzle.
@@ -2055,18 +2048,6 @@ export class GameEngine {
     laser.hasExploded = true;
     this.observeFixtureTerminal(laser, 'segment-budget');
     return null;
-  }
-
-  private emitAsteroidHits(hits: AppliedAsteroidHit[]): void {
-    const applied = hits.filter((hit) => hit.applied);
-    if (applied.length === 0) {
-      return;
-    }
-    if (this.onAsteroidHits) {
-      this.onAsteroidHits(applied);
-      return;
-    }
-    this.pendingAsteroidHits.push(...applied);
   }
 
   // Game state

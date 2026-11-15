@@ -145,7 +145,7 @@ test('a tow feedback laser kill cancels a queued bite before contact consumes it
     engine.asteroidLifecycle.insert(other);
     const health = pilot.health;
     const feedback: AppliedAsteroidHit[] = [];
-    engine.setOnAsteroidHits((hits) => {
+    engine.asteroidHitFeedback.setListener((hits) => {
       expect(hits.map((hit) => [hit.asteroidId, hit.playerId])).toEqual([
         [cargo.id, hauler.id],
         [other.id, hauler.id],

@@ -95,7 +95,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     activate(alice);
     activate(alice);
     world.entity(alice).spawnProtectionTimer = 0;
-    expect(world.engine.handleShipDamage(alice.id, 'ricochet', 1000).isDestroyed).toBe(true);
+    expect(world.engine.shipDamage.apply(alice.id, 'ricochet', 1000).isDestroyed).toBe(true);
     expect(rock.boost?.phase).toBe('burning');
     step(1);
     expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(ASTEROID_BOOST.acceleration);

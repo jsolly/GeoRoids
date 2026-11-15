@@ -259,7 +259,7 @@ test('resuming during an explosion keeps the pending respawn until the server re
   const original = pilot(engine, 'scout', 'scout');
   original.actor.spawnProtectionTimer = 0;
   original.actor.score = 210;
-  expect(engine.handleShipDamage('scout', 'asteroid', original.actor.health).isDestroyed).toBe(
+  expect(engine.shipDamage.apply('scout', 'asteroid', original.actor.health).isDestroyed).toBe(
     true
   );
   const remaining = original.actor.respawnTimer;
@@ -297,7 +297,7 @@ test('a restart preserves the damaged pilot recovery wait across saved flight re
   vi.spyOn(first, 'getServerTime').mockReturnValue(10_000);
   const original = pilot(first, 'damaged', 'scout');
   delete original.actor.spawnProtectionTimer;
-  first.handleShipDamage(original.actor.id, 'asteroid', 20);
+  first.shipDamage.apply(original.actor.id, 'asteroid', 20);
   original.actor.shieldFrames = 120;
   original.actor.shieldCooldownFrames = 600;
   first.removePlayer(original.actor.id);

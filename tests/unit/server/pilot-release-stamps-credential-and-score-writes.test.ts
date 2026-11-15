@@ -153,7 +153,7 @@ test('death preserves bank provenance and keeps the issued credential', () => {
   actor.score = 1200;
   actor.spawnProtectionTimer = 0;
   engine.checkpointWorld();
-  expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
+  expect(engine.shipDamage.apply(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
   engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'pilot');

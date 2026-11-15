@@ -146,7 +146,7 @@ while the surviving deterministic cases define the automated proof.
   Boundary contact destroys a vulnerable ship regardless of health. The server
   reads the contact from the position a pilot reports: `PlayerMotionService.failedEnvelopeCheck`
   refuses that pose as `'boundary'` and `MessageHandler.applyBoundaryContact`
-  bills remaining health through `GameEngine.handleShipDamage`, so cargo absorbs
+  bills remaining health through `ShipDamage.apply`, so cargo absorbs
   it first. Verified in `tests/unit/server/authoritative-combat.test.ts` and
   `tests/unit/scenarios/boundary/`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager

@@ -92,7 +92,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
       if (cause === 'death') {
         world.entity(alice).spawnProtectionTimer = 0;
         expect(
-          world.engine.handleShipDamage(alice.id, 'asteroid', world.entity(alice).health)
+          world.engine.shipDamage.apply(alice.id, 'asteroid', world.entity(alice).health)
             .isDestroyed
         ).toBe(true);
       } else {

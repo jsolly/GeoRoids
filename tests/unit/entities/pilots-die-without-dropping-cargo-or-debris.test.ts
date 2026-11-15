@@ -24,7 +24,7 @@ describe('death, shared pickups and saved mass', () => {
     victim.score = 300;
     victim.equipment = ['survey_probe'];
     const before = engine.getLoot();
-    engine.handleShipDamage(victim.id, 'boundary', victim.health + 40);
+    engine.shipDamage.apply(victim.id, 'boundary', victim.health + 40);
     expect(victim.cargo).toBe(0);
     expect(victim.score).toBe(300);
     expect(victim.equipment).toEqual(['survey_probe']);
@@ -76,7 +76,7 @@ describe('death, shared pickups and saved mass', () => {
     applyShipMass(player, 5);
     expect(player.maxHealth).toBeGreaterThan(100);
 
-    engine.handleShipDamage('p1', 'boundary', player.health);
+    engine.shipDamage.apply('p1', 'boundary', player.health);
     for (let i = 0; i < 200; i++) {
       engine.entityManager.updateExplosions();
       engine.entityManager.updateRespawns();

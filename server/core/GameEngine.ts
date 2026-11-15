@@ -12,10 +12,9 @@ import {
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
 import { pointsForRoidSize } from '../../shared/asteroidScale';
 import { checkBoundaryCollision } from '../../shared/boundary';
-import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
+import { isCombatantImmune, laserDamagesShips } from '../../shared/combat';
 import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
-import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
-import { cargoCapacity, ECONOMY } from '../../shared/economy';
+import { cargoCapacity } from '../../shared/economy';
 import { canEquipUtility, EQUIPMENT_IDS, isEquipmentId } from '../../shared/equipment';
 import { ExplorationMap } from '../../shared/exploration';
 import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
@@ -119,6 +118,7 @@ import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 import { SettlementLedger } from './SettlementLedger';
 import { ShipAbilityManager } from './ShipAbilityManager';
+import { ShipDamage } from './ShipDamage';
 import { SpiderField } from './SpiderField';
 import { SpiderPopulationBudget } from './SpiderPopulationBudget';
 import { SurveyProbeManager } from './SurveyProbeManager';
@@ -255,6 +255,7 @@ export class GameEngine {
   private readonly hazards: WorldHazards;
   private readonly supplyRestoration: CooperativeSupplyRestoration;
   public readonly crewRescue: CrewRescueManager;
+  public readonly shipDamage: ShipDamage;
   private clockPrimed: boolean = false;
   private readonly loopHealth = new GameLoopHealth(() => ({
     players: this.getPlayerCount(),
@@ -286,7 +287,6 @@ export class GameEngine {
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly laserExpiry = new WeakMap<ServerLaser, number>();
-  private readonly damageStateLogs = new WeakMap<GameEntity, number>();
 
   private fixtureCombat: FixtureCombatRecorder | undefined;
 
@@ -511,7 +511,7 @@ export class GameEngine {
       population,
       spiders: this.spiderManager,
       actors: this.entityManager,
-      hit: (id) => this.handleShipDamage(id, 'asteroid', 50),
+      hit: (id) => this.shipDamage.apply(id, 'asteroid', 50),
     });
     this.crewRescue = new CrewRescueManager({
       actors: this.entityManager,
@@ -521,6 +521,17 @@ export class GameEngine {
       cancelCharge: (actor) => this.chargedWeapons.cancel(actor),
       cancelBoost: (id, targetId) => this.cancelArmedBoost(id, targetId),
       capturePilot: (id) => this.pilotLedger.capture(id),
+      terminalDeath: (actor, cause) => this.applyShipDeath(actor, cause),
+    });
+    this.shipDamage = new ShipDamage({
+      actors: this.entityManager,
+      motion: this.playerMotion,
+      rescue: this.crewRescue,
+      campaign: this.cooperative,
+      ledger: this.pilotLedger,
+      loot: this.lootManager,
+      serverNow: () => this.getServerTime(),
+      currentFrame: () => this.gameTime,
       terminalDeath: (actor, cause) => this.applyShipDeath(actor, cause),
     });
     this.abilities = new ShipAbilityManager({
@@ -1469,128 +1480,6 @@ export class GameEngine {
     return this.satellitePickupManager.damage(pickupId, damage);
   }
 
-  /**
-   * Apply damage through one path. Protection, loot, and deathCause stay on
-   * the tip helpers; health/cargo stay server-owned.
-   */
-  public handleShipDamage(
-    targetId: string,
-    attackerId: string,
-    damage: number
-  ): { applied: boolean; isDestroyed: boolean; entity?: GameEntity } {
-    logger.debug('handleShipDamage called', { targetId, attackerId, damage });
-    // Crew remain safe from allied fire and rams. Opposing factions and world
-    // hazards, including bounced lasers, use the same authoritative damage path.
-    const target = this.entityManager.getEntity(targetId);
-    const opposedShot =
-      (attackerId === 'raider' && target?.botRole !== 'raider') ||
-      (attackerId === 'crew-fire' && target?.botRole === 'raider');
-    if (!isWorldHazard(attackerId) && !opposedShot) {
-      return { applied: false, isDestroyed: false };
-    }
-
-    const existing = this.entityManager.getEntity(targetId);
-    if (!existing) {
-      return { applied: false, isDestroyed: false };
-    }
-    this.playerMotion.releaseContourLock(existing.id, this.getServerTime());
-    if (
-      existing.furnaceTransit ||
-      (existing.shieldFrames ?? 0) > 0 ||
-      isCombatantImmune(existing)
-    ) {
-      return { applied: false, isDestroyed: false };
-    }
-
-    if (!Number.isFinite(damage) || damage <= 0) {
-      return { applied: false, isDestroyed: false };
-    }
-    this.crewRescue.cancel(existing.id);
-    const healthBefore = existing.health;
-    const spilled = Math.min(existing.cargo, Math.ceil(damage * ECONOMY.cargoPointsPerHp));
-    if (spilled > 0) {
-      existing.cargo -= spilled;
-      this.spillCargo(existing, spilled);
-      existing.healthRegenTimer = calculateHealthRegenDelayFrames();
-      this.pilotLedger.capture(existing.id);
-    }
-    const hullDamage = Math.max(0, damage - spilled / ECONOMY.cargoPointsPerHp);
-    const damaged = this.entityManager.damageEntity(targetId, hullDamage);
-    if (!damaged) {
-      return { applied: false, isDestroyed: false };
-    }
-
-    if (damaged.health > 0) {
-      if (damaged.health < healthBefore) {
-        this.logDamageState(damaged, attackerId, damage, healthBefore, 'survived');
-      }
-      return { applied: true, isDestroyed: false, entity: damaged };
-    }
-
-    if (this.cooperative.activated && damaged.botRole === undefined) {
-      this.crewRescue.down(damaged, attackerId);
-    } else {
-      this.applyShipDeath(damaged, attackerId);
-    }
-    const finalDeath =
-      damaged.downedUntil == null || damaged.downedUntil === 0 || Number.isNaN(damaged.downedUntil);
-    this.logDamageState(
-      damaged,
-      attackerId,
-      damage,
-      healthBefore,
-      finalDeath ? 'destroyed' : 'downed'
-    );
-    return { applied: true, isDestroyed: finalDeath, entity: damaged };
-  }
-
-  /**
-   * A record for each hit that changes health, except an ordinary surviving hit
-   * inside the one-second window. Only that case is throttled: a hit that ends
-   * a life is the record `MessageHandler.applyBoundaryContact` suppresses the
-   * motion-rejection warning in favour of, so it has to be written every time.
-   * A hit a hold absorbs entirely changes no health and is not logged here at
-   * all; for a wall contact the refused pose carries that record instead, under
-   * its own throttle. A cooperative downing ends a life without destroying
-   * the hull, and before it had its own event it was logged as a throttleable
-   * `damage_applied` — which meant a wall death in cooperative play could leave
-   * no record at all once the warning was suppressed.
-   */
-  private logDamageState(
-    entity: GameEntity,
-    attackerId: string,
-    damage: number,
-    healthBefore: number,
-    outcome: 'destroyed' | 'downed' | 'survived'
-  ): void {
-    const observedAt = Date.now();
-    const throttleAt = this.getServerTime();
-    const lastThrottleAt = this.damageStateLogs.get(entity) ?? -Infinity;
-    if (outcome === 'survived' && throttleAt - lastThrottleAt < 1000) {
-      return;
-    }
-    this.damageStateLogs.set(entity, throttleAt);
-    const event =
-      outcome === 'destroyed'
-        ? 'player_died'
-        : outcome === 'downed'
-          ? 'player_downed'
-          : 'damage_applied';
-    logger.info('STATE', event, {
-      releaseId: SERVER_RELEASE_ID,
-      playerId: entity.id,
-      attackerId,
-      source: 'collision',
-      damage,
-      observedAt,
-      gameTime: this.gameTime,
-      healthBefore,
-      healthAfter: entity.health,
-
-      state: captureDiagnosticActorState(entity),
-    });
-  }
-
   private logRespawns(ids: readonly string[]): void {
     for (const playerId of ids) {
       const entity = this.entityManager.getEntity(playerId);
@@ -1772,8 +1661,8 @@ export class GameEngine {
     attackerId: string,
     damage: number
   ): CombatBroadcast | null {
-    const outcome = this.handleShipDamage(targetId, attackerId, damage);
-    if (!outcome.applied || !outcome.entity) {
+    const outcome = this.shipDamage.apply(targetId, attackerId, damage);
+    if (!outcome.applied) {
       return null;
     }
     const broadcast: CombatBroadcast = {
@@ -2804,26 +2693,6 @@ export class GameEngine {
     }
 
     return { success: true, loot, origin, pushedAsteroidIds };
-  }
-
-  /** Recoverable hit spills launch beyond magnet range before collection resumes. */
-  private spillCargo(entity: GameEntity, points: number): void {
-    const count = Math.min(8, Math.max(1, Math.ceil(points / 100)));
-    const base = Math.floor(points / count);
-    for (let index = 0; index < count; index++) {
-      const angle = entity.angle + (index / count) * Math.PI * 2;
-      const dx = Math.cos(angle);
-      const dy = Math.sin(angle);
-      const offset = hullRadiusForKit(entity.kitId) + GROWTH.LOOT_RADIUS + 10;
-      this.lootManager.spawnPoints(
-        { x: entity.position.x + dx * offset, y: entity.position.y + dy * offset },
-        base + (index < points % count ? 1 : 0),
-        {
-          velocity: { x: dx * ECONOMY.cargoSpillSpeed, y: dy * ECONOMY.cargoSpillSpeed },
-          ejectFramesLeft: ECONOMY.cargoSpillEjectFrames,
-        }
-      );
-    }
   }
 
   private addCargo(entity: GameEntity, points: number): void {

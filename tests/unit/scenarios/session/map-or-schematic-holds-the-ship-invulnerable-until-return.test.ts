@@ -67,8 +67,8 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
     const health = held.health;
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health);
-    expect(world.engine.handleShipDamage(ace.id, 'ricochet', 25).applied).toBe(false);
-    expect(world.engine.handleShipDamage(ace.id, 'boundary', health).applied).toBe(false);
+    expect(world.engine.shipDamage.apply(ace.id, 'ricochet', 25).applied).toBe(false);
+    expect(world.engine.shipDamage.apply(ace.id, 'boundary', health).applied).toBe(false);
     world.clearAsteroids();
 
     sendHold(false);

@@ -433,7 +433,7 @@ describe('Satellite pickups', () => {
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
 
-    gameEngine.handleShipDamage(
+    gameEngine.shipDamage.apply(
       'pilot',
       'asteroid',
       pilot.health + pilot.cargo / ECONOMY.cargoPointsPerHp

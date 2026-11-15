@@ -145,7 +145,7 @@ test('salvaged tools survive an ordinary death, reconnect, and a server restart'
     actor.color = '#FBBF24';
     actor.score = 400;
     actor.spawnProtectionTimer = 0;
-    expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
+    expect(engine.shipDamage.apply(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
     const continued = engine.pilotSessions.resume({
       token: registered.resumeToken,
       socket: new RecordingSocket(),
@@ -290,7 +290,7 @@ test('death preserves bank and equipment through a restart', () => {
     actor.color = '#FBBF24';
     expect(engine.setHaulerUtility(actor.id, 'resource_tap')).toBe(true);
     actor.spawnProtectionTimer = 0;
-    engine.handleShipDamage(actor.id, 'asteroid', actor.health);
+    engine.shipDamage.apply(actor.id, 'asteroid', actor.health);
     expect(actor).toMatchObject({
       score: 900,
       silk: 20,

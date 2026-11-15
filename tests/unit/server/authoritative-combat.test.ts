@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { ServerClock } from '../../../server/core/ServerClock';
 import { logger } from '../../../setup/serverLogger';
 import { checkBoundaryCollision } from '../../../shared/boundary';
 import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
@@ -304,7 +305,7 @@ describe('server-authoritative combat', () => {
     clearProtection(engine, 'p1');
 
     for (let hit = 0; hit < 4; hit++) {
-      engine.handleShipDamage('p1', 'asteroid', DAMAGE.LASER_HIT);
+      engine.shipDamage.apply('p1', 'asteroid', DAMAGE.LASER_HIT);
     }
     for (let frame = 0; frame < SHIP.RESPAWN_DELAY_FRAMES; frame++) {
       engine.advanceCombatFrame();
@@ -326,6 +327,57 @@ describe('server-authoritative combat', () => {
     expect(stateEvents[2]?.[2]).toMatchObject({
       playerId: 'p1',
       state: { health: SHIP.MAX_HEALTH, exploding: false },
+    });
+  });
+
+  test('damage sampling follows elapsed time and a replacement hull with the same id gets its own record', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    let elapsed = 0;
+    engine = new GameEngine(
+      12345,
+      new ServerClock({ wallNow: () => 10_000, monotonicNow: () => elapsed })
+    );
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const first = engine.addPlayer('p1', 'First hull', new RecordingSocket(), { x: 0, y: 0 });
+    clearProtection(engine, first.id);
+    engine.shipDamage.apply(first.id, 'asteroid', 1);
+    vi.setSystemTime(1_000_000);
+    elapsed = 999;
+    engine.shipDamage.apply(first.id, 'asteroid', 1);
+    expect(info.mock.calls.filter(([, event]) => event === 'damage_applied')).toHaveLength(1);
+    elapsed = 1000;
+    engine.shipDamage.apply(first.id, 'asteroid', 1);
+    expect(first.health).toBe(97);
+    const sampled = info.mock.calls.filter(([, event]) => event === 'damage_applied');
+    expect(sampled).toHaveLength(2);
+    expect(sampled[0]?.[2]).toMatchObject({
+      observedAt: 10_000,
+      healthBefore: 100,
+      healthAfter: 99,
+    });
+    expect(sampled[1]?.[2]).toMatchObject({
+      observedAt: 1_000_000,
+      healthBefore: 98,
+      healthAfter: 97,
+    });
+    engine.removePlayer(first.id);
+    const replacement = engine.addPlayer('p1', 'Replacement hull', new RecordingSocket(), {
+      x: 0,
+      y: 0,
+    });
+    expect(replacement).not.toBe(first);
+    clearProtection(engine, replacement.id);
+    engine.shipDamage.apply(replacement.id, 'asteroid', 1);
+    engine.shipDamage.apply(replacement.id, 'asteroid', 1);
+    expect(replacement.health).toBe(98);
+    const recorded = info.mock.calls.filter(([, event]) => event === 'damage_applied');
+    expect(recorded).toHaveLength(3);
+    expect(recorded[2]?.[2]).toMatchObject({
+      playerId: 'p1',
+      observedAt: 1_000_000,
+      healthBefore: 100,
+      healthAfter: 99,
     });
   });
 

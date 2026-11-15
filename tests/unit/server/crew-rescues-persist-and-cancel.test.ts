@@ -56,7 +56,9 @@ function scenario() {
   rescuer.position = { x: 2300, y: 2200 };
   downed.spawnProtectionTimer = 0;
   rescuer.spawnProtectionTimer = 0;
-  engine.handleShipDamage(downed.id, 'asteroid', 1000);
+  const outcome = engine.shipDamage.apply(downed.id, 'asteroid', 1000);
+  expect(outcome).toMatchObject({ applied: true, isDestroyed: false });
+  expect(outcome.entity).toBe(downed);
   const tick = (ms: number) => {
     elapsed = ms;
     engine.advanceCombatFrame();
@@ -114,7 +116,7 @@ test.each(['release', 'movement', 'overlay', 'damage', 'disconnect'] as const)(
         engine.setOverlayHold(rescuer.id, true);
         break;
       case 'damage':
-        engine.handleShipDamage(rescuer.id, 'asteroid', 1);
+        engine.shipDamage.apply(rescuer.id, 'asteroid', 1);
         break;
       case 'disconnect':
         engine.transportClosed(rescuerSocket);
@@ -127,6 +129,29 @@ test.each(['release', 'movement', 'overlay', 'damage', 'disconnect'] as const)(
     expect(rescuer.rescue).toBeNull();
     tick(3000);
     expect(downed.health).toBe(0);
+    expect(rescuer.rescue).toBeNull();
+  }
+);
+
+test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+  'invalid damage %s leaves an active rescue and cargo untouched',
+  (damage) => {
+    const { engine, downed, rescuer, tick } = scenario();
+    rescuer.cargo = 30;
+    const health = rescuer.health;
+    expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+    const rescue = rescuer.rescue;
+    expect(rescue).toBeDefined();
+    expect(engine.shipDamage.apply(rescuer.id, 'asteroid', damage)).toEqual({
+      applied: false,
+      isDestroyed: false,
+    });
+    expect(rescuer.rescue).toBe(rescue);
+    expect(rescuer.cargo).toBe(30);
+    expect(rescuer.health).toBe(health);
+    expect(engine.getLoot()).toEqual([]);
+    tick(3000);
+    expect(downed.health).toBe(downed.maxHealth * 0.35);
     expect(rescuer.rescue).toBeNull();
   }
 );

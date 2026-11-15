@@ -66,7 +66,7 @@ describe('Game clock catch-up after a hitch', () => {
     const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    engine.handleShipDamage('p1', 'boundary', 100);
+    engine.shipDamage.apply('p1', 'boundary', 100);
 
     engine.stepClock(0);
     engine.stepClock(GAME_TICK_MS * SHIP.EXPLODE_DURATION_FRAMES);

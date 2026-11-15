@@ -156,7 +156,7 @@ test('a worker banks recovered points in the shared settlement and leaves equipm
   pilot.cargo = 30;
   pilot.overlayHold = false;
   delete pilot.spawnProtectionTimer;
-  expect(engine.handleShipDamage(pilot.id, 'asteroid', 30).applied).toBe(true);
+  expect(engine.shipDamage.apply(pilot.id, 'asteroid', 30).applied).toBe(true);
   pilot.position = { x: 0, y: 0 };
   pilot.overlayHold = true;
   const gear = engine.dropEquipmentAt(worker.position, 'resource_tap');
@@ -267,7 +267,7 @@ test('bot death respawns outside town, and final human removal spills holds befo
   const { engine, pilot, bot, frame, restart } = world(store);
   const raider = bot('raider');
   delete raider.spawnProtectionTimer;
-  expect(engine.handleShipDamage(raider.id, 'crew-fire', 1000).isDestroyed).toBe(true);
+  expect(engine.shipDamage.apply(raider.id, 'crew-fire', 1000).isDestroyed).toBe(true);
   frame(SHIP.RESPAWN_DELAY_FRAMES);
   expect(raider.health).toBe(raider.maxHealth);
   expect(raider.respawnTimer).toBeUndefined();

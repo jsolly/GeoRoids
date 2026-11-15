@@ -49,7 +49,7 @@ Approach a lit furnace with cargo; both ships lock onto the intake ring when the
 
 ## Cargo protection
 
-Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills, while a protected hit still delays health regeneration; any cargo left on death is discarded without an extra stash.
+Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills; a hit absorbed by cargo still delays health regeneration.
 
 Store purchases spend your bank, never carried cargo. See [Town Square](/wiki/#controls) for the store and [survival](/wiki/#combat-survival) for damage and respawns.
 

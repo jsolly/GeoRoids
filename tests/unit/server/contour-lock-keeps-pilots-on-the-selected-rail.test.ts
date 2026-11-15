@@ -976,49 +976,66 @@ test('three accepted adjacent hops charge one crew bridge, followers glide acros
   expect(followerActor.contourTransit).toBeUndefined();
 });
 
-test.each(['damage', 'protected contact', 'impulse', 'disconnect'] as const)(
-  'a bridge glide gives up motion when interrupted by %s',
-  (cause) => {
-    const { charged } = crewBridge();
-    const follower = world.join('Interrupted follower', { x: 0, y: 0 });
-    const actor = world.entity(follower);
-    world.engine.playerMotion.placeActorForTesting(
-      actor.id,
-      charged.from,
-      world.engine.getServerTime()
-    );
-    actor.contourLock = charged.source;
-    actor.spawnProtectionTimer = cause === 'protected contact' ? 180 : 0;
-    world.engine.advanceOneFrame();
-    expect(actor.contourTransit).toBeDefined();
-    if (cause === 'damage') {
-      expect(world.engine.handleShipDamage(actor.id, 'asteroid', 25).applied).toBe(true);
-    } else if (cause === 'impulse') {
-      actor.position.x += 50;
-      actor.velocity = { x: 2, y: 0 };
-      world.engine.playerMotion.applyExternalImpulse(actor.id, world.engine.getServerTime());
-    } else if (cause === 'disconnect') {
-      expect(world.engine.transportClosed(follower.socket)).toBe(true);
-      const resumed = world.resume(follower);
-      expect(resumed.id).toBe(actor.id);
-      expect(actor.playerMotion?.anchor).toEqual(actor.position);
-    } else {
-      world.hitAsteroid(follower);
-      expect(actor.health).toBe(100);
-    }
-    expect(actor.contourTransit).toBeUndefined();
-    const interrupted = { ...actor.position };
-    for (let frame = 0; frame < CONTOUR_BRIDGE.transitFrames; frame++) {
-      world.engine.advanceOneFrame();
-    }
-    expect(actor.contourLock).toBeNull();
-    expect(actor.contourDraftFrames ?? 0).toBe(0);
-    expect(actor.position).not.toEqual(charged.to);
-    expect(
-      Math.hypot(actor.position.x - interrupted.x, actor.position.y - interrupted.y)
-    ).toBeLessThan(50);
+test.each([
+  'damage',
+  'invalid damage',
+  'protected damage',
+  'protected contact',
+  'impulse',
+  'disconnect',
+] as const)('a bridge glide gives up motion when interrupted by %s', (cause) => {
+  const { charged } = crewBridge();
+  const follower = world.join('Interrupted follower', { x: 0, y: 0 });
+  const actor = world.entity(follower);
+  world.engine.playerMotion.placeActorForTesting(
+    actor.id,
+    charged.from,
+    world.engine.getServerTime()
+  );
+  actor.contourLock = charged.source;
+  actor.spawnProtectionTimer =
+    cause === 'protected contact' || cause === 'protected damage' ? 180 : 0;
+  world.engine.advanceOneFrame();
+  expect(actor.contourTransit).toBeDefined();
+  if (cause === 'damage') {
+    expect(world.engine.shipDamage.apply(actor.id, 'asteroid', 25).applied).toBe(true);
+  } else if (cause === 'invalid damage') {
+    expect(world.engine.shipDamage.apply(actor.id, 'asteroid', Number.NaN)).toEqual({
+      applied: false,
+      isDestroyed: false,
+    });
+    expect(actor.health).toBe(100);
+  } else if (cause === 'protected damage') {
+    expect(world.engine.shipDamage.apply(actor.id, 'asteroid', 25)).toEqual({
+      applied: false,
+      isDestroyed: false,
+    });
+    expect(actor.health).toBe(100);
+  } else if (cause === 'impulse') {
+    actor.position.x += 50;
+    actor.velocity = { x: 2, y: 0 };
+    world.engine.playerMotion.applyExternalImpulse(actor.id, world.engine.getServerTime());
+  } else if (cause === 'disconnect') {
+    expect(world.engine.transportClosed(follower.socket)).toBe(true);
+    const resumed = world.resume(follower);
+    expect(resumed.id).toBe(actor.id);
+    expect(actor.playerMotion?.anchor).toEqual(actor.position);
+  } else {
+    world.hitAsteroid(follower);
+    expect(actor.health).toBe(100);
   }
-);
+  expect(actor.contourTransit).toBeUndefined();
+  const interrupted = { ...actor.position };
+  for (let frame = 0; frame < CONTOUR_BRIDGE.transitFrames; frame++) {
+    world.engine.advanceOneFrame();
+  }
+  expect(actor.contourLock).toBeNull();
+  expect(actor.contourDraftFrames ?? 0).toBe(0);
+  expect(actor.position).not.toEqual(charged.to);
+  expect(
+    Math.hypot(actor.position.x - interrupted.x, actor.position.y - interrupted.y)
+  ).toBeLessThan(50);
+});
 
 test.each([0, 1200])(
   'navigation salvage widens authoritative acquisition only while its %s-frame timer is active',

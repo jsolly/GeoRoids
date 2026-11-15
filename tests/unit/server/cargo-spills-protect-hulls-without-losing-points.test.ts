@@ -1,13 +1,18 @@
+import assert from 'node:assert/strict';
 import { afterEach, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
+import { logger } from '../../../setup/serverLogger';
 import { cargoCapacity, ECONOMY } from '../../../shared/economy';
 import { GROWTH } from '../../../shared/shipGrowth';
 import { instrumentLootIndex } from '../../support/lootIndexInstrumentation';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 function pilot(engine: GameEngine, id = 'pilot') {
   const actor = engine.addPlayer(id, id, new RecordingSocket(), { x: 1000, y: 1000 }, 'scout');
   actor.spawnProtectionTimer = 0;
@@ -19,19 +24,123 @@ test('immunity and direct crew fire preserve cargo while fractional protection o
   const actor = pilot(engine);
   actor.cargo = 9;
   actor.spawnProtectionTimer = 20;
-  expect(engine.handleShipDamage(actor.id, 'spider', 50).applied).toBe(false);
+  expect(engine.shipDamage.apply(actor.id, 'spider', 50).applied).toBe(false);
   actor.spawnProtectionTimer = 0;
   actor.overlayHold = true;
-  expect(engine.handleShipDamage(actor.id, 'asteroid', 50).applied).toBe(false);
+  expect(engine.shipDamage.apply(actor.id, 'asteroid', 50).applied).toBe(false);
   actor.overlayHold = false;
-  expect(engine.handleShipDamage(actor.id, 'teammate', 50).applied).toBe(false);
+  expect(engine.shipDamage.apply(actor.id, 'teammate', 50).applied).toBe(false);
   expect(actor.cargo).toBe(9);
   expect(engine.getLoot()).toEqual([]);
   const health = actor.health;
-  engine.handleShipDamage(actor.id, 'spider', 2);
+  engine.shipDamage.apply(actor.id, 'spider', 2);
   expect(actor.health).toBeCloseTo(health - 1.1);
   expect(actor.cargo).toBe(0);
   expect(engine.getLoot().reduce((sum, drop) => sum + (drop.points ?? 0), 0)).toBe(9);
+});
+
+test.each([
+  {
+    kit: 'scout',
+    cargo: 500,
+    damage: 0.01,
+    points: [1],
+    offset: 37,
+    position: { x: 1000, y: 1200 },
+    angle: Math.PI / 2,
+    directions: [[0, 1]],
+  },
+  {
+    kit: 'scout',
+    cargo: 500,
+    damage: 20.11,
+    points: [68, 67, 67],
+    offset: 37,
+    position: { x: 1000, y: 1000 },
+    angle: 0,
+    directions: [
+      [1, 0],
+      [-0.5, Math.sqrt(3) / 2],
+      [-0.5, -Math.sqrt(3) / 2],
+    ],
+  },
+  {
+    kit: 'hauler',
+    cargo: 1500,
+    damage: 100.1,
+    points: [126, 125, 125, 125, 125, 125, 125, 125],
+    offset: 52,
+    position: { x: 1000, y: 1000 },
+    angle: 0,
+    directions: [
+      [1, 0],
+      [Math.SQRT1_2, Math.SQRT1_2],
+      [0, 1],
+      [-Math.SQRT1_2, Math.SQRT1_2],
+      [-1, 0],
+      [-Math.SQRT1_2, -Math.SQRT1_2],
+      [0, -1],
+      [Math.SQRT1_2, -Math.SQRT1_2],
+    ],
+  },
+] as const)(
+  '$kit cargo absorbs $damage damage and ejects every point in recoverable outward drops',
+  ({ kit, cargo, damage, points, offset, position, angle, directions }) => {
+    const engine = new GameEngine(42);
+    engine.createAsteroids(0);
+    const actor = engine.addPlayer('shielded', 'Shielded', new RecordingSocket(), position, kit);
+    actor.spawnProtectionTimer = 0;
+    actor.angle = angle;
+    actor.cargo = cargo;
+    actor.healthRegenTimer = 1;
+    const health = actor.health;
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const outcome = engine.shipDamage.apply(actor.id, 'asteroid', damage);
+    expect(outcome).toMatchObject({ applied: true, isDestroyed: false });
+    expect(outcome.entity).toBe(actor);
+    expect(actor.health).toBe(health);
+    expect(actor.cargo).toBe(cargo - points.reduce((sum, value) => sum + value, 0));
+    expect(actor.healthRegenTimer).toBe(300);
+    expect(info.mock.calls.filter(([, event]) => event === 'damage_applied')).toEqual([]);
+    const drops = engine.getLoot();
+    expect(drops).toHaveLength(points.length);
+    const identified = directions.map((direction, index) => {
+      const drop = drops.find(
+        (row) =>
+          Math.abs(row.position.x - (position.x + direction[0] * offset)) < 0.000001 &&
+          Math.abs(row.position.y - (position.y + direction[1] * offset)) < 0.000001
+      );
+      assert.ok(drop, 'Expected outward spill missing');
+      expect(drop.kind).toBe('points');
+      expect(drop.points).toBe(points[index]);
+      return { drop, direction };
+    });
+    engine.advanceOneFrame();
+    for (const { drop, direction } of identified) {
+      const moved = engine.getLoot().find((row) => row.id === drop.id);
+      assert.ok(moved, 'Identified ejected spill missing');
+      expect(moved.points).toBe(drop.points);
+      expect(moved.position.x).toBeCloseTo(drop.position.x + direction[0] * 9);
+      expect(moved.position.y).toBeCloseTo(drop.position.y + direction[1] * 9);
+    }
+  }
+);
+
+test('a failed pilot capture leaves the real cargo spill visible and stops before hull damage', () => {
+  const engine = new GameEngine(42);
+  const actor = pilot(engine);
+  actor.cargo = 9;
+  const health = actor.health;
+  const failure = new Error('pilot capture failed');
+  vi.spyOn(engine.pilotLedger, 'capture').mockImplementationOnce(() => {
+    throw failure;
+  });
+  expect(() => engine.shipDamage.apply(actor.id, 'spider', 2)).toThrow(failure);
+  expect(actor.cargo).toBe(0);
+  expect(engine.getLoot().map((drop) => drop.points)).toEqual([9]);
+  expect(actor.healthRegenTimer).toBe(300);
+  expect(actor.health).toBe(health);
+  expect(actor.exploding).toBe(false);
 });
 
 test('full holds leave loot intact and two partial collectors conserve the original drop and deadline', () => {

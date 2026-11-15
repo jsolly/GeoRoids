@@ -344,7 +344,7 @@ test('shield commands require the owning socket and cooldown survives a real rec
   actor.cargo = 100;
   delete actor.spawnProtectionTimer;
   const protectedHealth = actor.health;
-  expect(engine.handleShipDamage('pilot', 'asteroid', 30).applied).toBe(false);
+  expect(engine.shipDamage.apply('pilot', 'asteroid', 30).applied).toBe(false);
   expect(actor.cargo).toBe(100);
   expect(actor.health).toBe(protectedHealth);
   pilot.send('activateShield', { id: 'pilot' });

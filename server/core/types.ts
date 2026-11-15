@@ -29,6 +29,22 @@ import type { TerrainSpiderManager } from './TerrainSpiderManager';
 
 export type RescueAction = Exclude<CrewAction, { kind: 'withdraw-supply' }>;
 
+export type ShipDamageOutcome =
+  | { applied: false; isDestroyed: false; entity?: never }
+  | { applied: true; isDestroyed: boolean; entity: GameEntity };
+
+export type ShipDamageInputs = {
+  readonly actors: Pick<EntityManager, 'getEntity' | 'damageEntity'>;
+  readonly motion: Pick<PlayerMotionService, 'releaseContourLock'>;
+  readonly rescue: Pick<CrewRescueManager, 'cancel' | 'down'>;
+  readonly campaign: Pick<CooperativeCampaign, 'activated'>;
+  readonly ledger: Pick<PilotLedger, 'capture'>;
+  readonly loot: Pick<LootManager, 'spawnPoints'>;
+  readonly serverNow: () => number;
+  readonly currentFrame: () => number;
+  readonly terminalDeath: (actor: GameEntity, cause: string) => void;
+};
+
 export type CrewRescueInputs = {
   readonly actors: Pick<EntityManager, 'getEntity' | 'getAllEntities'>;
   readonly campaign: Pick<CooperativeCampaign, 'activated' | 'get' | 'set' | 'removeDowned'>;

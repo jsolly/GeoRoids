@@ -18,7 +18,7 @@ test('a dead pilot resumes the countdown and preserves bank and exploration', ()
     actor.spawnProtectionTimer = 0;
     engine.useAbility(actor.id);
     const revealed = engine.getGameState().exploration;
-    expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
+    expect(engine.shipDamage.apply(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
     expect(actor.score).toBe(1200);
 
     const continued = engine.pilotSessions.resume({

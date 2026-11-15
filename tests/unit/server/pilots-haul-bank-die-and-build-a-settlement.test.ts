@@ -68,7 +68,7 @@ test('death repeatedly discards cargo, preserves the bank, and always respawns',
     actor.cargo = 90;
     actor.spawnProtectionTimer = 0;
     const beforeDeath = engine.getLoot();
-    engine.handleShipDamage(
+    engine.shipDamage.apply(
       actor.id,
       'boundary',
       actor.health + actor.cargo / ECONOMY.cargoPointsPerHp

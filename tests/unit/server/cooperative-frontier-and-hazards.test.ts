@@ -245,7 +245,7 @@ test('meteors use normal cargo shielding and expire without changing structures'
     population,
     spiders,
     actors: { getAllEntities: () => [pilot] },
-    hit: (id) => engine.handleShipDamage(id, 'asteroid', 50),
+    hit: (id) => engine.shipDamage.apply(id, 'asteroid', 50),
   });
   hazards.advance(1_800_000);
   const meteor = hazards.snapshot()[0];

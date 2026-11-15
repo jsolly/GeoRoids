@@ -413,7 +413,7 @@ export class MessageHandler {
       motionNow
     );
     // A contact that ends a life is ordinary gameplay, already recorded by
-    // `GameEngine.logDamageState` as `player_died`, or as `player_downed` when
+    // `ShipDamage` as `player_died`, or as `player_downed` when
     // the cooperative campaign routes the hull into a rescue window instead.
     // Both are written unthrottled, so suppressing the rejection warning here
     // loses nothing: that throttle window belongs to real envelope violations.
@@ -487,7 +487,7 @@ export class MessageHandler {
   }
 
   /** Returns true when the hit ended the target's life: destroyed outright, or
-   * downed into a cooperative rescue window. `handleShipDamage` reports
+   * downed into a cooperative rescue window. `ShipDamage.apply` reports
    * `isDestroyed: false` for a cooperative down (`CrewRescueManager.down` sets a
    * positive `downedUntil`), so reading that flag alone would log a wall death
    * as a movement violation in exactly the mode the game is usually played in. */
@@ -497,8 +497,8 @@ export class MessageHandler {
     damage: number,
     healthBefore: number | undefined
   ): boolean {
-    const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
-    if (!outcome.applied || !outcome.entity) {
+    const outcome = this.gameEngine.shipDamage.apply(targetId, attackerId, damage);
+    if (!outcome.applied) {
       return false;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
@@ -524,7 +524,7 @@ export class MessageHandler {
    * a pilot elsewhere in the world cannot claim a contact. The pose itself is
    * refused, so the authoritative hull never moves outside the wall. Contact
    * kills regardless of remaining hull health; cargo absorbs it first inside
-   * `handleShipDamage`. Returns true when the contact ended this life, whether
+   * `ShipDamage.apply`. Returns true when the contact ended this life, whether
    * by destroying the hull or by downing it — see `emitShipDamage`.
    *
    * What this trusts is that the reported position is truthful, not merely that

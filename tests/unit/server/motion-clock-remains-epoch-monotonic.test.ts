@@ -77,7 +77,7 @@ describe('server motion clock', () => {
     const actor = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 1000, y: 1000 });
     actor.spawnProtectionTimer = 0;
     actor.cargo = 10;
-    expect(engine.handleShipDamage(actor.id, 'asteroid', 1).applied).toBe(true);
+    expect(engine.shipDamage.apply(actor.id, 'asteroid', 1).applied).toBe(true);
     const original = engine.getLoot().filter((drop) => drop.kind === 'points');
     expect(original).toHaveLength(1);
     const pointId = original[0]?.id;

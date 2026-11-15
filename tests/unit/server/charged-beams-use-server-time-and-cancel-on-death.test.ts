@@ -215,7 +215,7 @@ test('cancellation, overlays, expiry and a dead life cannot release a stored cha
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(90);
-  engine.handleShipDamage(pilot.id, 'boundary', 1000);
+  engine.shipDamage.apply(pilot.id, 'boundary', 1000);
   advance(90);
   expect(pilot.health).toBeGreaterThan(0);
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();

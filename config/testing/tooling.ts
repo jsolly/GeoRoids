@@ -53,6 +53,7 @@ export default defineConfig({
             'scripts/railpack-build.test.ts',
             'scripts/railway-version-pin.test.ts',
             'scripts/railway-ownership-plan.test.ts',
+            'scripts/railway-setting-details.test.ts',
           ],
         },
       },

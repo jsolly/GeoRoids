@@ -135,6 +135,17 @@ labels and an unknown-field count. Unrecognized text and all raw operation
 values, summaries, diagnostic messages and variable values stay private.
 Oversized or untrusted artifacts fail explicitly rather than truncating rows.
 
+Exact service `build` and `deploy` updates also include `settingDetails`. This
+fixed-schema projection reports changed known paths and distinguishes absent,
+null, typed safe values and withheld values. Only reviewed enums, bounded numbers,
+booleans, version numbers and the exact existing start command and health path
+can be printed. Arbitrary keys, commands, URLs, variables, summaries and diagnostic
+text remain private. Unknown fields are counted without their names. Unknown
+fields, malformed containers or withheld changed values mark details incomplete;
+other operations are explicitly not inspected. The complete/incomplete label
+describes diagnostic detail coverage, never policy acceptance or apply readiness.
+The original setting guard still reviews the entire unchanged saved artifact.
+
 After inventory, the shared complete settings review determines whether only
 the pin would change. Ownership inspection does not bypass, rewrite or filter
 the saved artifact. Even a policy-blocked inventory must pass a second snapshot,

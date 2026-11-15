@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
+import { settingDetails } from './railway-setting-details.ts';
 import {
   railwayCli,
   railwayTarget,
@@ -9,7 +10,10 @@ import {
   VersionPinError,
 } from './railway-version-pin.ts';
 
-const volume = { id: 'a32aab03-3044-46a5-ba40-578f8c6d2129', name: 'world-data' };
+const volume = {
+  id: 'a32aab03-3044-46a5-ba40-578f8c6d2129',
+  name: 'world-data',
+};
 const declared = ['volume.world-data', 'service.Georoids'];
 const intendedOwner = '*';
 type ObjectValue = Record<string, unknown>;
@@ -181,7 +185,11 @@ function label(value: unknown, allowed: readonly string[]) {
 /** Inventory first, classify second. A report has no application capability or admission authority. */
 export function inspectOwnershipPlan(
   value: unknown,
-  expected: { sourceTree: string; version: string; snapshot: OwnershipSnapshot }
+  expected: {
+    sourceTree: string;
+    version: string;
+    snapshot: OwnershipSnapshot;
+  }
 ) {
   const plan = object(value);
   onlyKeys(plan, planKeys);
@@ -212,16 +220,16 @@ export function inspectOwnershipPlan(
     throw new VersionPinError('Ownership change set is unsupported; inventory unverified');
   }
   const operations = set['changes'].map((raw: unknown, index: number) => {
-    const change = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw : {};
+    const change: ObjectValue = isObject(raw) ? raw : {};
     return {
       index,
-      kind: label('kind' in change ? change.kind : undefined, [
+      kind: label('kind' in change ? change['kind'] : undefined, [
         'resource.update',
         'resource.create',
         'resource.delete',
       ]),
-      address: label('address' in change ? change.address : undefined, declared),
-      field: label('field' in change ? change.field : undefined, [
+      address: label('address' in change ? change['address'] : undefined, declared),
+      field: label('field' in change ? change['field'] : undefined, [
         'build',
         'deploy',
         'source',
@@ -233,6 +241,13 @@ export function inspectOwnershipPlan(
       ]),
       unknownFieldCount: Object.keys(change).filter((key) => !operationKeys.includes(key)).length,
       values: 'withheld',
+      settingDetails:
+        change['kind'] === 'resource.update' &&
+        change['address'] === 'service.Georoids' &&
+        (change['field'] === 'build' || change['field'] === 'deploy') &&
+        change['path'] === `resources.service.Georoids.${change['field']}`
+          ? settingDetails(change['field'], change['before'], change['after'])
+          : { status: 'not-inspected' },
     };
   });
   let settings:

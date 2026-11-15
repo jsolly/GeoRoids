@@ -112,7 +112,7 @@ try {
   if (process.env['GITHUB_STEP_SUMMARY']) {
     await appendFile(
       process.env['GITHUB_STEP_SUMMARY'],
-      `Railway ownership-plan result: ${summary}\n`
+      `Railway ownership-plan result:\n\n\`\`\`json\n${summary}\n\`\`\`\n`
     );
   }
   if (

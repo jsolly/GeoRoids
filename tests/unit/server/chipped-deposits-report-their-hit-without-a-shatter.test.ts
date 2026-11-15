@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
-import type { AppliedAsteroidHit } from '../../../server/core/GameEngine';
 import { GameEngine } from '../../../server/core/GameEngine';
+import type { AppliedAsteroidHit } from '../../../server/core/types';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -52,8 +52,16 @@ function deposit(id: string): AsteroidData {
 }
 
 function chip(asteroidId: string): AppliedAsteroidHit {
-  const hit = engine.applyLaserAsteroidHit(asteroidId, 'pilot');
+  const target = engine.getAsteroid(asteroidId);
+  const hit = engine.asteroidMining.apply(asteroidId, 'pilot');
   handler.broadcastAppliedAsteroidHits([hit]);
+  if (hit.applied) {
+    expect(hit.origin).toBe(target?.position);
+  } else {
+    expect(hit.origin).toBeUndefined();
+    expect(hit.points).toBe(0);
+    expect(hit.newAsteroids).toEqual([]);
+  }
   return hit;
 }
 
@@ -111,6 +119,7 @@ test('a hit that never applied stays silent', () => {
   expect(chip('no-such-rock').outcome).toBe('missing');
   expect(socket.received('asteroidHit')).toEqual([]);
   expect(socket.received('asteroidDestroy')).toEqual([]);
+  expect(engine.getLoot()).toEqual([]);
 
   // A deposit inside a burning boost ignores the shot, so nothing sounds.
   const burning = deposit('burning');
@@ -121,4 +130,5 @@ test('a hit that never applied stays silent', () => {
   expect(chip('burning').outcome).toBe('ignored');
   expect(socket.received('asteroidHit')).toEqual([]);
   expect(socket.received('asteroidDestroy')).toEqual([]);
+  expect(engine.getLoot()).toEqual([]);
 });

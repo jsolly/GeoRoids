@@ -327,7 +327,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       phenomenon: { kind: 'reflective', clusterId: 'test', energy: 0, maxEnergy: 6 },
     });
     for (let hit = 0; hit < 3; hit++) {
-      engine.handleAsteroidHit('reflector-rock', 'peer');
+      engine.asteroidMining.hit('reflector-rock', 'peer');
     }
     const shard = engine.getLoot().find((loot) => loot.kind === 'shard');
     assert.ok(shard, 'laser shard loot');

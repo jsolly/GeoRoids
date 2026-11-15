@@ -4,7 +4,6 @@ import { logger } from '../../setup/serverLogger';
 import { inBotSanctuary } from '../../shared/aiShips';
 import type { BeltSlotState } from '../../shared/asteroidBelt';
 import { boostOwnerIds, removeBoostOwner } from '../../shared/asteroidBoost';
-import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import {
   ASTEROID_INTERACTIONS,
   advanceReflectionEnergy,
@@ -17,12 +16,7 @@ import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../share
 import { DAMAGE, GAME, LASER, ROID, SHIP } from '../../shared/constants/gameplay';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { cargoCapacity, ECONOMY } from '../../shared/economy';
-import {
-  canEquipUtility,
-  EQUIPMENT_DROPS,
-  EQUIPMENT_IDS,
-  isEquipmentId,
-} from '../../shared/equipment';
+import { canEquipUtility, EQUIPMENT_IDS, isEquipmentId } from '../../shared/equipment';
 import { ExplorationMap } from '../../shared/exploration';
 import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
 import {
@@ -96,11 +90,8 @@ import type { SavedWorld } from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import { AsteroidField } from './AsteroidField';
 import { AsteroidLifecycle } from './AsteroidLifecycle';
-import {
-  type AsteroidHitCause,
-  type AsteroidHitOutcome,
-  AsteroidManager,
-} from './AsteroidManager.ts';
+import { AsteroidManager } from './AsteroidManager.ts';
+import { AsteroidMining } from './AsteroidMining';
 import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { BotFleet } from './BotFleet';
 import { CargoOffloadManager } from './CargoOffloadManager';
@@ -133,6 +124,7 @@ import { SpiderPopulationBudget } from './SpiderPopulationBudget';
 import { SurveyProbeManager } from './SurveyProbeManager';
 import { TerrainSpiderManager } from './TerrainSpiderManager';
 import { ToolFlightManager } from './ToolFlightManager';
+import type { AppliedAsteroidHit } from './types';
 import { WorldDiscovery } from './WorldDiscovery';
 import { WorldHazards } from './WorldHazards';
 
@@ -161,16 +153,6 @@ type LaserAuxiliaryTarget = {
   | { kind: 'surveyProbe'; hostId: string; ownerId: string }
   | { kind: 'ship' | 'satellitePickup' | 'loot' | 'encounter'; ownerId?: string }
 );
-
-export interface AppliedAsteroidHit {
-  applied: boolean;
-  outcome: AsteroidHitOutcome['outcome'];
-  asteroidId: string;
-  playerId: string;
-  points: number;
-  newAsteroids: AsteroidData[];
-  origin?: Position;
-}
 
 export interface CombatBroadcast {
   targetId: string;
@@ -246,6 +228,7 @@ export class GameEngine {
   public readonly pilotSessions: PilotSessionLifecycle;
   private readonly asteroidField: AsteroidField;
   public readonly furnaceDeliveries: FurnaceDeliveryManager;
+  public readonly asteroidMining: AsteroidMining;
   private lastFurnaceBuildNotice = '';
   public readonly entityManager: EntityManager;
   private readonly asteroidManager: AsteroidManager;
@@ -578,6 +561,15 @@ export class GameEngine {
       settlement: this.settlementLedger,
       awardPilotPoints: (id, points) => this.pilotLedger.awardPoints(id, points),
       savedPilotName: (id) => this.pilotLedger.savedName(id),
+    });
+
+    this.asteroidMining = new AsteroidMining({
+      actors: this.entityManager,
+      rocks: this.asteroidManager,
+      deliveries: this.furnaceDeliveries,
+      loot: this.lootManager,
+      rng: this.rngService,
+      currentFrame: () => this.gameTime,
     });
 
     this.pilotSessions = new PilotSessionLifecycle({
@@ -1663,7 +1655,7 @@ export class GameEngine {
         continue;
       }
       if (!destroyedAsteroids.has(hit.asteroidId)) {
-        const destruction = this.handleAsteroidHit(hit.asteroidId, hit.shipId, 'collision');
+        const destruction = this.asteroidMining.hit(hit.asteroidId, hit.shipId, 'collision');
         if (destruction.outcome === 'destroyed') {
           destroyedAsteroids.add(hit.asteroidId);
           result.destroyedAsteroidId = hit.asteroidId;
@@ -1763,7 +1755,7 @@ export class GameEngine {
         if (destroyedAsteroids.has(asteroidId)) {
           continue;
         }
-        const applied = this.applyLaserAsteroidHit(asteroidId, scorerId, 'collision');
+        const applied = this.asteroidMining.apply(asteroidId, scorerId, 'collision');
         if (!applied.applied || applied.outcome !== 'destroyed') {
           continue;
         }
@@ -1828,85 +1820,6 @@ export class GameEngine {
     entity.cargo = 0;
     this.entityManager.scheduleShipRespawn(entity);
     this.pilotLedger.capture(entity.id);
-  }
-
-  private miningDamage(playerId: string): number {
-    const kitId = this.entityManager.getEntity(playerId)?.kitId;
-    return DAMAGE.LASER_HIT * (kitId === 'hauler' ? SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER : 1);
-  }
-
-  public handleAsteroidHit(
-    asteroidId: string,
-    playerId: string,
-    cause: AsteroidHitCause = 'laser',
-    miningDamage = this.miningDamage(playerId)
-  ): AsteroidHitOutcome {
-    const result =
-      cause === 'collision'
-        ? this.asteroidManager.destroyFromCollision(asteroidId)
-        : this.asteroidManager.registerLaserHit(asteroidId, playerId, miningDamage);
-
-    if (result.outcome === 'destroyed') {
-      this.furnaceDeliveries.releaseTowsAttachedTo(asteroidId);
-      if (cause === 'laser' && result.destroyed.contourRider) {
-        this.lootManager.spawnTap(
-          result.destroyed.position,
-          this.gameTime,
-          { x: 0, y: 0 },
-          'crystal'
-        );
-      }
-      const points = pointsForRoidSize(result.destroyed.size);
-      this.lootManager.spawnPoints(result.destroyed.position, points);
-      this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
-      if (cause === 'laser' && this.rngService.random() < EQUIPMENT_DROPS.ASTEROID_CHANCE) {
-        const equipment =
-          EQUIPMENT_IDS[Math.floor(this.rngService.random() * EQUIPMENT_IDS.length)];
-        if (equipment) {
-          this.dropEquipmentAt(result.destroyed.position, equipment);
-        }
-      }
-    }
-    return result;
-  }
-
-  /** Sole apply path for authoritative laser and ram outcomes. */
-  public applyLaserAsteroidHit(
-    asteroidId: string,
-    playerId: string,
-    cause: AsteroidHitCause = 'laser',
-    miningDamage = this.miningDamage(playerId)
-  ): AppliedAsteroidHit {
-    const empty: AppliedAsteroidHit = {
-      applied: false,
-      outcome: 'missing',
-      asteroidId,
-      playerId,
-      points: 0,
-      newAsteroids: [],
-    };
-
-    const asteroid = this.asteroidManager.getAsteroid(asteroidId);
-    if (!asteroid) {
-      return empty;
-    }
-
-    const result = this.handleAsteroidHit(asteroidId, playerId, cause, miningDamage);
-    if (result.outcome === 'missing' || result.outcome === 'ignored') {
-      return { ...empty, outcome: result.outcome };
-    }
-
-    const origin = result.outcome === 'destroyed' ? result.destroyed.position : asteroid.position;
-
-    return {
-      applied: true,
-      outcome: result.outcome,
-      asteroidId,
-      playerId,
-      points: result.outcome === 'destroyed' ? pointsForRoidSize(result.destroyed.size) : 0,
-      newAsteroids: result.newAsteroids,
-      origin,
-    };
   }
 
   public setOnAsteroidHits(listener: (hits: AppliedAsteroidHit[]) => void): void {
@@ -2056,7 +1969,7 @@ export class GameEngine {
       id: `server-laser-${this.laserNonce}-${ownerId}-${this.laserSeq}`,
       ownerId,
       ...(attackerRole ? { attackerRole } : {}),
-      miningDamage: this.miningDamage(ownerId),
+      miningDamage: this.asteroidMining.damageFor(ownerId),
       position: { x: position.x, y: position.y },
       prevPosition: { x: position.x, y: position.y },
       velocity: { x: vx, y: vy },
@@ -2388,7 +2301,7 @@ export class GameEngine {
         );
         rock.phenomenon.energy = charge.asteroidEnergy;
         if (!charge.reflects) {
-          const result = this.handleAsteroidHit(rock.id, laser.ownerId, 'collision');
+          const result = this.asteroidMining.hit(rock.id, laser.ownerId, 'collision');
           laser.hasExploded = true;
           this.observeFixtureTerminal(laser, 'reflective-asteroid', rock.id);
           return {
@@ -2421,14 +2334,14 @@ export class GameEngine {
       const healthBefore = rock.health;
       // Energized ricochets double one physical shot's metal chip; each logical shot
       // is still consumed once and terminal drops/score happen only once.
-      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', laser.miningDamage);
+      let hit = this.asteroidMining.apply(rock.id, laser.ownerId, 'laser', laser.miningDamage);
       if (
         laser.charged !== true &&
         laser.energy >= 2 &&
         rock.material === 'metal' &&
         this.getAsteroid(rock.id)
       ) {
-        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', laser.miningDamage);
+        hit = this.asteroidMining.apply(rock.id, laser.ownerId, 'laser', laser.miningDamage);
       }
       if (this.fixtureCombat?.watches(laser.ownerId) === true) {
         this.observeFixtureTerminal(
@@ -2891,10 +2804,6 @@ export class GameEngine {
     }
 
     return { success: true, loot, origin, pushedAsteroidIds };
-  }
-
-  private dropShardAt(position: Position, mass?: number): LootData {
-    return this.lootManager.spawnShard(position, this.gameTime, mass);
   }
 
   /** Recoverable hit spills launch beyond magnet range before collection resumes. */

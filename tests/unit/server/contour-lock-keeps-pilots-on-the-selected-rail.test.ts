@@ -155,7 +155,7 @@ test.each([
       vertices: 8,
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
-    expect(world.engine.handleAsteroidHit('pickup-race-rock', actor.id, 'laser').outcome).toBe(
+    expect(world.engine.asteroidMining.hit('pickup-race-rock', actor.id, 'laser').outcome).toBe(
       'destroyed'
     );
     const points = world.engine.getLoot().find((drop) => drop.kind === 'points');

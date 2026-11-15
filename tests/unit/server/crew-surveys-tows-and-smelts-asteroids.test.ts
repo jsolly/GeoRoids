@@ -180,6 +180,27 @@ test('a Scout identifies cargo and both pilots receive the full furnace reward e
   expect(actor('scout').score).toBe(initial.scout + points);
 });
 
+test('mining a latched deposit releases its tow only on the terminal hit', () => {
+  const rock = deposit('mined-tow');
+  engine.asteroidLifecycle.insert(rock);
+  const hauler = actor('hauler');
+  expect(engine.useAbility(hauler.id)).toBe(true);
+  resolveToolFlights(engine);
+  expect(hauler.harpoonTargetId).toBe(rock.id);
+
+  expect(engine.asteroidMining.hit(rock.id, hauler.id).outcome).toBe('damaged');
+  expect(rock.health).toBe(25);
+  expect(hauler.harpoonTargetId).toBe(rock.id);
+  expect(engine.getLoot()).toEqual([]);
+
+  expect(engine.asteroidMining.hit(rock.id, 'scout').outcome).toBe('destroyed');
+  expect(engine.getAsteroid(rock.id)).toBeUndefined();
+  expect(hauler.harpoonTargetId).toBeNull();
+  expect(hauler.harpoonLatchPos).toBeUndefined();
+  expect(engine.getLoot().filter((drop) => drop.kind === 'points')).toHaveLength(1);
+  expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
+});
+
 test('a towed burning rock pays the tow crew once instead of substituting its distinct launcher', () => {
   const rock = deposit('shared-intake');
   rock.ore = 'metal';

@@ -160,7 +160,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     activate(alice);
     activate(alice);
     const original = structuredClone(rock);
-    expect(world.engine.applyLaserAsteroidHit(rock.id, bob.id).outcome).toBe('ignored');
+    expect(world.engine.asteroidMining.apply(rock.id, bob.id).outcome).toBe('ignored');
     const scout = world.join('Scout', { x: 150, y: 0 });
     world.engine.useAbility(scout.id);
     expect(rock).toEqual(original);

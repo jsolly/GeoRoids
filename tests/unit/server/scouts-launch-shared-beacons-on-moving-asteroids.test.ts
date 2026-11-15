@@ -551,7 +551,7 @@ describe('authoritative Scout probes', () => {
     engine.asteroidLifecycle.insert(host);
 
     const probe = host.probe;
-    const destroyed = engine.applyLaserAsteroidHit(host.id, secondShooter.id, 'laser');
+    const destroyed = engine.asteroidMining.apply(host.id, secondShooter.id, 'laser');
     expect(destroyed.outcome).toBe('destroyed');
     expect(destroyed.newAsteroids.length).toBeGreaterThan(0);
     expect(destroyed.newAsteroids.every((fragment) => fragment.probe === undefined)).toBe(true);

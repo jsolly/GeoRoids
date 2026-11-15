@@ -5,7 +5,7 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { previewChargedReflections } from '../../../shared/asteroidPhenomena';
-import { GAME, LASER } from '../../../shared/constants/gameplay';
+import { GAME, LASER, ROID } from '../../../shared/constants/gameplay';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -108,6 +108,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
   test('charging a reflector destroys it once, leaves ordinary salvage, and preserves normal firing', () => {
     const { engine, pilot, reflector } = arena();
     const admitted = new Set<string>();
+    const overloadHits: ReturnType<GameEngine['advanceLasersAndResolveHits']> = [];
     let destructionOrigin = { ...reflector.position };
     for (let index = 0; index < 6; index++) {
       const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
@@ -117,7 +118,10 @@ describe('reflected shots remain authoritative across snapshots and resource col
       if (index === 5) {
         destructionOrigin = { ...reflector.position };
       }
-      engine.advanceLasersAndResolveHits();
+      const hits = engine.advanceLasersAndResolveHits();
+      if (index === 5) {
+        overloadHits.push(...hits);
+      }
       const state = snapshot(engine);
       if (index < 5) {
         expect(engine.getAsteroid(reflector.id)).toBe(reflector);
@@ -133,6 +137,17 @@ describe('reflected shots remain authoritative across snapshots and resource col
         expect(shot.hasExploded).toBe(true);
       }
     }
+    const overload = overloadHits.find((hit) => hit.asteroidId === reflector.id);
+    assert.ok(overload, 'the actual overload shot returns its asteroid outcome');
+    expect(overload).toMatchObject({
+      applied: true,
+      outcome: 'destroyed',
+      playerId: pilot.id,
+      points: ROID.POINTS_MEDIUM,
+      origin: destructionOrigin,
+    });
+    reflector.position.x += 1000;
+    expect(overload.origin).toEqual(destructionOrigin);
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
     expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
@@ -142,7 +157,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
       Math.hypot(shard.position.x - destructionOrigin.x, shard.position.y - destructionOrigin.y)
     ).toBeLessThan(80);
     const score = pilot.cargo;
-    engine.handleAsteroidHit(reflector.id, pilot.id);
+    engine.asteroidMining.hit(reflector.id, pilot.id);
     expect(pilot.cargo).toBe(score);
     pilot.position = { ...shard.position };
     engine.lootCollection.collect();

@@ -1,23 +1,25 @@
 import type { WebSocket } from 'ws';
 import type { ExplorationMap } from '../../shared/exploration';
 import type { FurnaceField } from '../../shared/furnaceField';
-import type { CrewAction, Position, ShipKitId } from '../../shared-types';
+import type { AsteroidData, CrewAction, Position, ShipKitId } from '../../shared-types';
 import type { CooperativeCampaign } from '../world/CooperativeCampaign';
 import type { MapAssets } from '../world/MapAssets';
 import type { RegionalAsteroidField } from '../world/RegionalAsteroidField';
 import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
 import type { AsteroidLifecycle } from './AsteroidLifecycle';
-import type { AsteroidManager } from './AsteroidManager';
+import type { AsteroidHitOutcome, AsteroidManager } from './AsteroidManager';
 import type { BeltCrawlerManager } from './BeltCrawlerManager';
 import type { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
+import type { FurnaceDeliveryManager } from './FurnaceDeliveryManager';
 import type { GlowtoyManager } from './GlowtoyManager';
 import type { HiveEncounters } from './HiveEncounters';
 import type { LootManager } from './LootManager';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
+import type { RNGService } from './RNGService';
 import type { SatellitePickupManager } from './SatellitePickupManager';
 import type { SettlementLedger } from './SettlementLedger';
 import type { ShipAbilityManager } from './ShipAbilityManager';
@@ -89,6 +91,28 @@ export type PilotSessionResume = {
   readonly requestedKit?: ShipKitId | undefined;
   readonly requestedName?: string | undefined;
   readonly clientReleaseId?: string | undefined;
+};
+
+export interface AppliedAsteroidHit {
+  applied: boolean;
+  outcome: AsteroidHitOutcome['outcome'];
+  asteroidId: string;
+  playerId: string;
+  points: number;
+  newAsteroids: AsteroidData[];
+  origin?: Position;
+}
+
+export type AsteroidMiningInputs = {
+  readonly actors: Pick<EntityManager, 'getEntity'>;
+  readonly rocks: Pick<
+    AsteroidManager,
+    'getAsteroid' | 'registerLaserHit' | 'destroyFromCollision'
+  >;
+  readonly deliveries: Pick<FurnaceDeliveryManager, 'releaseTowsAttachedTo'>;
+  readonly loot: Pick<LootManager, 'spawnTap' | 'spawnPoints' | 'spawnShard' | 'spawnEquipment'>;
+  readonly rng: Pick<RNGService, 'random'>;
+  readonly currentFrame: () => number;
 };
 
 export type AsteroidFieldInputs = {

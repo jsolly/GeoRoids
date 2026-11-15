@@ -51,8 +51,8 @@ describe('Server laser↔asteroid authority', () => {
     }
     engine.asteroidLifecycle.insert(mediumAsteroid('roid-once'));
 
-    const first = engine.applyLaserAsteroidHit('roid-once', 'p1');
-    const second = engine.applyLaserAsteroidHit('roid-once', 'p1');
+    const first = engine.asteroidMining.apply('roid-once', 'p1');
+    const second = engine.asteroidMining.apply('roid-once', 'p1');
 
     expect(first.applied).toBe(true);
     expect(first.outcome).toBe('destroyed');
@@ -78,7 +78,7 @@ describe('Server laser↔asteroid authority', () => {
     assert.ok(target);
     target.surveyedBy = ['scout', 'miner-a', 'scout'];
 
-    const result = engine.applyLaserAsteroidHit(target.id, 'miner-b', 'laser');
+    const result = engine.asteroidMining.apply(target.id, 'miner-b', 'laser');
 
     expect(result.outcome).toBe('destroyed');
     expect(engine.getPlayer('miner-a')?.score).toBe(0);
@@ -142,8 +142,8 @@ describe('Server laser↔asteroid authority', () => {
     engine.addPlayer('p2', 'Two', {} as never, { x: 40, y: 0 });
 
     engine.asteroidLifecycle.insert(mediumAsteroid('roid-shared'));
-    const firstHit = engine.applyLaserAsteroidHit('roid-shared', 'p2');
-    const playerHit = engine.applyLaserAsteroidHit('roid-shared', 'p1');
+    const firstHit = engine.asteroidMining.apply('roid-shared', 'p2');
+    const playerHit = engine.asteroidMining.apply('roid-shared', 'p1');
 
     expect(firstHit.applied).toBe(true);
     expect(firstHit.points).toBe(ROID.POINTS_MEDIUM);

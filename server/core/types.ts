@@ -1,7 +1,9 @@
 import type { WebSocket } from 'ws';
+import type { ExplorationMap } from '../../shared/exploration';
 import type { FurnaceField } from '../../shared/furnaceField';
 import type { CrewAction, Position, ShipKitId } from '../../shared-types';
 import type { CooperativeCampaign } from '../world/CooperativeCampaign';
+import type { MapAssets } from '../world/MapAssets';
 import type { PersistentPilot } from '../world/WorldStore';
 import type { LoadedWorld } from '../world/worldPersistence';
 import type { AsteroidLifecycle } from './AsteroidLifecycle';
@@ -11,6 +13,7 @@ import type { CooperativeSupplyRestoration } from './CooperativeSupplyRestoratio
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
 import type { HiveEncounters } from './HiveEncounters';
+import type { LootManager } from './LootManager';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
 import type { SettlementLedger } from './SettlementLedger';
@@ -102,4 +105,10 @@ export type FurnaceDeliveryInputs = {
   readonly settlement: Pick<SettlementLedger, 'addOre'>;
   readonly awardPilotPoints: PilotLedger['awardPoints'];
   readonly savedPilotName: PilotLedger['savedName'];
+};
+
+export type WorldDiscoveryInputs = {
+  readonly exploration: Pick<ExplorationMap, 'reveal'>;
+  readonly loot: Pick<LootManager, 'queryExplorationCell'>;
+  readonly assets: Pick<MapAssets, 'discovered'>;
 };

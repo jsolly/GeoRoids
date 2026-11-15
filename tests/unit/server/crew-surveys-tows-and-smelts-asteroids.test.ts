@@ -63,7 +63,7 @@ test.each(['mineral_scan', 'survey_probe'] as const)(
     const far = deposit('far', { x: 11_300, y: 10_000 });
     engine.asteroidLifecycle.insert(near);
     engine.asteroidLifecycle.insert(far);
-    const reveal = vi.spyOn(engine, 'revealArea');
+    const reveal = vi.spyOn(engine.discovery, 'revealArea');
 
     engine.abilities.advance();
 
@@ -93,7 +93,7 @@ test('a satellite widens Hauler exploration with one reveal and base Scout disco
   const far = deposit('satellite-far', { x: 16_700, y: 10_000 });
   engine.asteroidLifecycle.insert(near);
   engine.asteroidLifecycle.insert(far);
-  const reveal = vi.spyOn(engine, 'revealArea');
+  const reveal = vi.spyOn(engine.discovery, 'revealArea');
 
   engine.abilities.advance();
 

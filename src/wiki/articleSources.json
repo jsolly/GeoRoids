@@ -1,5 +1,6 @@
 {
   "field-manual": [
+    "server/core/WorldDiscovery.ts",
     "src/core/gameController.ts",
     "src/constants/index.ts",
     "shared/constants/gameplay.ts",
@@ -440,6 +441,7 @@
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts"
   ],
   "hud-network": [
+    "server/core/WorldDiscovery.ts",
     "src/entities/player/Player.ts",
     "src/entities/player/remoteLasers.ts",
     "src/entities/player/remoteMotion.ts",
@@ -587,6 +589,7 @@
     "server/staticClient.ts"
   ],
   "scout": [
+    "server/core/WorldDiscovery.ts",
     "shared/shipKits.ts",
     "shared/shipAbilities.ts",
     "src/entities/ship/hullOutlines.ts",
@@ -684,6 +687,7 @@
     "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts"
   ],
   "teamwork": [
+    "server/core/WorldDiscovery.ts",
     "shared-types.ts",
     "shared/combat.ts",
     "shared/exploration.ts",

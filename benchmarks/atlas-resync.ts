@@ -312,7 +312,7 @@ function measureAtlasResync(fixturePath: string): WindowEvidence[] {
       handler.handleMessage({ type: 'snapshotResync', data: {} }, socket);
       broadcaster.broadcastGameState();
     });
-    engine.revealArea(fixture.reveal, 1);
+    engine.discovery.revealArea(fixture.reveal, 1);
     engine.checkpointWorld();
     const changed = runWindow('same-socket-one-tile-resync', () => {
       handler.handleMessage({ type: 'snapshotResync', data: {} }, socket);

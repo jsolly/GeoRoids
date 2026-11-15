@@ -122,8 +122,8 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
   expect(scripts).not.toHaveBeenCalled();
 
   // Mapping harvested ground does not wall it off, move the ship, or refill it.
-  engine.revealArea({ x: 7_000, y: 9_000 }, WORLD.sectorSize);
-  engine.revealArea({ x: 11_000, y: 9_000 }, WORLD.sectorSize);
+  engine.discovery.revealArea({ x: 7_000, y: 9_000 }, WORLD.sectorSize);
+  engine.discovery.revealArea({ x: 11_000, y: 9_000 }, WORLD.sectorSize);
   pilot.position = { x: 7_000, y: 9_000 };
   pilot.velocity = { x: 0, y: 0 };
   elapsed += 1000 / 60;

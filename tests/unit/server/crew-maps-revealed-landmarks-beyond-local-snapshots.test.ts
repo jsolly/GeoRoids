@@ -2,6 +2,9 @@
 import { strict as assert } from 'node:assert';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { LootManager } from '../../../server/core/LootManager';
+import { RNGService } from '../../../server/core/RNGService';
+import { WorldDiscovery } from '../../../server/core/WorldDiscovery';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { MapAssets } from '../../../server/world/MapAssets';
@@ -83,31 +86,29 @@ test('the global map shares the furnace plan while each pilot receives only near
 test('valuable drops appear only after exploration and disappear when collected without mapping ordinary shards', () => {
   const exploration = new ExplorationMap();
   const assets = new MapAssets(exploration);
-  const drops: LootData[] = [
+  const loot = new LootManager(new RNGService(82), () => 1_000, assets);
+  const discovery = new WorldDiscovery({ exploration, loot, assets });
+  const position = { x: 40_000, y: 24_000 };
+  loot.restorePoints([
     {
       id: 'cargo',
-      kind: 'points',
-      position: { x: 40_000, y: 24_000 },
-      radius: 14,
-      mass: 0,
+      position,
       points: 100,
+      expiresAt: 10_000,
+      velocity: { x: 0, y: 0 },
+      ejectFramesLeft: 0,
     },
-    { id: 'fragment', kind: 'shard', position: { x: 40_000, y: 24_000 }, radius: 5, mass: 0.25 },
-    { id: 'canister', kind: 'tap', position: { x: 40_000, y: 24_000 }, radius: 28, mass: 0.4 },
-  ];
-  drops.forEach((drop, order) => {
-    assets.changed(drop, order);
-  });
+  ]);
+  const fragment = loot.spawnShard(position, 0);
+  const canister = loot.spawnTap(position, 0, { x: 0, y: 0 });
   const cold = assets.snapshot([]);
   expect(cold.every((asset) => asset.kind === 'furnace' || asset.kind === 'foundation')).toBe(true);
-  expect(cold.some((asset) => asset.id === 'loot:cargo')).toBe(false);
-  exploration.reveal(drops[0]?.position ?? { x: 0, y: 0 }, 260);
-  assets.discovered('cargo');
+  discovery.revealArea(position, 260);
   const revealed = assets.snapshot([]);
   expect(revealed.some((asset) => asset.id === 'loot:cargo')).toBe(true);
-  expect(revealed.some((asset) => asset.id === 'loot:fragment')).toBe(false);
-  expect(revealed.some((asset) => asset.id === 'loot:canister')).toBe(false);
-  assets.removed('cargo');
+  expect(revealed.some((asset) => asset.id === `loot:${fragment.id}`)).toBe(false);
+  expect(revealed.some((asset) => asset.id === `loot:${canister.id}`)).toBe(false);
+  loot.remove('cargo');
   expect(assets.snapshot([]).some((asset) => asset.id === 'loot:cargo')).toBe(false);
 });
 

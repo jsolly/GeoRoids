@@ -104,12 +104,63 @@ function jsonData(value: unknown): RecordValue {
   return record(envelope['data']);
 }
 
+function responseShape(value: unknown) {
+  if (value === undefined) {
+    return 'missing';
+  }
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
+  if (isRecord(value)) {
+    return Object.keys(value).length === 0 ? 'empty-object' : 'object-with-keys';
+  }
+  return typeof value;
+}
+
+function emptyStagedDraft(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !['id', 'status', 'patch'].includes(key)) ||
+    typeof value['id'] !== 'string' ||
+    value['id'].trim() === '' ||
+    value['status'] !== 'STAGED' ||
+    !isRecord(value['patch'])
+  ) {
+    return false;
+  }
+  const patch = value['patch'];
+  return Object.keys(patch).every((key) => {
+    const entry = patch[key];
+    if (key === 'privateNetworkDisabled') {
+      return entry === null;
+    }
+    return (
+      ['services', 'sharedVariables', 'volumes', 'buckets'].includes(key) &&
+      isRecord(entry) &&
+      Object.keys(entry).length === 0
+    );
+  });
+}
+
 /** Parse the pinned CLI's environment/project/staged/latest-deployment query. Never retain variables. */
 export function readSnapshot(value: unknown): Snapshot {
   const data = jsonData(value);
   keys(data, ['environment', 'project', 'environmentStagedChanges', 'serviceInstance']);
-  if (data['environmentStagedChanges'] !== null) {
-    throw new VersionPinError('Existing staged Railway work blocks automation');
+  const staged = data['environmentStagedChanges'];
+  if (!emptyStagedDraft(staged)) {
+    const status = isRecord(staged) ? staged['status'] : undefined;
+    const label =
+      status === 'STAGED' || status === 'APPLYING' || status === 'COMMITTED'
+        ? status
+        : 'unrecognized';
+    const shape = isRecord(staged) ? 'object' : responseShape(staged);
+    const patchShape = responseShape(isRecord(staged) ? staged['patch'] : undefined);
+    throw new VersionPinError(
+      `Existing staged Railway work blocks automation (${shape}; status=${label}; patch=${patchShape})`
+    );
   }
   const environment = record(data['environment']);
   keys(environment, ['id', 'projectId', 'config', 'configEtag']);
@@ -284,7 +335,7 @@ export function reviewPlan(
 const snapshotQuery = `query VersionPinSnapshot($projectId: String!, $environmentId: String!, $serviceId: String!) {
   environment(id: $environmentId) { id projectId config(decryptVariables: false) configEtag }
   project(id: $projectId) { id services(first: 1000) { edges { node { id name } } } }
-  environmentStagedChanges(environmentId: $environmentId) { id status }
+  environmentStagedChanges(environmentId: $environmentId) { id status patch(decryptVariables: false) }
   serviceInstance(environmentId: $environmentId, serviceId: $serviceId) { latestDeployment { id status } }
 }`;
 const deploymentQuery =

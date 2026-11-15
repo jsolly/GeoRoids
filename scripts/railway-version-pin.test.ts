@@ -48,7 +48,7 @@ function snapshot(build = oldBuild, etag = 'etag-before', deployment = 'deployme
         id: production.project,
         services: { edges: [{ node: { id: production.service, name: production.name } }] },
       },
-      environmentStagedChanges: null,
+      environmentStagedChanges: { id: 'staged-id', status: 'STAGED', patch: {} },
       serviceInstance: { latestDeployment: { id: deployment, status: 'SUCCESS' } },
     },
   };
@@ -194,7 +194,67 @@ test('unknown, destructive, unrelated, hidden and stale changes cannot pass as a
   assert.throws(() => review(artifact([change(), { kind: 'variable.set', value: 'DO-NOT-LOG' }])));
 });
 
-test('live target and every non-null staged response block before a plan can run', async () => {
+test('empty staged drafts match the pinned non-null API without retaining patch data', () => {
+  for (const patch of [
+    {},
+    { services: {} },
+    { sharedVariables: {}, volumes: {}, buckets: {}, privateNetworkDisabled: null },
+  ]) {
+    const live = snapshot();
+    assert.deepEqual(
+      readSnapshot({
+        data: {
+          ...live.data,
+          environmentStagedChanges: { id: 'draft-id', status: 'STAGED', patch },
+        },
+      }),
+      {
+        etag: 'etag-before',
+        build: oldBuild,
+        deployment: { id: 'deployment-before', status: 'SUCCESS' },
+      }
+    );
+  }
+});
+
+test('staged-state diagnostics reveal only fixed status and shape labels', () => {
+  const cases = [
+    [
+      { id: 'DO-NOT-LOG', status: 'STAGED', patch: { unknown: 'DO-NOT-LOG' } },
+      'object; status=STAGED; patch=object-with-keys',
+    ],
+    [
+      { id: 'DO-NOT-LOG', status: 'COMMITTED', patch: { services: {} } },
+      'object; status=COMMITTED; patch=object-with-keys',
+    ],
+    [{ status: 'APPLYING', patch: null }, 'object; status=APPLYING; patch=null'],
+    [
+      { status: 'DO-NOT-LOG', patch: { sharedVariables: { PRIVATE: 'DO-NOT-LOG' } } },
+      'object; status=unrecognized; patch=object-with-keys',
+    ],
+    [{ status: 'STAGED', patch: 'DO-NOT-LOG' }, 'object; status=STAGED; patch=string'],
+    [undefined, 'missing; status=unrecognized; patch=missing'],
+    ['DO-NOT-LOG', 'string; status=unrecognized; patch=missing'],
+    [[], 'array; status=unrecognized; patch=missing'],
+  ];
+  for (const [staged, diagnostic] of cases) {
+    const live = snapshot();
+    assert.throws(
+      () => readSnapshot({ data: { ...live.data, environmentStagedChanges: staged } }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(
+          error.message,
+          `Existing staged Railway work blocks automation (${diagnostic})`
+        );
+        assert.equal(error.message.includes('DO-NOT-LOG'), false);
+        return true;
+      }
+    );
+  }
+});
+
+test('live target, staged work and malformed drafts block before a plan can run', async () => {
   const live = snapshot();
   const forbidden: unknown[] = [
     null,
@@ -202,6 +262,7 @@ test('live target and every non-null staged response block before a plan can run
     {},
     { ...live, errors: [{ message: 'DO-NOT-LOG' }] },
     { data: { ...live.data, environmentStagedChanges: {} } },
+    { data: { ...live.data, environmentStagedChanges: null } },
     { data: { ...live.data, environmentStagedChanges: { id: 'unrelated', status: 'staged' } } },
     { data: { ...live.data, environmentStagedChanges: undefined } },
     { data: { ...live.data, environment: { ...live.data.environment, id: 'preview' } } },
@@ -225,6 +286,37 @@ test('live target and every non-null staged response block before a plan can run
       },
     },
   ];
+  for (const patch of [
+    { services: { [production.service]: { build: {} } } },
+    { sharedVariables: { PRIVATE: { value: 'DO-NOT-LOG' } } },
+    { volumes: { 'volume-id': {} } },
+    { buckets: { 'bucket-id': {} } },
+    { privateNetworkDisabled: false },
+    { privateNetworkDisabled: true },
+    { unknown: {} },
+    { services: null },
+    { services: [] },
+    { services: 'DO-NOT-LOG' },
+  ]) {
+    forbidden.push({
+      data: { ...live.data, environmentStagedChanges: { id: 'draft', status: 'STAGED', patch } },
+    });
+  }
+  for (const status of ['APPLYING', 'COMMITTED', 'unknown']) {
+    forbidden.push({
+      data: { ...live.data, environmentStagedChanges: { id: 'draft', status, patch: {} } },
+    });
+  }
+  for (const draft of [
+    { id: '', status: 'STAGED', patch: {} },
+    { id: ' ', status: 'STAGED', patch: {} },
+    { id: 7, status: 'STAGED', patch: {} },
+    { id: 'draft', status: 'STAGED', patch: null },
+    { id: 'draft', status: 'STAGED', patch: [], extra: 'DO-NOT-LOG' },
+    { id: 'draft', status: 'STAGED', patch: {}, extra: 'DO-NOT-LOG' },
+  ]) {
+    forbidden.push({ data: { ...live.data, environmentStagedChanges: draft } });
+  }
   for (const response of forbidden) {
     const calls: string[][] = [];
     await assert.rejects(
@@ -396,6 +488,7 @@ test('plan-only never applies, reads build logs or claims production verificatio
     transport.calls.some((args) => args[1] === 'apply' || args[0] === 'logs'),
     false
   );
+  assert.equal(transport.calls[0]?.[1]?.includes('patch(decryptVariables: false)'), true);
 });
 
 test('changed staged state, etag, source and saved bytes stop before apply', async () => {

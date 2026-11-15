@@ -56,7 +56,14 @@ function snapshot() {
       project: {
         id: railwayTarget.project,
         services: {
-          edges: [{ node: { id: '4e2cb2a2-c1e2-41a8-a970-3f60659c2524', name: 'Georoids' } }],
+          edges: [
+            {
+              node: {
+                id: '4e2cb2a2-c1e2-41a8-a970-3f60659c2524',
+                name: 'Georoids',
+              },
+            },
+          ],
           pageInfo: { hasNextPage: false },
         },
         volumes: {
@@ -65,7 +72,9 @@ function snapshot() {
         },
       },
       environmentStagedChanges: { id: 'draft', status: 'STAGED', patch: {} },
-      serviceInstance: { latestDeployment: { id: 'existing-deployment', status: 'SUCCESS' } },
+      serviceInstance: {
+        latestDeployment: { id: 'existing-deployment', status: 'SUCCESS' },
+      },
     },
   };
 }
@@ -140,7 +149,10 @@ test('explicit null and empty owner maps identify each first claim, while missin
   assert.deepEqual(readOwnershipSnapshot(current).ownership, owners);
   const { iacPartials: _removed, ...missing } = current.data.environment;
   assert.throws(
-    () => readOwnershipSnapshot({ data: { ...current.data, environment: missing } }),
+    () =>
+      readOwnershipSnapshot({
+        data: { ...current.data, environment: missing },
+      }),
     /map is missing/u
   );
 });
@@ -162,7 +174,10 @@ test('partial claims and foreign named owners are reported without treating them
   assert.equal(result.foreignOwner, true);
   assert.equal(result.liveApprovalReady, false);
   assert.equal(result.pinPolicyAccepted, false);
-  current.data.environment.iacPartials = { 'volume.world-data': '*', 'service.Georoids': '*' };
+  current.data.environment.iacPartials = {
+    'volume.world-data': '*',
+    'service.Georoids': '*',
+  };
   const artifact = plan();
   assert.equal(inspect(artifact, current).claimConsistent, false);
   artifact.claim = false;
@@ -194,7 +209,9 @@ test('mapping, volume, mount, pagination and staged-work drift block exact produ
       current.data.environment.id = 'wrong-environment';
     },
     (current) => {
-      current.data.project.services.edges.push({ node: { id: 'different', name: 'Georoids' } });
+      current.data.project.services.edges.push({
+        node: { id: 'different', name: 'Georoids' },
+      });
     },
     (current) => {
       current.data.project.volumes.edges = [{ node: { id: 'different', name: 'world-data' } }];
@@ -233,6 +250,17 @@ test('ownership inspection checks the complete pin despite claim=true, while ori
       field: 'build',
       unknownFieldCount: 0,
       values: 'withheld',
+      settingDetails: {
+        status: 'complete',
+        unknownFieldCount: 0,
+        changes: [
+          {
+            path: 'build.railpackVersion',
+            before: { state: 'absent' },
+            after: { state: 'value', value: '0.43.0' },
+          },
+        ],
+      },
     },
   ]);
   assert.equal(result.operationCount, 1);
@@ -282,13 +310,163 @@ test('every unexpected operation is inventoried in order without arbitrary field
   assert.equal(JSON.stringify(result).includes(secret), false);
 });
 
+test('two native setting updates expose exact pin and draining removal while preserving policy rejection', () => {
+  const artifact = plan([
+    change(),
+    {
+      ...change(),
+      field: 'deploy',
+      path: 'resources.service.Georoids.deploy',
+      before: {
+        runtime: 'V2',
+        drainingSeconds: 30,
+        multiRegionConfig: { iad: { numReplicas: 1 } },
+      },
+      after: { runtime: 'V2', multiRegionConfig: { iad: { numReplicas: 2 } } },
+    },
+  ]);
+  const fixture = entryFixture(artifact);
+  try {
+    const result = fixture.run();
+    assert.equal(result.status, 1);
+    const receipt = JSON.parse(result.stdout.trim().split('\n')[1] ?? 'null');
+    assert.equal(receipt.settings.status, 'outside-pin-policy');
+    assert.equal(receipt.applicationEnabled, false);
+    assert.equal(receipt.stabilityVerified, true);
+    assert.deepEqual(receipt.operations[1].settingDetails, {
+      status: 'complete',
+      unknownFieldCount: 0,
+      changes: [
+        {
+          path: 'deploy.drainingSeconds',
+          before: { state: 'value', value: 30 },
+          after: { state: 'absent' },
+        },
+        {
+          path: 'deploy.multiRegionConfig.iad.numReplicas',
+          before: { state: 'value', value: 1 },
+          after: { state: 'value', value: 2 },
+        },
+      ],
+    });
+    const summary = readFileSync(fixture.summaryPath, 'utf8');
+    assert.equal(
+      summary,
+      `Railway ownership-plan result:\n\n\`\`\`json\n${JSON.stringify(receipt)}\n\`\`\`\n`
+    );
+    assert.equal(`${result.stdout}${result.stderr}${summary}`.includes(secret), false);
+    assert.deepEqual(readdirSync(fixture.privateFiles), []);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('nested projection withholds unreviewed values and keys and distinguishes null from absence', () => {
+  const inspectDeploy = (before: unknown, after: unknown) =>
+    inspect(
+      plan([
+        {
+          ...change(),
+          field: 'deploy',
+          path: 'resources.service.Georoids.deploy',
+          before,
+          after,
+        },
+      ])
+    ).operations[0]?.settingDetails;
+  const details = inspectDeploy(
+    {
+      startCommand: secret,
+      healthcheckPath: secret,
+      drainingSeconds: null,
+      [secret]: secret,
+      multiRegionConfig: { [secret]: { [secret]: secret } },
+    },
+    {
+      startCommand: 'node --import tsx server.ts',
+      healthcheckPath: '/health',
+      drainingSeconds: -1,
+    }
+  );
+  assert.deepEqual(details, {
+    status: 'incomplete',
+    unknownFieldCount: 2,
+    changes: [
+      {
+        path: 'deploy.startCommand',
+        before: { state: 'withheld' },
+        after: { state: 'value', value: 'node --import tsx server.ts' },
+      },
+      {
+        path: 'deploy.healthcheckPath',
+        before: { state: 'withheld' },
+        after: { state: 'value', value: '/health' },
+      },
+      {
+        path: 'deploy.drainingSeconds',
+        before: { state: 'null' },
+        after: { state: 'withheld' },
+      },
+      {
+        path: 'deploy.multiRegionConfig',
+        before: { state: 'withheld' },
+        after: { state: 'absent' },
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(details).includes(secret), false);
+  assert.deepEqual(inspectDeploy({}, { multiRegionConfig: {} }), {
+    status: 'incomplete',
+    unknownFieldCount: 0,
+    changes: [
+      {
+        path: 'deploy.multiRegionConfig',
+        before: { state: 'absent' },
+        after: { state: 'withheld' },
+      },
+    ],
+  });
+  for (const invalid of [null, [], secret, 30]) {
+    assert.deepEqual(inspectDeploy(invalid, {}), {
+      status: 'incomplete',
+      unknownFieldCount: 0,
+      changes: [],
+    });
+    assert.equal(inspectDeploy({}, { multiRegionConfig: { iad: invalid } })?.status, 'incomplete');
+  }
+  for (const changeField of [
+    { field: 'variables' },
+    { address: 'volume.world-data' },
+    { path: secret },
+    { kind: 'resource.create' },
+  ]) {
+    const receipt = inspect(
+      plan([
+        {
+          ...change(),
+          ...changeField,
+          before: { railpackVersion: secret },
+          after: { railpackVersion: secret },
+        },
+      ])
+    );
+    assert.deepEqual(receipt.operations[0]?.settingDetails, {
+      status: 'not-inspected',
+    });
+    assert.equal(JSON.stringify(receipt).includes(secret), false);
+  }
+});
+
 test('bad identity/hash/schema/declarations and oversized plans explicitly leave inventory unverified', () => {
   const variants = [
     { ...plan(), sourceTree: 'other' },
     { ...plan(), changeSetHash: secret },
     { ...plan(), cliVersion: '5.74.0' },
     { ...plan(), [secret]: secret },
-    rehash({ ...plan(), changeSet: { ...plan().changeSet, declared: ['service.Other'] } }),
+    rehash({
+      ...plan(),
+      changeSet: { ...plan().changeSet, declared: ['service.Other'] },
+    }),
     plan(Array.from({ length: 257 }, change)),
   ];
   for (const artifact of variants) {
@@ -335,7 +513,12 @@ function provider(artifact = plan()) {
       observed.push(owners);
     },
   };
-  return { calls, options, observed, counts: () => ({ snapshots, reads, sourceChecks }) };
+  return {
+    calls,
+    options,
+    observed,
+    counts: () => ({ snapshots, reads, sourceChecks }),
+  };
 }
 
 test('read-only orchestration proves stability for a complete policy-blocked inventory and never applies', async () => {
@@ -347,7 +530,11 @@ test('read-only orchestration proves stability for a complete policy-blocked inv
   assert.equal(result.applicationEnabled, false);
   assert.equal(result.deploymentId, null);
   assert.equal(current.observed.length, 1);
-  assert.deepEqual(current.counts(), { snapshots: 2, reads: 2, sourceChecks: 2 });
+  assert.deepEqual(current.counts(), {
+    snapshots: 2,
+    reads: 2,
+    sourceChecks: 2,
+  });
   assert.deepEqual(
     current.calls.map((args) => args[0]),
     ['api', 'config', 'api']
@@ -417,7 +604,11 @@ test('a native plan failure leaves observed owners explicitly separate from any 
   };
   await assert.rejects(runOwnershipPlan(current.options), /provider failed/u);
   assert.equal(current.observed.length, 1);
-  assert.deepEqual(current.counts(), { snapshots: 1, reads: 0, sourceChecks: 1 });
+  assert.deepEqual(current.counts(), {
+    snapshots: 1,
+    reads: 0,
+    sourceChecks: 1,
+  });
 });
 
 test('manual ownership workflow has no inputs, automatic events or application command', () => {
@@ -452,7 +643,9 @@ test('manual ownership workflow has no inputs, automatic events or application c
     ['RAILWAY_CONFIG_APPLY_ENABLED', 'RAILWAY_CONFIG_TOKEN']
   );
   assert.deepEqual(
-    { RAILWAY_CONFIG_APPLY_ENABLED: secretSteps[0].env.RAILWAY_CONFIG_APPLY_ENABLED },
+    {
+      RAILWAY_CONFIG_APPLY_ENABLED: secretSteps[0].env.RAILWAY_CONFIG_APPLY_ENABLED,
+    },
     {
       RAILWAY_CONFIG_APPLY_ENABLED: 'disabled',
     }
@@ -518,6 +711,7 @@ function entryFixture(artifact: ReturnType<typeof plan>, current = snapshot(), f
   for (const relative of [
     'scripts/railway-ownership-plan-entry.ts',
     'scripts/railway-ownership-plan.ts',
+    'scripts/railway-setting-details.ts',
     'scripts/railway-version-pin.ts',
     '.railway/railway.ts',
   ]) {
@@ -538,7 +732,14 @@ function entryFixture(artifact: ReturnType<typeof plan>, current = snapshot(), f
   const head = 'aa11111111111111111111111111111111111111';
   writeFileSync(
     dataPath,
-    JSON.stringify({ snapshot: current, artifact, failPlan, head, tree, secret })
+    JSON.stringify({
+      snapshot: current,
+      artifact,
+      failPlan,
+      head,
+      tree,
+      secret,
+    })
   );
   const cli = join(bin, 'railway');
   writeFileSync(
@@ -686,7 +887,9 @@ test('executed entry emits the complete sanitized inventory and fails for every 
     const artifact = plan();
     const current = snapshot();
     if (kind === 'foreign-owner') {
-      current.data.environment.iacPartials = { 'service.Georoids': 'other-repo' };
+      current.data.environment.iacPartials = {
+        'service.Georoids': 'other-repo',
+      };
     }
     if (kind === 'inconsistent-claim') {
       artifact.claim = false;

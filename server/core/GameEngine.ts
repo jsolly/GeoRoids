@@ -237,7 +237,7 @@ export class GameEngine {
   private readonly remains = new WorldRemains();
   private readonly glowtoys: GlowtoyManager;
   public readonly cargoOffload: CargoOffloadManager;
-  private readonly rolyPolys = new RolyPolyManager();
+  private readonly rolyPolys: RolyPolyManager;
   private readonly furnaces = new FurnaceField();
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
@@ -410,6 +410,7 @@ export class GameEngine {
     }
     persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
+    this.rolyPolys = new RolyPolyManager(this.entityManager);
     this.pilotLedger = new PilotLedger({
       saved: loaded?.pilots ?? [],
       actors: this.entityManager,
@@ -785,16 +786,7 @@ export class GameEngine {
     const toolStartPositions = this.toolFlights.captureStartPositions();
     this.asteroidManager.updateMotion(this.toolFlights.hasOutboundFlight());
     this.hives.advance(this.gameTime, serverNow);
-    this.rolyPolys.advance(
-      this.entityManager.getAllEntities().map((pilot) => ({
-        position: pilot.position,
-        velocity: pilot.velocity,
-        health: pilot.health,
-        exploding: pilot.exploding,
-        radius: hullRadiusForKit(pilot.kitId),
-      })),
-      this.gameTime
-    );
+    this.rolyPolys.advance(this.gameTime);
     this.glowtoys.advance(this.gameTime);
 
     this.spiderField.advance(this.gameTime);

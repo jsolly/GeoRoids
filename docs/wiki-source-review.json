@@ -104,7 +104,7 @@
     "server/core/EntityManager.ts": "sha256:684a0e71ca1e8ca0a5bad20a709fb57f3b5b1d746d7fc8be4b2e810831c8d628",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:0cbdfcc820a18c30c7d2e7fbdaa7e899a59442d43e24f3ebeae0028dd2cb3a2b",
+    "server/core/GameEngine.ts": "sha256:e1130c1486efa8cbf19d1828cae6c9d6f4401623c2b199f31dae3ec082836894",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:00cabaaa9b6ad0483f51ac095af0c23541341f4034d72fded32b851e7655fb08",
@@ -114,7 +114,7 @@
     "server/core/PilotSessionLifecycle.ts": "sha256:980205610dbb29ef3738ffd8396568c30209dcfe907d4f0ac37828c501b3d284",
     "server/core/PlayerMotionService.ts": "sha256:3d95224c2191c6a3ac263e3c0e6b3b495e7ae23d192546612132f06a138ec3c4",
     "server/core/RNGService.ts": "sha256:d539b5041594b9e7037d6967a149a42348b47febf3a5275c302e6a34166af582",
-    "server/core/RolyPolyManager.ts": "sha256:1564c9b42dbf3091f1ba8cbe90b10f63458a9d3b5e9830b66b46fc733bd05cad",
+    "server/core/RolyPolyManager.ts": "sha256:5fcdf24fa53b1ac794aa9f8ea3fcc4e2f33df9105eca0b6ffb155909ffdc03ba",
     "server/core/SatellitePickupField.ts": "sha256:7844444fd5a238fc00b95516d2d8038dca41dbd1e05e865813c394a7048e20d6",
     "server/core/SatellitePickupManager.ts": "sha256:e44b5e648b8490c81fec961a251ef8f8473d78036331ebdac9acb7ce5c83083a",
     "server/core/ServerClock.ts": "sha256:049f40cf33f1eaf35a36890f96a1bd763dd8bdc3209668f062ef40e7c6d986b3",
@@ -568,7 +568,7 @@
     "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts": "sha256:6ab5be97d67954ed3cfa57ec70cd5a955df83bfa8342a1a1334d6613a728550a",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts": "sha256:25aa710f133a90bbf452fe7898ff8d08b74a4b78e5966f6cb8d2f2a5d19bc0af",
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts": "sha256:d9f9246b8cace56695ca00aacebf786abdd804ce2130af1f2bf5c46ab2b4cd4d",
-    "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts": "sha256:e48180121688f0a7b1bee099cab26f7ccf4a19738d191abaaedcf462c1ef9283",
+    "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts": "sha256:6ddd6e88fdeab5aa67cbf44fe639f1d28fe9f48b0c0c8f49b352ceb98f9bb5c4",
     "tests/unit/server/persistent-world-boundaries.test.ts": "sha256:9bacc162065135ccd0e57d8a83f0320db881dd6492b856c38e5b147de4ca6668",
     "tests/unit/server/physical-supplies-restore-frontier.test.ts": "sha256:d5eda452fb33579efabc711c035cec8774a8b2758e1b937aa4e384e32af8cb79",
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:5a68a40d09dec9bb61acd09abd351e3b5b2da61cde5a7cfd93009c6185864cbb",
@@ -9794,6 +9794,46 @@
         "src/wiki/articleSources.json": "terrain",
         "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts": "terrain"
       }
+    },
+    {
+      "note": "Moved the same live actor projection into RolyPolyManager through a stable registry capability. The living filter, kit radius, habitats, neutral motion, snapshots and cleanup remain unchanged. The full-frame call stays between hives and glowtoys; combat-only still omits wildlife. Both type suites and seven focused files with 39 cases passed. Whole-file structural comparisons preserve the original behavior and 13 assertions, with no damage checked against each real kit's initial health. Fifteen controlled defects failed their intended assertions in an isolated clone; 1,345 real source and four Git/configuration hashes stayed unchanged after each. Position and velocity copies failed independently. The first private proof was whitespace-sensitive, and the first mutation reader mishandled grouped failure headers. Both helpers were corrected and rerun without changing product behavior. Fresh Terrain source and browser review covered desktop and 390-pixel touch widths, a decoded illustration, expanded wildlife values and the Controls link. The console retained the existing image-dimensions issues and had no errors or warnings. After a transient decode failure during emulation, a fresh decode succeeded before the final capture. Both native captures were inspected and preserved. All 59 article, rendering, reference and media files and the source mapping match released PR982. Other topics and the Scout, Hauler and cargo media retain their earlier recorded scope; no new browser coverage is claimed for them. The selected sources, 11 topics and three media entries were computed from current mappings. Prior ledger records and unrelated hashes are preserved. Complete gate and independent publication review were pending when this batch was accepted. The whole pipeline and final whole-Wiki audit remain open.",
+      "sources": [
+        "server/core/GameEngine.ts",
+        "server/core/RolyPolyManager.ts",
+        "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": ["cargo", "hauler", "scout"],
+      "owners": {}
+    },
+    {
+      "note": "Resolved three review findings. The canonical nudge story now checks that the identified animal rolls with a positive component along the pilot's nudge. A new reversed-input defect fails that assertion; all 15 earlier defects also fail their intended assertions in a fresh isolated clone. The real source and Git/configuration hashes stay unchanged after each of the 16 probes. Both type suites and seven focused files with 39 cases pass. The private habitat input now requires only position, and the obsolete broader Pilot type is removed. R1 and R2 emit identical wildlife runtime code. Whole-file comparisons preserve the original Engine and wildlife behavior, including all 13 original assertions with actual kit health. Only this task's newly introduced, unpublished R1 batch note was rewritten for readability; its selectors and all 378 earlier batches remain unchanged. The source mapping and all five browser evidence files, including both native captures, are unchanged. The earlier Terrain desktop and touch checks retain their recorded scope; no new browser run or gameplay acceptance is claimed. Other Wiki content and media remain unchanged. The new complete gate and affected independent reviews are still pending. The whole pipeline and final whole-Wiki audit remain open.",
+      "sources": [
+        "server/core/RolyPolyManager.ts",
+        "tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts"
+      ],
+      "topics": ["terrain"],
+      "media": [],
+      "owners": {}
+    },
+    {
+      "note": "The real Scout and Hauler in the canonical wildlife story now have spawn protection cleared before any interaction. This makes the existing no-damage assertion test vulnerable hulls. In a fresh isolated clone, the previous protected fixture passed all seven canonical cases despite an injected one-point authoritative contact-damage fault. The corrected fixture rejects that same fault for both kits, observing 99 instead of 100 health and 139 instead of 140. All 16 earlier defects also fail their intended assertions against the corrected fixture. The real source and Git/configuration hashes remain unchanged after each probe. The damage capability and actor ID used by that fault exist only in the disposable fixture; production wildlife still has its original read-only registry capability. Both type suites and seven focused files with 39 cases pass. All 13 original assertions remain, and the whole Engine and wildlife runtime are unchanged from the previous review. All five browser evidence files, player text, rendering, reference and media bytes remain unchanged; earlier Terrain checks retain their recorded scope. No new browser run or gameplay acceptance is claimed. All 380 prior ledger batches, the original note and unrelated hashes are preserved. The next complete gate and affected reviews are pending. The whole pipeline and final whole-Wiki audit remain open.",
+      "sources": ["tests/unit/server/neutral-wildlife-curls-rolls-and-stays-local.test.ts"],
+      "topics": ["terrain"],
+      "media": [],
+      "owners": {}
     }
   ]
 }

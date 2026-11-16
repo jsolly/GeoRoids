@@ -394,7 +394,7 @@ export async function startFixtureControl(
           })),
           asteroids: normalizeFixtureAsteroids(engine.getAllAsteroids()),
           pickups: engine.getAllSatellitePickups().map(({ id: _id, ...pickup }) => pickup),
-          playerProjectiles: engine.getPlayerProjectiles(),
+          playerProjectiles: engine.laserCombat.projectiles(),
         };
         const hash = createHash('sha256').update(JSON.stringify(manifest)).digest('hex');
         socket.end(

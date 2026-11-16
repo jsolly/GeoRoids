@@ -2,7 +2,8 @@
 import { performance as nodePerformance } from 'node:perf_hooks';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
-import { GameEngine, PLAYER_LASER_MAX_LIFETIME_MS } from '../../../server/core/GameEngine';
+import { GameEngine } from '../../../server/core/GameEngine';
+import { PLAYER_LASER_MAX_LIFETIME_MS } from '../../../server/core/LaserCombat';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -63,14 +64,14 @@ describe('server motion clock', () => {
       engine.asteroidLifecycle.remove(asteroid.id);
     }
 
-    const laser = engine.spawnPlayerLaser(pilot.id, pilot.position, { x: 0, y: 0 });
+    const laser = engine.laserCombat.spawnPlayer(pilot.id, pilot.position, { x: 0, y: 0 });
     expect(laser).not.toBeNull();
-    expect(engine.getServerLasers()).toHaveLength(1);
+    expect(engine.laserCombat.shots()).toHaveLength(1);
 
     advanceElapsed(PLAYER_LASER_MAX_LIFETIME_MS + 1);
     vi.setSystemTime(9_999);
-    expect(engine.advanceLasersAndResolveHits()).toEqual([]);
-    expect(engine.getServerLasers()).toHaveLength(0);
+    expect(engine.laserCombat.advance()).toEqual([]);
+    expect(engine.laserCombat.shots()).toHaveLength(0);
   });
 
   test('point cargo keeps its elapsed lifetime through a paused world and wall-clock jumps', () => {

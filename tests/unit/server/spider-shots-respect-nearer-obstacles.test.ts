@@ -33,22 +33,22 @@ test('a nearer asteroid takes the shot before a spider, and an unobstructed shot
     vertices: 4,
     offsets: [1, 1, 1, 1],
   });
-  assert(engine.spawnLaser(pilot.id, { x: 2900, y: 3000 }, { x: 200, y: 0 }));
-  const hits = engine.advanceLasersAndResolveHits();
+  assert(engine.laserCombat.spawn(pilot.id, { x: 2900, y: 3000 }, { x: 200, y: 0 }));
+  const hits = engine.laserCombat.advance();
   expect(hits.map((hit) => hit.asteroidId)).toEqual(['obstacle']);
   expect(engine.getSpiderField().spiders.find((row) => row.id === spider.id)?.position).toEqual(
     spider.position
   );
-  const weakened = engine.spawnLaser(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 });
+  const weakened = engine.laserCombat.spawn(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 });
   assert(weakened);
   weakened.energy = 0.5;
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.advance();
   const damaged = engine.getSpiderField().spiders.find((row) => row.id === spider.id);
   expect(damaged?.position).toEqual(spider.position);
   expect(damaged?.health).toBe(SPIDER.MAX_HEALTH - DAMAGE.LASER_HIT * 0.5);
-  expect(engine.getServerLasers()).toHaveLength(0);
-  assert(engine.spawnLaser(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 }));
-  engine.advanceLasersAndResolveHits();
+  expect(engine.laserCombat.shots()).toHaveLength(0);
+  assert(engine.laserCombat.spawn(pilot.id, { x: 2955, y: 3000 }, { x: 100, y: 0 }));
+  engine.laserCombat.advance();
   expect(engine.getSpiderField().spiders.some((row) => row.id === spider.id)).toBe(false);
 });
 
@@ -67,8 +67,8 @@ test('killing the spider before combat resolves cancels the pending bite', () =>
   engine.advanceCombatFrame();
   engine.advanceCombatFrame();
   const health = pilot.health;
-  assert(engine.spawnLaser(pilot.id, { ...spider.position }, { x: 10, y: 0 }));
-  engine.advanceLasersAndResolveHits();
+  assert(engine.laserCombat.spawn(pilot.id, { ...spider.position }, { x: 10, y: 0 }));
+  engine.laserCombat.advance();
   expect(engine.getSpiderField().spiders.some((row) => row.id === spider.id)).toBe(false);
   engine.contactCombat.advance();
   expect(pilot.health).toBe(health);
@@ -154,8 +154,8 @@ test('a tow feedback laser kill cancels a queued bite before contact consumes it
       expect(engine.getAsteroid(other.id)).toBeUndefined();
       expect(engine.getSpiderField().spiders.some((row) => row.id === spider.id)).toBe(true);
       feedback.push(...hits);
-      assert(engine.spawnLaser(pilot.id, { ...spider.position }, { x: 10, y: 0 }));
-      engine.advanceLasersAndResolveHits();
+      assert(engine.laserCombat.spawn(pilot.id, { ...spider.position }, { x: 10, y: 0 }));
+      engine.laserCombat.advance();
       expect(engine.getSpiderField().spiders.some((row) => row.id === spider.id)).toBe(false);
     });
 

@@ -155,16 +155,16 @@ describe('Asteroid destruction over real sockets', () => {
             })
           );
           await wire.barrier();
-          expect(server.gameEngine.getServerLasers()).toHaveLength(1);
+          expect(server.gameEngine.laserCombat.shots()).toHaveLength(1);
           // Advance only the actual projectile pipeline. The stopped world cannot
           // supply an NPC hit, pickup score, expiry, or replacement asteroid.
-          const hits = server.gameEngine.advanceLasersAndResolveHits();
+          const hits = server.gameEngine.laserCombat.advance();
           server.wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
           await wire.barrier();
         }
         server.wsCore.getBroadcaster().broadcastGameState();
         await wire.barrier();
-        expect(server.gameEngine.getServerLasers()).toHaveLength(0);
+        expect(server.gameEngine.laserCombat.shots()).toHaveLength(0);
         expect(received.filter((message) => message.type === 'asteroidDestroy')).toEqual([
           {
             type: 'asteroidDestroy',

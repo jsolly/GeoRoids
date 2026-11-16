@@ -40,7 +40,7 @@ test('a natural belt shares valid snapshots with roaming spiders and retains cra
     expect(() =>
       captureSnapshot({
         ...engine.getGameState(),
-        playerProjectiles: engine.getPlayerProjectiles(),
+        playerProjectiles: engine.laserCombat.projectiles(),
       })
     ).not.toThrow();
     engine.checkpointWorld();
@@ -68,7 +68,7 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   try {
     const player = addPilot(engine);
-    engine.observeFixtureShots('test', [player.id]);
+    engine.laserCombat.observeFixtureShots('test', [player.id]);
     for (const rock of engine.getAllAsteroids()) {
       engine.asteroidLifecycle.remove(rock.id);
     }
@@ -93,15 +93,15 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
       .getSpiderField()
       .spiders.find((spider) => spider.crawler?.hostId === rock.id && spider.id.endsWith(':0'));
     assert(crawler);
-    const shot = engine.spawnLaser(
+    const shot = engine.laserCombat.spawn(
       player.id,
       { x: crawler.position.x + 45, y: crawler.position.y },
       { x: -80, y: 0 }
     );
     assert(shot);
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
     expect(shot.hasExploded).toBe(true);
-    expect(engine.getFixtureCombatEvidence().events).toContainEqual(
+    expect(engine.laserCombat.getFixtureCombatEvidence().events).toContainEqual(
       expect.objectContaining({
         kind: 'terminal',
         projectileId: shot.id,
@@ -243,7 +243,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     );
     const snapshot = {
       ...restarted.getGameState(),
-      playerProjectiles: restarted.getPlayerProjectiles(),
+      playerProjectiles: restarted.laserCombat.projectiles(),
     };
     expect(() => captureSnapshot(snapshot)).not.toThrow();
     for (const candidate of restarted.getAllAsteroids()) {

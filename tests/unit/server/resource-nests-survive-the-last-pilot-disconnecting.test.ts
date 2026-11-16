@@ -40,12 +40,12 @@ test.each(['full', 'combat-only'] as const)(
       advance();
       const [wounded, killed] = engine.getSpiderField().spiders;
       assert(wounded && killed);
-      const graze = engine.spawnLaser(pilot.id, wounded.position, { x: 1, y: 0 });
+      const graze = engine.laserCombat.spawn(pilot.id, wounded.position, { x: 1, y: 0 });
       assert(graze);
       graze.energy = 0.5;
-      engine.advanceLasersAndResolveHits();
-      assert(engine.spawnLaser(pilot.id, killed.position, { x: 1, y: 0 }));
-      engine.advanceLasersAndResolveHits();
+      engine.laserCombat.advance();
+      assert(engine.laserCombat.spawn(pilot.id, killed.position, { x: 1, y: 0 }));
+      engine.laserCombat.advance();
       const before = engine.getSpiderField().spiders.map(({ id, health }) => ({ id, health }));
       expect(before).toHaveLength(SPIDER.NEST_GUARDS - 1);
       expect(before.find(({ id }) => id === wounded.id)?.health).toBe(

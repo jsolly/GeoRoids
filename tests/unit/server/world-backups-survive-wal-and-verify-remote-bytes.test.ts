@@ -182,7 +182,10 @@ test('online snapshot includes committed WAL, every auxiliary table and a resuma
       throw new Error('Restored pilot could not resume');
     }
     expect(resumed.actor.id).toBe('fixture-pilot');
-    const laser = engine.spawnPlayerLaser(resumed.actor.id, resumed.actor.position, { x: 1, y: 0 });
+    const laser = engine.laserCombat.spawnPlayer(resumed.actor.id, resumed.actor.position, {
+      x: 1,
+      y: 0,
+    });
     expect(laser?.ownerId).toBe('fixture-pilot');
     engine.removePlayer(resumed.actor.id);
     expect(store.loadPilots()).toHaveLength(1);

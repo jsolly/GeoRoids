@@ -445,13 +445,13 @@ describe('authoritative Scout probes', () => {
     resolveToolFlights(engine);
     assert.ok(host.probe);
 
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
-    engine.advanceLasersAndResolveHits(now.value + 1);
+    engine.laserCombat.spawn('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
+    engine.laserCombat.advance(now.value + 1);
     expect(host.probe?.health).toBe(SURVEY_PROBE.MAX_HEALTH - 25);
     expect(host.health).toBe(host.maxHealth);
 
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
-    engine.advanceLasersAndResolveHits(now.value + 3);
+    engine.laserCombat.spawn('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
+    engine.laserCombat.advance(now.value + 3);
     expect(host.probe).toBeNull();
     expect(engine.getAsteroid(host.id)).toBe(host);
   });

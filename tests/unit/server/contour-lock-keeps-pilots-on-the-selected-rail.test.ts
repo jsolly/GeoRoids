@@ -437,7 +437,7 @@ test('equipment loot preserves the contour lock and current motion epoch', () =>
 test('a crew laser passing through a hull is not a collision', () => {
   const { actor, pilot, pose } = railPilot();
   expect(pose(0).ok).toBe(true);
-  const shot = world.engine.spawnLaser(
+  const shot = world.engine.laserCombat.spawn(
     pilot.id,
     { x: actor.position.x - 80, y: actor.position.y },
     { x: 120, y: 0 }
@@ -445,7 +445,7 @@ test('a crew laser passing through a hull is not a collision', () => {
   if (!shot) {
     throw new Error('Missing fixture shot');
   }
-  world.engine.advanceLasersAndResolveHits();
+  world.engine.laserCombat.advance();
   expect(actor.contourLock).not.toBeNull();
   expect(shot.hasExploded).toBe(false);
 });
@@ -469,7 +469,7 @@ test.each([0, 30])(
     expect(pose(0).ok).toBe(true);
     actor.spawnProtectionTimer = protection;
     const health = actor.health;
-    const shot = world.engine.spawnLaser(
+    const shot = world.engine.laserCombat.spawn(
       pilot.id,
       { x: actor.position.x - 80, y: actor.position.y },
       { x: 120, y: 0 }
@@ -478,7 +478,7 @@ test.each([0, 30])(
       throw new Error('Missing fixture shot');
     }
     shot.bounces = 1;
-    world.engine.advanceLasersAndResolveHits();
+    world.engine.laserCombat.advance();
     if (protection) {
       expect(actor.contourLock).not.toBeNull();
       expect(shot.hasExploded).toBe(false);
@@ -580,7 +580,7 @@ test.each(['scout', 'hauler'] as const)(
       if (frame % 30 === 0) {
         const laser = ship.generateLaser();
         expect(
-          world.engine.spawnPlayerLaser(
+          world.engine.laserCombat.spawnPlayer(
             actor.id,
             laser.position,
             laser.velocity,

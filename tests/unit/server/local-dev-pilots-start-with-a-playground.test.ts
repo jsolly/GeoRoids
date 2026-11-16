@@ -31,14 +31,14 @@ test('local pilots start with points, nearby tools and hulls, and three lit trav
     ).toBeLessThan(700);
   }
   const destinations = CIVIC_LOTS.filter((lot) => lot.parentId === TOWN_HEARTH.id);
-  expect(destinations.filter((lot) => engine.isFurnaceLit(lot.id))).toHaveLength(3);
+  expect(destinations.filter((lot) => engine.furnaces.isLit(lot.id))).toHaveLength(3);
 });
 
 test('ordinary fixtures retain their normal starting balance and unbuilt destinations', () => {
   const engine = new GameEngine(42);
   expect(engine.addPlayer('normal', 'Normal', new RecordingSocket()).score).toBe(0);
   expect(engine.getLoot()).toHaveLength(0);
-  expect(CIVIC_LOTS.filter((lot) => engine.isFurnaceLit(lot.id))).toHaveLength(0);
+  expect(CIVIC_LOTS.filter((lot) => engine.furnaces.isLit(lot.id))).toHaveLength(0);
 });
 
 test('production and unconfigured development servers reject the local preset', () => {

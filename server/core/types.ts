@@ -283,3 +283,11 @@ export type LaserCombatInputs = {
   readonly now: () => number;
   readonly frame: () => number;
 };
+
+export type CivicTransactionsInputs = {
+  readonly actors: Pick<EntityManager, 'getEntity'>;
+  readonly ledger: Pick<PilotLedger, 'capture'>;
+  readonly settlement: Pick<SettlementLedger, 'current'>;
+  readonly furnaces: Pick<FurnaceField, 'isLit' | 'displayName' | 'light'>;
+  readonly paused: () => boolean;
+};

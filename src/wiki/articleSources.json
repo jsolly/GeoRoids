@@ -131,7 +131,8 @@
     "tests/unit/input/desktop-pilots-charge-and-release-a-beam.test.ts",
     "shared/contourBridge.ts",
     "server/core/LaserCombat.ts",
-    "tests/unit/server/pilots-can-fire-only-from-owned-muzzles.test.ts"
+    "tests/unit/server/pilots-can-fire-only-from-owned-muzzles.test.ts",
+    "server/core/CivicTransactions.ts"
   ],
   "hauler": [
     "server/core/ToolFlightManager.ts",
@@ -492,7 +493,8 @@
     "tests/unit/server/nearby-pilots-hear-each-new-shot-once.test.ts",
     "tests/unit/server/reflected-shots-carry-energy-and-leave-salvage.test.ts",
     "tests/unit/server/laser-asteroid-authority.test.ts",
-    "tests/unit/server/destroy-drop-loot.test.ts"
+    "tests/unit/server/destroy-drop-loot.test.ts",
+    "server/core/CivicTransactions.ts"
   ],
   "hud-network": [
     "server/core/SurveyProbeManager.ts",
@@ -646,7 +648,8 @@
     "server/createServer.ts",
     "server/staticClient.ts",
     "server/core/LaserCombat.ts",
-    "tests/unit/server/nearby-pilots-hear-each-new-shot-once.test.ts"
+    "tests/unit/server/nearby-pilots-hear-each-new-shot-once.test.ts",
+    "server/core/CivicTransactions.ts"
   ],
   "scout": [
     "server/core/ToolFlightManager.ts",
@@ -711,7 +714,8 @@
     "tests/unit/entities/launched-tools-hit-or-return.test.ts",
     "src/ui/furnaceTravelPrompt.ts",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts",
-    "server/core/LaserCombat.ts"
+    "server/core/LaserCombat.ts",
+    "server/core/CivicTransactions.ts"
   ],
   "loot-growth": [
     "server/core/CargoOffloadManager.ts",
@@ -756,7 +760,8 @@
     "shared/navigationSalvage.ts",
     "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts",
     "server/core/LaserCombat.ts",
-    "tests/unit/server/destroy-drop-loot.test.ts"
+    "tests/unit/server/destroy-drop-loot.test.ts",
+    "server/core/CivicTransactions.ts"
   ],
   "teamwork": [
     "server/core/ToolFlightManager.ts",
@@ -865,6 +870,7 @@
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts",
     "server/core/SpiderPopulationBudget.ts",
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts",
-    "server/core/LaserCombat.ts"
+    "server/core/LaserCombat.ts",
+    "server/core/CivicTransactions.ts"
   ]
 }

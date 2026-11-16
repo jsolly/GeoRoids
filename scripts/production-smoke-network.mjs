@@ -22,7 +22,7 @@ export function requireEvidence(condition, message) {
     throw new SmokeFailure(message);
   }
 }
-export async function verifyProductionHttp({
+async function verifyProductionHttp({
   url,
   signal = new AbortController().signal,
   fetcher = fetch,

@@ -5,7 +5,8 @@ small, trustworthy suite. Coverage percentage and test count are not goals.
 Automated regression suites execute code without launching a browser. Do not add
 Playwright, Cypress, WebDriver or other broad browser correctness suites. John's
 November 12, 2026 authorization permits the bounded, manually dispatched hosted
-Chromium smoke below when local browser verification is blocked.
+Chromium smoke below when local browser verification is blocked. John authorized
+one daily basic run on November 15, 2026.
 Svelte/jsdom component tests and canvas-call tests execute code in the runner;
 they do not launch a browser. Brief native checks follow [Basic manual browser
 smoke](#basic-manual-browser-smoke).
@@ -181,9 +182,11 @@ smoke is the same brief check; cloud-session mechanics live in
 
 ## Hosted browser smoke
 
-The manual `Browser smoke` workflow is a scoped alternative to the basic local
-smoke. It uses an ephemeral local world on a hosted runner and takes an exact
-candidate commit. Run its first self-check against its landed `main` commit.
+The `Browser smoke` workflow runs the basic smoke once daily at 10:23 UTC against
+the scheduled `main` commit. It uses an ephemeral local world on a hosted runner,
+so the daily run checks the repository build rather than the live production site.
+GitHub scheduling is best effort. Manual dispatch remains available with an exact
+candidate commit as a scoped alternative to the basic local smoke.
 For a UI change, dispatch from `main`, with the candidate PR kept in draft.
 The verification script comes from the workflow commit, separately from the
 candidate checkout. It checks desktop and mobile Chromium viewports, joins through

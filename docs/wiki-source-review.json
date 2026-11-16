@@ -84,7 +84,7 @@
     "scripts/wiki-satellite-demo.ts": "sha256:7ecaae18ab604448b3706caab776aaf48e7f4b18fc5781e97cae2838fca52f88",
     "scripts/wiki-source-digest.ts": "sha256:00b9839528d372a5a8ec7a6bfe761f23e68837c3f2f3b7afe3fd7b1bcfaedc94",
     "server.ts": "sha256:a62cb69f897fd54f91e95293b873e5a4c4ec2a9237d6e11869eadce012ec8358",
-    "server/communication/MessageHandler.ts": "sha256:e092dc91ad68193a26c62482642539cdf535a59b28960ff1fa3e64e34041cdc8",
+    "server/communication/MessageHandler.ts": "sha256:3ddb005c83c3b8d147e16fea897e14e763defe4db0a48f2a75e15050108a121d",
     "server/communication/WebSocketCore.ts": "sha256:6e052eaea9fdab07c4b124336f68b378a69cf4399dd9e9e7780989db90b2cca8",
     "server/communication/clientCommandDecoder.ts": "sha256:9b449bab5cdab7ca39ea9cef64f55305b294fbb7bf285cf4fc4765201f9e6d43",
     "server/communication/connectionAdmission.ts": "sha256:52710c40140b63941dc0b13b4cfbc805dda043992460c45c3c1c3a8c331901ea",
@@ -104,7 +104,7 @@
     "server/core/EntityManager.ts": "sha256:a5e9788e74041f9480c6af4a1853cc6641f7f19056a8e1058ab30ce7496b8ac9",
     "server/core/FurnaceDeliveryManager.ts": "sha256:227a6381b2f4eb214fc53011056808526c27cc297f9a6af5874bf447ecaaf180",
     "server/core/FurnaceTravelManager.ts": "sha256:005dadec3ca39e6cc6a65e6460d192daa8ce17b7bda093c5d3479a2db225be73",
-    "server/core/GameEngine.ts": "sha256:3dc89ec8d4adfa65f811a98df802f87e76229a406c74fa3fc76e40c41561f3ad",
+    "server/core/GameEngine.ts": "sha256:e0fc1dae2d2bfdc3329c2ba33362c0dd9199f48ebdb53ae73a51f07ecf079b8f",
     "server/core/GameLoopHealth.ts": "sha256:5d5470ee5a9ee04558513c7902460103f79e35fba4f11079e9cdc9e49973e1ef",
     "server/core/GlowtoyManager.ts": "sha256:55c870c8666d5abd70b839558da13e068f445b0edf2b13f9fff3c663db894837",
     "server/core/HiveEncounters.ts": "sha256:00cabaaa9b6ad0483f51ac095af0c23541341f4034d72fded32b851e7655fb08",
@@ -127,7 +127,7 @@
     "server/core/constants.ts": "sha256:7d249e4c4e193e7deaf1fd9f963cadb986fcde5758e5d7ac0929d4fd93a876f9",
     "server/core/spiderRescueTarget.ts": "sha256:8c1c24d87e00654169c5ddef1e93441f611b17b223cc7337329abfb236ac9405",
     "server/core/spiderResources.ts": "sha256:84454ab921c9b8b115488df297f79e625f38e00586cfe56539fc2fbf49f16548",
-    "server/core/types.ts": "sha256:50cd632177ecf7816bd8292384c6fb9fb3ec9365703cb0f1d791cfec91478225",
+    "server/core/types.ts": "sha256:ff14ea1f8ef36129223a897d4db554d3c1f506328ac0cbba4a4e2b40dd782a52",
     "server/createServer.ts": "sha256:4a8d18ca5228e6dabc5c989756d217d0f2bf5d8708a1fd7ca319952159b41c3e",
     "server/services/ClientLogger.ts": "sha256:227f529d940aec0967aa6e35646cd87a58bc2484ed68bf09f8a29f90c2f26e8b",
     "server/services/GameStateBroadcaster.ts": "sha256:1875fdcc995e7843daebc64f6261d0a035ab76ac205486ae1d4bcff8d21e7856",
@@ -460,7 +460,7 @@
     "src/utils/safeStorage.ts": "sha256:e3d362890bdaca7f8458227114fe2422b6cd0774095ab7e9dc64bce311313cfa",
     "src/utils/spawnPosition.ts": "sha256:47ed09b507d9b1124bb6a0215ceb7f4708b81815f32c2da30bd617e0d2d0a4c7",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:785ebd640b4788ab8e16ba31b7a74c19c9562b87a5c11fa9ec42a2d452966652",
+    "src/wiki/articleSources.json": "sha256:02e45a8bf37120c1b6de6f7dfc1088d0ca518041199edb472178e469a50810a0",
     "src/wiki/contentLoader.ts": "sha256:abe0ee24945205113a07ededf0b8b54888a7d08e619b9d7a018d80a273e5afa4",
     "src/wiki/gameReference.ts": "sha256:8a16f2749f6225333e103dc0989bfe7a0b24b83ce33814d4879ee657e533b5cb",
     "src/wiki/media.ts": "sha256:1974cd25c3c195b8adaa4de36f281c5b2659d5b57c989f7c06ec41a11d44d9c8",
@@ -574,7 +574,7 @@
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts": "sha256:aa65c387d78dc567956b403631145b01c874306af9c808a9e46bcd703b37aa4a",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts": "sha256:4e0cbf3b7251c61a9a8a272083daef31f25f083c13221cc7e8fc0158952ded18",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts": "sha256:54418482526c43166733135d20c46c3266e2a00aa225bb717b40094154741f30",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:da4d6ee6d4c8fc83266c8f32b587a046574588e2b049c22ee570bfc0eb41d81c",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts": "sha256:acdbf705abf53a45d382fb2ec7f3b47cb10fea8b481eefbe0d9b85c7a1b8d8b5",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts": "sha256:8986344e504c7998821db86bf33087df5db638f319ecb4c3cad9ed379c791864",
     "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts": "sha256:6f5eaf8cb69bdfd231c78585e0bb2ccba34025456bd54ee6d5bf5433673dff7e",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts": "sha256:671359aff07f4bbdb451d5bd3dca34c4fbd39645ce681fe37182d3148d708228",
@@ -582,7 +582,7 @@
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts": "sha256:a014fb3cc93e36091aa5b9cd17f25640270e08d9d63e9a102debceb69305b622",
     "tests/unit/server/regional-asteroid-density.test.ts": "sha256:0f3d75e2ed73594f338d9773a7aed868b2f6a7ef40b8b0e2bb2846cdac81a6e5",
     "tests/unit/server/remains-stay-local-and-expire-without-awarding-loot.test.ts": "sha256:a9d24fffb7daaea9a34a2e375a847d763da5ddba6c5f3b8dbad6936d75fa8c46",
-    "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:e948ec139f99eb4b596de79ab3ac7a691779a3580bcf0747df1dabd3e65c84d1",
+    "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts": "sha256:75409b1663dcf4052cd516ec4227e0eaf266dd76a7c8c154107638eb55a8bd5e",
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:8157f17b02b79a0594bdc3e9873538413a6c3e3f1e1c83874ed4d1dce8b2a624",
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts": "sha256:6068a8366a989a66aec10c641d83bcb33272d2177c4ae8f1aea08306451e0e43",
     "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts": "sha256:15a683e29b00ec9045c9ebea5e5f65435ab2eb5ea9ec84f872d81542c664d6c4",
@@ -623,7 +623,8 @@
     "tests/unit/server/laser-asteroid-authority.test.ts": "sha256:8d1309b2d74a2e6711044d2da66c65b730376c8ad43c8507f8944cbd853ab04d",
     "tests/unit/server/nearby-pilots-hear-each-new-shot-once.test.ts": "sha256:400d65193fcd77d8eb4e3ff5d481c7fb89b2c92df0b12fe5009625638c88caf7",
     "tests/unit/server/pilots-can-fire-only-from-owned-muzzles.test.ts": "sha256:b6e13b9cdc7d6ba1e2286b4e0e2c1e9c28c3f792b9eb2dc34b392bf0e1ab1b9a",
-    "tests/unit/server/reflected-shots-carry-energy-and-leave-salvage.test.ts": "sha256:b9795ede784b51283c44cefbca9d7a79638aa53ab6207cc10d201c565469f7c2"
+    "tests/unit/server/reflected-shots-carry-energy-and-leave-salvage.test.ts": "sha256:b9795ede784b51283c44cefbca9d7a79638aa53ab6207cc10d201c565469f7c2",
+    "server/core/CivicTransactions.ts": "sha256:dab6e765864d9ee4fea782882d1e03c751f5f1c16b0adc95e5905915c7378f99"
   },
   "reviews": [
     {
@@ -10168,6 +10169,46 @@
         "tests/unit/server/scouts-launch-shared-beacons-on-moving-asteroids.test.ts",
         "tests/unit/server/spider-shots-respect-nearer-obstacles.test.ts",
         "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts"
+      ],
+      "topics": [
+        "asteroids",
+        "combat-survival",
+        "controls",
+        "field-manual",
+        "hauler",
+        "hud-network",
+        "loot-growth",
+        "satellites",
+        "scout",
+        "teamwork",
+        "terrain"
+      ],
+      "media": [
+        "cargo",
+        "hauler",
+        "loot",
+        "movement",
+        "pickups",
+        "reflection",
+        "satellites",
+        "scout",
+        "survival",
+        "terrain"
+      ],
+      "owners": {
+        "src/wiki/articleSources.json": "field-manual"
+      }
+    },
+    {
+      "note": "Moved complete furnace construction, store transactions and last successful notice state into CivicTransactions; direct callers and defining source references migrated. All five moved policy bodies and notice state match original tokens under declared owner substitutions; all other extraction statements and imports compared, with32 original canonical-story statements retained in order. The passive owner is constructed after PilotLedger, moving only unobserved empty notice initialization. Eight canonical baseline files76cases and final focused86cases passed; strict application/tooling types passed. All23 controlled unit defects failed intended assertions in an origin-free fixture with independent dependencies and real source/Git/global/canonical-cache identity guarded. Initial ambiguous mutation stopped before execution; an extra rejected-purchase broadcast survived because unchanged state produced no snapshot, then a real queued pickup notification closed the gap and all23 variants were rerun successfully. Reviewed all11 article texts against the unchanged policies; all59 article/render/reference/media/generator files match base bytes, including all10 demonstrations. Native Controls, Scout and Teamwork checks at1280x900 and390x844touch exercised exact-values disclosure and actual links; all six original captures visually inspected. Movement and Scout posters decoded at640x360 under reduced motion. No console errors/warnings; existing lazy-image dimensions issue reported counts11/10/10 across navigation. No player copy or rendering change, GIF regeneration needed no change; linux-x64 media CI, full local gate and final whole-pipeline Wiki acceptance remain separate. Native checks do not certify gameplay controls, animation playback, physical devices or performance.",
+      "sources": [
+        "server/communication/MessageHandler.ts",
+        "server/core/CivicTransactions.ts",
+        "server/core/GameEngine.ts",
+        "server/core/types.ts",
+        "src/wiki/articleSources.json",
+        "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+        "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts"
       ],
       "topics": [
         "asteroids",

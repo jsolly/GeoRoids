@@ -6,15 +6,8 @@ import { GAME, ROID, SHIP } from '../../shared/constants/gameplay';
 import { cargoCapacity } from '../../shared/economy';
 import { canEquipUtility, EQUIPMENT_IDS, isEquipmentId } from '../../shared/equipment';
 import { ExplorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD, FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
-import {
-  CIVIC_LOTS,
-  civicLot,
-  civicLotAt,
-  civicModuleName,
-  TOWN_HEARTH,
-  townSquareSpawn,
-} from '../../shared/furnaces';
+import { FurnaceField, onDarkFurnaceFootprint } from '../../shared/furnaceField';
+import { CIVIC_LOTS, TOWN_HEARTH, townSquareSpawn } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
@@ -23,7 +16,7 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../../shared/lootBlast';
-import { chooseCrewSpawn, sanitizePlayerName } from '../../shared/player';
+import { chooseCrewSpawn } from '../../shared/player';
 import { activatePlayerShield } from '../../shared/playerShield';
 import {
   activateAbilityOnHost,
@@ -42,7 +35,6 @@ import {
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { TERRAIN } from '../../shared/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../shared/terrainField';
-import { insideTownStore, storeOffer, TOWN_STORE_ISSUE } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import { hazardPhase } from '../../shared/worldHazards';
 import type {
@@ -77,6 +69,7 @@ import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { BotFleet } from './BotFleet';
 import { CargoOffloadManager } from './CargoOffloadManager';
 import { ChargedWeaponManager } from './ChargedWeaponManager';
+import { CivicTransactions } from './CivicTransactions';
 import { CollisionAuthority } from './CollisionAuthority';
 import { ContactCombat } from './ContactCombat';
 import { CooperativeContourBridges } from './CooperativeContourBridges';
@@ -156,7 +149,7 @@ export class GameEngine {
   private readonly glowtoys: GlowtoyManager;
   public readonly cargoOffload: CargoOffloadManager;
   private readonly rolyPolys: RolyPolyManager;
-  private readonly furnaces = new FurnaceField();
+  public readonly furnaces = new FurnaceField();
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
   private worldStartedAt: number;
@@ -166,7 +159,7 @@ export class GameEngine {
   public readonly furnaceDeliveries: FurnaceDeliveryManager;
   public readonly asteroidMining: AsteroidMining;
   public readonly contactCombat: ContactCombat;
-  private lastFurnaceBuildNotice = '';
+  public readonly civicTransactions: CivicTransactions;
   public readonly entityManager: EntityManager;
   private readonly asteroidManager: AsteroidManager;
   public readonly asteroidLifecycle: AsteroidLifecycle;
@@ -311,6 +304,13 @@ export class GameEngine {
       actors: this.entityManager,
       now: () => this.getServerTime(),
       settlementLedger: this.settlementLedger,
+    });
+    this.civicTransactions = new CivicTransactions({
+      actors: this.entityManager,
+      ledger: this.pilotLedger,
+      settlement: this.settlementLedger,
+      furnaces: this.furnaces,
+      paused: () => this.isPaused,
     });
     this.furnaceTravel = new FurnaceTravelManager({
       actors: this.entityManager,
@@ -1576,7 +1576,7 @@ export class GameEngine {
     }
     if (entity.kitId === 'scout') {
       if (onDarkFurnaceFootprint(entity.position, (id) => this.furnaces.isLit(id))) {
-        return this.buildFurnace(entity);
+        return this.civicTransactions.build(entity);
       }
       if (scoutUtilityOf(entity) === 'survey_probe') {
         return this.launchSurveyProbe(entity);
@@ -1643,102 +1643,9 @@ export class GameEngine {
     return activation.activated;
   }
 
-  public furnaceBuildIssue(entityId: string): string | undefined {
-    const scout = this.getPlayer(entityId);
-    if (
-      scout?.kitId !== 'scout' ||
-      scout.exploding ||
-      scout.health <= 0 ||
-      scout.furnaceTransit ||
-      scout.respawnTimer !== undefined
-    ) {
-      return FURNACE_BUILD.ISSUE.READY;
-    }
-    const lot = civicLotAt(scout.position);
-    if (!lot) {
-      return FURNACE_BUILD.ISSUE.STAND;
-    }
-    if (this.furnaces.isLit(lot.id)) {
-      return FURNACE_BUILD.ISSUE.LIT;
-    }
-    if (lot.parentId !== TOWN_HEARTH.id && !this.furnaces.isLit(lot.parentId)) {
-      const parent = civicLot(lot.parentId);
-      return parent
-        ? `Light ${this.furnaces.displayName(parent.id)} first`
-        : 'Light the inward furnace first';
-    }
-    const score = Number.isSafeInteger(scout.score) ? scout.score : 0;
-    if (score < lot.cost) {
-      const remaining = lot.cost - Math.max(0, score);
-      return `You need ${remaining} more ${remaining === 1 ? 'point' : 'points'} to build this furnace`;
-    }
-    return undefined;
-  }
-
-  public furnaceBuildNotice(): string {
-    return this.lastFurnaceBuildNotice;
-  }
-
-  public isFurnaceLit(id: string): boolean {
-    return this.furnaces.isLit(id);
-  }
-
-  public buyStoreItem(entityId: string, offerId: string): string | undefined {
-    const offer = storeOffer(offerId);
-    const pilot = this.getPlayer(entityId);
-    if (
-      !offer ||
-      !pilot ||
-      pilot.furnaceTransit ||
-      this.isPaused ||
-      pilot.health <= 0 ||
-      pilot.exploding ||
-      pilot.respawnTimer !== undefined
-    ) {
-      return TOWN_STORE_ISSUE.CLOSED;
-    }
-    if (!insideTownStore(pilot.position)) {
-      return TOWN_STORE_ISSUE.AWAY;
-    }
-    if (pilot.purchases.includes(offer.id)) {
-      return 'Already purchased. This placeholder grants no upgrade.';
-    }
-    if (this.settlementLedger.current().level < offer.level) {
-      return `Requires settlement level ${offer.level}`;
-    }
-    if (pilot.score < offer.cost) {
-      return `You need ${offer.cost - pilot.score} more banked points`;
-    }
-    pilot.score -= offer.cost;
-    pilot.purchases.push(offer.id);
-    this.pilotLedger.capture(pilot.id);
-    return undefined;
-  }
-
-  public townStoreNotice(offerId: string): string {
-    return `${storeOffer(offerId)?.name ?? 'Placeholder'} purchased. No upgrade granted.`;
-  }
-
   private clearTown(): void {
     this.settlementLedger.reset();
     this.furnaces.replaceLit([]);
-  }
-
-  private buildFurnace(scout: GameEntity): boolean {
-    const furnaceIssue = this.furnaceBuildIssue(scout.id);
-    if (furnaceIssue != null && furnaceIssue !== '') {
-      return false;
-    }
-    const lot = civicLotAt(scout.position);
-    if (!lot) {
-      return false;
-    }
-    const builderName = sanitizePlayerName(scout.name);
-    scout.score -= lot.cost;
-    this.pilotLedger.capture(scout.id);
-    this.furnaces.light(lot.id, builderName, scout.id);
-    this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
-    return true;
   }
 
   private launchSurveyProbe(scout: GameEntity): boolean {

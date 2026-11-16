@@ -17,6 +17,7 @@ import {
 } from '../../../shared/economy';
 import { civicLot, TOWN_HEARTH, TOWN_SPAWN_RADIUS } from '../../../shared/furnaces';
 import { hullRadiusForKit } from '../../../shared/shipKits';
+import { TOWN_STORE_ISSUE } from '../../../shared/townStore';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -507,16 +508,20 @@ test('dummy purchases enforce bank, level, proximity and socket ownership withou
   const engine = new GameEngine(42);
   const { actor, socket } = pilot(engine);
   actor.score = 500;
-  expect(engine.buyStoreItem(actor.id, 'placeholder-1')).toContain('Town Square');
+  expect(engine.civicTransactions.buy(actor.id, 'placeholder-1')).toContain('Town Square');
   actor.position = { x: 0, y: 0 };
-  expect(engine.buyStoreItem(actor.id, 'placeholder-2')).toContain('level 2');
+  expect(engine.civicTransactions.buy(actor.id, 'placeholder-2')).toContain('level 2');
   const broadcaster = new GameStateBroadcaster(engine);
   broadcaster.negotiateSnapshot(socket);
   const handler = new MessageHandler(engine, broadcaster);
   const stranger = pilot(engine, 'stranger').socket;
   broadcaster.negotiateSnapshot(stranger);
   const command = { type: 'buyStoreItem', id: actor.id, data: { offerId: 'placeholder-1' } };
+  socket.clear();
+  stranger.clear();
   handler.handleMessage(command, stranger);
+  expect(socket.inbox).toEqual([]);
+  expect(stranger.inbox).toEqual([]);
   expect(actor.score).toBe(500);
   const before = {
     health: actor.health,
@@ -526,7 +531,19 @@ test('dummy purchases enforce bank, level, proximity and socket ownership withou
     kitId: actor.kitId,
   };
   handler.handleMessage(command, socket);
+  expect(socket.inbox.map((message) => message.type)).toEqual(['townStoreResult', 'snapshot']);
+  expect(socket.lastReceived('townStoreResult')?.data).toEqual({
+    message: 'Placeholder A purchased. No upgrade granted.',
+    score: 400,
+    purchases: ['placeholder-1'],
+  });
+  socket.clear();
   handler.handleMessage(command, socket);
+  expect(socket.inbox.map((message) => message.type)).toEqual(['townStoreResult']);
+  expect(socket.lastReceived('townStoreResult')?.data).toEqual({
+    message: 'Already purchased. This placeholder grants no upgrade.',
+  });
+  expect(stranger.received('snapshot')).toHaveLength(1);
   expect(actor.score).toBe(400);
   expect(actor.purchases).toEqual(['placeholder-1']);
   expect(engine.getPlayer(actor.id)).toBe(actor);
@@ -564,4 +581,118 @@ test('a long absence and a smaller kit preserve cargo at its field position with
       .filter((drop) => drop.kind === 'points')
       .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
   ).toBe(0);
+});
+
+test('a failed purchase capture reports an error after spending and adding the receipt', () => {
+  const engine = new GameEngine(42);
+  const { actor, socket } = pilot(engine);
+  actor.position = { x: 0, y: 0 };
+  actor.score = 500;
+  const registered = engine.pilotSessions.register({ actor, socket });
+  if (!registered.ok) {
+    throw new Error('Pilot registration failed');
+  }
+  const broadcaster = new GameStateBroadcaster(engine);
+  broadcaster.negotiateSnapshot(socket);
+  const handler = new MessageHandler(engine, broadcaster);
+  const failure = new Error('Purchase capture failed');
+  const capture = vi.spyOn(engine.pilotLedger, 'capture').mockImplementation(() => {
+    throw failure;
+  });
+  try {
+    handler.handleMessage(
+      { type: 'buyStoreItem', id: actor.id, data: { offerId: 'placeholder-1' } },
+      socket
+    );
+    expect(actor.score).toBe(400);
+    expect(actor.purchases).toEqual(['placeholder-1']);
+    expect(engine.pilotLedger.saved(actor.id)?.score).toBe(500);
+    expect(engine.pilotLedger.saved(actor.id)?.purchases).toEqual([]);
+    expect(socket.inbox.map((message) => message.type)).toEqual(['error']);
+    expect(socket.lastReceived('error')?.data).toBe('Internal server error');
+  } finally {
+    capture.mockRestore();
+    broadcaster.stopPeriodicBroadcast();
+  }
+});
+
+test.each(['dead', 'exploding', 'respawning', 'travelling', 'paused'])(
+  'the store refuses a %s pilot without spending or adding a receipt',
+  (state) => {
+    const engine = new GameEngine(42);
+    if (state === 'paused') {
+      engine.resetForTesting();
+    }
+    const actor =
+      state === 'paused'
+        ? engine.entityManager.addPlayer(
+            'paused',
+            'Paused',
+            new RecordingSocket(),
+            { x: 0, y: 0 },
+            'scout'
+          )
+        : pilot(engine).actor;
+    actor.position = { x: 0, y: 0 };
+    actor.score = 500;
+    if (state === 'dead') {
+      actor.health = 0;
+    } else if (state === 'exploding') {
+      actor.exploding = true;
+    } else if (state === 'respawning') {
+      actor.respawnTimer = 1;
+    } else if (state === 'travelling') {
+      const destination = civicLot('street-1-0');
+      if (!destination) {
+        throw new Error('Missing furnace lot');
+      }
+      engine.furnaces.light(destination.id, actor.name, actor.id);
+      expect(engine.furnaceTravel.start(actor.id, destination.id)).toBeUndefined();
+      expect(actor.furnaceTransit?.destinationId).toBe(destination.id);
+    } else {
+      expect(engine.isGamePaused()).toBe(true);
+    }
+    expect(engine.civicTransactions.buy(actor.id, 'placeholder-1')).toBe(TOWN_STORE_ISSUE.CLOSED);
+    expect(actor.score).toBe(500);
+    expect(actor.purchases).toEqual([]);
+  }
+);
+
+test('a refused purchase leaves a real pickup notification queued for the next broadcast', () => {
+  const engine = new GameEngine(42);
+  const { actor, socket } = pilot(engine);
+  actor.position = { x: 0, y: 0 };
+  actor.score = 500;
+  const broadcaster = new GameStateBroadcaster(engine);
+  broadcaster.negotiateSnapshot(socket);
+  const handler = new MessageHandler(engine, broadcaster);
+  const command = { type: 'buyStoreItem', id: actor.id, data: { offerId: 'placeholder-1' } };
+  try {
+    handler.handleMessage(command, socket);
+    expect(actor.score).toBe(400);
+    socket.clear();
+    const pickup = engine.dropEquipmentAt(actor.position, 'survey_probe');
+    engine.lootCollection.collect();
+    expect(actor.equipment).toContain('survey_probe');
+    expect(socket.inbox).toEqual([]);
+    handler.handleMessage(command, socket);
+    expect(actor.score).toBe(400);
+    expect(actor.purchases).toEqual(['placeholder-1']);
+    expect(socket.inbox.map((message) => message.type)).toEqual(['townStoreResult']);
+    expect(socket.lastReceived('townStoreResult')?.data).toEqual({
+      message: 'Already purchased. This placeholder grants no upgrade.',
+    });
+    broadcaster.broadcastGameState();
+    expect(socket.received('lootCollected')).toHaveLength(1);
+    expect(socket.lastReceived('lootCollected')?.data).toEqual(
+      expect.objectContaining({
+        lootId: pickup.id,
+        collectorId: actor.id,
+        kind: 'survey_probe',
+        position: { x: 0, y: 0 },
+      })
+    );
+  } finally {
+    broadcaster.stopPeriodicBroadcast();
+  }
 });

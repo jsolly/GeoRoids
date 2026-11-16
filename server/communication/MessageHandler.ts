@@ -589,7 +589,7 @@ export class MessageHandler {
     if (!socketPlayer || socketPlayer.id !== command.id) {
       return;
     }
-    const issue = this.gameEngine.buyStoreItem(command.id, command.offerId);
+    const issue = this.gameEngine.civicTransactions.buy(command.id, command.offerId);
     const pilot = this.gameEngine.getPlayer(command.id);
     this.broadcaster.sendToWebSocket(ws, {
       type: 'townStoreResult',
@@ -597,7 +597,7 @@ export class MessageHandler {
         issue != null && issue !== ''
           ? { message: issue }
           : {
-              message: this.gameEngine.townStoreNotice(command.offerId),
+              message: this.gameEngine.civicTransactions.storeNotice(command.offerId),
               score: pilot?.score,
               purchases: pilot?.purchases,
             },
@@ -632,14 +632,14 @@ export class MessageHandler {
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const offeringBuild =
       socketPlayer.kitId === 'scout' &&
-      onDarkFurnaceFootprint(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
+      onDarkFurnaceFootprint(socketPlayer.position, (id) => this.gameEngine.furnaces.isLit(id));
     const activated = this.gameEngine.useAbility(playerId);
     if (offeringBuild) {
       this.broadcaster.sendToWebSocket(ws, {
         type: 'furnaceBuildResult',
         data: activated
-          ? this.gameEngine.furnaceBuildNotice()
-          : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
+          ? this.gameEngine.civicTransactions.buildNotice()
+          : (this.gameEngine.civicTransactions.buildIssue(playerId) ?? 'Furnace builder not ready'),
         timestamp: Date.now(),
       });
     }

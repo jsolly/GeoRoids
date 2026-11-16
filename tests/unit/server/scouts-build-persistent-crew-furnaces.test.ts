@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
@@ -112,7 +112,7 @@ test('a Scout builds only the furnace foundation they are standing in and pays w
   );
   bystander.score = furnace.cost * 2;
   expect(engine.useAbility(scout.actor.id)).toBe(false);
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(
+  expect(engine.civicTransactions.buildIssue(scout.actor.id)).toBe(
     `You need ${furnace.cost} more points to build this furnace`
   );
   expect(scout.actor.score).toBe(0);
@@ -125,15 +125,15 @@ test('a Scout builds only the furnace foundation they are standing in and pays w
   };
   expect(engine.useAbility(scout.actor.id)).toBe(true);
   expect(engine.getGameState().civicModules).toEqual([]);
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.STAND);
+  expect(engine.civicTransactions.buildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.STAND);
   expect(scout.actor.score).toBe(furnace.cost);
   scout.actor.abilityCooldownFrames = 0;
   scout.actor.position = { ...child.position };
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(`Light ${furnace.name} first`);
+  expect(engine.civicTransactions.buildIssue(scout.actor.id)).toBe(`Light ${furnace.name} first`);
   scout.actor.position = { ...furnace.position };
   expect(engine.useAbility(scout.actor.id)).toBe(true);
   const builtName = civicModuleName('scout', furnace.name);
-  expect(engine.furnaceBuildNotice()).toBe(`${builtName} is burning`);
+  expect(engine.civicTransactions.buildNotice()).toBe(`${builtName} is burning`);
   expect(scout.actor.score).toBe(0);
   expect(bystander.score).toBe(furnace.cost * 2);
   expect(engine.getGameState().civicModules).toEqual([
@@ -148,7 +148,7 @@ test('a Scout builds only the furnace foundation they are standing in and pays w
   expect(scout.actor.abilityCooldownFrames).toBe(0);
   scout.actor.abilityCooldownFrames = 0;
   // Lit lot: E returns to Mineral Scan; Build is no longer offered here.
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
+  expect(engine.civicTransactions.buildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
   expect(engine.useAbility(scout.actor.id)).toBe(true);
   expect(scout.actor.abilityActiveFrames).toBeGreaterThan(0);
   expect(scout.actor.score).toBe(0);
@@ -161,7 +161,7 @@ test('a dead ship and the wrong kit spend neither score nor a furnace', () => {
   actor.score = furnace.cost;
   actor.health = 0;
   expect(engine.useAbility(actor.id)).toBe(false);
-  expect(engine.furnaceBuildIssue(actor.id)).toBe(FURNACE_BUILD.ISSUE.READY);
+  expect(engine.civicTransactions.buildIssue(actor.id)).toBe(FURNACE_BUILD.ISSUE.READY);
   const hauler = engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), undefined, 'hauler');
   hauler.position = { ...furnace.position };
   hauler.score = furnace.cost;
@@ -209,7 +209,9 @@ test('a named furnace and the builder leftover score survive a SQLite restart', 
       );
       resumed.actor.position = { ...furnace.position };
       resumed.actor.abilityCooldownFrames = 0;
-      expect(restarted.furnaceBuildIssue(resumed.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
+      expect(restarted.civicTransactions.buildIssue(resumed.actor.id)).toBe(
+        FURNACE_BUILD.ISSUE.LIT
+      );
       expect(restarted.useAbility(resumed.actor.id)).toBe(true);
       expect(resumed.actor.score).toBe(leftover);
     } finally {
@@ -261,7 +263,7 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken m
       expect(loaded.loadWorld()?.civicModules).toEqual([]);
       const engine = new GameEngine(42, undefined, new InlineWorldPersistence(loaded));
       expect(engine.getGameState().civicModules).toEqual([]);
-      expect(engine.furnaceBuildNotice()).toBe('');
+      expect(engine.civicTransactions.buildNotice()).toBe('');
       engine.checkpointWorld();
       const rewrittenDb = new DatabaseSync(path);
       const rewritten = rewrittenDb.prepare('SELECT json FROM world WHERE id=1').get() as {
@@ -336,6 +338,7 @@ test('a raised furnace toasts the Scout with the lot name', () => {
   const scout = addScout(engine, 'scout', socket);
   scout.actor.score = furnace.cost;
   const broadcaster = new GameStateBroadcaster(engine);
+  broadcaster.negotiateSnapshot(socket);
   const handler = new MessageHandler(engine, broadcaster);
   handler.handleMessage({ type: 'useAbility', id: scout.actor.id }, socket);
   expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(
@@ -343,6 +346,11 @@ test('a raised furnace toasts the Scout with the lot name', () => {
   );
   expect(engine.getGameState().civicModules).toEqual([
     { id: furnace.id, builderName: 'scout', builderId: 'scout' },
+  ]);
+  expect(socket.inbox.map((message) => message.type)).toEqual([
+    'furnaceBuildResult',
+    'abilityUsed',
+    'snapshot',
   ]);
   broadcaster.stopPeriodicBroadcast();
 });
@@ -406,7 +414,7 @@ test('construction keeps nest guards attached to their home', () => {
   actor.abilityCooldownFrames = 300;
   engine.advanceCombatFrame();
   const health = actor.health;
-  expect(engine.furnaceBuildIssue(actor.id)).toBeUndefined();
+  expect(engine.civicTransactions.buildIssue(actor.id)).toBeUndefined();
   expect(engine.useAbility(actor.id)).toBe(true);
   engine.advanceCombatFrame();
   const manager: TerrainSpiderManager = Reflect.get(engine, 'spiderManager');
@@ -440,3 +448,68 @@ test('construction keeps nest guards attached to their home', () => {
     );
   }
 });
+
+test('the last successful furnace notice survives a failed build, pauses and world resets', () => {
+  const engine = new GameEngine(42);
+  const { actor } = addScout(engine);
+  actor.score = furnace.cost;
+  expect(engine.useAbility(actor.id)).toBe(true);
+  const notice = `${civicModuleName('scout', furnace.name)} is burning`;
+  expect(engine.civicTransactions.buildNotice()).toBe(notice);
+  actor.position = { ...child.position };
+  expect(engine.useAbility(actor.id)).toBe(false);
+  expect(engine.civicTransactions.buildIssue(actor.id)).toBe(
+    `You need ${child.cost} more points to build this furnace`
+  );
+  expect(engine.civicTransactions.buildNotice()).toBe(notice);
+  engine.prepareDiagnosticWorld('traversal');
+  expect(engine.getGameState().civicModules).toEqual([]);
+  expect(engine.civicTransactions.buildNotice()).toBe(notice);
+  engine.removePlayer(actor.id);
+  expect(engine.isGamePaused()).toBe(true);
+  expect(engine.civicTransactions.buildNotice()).toBe(notice);
+  engine.resetForTesting();
+  expect(engine.getGameState().civicModules).toEqual([]);
+  expect(engine.civicTransactions.buildNotice()).toBe(notice);
+  const replacement = addScout(engine, 'replacement');
+  replacement.actor.score = furnace.cost;
+  expect(engine.useAbility(replacement.actor.id)).toBe(true);
+  expect(engine.civicTransactions.buildNotice()).toBe(
+    `${civicModuleName('replacement', furnace.name)} is burning`
+  );
+});
+
+test.each(['capture', 'light'])(
+  'a failed furnace %s preserves the original partial transaction and prior notice',
+  (boundary) => {
+    const engine = new GameEngine(42);
+    const { actor } = addScout(engine);
+    actor.score = furnace.cost;
+    expect(engine.useAbility(actor.id)).toBe(true);
+    const notice = engine.civicTransactions.buildNotice();
+    actor.position = { ...child.position };
+    actor.score = child.cost + 37;
+    engine.pilotLedger.capture(actor.id);
+    const failure = new Error('Furnace boundary failed');
+    const inject = () => {
+      throw failure;
+    };
+    const operation =
+      boundary === 'capture'
+        ? vi.spyOn(engine.pilotLedger, 'capture').mockImplementation(inject)
+        : vi.spyOn(engine.furnaces, 'light').mockImplementation(inject);
+    try {
+      expect(() => engine.useAbility(actor.id)).toThrow(failure);
+      expect(actor.score).toBe(37);
+      expect(engine.getGameState().civicModules).toEqual([
+        { id: furnace.id, builderName: 'scout', builderId: actor.id },
+      ]);
+      expect(engine.pilotLedger.saved(actor.id)?.score).toBe(
+        boundary === 'capture' ? child.cost + 37 : 37
+      );
+      expect(engine.civicTransactions.buildNotice()).toBe(notice);
+    } finally {
+      operation.mockRestore();
+    }
+  }
+);

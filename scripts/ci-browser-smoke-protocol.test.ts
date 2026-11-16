@@ -478,7 +478,20 @@ test('the workflow passes its fixed candidate root while keeping the verificatio
   const workflow = record(
     parse(readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8'))
   );
+  const triggers = record(workflow['on']);
+  assert.deepEqual(triggers['schedule'], [{ cron: '23 10 * * *' }]);
+  assert.deepEqual(
+    Object.keys(triggers).sort((a, b) => a.localeCompare(b)),
+    ['schedule', 'workflow_dispatch']
+  );
   const browser = record(record(workflow['jobs'])['browser']);
+  assert.equal(
+    browser['if'],
+    "github.repository == 'jsolly/GeoRoids' && github.ref == 'refs/heads/main'"
+  );
+  const environment = record(browser['env']);
+  assert.equal(environment['REQUESTED_SHA'], `\${{ inputs.commit_sha || github.sha }}`);
+  assert.equal(environment['BROWSER_SMOKE_FOCUS'], `\${{ inputs.focus || 'basic' }}`);
   assert(Array.isArray(browser['steps']));
   const steps = browser['steps'].map(record);
   const checkout = steps.find(
@@ -488,6 +501,9 @@ test('the workflow passes its fixed candidate root while keeping the verificatio
   const ref = record(checkout['with'])['ref'];
   assert(typeof ref === 'string');
   assert.match(ref, /^\$\{\{ github\.workflow_sha \}\}$/u);
+  const candidate = steps.find((step) => step['name'] === 'Check out the exact candidate');
+  assert(candidate);
+  assert.equal(record(candidate['with'])['ref'], environment['REQUESTED_SHA']);
   const run = steps.find((step) => step['name'] === 'Run the local browser smoke');
   assert(run && typeof run['run'] === 'string');
   assert.match(

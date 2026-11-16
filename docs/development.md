@@ -145,7 +145,7 @@ personal review skills may help, but they are not prerequisites for this flow.
 
 A non-draft pull request from this repository whose author login is exactly
 `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arms GitHub squash auto-merge. `pull_request` events report Cursor as `cursor[bot]`; `gh pr view` reports `app/cursor`. Convert the pull request
-to a draft, or run `gh pr merge --disable-auto`, to hold it. The 30-minute sweep
+to a draft, or run `gh pr merge --disable-auto`, to hold it. The daily sweep at 09:00, 17:00 and 22:00 UTC
 re-arms that auto-merge and squash-merges with `--match-head-commit` once `ci`
 and `security` have succeeded on the current head. The workflow authenticates
 with `AUTO_MERGE_TOKEN` and fails closed when that secret is absent. Those merges

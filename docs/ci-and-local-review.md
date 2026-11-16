@@ -58,7 +58,7 @@ from exact-tree lane proofs. CI checkouts use the existing canonical v7.0.1 pin.
 The lane secrets scans remain, and branch protection is unchanged.
 Non-draft pull requests from `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arm GitHub squash
 auto-merge. Hold one by converting it to a draft or by running
-`gh pr merge --disable-auto`. The 30-minute sweep squash-merges the current
+`gh pr merge --disable-auto`. The daily sweep at 09:00, 17:00 and 22:00 UTC squash-merges the current
 head only after both `ci` and `security` have succeeded.
 
 ## Local review

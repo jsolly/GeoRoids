@@ -202,8 +202,8 @@ describe('spiders carry Scout probes', () => {
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.ownerId
     ).toBe(scout.id);
     const now = engine.getServerTime();
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
-    engine.advanceLasersAndResolveHits(now + 1);
+    engine.laserCombat.spawn('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
+    engine.laserCombat.advance(now + 1);
     expect(
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.health
     ).toBe(15);

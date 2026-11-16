@@ -164,10 +164,10 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     const scout = world.join('Scout', { x: 150, y: 0 });
     world.engine.useAbility(scout.id);
     expect(rock).toEqual(original);
-    const laser = world.engine.spawnLaser(bob.id, { x: 100, y: 0 }, { x: 8, y: 0 });
+    const laser = world.engine.laserCombat.spawn(bob.id, { x: 100, y: 0 }, { x: 8, y: 0 });
     expect(laser).toBeTruthy();
     for (let frame = 0; frame < 15; frame++) {
-      expect(world.engine.advanceLasersAndResolveHits()).toEqual([]);
+      expect(world.engine.laserCombat.advance()).toEqual([]);
     }
     expect(laser?.hasExploded).toBe(false);
     expect(laser?.position.x).toBeGreaterThan(rock.position.x + rock.size);

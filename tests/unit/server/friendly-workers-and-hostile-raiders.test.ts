@@ -197,27 +197,27 @@ test('opposing direct shots damage hulls while crew shots pass through friendlie
   pilot.overlayHold = false;
   worker.position = { x: 5200, y: 4000 };
   raider.position = { x: 5100, y: 4000 };
-  const bolt = engine.spawnLaser(
+  const bolt = engine.laserCombat.spawn(
     pilot.id,
     { x: 5080, y: 4000 },
     { x: LASER.SPEED / GAME.FPS, y: 0 }
   );
   assert(bolt);
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.advance();
   expect(raider.health).toBe(raider.maxHealth - DAMAGE.LASER_HIT);
   const health = pilot.health;
-  engine.spawnLaser(raider.id, { x: 5020, y: 4000 }, { x: -LASER.SPEED / GAME.FPS, y: 0 });
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.spawn(raider.id, { x: 5020, y: 4000 }, { x: -LASER.SPEED / GAME.FPS, y: 0 });
+  engine.laserCombat.advance();
   expect(pilot.health).toBe(health - DAMAGE.LASER_HIT);
   // A friendly bolt crosses a worker without consuming itself or removing hull health.
   const workerHealth = worker.health;
-  engine.spawnLaser(pilot.id, { x: 5180, y: 4000 }, { x: LASER.SPEED / GAME.FPS, y: 0 });
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.spawn(pilot.id, { x: 5180, y: 4000 }, { x: LASER.SPEED / GAME.FPS, y: 0 });
+  engine.laserCombat.advance();
   expect(worker.health).toBe(workerHealth);
   pilot.position = { x: 0, y: 0 };
   const protectedHealth = pilot.health;
-  engine.spawnLaser(raider.id, { x: -20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 });
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.spawn(raider.id, { x: -20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 });
+  engine.laserCombat.advance();
   expect(pilot.health).toBe(protectedHealth);
 });
 
@@ -235,10 +235,10 @@ test('a raider aims and fires through the real authoritative shot path', () => {
   engine.chargedWeapons.request(raider.id, 'start');
   frame(AI_SHIPS.shotIntervalFrames + 20);
   expect(pilot.health).toBe(pilot.maxHealth);
-  expect(engine.drainShotSounds()).toEqual([]);
+  expect(engine.laserCombat.drainShotSounds()).toEqual([]);
   engine.chargedWeapons.request(raider.id, 'cancel');
   frame(AI_SHIPS.shotIntervalFrames + Math.ceil(300 / (LASER.SPEED / GAME.FPS)) + 20);
-  expect(engine.drainShotSounds().map((shot) => shot.ownerId)).toContain(raider.id);
+  expect(engine.laserCombat.drainShotSounds().map((shot) => shot.ownerId)).toContain(raider.id);
   expect(pilot.health).toBeLessThan(pilot.maxHealth);
 });
 

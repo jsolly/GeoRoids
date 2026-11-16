@@ -242,7 +242,7 @@ describe('current pilots share the production handler and broadcaster', () => {
         asteroids,
         loot: nearby(state.loot),
         satellitePickups: nearby(state.satellitePickups),
-        playerProjectiles: nearby(engine.getPlayerProjectiles()),
+        playerProjectiles: nearby(engine.laserCombat.projectiles()),
       }).state;
     };
     const a = socket();
@@ -622,7 +622,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       asteroids: 80,
       satellitePickups: 6,
     });
-    expect(engine.getPlayerProjectiles()).toHaveLength(0);
+    expect(engine.laserCombat.projectiles()).toHaveLength(0);
     const firstRocks = normalizeFixtureAsteroids(engine.getAllAsteroids());
     engine.prepareDiagnosticWorld('combat');
     expect(normalizeFixtureAsteroids(engine.getAllAsteroids())).toEqual(firstRocks);

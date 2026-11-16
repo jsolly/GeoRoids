@@ -343,7 +343,7 @@ test('a launched Tow Cable pins the queen and real swept laser contact damages h
   engine.parkSatellitePickups();
   const before = engine.getGameState().campaign?.hives.find((h) => h.id === site.id);
   expect(before?.queenHealth).toBe(500);
-  const shot = engine.spawnLaser(
+  const shot = engine.laserCombat.spawn(
     pilot.id,
     { x: site.position.x + 60, y: site.position.y },
     { x: -5, y: 0 }
@@ -351,7 +351,7 @@ test('a launched Tow Cable pins the queen and real swept laser contact damages h
   if (!shot) {
     throw new Error('Shot missing');
   }
-  engine.resolveSpawnedLaserHits(shot.id);
+  engine.laserCombat.resolveSpawned(shot.id);
   expect(engine.getGameState().campaign?.hives.find((h) => h.id === site.id)?.queenHealth).toBe(
     500
   );
@@ -362,7 +362,7 @@ test('a launched Tow Cable pins the queen and real swept laser contact damages h
   expect(engine.getGameState().campaign?.hives.find((h) => h.id === site.id)?.shieldOpen).toBe(
     true
   );
-  const exposed = engine.spawnLaser(
+  const exposed = engine.laserCombat.spawn(
     pilot.id,
     { x: site.position.x + 60, y: site.position.y },
     { x: -5, y: 0 }
@@ -370,7 +370,7 @@ test('a launched Tow Cable pins the queen and real swept laser contact damages h
   if (!exposed) {
     throw new Error('Shot missing');
   }
-  engine.resolveSpawnedLaserHits(exposed.id);
+  engine.laserCombat.resolveSpawned(exposed.id);
   expect(engine.getGameState().campaign?.hives.find((h) => h.id === site.id)?.queenHealth).toBe(
     500 - DAMAGE.LASER_HIT
   );
@@ -426,7 +426,7 @@ test('actual hive state reaches only nearby snapshot recipients and carries shie
   resolveToolFlights(engine);
   expect(pilot.harpoonTargetId).toBe(near.id);
   engine.advanceOneFrame();
-  const shot = engine.spawnLaser(
+  const shot = engine.laserCombat.spawn(
     pilot.id,
     { x: near.position.x + 60, y: near.position.y },
     { x: -5, y: 0 }
@@ -434,7 +434,7 @@ test('actual hive state reaches only nearby snapshot recipients and carries shie
   if (!shot) {
     throw new Error('Missing shot');
   }
-  engine.resolveSpawnedLaserHits(shot.id);
+  engine.laserCombat.resolveSpawned(shot.id);
   broadcaster.broadcastGameState();
   expect(hives(socket, nearDecoder)).toEqual([
     expect.objectContaining({ id: near.id, queenHealth: 500 - DAMAGE.LASER_HIT, shieldOpen: true }),

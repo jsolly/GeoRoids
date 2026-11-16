@@ -352,14 +352,14 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
     phenomenon: { kind: 'reflective', clusterId: 'shared-reflector', energy: 0, maxEnergy: 2 },
   };
   engine.asteroidLifecycle.insert(target);
-  const firstShot = engine.spawnLaser(first.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+  const firstShot = engine.laserCombat.spawn(first.id, { x: -50, y: 0 }, { x: 40, y: 0 });
   assert(firstShot);
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.advance();
   expect(firstShot.bounces).toBe(1);
   expect(target.miningContributors).toEqual([first.id]);
   engine.removePlayer(first.id);
-  assert(engine.spawnLaser(second.id, { x: -50, y: 0 }, { x: 40, y: 0 }));
-  engine.advanceLasersAndResolveHits();
+  assert(engine.laserCombat.spawn(second.id, { x: -50, y: 0 }, { x: 40, y: 0 }));
+  engine.laserCombat.advance();
 
   expect(engine.getAsteroid(target.id)).toBeUndefined();
   expect(second.score).toBe(0);

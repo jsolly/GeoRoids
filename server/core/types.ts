@@ -12,13 +12,16 @@ import type { AsteroidLifecycle } from './AsteroidLifecycle';
 import type { AsteroidHitOutcome, AsteroidManager } from './AsteroidManager';
 import type { AsteroidMining } from './AsteroidMining';
 import type { BeltCrawlerManager } from './BeltCrawlerManager';
+import type { ChargedWeaponManager } from './ChargedWeaponManager';
 import type { CollisionAuthority } from './CollisionAuthority';
+import type { ContactCombat } from './ContactCombat';
 import type { CooperativeSupplyRestoration } from './CooperativeSupplyRestoration';
 import type { CrewRescueManager } from './CrewRescueManager';
 import type { EntityManager, GameEntity } from './EntityManager';
 import type { FurnaceDeliveryManager } from './FurnaceDeliveryManager';
 import type { GlowtoyManager } from './GlowtoyManager';
 import type { HiveEncounters } from './HiveEncounters';
+import type { ServerLaser } from './LaserCombat';
 import type { LootManager } from './LootManager';
 import type { PilotLedger } from './PilotLedger';
 import type { PlayerMotionService } from './PlayerMotionService';
@@ -258,4 +261,25 @@ export type SpiderFieldInputs = {
     'spawnNestPickup' | 'getPickup' | 'getNestResources'
   >;
   readonly glowtoys: Pick<GlowtoyManager, 'lightSources'>;
+};
+
+export type LaserCombatInputs = {
+  readonly actors: Pick<EntityManager, 'getEntity' | 'getAllEntities'>;
+  readonly charged: Pick<ChargedWeaponManager<ServerLaser>, 'isCharging'>;
+  readonly motion: Pick<PlayerMotionService, 'legalSpeed'>;
+  readonly rocks: Pick<AsteroidManager, 'spatialIndex' | 'getAsteroid' | 'recordMiningHit'>;
+  readonly mining: Pick<AsteroidMining, 'damageFor' | 'hit' | 'apply'>;
+  readonly probes: Pick<SurveyProbeManager, 'targetsIn' | 'damage'>;
+  readonly terrain: Pick<
+    TerrainSpiderManager,
+    'getBodies' | 'findLaserHit' | 'getBody' | 'resolveLaserHit'
+  >;
+  readonly crawlers: Pick<BeltCrawlerManager, 'findLaserHit' | 'getBody' | 'resolveLaserHit'>;
+  readonly hives: Pick<HiveEncounters, 'targetsNear' | 'hit'>;
+  readonly pickups: Pick<SatellitePickupManager, 'getAllPickups' | 'damage'>;
+  readonly loot: Pick<LootManager, 'queryCircle'>;
+  readonly combat: Pick<ContactCombat, 'directedHit' | 'emit'>;
+  readonly explodeLoot: (owner: string, id: string) => { success: boolean; origin?: Position };
+  readonly now: () => number;
+  readonly frame: () => number;
 };

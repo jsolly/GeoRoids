@@ -162,7 +162,9 @@ export class MessageHandler {
           if (pilot?.id === command.id) {
             const laser = this.gameEngine.chargedWeapons.request(pilot.id, command.action);
             if (laser) {
-              this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
+              this.broadcastAppliedAsteroidHits(
+                this.gameEngine.laserCombat.resolveSpawned(laser.id)
+              );
             }
           }
           break;
@@ -461,7 +463,7 @@ export class MessageHandler {
       return;
     }
 
-    const laser = this.gameEngine.spawnPlayerLaser(
+    const laser = this.gameEngine.laserCombat.spawnPlayer(
       shooter.id,
       laserStart,
       laserDirection,
@@ -483,7 +485,7 @@ export class MessageHandler {
       return;
     }
 
-    this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
+    this.broadcastAppliedAsteroidHits(this.gameEngine.laserCombat.resolveSpawned(laser.id));
   }
 
   /** Returns true when the hit ended the target's life: destroyed outright, or

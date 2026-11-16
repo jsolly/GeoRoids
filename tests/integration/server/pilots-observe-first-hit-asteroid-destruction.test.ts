@@ -142,11 +142,11 @@ async function sendCurrentShot(
     },
   });
   await client.barrier();
-  for (let frame = 0; frame < 200 && server.gameEngine.getServerLasers().length > 0; frame++) {
+  for (let frame = 0; frame < 200 && server.gameEngine.laserCombat.shots().length > 0; frame++) {
     server.gameEngine.advanceOneFrame();
   }
   await client.barrier();
-  expect(server.gameEngine.getServerLasers()).toHaveLength(0);
+  expect(server.gameEngine.laserCombat.shots()).toHaveLength(0);
 }
 
 function countType(client: WireClient, type: string): number {

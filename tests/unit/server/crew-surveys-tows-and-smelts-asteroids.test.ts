@@ -384,9 +384,9 @@ test('player hulls ignore crew lasers and ship overlap while asteroid impacts st
   const players = [actor('scout'), hauler, actor('third')];
   const health = players.map((player) => player.health);
   for (const shooter of players) {
-    engine.spawnLaser(shooter.id, { x: -100, y: 0 }, { x: 300, y: 0 });
+    engine.laserCombat.spawn(shooter.id, { x: -100, y: 0 }, { x: 300, y: 0 });
   }
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.advance();
   engine.contactCombat.advance();
   expect(players.map((player) => player.health)).toEqual(health);
   expect(engine.shipDamage.apply(hauler.id, 'scout', 100).applied).toBe(false);

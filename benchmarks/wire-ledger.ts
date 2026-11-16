@@ -782,7 +782,7 @@ export async function runWireLedgerSample(
             }
             if (tick % 20 === 0) {
               work.shotsOffered++;
-              const shot = engine.spawnPlayerLaser(
+              const shot = engine.laserCombat.spawnPlayer(
                 actor.id,
                 { ...actor.position },
                 {
@@ -797,7 +797,7 @@ export async function runWireLedgerSample(
               }
               core
                 .getMessageHandler()
-                .broadcastAppliedAsteroidHits(engine.resolveSpawnedLaserHits(shot.id));
+                .broadcastAppliedAsteroidHits(engine.laserCombat.resolveSpawned(shot.id));
             }
           }
         }

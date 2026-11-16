@@ -129,7 +129,9 @@
     "shared/chargedWeapon.ts",
     "src/audio/routeMusic.ts",
     "tests/unit/input/desktop-pilots-charge-and-release-a-beam.test.ts",
-    "shared/contourBridge.ts"
+    "shared/contourBridge.ts",
+    "server/core/LaserCombat.ts",
+    "tests/unit/server/pilots-can-fire-only-from-owned-muzzles.test.ts"
   ],
   "hauler": [
     "server/core/ToolFlightManager.ts",
@@ -206,7 +208,8 @@
     "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts",
     "server/core/SpiderField.ts",
     "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts",
-    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts"
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts",
+    "server/core/LaserCombat.ts"
   ],
   "asteroids": [
     "server/core/ToolFlightManager.ts",
@@ -263,7 +266,10 @@
     "tests/unit/server/campaign-spiders-share-reserved-population.test.ts",
     "server/core/SpiderField.ts",
     "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts",
-    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts"
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts",
+    "server/core/LaserCombat.ts",
+    "tests/unit/server/reflected-shots-carry-energy-and-leave-salvage.test.ts",
+    "tests/unit/server/laser-asteroid-authority.test.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",
@@ -287,7 +293,8 @@
     "shared/combat.ts",
     "tests/unit/entities/menu-stops-flight-and-protects-the-hull.test.ts",
     "src/audio/satelliteOrbitSound.ts",
-    "src/entities/satellitePickup/SatellitePickup.ts"
+    "src/entities/satellitePickup/SatellitePickup.ts",
+    "server/core/LaserCombat.ts"
   ],
   "terrain": [
     "server/core/SurveyProbeManager.ts",
@@ -399,7 +406,8 @@
     "server/core/SpiderPopulationBudget.ts",
     "server/core/SpiderField.ts",
     "tests/unit/server/spider-field-keeps-frame-and-attack-lifetimes.test.ts",
-    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts"
+    "tests/unit/server/resource-nests-survive-the-last-pilot-disconnecting.test.ts",
+    "server/core/LaserCombat.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -478,7 +486,13 @@
     "shared/aiShips.ts",
     "server/core/BotFleet.ts",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts",
-    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts"
+    "tests/unit/server/chipped-deposits-report-their-hit-without-a-shatter.test.ts",
+    "server/core/LaserCombat.ts",
+    "tests/unit/server/pilots-can-fire-only-from-owned-muzzles.test.ts",
+    "tests/unit/server/nearby-pilots-hear-each-new-shot-once.test.ts",
+    "tests/unit/server/reflected-shots-carry-energy-and-leave-salvage.test.ts",
+    "tests/unit/server/laser-asteroid-authority.test.ts",
+    "tests/unit/server/destroy-drop-loot.test.ts"
   ],
   "hud-network": [
     "server/core/SurveyProbeManager.ts",
@@ -630,7 +644,9 @@
     "src/diagnostics/debugReportStorage.ts",
     "scripts/build-vercel-output.mjs",
     "server/createServer.ts",
-    "server/staticClient.ts"
+    "server/staticClient.ts",
+    "server/core/LaserCombat.ts",
+    "tests/unit/server/nearby-pilots-hear-each-new-shot-once.test.ts"
   ],
   "scout": [
     "server/core/ToolFlightManager.ts",
@@ -694,7 +710,8 @@
     "server/world/AsteroidSpatialIndex.ts",
     "tests/unit/entities/launched-tools-hit-or-return.test.ts",
     "src/ui/furnaceTravelPrompt.ts",
-    "tests/unit/ui/town-store-opens-beside-town-square.test.ts"
+    "tests/unit/ui/town-store-opens-beside-town-square.test.ts",
+    "server/core/LaserCombat.ts"
   ],
   "loot-growth": [
     "server/core/CargoOffloadManager.ts",
@@ -737,7 +754,9 @@
     "tests/unit/rendering/a-cargo-deposit-finishes-even-when-the-pilot-spends-their-bank.test.ts",
     "tests/unit/rendering/ship-cargo-bays-fill-with-crates-as-the-hold-fills.test.ts",
     "shared/navigationSalvage.ts",
-    "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts"
+    "tests/unit/server/material-salvage-grants-bounded-navigation-and-repairs.test.ts",
+    "server/core/LaserCombat.ts",
+    "tests/unit/server/destroy-drop-loot.test.ts"
   ],
   "teamwork": [
     "server/core/ToolFlightManager.ts",
@@ -845,6 +864,7 @@
     "server/core/BotFleet.ts",
     "tests/unit/server/friendly-workers-and-hostile-raiders.test.ts",
     "server/core/SpiderPopulationBudget.ts",
-    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts"
+    "tests/unit/server/campaign-spiders-share-reserved-population.test.ts",
+    "server/core/LaserCombat.ts"
   ]
 }

@@ -21,7 +21,7 @@ test('a published snapshot omits a death cause the server still stores on the pi
       JSON.stringify(
         new SnapshotEncoder({
           ...engine.getGameState(),
-          playerProjectiles: engine.getPlayerProjectiles(),
+          playerProjectiles: engine.laserCombat.projectiles(),
         }).encode(1)
       )
     ).not.toContain('deathCause');

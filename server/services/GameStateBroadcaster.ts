@@ -22,6 +22,7 @@ import {
 import type { AsteroidData, AsteroidHitEvent, SatellitePickupCollected } from '../../shared-types';
 import type { GameEntity } from '../core/EntityManager';
 import type { GameEngine } from '../core/GameEngine';
+import type { LaserCombat } from '../core/LaserCombat';
 import type { CombatBroadcast } from '../core/types';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 
@@ -165,7 +166,7 @@ export class GameStateBroadcaster {
       this.broadcastAsteroidDestruction(delivery.asteroidId, { consumedBy: 'furnace' });
       this.broadcastToAll({ type: 'furnaceDelivery', data: delivery, timestamp: Date.now() });
     }
-    for (const data of this.gameEngine.drainShotSounds()) {
+    for (const data of this.gameEngine.laserCombat.drainShotSounds()) {
       this.broadcastToAll(
         { type: 'playerShotFired', data, timestamp: Date.now() },
         data.charged === true ? undefined : data.ownerId
@@ -192,11 +193,11 @@ export class GameStateBroadcaster {
     const asteroidIndex = this.gameEngine.getAsteroidSpatialIndex();
     const timestamp = Date.now();
 
-    for (const blast of this.gameEngine.drainLootBlasts()) {
+    for (const blast of this.gameEngine.laserCombat.drainLootBlasts()) {
       this.broadcastLootExploded(blast);
     }
     const players = this.gameEngine.getAllPlayers();
-    let playerProjectiles: ReturnType<GameEngine['getPlayerProjectiles']> | undefined;
+    let playerProjectiles: ReturnType<LaserCombat['projectiles']> | undefined;
     for (const player of players) {
       const ws = player.ws;
       if (!ws || (excludeId != null && excludeId !== '' && player.id === excludeId)) {
@@ -221,7 +222,7 @@ export class GameStateBroadcaster {
         // Prepare common rows only once, after a recipient can accept this broadcast.
         capture ??= new SnapshotBroadcastCapture('live');
         gameState ??= this.gameEngine.getBroadcastState();
-        playerProjectiles ??= this.gameEngine.getPlayerProjectiles();
+        playerProjectiles ??= this.gameEngine.laserCombat.projectiles();
         const scanning = isActiveScanner(player);
         const reach = asteroidReach(scanning);
         const asteroids = nearbyAsteroidRows(

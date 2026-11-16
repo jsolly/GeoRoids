@@ -97,15 +97,15 @@ test('an external pilot shot ricochets through the seeded cluster in GameEngine 
   }
 
   const lane = externalLane(center);
-  const shot = engine.spawnLaser('pilot', lane.start, lane.velocity);
+  const shot = engine.laserCombat.spawn('pilot', lane.start, lane.velocity);
   assert.ok(shot, 'external laser');
   for (let frame = 0; frame < 180; frame += 1) {
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
   }
 
   expect(shot.bounces).toBeGreaterThanOrEqual(3);
   expect(shot.energy).toBeCloseTo(3.375);
-  expect(engine.getServerLasers()).toContain(shot);
+  expect(engine.laserCombat.shots()).toContain(shot);
   expect(
     cluster.filter((asteroid) => {
       const current = engine.getAsteroid(asteroid.id);
@@ -222,7 +222,7 @@ test.each([false, true])(
         engine.advanceOneFrame(now);
       }
       expect(rows.filter((row) => row.phenomenon)).toHaveLength(0);
-      const shot = engine.spawnLaser('pilot', { x: 960, y: 0 }, { x: 80, y: 0 });
+      const shot = engine.laserCombat.spawn('pilot', { x: 960, y: 0 }, { x: 80, y: 0 });
       assert.ok(shot);
       if (stale) {
         pilot.lastUpdate = now - 30_001;
@@ -234,7 +234,7 @@ test.each([false, true])(
       expect(rows.filter((row) => row.phenomenon?.kind === 'reflective')).toHaveLength(6);
       expect(shot.hasExploded).toBe(false);
       expect(shot.age).toBe(stale ? 0 : 1);
-      expect(engine.getServerLasers().includes(shot)).toBe(!stale);
+      expect(engine.laserCombat.shots().includes(shot)).toBe(!stale);
     } finally {
       engine.stopGameLoop();
     }

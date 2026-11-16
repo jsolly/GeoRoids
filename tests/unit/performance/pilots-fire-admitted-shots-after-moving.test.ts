@@ -63,7 +63,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     expect(actor.position.x).toBeCloseTo(Math.cos(0.4));
     expect(actor.position.y).toBeCloseTo(Math.sin(0.4));
     expect(actor.playerMotion).toMatchObject({ epoch: 1, ack: 1, mode: 'free' });
-    const shots = server.gameEngine.getServerLasers();
+    const shots = server.gameEngine.laserCombat.shots();
     expect(shots).toHaveLength(1);
     const shot = shots[0];
     assert(shot);

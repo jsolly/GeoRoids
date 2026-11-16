@@ -44,7 +44,7 @@ test('one active frame cancels a held charge before an overlay is closed again',
   engine.advanceOneFrame();
   pilot.overlayHold = false;
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
-  expect(engine.getServerLasers()).toHaveLength(0);
+  expect(engine.laserCombat.shots()).toHaveLength(0);
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(CHARGED_WEAPON.minimumFrames);
   expect(engine.chargedWeapons.request(pilot.id, 'release')?.charged).toBe(true);
@@ -72,7 +72,7 @@ test('a charge is cancelled before a furnace arrival clears its transit hold in 
   expect(pilot.furnaceTransit).toBeNull();
   expect(pilot.overlayHold).toBe(false);
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
-  expect(engine.getServerLasers()).toHaveLength(0);
+  expect(engine.laserCombat.shots()).toHaveLength(0);
 });
 
 test('rejected charged release obeys ordinary firing budget without consuming its charge cooldown', () => {
@@ -80,12 +80,12 @@ test('rejected charged release obeys ordinary firing budget without consuming it
   const origin = { x: 20, y: 0 };
   const velocity = { x: LASER.SPEED / GAME.FPS, y: 0 };
   for (let i = 0; i < SHIP.MAX_LASERS; i++) {
-    expect(engine.spawnPlayerLaser(pilot.id, origin, velocity)).not.toBeNull();
+    expect(engine.laserCombat.spawnPlayer(pilot.id, origin, velocity)).not.toBeNull();
   }
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(CHARGED_WEAPON.minimumFrames);
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
-  expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS);
+  expect(engine.laserCombat.shots()).toHaveLength(SHIP.MAX_LASERS);
 
   elapse(getShipKit(pilot.kitId).shotCooldown);
   engine.chargedWeapons.request(pilot.id, 'start');
@@ -93,7 +93,7 @@ test('rejected charged release obeys ordinary firing budget without consuming it
   const accepted = engine.chargedWeapons.request(pilot.id, 'release');
   expect(accepted?.charged).toBe(true);
   expect(accepted?.ownerId).toBe(pilot.id);
-  expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS + 1);
+  expect(engine.laserCombat.shots()).toHaveLength(SHIP.MAX_LASERS + 1);
 });
 
 test('diagnostic world arrangement preserves a live charge while a full reset admits a fresh life', () => {
@@ -133,7 +133,7 @@ test('a charge abandoned during transport loss cannot block the resumed pilot fr
     engine.getSnapshotState().entities.find((row) => row.id === pilot.id)?.weaponChargeFrames
   ).toBe(0);
   expect(
-    engine.spawnPlayerLaser(pilot.id, { x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 })
+    engine.laserCombat.spawnPlayer(pilot.id, { x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 })
   ).not.toBeNull();
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
 });
@@ -163,7 +163,7 @@ test('a replacement socket cancels abandoned charge while repeated joins on the 
     engine.getSnapshotState().entities.find((row) => row.id === pilot.id)?.weaponChargeFrames
   ).toBe(0);
   expect(
-    engine.spawnPlayerLaser(pilot.id, { x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 })
+    engine.laserCombat.spawnPlayer(pilot.id, { x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 })
   ).not.toBeNull();
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
 });
@@ -188,7 +188,7 @@ test('charge releases one bounded stronger projectile using elapsed server frame
   const shot = engine.chargedWeapons.request(pilot.id, 'release');
   expect(shot?.energy).toBe(CHARGED_WEAPON.maximumEnergy);
   expect(shot?.miningDamage).toBe(100);
-  expect(engine.getPlayerProjectiles()[0]?.energy).toBe(4);
+  expect(engine.laserCombat.projectiles()[0]?.energy).toBe(4);
   expect(engine.chargedWeapons.request(pilot.id, 'release')).toBeNull();
   engine.chargedWeapons.request(pilot.id, 'start');
   advance(90);
@@ -232,15 +232,15 @@ test('wire clients cannot forge charge time or act for a different socket owner'
   send('stranger', 'start');
   advance(90);
   send(pilot.id, 'release');
-  expect(engine.getServerLasers()).toHaveLength(0);
+  expect(engine.laserCombat.shots()).toHaveLength(0);
   send(pilot.id, 'start');
   send(pilot.id, 'release');
-  expect(engine.getServerLasers()).toHaveLength(0);
+  expect(engine.laserCombat.shots()).toHaveLength(0);
   send(pilot.id, 'start');
   advance(90);
   send(pilot.id, 'release');
-  expect(engine.getServerLasers()).toHaveLength(1);
-  expect(engine.getServerLasers()[0]?.energy).toBe(4);
+  expect(engine.laserCombat.shots()).toHaveLength(1);
+  expect(engine.laserCombat.shots()[0]?.energy).toBe(4);
 });
 
 test('a full beam applies exactly four ordinary mining hits of damage once to a durable deposit', () => {
@@ -268,7 +268,7 @@ test('a full beam applies exactly four ordinary mining hits of damage once to a 
   const shot = engine.chargedWeapons.request(pilot.id, 'release');
   expect(shot).not.toBeNull();
   for (let i = 0; i < 20; i++) {
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
   }
   expect(engine.getAsteroid('durable-target')?.health).toBe(400);
 });

@@ -598,7 +598,7 @@ describe('server-authoritative combat', () => {
     expect(engine.playerMotion.register(actor, socket, now).ok).toBe(true);
     const start = { x: -126.73821133054508, y: -103.1050782968309 };
     const velocity = { x: 2.322998686897575, y: -4.559141627179853 };
-    expect(engine.spawnPlayerLaser(actor.id, start, velocity, now + 92)).toBeNull();
+    expect(engine.laserCombat.spawnPlayer(actor.id, start, velocity, now + 92)).toBeNull();
     expect(
       engine.playerMotion.acceptFreePose(
         socket,
@@ -614,9 +614,11 @@ describe('server-authoritative combat', () => {
         now + 92
       ).ok
     ).toBe(true);
-    expect(engine.spawnPlayerLaser(actor.id, start, velocity, now + 92)).not.toBeNull();
-    expect(engine.spawnPlayerLaser(actor.id, start, { x: 100, y: 0 }, now + 92)).toBeNull();
-    expect(engine.spawnPlayerLaser(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)).toBeNull();
+    expect(engine.laserCombat.spawnPlayer(actor.id, start, velocity, now + 92)).not.toBeNull();
+    expect(engine.laserCombat.spawnPlayer(actor.id, start, { x: 100, y: 0 }, now + 92)).toBeNull();
+    expect(
+      engine.laserCombat.spawnPlayer(actor.id, { x: 1000, y: 1000 }, velocity, now + 92)
+    ).toBeNull();
   });
 
   test('a reported pose that overlaps the wall is read by the server and kills', () => {

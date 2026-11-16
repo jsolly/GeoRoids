@@ -32,7 +32,7 @@ export function recipientSnapshotOracle(engine: GameEngine, id: string): ServerG
         player.position
       ),
     ],
-    playerProjectiles: nearbyWorldRows(engine.getPlayerProjectiles(), player.position),
+    playerProjectiles: nearbyWorldRows(engine.laserCombat.projectiles(), player.position),
   } satisfies ServerGameSnapshot;
   const owned: unknown = JSON.parse(JSON.stringify(source));
   validateSnapshotDto(owned);

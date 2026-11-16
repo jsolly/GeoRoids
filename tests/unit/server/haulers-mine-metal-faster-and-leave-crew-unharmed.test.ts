@@ -55,10 +55,10 @@ test('Hauler breaks metal in two shots while Scout needs three and teammate lase
   hauler.spawnProtectionTimer = 0;
   scout.spawnProtectionTimer = 0;
   const health = scout.health;
-  engine.spawnLaser(hauler.id, { x: 50, y: 0 }, { x: 80, y: 0 });
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.spawn(hauler.id, { x: 50, y: 0 }, { x: 80, y: 0 });
+  engine.laserCombat.advance();
   expect(scout.health).toBe(health);
-  expect(engine.getServerLasers()).toHaveLength(1);
+  expect(engine.laserCombat.shots()).toHaveLength(1);
 });
 
 test.each(['leaves', 'changes to Scout'] as const)(
@@ -77,7 +77,7 @@ test.each(['leaves', 'changes to Scout'] as const)(
     }
     engine.asteroidLifecycle.insert(metal('in-flight-metal'));
     expect(
-      engine.spawnLaser('departing-hauler', { x: 950, y: 1000 }, { x: 80, y: 0 })
+      engine.laserCombat.spawn('departing-hauler', { x: 950, y: 1000 }, { x: 80, y: 0 })
     ).not.toBeNull();
     if (transition === 'leaves') {
       engine.removePlayer('departing-hauler');
@@ -85,7 +85,7 @@ test.each(['leaves', 'changes to Scout'] as const)(
       engine.entityManager.updateEntity('departing-hauler', { kitId: 'scout' });
       expect(engine.getPlayer('departing-hauler')?.kitId).toBe('scout');
     }
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
     expect(engine.getAsteroid('in-flight-metal')?.health).toBe(25);
   }
 );

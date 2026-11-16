@@ -1,10 +1,12 @@
 import { strict as assert } from 'node:assert';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import type { LaserCombat } from '../../../server/core/LaserCombat';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { ROID } from '../../../shared/constants/gameplay';
 import { cargoCapacity } from '../../../shared/economy';
 import { isEquipmentId } from '../../../shared/equipment';
+import { LOOT_BLAST } from '../../../shared/lootBlast';
 import { GROWTH } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -342,4 +344,59 @@ describe('destroying asteroids drops shared shards into game state', () => {
     expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
     expect(engine.getDiagnostics().loot).toBe(0);
   });
+
+  test.each(['broadcast', 'last pilot leaves', 'world reset'] as const)(
+    '%s handles laser-created blast feedback without replaying a detonation',
+    (ending) => {
+      const blastEffect = vi.spyOn(engine, 'handleLootExplode');
+      try {
+        const socket = new RecordingSocket();
+        const shooter = engine.addPlayer('blast-pilot', 'Pilot', socket, { x: 0, y: 0 });
+        for (const rock of engine.getAllAsteroids()) {
+          engine.asteroidLifecycle.remove(rock.id);
+        }
+        engine.parkSatellitePickups();
+        const expected: ReturnType<LaserCombat['drainLootBlasts']> = [];
+        for (const id of ['first-blast', 'second-blast']) {
+          addSmallAsteroid(engine, id);
+          expect(engine.asteroidMining.hit(id, shooter.id, 'laser').outcome).toBe('destroyed');
+          const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
+          assert.ok(shard);
+          const origin = { ...shard.position };
+          const shot = engine.laserCombat.spawn(shooter.id, origin, { x: 0, y: 0 });
+          assert.ok(shot);
+          expect(engine.laserCombat.resolveSpawned(shot.id)).toEqual([]);
+          expect(shot.hasExploded).toBe(true);
+          expect(engine.getLoot().some((drop) => drop.id === shard.id)).toBe(false);
+          expect(engine.laserCombat.shots()).toEqual([]);
+          expected.push({
+            lootId: shard.id,
+            position: origin,
+            radius: LOOT_BLAST.RADIUS,
+            shooterId: shooter.id,
+          });
+          const effect = blastEffect.mock.results.at(-1);
+          assert.ok(effect?.type === 'return' && effect.value.origin);
+          effect.value.origin.x += 1000;
+        }
+        if (ending === 'broadcast') {
+          const broadcaster = new GameStateBroadcaster(engine);
+          broadcaster.negotiateSnapshot(socket);
+          broadcaster.broadcastGameState();
+          broadcaster.broadcastGameState();
+          expect(engine.getPlayer(shooter.id)).toBe(shooter);
+          expect(shooter.ws).toBe(socket);
+          expect(socket.received('lootExploded').map((message) => message.data)).toEqual(expected);
+        } else if (ending === 'last pilot leaves') {
+          engine.removePlayer(shooter.id);
+          expect(engine.isGamePaused()).toBe(true);
+        } else {
+          engine.resetForTesting();
+        }
+        expect(engine.laserCombat.drainLootBlasts()).toEqual([]);
+      } finally {
+        blastEffect.mockRestore();
+      }
+    }
+  );
 });

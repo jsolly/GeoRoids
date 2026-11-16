@@ -101,7 +101,7 @@ test.each([12, 30, 60])(
     ).toBeGreaterThan(30);
     const laser = f.ship.generateLaser();
     expect(
-      f.engine.spawnPlayerLaser(f.actor.id, laser.position, laser.velocity, f.clock.now())
+      f.engine.laserCombat.spawnPlayer(f.actor.id, laser.position, laser.velocity, f.clock.now())
     ).not.toBeNull();
   }
 );
@@ -151,7 +151,7 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
   expect(f.report().ok).toBe(true);
   const laser = f.ship.generateLaser();
   expect(
-    f.engine.spawnPlayerLaser(f.actor.id, laser.position, laser.velocity, f.clock.now())
+    f.engine.laserCombat.spawnPlayer(f.actor.id, laser.position, laser.velocity, f.clock.now())
   ).not.toBeNull();
   for (const rock of f.engine.getAllAsteroids()) {
     f.engine.asteroidLifecycle.remove(rock.id);

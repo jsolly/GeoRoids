@@ -1,11 +1,11 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
+import { GameEngine } from '../../../server/core/GameEngine';
 import {
-  GameEngine,
   PLAYER_LASER_MAX_LIFETIME_MS,
   PLAYER_SHOOT_POSE_ALLOWANCE_MS,
-} from '../../../server/core/GameEngine';
+} from '../../../server/core/LaserCombat';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { GAME, LASER, SHIP } from '../../../shared/constants/gameplay';
 import { getShipKit } from '../../../shared/shipKits';
@@ -60,8 +60,8 @@ describe('server-authoritative player shooting', () => {
     vi.spyOn(broadcaster, 'sendToWebSocket').mockImplementation(() => {
       order.push('acknowledgement');
     });
-    const originalResolve = engine.resolveSpawnedLaserHits.bind(engine);
-    vi.spyOn(engine, 'resolveSpawnedLaserHits').mockImplementation((...args) => {
+    const originalResolve = engine.laserCombat.resolveSpawned.bind(engine.laserCombat);
+    vi.spyOn(engine.laserCombat, 'resolveSpawned').mockImplementation((...args) => {
       order.push('resolve');
       return originalResolve(...args);
     });
@@ -97,11 +97,11 @@ describe('server-authoritative player shooting', () => {
     const acknowledgements = socket.received('shotAcknowledged');
     expect(acknowledgements).toHaveLength(3);
     expect(acknowledgements.map((message) => message.data)).toEqual([
-      { requestId: 'shot-1', projectileId: engine.getServerLasers()[0]?.id },
-      { requestId: 'shot-2', projectileId: engine.getServerLasers()[1]?.id },
-      { requestId: 'shot-3', projectileId: engine.getServerLasers()[2]?.id },
+      { requestId: 'shot-1', projectileId: engine.laserCombat.shots()[0]?.id },
+      { requestId: 'shot-2', projectileId: engine.laserCombat.shots()[1]?.id },
+      { requestId: 'shot-3', projectileId: engine.laserCombat.shots()[2]?.id },
     ]);
-    expect(new Set(engine.getServerLasers().map((laser) => laser.id)).size).toBe(3);
+    expect(new Set(engine.laserCombat.shots().map((laser) => laser.id)).size).toBe(3);
   });
 
   test('accepted and rejected owned shots acknowledge the authoritative outcome', () => {
@@ -109,14 +109,14 @@ describe('server-authoritative player shooting', () => {
     shoot({ x: 1000, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'rejected');
 
     expect(socket.received('shotAcknowledged').map((message) => message.data)).toEqual([
-      { requestId: 'accepted', projectileId: engine.getServerLasers()[0]?.id },
+      { requestId: 'accepted', projectileId: engine.laserCombat.shots()[0]?.id },
       { requestId: 'rejected', projectileId: null },
     ]);
-    expect(engine.getServerLasers()).toHaveLength(1);
+    expect(engine.laserCombat.shots()).toHaveLength(1);
   });
 
   test('finite speed bounds and live ownership reject malformed, unjoined and respawning shots', () => {
-    expect(engine.spawnPlayerLaser('missing', { x: 20, y: 0 }, { x: 5, y: 0 })).toBeNull();
+    expect(engine.laserCombat.spawnPlayer('missing', { x: 20, y: 0 }, { x: 5, y: 0 })).toBeNull();
     shoot({ x: Number.POSITIVE_INFINITY, y: 0 });
     shoot({ x: 20, y: 0 }, { x: 1e10, y: 0 });
     shoot({ x: 20, y: 0 }, { x: Number.NaN, y: 0 });
@@ -124,13 +124,13 @@ describe('server-authoritative player shooting', () => {
     assert.ok(pilot, 'respawning pilot');
     pilot.respawnTimer = 2;
     shoot();
-    expect(engine.getServerLasers()).toHaveLength(0);
+    expect(engine.laserCombat.shots()).toHaveLength(0);
   });
 
   test('a pilot cannot claim ungranted speed or distant muzzle allowance', () => {
     shoot({ x: 20, y: 0 }, { x: 37, y: 0 });
     shoot({ x: 400, y: 0 });
-    expect(engine.getServerLasers()).toHaveLength(0);
+    expect(engine.laserCombat.shots()).toHaveLength(0);
   });
 
   test('a legitimate muzzle from a 250 ms delayed pose is accepted with inherited ship speed', () => {
@@ -144,7 +144,7 @@ describe('server-authoritative player shooting', () => {
     };
     const muzzle = calculateLaserStartPosition(delayedPosition, 0, kit.size / 2);
     shoot(muzzle, { x: SHIP.MAX_VELOCITY + LASER.SPEED / GAME.FPS, y: 0 });
-    expect(engine.getServerLasers()).toHaveLength(1);
+    expect(engine.laserCombat.shots()).toHaveLength(1);
   });
 
   test('normal Scout firing stays bounded by the regular shot cadence', () => {
@@ -156,35 +156,101 @@ describe('server-authoritative player shooting', () => {
       shoot();
     }
     shoot();
-    expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS);
+    expect(engine.laserCombat.shots()).toHaveLength(SHIP.MAX_LASERS);
     clock.mockReturnValue(1000 + getShipKit('scout').shotCooldown);
     shoot();
-    expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS + 1);
+    expect(engine.laserCombat.shots()).toHaveLength(SHIP.MAX_LASERS + 1);
   });
 
   test('a shot flies 800 world units before the server drops it, matching the client reach', () => {
     vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     expect(LASER.MAX_TRAVEL_DISTANCE).toBe(800);
-    const shot = engine.spawnLaser('pilot', { x: 20, y: 0 }, { x: 4, y: 0 });
+    const shot = engine.laserCombat.spawn('pilot', { x: 20, y: 0 }, { x: 4, y: 0 });
     assert.ok(shot, 'spawned shot');
     // 199 steps of 4 = 796 units, still in flight; step 200 lands on 800, which the
     // former 800.6 reach would still have allowed.
     for (let frame = 0; frame < 199; frame += 1) {
-      engine.advanceLasersAndResolveHits();
+      engine.laserCombat.advance();
     }
-    expect(engine.getServerLasers()).toEqual([shot]);
+    expect(engine.laserCombat.shots()).toEqual([shot]);
     expect(shot.distTraveled).toBe(796);
-    engine.advanceLasersAndResolveHits();
-    expect(engine.getServerLasers()).toHaveLength(0);
+    engine.laserCombat.advance();
+    expect(engine.laserCombat.shots()).toHaveLength(0);
   });
 
   test('counter-thrust stationary shots have a finite server lifetime', () => {
     const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     shoot({ x: 20, y: 0 }, { x: 0, y: 0 });
-    expect(engine.getServerLasers()).toHaveLength(1);
+    expect(engine.laserCombat.shots()).toHaveLength(1);
     expect(socket.received('shotAcknowledged')).toHaveLength(0);
     clock.mockReturnValue(1000 + PLAYER_LASER_MAX_LIFETIME_MS);
-    engine.advanceLasersAndResolveHits();
-    expect(engine.getServerLasers()).toHaveLength(0);
+    engine.laserCombat.advance();
+    expect(engine.laserCombat.shots()).toHaveLength(0);
+  });
+
+  test('clearing the world retains the live pilot budget while a replacement pilot starts fresh', () => {
+    const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
+    const originalPilot = engine.getPlayer('pilot');
+    assert.ok(originalPilot);
+    for (let shot = 0; shot < SHIP.MAX_LASERS; shot++) {
+      assert.ok(engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 }));
+    }
+    expect(engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 })).toBeNull();
+
+    engine.prepareDiagnosticWorld('traversal');
+    expect(engine.getPlayer('pilot')).toBe(originalPilot);
+    expect(engine.laserCombat.shots()).toEqual([]);
+    expect(engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 })).toBeNull();
+    clock.mockReturnValue(1000 + getShipKit('scout').shotCooldown);
+    assert.ok(engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 }));
+
+    engine.removePlayer('pilot');
+    const replacement = engine.addPlayer(
+      'pilot',
+      'Replacement',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      'scout'
+    );
+    expect(replacement).not.toBe(originalPilot);
+    for (let shot = 0; shot < SHIP.MAX_LASERS; shot++) {
+      assert.ok(engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 }));
+    }
+    expect(engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 })).toBeNull();
+  });
+
+  test('production fixture denial preserves current evidence and a new fixture starts empty', () => {
+    engine.laserCombat.observeFixtureShots('test', ['pilot']);
+    const accepted = engine.laserCombat.spawnPlayer('pilot', { x: 20, y: 0 }, { x: 0, y: 0 });
+    assert.ok(accepted);
+    const evidence = engine.laserCombat.getFixtureCombatEvidence();
+    expect(evidence.events).toHaveLength(1);
+    expect(evidence.events[0]).toMatchObject({
+      kind: 'admission',
+      ownerId: 'pilot',
+      projectileId: accepted.id,
+      rejectionReason: null,
+    });
+    expect(() => engine.laserCombat.observeFixtureShots('production', ['pilot'])).toThrow(
+      'Combat fixture evidence is unavailable in production'
+    );
+    expect(engine.laserCombat.getFixtureCombatEvidence()).toEqual(evidence);
+
+    engine.laserCombat.observeFixtureShots('development', ['pilot']);
+    expect(engine.laserCombat.getFixtureCombatEvidence()).toEqual({ events: [], dropped: 0 });
+    expect(
+      engine.laserCombat.spawnPlayer('pilot', { x: Number.NaN, y: 0 }, { x: 0, y: 0 })
+    ).toBeNull();
+    expect(engine.laserCombat.getFixtureCombatEvidence().events).toEqual([
+      expect.objectContaining({
+        kind: 'admission',
+        ownerId: 'pilot',
+        projectileId: null,
+        rejectionReason: 'invalid-pilot-or-request',
+        sequence: 0,
+      }),
+    ]);
+    engine.resetForTesting();
+    expect(engine.laserCombat.getFixtureCombatEvidence()).toEqual({ events: [], dropped: 0 });
   });
 });

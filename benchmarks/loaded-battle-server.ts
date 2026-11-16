@@ -58,7 +58,7 @@ function sample() {
     towing: players.filter(
       (player) => player.harpoonTargetId && engine.getAsteroid(player.harpoonTargetId)
     ).length,
-    projectiles: engine.getServerLasers().length,
+    projectiles: engine.laserCombat.shots().length,
     towTargets: players.flatMap((player) => {
       const rock = player.harpoonTargetId ? engine.getAsteroid(player.harpoonTargetId) : undefined;
       return rock

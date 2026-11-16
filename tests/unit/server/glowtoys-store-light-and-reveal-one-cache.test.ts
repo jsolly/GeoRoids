@@ -76,14 +76,14 @@ test('authoritative laser contact is absorbed as charge without damage or repeat
   }
   const target = rock();
   engine.asteroidLifecycle.insert(target);
-  const projectile = engine.spawnPlayerLaser(
+  const projectile = engine.laserCombat.spawnPlayer(
     pilot.id,
     { x: 40, y: 0 },
     { x: LASER.SPEED / GAME.FPS, y: 0 }
   );
   expect(projectile).toBeTruthy();
   for (let i = 0; i < 100; i++) {
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
   }
   expect(engine.getAsteroid(target.id)?.health).toBe(100);
   expect(target.glowtoy?.charge).toBe(GLOWTOY.laserCharge);

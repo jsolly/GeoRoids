@@ -14,6 +14,7 @@
     "dev": "./scripts/dev-server.sh",
     "dev:check": "./scripts/check-dev-servers.sh",
     "dev:kill": "./scripts/dev-server.sh --stop",
+    "maintenance:world": "node --import tsx server/maintenance.ts",
     "build": "npm run check:wiki && astro sync --config config/app/astro.ts && node scripts/typescript-cli.mjs -p config/typescript/build.json && astro build --config config/app/astro.ts && node scripts/check-built-client.ts && node scripts/build-vercel-output.mjs",
     "start": "astro dev --config config/app/astro.ts --ignore-lock",
     "preview": "astro preview --config config/app/astro.ts --ignore-lock",
@@ -25,7 +26,7 @@
     "test:integration:server": "./scripts/test-runner.sh tests/integration/server/",
     "check:test-runner": "node scripts/validation-admission.mjs contracts -- bash scripts/test-runner-contract.sh",
     "check:dev-server": "vitest run --config config/testing/tooling.ts --project dev-server",
-    "check:ts": "astro sync --config config/app/astro.ts && node scripts/typescript-cli.mjs --noEmit && node scripts/generate-asset-boundaries.ts --check",
+    "check:ts": "astro sync --config config/app/astro.ts && node scripts/typescript-cli.mjs --noEmit && node scripts/typescript-cli.mjs --noEmit -p config/typescript/tooling-contracts.json && node scripts/generate-asset-boundaries.ts --check",
     "check:benchmarks": "node scripts/typescript-cli.mjs -p config/typescript/benchmarks.json",
     "check:md": "bash scripts/lint-md.sh",
     "check:yaml": "uvx yamllint@1.38.0 -c config/quality/yamllint.yaml --strict .",
@@ -71,21 +72,22 @@
     "node": "^26.0.0"
   },
   "dependencies": {
-    "@astrojs/svelte": "9.0.1",
+    "@astrojs/svelte": "9.1.2",
+    "@aws-sdk/client-s3": "3.1167.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.6",
     "@types/ws": "^8.18.2",
     "@typescript/native": "npm:typescript@7.0.2",
     "@vercel/speed-insights": "^2.0.0",
-    "astro": "7.4.4",
+    "astro": "7.4.7",
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
     "svelte": "5.57.2",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "4.3.5",
     "tsx": "^4.23.15",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "vite": "^8.3.0",
-    "ws": "^8.22.0"
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",

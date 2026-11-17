@@ -12,7 +12,7 @@ test('a broadcast with only pressured recipients prepares no common projectile r
   const engine = new GameEngine(82);
   const socket = new RecordingSocket();
   const broadcaster = new GameStateBroadcaster(engine);
-  const projectiles = vi.spyOn(engine, 'getPlayerProjectiles');
+  const projectiles = vi.spyOn(engine.laserCombat, 'projectiles');
   try {
     engine.addPlayer('waiting', 'Waiting', socket, { x: 0, y: 0 });
     broadcaster.negotiateSnapshot(socket);
@@ -43,8 +43,8 @@ test.each(['tow', 'probe'] as const)(
       owner.utilityFlight = launchUtilityFlight(owner, kind, 20, 700);
       broadcaster.negotiateSnapshot(ownerSocket);
       broadcaster.negotiateSnapshot(observerSocket);
-      const ownerDecoder = new SnapshotDecoder();
-      const observerDecoder = new SnapshotDecoder();
+      const ownerDecoder = new SnapshotDecoder('live');
+      const observerDecoder = new SnapshotDecoder('live');
       const ownerRow = (socket: RecordingSocket, decoder: SnapshotDecoder) => {
         const raw = socket.sent.at(-1);
         assert(raw);
@@ -91,12 +91,12 @@ test('pilots receive only nearby loot, loose pickups and projectiles after movin
     expect(pickups.every((row) => row.ownerId === null && row.state === 'loose')).toBe(true);
     const pickupIds = pickups.map((pickup) => pickup.id).sort((a, b) => a.localeCompare(b));
     const drop = engine.dropEquipmentAt({ x: 2800, y: 2800 }, 'boost_coupling');
-    const shot = engine.spawnLaser(west.id, { x: 2800, y: 2800 }, { x: 1, y: 0 });
+    const shot = engine.laserCombat.spawn(west.id, { x: 2800, y: 2800 }, { x: 1, y: 0 });
     assert(shot);
     broadcaster.negotiateSnapshot(westSocket);
     broadcaster.negotiateSnapshot(eastSocket);
-    const westDecoder = new SnapshotDecoder();
-    const eastDecoder = new SnapshotDecoder();
+    const westDecoder = new SnapshotDecoder('live');
+    const eastDecoder = new SnapshotDecoder('live');
     const rows = (socket: RecordingSocket, decoder: SnapshotDecoder) => {
       const raw = socket.sent.at(-1);
       assert(raw);

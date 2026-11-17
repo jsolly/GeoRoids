@@ -7,7 +7,9 @@ import { WorldStore } from '../../../server/world/WorldStore';
 import { beltSlotForAsteroid, beltSlotPosition } from '../../../shared/asteroidBelt';
 import { BELT_CRAWLER } from '../../../shared/beltCrawler';
 import { DAMAGE } from '../../../shared/constants/gameplay';
+import { TOWN_HEARTH } from '../../../shared/furnaces';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
+import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -38,7 +40,7 @@ test('a natural belt shares valid snapshots with roaming spiders and retains cra
     expect(() =>
       captureSnapshot({
         ...engine.getGameState(),
-        playerProjectiles: engine.getPlayerProjectiles(),
+        playerProjectiles: engine.laserCombat.projectiles(),
       })
     ).not.toThrow();
     engine.checkpointWorld();
@@ -66,9 +68,9 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   try {
     const player = addPilot(engine);
-    engine.observeFixtureShots('test', [player.id]);
+    engine.laserCombat.observeFixtureShots('test', [player.id]);
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.clearSpiderField();
     const rock: AsteroidData = {
@@ -84,22 +86,22 @@ test('authoritative laser ordering hits an exposed crawler before its host and r
       vertices: 4,
       offsets: [1, 1, 1, 1],
     };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     player.position = { x: 10500, y: 10000 };
     engine.advanceCombatFrame();
     const crawler = engine
       .getSpiderField()
       .spiders.find((spider) => spider.crawler?.hostId === rock.id && spider.id.endsWith(':0'));
     assert(crawler);
-    const shot = engine.spawnLaser(
+    const shot = engine.laserCombat.spawn(
       player.id,
       { x: crawler.position.x + 45, y: crawler.position.y },
       { x: -80, y: 0 }
     );
     assert(shot);
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
     expect(shot.hasExploded).toBe(true);
-    expect(engine.getFixtureCombatEvidence().events).toContainEqual(
+    expect(engine.laserCombat.getFixtureCombatEvidence().events).toContainEqual(
       expect.objectContaining({
         kind: 'terminal',
         projectileId: shot.id,
@@ -124,7 +126,7 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
   try {
     const player = addPilot(engine);
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.clearSpiderField();
     const rock: AsteroidData = {
@@ -140,7 +142,7 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
       vertices: 4,
       offsets: [1, 1, 1, 1],
     };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     player.position = { x: 10165, y: 9990 };
     for (let frame = 0; frame < BELT_CRAWLER.WINDUP_FRAMES + 10; frame++) {
       engine.advanceCombatFrame();
@@ -149,8 +151,8 @@ test('destroying the host cancels a crawler bite queued earlier in the same auth
       engine.getSpiderField().spiders.some((spider) => spider.crawler?.phase === 'lunging')
     ).toBe(true);
     const health = player.health;
-    engine.removeAsteroid(rock.id);
-    engine.resolveAuthoritativeCombat();
+    engine.asteroidLifecycle.remove(rock.id);
+    engine.contactCombat.advance();
     expect(player.health).toBe(health);
     engine.advanceCombatFrame();
     expect(engine.getSpiderField().spiders.filter((spider) => spider.crawler)).toEqual([]);
@@ -171,7 +173,7 @@ test('the last miner leaving immediately after removing a belt rock saves its re
       .find((rock) => beltSlotForAsteroid(rock.id) !== undefined);
     assert(host);
     const slot = beltSlotForAsteroid(host.id);
-    engine.removeAsteroid(host.id);
+    engine.asteroidLifecycle.remove(host.id);
     engine.removePlayer(player.id);
     const savedSlot = store.load().world?.asteroidBelt?.find((entry) => entry.slot === slot);
     expect(savedSlot?.recoverAt).toEqual(expect.any(Number));
@@ -189,7 +191,7 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
   try {
     const player = addPilot(engine);
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.clearSpiderField();
     const home = beltSlotPosition(60);
@@ -215,13 +217,13 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
       health: 150,
     };
     delete destination.beltCrawlerHealth;
-    engine.addAsteroid(rock);
-    engine.addAsteroid(destination);
+    engine.asteroidLifecycle.insert(rock);
+    engine.asteroidLifecycle.insert(destination);
     player.position = { x: home.x - 500, y: home.y };
     engine.advanceCombatFrame();
     const before = engine.getSpiderField().spiders.find((body) => body.crawler?.hostId === rock.id);
     assert(before);
-    expect(engine.handleAsteroidHit(rock.id, player.id, 'laser', 25).outcome).toBe('destroyed');
+    expect(engine.asteroidMining.hit(rock.id, player.id, 'laser', 25).outcome).toBe('destroyed');
     expect(engine.getSpiderField().spiders.find((body) => body.id === before.id)).toMatchObject({
       health: BELT_CRAWLER.MAX_HEALTH,
       crawler: { phase: 'escaping', hostId: destination.id },
@@ -241,12 +243,108 @@ test('mining a host transfers a wounded crawler and a database reload preserves 
     );
     const snapshot = {
       ...restarted.getGameState(),
-      playerProjectiles: restarted.getPlayerProjectiles(),
+      playerProjectiles: restarted.laserCombat.projectiles(),
     };
     expect(() => captureSnapshot(snapshot)).not.toThrow();
+    for (const candidate of restarted.getAllAsteroids()) {
+      if (candidate.id !== destination.id) {
+        restarted.asteroidLifecycle.remove(candidate.id);
+      }
+    }
+    restarted.asteroidLifecycle.update(destination.id, { material: 'rubble', size: 50 });
+    const shattered = restarted.asteroidMining.hit(destination.id, player.id, 'laser');
+    expect(shattered.outcome).toBe('destroyed');
+    expect(shattered.newAsteroids).toHaveLength(3);
+    const escaping = restarted.getSpiderField().spiders.find((body) => body.id === before.id);
+    assert(escaping?.crawler);
+    expect(escaping.crawler.phase).toBe('escaping');
+    expect(shattered.newAsteroids.map((fragment) => fragment.id)).toContain(
+      escaping.crawler.hostId
+    );
+    expect(restarted.getAsteroidSpatialIndex().get(escaping.crawler.hostId)).toBe(
+      restarted.getAsteroid(escaping.crawler.hostId)
+    );
   } finally {
     engine.stopGameLoop();
     restarted?.stopGameLoop();
     store.close();
+  }
+});
+
+test('furnace consumption clears the attached probe and retires its identified crawler host before feedback', () => {
+  const engine = new GameEngine(82);
+  try {
+    const hauler = engine.addPlayer(
+      'intake-hauler',
+      'Intake Hauler',
+      new RecordingSocket(),
+      { x: 10000, y: 10000 },
+      'hauler'
+    );
+    for (const row of engine.getAllAsteroids()) {
+      engine.asteroidLifecycle.remove(row.id);
+    }
+    engine.clearSpiderField();
+    const host: AsteroidData = {
+      id: 'belt-82-0-0',
+      position: { x: 10000, y: 10000 },
+      velocity: { x: 0, y: 0 },
+      size: 100,
+      material: 'metal',
+      ore: 'metal',
+      health: 150,
+      maxHealth: 150,
+      rotation: 0,
+      angularVelocity: 0,
+      jaggedness: 0,
+      vertices: 4,
+      offsets: [1, 1, 1, 1],
+    };
+    engine.asteroidLifecycle.insert(host);
+    engine.advanceCombatFrame();
+    const crawler = engine.getSpiderField().spiders.find((row) => row.crawler?.hostId === host.id);
+    assert(crawler?.crawler);
+    const now = engine.getServerTime();
+    engine.asteroidLifecycle.update(host.id, {
+      position: { ...TOWN_HEARTH.position },
+      probe: {
+        id: 'furnace-host-probe',
+        ownerId: hauler.id,
+        health: SURVEY_PROBE.MAX_HEALTH,
+        maxHealth: SURVEY_PROBE.MAX_HEALTH,
+        attachedAt: now,
+        expiresAt: now + SURVEY_PROBE.LIFETIME_MS,
+        angle: 0,
+        radialOffset: 105,
+      },
+    });
+    hauler.position = { x: 80, y: 0 };
+    engine.advanceCombatFrame();
+    expect(host.probe?.id).toBe('furnace-host-probe');
+    expect(engine.getSpiderField().spiders).toContainEqual(
+      expect.objectContaining({
+        id: crawler.id,
+        crawler: expect.objectContaining({ hostId: host.id }),
+      })
+    );
+    hauler.harpoonTargetId = host.id;
+    hauler.harpoonLatchPos = { ...host.position };
+
+    engine.furnaceDeliveries.advance();
+
+    expect(engine.getAsteroid(host.id)).toBeUndefined();
+    expect(host.probe).toBeNull();
+    expect(
+      engine
+        .getSpiderField()
+        .spiders.some((row) => row.id === crawler.id && row.crawler?.hostId === host.id)
+    ).toBe(false);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(hauler.harpoonLatchPos).toBeUndefined();
+    expect(engine.furnaceDeliveries.drainDeliveries()).toContainEqual(
+      expect.objectContaining({ asteroidId: host.id, furnaceId: TOWN_HEARTH.id })
+    );
+  } finally {
+    engine.stopGameLoop();
   }
 });

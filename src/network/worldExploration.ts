@@ -14,6 +14,17 @@ export function setSettlement(value: SettlementState): void {
 }
 
 let exploration: ExplorationTile[] = EMPTY_EXPLORATION;
+let atlasSyncing = true;
+export function isAtlasSyncing(): boolean {
+  return atlasSyncing;
+}
+export function setAtlasSyncing(value: boolean): void {
+  atlasSyncing = value;
+}
+export function resetAtlasState(): void {
+  exploration = EMPTY_EXPLORATION;
+  atlasSyncing = true;
+}
 let mapAssets: MapAsset[] = [];
 let remains: MapAsset[] = [];
 export function getWorldRemains(): readonly MapAsset[] {
@@ -53,6 +64,7 @@ export function setWorldExploration(value: ExplorationTile[]): void {
 }
 
 export function resetWorldExploration(): void {
+  resetAtlasState();
   worldFurnaces.replaceLit([]);
   worldFurnaces.replaceFrontier([]);
   settlement = emptySettlement();

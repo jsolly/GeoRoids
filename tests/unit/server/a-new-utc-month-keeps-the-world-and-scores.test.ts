@@ -39,11 +39,11 @@ test('a UTC month boundary keeps scores, exploration, and the live ship', () => 
     const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('pilot', 'Bob', socket, { x: 4_000, y: 1_200 });
-    const registered = engine.registerPilot(actor, socket);
+    const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
     assert(registered.ok);
     actor.score = 880;
-    engine.revealArea(actor.position, WORLD.sectorSize);
-    engine.revealArea({ x: 40_000, y: 24_000 }, WORLD.sectorSize);
+    engine.discovery.revealArea(actor.position, WORLD.sectorSize);
+    engine.discovery.revealArea({ x: 40_000, y: 24_000 }, WORLD.sectorSize);
     const distantCell = explorationCellAt({ x: 40_000, y: 24_000 });
     assert(distantCell !== null);
     expect(isCellExplored(engine.getGameState().exploration, distantCell)).toBe(true);

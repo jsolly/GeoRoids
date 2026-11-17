@@ -14,7 +14,7 @@ export function resolveToolFlights(engine: GameEngine): void {
     ) {
       return;
     }
-    engine.tickToolFlights();
+    engine.toolFlights.advance();
   }
   throw new Error('Tool flight did not resolve within its launch range');
 }
@@ -56,18 +56,18 @@ export function attachTowForScenario(
     .map((rock) => ({ rock, position: { ...rock.position } }));
   for (const obstacle of obstacles) {
     obstacle.rock.position.y += 2000;
-    engine.addAsteroid(obstacle.rock);
+    engine.asteroidLifecycle.insert(obstacle.rock);
   }
   target.position = { x: pilot.position.x + target.size + 120, y: pilot.position.y };
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   pilot.angle = 0;
   expect(engine.useAbility(pilotId)).toBe(true);
   resolveToolFlights(engine);
   expect(pilot.harpoonTargetId).toBe(asteroidId);
   target.position = original;
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   for (const obstacle of obstacles) {
     obstacle.rock.position = obstacle.position;
-    engine.addAsteroid(obstacle.rock);
+    engine.asteroidLifecycle.insert(obstacle.rock);
   }
 }

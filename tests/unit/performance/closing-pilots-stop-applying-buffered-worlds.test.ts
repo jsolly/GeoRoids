@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { expect, test, vi } from 'vitest';
 import { Pilot } from '../../../benchmarks/pilot';
-import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 vi.mock('ws', async () => {
@@ -56,6 +57,7 @@ function joinedPilot() {
           id: pilot.id,
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           resumeToken: 'a'.repeat(64),
         },
       })

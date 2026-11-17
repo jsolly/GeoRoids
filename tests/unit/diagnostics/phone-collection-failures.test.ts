@@ -706,3 +706,53 @@ test('presentation observations remain bounded across repeated Scan transitions 
     expect(sample.presentationStates.values.length).toBeLessThanOrEqual(16);
   }
 });
+
+test('Start owns one heartbeat worker and exported recording retains its sender evidence before Stop terminates it', async () => {
+  storage();
+  const terminate = vi.fn();
+  let deliver: ((event: MessageEvent<unknown>) => void) | null = null;
+  const construct = vi.fn();
+  class RecordingWorker {
+    constructor() {
+      construct();
+    }
+    set onmessage(value: ((event: MessageEvent<unknown>) => void) | null) {
+      deliver = value;
+    }
+    onerror = null;
+    onmessageerror = null;
+    terminate = terminate;
+  }
+  // The real collector constructs and owns this worker boundary.
+  vi.stubGlobal('Worker', RecordingWorker);
+  const subject = collector();
+  expect(construct).not.toHaveBeenCalled();
+  await subject.start('iPhone', 'muted, firing');
+  expect(construct).toHaveBeenCalledTimes(1);
+  const message = new MessageEvent('message', {
+    data: { sequence: 1, monotonicMs: 100, wallMs: 10000, timeOrigin: 9900 },
+  });
+  // Invoke the transport callback after construction rather than supplying prebuilt evidence to the collector.
+  const send = () => deliver?.(message);
+  send();
+  await vi.advanceTimersByTimeAsync(1000);
+  subject.stop();
+  expect(terminate).toHaveBeenCalledTimes(1);
+  const recording = await artifact(subject);
+  expect(recording.content.samples[0].heartbeat).toMatchObject({
+    status: 'available',
+    observed: 1,
+    omitted: 0,
+  });
+  expect(recording.content.samples[0].heartbeat.ticks[0]).toMatchObject({
+    sequence: 1,
+    monotonicMs: 100,
+  });
+  expect(recording.content.samples[0].bitmapBudget.estimate).toBe(
+    'owned-canvas-width-height-rgba8'
+  );
+  await subject.start('iPhone', 'second run');
+  expect(construct).toHaveBeenCalledTimes(2);
+  subject.dispose();
+  expect(terminate).toHaveBeenCalledTimes(2);
+});

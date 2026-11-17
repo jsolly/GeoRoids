@@ -1,8 +1,7 @@
 import { COOPERATIVE } from '../../shared/cooperativeRules';
 import { hazardPhase } from '../../shared/worldHazards';
 import type { Position } from '../../shared-types';
-import type { GameEntity } from './EntityManager';
-import type { TerrainSpiderManager } from './TerrainSpiderManager';
+import type { WorldHazardInputs } from './types';
 
 /** Event ownership is explicit so expiration never removes ordinary or queen-owned spiders. */
 export class WorldHazards {
@@ -12,9 +11,14 @@ export class WorldHazards {
   private lastNow = 0;
   private sequence = 0;
   private meteors: { id: string; position: Position; velocity: Position; expiresAt: number }[] = [];
-  constructor(private readonly spiders: TerrainSpiderManager) {}
+  constructor(private readonly inputs: WorldHazardInputs) {}
 
-  advance(now: number, players: readonly GameEntity[], hit: (id: string) => void): void {
+  advance(now: number): void {
+    if (!this.inputs.campaign.activated) {
+      return;
+    }
+    this.inputs.population.refresh();
+    const players = this.inputs.actors.getAllEntities();
     const phase = hazardPhase(now);
     if (phase.phase !== 'active' || this.window !== phase.startsAt || now < this.lastNow) {
       this.clearActors();
@@ -27,7 +31,7 @@ export class WorldHazards {
     }
     const crew = players.filter((p) => p.ws && p.health > 0 && !p.exploding && !p.furnaceTransit);
     for (const id of this.swarm) {
-      if (!this.spiders.getBody(id)) {
+      if (!this.inputs.spiders.getBody(id)) {
         this.swarm.delete(id);
       }
     }
@@ -46,7 +50,7 @@ export class WorldHazards {
           y: pilot.position.y + Math.sin(angle) * 700,
         };
         if (phase.kind === 'swarm' && this.swarm.size < COOPERATIVE.swarmSlots) {
-          const spider = this.spiders.spawnSpider(position, angle + Math.PI, true);
+          const spider = this.inputs.spiders.spawnSpider(position, angle + Math.PI, true);
           if (spider) {
             this.swarm.add(spider.id);
           }
@@ -71,7 +75,7 @@ export class WorldHazards {
           Math.hypot(pilot.position.x - meteor.position.x, pilot.position.y - meteor.position.y) <=
           48
         ) {
-          hit(pilot.id);
+          this.inputs.hit(pilot.id);
           meteor.expiresAt = now;
           break;
         }
@@ -80,7 +84,7 @@ export class WorldHazards {
   }
   private clearActors(): void {
     for (const id of this.swarm) {
-      this.spiders.removeSpider(id);
+      this.inputs.spiders.removeSpider(id);
     }
     this.swarm.clear();
     this.meteors = [];

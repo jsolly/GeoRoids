@@ -2,7 +2,7 @@ import { defineRailway, github, preserve, project, service, volume } from 'railw
 
 export default defineRailway(() => {
   const worldData = volume('world-data', { region: 'iad', sizeMB: 1024 });
-  const geoasteroids = service('geoasteroids', {
+  const georoids = service('Georoids', {
     source: github('jsolly/GeoRoids', { branch: 'main' }),
     build: {
       builder: 'RAILPACK',
@@ -14,6 +14,7 @@ export default defineRailway(() => {
       startCommand: 'node --import tsx server.ts',
       healthcheckPath: '/health',
       healthcheckTimeout: 300,
+      drainingSeconds: 30,
       multiRegionConfig: {
         iad: { numReplicas: 1 },
       },
@@ -25,6 +26,7 @@ export default defineRailway(() => {
     env: {
       DEPLOY_TRIGGER: preserve(),
       NODE_ENV: preserve(),
+      TODOIST_API_TOKEN: preserve(),
       GEOROIDS_WORLD_PATH: '/data/world.sqlite',
     },
     volumeMounts: { '/data': worldData },
@@ -33,6 +35,6 @@ export default defineRailway(() => {
   });
 
   return project('GeoRoids', {
-    resources: [worldData, geoasteroids],
+    resources: [worldData, georoids],
   });
 });

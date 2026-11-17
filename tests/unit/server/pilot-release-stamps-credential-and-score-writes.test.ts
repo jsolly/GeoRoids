@@ -2,6 +2,7 @@ import { resolveToolFlights } from '../../support/tool-flight';
 /* @vitest-environment node */
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,7 +17,7 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { GAME, ROID } from '../../../shared/constants/gameplay';
-import { FURNACES } from '../../../shared/furnaces';
+import { civicLot, FURNACES, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -83,7 +84,11 @@ test('registering a pilot stamps the current server and joining client on the cr
   const engine = engineWithStore(store, frozenClock(issuedAt));
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('scout', 'Bob', socket, { x: 200, y: 300 });
-  const registered = engine.registerPilot(actor, socket, CLIENT_RELEASE);
+  const registered = engine.pilotSessions.register({
+    actor: actor,
+    socket: socket,
+    clientReleaseId: CLIENT_RELEASE,
+  });
   assert(registered.ok);
   engine.checkpointWorld();
 
@@ -100,6 +105,10 @@ test('registering a pilot stamps the current server and joining client on the cr
     lastClientReleaseId: CLIENT_RELEASE,
   });
   expect(store.loadWorld()?.writtenReleaseId).toBe(SERVER_RELEASE_ID);
+  expect(saved.tokenHash).toBe(createHash('sha256').update(registered.resumeToken).digest('hex'));
+  expect(saved).not.toHaveProperty('resumeToken');
+  expect(engine.pilotLedger.provenance(actor.id)).not.toHaveProperty('tokenHash');
+  expect(JSON.stringify(engine.getSnapshotState())).not.toContain(saved.tokenHash);
 });
 
 test('a later score write updates score provenance without rotating the credential', () => {
@@ -112,7 +121,10 @@ test('a later score write updates score provenance without rotating the credenti
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('miner', 'Miner', socket, { x: 0, y: 0 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   const issuedAt = engine.getServerTime();
   monotonicMs += 5_000;
   actor.score = ROID.POINTS_LARGE;
@@ -134,11 +146,14 @@ test('death preserves bank provenance and keeps the issued credential', () => {
   const engine = engineWithStore(store);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 400, y: 0 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   actor.score = 1200;
   actor.spawnProtectionTimer = 0;
   engine.checkpointWorld();
-  expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
+  expect(engine.shipDamage.apply(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
   engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'pilot');
@@ -163,7 +178,10 @@ test('a new UTC month leaves the saved score and its credential stamps alone', (
   const engine = engineWithStore(store, clock);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Bob', socket, { x: 4_000, y: 1_200 });
-  assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
   actor.score = 880;
   engine.checkpointWorld();
   const before = store.loadPilots().find((pilot) => pilot.id === 'pilot');
@@ -236,6 +254,7 @@ test('joined echoes credential and score releases from the saved pilot', () => {
         position: { x: 100, y: 100 },
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
         clientReleaseId: CLIENT_RELEASE,
       },
     },
@@ -243,6 +262,7 @@ test('joined echoes credential and score releases from the saved pilot', () => {
   );
   const joined = socket.lastReceived('joined');
   assert(joined);
+  expect(joined.data).not.toHaveProperty('tokenHash');
   expect(joined.data).toMatchObject({
     id: 'scout',
     snapshotVersion: SNAPSHOT_VERSION,
@@ -266,6 +286,7 @@ test('join decoding keeps a valid client release and ignores a malformed one', (
       position: { x: 12.5, y: -4 },
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
     },
   };
   expect(
@@ -302,13 +323,25 @@ test('offline delivery credit restamps the server score without copying the last
   const haulerSocket = new RecordingSocket();
   const scout = engine.addPlayer('scout', 'Scout', scoutSocket, { x: 0, y: 0 }, 'scout');
   const hauler = engine.addPlayer('hauler', 'Hauler', haulerSocket, { x: 80, y: 0 }, 'hauler');
-  assert(engine.registerPilot(scout, scoutSocket, CLIENT_RELEASE).ok);
-  assert(engine.registerPilot(hauler, haulerSocket, CLIENT_RELEASE).ok);
+  assert(
+    engine.pilotSessions.register({
+      actor: scout,
+      socket: scoutSocket,
+      clientReleaseId: CLIENT_RELEASE,
+    }).ok
+  );
+  assert(
+    engine.pilotSessions.register({
+      actor: hauler,
+      socket: haulerSocket,
+      clientReleaseId: CLIENT_RELEASE,
+    }).ok
+  );
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const rock = cargo('delivery', { x: 180, y: 0 });
-  engine.addAsteroid(rock);
+  engine.asteroidLifecycle.insert(rock);
   expect(engine.useAbility(scout.id)).toBe(true);
   resolveToolFlights(engine);
   expect(rock.surveyedBy).toEqual(['scout']);
@@ -319,7 +352,7 @@ test('offline delivery credit restamps the server score without copying the last
   assert(station);
   rock.position = { ...station.position };
   hauler.position = { x: station.position.x + 100, y: station.position.y };
-  engine.processFurnaceDeliveries();
+  engine.furnaceDeliveries.advance();
   engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'scout');
@@ -330,4 +363,135 @@ test('offline delivery credit restamps the server score without copying the last
   expect(saved.lastClientReleaseId).toBe(CLIENT_RELEASE);
   expect(saved.credentialClientReleaseId).toBe(CLIENT_RELEASE);
   expect(saved.scoreUpdatedAt).toEqual(expect.any(Number));
+});
+
+test('zero awards preserve live score stamps but restamp offline scores, while bots and unknown IDs retain their distinct rules', () => {
+  let elapsed = 0;
+  const clock = new ServerClock({ wallNow: () => 100_000, monotonicNow: () => elapsed });
+  const store = worldStore();
+  const engine = engineWithStore(store, clock);
+  const socket = new RecordingSocket();
+  const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 200, y: 300 });
+  assert(
+    engine.pilotSessions.register({ actor: actor, socket: socket, clientReleaseId: CLIENT_RELEASE })
+      .ok
+  );
+  engine.checkpointWorld();
+  const score = actor.score;
+  const original = engine.pilotLedger.provenance(actor.id);
+  const beforeZero = engine.getSnapshotState().settlement;
+  elapsed = 1_000;
+  expect(engine.pilotLedger.awardPoints(actor.id, 0)).toBe(score);
+  expect(engine.pilotLedger.provenance(actor.id)).toEqual(original);
+  expect(engine.getSnapshotState().settlement).not.toBe(beforeZero);
+  elapsed = 2_000;
+  expect(engine.pilotLedger.awardPoints(actor.id, 25)).toBe(score + 25);
+  expect(actor.score).toBe(score + 25);
+  expect(engine.pilotLedger.provenance(actor.id)).toMatchObject({
+    credentialIssuedAt: original.credentialIssuedAt,
+    scoreUpdatedAt: 102_000,
+    scoreClientReleaseId: CLIENT_RELEASE,
+  });
+  const worker = engine.addPlayer('worker', 'Worker', new RecordingSocket(), { x: 0, y: 0 });
+  worker.botRole = 'worker';
+  worker.score = 700;
+  const points = engine.getSnapshotState().settlement.points;
+  expect(engine.pilotLedger.awardPoints(worker.id, 7)).toBe(700);
+  expect(worker.score).toBe(700);
+  expect(engine.pilotLedger.has(worker.id)).toBe(false);
+  expect(engine.getSnapshotState().settlement.points).toBe(points + 7);
+  const beforeUnknown = engine.getSnapshotState().settlement;
+  expect(engine.pilotLedger.awardPoints('unknown', 9)).toBeUndefined();
+  expect(engine.pilotLedger.has('unknown')).toBe(false);
+  expect(engine.getSnapshotState().settlement).toBe(beforeUnknown);
+  engine.removePlayer(actor.id);
+  elapsed = 3_000;
+  expect(engine.pilotLedger.awardPoints(actor.id, 0)).toBe(score + 25);
+  expect(engine.pilotLedger.provenance(actor.id)).toMatchObject({
+    credentialIssuedAt: original.credentialIssuedAt,
+    scoreUpdatedAt: 103_000,
+  });
+  expect(engine.pilotLedger.provenance(actor.id)).not.toHaveProperty('scoreClientReleaseId');
+  engine.checkpointWorld();
+  const saved = store.loadPilots().find((pilot) => pilot.id === actor.id);
+  assert(saved);
+  expect(saved).toMatchObject({ score: score + 25, lastClientReleaseId: CLIENT_RELEASE });
+  expect(saved).not.toHaveProperty('scoreClientReleaseId');
+});
+
+test('saved resume rotates credential provenance without restamping an unchanged bank', () => {
+  let elapsed = 0;
+  const clock = new ServerClock({ wallNow: () => 100_000, monotonicNow: () => elapsed });
+  const store = worldStore();
+  const engine = engineWithStore(store, clock);
+  const socket = new RecordingSocket();
+  const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 200, y: 300 });
+  const registered = engine.pilotSessions.register({
+    actor: actor,
+    socket: socket,
+    clientReleaseId: CLIENT_RELEASE,
+  });
+  assert(registered.ok);
+  engine.checkpointWorld();
+  const before = store.loadPilots().find((pilot) => pilot.id === actor.id);
+  assert(before);
+  engine.removePlayer(actor.id);
+  elapsed = 2_000;
+  const resumed = engine.pilotSessions.resume({
+    token: registered.resumeToken,
+    socket: new RecordingSocket(),
+    requestedKit: undefined,
+    requestedName: undefined,
+    clientReleaseId: PRIOR_RELEASE,
+  });
+  assert(resumed.ok);
+  engine.checkpointWorld();
+  const saved = store.loadPilots().find((pilot) => pilot.id === actor.id);
+  assert(saved);
+  expect(saved.tokenHash).not.toBe(before.tokenHash);
+  expect(saved.tokenHash).toBe(createHash('sha256').update(resumed.resumeToken).digest('hex'));
+  expect(saved).toMatchObject({
+    score: before.score,
+    credentialIssuedAt: 102_000,
+    credentialClientReleaseId: PRIOR_RELEASE,
+    scoreUpdatedAt: before.scoreUpdatedAt,
+    scoreClientReleaseId: before.scoreClientReleaseId,
+    lastClientReleaseId: PRIOR_RELEASE,
+  });
+});
+
+test('a transit checkpoint saves the furnace arrival without moving the live hull and restores that arrival', () => {
+  const store = worldStore();
+  const clock = frozenClock(100_000);
+  const engine = engineWithStore(store, clock);
+  const socket = new RecordingSocket();
+  const actor = engine.addPlayer('traveler', 'Traveler', socket, { x: 0, y: 0 }, 'scout');
+  const registered = engine.pilotSessions.register({
+    actor: actor,
+    socket: socket,
+    clientReleaseId: CLIENT_RELEASE,
+  });
+  assert(registered.ok);
+  const street = civicLot('street-1-0');
+  assert(street);
+  actor.position = { ...street.position };
+  actor.score = street.cost;
+  expect(engine.useAbility(actor.id)).toBe(true);
+  actor.position = { ...TOWN_HEARTH.position };
+  expect(engine.furnaceTravel.start(actor.id, street.id)).toBeUndefined();
+  expect(actor.furnaceTransit?.destinationId).toBe(street.id);
+  engine.checkpointWorld();
+  expect(actor.position).toEqual(TOWN_HEARTH.position);
+  const saved = store.loadPilots().find((pilot) => pilot.id === actor.id);
+  assert(saved);
+  expect(saved.position).toEqual(street.position);
+  expect(saved.velocity).toEqual({ x: 0, y: 0 });
+  const restored = engineWithStore(store, clock);
+  const resumed = restored.pilotSessions.resume({
+    token: registered.resumeToken,
+    socket: new RecordingSocket(),
+  });
+  assert(resumed.ok);
+  expect(resumed.actor.position).toEqual(street.position);
+  expect(resumed.actor.furnaceTransit).toBeUndefined();
 });

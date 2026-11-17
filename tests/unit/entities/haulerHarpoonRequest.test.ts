@@ -56,7 +56,7 @@ test('two rapid presses reach the server in order without a predicted cooldown d
       world.engine.getServerTime()
     );
     world.clearAsteroids();
-    world.engine.addAsteroid({
+    world.engine.asteroidLifecycle.insert({
       id: 'tow-rock',
       position: { x: 80, y: 0 },
       velocity: { x: 0, y: 0 },

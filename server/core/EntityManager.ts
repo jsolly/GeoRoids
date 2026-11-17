@@ -116,6 +116,10 @@ export class EntityManager {
     return Array.from(this.entities.values());
   }
 
+  public getHumanPlayers(): GameEntity[] {
+    return this.getAllEntities().filter((actor) => actor.botRole === undefined);
+  }
+
   public getEntityBySocket(ws: WebSocket): GameEntity | undefined {
     for (const entity of this.entities.values()) {
       if (entity.ws === ws) {

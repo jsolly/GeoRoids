@@ -101,7 +101,7 @@ test.each([12, 30, 60])(
     ).toBeGreaterThan(30);
     const laser = f.ship.generateLaser();
     expect(
-      f.engine.spawnPlayerLaser(f.actor.id, laser.position, laser.velocity, f.clock.now())
+      f.engine.laserCombat.spawnPlayer(f.actor.id, laser.position, laser.velocity, f.clock.now())
     ).not.toBeNull();
   }
 );
@@ -151,12 +151,12 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
   expect(f.report().ok).toBe(true);
   const laser = f.ship.generateLaser();
   expect(
-    f.engine.spawnPlayerLaser(f.actor.id, laser.position, laser.velocity, f.clock.now())
+    f.engine.laserCombat.spawnPlayer(f.actor.id, laser.position, laser.velocity, f.clock.now())
   ).not.toBeNull();
   for (const rock of f.engine.getAllAsteroids()) {
-    f.engine.removeAsteroid(rock.id);
+    f.engine.asteroidLifecycle.remove(rock.id);
   }
-  f.engine.addAsteroid({
+  f.engine.asteroidLifecycle.insert({
     id: 'impact-rock',
     position: { ...f.ship.position },
     velocity: { x: 0, y: 0 },
@@ -170,7 +170,7 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
     offsets: [1, 1, 1, 1, 1, 1, 1, 1],
   });
   const health = f.actor.health;
-  f.engine.resolveAuthoritativeCombat();
+  f.engine.contactCombat.advance();
   expect(f.actor.health).toBeLessThan(health);
   expect(f.engine.getAsteroid('impact-rock')).toBeUndefined();
 });
@@ -230,7 +230,7 @@ test.each([200, 400, 900])(
 /** Ambient rocks must not hit the pilot while the clock replays a blocked second. */
 function clearAmbientField(f: ReturnType<typeof flight>): void {
   for (const rock of f.engine.getAllAsteroids()) {
-    f.engine.removeAsteroid(rock.id);
+    f.engine.asteroidLifecycle.remove(rock.id);
   }
 }
 

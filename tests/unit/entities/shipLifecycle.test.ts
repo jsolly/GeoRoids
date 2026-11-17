@@ -339,7 +339,7 @@ describe('server ship respawn lifecycle', () => {
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
-    engine.handleShipDamage('p1', 'boundary', player.health);
+    engine.shipDamage.apply('p1', 'boundary', player.health);
     const afterDeath = engine.getPlayer('p1');
     expect(afterDeath?.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
     expect(afterDeath?.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
@@ -360,7 +360,7 @@ describe('server ship respawn lifecycle', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    engine.handleShipDamage('p1', 'boundary', player.health);
+    engine.shipDamage.apply('p1', 'boundary', player.health);
 
     for (let i = 0; i < SHIP.EXPLODE_DURATION_FRAMES; i++) {
       engine.advanceCombatFrame();
@@ -377,7 +377,7 @@ describe('server ship respawn lifecycle', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 3100, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    engine.handleShipDamage('p1', 'asteroid', player.health);
+    engine.shipDamage.apply('p1', 'asteroid', player.health);
 
     for (let i = 0; i < SHIP.RESPAWN_DELAY_FRAMES; i++) {
       engine.entityManager.updateExplosions();

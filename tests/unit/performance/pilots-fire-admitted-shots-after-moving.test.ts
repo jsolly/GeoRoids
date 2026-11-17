@@ -16,7 +16,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
   const failures: unknown[] = [];
   const pilot = new Pilot(0, {
     url: new URL(
-      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
     ),
     measuring: () => false,
     fail: (error) => failures.push(error),
@@ -32,7 +32,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     actor.velocity = { x: 0, y: 0 };
     actor.angle = 0;
     for (const rock of server.gameEngine.getAllAsteroids()) {
-      server.gameEngine.removeAsteroid(rock.id);
+      server.gameEngine.asteroidLifecycle.remove(rock.id);
     }
     server.gameEngine.parkSatellitePickups({ x: -2400, y: -2400 });
     const barrier = async () => {
@@ -56,14 +56,14 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     await barrier();
     // Broadcasting can replenish the field; isolate the actual shot corridor again.
     for (const rock of server.gameEngine.getAllAsteroids()) {
-      server.gameEngine.removeAsteroid(rock.id);
+      server.gameEngine.asteroidLifecycle.remove(rock.id);
     }
     pilot.drive(10);
     await barrier();
     expect(actor.position.x).toBeCloseTo(Math.cos(0.4));
     expect(actor.position.y).toBeCloseTo(Math.sin(0.4));
     expect(actor.playerMotion).toMatchObject({ epoch: 1, ack: 1, mode: 'free' });
-    const shots = server.gameEngine.getServerLasers();
+    const shots = server.gameEngine.laserCombat.shots();
     expect(shots).toHaveLength(1);
     const shot = shots[0];
     assert(shot);

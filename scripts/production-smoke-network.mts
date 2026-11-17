@@ -88,7 +88,7 @@ export function requireEvidence(condition: unknown, message: string): asserts co
     throw new SmokeFailure(message);
   }
 }
-export async function verifyProductionHttp({
+async function verifyProductionHttp({
   url,
   signal = new AbortController().signal,
   fetcher = fetch,

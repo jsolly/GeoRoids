@@ -23,7 +23,7 @@ test('authoritative death leaves nearby decorative remains with no new collectib
     world.entity(near).position = { x: 4100, y: 4000 };
     world.entity(far).position = { x: 20000, y: 20000 };
     const loot = world.engine.getLoot().length;
-    world.engine.handleShipDamage(actor.id, 'boundary', actor.health);
+    world.engine.shipDamage.apply(actor.id, 'boundary', actor.health);
     world.broadcastGameState();
     const marker = world.snapshot(near).mapAssets.find((asset) => asset.kind === 'ship-remains');
     expect(marker?.position).toEqual({ x: 4000, y: 4000 });
@@ -34,7 +34,7 @@ test('authoritative death leaves nearby decorative remains with no new collectib
       false
     );
     expect(world.engine.getLoot()).toHaveLength(loot);
-    world.engine.handleShipDamage(actor.id, 'boundary', 1000);
+    world.engine.shipDamage.apply(actor.id, 'boundary', 1000);
     expect(
       world.engine.getGameState().mapAssets.filter((asset) => asset.kind === 'ship-remains')
     ).toHaveLength(1);

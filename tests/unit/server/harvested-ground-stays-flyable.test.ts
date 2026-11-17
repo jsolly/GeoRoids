@@ -107,10 +107,10 @@ test('an old completed-sector list neither walls harvested ground nor refills it
     expect(crossed.ok).toBe(true);
     expect(pilot.position).toEqual({ x: 2_020, y: 800 });
     engine.ensureAsteroidField();
-    const shot = engine.spawnLaser('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 });
+    const shot = engine.laserCombat.spawn('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 });
     expect(shot).not.toBeNull();
-    engine.advanceLasersAndResolveHits(joinedAt);
-    const liveShot = engine.getServerLasers().find((laser) => laser.id === shot?.id);
+    engine.laserCombat.advance(joinedAt);
+    const liveShot = engine.laserCombat.shots().find((laser) => laser.id === shot?.id);
     expect(liveShot?.hasExploded).toBe(false);
     expect(liveShot?.position.x).toBeGreaterThan(2_000);
     delete pilot.spawnProtectionTimer;
@@ -123,7 +123,7 @@ test('an old completed-sector list neither walls harvested ground nor refills it
       engine.getAllAsteroids().some((rock) => rock.id.startsWith(`deposit-${seed}-1-0-`))
     ).toBe(false);
     expect(engine.getAsteroid(`deposit-${seed}-0-0-0`)).toBeDefined();
-    engine.revealArea({ x: 2_500, y: 200 }, 100);
+    engine.discovery.revealArea({ x: 2_500, y: 200 }, 100);
     engine.checkpointWorld();
     // Only the additive belt rollout may populate this old harvest tombstone.
     // A restart is not a refill: ordinary slots regrow only as intervals pass.

@@ -4,12 +4,16 @@ import { TERRAIN } from '../../shared/terrainConfig';
 import { PALETTE, VISUAL } from '../constants';
 import { extractIsoContours } from '../physics/terrain/contours';
 import { hexToRgba } from '../utils/colorUtils';
+import { releaseBitmap, resizeBitmap } from './bitmapBudget';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 
 /** A fixed terrain preview, independent of the live room's terrain cache. */
 export function initTitleTerrain(canvas: HTMLCanvasElement): () => void {
+  // No default backing allocation survives a failed initial context or terrain build.
+  releaseBitmap(canvas);
   const ctx = canvas.getContext('2d');
   if (!ctx) {
+    releaseBitmap(canvas);
     return () => {};
   }
 
@@ -31,8 +35,7 @@ export function initTitleTerrain(canvas: HTMLCanvasElement): () => void {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    resizeBitmap(canvas, Math.round(width * dpr), Math.round(height * dpr), 'title');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = PALETTE.BG;
     ctx.fillRect(0, 0, width, height);
@@ -62,9 +65,17 @@ export function initTitleTerrain(canvas: HTMLCanvasElement): () => void {
     }
   };
 
-  resize();
-  window.addEventListener('resize', resize);
-  const stopDpr = watchDevicePixelRatio(resize);
+  let stopDpr: (() => void) | undefined;
+  try {
+    resize();
+    window.addEventListener('resize', resize);
+    stopDpr = watchDevicePixelRatio(resize);
+  } catch (error) {
+    window.removeEventListener('resize', resize);
+    stopDpr?.();
+    releaseBitmap(canvas);
+    throw error;
+  }
   let disposed = false;
   return () => {
     if (disposed) {
@@ -72,6 +83,7 @@ export function initTitleTerrain(canvas: HTMLCanvasElement): () => void {
     }
     disposed = true;
     window.removeEventListener('resize', resize);
-    stopDpr();
+    stopDpr?.();
+    releaseBitmap(canvas);
   };
 }

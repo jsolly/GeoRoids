@@ -56,6 +56,7 @@ interface JoinedAcknowledgment {
   resumeToken: string;
   snapshotVersion: typeof SNAPSHOT_VERSION;
   asteroidInteractions: 1;
+  explorationVersion: 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,6 +85,7 @@ function readJoinedAcknowledgment(socket: RecordingSocket): JoinedAcknowledgment
     resumeToken: data['resumeToken'],
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
   };
 }
 
@@ -93,7 +95,7 @@ type SendOptions = { mask?: boolean; binary?: boolean; compress?: boolean; fin?:
 
 /** Application state survives clearing the fixture's transport recording. */
 class ScenarioSocket extends RecordingSocket {
-  private readonly decoder = new SnapshotDecoder();
+  private readonly decoder = new SnapshotDecoder('live');
   private protocolReady = false;
   private ownerId: string | undefined;
   private appliedWorld: ServerGameSnapshot | undefined;
@@ -182,7 +184,7 @@ export class GameServerWorld {
   constructor(seed = 42) {
     this.engine = new GameEngine(seed);
     this.core = new WebSocketCore(this.engine);
-    this.engine.setOnAsteroidHits((hits) => {
+    this.engine.asteroidHitFeedback.setListener((hits) => {
       this.core.getMessageHandler().broadcastAppliedAsteroidHits(hits);
     });
   }
@@ -262,6 +264,7 @@ export class GameServerWorld {
           kitId: options.kitId,
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           cooperativeVersion: 1,
           ...(options.worldRemains ? { worldRemains: options.worldRemains } : {}),
 
@@ -344,13 +347,13 @@ export class GameServerWorld {
 
   hitAsteroid(pilot: Pilot): void {
     const ship = this.entity(pilot);
-    this.engine.addAsteroid(
+    this.engine.asteroidLifecycle.insert(
       scenarioAsteroid({
         id: `scenario-roid-${pilot.id}`,
         position: { x: ship.position.x, y: ship.position.y },
       })
     );
-    this.engine.resolveAuthoritativeCombat();
+    this.engine.contactCombat.advance();
   }
 
   move(pilot: Pilot, position: Position): void {
@@ -398,9 +401,9 @@ export class GameServerWorld {
   /** Remove the production-seeded belt when a scenario isolates ship combat. */
   clearAsteroids(): void {
     for (const asteroid of this.engine.getAllAsteroids()) {
-      this.engine.removeAsteroid(asteroid.id);
+      this.engine.asteroidLifecycle.remove(asteroid.id);
     }
-    this.engine.addAsteroid(
+    this.engine.asteroidLifecycle.insert(
       scenarioAsteroid({
         id: 'scenario-combat-buffer',
         position: { x: 2000, y: 2000 },

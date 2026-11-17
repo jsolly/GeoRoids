@@ -127,7 +127,7 @@ test('a pose credited a blocked server second lands where the pilot flew and is 
     throw new Error('Expected the enhanced pilot to join');
   }
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   expect(engine.stepClock()).toBe(0);
   const speed = engine.playerMotion.legalSpeed(pilot, engine.getServerTime());
@@ -191,7 +191,13 @@ function join(id: string) {
   core.handleClientMessage(
     {
       type: 'join',
-      data: { id, name: id, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
+      data: {
+        id,
+        name: id,
+        snapshotVersion: SNAPSHOT_VERSION,
+        asteroidInteractions: 1,
+        explorationVersion: 1,
+      },
     },
     socket
   );

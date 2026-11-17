@@ -80,7 +80,7 @@ test.each([
       server.wss.once('connection', (socket) => socket.send(text));
       client = new WireClient(
         new WebSocket(
-          `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`,
+          `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`,
           { perMessageDeflate: offered }
         )
       );

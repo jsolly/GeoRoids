@@ -1,0 +1,51 @@
+---
+name: Railway version pin
+'on':
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: railway-production-version-pin
+  cancel-in-progress: false
+jobs:
+  pin:
+    # John authorized manual plan-only setup on 2026-11-14. Production apply
+    # requires separate approval and a reviewed workflow change.
+    if: >-
+      github.repository == 'jsolly/GeoRoids' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: railway-production-config
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Install reviewed dependencies
+        run: npm ci --ignore-scripts
+      - name: Install checksum-pinned official Railway CLI
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/railway-cli"
+          mkdir -m 700 "$work"
+          curl --fail --silent --show-error --location \
+            https://github.com/railwayapp/cli/releases/download/v5.50.2/railway-v5.50.2-x86_64-unknown-linux-musl.tar.gz \
+            --output "$work/railway.tar.gz"
+          echo "16a3ead7ce37fcdd2349f27a26d56b4914e47d6c6b83bd416e218d6afa680960  $work/railway.tar.gz" | sha256sum --check --status
+          tar -xzf "$work/railway.tar.gz" -C "$work" railway
+          echo "b0919b175c72cd829f9124caa9cf6d1a116741d847ef7be72abed14c70d3f43a  $work/railway" | sha256sum --check --status
+          echo "RAILWAY_CONFIG_CLI=$work/railway" >> "$GITHUB_ENV"
+      - name: Review the read-only pin plan
+        env:
+          RAILWAY_CONFIG_TOKEN: ${{ secrets.RAILWAY_CONFIG_TOKEN }}
+          RAILWAY_CONFIG_APPLY_ENABLED: disabled
+        run: |
+          umask 077
+          node --import tsx scripts/railway-version-pin-entry.ts --plan-only

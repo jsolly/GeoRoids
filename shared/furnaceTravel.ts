@@ -8,7 +8,7 @@ export const FURNACE_TRAVEL = {
   SPEED: 3_000,
 } as const;
 
-export function nearestTravelFurnace(position: Position, field: FurnaceField) {
+export function nearestTravelFurnace(position: Position, field: Pick<FurnaceField, 'nearby'>) {
   return field
     .nearby(position, TOWN_HEARTH.radius)
     .filter(

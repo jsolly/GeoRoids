@@ -18,7 +18,7 @@ class PilotSocket {
   readonly messages: WireClient['messages'];
   private readonly wire: WireClient;
   readonly snapshots: ServerGameSnapshot[] = [];
-  private readonly decoder = new SnapshotDecoder();
+  private readonly decoder = new SnapshotDecoder('live');
 
   constructor(readonly ws: WebSocket) {
     this.wire = new WireClient(ws);
@@ -81,6 +81,7 @@ class PilotSocket {
       kitId: 'hauler',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       ...(resumeToken != null && resumeToken !== '' ? { resumeToken } : {}),
     });
     return this.waitFor(() => {
@@ -108,7 +109,7 @@ async function connect(): Promise<PilotSocket> {
   }
   const client = new PilotSocket(
     new WebSocket(
-      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
     )
   );
   clients.push(client);
@@ -220,6 +221,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       position: { x: 800, y: 0 },
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: joined['resumeToken'],
     });
     const error = await other.waitFor(
@@ -315,6 +317,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       kitId: 'hauler',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       resumeToken: token,
     });
     await retired.waitFor(
@@ -341,7 +344,7 @@ test('shield commands require the owning socket and cooldown survives a real rec
   actor.cargo = 100;
   delete actor.spawnProtectionTimer;
   const protectedHealth = actor.health;
-  expect(engine.handleShipDamage('pilot', 'asteroid', 30).applied).toBe(false);
+  expect(engine.shipDamage.apply('pilot', 'asteroid', 30).applied).toBe(false);
   expect(actor.cargo).toBe(100);
   expect(actor.health).toBe(protectedHealth);
   pilot.send('activateShield', { id: 'pilot' });

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
-import { SNAPSHOT_VERSION, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { readDebugHudMetrics } from '../../../src/diagnostics/debugHudMetrics';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { createPlayer } from '../../../src/entities/player/createPlayer';
@@ -11,6 +11,7 @@ import {
   JOIN_COMPLETION_TIMEOUT_MS,
 } from '../../../src/network/services/connectionHealth';
 import { logger } from '../../../src/utils/Logger';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { snapshotFixture } from './snapshotFixture';
 
 class Transport {
@@ -168,6 +169,8 @@ test('leaving while connecting settles the promise and ignores a late open callb
 
 test('a thrown gameplay send reports failure and reconnects without replaying the command', async () => {
   const socket = await open();
+  manager.setLocalPlayerName('Runtime pilot');
+  manager.initializeAsteroidSync();
   socket.receive('joined', {
     id: manager.getClientId(),
     name: 'Runtime pilot',
@@ -175,6 +178,7 @@ test('a thrown gameplay send reports failure and reconnects without replaying th
     color: '#fff',
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
     terrainSeed: 7,
     resumeToken: 'a'.repeat(64),
   });
@@ -338,6 +342,7 @@ test('a pre-join server error fails the attempt while a post-join error leaves t
       color: '#fff',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
     });
@@ -362,6 +367,7 @@ test('join waits for the joined pose and first snapshot before play can start', 
     color: '#fff',
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
     terrainSeed: 7,
     resumeToken: 'a'.repeat(64),
   });
@@ -403,6 +409,7 @@ test('the first local authoritative state clears the join completion deadline', 
       color: '#fff',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
     });
@@ -436,6 +443,7 @@ test('resync diagnostics count successful sends only', async () => {
       color: '#fff',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
     });

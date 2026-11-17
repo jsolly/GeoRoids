@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { type ChildProcessByStdio, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -15,20 +15,70 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
+import type { Readable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { afterAll, test } from 'vitest';
-import { runGate } from './gate.mjs';
 import {
   candidateMatches,
+  canonicalEnvironment,
+  receipt as checkedReceipt,
   digest,
   fileRecord,
+  type GateIdentity,
+  type GateReceipt,
   GRAPH_COMMANDS,
+  identity,
+  lifecycleCommand,
+  literalOnlyChange,
+  runGate,
   STAGES,
+  type StageRunner,
   sourceRows,
-} from './gate-receipt.mjs';
-import { canonicalEnvironment, lifecycleCommand } from './gate-runtime.mjs';
-import { literalOnlyChange } from './literal-only-change.mjs';
+} from './fixtures/gate-interop';
+
+function objectValue(value: unknown): Record<string, unknown> {
+  assert.ok(value !== null && typeof value === 'object' && !Array.isArray(value));
+  return Object.fromEntries(Object.entries(value));
+}
+
+function at<T>(values: T[], index: number): T {
+  const value = values[index];
+  assert.ok(value !== undefined, `Missing entry ${index}`);
+  return value;
+}
+
+function present<T>(value: T | undefined): T {
+  assert.ok(value !== undefined, 'Missing required value');
+  return value;
+}
+
+function birthRecord(value: unknown): { pid: number; start: string } {
+  const data = objectValue(value);
+  const pid = data['pid'];
+  const start = data['start'];
+  assert.ok(
+    typeof pid === 'number' && Number.isInteger(pid) && pid > 0 && typeof start === 'string'
+  );
+  return { pid, start };
+}
+
+function runtimeProbe(source: string) {
+  const data = objectValue(JSON.parse(source));
+  const runtime = data['runtime'];
+  const installation = data['installation'];
+  const reusable = data['reusable'];
+  const unknown: unknown = data['unknown'];
+  const presentValues: unknown = data['present'];
+  assert.ok(
+    typeof runtime === 'string' && typeof installation === 'string' && typeof reusable === 'boolean'
+  );
+  assert.ok(Array.isArray(unknown) && unknown.every((item: unknown) => typeof item === 'string'));
+  assert.ok(
+    Array.isArray(presentValues) && presentValues.every((item: unknown) => typeof item === 'string')
+  );
+  return { ...data, runtime, installation, reusable, unknown, present: presentValues };
+}
 
 // This file runs in a dedicated Vitest fork. Isolate every fixture Git
 // call, including production helpers under test, from a committing parent's
@@ -39,10 +89,10 @@ for (const key of Object.keys(process.env)) {
     delete process.env[key];
   }
 }
-process.env.HOME = fixtureHome;
-process.env.XDG_CONFIG_HOME = join(fixtureHome, 'xdg');
-process.env.GIT_CONFIG_GLOBAL = '/dev/null';
-process.env.GIT_CONFIG_NOSYSTEM = '1';
+process.env['HOME'] = fixtureHome;
+process.env['XDG_CONFIG_HOME'] = join(fixtureHome, 'xdg');
+process.env['GIT_CONFIG_GLOBAL'] = '/dev/null';
+process.env['GIT_CONFIG_NOSYSTEM'] = '1';
 afterAll(() => rmSync(fixtureHome, { recursive: true, force: true }));
 
 // Independent acceptance contract: never derive this battery from STAGES.
@@ -70,7 +120,7 @@ const REQUIRED_COMMANDS = [
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'georoids-gate-contract-'));
-  const git = (...args) => {
+  const git = (...args: string[]) => {
     const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
   };
@@ -81,7 +131,7 @@ function fixture() {
   let installation = 'installed';
   let runtime = 'runtime';
   let buildHead = 'a'.repeat(40);
-  const capture = () => {
+  const capture = (): GateIdentity => {
     const source = sourceRows(root);
     return {
       source,
@@ -93,17 +143,19 @@ function fixture() {
       manifest: digest(JSON.stringify(STAGES)),
     };
   };
-  const calls = [];
-  const run = (_, args, options) => {
+  const calls: string[] = [];
+  const run: StageRunner = (_, args, options) => {
     calls.push(args[1]);
     writeFileSync(options.artifact, 'passed\n');
     if (args[1] === 'test:review') {
-      writeFileSync(options.env.GEOROIDS_REVIEW_RECEIPT, '{"cleanupSucceeded":true}');
+      const reviewPath = options.env['GEOROIDS_REVIEW_RECEIPT'];
+      assert.ok(reviewPath);
+      writeFileSync(reviewPath, '{"cleanupSucceeded":true}');
     }
     return { status: 0, stdout: 'passed\n', stderr: '' };
   };
-  const validateReview = (path) => {
-    assert.equal(JSON.parse(readFileSync(path, 'utf8')).cleanupSucceeded, true);
+  const validateReview = (path: string) => {
+    assert.equal(objectValue(JSON.parse(readFileSync(path, 'utf8')))['cleanupSucceeded'], true);
   };
   const gate = () =>
     runGate({
@@ -135,7 +187,7 @@ function fixture() {
 }
 
 /** The digested variables Claude Code cloud's egress proxy injects, at fixture paths. */
-function cloudProxyEnvironment(root) {
+function cloudProxyEnvironment(root: string) {
   return {
     NODE_EXTRA_CA_CERTS: join(root, '.performance', 'proxy-ca.crt'),
     NPM_CONFIG_USERCONFIG: join(root, '.performance', 'proxy.npmrc'),
@@ -153,8 +205,8 @@ test('complete proof reuses only exact candidate and retained successful artifac
     );
     f.calls.length = 0;
     await f.gate();
-    assert.deepEqual(f.calls, []);
-    writeFileSync(first.stages[0].artifact, 'corrupt');
+    assert.deepEqual([...f.calls], []);
+    writeFileSync(at(first.stages, 0).artifact, 'corrupt');
     await f.gate();
     assert.equal(f.calls.length, STAGES.length);
     f.calls.length = 0;
@@ -178,28 +230,32 @@ test('committing the already verified source reuses code checks and executes a b
     const committed = await f.gate();
     assert.deepEqual(f.calls, ['build']);
     assert.equal(committed.identity.buildHead, 'b'.repeat(40));
-    assert.equal(committed.stages.find((stage) => stage.command === 'build').kind, 'ran');
+    assert.equal(present(committed.stages.find((stage) => stage.command === 'build')).kind, 'ran');
     for (const stage of committed.stages.filter((row) => row.command !== 'build')) {
       assert.equal(stage.kind, 'head-reuse');
       assert.equal(
         stage.artifact,
-        original.stages.find((row) => row.command === stage.command).artifact
+        present(original.stages.find((row) => row.command === stage.command)).artifact
       );
       assert.equal(
         stage.digest,
-        original.stages.find((row) => row.command === stage.command).digest
+        present(original.stages.find((row) => row.command === stage.command)).digest
       );
-      assert.equal(stage.provenance.buildHead, 'a'.repeat(40));
+      assert.equal(present(stage.provenance).buildHead, 'a'.repeat(40));
     }
     f.calls.length = 0;
     await f.gate();
-    assert.deepEqual(f.calls, [], 'complete new-head receipt is reusable');
+    assert.deepEqual([...f.calls], [], 'complete new-head receipt is reusable');
     f.buildHead('c'.repeat(40));
     const later = await f.gate();
     assert.deepEqual(f.calls, ['build']);
     for (const row of later.stages.filter((item) => item.kind === 'head-reuse')) {
       const earlier = committed.stages.find((item) => item.command === row.command);
-      assert.deepEqual(row.provenance, earlier.provenance, 'reuse keeps the fully executed origin');
+      assert.deepEqual(
+        row.provenance,
+        present(earlier).provenance,
+        'reuse keeps the fully executed origin'
+      );
     }
     f.buildHead('a'.repeat(40));
     f.calls.length = 0;
@@ -207,14 +263,21 @@ test('committing the already verified source reuses code checks and executes a b
     assert.deepEqual(f.calls, ['build'], 'returning to the original HEAD still rebuilds its stamp');
     f.calls.length = 0;
     await f.gate();
-    assert.deepEqual(f.calls, [], 'the round-trip receipt retains valid executed origins');
+    assert.deepEqual([...f.calls], [], 'the round-trip receipt retains valid executed origins');
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
 });
 
 test('new-head reuse refuses changed execution inputs, damaged donor evidence and a failed build', async () => {
-  for (const changed of ['source', 'installation', 'runtime', 'unknown', 'cleanup']) {
+  const changes: ('source' | 'installation' | 'runtime' | 'unknown' | 'cleanup')[] = [
+    'source',
+    'installation',
+    'runtime',
+    'unknown',
+    'cleanup',
+  ];
+  for (const changed of changes) {
     const f = fixture();
     try {
       const validated = await f.gate();
@@ -276,7 +339,9 @@ test('new-head reuse refuses changed execution inputs, damaged donor evidence an
     f.calls.length = 0;
     const committed = await f.gate();
     assert.deepEqual(f.calls, ['build'], 'retry still executes the failed build');
-    const proof = committed.stages.find((row) => row.kind === 'head-reuse').provenance.receipt;
+    const proof = present(
+      present(committed.stages.find((row) => row.kind === 'head-reuse')).provenance
+    ).receipt;
     writeFileSync(proof, 'damaged complete donor evidence');
     f.calls.length = 0;
     await f.gate();
@@ -304,7 +369,7 @@ test('new-head reuse refuses late index mutation or loss of retained donor evide
               if (fault === 'index') {
                 f.git('rm', '--cached', 'data.ts');
               } else {
-                writeFileSync(old.stages[0].artifact, 'damaged during build');
+                writeFileSync(at(old.stages, 0).artifact, 'damaged during build');
               }
               return { status: 0 };
             },
@@ -374,7 +439,7 @@ test('a newer failed or interrupted code attempt blocks an older pass until fres
         /failed/u
       );
       const capture = f.capture;
-      const originalInstallation = JSON.parse(old).identity.installation;
+      const originalInstallation = checkedReceipt(JSON.parse(old)).identity.installation;
       const retryOptions = {
         root: f.root,
         capture: () => ({ ...capture(), installation: originalInstallation }),
@@ -392,7 +457,7 @@ test('a newer failed or interrupted code attempt blocks an older pass until fres
       );
       f.calls.length = 0;
       await runGate(retryOptions);
-      assert.deepEqual(f.calls, [], 'the newly complete pass remains reusable');
+      assert.deepEqual([...f.calls], [], 'the newly complete pass remains reusable');
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
@@ -429,7 +494,7 @@ test('literal tuning skips only graphs while partial staging never certifies can
     f.git('add', '.');
     f.calls.length = 0;
     await f.gate();
-    assert.deepEqual(f.calls, []);
+    assert.deepEqual([...f.calls], []);
     chmodSync(join(f.root, 'data.ts'), 0o755);
     assert.equal(candidateMatches(f.root, sourceRows(f.root)), false);
     f.calls.length = 0;
@@ -484,7 +549,7 @@ test('failed or cancelled stage and incomplete cleanup never replace successful 
 });
 test('queued stage reports progress before completion and retains failed subprocess output', async () => {
   const f = fixture();
-  let child;
+  let child: ChildProcessByStdio<null, Readable, Readable> | undefined;
   try {
     await f.gate();
     f.installation();
@@ -532,28 +597,27 @@ try {
       ],
       { stdio: ['ignore', 'pipe', 'pipe'], detached: true }
     );
-    const finished = new Promise((accept, reject) => {
-      child.once('error', reject);
-      child.once('close', (status, signal) => accept({ status, signal }));
-    });
+    const finished = new Promise<{ status: number | null; signal: NodeJS.Signals | null }>(
+      (accept, reject) => {
+        present(child).once('error', reject);
+        present(child).once('close', (status, signal) => accept({ status, signal }));
+      }
+    );
     let output = '';
-    let progress;
-    const reported = new Promise((accept) => {
-      progress = accept;
-    });
-    const report = (chunk) => {
+    const reported = Promise.withResolvers<boolean>();
+    const report = (chunk: Buffer) => {
       output += chunk;
       if (
         output.includes('Waiting for heavy validation admission, ticket fixture: fixture-queue') &&
         output.includes('Review artifacts: fixture-review') &&
         output.includes('Waiting for heavy validation ticket allocation: fixture-allocation')
       ) {
-        progress(true);
+        reported.resolve(true);
       }
     };
     child.stdout.on('data', report);
     child.stderr.on('data', report);
-    assert.equal(await Promise.race([reported, finished.then(() => false)]), true, output);
+    assert.equal(await Promise.race([reported.promise, finished.then(() => false)]), true, output);
     assert.equal(existsSync(completed), false);
     assert.doesNotMatch(output, /private (?:stdout|stderr) diagnostics/u);
     writeFileSync(release, 'continue');
@@ -582,7 +646,7 @@ try {
   }
 });
 test('classifier freezes symbols, shape, module strings, and unknown string use', () => {
-  const check = (a, b) => literalOnlyChange({ 'data.ts': a }, { 'data.ts': b });
+  const check = (a: string, b: string) => literalOnlyChange({ 'data.ts': a }, { 'data.ts': b });
   assert.equal(check('export const a={speed:1};', 'export const a={speed:2};'), true);
   for (const [a, b] of [
     ['const a=1;', 'const b=1;'],
@@ -592,7 +656,7 @@ test('classifier freezes symbols, shape, module strings, and unknown string use'
     ['const a=foo(1);', 'const a=foo(2);'],
     ['const a=1;', 'const a=1+1;'],
   ]) {
-    assert.equal(check(a, b), false);
+    assert.equal(check(present(a), present(b)), false);
   }
   assert.equal(literalOnlyChange({ 'package.json': '{}' }, { 'package.json': '{"a":1}' }), false);
 });
@@ -612,7 +676,7 @@ test('installed payload identity records executable mode and symlink contents', 
   }
 });
 
-function runtimeIdentityFixture(root) {
+function runtimeIdentityFixture(root: string) {
   mkdirSync(join(root, 'scripts'), { recursive: true });
   writeFileSync(
     join(root, 'scripts/repo-python.sh'),
@@ -625,17 +689,18 @@ function runtimeIdentityFixture(root) {
   const python = join(root, 'bin/python3');
   writeFileSync(python, `#!/bin/sh\nprintf '%s\\n' '${python}'\n`, { mode: 0o755 });
   const npm = join(root, 'bin/npm');
+  // Native npm's backing CLI is JavaScript. Keep that fixture format so the
+  // identity check still follows the real shell-wrapper-to-JavaScript boundary.
   const cli = join(root, 'bin/npm-cli.js');
   writeFileSync(cli, readFileSync(npm));
-  const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   writeFileSync(npm, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`, {
     mode: 0o755,
   });
   return { bash, python, npm, cli };
 }
 
-test('installed identity ignores the caches validation itself writes', async () => {
-  const { identity } = await import('./gate-receipt.mjs');
+test('installed identity ignores the caches validation itself writes', () => {
   const f = fixture();
   try {
     mkdirSync(join(f.root, 'bin'));
@@ -663,6 +728,8 @@ test('installed identity ignores the caches validation itself writes', async () 
     // A cold installation: no tool downloads, loader caches or build caches yet.
     const cold = identity(f.root, env).installation;
 
+    // These .js/.mjs payloads are generated cache/module-format inputs under
+    // inspection, not authored test-driver modules. Preserve their exact bytes.
     // Stages then write their own scratch, exactly as a real run does: pinned
     // tool archives and their extraction directory, jiti's loader cache for the
     // Vitest configuration, and the build and test caches.
@@ -715,8 +782,7 @@ test('installed identity ignores the caches validation itself writes', async () 
   }
 });
 
-test('real identity covers installed bytes, ignored env, tool bytes, and unknown overrides', async () => {
-  const { identity } = await import('./gate-receipt.mjs');
+test('real identity covers installed bytes, ignored env, tool bytes, and unknown overrides', () => {
   const f = fixture();
   try {
     mkdirSync(join(f.root, 'bin'));
@@ -773,13 +839,13 @@ test('real identity covers installed bytes, ignored env, tool bytes, and unknown
     assert.notEqual(identity(f.root, env).runtime, second.runtime);
     assert.equal(identity(f.root, { ...env, GEOROIDS_UNKNOWN_OVERRIDE: '1' }).reusable, false);
     const systemCa = identity(f.root, { ...env, NODE_USE_SYSTEM_CA: '1' });
-    assert.equal(systemCa.reusable, true, JSON.stringify(systemCa.unknown));
-    assert.notEqual(systemCa.runtime, identity(f.root, env).runtime);
+    assert.equal(systemCa['reusable'], true, JSON.stringify(systemCa['unknown']));
+    assert.notEqual(systemCa['runtime'], identity(f.root, env).runtime);
     const proxyVariables = cloudProxyEnvironment(f.root);
     for (const [key, value] of Object.entries(proxyVariables)) {
       const proxied = identity(f.root, { ...env, [key]: value });
-      assert.equal(proxied.reusable, true, `${key}: ${JSON.stringify(proxied.unknown)}`);
-      assert.notEqual(proxied.runtime, identity(f.root, env).runtime, key);
+      assert.equal(proxied['reusable'], true, `${key}: ${JSON.stringify(proxied['unknown'])}`);
+      assert.notEqual(proxied['runtime'], identity(f.root, env).runtime, key);
     }
     // npm selects its user config from either case; the selected file's bytes are consumed.
     const userconfig = { ...env, NPM_CONFIG_USERCONFIG: proxyVariables.NPM_CONFIG_USERCONFIG };
@@ -815,20 +881,20 @@ test('manifest tampering, missing receipts and final source mutation fail closed
   try {
     await f.gate();
     const path = join(f.root, '.performance/gate/receipt.json');
-    const receipt = JSON.parse(readFileSync(path, 'utf8'));
+    const receipt = checkedReceipt(JSON.parse(readFileSync(path, 'utf8')));
     receipt.stages.reverse();
     writeFileSync(path, JSON.stringify(receipt));
     f.calls.length = 0;
     await f.gate();
     assert.equal(f.calls.length, STAGES.length);
-    const current = JSON.parse(readFileSync(path, 'utf8'));
+    const current = checkedReceipt(JSON.parse(readFileSync(path, 'utf8')));
     rmSync(current.reviewReceipt);
     f.calls.length = 0;
     await f.gate();
     assert.equal(f.calls.length, STAGES.length);
     f.installation();
     const prior = readFileSync(path, 'utf8');
-    const mutate = (...args) => {
+    const mutate = (...args: Parameters<StageRunner>) => {
       const result = f.run(...args);
       if (args[1][1] === 'build') {
         writeFileSync(join(f.root, 'data.ts'), 'const changed=123;');
@@ -898,10 +964,13 @@ run_step() { printf 'step:%s\\n' "$1" >> "$CALLS"; shift; "$@"; }
         'core',
       ]);
     }
-    const packageJson = JSON.parse(
-      readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+    const packageJson = objectValue(
+      JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
     );
-    assert.equal(packageJson.scripts.gate, 'FLEET_DOC_FAST=0 bash .git-hooks/pre-commit');
+    assert.equal(
+      objectValue(packageJson['scripts'])['gate'],
+      'FLEET_DOC_FAST=0 bash .git-hooks/pre-commit'
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -924,10 +993,10 @@ test('staging a deletion preserves working content identity but changes candidat
 test('every gate stage writes generated caches in its issued artifact session', async () => {
   const f = fixture();
   try {
-    const sessions = [];
-    const cacheRunner = (...args) => {
+    const sessions: string[] = [];
+    const cacheRunner = (...args: Parameters<StageRunner>) => {
       const options = args[2];
-      const session = options.env.GEOROIDS_TEST_SESSION_DIR;
+      const session = present(options.env['GEOROIDS_TEST_SESSION_DIR']);
       assert.match(session, /\.performance\/gate\/run\.[^/]+\/session-\d+$/u);
       assert.equal(session.startsWith(`${f.root}/`), true);
       sessions.push(session);
@@ -954,7 +1023,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
       prepare: () => ({ status: 0, stdout: 'fixture tool preparation' }),
       environment: {},
     });
-    assert.deepEqual(f.calls, []);
+    assert.deepEqual([...f.calls], []);
     assert.equal(sessions.length, STAGES.length);
     assert.match(
       readFileSync(new URL('./client-build.ts', import.meta.url), 'utf8'),
@@ -1002,7 +1071,10 @@ test('every gate stage writes generated caches in its issued artifact session', 
         `import { expect, test } from 'vitest';\nimport { marker } from '${depth}src/cache-proof';\ntest('loads the cached module', () => expect(marker).toBe(17));\n`
       );
     }
-    const installedFiles = (directory, prefix = '') =>
+    const installedFiles = (
+      directory: string,
+      prefix = ''
+    ): [string, ReturnType<typeof fileRecord>][] =>
       readdirSync(directory, { withFileTypes: true })
         .sort((left, right) => left.name.localeCompare(right.name))
         .flatMap((entry) => {
@@ -1014,9 +1086,9 @@ test('every gate stage writes generated caches in its issued artifact session', 
     const issuedSession = join(f.root, '.performance/consumer-session');
     for (const issued of [true, false]) {
       const env = { ...process.env };
-      delete env.GEOROIDS_TEST_SESSION_DIR;
+      delete env['GEOROIDS_TEST_SESSION_DIR'];
       if (issued) {
-        env.GEOROIDS_TEST_SESSION_DIR = issuedSession;
+        env['GEOROIDS_TEST_SESSION_DIR'] = issuedSession;
       }
       const result = spawnSync(
         process.execPath,
@@ -1050,7 +1122,7 @@ test('every gate stage writes generated caches in its issued artifact session', 
     // installed tree just as the game projects do during an admitted gate.
     for (const [name, extension] of [
       ['code-integration-runner', 'mjs'],
-      ['ci-contract', 'mjs'],
+      ['ci-contract', 'ts'],
       ['server-release-inputs', 'mjs'],
       ['dev-server', 'ts'],
       ['lint-policy', 'ts'],
@@ -1112,7 +1184,7 @@ test('hostile inherited Git repository, index and config never affect parent sta
       '-qm',
       'fixture'
     );
-    const tracked = ['HEAD', 'index', 'config'].map((name) => [
+    const tracked = ['HEAD', 'index', 'config'].map((name): [string, Buffer] => [
       name,
       readFileSync(join(f.root, '.git', name)),
     ]);
@@ -1130,7 +1202,7 @@ test('hostile inherited Git repository, index and config never affect parent sta
         'run',
         '--config',
         'config/testing/tooling.ts',
-        'scripts/gate-contract.test.mjs',
+        'scripts/gate-contract.test.ts',
         '--reporter=verbose',
         '--testNamePattern=^(?!hostile inherited Git repository, index and config never affect parent state$)',
       ],
@@ -1213,7 +1285,7 @@ test('cache-hit final boundary rejects index-only candidate mutation', async () 
         }),
       /inputs changed/u
     );
-    assert.deepEqual(f.calls, []);
+    assert.deepEqual([...f.calls], []);
     assert.equal(candidateMatches(f.root, f.capture().source), false);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
@@ -1226,7 +1298,7 @@ test('malformed graph skip, classifier and witness metadata always force complet
     await f.gate();
     const path = join(f.root, '.performance/gate/receipt.json');
     const original = readFileSync(path, 'utf8');
-    const mutations = [
+    const mutations: ((r: GateReceipt) => void)[] = [
       (r) => {
         for (const stage of r.stages) {
           stage.kind = 'literal-graph';
@@ -1235,23 +1307,23 @@ test('malformed graph skip, classifier and witness metadata always force complet
         delete r.graphWitness;
       },
       (r) => {
-        r.stages[2].kind = 'literal-graph';
+        at(r.stages, 2).kind = 'literal-graph';
       },
       (r) => {
         delete r.classifier;
       },
       (r) => {
-        r.graphArtifacts[0].witness = '0'.repeat(64);
+        at(r.graphArtifacts, 0).witness = '0'.repeat(64);
       },
       (r) => {
-        r.graphArtifacts[0].command = 'test';
+        at(r.graphArtifacts, 0).command = 'test';
       },
       (r) => {
         r.classifier = { kind: 'literal-only', witness: r.graphWitness };
       },
     ];
     for (const mutation of mutations) {
-      const receipt = JSON.parse(original);
+      const receipt = checkedReceipt(JSON.parse(original));
       mutation(receipt);
       writeFileSync(path, JSON.stringify(receipt));
       f.calls.length = 0;
@@ -1263,8 +1335,7 @@ test('malformed graph skip, classifier and witness metadata always force complet
   }
 });
 
-test('actual identity hashes hosted SHAs, npm config and resolved consumed file links', async () => {
-  const { identity } = await import('./gate-receipt.mjs');
+test('actual identity hashes hosted SHAs, npm config and resolved consumed file links', () => {
   const f = fixture();
   const external = mkdtempSync(join(tmpdir(), 'georoids-consumed-'));
   try {
@@ -1392,6 +1463,7 @@ test('missing mandatory unit stage fails independent battery assertion', async (
   const f = fixture();
   const index = STAGES.findIndex(([, command]) => command === 'test');
   const [removed] = STAGES.splice(index, 1);
+  assert.ok(removed);
   try {
     await f.gate();
     assert.throws(() =>
@@ -1436,7 +1508,7 @@ test('cold pinned archive bootstrap precedes capture and failure cannot consume 
     assert.match(readFileSync(first.bootstrap.artifact, 'utf8'), /canonical-helper-prepared/u);
     f.calls.length = 0;
     await runGate(options);
-    assert.deepEqual(f.calls, []);
+    assert.deepEqual([...f.calls], []);
     const path = join(f.root, '.performance/gate/receipt.json');
     const prior = readFileSync(path, 'utf8');
     await assert.rejects(
@@ -1447,7 +1519,7 @@ test('cold pinned archive bootstrap precedes capture and failure cannot consume 
         }),
       /tool preparation failed/u
     );
-    assert.deepEqual(f.calls, []);
+    assert.deepEqual([...f.calls], []);
     assert.equal(readFileSync(path, 'utf8'), prior);
     const preparationHomes = readdirSync(join(f.root, '.performance/gate')).filter((name) =>
       name.startsWith('prepare.')
@@ -1508,6 +1580,8 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   writeFileSync(join(f.root, 'package.json'), '{"name":"owned-runtime-fixture","private":true}');
   const gitTool = join(f.root, 'bin/git');
   writeFileSync(gitTool, '#!/bin/sh\nexec /usr/bin/git "$@"\n', { mode: 0o755 });
+  // This fixture exercises the production launcher's JavaScript ESM entrypoint
+  // and npm CLI selection. Keep those input module formats while the driver is TS.
   const probe = join(f.root, 'probe.mjs');
   writeFileSync(
     probe,
@@ -1554,7 +1628,7 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     process.exitCode = await runAdmitted('checkout', [process.execPath, ${JSON.stringify(launcher)}], { root: process.cwd() });
   `
   );
-  const base = Object.fromEntries(
+  const base: NodeJS.ProcessEnv = Object.fromEntries(
     Object.entries(process.env).filter(
       ([key]) =>
         !key.startsWith('GIT_') &&
@@ -1571,21 +1645,21 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     NODE_REPL_NODE_MODULE_DIRS: 'fixture-only-modules',
     NODE_REPL_TRUSTED_CODE_PATHS: 'fixture-only-paths',
     NODE_REPL_TRUSTED_SERVICES: 'fixture-only-services',
-    PATH: `${join(f.root, 'bin')}:${process.env.PATH}`,
+    PATH: `${join(f.root, 'bin')}:${process.env['PATH']}`,
   });
   const core = spawnSync('/usr/bin/git', ['--exec-path'], { encoding: 'utf8' }).stdout.trim();
-  function launch(environment, nested = false, admitted = false) {
+  function launch(environment: NodeJS.ProcessEnv, nested = false, admitted = false) {
     const command = nested
       ? lifecycleCommand(f.root, environment, launcher)
       : [process.execPath, admitted ? admittedParent : launcher];
-    const result = spawnSync(command[0], command.slice(1), {
+    const result = spawnSync(present(command[0]), command.slice(1), {
       cwd: f.root,
       env: environment,
       encoding: 'utf8',
       timeout: 20000,
     });
     assert.equal(result.status, 0, result.stderr);
-    return JSON.parse(result.stdout.slice(result.stdout.indexOf('{')));
+    return runtimeProbe(result.stdout.slice(result.stdout.indexOf('{')));
   }
   const direct = launch(base);
   assert.equal(direct.reusable, true, JSON.stringify(direct.unknown));
@@ -1605,13 +1679,13 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     direct
   );
   // Claude desktop sets Node's system TLS trust; every launch keeps and digests it.
-  const systemCa = { ...base, NODE_USE_SYSTEM_CA: '1' };
+  const systemCa: NodeJS.ProcessEnv = { ...base, NODE_USE_SYSTEM_CA: '1' };
   const trusted = launch(systemCa);
   assert.equal(trusted.reusable, true, JSON.stringify(trusted.unknown));
   assert.deepEqual(launch(systemCa, true), trusted);
   assert.deepEqual(launch(systemCa, false, true), trusted);
   assert.deepEqual(
-    launch({ ...systemCa, GIT_PREFIX: '', PATH: `${core}:${systemCa.PATH}` }),
+    launch({ ...systemCa, GIT_PREFIX: '', PATH: `${core}:${systemCa['PATH']}` }),
     trusted
   );
   assert.notEqual(trusted.runtime, direct.runtime);
@@ -1628,7 +1702,7 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     assert.deepEqual(alone.present, [key], `${key} stays in execution`);
     assert.notEqual(alone.runtime, direct.runtime, `${key} enters the runtime digest`);
   }
-  const proxied = { ...base, ...proxyVariables };
+  const proxied: NodeJS.ProcessEnv = { ...base, ...proxyVariables };
   const cloud = launch(proxied);
   assert.equal(cloud.reusable, true, JSON.stringify(cloud.unknown));
   assert.deepEqual(cloud.present, Object.keys(proxyVariables));
@@ -1637,7 +1711,10 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   assert.deepEqual(launch(proxied), cloud);
   assert.deepEqual(launch(proxied, true), cloud);
   assert.deepEqual(launch(proxied, false, true), cloud);
-  assert.deepEqual(launch({ ...proxied, GIT_PREFIX: '', PATH: `${core}:${proxied.PATH}` }), cloud);
+  assert.deepEqual(
+    launch({ ...proxied, GIT_PREFIX: '', PATH: `${core}:${proxied['PATH']}` }),
+    cloud
+  );
   assert.notEqual(cloud.runtime, direct.runtime);
   assert.notEqual(
     launch({ ...proxied, npm_config_https_proxy: 'http://other-proxy.invalid:3128' }).runtime,
@@ -1650,14 +1727,14 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   // The uppercase npm user config selection is consumed by its bytes, as npm reads it.
   writeFileSync(proxyVariables.NPM_CONFIG_USERCONFIG, 'loglevel=error\n');
   assert.notEqual(launch(proxied).runtime, cloud.runtime);
-  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base.PATH}` }), direct);
+  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base['PATH']}` }), direct);
   assert.notEqual(
-    launch({ ...base, PATH: `${core}:${base.PATH}` }).runtime,
+    launch({ ...base, PATH: `${core}:${base['PATH']}` }).runtime,
     direct.runtime,
     'an intentional non-hook Git backend selection remains distinct'
   );
   assert.notEqual(
-    launch({ ...base, PATH: `${base.PATH}:${join(f.root, 'extra-path')}` }).runtime,
+    launch({ ...base, PATH: `${base['PATH']}:${join(f.root, 'extra-path')}` }).runtime,
     direct.runtime
   );
   writeFileSync(gitTool, '#!/bin/sh\n# changed selected tool bytes\nexec /usr/bin/git "$@"\n', {
@@ -1684,7 +1761,8 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   assert.notEqual(launch(selected).runtime, before.runtime);
   // Tool managers can expose npm as a shell wrapper around the actual CLI.
   const beforeWrapper = launch(base);
-  const installedNpm = base.PATH.split(':')
+  const installedNpm = present(base['PATH'])
+    .split(':')
     .map((path) => join(path, 'npm'))
     .find(existsSync);
   assert(installedNpm);
@@ -1707,7 +1785,7 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   assert.equal(wrapped.reusable, true, JSON.stringify(wrapped.unknown));
   assert.notEqual(wrapped.runtime, beforeWrapper.runtime);
   assert.deepEqual(launch(base, true), wrapped);
-  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base.PATH}` }), wrapped);
+  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base['PATH']}` }), wrapped);
   // Multiplexer shims choose the tool from the invoked symlink's basename.
   const npmShim = join(f.root, 'bin/npm');
   const multiplexer = join(f.root, 'bin/tool-multiplexer');
@@ -1721,7 +1799,10 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   const multiplexed = launch(base);
   assert.equal(multiplexed.reusable, true, JSON.stringify(multiplexed.unknown));
   assert.deepEqual(launch(base, true), multiplexed);
-  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base.PATH}` }), multiplexed);
+  assert.deepEqual(
+    launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base['PATH']}` }),
+    multiplexed
+  );
   writeFileSync(multiplexer, `${readFileSync(multiplexer, 'utf8')}# changed target bytes\n`);
   assert.notEqual(
     launch(base).runtime,
@@ -1741,10 +1822,10 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
 test('stalled npm script-shell setup is owned, cancelled and cleaned without exposing captured environment', async () => {
   for (const fault of ['timeout', 'interruption', 'overflow', 'resistant']) {
     const f = fixture();
-    const records = ['shell.json', 'descendant.json'].map((name) => join(f.root, name));
-    let driver;
-    let completed;
-    const live = (record) => {
+    const records: [string, string] = [join(f.root, 'shell.json'), join(f.root, 'descendant.json')];
+    let driver: ChildProcessByStdio<null, Readable, Readable> | undefined;
+    let completed: Promise<{ code: number | null; signal: NodeJS.Signals | null }> | undefined;
+    const live = (record: { pid: number; start: string }) => {
       const start = spawnSync('ps', ['-p', String(record.pid), '-o', 'lstart='], {
         encoding: 'utf8',
       }).stdout.trim();
@@ -1762,6 +1843,8 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         fs.writeFileSync(process.argv[1] + '.tmp', JSON.stringify({pid:process.pid,start}));
         fs.renameSync(process.argv[1] + '.tmp', process.argv[1]);
         setInterval(() => {}, 1000);`;
+      // npm script-shell executes a CommonJS shebang, including inherited streams.
+      // Preserve this explicit runtime input format for cancellation/identity proof.
       const shell = join(f.root, 'stalled-shell.cjs');
       writeFileSync(
         shell,
@@ -1821,7 +1904,7 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         poll.unref();`
       );
       if (fault === 'resistant') {
-        env.TERM_RESISTANT = '1';
+        env['TERM_RESISTANT'] = '1';
       }
       driver = spawn(
         process.execPath,
@@ -1847,13 +1930,13 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         output += chunk;
       });
       completed = new Promise((accept) =>
-        driver.once('close', (code, signal) => accept({ code, signal }))
+        present(driver).once('close', (code, signal) => accept({ code, signal }))
       );
       const deadline = Date.now() + 8000;
       const ready = () =>
         records.every(existsSync) && (fault !== 'timeout' || existsSync(deadlineArmed));
       while (!ready()) {
-        const readiness = `fault=${fault}; shell=${existsSync(records[0])}; descendant=${existsSync(records[1])}; deadline=${existsSync(deadlineArmed)}; driverExit=${driver.exitCode}; driverSignal=${driver.signalCode}`;
+        const readiness: string = `fault=${fault}; shell=${existsSync(records[0])}; descendant=${existsSync(records[1])}; deadline=${existsSync(deadlineArmed)}; driverExit=${driver.exitCode}; driverSignal=${driver.signalCode}`;
         assert(
           driver.exitCode === null && driver.signalCode === null,
           `owned setup exited before readiness: ${readiness}`
@@ -1861,17 +1944,17 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
         assert(Date.now() < deadline, `owned setup readiness deadline: ${readiness}`);
         await delay(10);
       }
-      const owned = records.map((path) => JSON.parse(readFileSync(path, 'utf8')));
+      const owned = records.map((path) => birthRecord(JSON.parse(readFileSync(path, 'utf8'))));
       if (fault === 'timeout') {
         writeFileSync(deadlineAdvance, '');
       }
       if (fault === 'interruption' || fault === 'resistant') {
         driver.kill('SIGTERM');
       }
-      let watchdog;
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
       const result = await Promise.race([
         completed,
-        new Promise((_, reject) => {
+        new Promise<never>((_, reject) => {
           watchdog = setTimeout(
             () => reject(new Error('owned setup supervisor did not close')),
             8000
@@ -1923,14 +2006,15 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
       const lock = join(f.root, '.git/georoids-validation-checkout.lock/children');
       if (existsSync(lock)) {
         for (const name of readdirSync(lock)) {
-          const command = JSON.parse(readFileSync(join(lock, name), 'utf8')).command;
+          const value = objectValue(JSON.parse(readFileSync(join(lock, name), 'utf8')))['command'];
+          const command = value === undefined || value === null ? undefined : birthRecord(value);
           if (command && live(command)) {
             process.kill(command.pid, 'SIGKILL');
           }
         }
       }
       for (const path of records.filter(existsSync)) {
-        const record = JSON.parse(readFileSync(path, 'utf8'));
+        const record = birthRecord(JSON.parse(readFileSync(path, 'utf8')));
         if (live(record)) {
           process.kill(record.pid, 'SIGKILL');
         }
@@ -1938,7 +2022,7 @@ test('stalled npm script-shell setup is owned, cancelled and cleaned without exp
       if (driver && driver.exitCode === null && driver.signalCode === null) {
         driver.kill('SIGTERM');
       }
-      if (completed) {
+      if (await completed) {
         await completed;
       }
       rmSync(f.root, { recursive: true, force: true });

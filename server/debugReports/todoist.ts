@@ -130,7 +130,6 @@ export class TodoistDelivery {
       !record(section) ||
       resourceId(section['id']) !== this.config.sectionId ||
       resourceId(section['project_id']) !== this.config.projectId ||
-      section['name'] !== 'Debug reports' ||
       section['is_archived'] === true
     ) {
       throw new TodoistDeliveryError(

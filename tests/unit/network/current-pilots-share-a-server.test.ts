@@ -31,7 +31,7 @@ type SendData = Parameters<RecordingSocket['send']>[0];
 class DelayedRecordingSocket extends RecordingSocket {
   defer = false;
   fail = false;
-  readonly decoder = new SnapshotDecoder();
+  readonly decoder = new SnapshotDecoder('live');
   readonly appliedStates: ServerGameSnapshot[] = [];
   readIndex = 0;
 
@@ -185,6 +185,7 @@ describe('current pilots share the production handler and broadcaster', () => {
           position: { x: 100, y: 100 },
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           ...(resumeToken != null && resumeToken !== '' ? { resumeToken } : {}),
         },
       },
@@ -204,6 +205,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       data: {
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        explorationVersion: 1,
         // The client refuses an ack without the seed of the world it is about to apply.
         terrainSeed: baseline.terrainSeed,
         resumeToken: expect.stringMatching(RESUME_TOKEN_PATTERN),
@@ -240,7 +242,7 @@ describe('current pilots share the production handler and broadcaster', () => {
         asteroids,
         loot: nearby(state.loot),
         satellitePickups: nearby(state.satellitePickups),
-        playerProjectiles: nearby(engine.getPlayerProjectiles()),
+        playerProjectiles: nearby(engine.laserCombat.projectiles()),
       }).state;
     };
     const a = socket();
@@ -309,7 +311,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     joinPilot(handler, peer.ws, 'peer');
     applySnapshots(recovery, handler);
     applySnapshots(peer, handler);
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'reflector-rock',
       position: { x: 500, y: 500 },
       velocity: { x: 0, y: 0 },
@@ -325,7 +327,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       phenomenon: { kind: 'reflective', clusterId: 'test', energy: 0, maxEnergy: 6 },
     });
     for (let hit = 0; hit < 3; hit++) {
-      engine.handleAsteroidHit('reflector-rock', 'peer');
+      engine.asteroidMining.hit('reflector-rock', 'peer');
     }
     const shard = engine.getLoot().find((loot) => loot.kind === 'shard');
     assert.ok(shard, 'laser shard loot');
@@ -351,10 +353,10 @@ describe('current pilots share the production handler and broadcaster', () => {
     assert.ok(collector, 'recovery player');
     collector.position = { ...shard.position };
     const score = collector.cargo;
-    engine.collectLoot();
+    engine.lootCollection.collect();
     expect(collector.cargo).toBeGreaterThanOrEqual(score + 5);
     const collectedScore = collector.cargo;
-    engine.collectLoot();
+    engine.lootCollection.collect();
     expect(collector.cargo).toBe(collectedScore);
     broadcaster.broadcastGameState();
     expect(
@@ -504,9 +506,9 @@ describe('current pilots share the production handler and broadcaster', () => {
     joinPilot(handler, second.ws, 'second');
     applySnapshots(first, handler);
     applySnapshots(second, handler);
-    const broken = engine.getSnapshotState();
+    const broken = engine.getBroadcastState();
     Object.assign(broken, { badField: broken });
-    vi.spyOn(engine, 'getSnapshotState').mockReturnValue(broken);
+    vi.spyOn(engine, 'getBroadcastState').mockReturnValue(broken);
     first.close.mockImplementation(() => {
       throw new Error('close failure');
     });
@@ -620,7 +622,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       asteroids: 80,
       satellitePickups: 6,
     });
-    expect(engine.getPlayerProjectiles()).toHaveLength(0);
+    expect(engine.laserCombat.projectiles()).toHaveLength(0);
     const firstRocks = normalizeFixtureAsteroids(engine.getAllAsteroids());
     engine.prepareDiagnosticWorld('combat');
     expect(normalizeFixtureAsteroids(engine.getAllAsteroids())).toEqual(firstRocks);
@@ -684,7 +686,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       offsets: [1, 0.76, 1.08, 0.84, 1, 0.72],
       material: 'ice' as const,
     };
-    engine.addAsteroid(edge);
+    engine.asteroidLifecycle.insert(edge);
     const latestRockIds = () =>
       applySnapshots(scout, handler)
         .at(-1)

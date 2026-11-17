@@ -3,6 +3,7 @@ import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import type { ContourLevel } from '../physics/terrain/contours';
 import { logger } from '../utils/Logger';
+import { releaseBitmap, resizeBitmap } from './bitmapBudget';
 import { GpuResources } from './gpuResources';
 import {
   GPU_COMPOSITE_FRAGMENT,
@@ -164,26 +165,38 @@ export class GpuRearRenderer {
       return null;
     }
     const canvas = document.createElement('canvas');
+    resizeBitmap(canvas, canvas.width, canvas.height, 'gpu-rear');
     canvas.id = 'gameGpuCanvas';
     canvas.className = 'gpu-rear-canvas';
     canvas.setAttribute('aria-hidden', 'true');
-    const gl = canvas.getContext('webgl2', {
-      alpha: true,
-      antialias: false,
-      depth: false,
-      stencil: false,
-      preserveDrawingBuffer: false,
-    });
-    if (!gl) {
-      return null;
+    let renderer: GpuRearRenderer | undefined;
+    try {
+      const gl = canvas.getContext('webgl2', {
+        alpha: true,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        preserveDrawingBuffer: false,
+      });
+      if (!gl) {
+        releaseBitmap(canvas);
+        return null;
+      }
+      renderer = new GpuRearRenderer(canvas, gl, onAvailabilityChange);
+      if (!renderer.available()) {
+        renderer.destroy();
+        return null;
+      }
+      parent.insertBefore(canvas, overlay);
+      return renderer;
+    } catch (error) {
+      if (renderer) {
+        renderer.destroy();
+      } else {
+        releaseBitmap(canvas);
+      }
+      throw error;
     }
-    const renderer = new GpuRearRenderer(canvas, gl, onAvailabilityChange);
-    if (!renderer.available()) {
-      renderer.destroy();
-      return null;
-    }
-    parent.insertBefore(canvas, overlay);
-    return renderer;
   }
 
   private constructor(
@@ -216,12 +229,7 @@ export class GpuRearRenderer {
   resizeSurface(width: number, height: number, dpr: number): void {
     const backingWidth = Math.max(1, Math.round(width * dpr));
     const backingHeight = Math.max(1, Math.round(height * dpr));
-    if (this.canvas.width !== backingWidth) {
-      this.canvas.width = backingWidth;
-    }
-    if (this.canvas.height !== backingHeight) {
-      this.canvas.height = backingHeight;
-    }
+    resizeBitmap(this.canvas, backingWidth, backingHeight, 'gpu-rear');
     const cssWidth = `${width}px`;
     const cssHeight = `${height}px`;
     if (this.canvas.style.width !== cssWidth) {
@@ -312,6 +320,7 @@ export class GpuRearRenderer {
     this.clearRetainedStats();
     // Release the browser context as well as its explicitly owned objects.
     this.gl.getExtension('WEBGL_lose_context')?.loseContext();
+    releaseBitmap(this.canvas);
     this.canvas.remove();
   }
 

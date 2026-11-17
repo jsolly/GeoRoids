@@ -1,5 +1,6 @@
 import type { ClientPerformanceMetrics } from './performanceMetrics';
 import { summarizePhoneRecording } from './phoneRecordingSummary';
+import { startRecordingHeartbeat } from './recordingHeartbeat';
 
 const MAX_BYTES = 32 * 1024 * 1024;
 const MAX_DURATION_MS = 30 * 60 * 1000;
@@ -239,6 +240,7 @@ export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed:
   let previousDrain = 0;
   let writing = Promise.resolve();
   let ownsDrain = false;
+  let heartbeat: ReturnType<typeof startRecordingHeartbeat> | undefined;
   const releaseDrain = () => {
     if (ownsDrain) {
       ownsDrain = false;
@@ -254,6 +256,8 @@ export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed:
     }
     clearInterval(timer);
     timer = undefined;
+    heartbeat?.dispose();
+    heartbeat = undefined;
     releaseDrain();
     if (disposed) {
       return;
@@ -306,7 +310,7 @@ export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed:
       }
     }
     previousDrain = now;
-    const sample = metrics.read(true, OWNER);
+    const sample = { ...metrics.read(true, OWNER), heartbeat: heartbeat?.read() ?? null };
     const serialized = JSON.stringify(sample);
     session.samples.push(serialized);
     session.escapedSampleBytes += escapedBytes(serialized);
@@ -374,6 +378,7 @@ export function createPhoneCollector(metrics: ClientPerformanceMetrics, changed:
       startedAt = performance.now();
       previousDrain = startedAt;
       metrics.read(true, OWNER);
+      heartbeat = startRecordingHeartbeat();
       phase = 'recording';
       status = 'Performance: recording';
       timer = setInterval(() => drain(session), 1000);

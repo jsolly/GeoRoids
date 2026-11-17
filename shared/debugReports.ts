@@ -23,6 +23,15 @@ const CLIPPED_WORD_REACH = 128;
  * `new URL` throw every few bytes would otherwise cost about a second per MiB.
  */
 const MAX_URL_PARSES = 2048;
+/** Bound URL conversion work as well as its count, including percent-encoding expansion. */
+const MAX_URL_TEXT = 65_536;
+const MAX_DIAGNOSTIC_KEY = 128;
+const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}\p{Pc}]$/u;
+/** Maximal runs: clipping must never turn userinfo into a different, apparently valid host. */
+const CLIP_TOKEN = /\S+/gu;
+const URI_SCHEME = /(?:https?|wss?):\/\//iu;
+/** An escape consumes its following character, so escaped quotes never open or close a span. */
+const QUOTE_BOUNDARY = /\\.|"/gu;
 const STATE_KEYS = new Set([
   'version',
   'capturedAt',
@@ -66,13 +75,13 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isWordCharacter(code: number): boolean {
-  return (
-    (code >= 48 && code <= 57) ||
-    (code >= 65 && code <= 90) ||
-    (code >= 97 && code <= 122) ||
-    code === 95
-  );
+/** Step over a whole code point when walking a UTF-16 string backwards. */
+function previousCharacter(value: string, end: number): number {
+  const last = value.charCodeAt(end - 1);
+  const before = value.charCodeAt(end - 2);
+  return last >= 0xdc00 && last <= 0xdfff && before >= 0xd800 && before <= 0xdbff
+    ? end - 2
+    : end - 1;
 }
 
 /**
@@ -89,15 +98,51 @@ function boundedText(value: string): string {
     return value;
   }
   let kept = MAX_DIAGNOSTIC_TEXT - TRUNCATED.length;
-  if (isWordCharacter(value.charCodeAt(kept))) {
-    const reach = kept - CLIPPED_WORD_REACH;
-    while (kept > reach && isWordCharacter(value.charCodeAt(kept - 1))) {
-      kept--;
-    }
-  }
   const last = value.charCodeAt(kept - 1);
   if (last >= 0xd800 && last <= 0xdbff) {
     kept--;
+  }
+  const nextCodePoint = value.codePointAt(kept);
+  const next = nextCodePoint === undefined ? '' : String.fromCodePoint(nextCodePoint);
+  let privateStart: number | undefined;
+  CLIP_TOKEN.lastIndex = 0;
+  for (let run = CLIP_TOKEN.exec(value); run; run = CLIP_TOKEN.exec(value)) {
+    if (CLIP_TOKEN.lastIndex <= kept) {
+      continue;
+    }
+    if (run.index <= kept && (run[0].includes('@') || URI_SCHEME.test(run[0]))) {
+      privateStart = run.index;
+    }
+    break;
+  }
+  if (privateStart !== undefined) {
+    kept = privateStart;
+  } else if (WORD_CHARACTER.test(next)) {
+    const reach = Math.max(0, kept - CLIPPED_WORD_REACH);
+    while (kept > reach) {
+      const at = previousCharacter(value, kept);
+      if (at < reach || !WORD_CHARACTER.test(value.slice(at, kept))) {
+        break;
+      }
+      kept = at;
+    }
+  }
+  // A quoted local part or diagnostic value can include whitespace. Do not retain
+  // an earlier piece when clipping removes its closing quote or a later token.
+  let quoteStart: number | undefined;
+  QUOTE_BOUNDARY.lastIndex = 0;
+  const prefix = value.slice(0, kept);
+  for (
+    let boundary = QUOTE_BOUNDARY.exec(prefix);
+    boundary;
+    boundary = QUOTE_BOUNDARY.exec(prefix)
+  ) {
+    if (boundary[0] === '"') {
+      quoteStart = quoteStart === undefined ? boundary.index : undefined;
+    }
+  }
+  if (quoteStart !== undefined) {
+    kept = quoteStart;
   }
   return `${value.slice(0, kept)}${TRUNCATED}`;
 }
@@ -121,7 +166,12 @@ function jsonValue(value: unknown, depth = 0): DebugJsonValue {
   if (object(value) && Object.keys(value).length <= 128) {
     const result: { [key: string]: DebugJsonValue } = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      if (
+        key.length > MAX_DIAGNOSTIC_KEY ||
+        key === '__proto__' ||
+        key === 'constructor' ||
+        key === 'prototype'
+      ) {
         throw new Error('Invalid diagnostic key');
       }
       result[key] = jsonValue(child, depth + 1);
@@ -201,6 +251,7 @@ export function parseDebugReportSubmission(input: unknown): DebugReportSubmissio
 
 interface UrlBudget {
   remaining: number;
+  textRemaining: number;
 }
 
 /** A clip marker is not evidence: redact the text before it, so no rule can swallow it. */
@@ -214,10 +265,11 @@ function redactText(value: string, secrets: readonly string[], urls: UrlBudget):
   // Scrub patterns first: a pilot named "http" or "Bearer" must not hide their labels.
   let text = dropPathQueries(
     value.replace(/\b(?:https?|wss?):\/\/[^\s"'<>]+/giu, (match) => {
-      if (urls.remaining <= 0) {
-        return '[redacted-url]';
+      if (urls.remaining <= 0 || match.length > urls.textRemaining) {
+        return '[redacted-url-budget]';
       }
       urls.remaining--;
+      urls.textRemaining -= match.length;
       try {
         const url = new URL(match);
         url.username = '';
@@ -275,7 +327,10 @@ export function sanitizeDebugDiagnostics(
   snapshot: DebugDiagnosticSnapshot,
   secrets: readonly string[] = []
 ): DebugDiagnosticSnapshot {
-  const urls: UrlBudget = { remaining: MAX_URL_PARSES };
+  const urls: UrlBudget = {
+    remaining: MAX_URL_PARSES,
+    textRemaining: MAX_URL_TEXT,
+  };
   const state: { [key: string]: DebugJsonValue } = {};
   for (const [key, value] of Object.entries(snapshot.state)) {
     state[key] = sanitize(value, STRUCTURAL_FIELDS.has(key) ? [] : secrets, urls);

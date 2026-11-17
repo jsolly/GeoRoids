@@ -3,7 +3,7 @@ import { WORLD } from '../../../shared/world';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
-import { setWorldMapAssets } from '../../../src/network/worldExploration';
+import { setAtlasSyncing, setWorldMapAssets } from '../../../src/network/worldExploration';
 import {
   FURNACE_MAP_CAMPFIRE_ZOOM,
   FURNACE_MAP_FAR_ZOOM,
@@ -49,6 +49,7 @@ beforeEach(() => {
   );
   published.mockClear();
   disconnect.mockClear();
+  setAtlasSyncing(true);
   canvas = document.createElement('canvas');
   document.body.replaceChildren(canvas);
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 600));
@@ -56,6 +57,7 @@ beforeEach(() => {
 afterEach(() => {
   map?.dispose();
   map = undefined;
+  setAtlasSyncing(true);
   setWorldMapAssets([]);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -79,6 +81,20 @@ function key(code: string) {
 }
 
 describe('a mounted universe chart', () => {
+  test('publishes syncing and completion even when the location list stays unchanged', () => {
+    start();
+    expect(latest.atlasSyncing).toBe(true);
+    const locations = latest.locations;
+    setAtlasSyncing(false);
+    frame();
+    expect(latest.atlasSyncing).toBe(false);
+    expect(latest.locations).toEqual(locations);
+    setAtlasSyncing(true);
+    frame();
+    expect(latest.atlasSyncing).toBe(true);
+    expect(published).toHaveBeenCalledTimes(3);
+  });
+
   test('keeps zoom bounded and projects world coordinates from the active view', () => {
     expect(FURNACE_MAP_CAMPFIRE_ZOOM).toBe(UNIVERSE_MAP_ZOOM.initial);
     expect(FURNACE_MAP_FAR_ZOOM).toBe(UNIVERSE_MAP_ZOOM.min);

@@ -111,7 +111,7 @@ test('pilots reject noncanonical or truncated packed numbers without losing the 
     'AAAA'.repeat(1281), // More than 80 maximal-size records, rejected before allocation.
   ];
   for (const motion of invalid) {
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const exposed = decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     const observed = structuredClone(exposed);
     const rejected = decoder.readMessage(
@@ -172,7 +172,7 @@ test('pilots reject overlapping operations and invalid relative baselines after 
     },
   ];
   for (const patch of patches) {
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const exposed = decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     const observed = structuredClone(exposed);
     expect(
@@ -230,7 +230,7 @@ test('packed asteroid drift coexists with unknown fields, clear operations, chur
   expect(patch?.update?.find((tuple) => tuple[0] === 2)?.[2]).toEqual(['surveyedBy']);
   expect(patch?.remove).toEqual([1]);
   expect(patch?.order?.[0]).toBe(80);
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
   expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(next.state);
 });
@@ -244,7 +244,7 @@ test('pilots recover exact asteroid impulses and wrapped rotations after irregul
   rock.velocity = { x: 0.1234, y: 0.5678 };
   rock.rotation = 6.28;
   rock.angularVelocity = 0.002;
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   let before = new SnapshotEncoder(source);
   decodeSnapshotMessage(decoder, snapshotMessage(before.encode(1)));
   for (const [sequence, ticks] of [
@@ -315,7 +315,7 @@ test('prediction rejects invalid elapsed ticks, spider targets, unsafe projectio
     },
   ];
   for (const patch of patches) {
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     expect(
       decoder.readMessage(
@@ -381,7 +381,7 @@ test('unsafe and unknown velocity references retain ordinary motion while large 
     const motion = frame.patch.collections?.['asteroids']?.motion;
     assert(typeof motion === 'string');
     expect((Buffer.from(motion, 'base64')[0] ?? 0) & 16).toBe(0);
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(next.state);
     expect(

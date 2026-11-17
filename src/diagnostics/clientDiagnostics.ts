@@ -6,6 +6,7 @@ import { readMusicDiagnostics } from '../audio/musicBeds';
 import { GameController } from '../core/gameController';
 import { readTouchControlDiagnostics } from '../input/touchControls';
 import { readStoredResumeName, readStoredResumeToken } from '../network/services/resumeCredential';
+import { readBitmapBudget } from '../rendering/bitmapBudget';
 import { canvasManager } from '../rendering/canvasSurface';
 import { getClientReleaseId } from '../utils/buildInfo';
 import { getClientLogContext } from '../utils/clientLogContext';
@@ -46,6 +47,7 @@ export function captureClientDiagnostics(): DebugDiagnosticSnapshot {
         }
       : null,
     graphics: {
+      bitmapBudget: readBitmapBudget(),
       maxDpr: graphics['maxDpr'],
       glow: graphics['glow'],
       source: graphics['source'],

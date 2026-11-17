@@ -40,6 +40,7 @@ test('resetting a populated test world closes its pilot and health reports the e
     const socket = new RecordingSocket();
     server.gameEngine.addPlayer('pilot', 'Pilot', socket);
     server.gameEngine.createAsteroids(5);
+    expect(server.gameEngine.getAsteroidFieldStatus().mode).toBe('fixture');
     const populated = server.gameEngine.getDiagnostics();
     expect(populated.gameTime).toBeGreaterThan(0);
     expect(populated.players).toBe(1);
@@ -61,6 +62,11 @@ test('resetting a populated test world closes its pilot and health reports the e
     expect(health.status).toBe(200);
     const healthBody: unknown = await health.json();
     expect(healthBody).toMatchObject({ world: { ...emptyWorld, gameTime: populated.gameTime } });
+    expect(server.gameEngine.getAsteroidFieldStatus().mode).toBe('regional');
+    server.gameEngine.addPlayer('next-pilot', 'Next pilot', new RecordingSocket());
+    expect(server.gameEngine.getAllAsteroids().some((row) => row.id.startsWith('deposit-'))).toBe(
+      true
+    );
   } finally {
     await server.close();
   }

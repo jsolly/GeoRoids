@@ -60,7 +60,7 @@ function pilot(
 ) {
   const socket = new RecordingSocket();
   const actor = engine.addPlayer(id, id, socket, position, kit);
-  const registered = engine.registerPilot(actor, socket);
+  const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
   assert(registered.ok);
   return actor;
 }
@@ -106,7 +106,7 @@ test('a flush that cannot save every delivered score rolls the whole batch back 
   const second = pilot(engine, 'second-hauler', furnace.position, 'hauler');
   const cargos = [first, second].map((hauler) => {
     const cargo = { ...metalDeposit(`${hauler.id}-cargo`), position: { ...furnace.position } };
-    engine.addAsteroid(cargo);
+    engine.asteroidLifecycle.insert(cargo);
     hauler.harpoonTargetId = cargo.id;
     return cargo;
   });
@@ -117,8 +117,8 @@ test('a flush that cannot save every delivered score rolls the whole batch back 
       "CREATE TRIGGER fail_second_score BEFORE INSERT ON pilots WHEN NEW.id = 'second-hauler' BEGIN SELECT RAISE(ABORT, 'injected second score failure'); END"
     );
     // The deliveries land in memory; the failing flush is what stops the world.
-    engine.processFurnaceDeliveries();
-    expect(engine.drainFurnaceDeliveries()).toHaveLength(2);
+    engine.furnaceDeliveries.advance();
+    expect(engine.furnaceDeliveries.drainDeliveries()).toHaveLength(2);
     expect(() => engine.checkpointWorld()).toThrow('Persistent world checkpoint failed');
     expect(engine.isPersistenceHealthy()).toBe(false);
     expect(() => engine.advanceOneFrame()).toThrow('Persistent world checkpoint failed');
@@ -142,9 +142,9 @@ test('an ordinary laser break saves collectible point loot by the next flush', (
   const secondMiner = pilot(engine, 'second-miner', { x: 10, y: 0 });
   const target = largeIce('persisted-first-hit-target');
   target.surveyedBy = ['first-miner', 'first-miner'];
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
 
-  const result = engine.applyLaserAsteroidHit(target.id, secondMiner.id, 'laser');
+  const result = engine.asteroidMining.apply(target.id, secondMiner.id, 'laser');
 
   expect(result.outcome).toBe('destroyed');
   expect(result.newAsteroids).toHaveLength(0);
@@ -166,13 +166,13 @@ test('a durable metal rock leaves collectible points instead of paying an offlin
   const firstMiner = pilot(engine, 'offline-high-hp', { x: 0, y: 0 }, 'hauler');
   const terminalMiner = pilot(engine, 'terminal-high-hp', { x: 10, y: 0 }, 'hauler');
   const target = durableMetal('persisted-high-hp-target');
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
 
-  expect(engine.handleAsteroidHit(target.id, firstMiner.id).outcome).toBe('damaged');
+  expect(engine.asteroidMining.hit(target.id, firstMiner.id).outcome).toBe('damaged');
   expect(target.health).toBe(50);
   expect(target.miningContributors).toEqual([firstMiner.id]);
   engine.removePlayer(firstMiner.id);
-  expect(engine.handleAsteroidHit(target.id, terminalMiner.id).outcome).toBe('destroyed');
+  expect(engine.asteroidMining.hit(target.id, terminalMiner.id).outcome).toBe('destroyed');
 
   expect(terminalMiner.score).toBe(0);
   engine.checkpointWorld();
@@ -190,9 +190,9 @@ test('a regional unload and reload keeps partial mining contributors on the rock
   const firstMiner = pilot(engine, 'regional-first', { x: 0, y: 0 }, 'hauler');
   const terminalMiner = pilot(engine, 'regional-terminal', { x: 10, y: 0 }, 'hauler');
   const target = durableMetal('regional-mining-target');
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
 
-  expect(engine.handleAsteroidHit(target.id, firstMiner.id).outcome).toBe('damaged');
+  expect(engine.asteroidMining.hit(target.id, firstMiner.id).outcome).toBe('damaged');
   engine.removePlayer(firstMiner.id);
   terminalMiner.position = { x: 40_000, y: 40_000 };
   engine.ensureAsteroidField();
@@ -205,7 +205,7 @@ test('a regional unload and reload keeps partial mining contributors on the rock
   expect(reloaded.health).toBe(50);
   expect(reloaded.miningContributors).toEqual([firstMiner.id]);
 
-  expect(engine.handleAsteroidHit(reloaded.id, terminalMiner.id).outcome).toBe('destroyed');
+  expect(engine.asteroidMining.hit(reloaded.id, terminalMiner.id).outcome).toBe('destroyed');
   expect(terminalMiner.score).toBe(0);
   engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
@@ -219,13 +219,13 @@ test('a metal chip leaves collectible points instead of paying an offline first 
   const firstMiner = pilot(engine, 'offline-metal', { x: 0, y: 0 }, 'hauler');
   const terminalMiner = pilot(engine, 'terminal-metal', { x: 10, y: 0 });
   const target = metalDeposit('persisted-metal-target');
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
 
-  expect(engine.handleAsteroidHit(target.id, firstMiner.id, 'laser').outcome).toBe('damaged');
+  expect(engine.asteroidMining.hit(target.id, firstMiner.id, 'laser').outcome).toBe('damaged');
   expect(target.health).toBe(25);
   expect(target.miningContributors).toEqual([firstMiner.id]);
   engine.removePlayer(firstMiner.id);
-  expect(engine.handleAsteroidHit(target.id, terminalMiner.id, 'laser').outcome).toBe('destroyed');
+  expect(engine.asteroidMining.hit(target.id, terminalMiner.id, 'laser').outcome).toBe('destroyed');
 
   expect(terminalMiner.score).toBe(0);
   engine.checkpointWorld();
@@ -244,9 +244,9 @@ test('a partially mined durable metal rock keeps its offline contributor after r
   const firstMiner = pilot(firstEngine, 'restart-high-hp-first', { x: 0, y: 0 }, 'hauler');
   pilot(firstEngine, 'restart-high-hp-terminal', { x: 10, y: 0 }, 'hauler');
   const target = durableMetal('restart-high-hp-target');
-  firstEngine.addAsteroid(target);
+  firstEngine.asteroidLifecycle.insert(target);
 
-  expect(firstEngine.handleAsteroidHit(target.id, firstMiner.id).outcome).toBe('damaged');
+  expect(firstEngine.asteroidMining.hit(target.id, firstMiner.id).outcome).toBe('damaged');
   expect(target.miningContributors).toEqual([firstMiner.id]);
   firstEngine.checkpointWorld();
   closeStore(firstStore);
@@ -259,7 +259,7 @@ test('a partially mined durable metal rock keeps its offline contributor after r
   expect(resumedTarget.health).toBe(50);
   expect(resumedTarget.miningContributors).toEqual([firstMiner.id]);
 
-  expect(resumedEngine.handleAsteroidHit(resumedTarget.id, terminalMiner.id).outcome).toBe(
+  expect(resumedEngine.asteroidMining.hit(resumedTarget.id, terminalMiner.id).outcome).toBe(
     'destroyed'
   );
   expect(terminalMiner.score).toBe(0);
@@ -279,9 +279,9 @@ test('a partially mined metal deposit keeps its offline contributor after restar
   const firstMiner = pilot(firstEngine, 'restart-metal-first', { x: 0, y: 0 }, 'hauler');
   pilot(firstEngine, 'restart-metal-terminal', { x: 10, y: 0 });
   const target = metalDeposit('restart-metal-target');
-  firstEngine.addAsteroid(target);
+  firstEngine.asteroidLifecycle.insert(target);
 
-  expect(firstEngine.handleAsteroidHit(target.id, firstMiner.id, 'laser').outcome).toBe('damaged');
+  expect(firstEngine.asteroidMining.hit(target.id, firstMiner.id, 'laser').outcome).toBe('damaged');
   expect(target.health).toBe(25);
   expect(target.miningContributors).toEqual([firstMiner.id]);
   firstEngine.checkpointWorld();
@@ -295,9 +295,9 @@ test('a partially mined metal deposit keeps its offline contributor after restar
   expect(resumedTarget.health).toBe(25);
   expect(resumedTarget.miningContributors).toEqual([firstMiner.id]);
 
-  expect(resumedEngine.handleAsteroidHit(resumedTarget.id, terminalMiner.id, 'laser').outcome).toBe(
-    'destroyed'
-  );
+  expect(
+    resumedEngine.asteroidMining.hit(resumedTarget.id, terminalMiner.id, 'laser').outcome
+  ).toBe('destroyed');
   expect(terminalMiner.score).toBe(0);
   resumedEngine.checkpointWorld();
   expect(
@@ -316,12 +316,12 @@ test('an accidental hull break leaves points without banking credit for an offli
   const rammer = pilot(engine, 'collision-finisher', { x: 20, y: 0 });
   const target = durableMetal('collision-cargo');
   target.surveyedBy = [scout.id];
-  engine.addAsteroid(target);
-  expect(engine.handleAsteroidHit(target.id, miner.id).outcome).toBe('damaged');
+  engine.asteroidLifecycle.insert(target);
+  expect(engine.asteroidMining.hit(target.id, miner.id).outcome).toBe('damaged');
   engine.removePlayer(miner.id);
   engine.removePlayer(scout.id);
 
-  const result = engine.handleAsteroidHit(target.id, rammer.id, 'collision');
+  const result = engine.asteroidMining.hit(target.id, rammer.id, 'collision');
   expect(result.outcome).toBe('destroyed');
   expect(result.newAsteroids).toHaveLength(0);
   expect(rammer.score).toBe(0);
@@ -340,7 +340,7 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
   const first = pilot(engine, 'first-reflector', { x: -500, y: 0 });
   const second = pilot(engine, 'last-reflector', { x: -500, y: 10 });
   for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+    engine.asteroidLifecycle.remove(rock.id);
   }
   const target: AsteroidData = {
     ...metalDeposit('shared-reflector'),
@@ -351,15 +351,15 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
     offsets: [1, 1, 1, 1],
     phenomenon: { kind: 'reflective', clusterId: 'shared-reflector', energy: 0, maxEnergy: 2 },
   };
-  engine.addAsteroid(target);
-  const firstShot = engine.spawnLaser(first.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+  engine.asteroidLifecycle.insert(target);
+  const firstShot = engine.laserCombat.spawn(first.id, { x: -50, y: 0 }, { x: 40, y: 0 });
   assert(firstShot);
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.advance();
   expect(firstShot.bounces).toBe(1);
   expect(target.miningContributors).toEqual([first.id]);
   engine.removePlayer(first.id);
-  assert(engine.spawnLaser(second.id, { x: -50, y: 0 }, { x: 40, y: 0 }));
-  engine.advanceLasersAndResolveHits();
+  assert(engine.laserCombat.spawn(second.id, { x: -50, y: 0 }, { x: 40, y: 0 }));
+  engine.laserCombat.advance();
 
   expect(engine.getAsteroid(target.id)).toBeUndefined();
   expect(second.score).toBe(0);
@@ -387,10 +387,10 @@ test.each(['ice', 'rubble'] as const)(
     firstMiner.position = { x: WORLD.radius - 100, y: 0 };
     secondMiner.position = { x: WORLD.radius - 120, y: 0 };
     engine.ensureAsteroidField();
-    engine.addAsteroid(target);
+    engine.asteroidLifecycle.insert(target);
     engine.checkpointWorld();
 
-    const result = engine.applyLaserAsteroidHit(target.id, secondMiner.id, 'laser');
+    const result = engine.asteroidMining.apply(target.id, secondMiner.id, 'laser');
     expect(result.outcome).toBe('destroyed');
     expect(result.newAsteroids).toHaveLength(material === 'rubble' ? 3 : 0);
     engine.checkpointWorld();

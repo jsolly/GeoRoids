@@ -169,7 +169,7 @@ test('the last miner leaving immediately after mining preserves the offline reco
     pilot.position = { ...HOME.position };
     first.ensureAsteroidField();
     expect(first.getAsteroid(HOME.id)).toBeDefined();
-    first.removeAsteroid(HOME.id);
+    first.asteroidLifecycle.remove(HOME.id);
     first.removePlayer(pilot.id);
     expect(store.loadWorld()?.asteroidBelt?.find((entry) => entry.slot === 60)?.recoverAt).toBe(
       START + ASTEROID_BELT.recoveryMs

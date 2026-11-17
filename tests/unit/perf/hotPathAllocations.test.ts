@@ -1,6 +1,7 @@
-import { expect, test } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import type { AsteroidData } from '../../../shared-types';
 import { Player } from '../../../src/entities/player/Player';
+import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
 import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
 
 import {
@@ -35,6 +36,8 @@ function roid(id: string, x: number, y: number): AsteroidData {
  * player list, snapshot set, partition buffers, and entity vectors.
  */
 test('120 gameState-style apply ticks reuse lists, sets, and entity vectors', () => {
+  const monotonic = vi.spyOn(performance, 'now').mockReturnValue(0);
+  onTestFinished(() => monotonic.mockRestore());
   const cache = new PlayerListCache<Player>();
   const snapshotIds = new Set<string>();
   const scratch = createAsteroidFieldSyncScratch();
@@ -64,6 +67,7 @@ test('120 gameState-style apply ticks reuse lists, sets, and entity vectors', ()
     });
     expect(pruneStaleRemotePlayers(players, snapshotIds)).toBe(0);
     expect(cache.allPlayers(players)).toBe(firstList);
+    advanceRemotePlayerShips(firstList);
 
     const live = roid('server-asteroid-0', tick, -tick);
     const partitioned = partitionAsteroidSnapshot([live], belt, scratch);
@@ -82,7 +86,15 @@ test('120 gameState-style apply ticks reuse lists, sets, and entity vectors', ()
     expect(localRoid.velocity).toBe(firstRoidVelocity);
   }
 
-  expect(firstPosition).toEqual({ x: 119, y: -119 });
+  // Remote presentation converges to the last snapshot's bounded projection,
+  // while the entity vectors must stay owned through both apply and frame ticks.
+  for (let frame = 0; frame < 6; frame++) {
+    advanceRemotePlayerShips(firstList);
+    expect(remote.ship.position).toBe(firstPosition);
+    expect(remote.ship.velocity).toBe(firstVelocity);
+  }
+  expect(firstPosition).toEqual({ x: 122, y: -117.5 });
+  expect(firstVelocity).toEqual({ x: 0.5, y: 0.25 });
   expect(firstRoidPosition).toEqual({ x: 119, y: -119 });
   expect(firstList).toHaveLength(1);
 });

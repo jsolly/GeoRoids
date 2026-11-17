@@ -1,23 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import { AI_SHIPS, inBotSanctuary } from '../../shared/aiShips';
 import { isCombatantImmune } from '../../shared/combat';
-import { GAME, SHIP } from '../../shared/constants/gameplay';
+import { GAME, LASER, SHIP } from '../../shared/constants/gameplay';
 import { ECONOMY } from '../../shared/economy';
+import type { FurnaceField } from '../../shared/furnaceField';
 import { hullRadiusForKit } from '../../shared/shipKits';
 import { terrainCruiseVelocity } from '../../shared/terrainTravel';
 import { WORLD } from '../../shared/world';
-import type { AsteroidData, BotRole, LootData, Position, SavedPointLoot } from '../../shared-types';
-import type { GameEntity } from './EntityManager';
+import type { BotRole, Position, SavedPointLoot, Velocity } from '../../shared-types';
+import { spatialQueryBounds } from '../world/spatialQueryBounds';
+import type { AsteroidManager } from './AsteroidManager';
+import type { EntityManager, GameEntity } from './EntityManager';
+import type { LootManager } from './LootManager';
 
-interface FleetHost {
-  humans: readonly GameEntity[];
-  frame: number;
-  spawn: (id: string, role: BotRole, position: Position) => GameEntity;
-  remove: (id: string) => void;
-  lootNear: (position: Position) => LootData[];
-  rocksNear: (position: Position) => readonly AsteroidData[];
-  furnaceNear: (position: Position) => { position: Position };
-  fire: (actor: GameEntity) => void;
+interface FleetInputs {
+  readonly actors: Pick<EntityManager, 'getAllEntities' | 'addBot' | 'removeEntity'>;
+  readonly loot: Pick<LootManager, 'queryCircle'>;
+  readonly rocks: Pick<AsteroidManager, 'spatialIndex'>;
+  readonly furnaces: Pick<FurnaceField, 'nearest'>;
+  readonly removePlayer: (id: string) => void;
+  readonly spawnPlayerLaser: (ownerId: string, start: Position, velocity: Velocity) => void;
 }
 
 interface Bot {
@@ -86,7 +88,19 @@ export class BotFleet {
   private readonly bots = new Map<BotRole, Bot>();
   private inhabitedFrames = 0;
 
-  clear(remove: (id: string) => void): void {
+  constructor(private readonly inputs: FleetInputs) {}
+
+  /** Normal departures return cargo and report removals before the final checkpoint. */
+  clear(): void {
+    this.clearWith((id) => this.inputs.removePlayer(id));
+  }
+
+  /** World resets discard transient actors without creating cargo or departure events. */
+  reset(): void {
+    this.clearWith((id) => this.inputs.actors.removeEntity(id));
+  }
+
+  private clearWith(remove: (id: string) => void): void {
     const ids = [...this.bots.values()].map((bot) => bot.actor.id);
     this.bots.clear();
     this.inhabitedFrames = 0;
@@ -115,16 +129,22 @@ export class BotFleet {
       }));
   }
 
-  advance(host: FleetHost): void {
-    if (!host.humans.length) {
-      this.clear(host.remove);
+  advance(frame: number): void {
+    const humans = this.inputs.actors
+      .getAllEntities()
+      .filter(
+        (actor) =>
+          actor.botRole === undefined && actor.ws !== undefined && actor.playerMotion !== undefined
+      );
+    if (!humans.length) {
+      this.clear();
       return;
     }
     this.inhabitedFrames++;
     if (this.inhabitedFrames < AI_SHIPS.spawnDelayFrames) {
       return;
     }
-    const anchor = host.humans[0];
+    const anchor = humans[0];
     if (!anchor) {
       return;
     }
@@ -132,14 +152,18 @@ export class BotFleet {
       let bot = this.bots.get(role);
       if (!bot) {
         bot = {
-          actor: host.spawn(`ai-${randomUUID()}`, role, botSpawn(anchor.position, role)),
+          actor: this.inputs.actors.addBot(
+            `ai-${randomUUID()}`,
+            role,
+            botSpawn(anchor.position, role)
+          ),
           awaitingRespawn: false,
-          nextShotFrame: host.frame + AI_SHIPS.shotIntervalFrames,
+          nextShotFrame: frame + AI_SHIPS.shotIntervalFrames,
         };
         this.bots.set(role, bot);
       }
       const actor = bot.actor;
-      const human = nearest(actor.position, host.humans);
+      const human = nearest(actor.position, humans);
       if (!human) {
         continue;
       }
@@ -147,7 +171,7 @@ export class BotFleet {
       // A fresh bounded replacement arrives on the next inhabited frame.
       if (distance(actor.position, human.position) > AI_SHIPS.tetherRadius) {
         this.bots.delete(role);
-        host.remove(actor.id);
+        this.inputs.removePlayer(actor.id);
         continue;
       }
       if (actor.health <= 0 || actor.exploding || actor.respawnTimer !== undefined) {
@@ -158,14 +182,14 @@ export class BotFleet {
         actor.position = botSpawn(human.position, role);
         actor.velocity = { x: 0, y: 0 };
         bot.awaitingRespawn = false;
-        bot.nextShotFrame = host.frame + AI_SHIPS.shotIntervalFrames;
+        bot.nextShotFrame = frame + AI_SHIPS.shotIntervalFrames;
       }
       const target =
         role === 'worker'
-          ? this.workerTarget(actor, human, host)
+          ? this.workerTarget(actor, human)
           : nearest(
               actor.position,
-              [...host.humans, ...[...this.bots.values()].map((entry) => entry.actor)].filter(
+              [...humans, ...[...this.bots.values()].map((entry) => entry.actor)].filter(
                 (candidate) =>
                   candidate.botRole !== 'raider' &&
                   !isCombatantImmune(candidate) &&
@@ -188,17 +212,20 @@ export class BotFleet {
       );
       let turn = Math.atan2(Math.sin(wanted - actor.angle), Math.cos(wanted - actor.angle));
       // Avoid local rocks, never enumerate the saved asteroid world.
-      const obstacle = host.rocksNear(actor.position).find((rock) => {
-        const dx = rock.position.x - actor.position.x;
-        const dy = rock.position.y - actor.position.y;
-        const ahead = dx * Math.cos(actor.angle) - dy * Math.sin(actor.angle);
-        return (
-          ahead > 0 &&
-          ahead < rock.size + AI_SHIPS.avoidRadius / 2 &&
-          Math.abs(dx * Math.sin(actor.angle) + dy * Math.cos(actor.angle)) <
-            rock.size + hullRadiusForKit(actor.kitId)
-        );
-      });
+      const obstacle = this.inputs.rocks
+        .spatialIndex()
+        .query(spatialQueryBounds(actor.position, AI_SHIPS.avoidRadius))
+        .find((rock) => {
+          const dx = rock.position.x - actor.position.x;
+          const dy = rock.position.y - actor.position.y;
+          const ahead = dx * Math.cos(actor.angle) - dy * Math.sin(actor.angle);
+          return (
+            ahead > 0 &&
+            ahead < rock.size + AI_SHIPS.avoidRadius / 2 &&
+            Math.abs(dx * Math.sin(actor.angle) + dy * Math.cos(actor.angle)) <
+              rock.size + hullRadiusForKit(actor.kitId)
+          );
+        });
       if (obstacle) {
         turn = Math.PI / 2;
       }
@@ -239,28 +266,40 @@ export class BotFleet {
         !inBotSanctuary(actor.position) &&
         !isCombatantImmune(actor) &&
         Math.abs(turn) < 0.12 &&
-        host.frame >= bot.nextShotFrame
+        frame >= bot.nextShotFrame
       ) {
-        host.fire(actor);
-        bot.nextShotFrame = host.frame + AI_SHIPS.shotIntervalFrames;
+        this.fire(actor);
+        bot.nextShotFrame = frame + AI_SHIPS.shotIntervalFrames;
       }
     }
   }
 
-  private workerTarget(
-    actor: GameEntity,
-    human: GameEntity,
-    host: FleetHost
-  ): { position: Position } | undefined {
+  private fire(actor: GameEntity): void {
+    const dx = Math.cos(actor.angle);
+    const dy = -Math.sin(actor.angle);
+    const reach = (4 / 3) * hullRadiusForKit(actor.kitId);
+    this.inputs.spawnPlayerLaser(
+      actor.id,
+      { x: actor.position.x + dx * reach, y: actor.position.y + dy * reach },
+      {
+        x: actor.velocity.x + (dx * LASER.SPEED) / GAME.FPS,
+        y: actor.velocity.y + (dy * LASER.SPEED) / GAME.FPS,
+      }
+    );
+  }
+
+  private workerTarget(actor: GameEntity, human: GameEntity): { position: Position } | undefined {
     if (actor.cargo > 0) {
-      const furnace = host.furnaceNear(actor.position);
+      const furnace = this.inputs.furnaces.nearest(actor.position);
       return distance(furnace.position, human.position) < AI_SHIPS.tetherRadius
         ? furnace
         : undefined;
     }
     return nearest(
       actor.position,
-      host.lootNear(actor.position).filter((loot) => loot.kind === 'points')
+      this.inputs.loot
+        .queryCircle(actor.position, AI_SHIPS.workRadius)
+        .filter((loot) => loot.kind === 'points')
     );
   }
 }

@@ -1,61 +1,28 @@
 /* @vitest-environment node */
 import { afterEach, expect, test, vi } from 'vitest';
+import { DebugReportWorker, type ReportWorkerReply } from '../../../server/debugReports/client';
+
 import {
-  DebugReportWorker,
-  type ReportWorkerReply,
-  type ReportWorkerRequest,
-} from '../../../server/debugReports/client';
+  deliverReportReply,
+  emitReportThread,
+  type ReportThreadDouble as FakeThread,
+} from '../../support/report-worker-double';
 
-/** One spawned thread: what the client sent it, and the handlers it attached. */
-interface FakeThread {
-  sent: ReportWorkerRequest[];
-  listeners: Map<string, ((value: never) => void)[]>;
-  terminated: number;
-}
-
-// One thread, because no case here sends a request after a failure, which is
-// the only thing that summons a replacement. Replacement, and the handover
-// between threads, is covered with a fake that tracks every thread in
-// `a-faulted-report-worker-is-replaced-one-thread-at-a-time.test.ts`.
-const threads = vi.hoisted(() => ({ live: undefined as FakeThread | undefined }));
+const threads = vi.hoisted(() => ({
+  all: [] as FakeThread[],
+  holdExits: false,
+  refuseConstructions: 0,
+}));
 const serverLogging = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: { error: serverLogging.error, warn: serverLogging.warn },
 }));
 
-// The thread is the external boundary. The fake supplies only transport and
-// the failure event, never a queue depth the assertions claim or a decision
-// about restarting; those rules belong to the client under test.
-vi.mock('node:worker_threads', () => ({
-  Worker: class {
-    private readonly thread: FakeThread;
-    constructor() {
-      this.thread = { sent: [], listeners: new Map(), terminated: 0 };
-      threads.live = this.thread;
-    }
-    on(event: string, handler: (value: never) => void): void {
-      const attached = this.thread.listeners.get(event) ?? [];
-      attached.push(handler);
-      this.thread.listeners.set(event, attached);
-    }
-    postMessage(request: ReportWorkerRequest): void {
-      this.thread.sent.push(request);
-    }
-    terminate(): Promise<number> {
-      this.thread.terminated += 1;
-      // Node raises `exit` once a terminated thread is gone, and that is the
-      // signal a replacement waits for. A fake that never emitted it would let
-      // a missing handover pass.
-      queueMicrotask(() => {
-        for (const handler of this.thread.listeners.get('exit') ?? []) {
-          (handler as (code: unknown) => void)(1);
-        }
-      });
-      return Promise.resolve(1);
-    }
-  },
-}));
+vi.mock('node:worker_threads', async () => {
+  const { reportWorkerClass } = await import('../../support/report-worker-double');
+  return { Worker: reportWorkerClass(threads) };
+});
 
 const CONFIG = {
   path: '/data/debug-reports.sqlite',
@@ -81,24 +48,22 @@ const UNKNOWN_AFTER_FAULT = {
 };
 
 afterEach(() => {
-  threads.live = undefined;
+  threads.all = [];
   vi.clearAllMocks();
 });
 
 function thread(): FakeThread {
-  const live = threads.live;
+  const live = threads.all.at(-1);
   if (!live) {
     throw new Error('The worker thread was never constructed.');
   }
   return live;
 }
 function emit(event: string, value: unknown): void {
-  for (const handler of thread().listeners.get(event) ?? []) {
-    (handler as (value: unknown) => void)(value);
-  }
+  emitReportThread(thread(), event, value);
 }
 function deliver(reply: ReportWorkerReply): void {
-  emit('message', reply);
+  deliverReportReply(thread(), reply);
 }
 /** When two records must read in order, an absent call is the failure, not a skip. */
 function callOrder(mock: { mock: { invocationCallOrder: number[] } }, index: number): number {

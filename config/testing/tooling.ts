@@ -45,11 +45,15 @@ export default defineConfig({
           name: 'actions',
           include: [
             'scripts/auto-merge-contract.test.mjs',
-            'scripts/ci-contract.test.mjs',
-            'scripts/gate-contract.test.mjs',
+            'scripts/ci-contract.test.ts',
+            'scripts/security-scan.test.ts',
+            'scripts/gate-contract.test.ts',
             'scripts/review-receipt-contract.test.mjs',
             'scripts/preview-comment.test.ts',
             'scripts/railpack-build.test.ts',
+            'scripts/railway-version-pin.test.ts',
+            'scripts/railway-ownership-plan.test.ts',
+            'scripts/railway-setting-details.test.ts',
           ],
         },
       },
@@ -58,9 +62,9 @@ export default defineConfig({
         test: {
           name: 'smoke',
           include: [
+            'scripts/ci-browser-smoke-protocol.test.ts',
             'scripts/server-release-inputs.test.mjs',
             'scripts/production-smoke-scenario.test.ts',
-            'scripts/production-health-watch.test.ts',
           ],
         },
       },

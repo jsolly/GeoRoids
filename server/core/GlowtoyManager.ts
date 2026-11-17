@@ -1,7 +1,50 @@
 import { GLOWTOY, type ShipLight, shipIlluminates } from '../../shared/glowtoy';
+import { WORLD } from '../../shared/world';
 import type { AsteroidData, Position } from '../../shared-types';
+import type { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
+import { spatialQueryBounds } from '../world/spatialQueryBounds';
+import type { EntityManager } from './EntityManager';
+import type { LootManager } from './LootManager';
 
-/** All state belongs to the persistent rock; the manager retains no history. */
+interface GlowtoyInputs {
+  actors: Pick<EntityManager, 'getAllEntities'>;
+  field: Pick<AsteroidSpatialIndex, 'queryMany'>;
+  points: Pick<LootManager, 'spawnPoints'>;
+  markFieldDirty: () => void;
+}
+
+/** Owns frame cadence and transient light sources; charge/reveals stay on persistent rocks. */
+export class GlowtoyManager {
+  private sources: Position[] = [];
+
+  constructor(private readonly inputs: GlowtoyInputs) {}
+
+  advance(frame: number): void {
+    if (frame % GLOWTOY.tickFrames !== 0) {
+      return;
+    }
+    const lights = this.inputs.actors
+      .getAllEntities()
+      .filter((pilot) => pilot.health > 0 && !pilot.exploding);
+    const nearby = this.inputs.field.queryMany(
+      lights.map((pilot) => spatialQueryBounds(pilot.position, WORLD.interestRadius))
+    );
+    this.sources = advanceGlowtoys(nearby, lights, (position) => {
+      this.inputs.points.spawnPoints(position, GLOWTOY.cachePoints);
+      this.inputs.markFieldDirty();
+    });
+  }
+
+  lightSources(): readonly Position[] {
+    return this.sources;
+  }
+
+  clear(): void {
+    this.sources = [];
+  }
+}
+
+/** Charge and first-reveal state are stored on the supplied persistent rock rows. */
 export function advanceGlowtoys(
   rocks: readonly AsteroidData[],
   lights: readonly ShipLight[],

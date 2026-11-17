@@ -76,7 +76,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const original = structuredClone(world);
     expect(captureSnapshot(world)).toEqual(original);
     const encoder = new SnapshotEncoder(world);
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const applied = decodeSnapshotMessage(decoder, encoder.encodeSerialized(1, undefined, 0).text);
     expect(world).toEqual(original);
     expect(applied.entities).toEqual(original.entities);
@@ -129,7 +129,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       asteroid.position.x = value;
       const encoder = new SnapshotEncoder(world);
       expect(
-        decodeSnapshotMessage(new SnapshotDecoder(), snapshotMessage(encoder.encode(1)))
+        decodeSnapshotMessage(new SnapshotDecoder('diagnostic'), snapshotMessage(encoder.encode(1)))
           .asteroids[0]?.position.x
       ).toBe(value);
       expect(asteroid.position.x).toBe(value);
@@ -147,7 +147,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       sequence: number;
       baseline?: SnapshotBaseline;
     }> = [1, 8, 98].map((sequence) => ({
-      decoder: new SnapshotDecoder(),
+      decoder: new SnapshotDecoder('diagnostic'),
       sequence,
     }));
     let deltas = 0;
@@ -230,7 +230,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const secondBaselineAsteroid = b.asteroids[0];
     assert.ok(secondBaselineAsteroid, 'second baseline asteroid');
     secondBaselineAsteroid.offsets = [0.2, 0.3];
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const first = new SnapshotEncoder(a);
     const next = new SnapshotEncoder(b);
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
@@ -245,7 +245,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
   });
 
   test('bad packets leave the last baseline intact and a fresh keyframe repairs gaps', () => {
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const state = captureSnapshot(snapshotFixture());
     const first = new SnapshotEncoder(state);
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
@@ -364,7 +364,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
                 ? { ...delta, sequence: recipientSequence, baseline: baselineSequence }
                 : { ...full, sequence: recipientSequence }
             );
-            const decoder = new SnapshotDecoder();
+            const decoder = new SnapshotDecoder('diagnostic');
             decodeSnapshotMessage(decoder, snapshotMessage(baseline.encode(baselineSequence)));
             expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(world);
 
@@ -426,7 +426,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     expect(serialized.text).toBe(
       JSON.stringify({ type: 'snapshot', data: frame, timestamp: 1234 })
     );
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(decoder, first.encodeSerialized(1, undefined, 1000).text);
     expect(decodeSnapshotMessage(decoder, serialized.text)).toEqual(next.state);
   });
@@ -470,7 +470,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     expect(encoded.text).toBe(
       JSON.stringify({ type: 'snapshot', data: encoded.frame, timestamp: 1234 })
     );
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(decoder, first.encodeSerialized(1, undefined, 1000).text);
     expect(decodeSnapshotMessage(decoder, encoded.text)).toEqual(
       JSON.parse(JSON.stringify(next.state))
@@ -516,7 +516,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     ]);
     expect(typeof patch.update?.find((row) => row[0] === 1)?.[1]).toBe('object');
     expect(typeof patch.update?.find((row) => row[0] === 2)?.[1]).toBe('object');
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const applied = decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     applied.asteroids.reverse();
     applied.asteroids[0]?.offsets.push(99);
@@ -535,7 +535,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     expect(naturalPatch.order).toBeUndefined();
     expect(naturalPatch.update).toBeUndefined();
     expect(naturalFrame.patch.clear).toBeUndefined();
-    const naturalDecoder = new SnapshotDecoder();
+    const naturalDecoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(naturalDecoder, snapshotMessage(first.encode(1)));
     expect(decodeSnapshotMessage(naturalDecoder, snapshotMessage(naturalFrame))).toEqual(
       new SnapshotEncoder(natural).state
@@ -572,7 +572,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         frame = next.encode(2, { sequence: 1, state: first.state });
       assert.equal(frame.kind, 'delta');
       expect(frame.patch.collections?.['asteroids']?.update).toEqual([[0, mask, ...values]]);
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('diagnostic');
       decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
       expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(next.state);
       expect(source).toEqual(original);
@@ -616,7 +616,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       expect(patch?.order?.[0]).toBe(80);
       expect(patch?.order?.at(-1)).toBe(0);
       expect(patch?.add?.[0]?.['position']).toEqual(next.state.asteroids[0]?.position);
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('diagnostic');
       const application = decodeSnapshotMessage(decoder, snapshotMessage(before.encode(1)));
       application.asteroids.reverse();
       const appRock = application.asteroids.at(-1);
@@ -677,7 +677,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       }
       const expected = relativeBytes < absoluteBytes ? scenario.relative : scenario.absolute;
       expect(expandedUpdates(frame.patch.collections?.['asteroids'])).toEqual([expected]);
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('diagnostic');
       decodeSnapshotMessage(decoder, snapshotMessage(before.encode(1)));
       expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(next.state);
     }
@@ -714,7 +714,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         [0, 9, 1],
         [0, 9, 1, 2, 3],
       ]) {
-        const decoder = new SnapshotDecoder();
+        const decoder = new SnapshotDecoder('diagnostic');
         const keyframe = { version: 3, sequence: 1, kind: 'keyframe', state: baseline } as const;
         const app = decodeSnapshotMessage(decoder, snapshotMessage(keyframe));
         const original = structuredClone(app);
@@ -782,7 +782,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       1,
       { position: { x: 102, y: 200 }, angle: 0.1235, health: 20 },
     ]);
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(next.state);
     const noSpiders = structuredClone(changed);
@@ -870,7 +870,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       JSON.parse('{"set":{"constructor":true}}'),
     ];
     for (const patch of corrupt) {
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('diagnostic');
       decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
       const rejected = decoder.readMessage(
         JSON.stringify({
@@ -882,7 +882,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       expect(rejected.kind).toBe('snapshot-rejected');
       expect(decodeSnapshotMessage(decoder, snapshotMessage(valid))).toEqual(next.state);
     }
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     expect(
       decoder.readMessage(
@@ -907,7 +907,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     sourceEntity.position.x = -900;
     expect(capturedEntity.position.x).toBe(500);
 
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const applied = decodeSnapshotMessage(decoder, first.text);
     const appliedEntity = applied.entities[0];
     assert.ok(appliedEntity, 'decoded entity');
@@ -933,7 +933,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const encodedEntity = encoder.state.entities[0];
     assert.ok(encodedEntity, 'encoded entity');
     expect(encodedEntity.position.x).toBe(500);
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const applied = decodeSnapshotMessage(decoder, snapshotMessage(encoder.encode(1)));
     const appliedEntity = applied.entities[0];
     assert.ok(appliedEntity, 'applied entity');
@@ -951,7 +951,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
   });
 
   test('one parser call owns the envelope and snapshot admission', () => {
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const frame = new SnapshotEncoder(snapshotFixture()).encode(1);
     const text = snapshotMessage(frame);
     const parse = vi.spyOn(JSON, 'parse');
@@ -967,7 +967,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
   });
 
   test('rejected admission does not retain a baseline and non-snapshots stay messages', () => {
-    const decoder = new SnapshotDecoder();
+    const decoder = new SnapshotDecoder('diagnostic');
     const state = snapshotFixture();
     const encoder = new SnapshotEncoder(state);
     const keyframe = snapshotMessage(encoder.encode(1));

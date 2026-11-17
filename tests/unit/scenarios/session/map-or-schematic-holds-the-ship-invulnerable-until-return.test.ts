@@ -60,15 +60,15 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
       throw new Error('Ace joined without a loose satellite pickup');
     }
     world.engine.parkSatellitePickups(origin);
-    world.engine.tickSatellitePickups();
+    world.engine.satelliteField.advance();
     expect(world.entity(ace).score).toBe(0);
     expect(world.engine.getSatellitePickup(parkedPickup.id)?.state).toBe('loose');
 
     const health = held.health;
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health);
-    expect(world.engine.handleShipDamage(ace.id, 'ricochet', 25).applied).toBe(false);
-    expect(world.engine.handleShipDamage(ace.id, 'boundary', health).applied).toBe(false);
+    expect(world.engine.shipDamage.apply(ace.id, 'ricochet', 25).applied).toBe(false);
+    expect(world.engine.shipDamage.apply(ace.id, 'boundary', health).applied).toBe(false);
     world.clearAsteroids();
 
     sendHold(false);

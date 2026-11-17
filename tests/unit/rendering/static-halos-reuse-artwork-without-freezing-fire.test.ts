@@ -8,6 +8,7 @@ import {
   setWorldExploration,
   worldFurnaces,
 } from '../../../src/network/worldExploration';
+import { readBitmapBudget, releaseBitmap, resizeBitmap } from '../../../src/rendering/bitmapBudget';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import {
   clearStaticFurnaceArtwork,
@@ -312,4 +313,25 @@ test('a failed replacement bed releases both partial surfaces and exposes the fa
   expect(surfaces).toHaveLength(4);
   expect(previous.every((c) => c.width === 0 && c.height === 0)).toBe(true);
   expect(surfaces.every((c) => c.width === 0 && c.height === 0)).toBe(true);
+});
+
+test('the shared exhausted budget leaves court and furnace artwork visible through their live painters', () => {
+  const { ctx, surfaces } = scene();
+  const reserve = document.createElement('canvas');
+  resizeBitmap(reserve, 4096, 4096, 'halo-budget-test');
+  try {
+    const denied = readBitmapBudget().deniedAllocations;
+    const images = vi.spyOn(ctx, 'drawImage');
+    const strokes = vi.spyOn(ctx, 'stroke');
+    drawRicochetCourt(RICOCHET_COURT.center);
+    drawFurnacesRelative(TOWN_HEARTH.position);
+    expect(images).not.toHaveBeenCalled();
+    expect(strokes.mock.calls.length).toBeGreaterThan(10);
+    expect(readBitmapBudget().deniedAllocations).toBeGreaterThanOrEqual(denied + 2);
+    expect(
+      surfaces.filter((canvas) => canvas !== reserve).every((canvas) => canvas.width === 0)
+    ).toBe(true);
+  } finally {
+    releaseBitmap(reserve);
+  }
 });

@@ -27,7 +27,7 @@ test('v3 keyframe, delta and clear preserve campaign, downed deadlines and physi
     hazard: { phase: 'warning', kind: 'swarm', startsAt: 1_800_000, endsAt: 1_980_000 },
     meteors: [],
   };
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const first = new SnapshotEncoder(world);
   const read = decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
   expect(read.entities[0]?.downedUntil).toBe(30_000);

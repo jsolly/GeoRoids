@@ -15,7 +15,7 @@ test('observing natural pilots preserves their real spawns and every generated a
     const socket = new RecordingSocket();
     const actor = engine.addPlayer(`pilot-${index}`, `Pilot ${index}`, socket);
     engine.ensureAsteroidField();
-    expect(engine.registerPilot(actor, socket).ok).toBe(true);
+    expect(engine.pilotSessions.register({ actor: actor, socket: socket }).ok).toBe(true);
   }
   const before = structuredClone(engine.getGameState());
   const manifest = captureRegionalManifest(engine, 42);
@@ -43,7 +43,7 @@ test('observing natural pilots preserves their real spawns and every generated a
   expect(manifest.asteroids.samples.some((sample) => sample.id === finalRock.id)).toBe(false);
   const sameRowsReordered = regionalAsteroidEvidence([...engine.getAllAsteroids()].reverse());
   expect(sameRowsReordered.digest).toBe(manifest.asteroids.digest);
-  engine.updateAsteroid(finalRock.id, { health: finalRock.health - 1 });
+  engine.asteroidLifecycle.update(finalRock.id, { health: finalRock.health - 1 });
   const changed = captureRegionalManifest(engine, 42);
   expect(changed.asteroids.digest).not.toBe(manifest.asteroids.digest);
   expect(changed.asteroids.samples).toEqual(manifest.asteroids.samples);

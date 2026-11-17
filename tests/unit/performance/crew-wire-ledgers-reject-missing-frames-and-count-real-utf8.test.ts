@@ -4,12 +4,12 @@ import { expect, test } from 'vitest';
 import { canonicalJson } from '../../../benchmarks/results';
 import { parseArguments } from '../../../benchmarks/run';
 import { sampleOptions } from '../../../benchmarks/sample';
-import {
-  partitionSnapshotBytes,
-  replayWireLedger,
-  websocketTextHeaderBytes,
-} from '../../../benchmarks/wire-ledger';
+import { recipientSnapshotOracle } from '../../../benchmarks/snapshot-oracle';
+import { websocketTextHeaderBytes } from '../../../benchmarks/websocket-frame-bytes';
+import { partitionSnapshotBytes, replayWireLedger } from '../../../benchmarks/wire-ledger';
+import { GameEngine } from '../../../server/core/GameEngine';
 import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { RecordingSocket } from '../../support/recordingSocket';
 import { snapshotFixture } from '../network/snapshotFixture';
 
 function hash(text: string): string {
@@ -19,6 +19,25 @@ function hash(text: string): string {
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
+
+test('the independent recipient oracle keeps nearby wildlife and excludes another habitat', () => {
+  const engine = new GameEngine(42);
+  try {
+    engine.addPlayer('local', 'Local', new RecordingSocket(), { x: 0, y: 0 });
+    engine.addPlayer('distant', 'Distant', new RecordingSocket(), { x: 10_000, y: 0 });
+    engine.advanceOneFrame();
+    const allIds = engine.getSnapshotState().rolyPolys?.map((animal) => animal.id);
+    expect(allIds).toContain('roly-poly:0,0');
+    expect(allIds).toContain('roly-poly:8,0');
+    const recipientIds = recipientSnapshotOracle(engine, 'local').rolyPolys?.map(
+      (animal) => animal.id
+    );
+    expect(recipientIds).toContain('roly-poly:0,0');
+    expect(recipientIds).not.toContain('roly-poly:8,0');
+  } finally {
+    engine.stopGameLoop();
+  }
+});
 
 function wireScene() {
   const world = snapshotFixture(0);
@@ -129,15 +148,15 @@ test('crew movement, changing global spiders and Unicode map names account for e
 
 test('captured crew streams reject missing baselines, duplicate frames and altered decoded outcomes', () => {
   const { keyframe, delta } = wireScene();
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const frames = [capture(keyframe.text, decoder), capture(delta.text, decoder)];
   const first = frames[0];
   if (first == null) {
     throw new Error('Missing initial keyframe');
   }
-  expect(replayWireLedger(frames)).toBe(2);
-  expect(() => replayWireLedger(frames.slice(1))).toThrow();
-  expect(() => replayWireLedger([first, ...frames])).toThrow();
+  expect(replayWireLedger(frames, 'diagnostic')).toBe(2);
+  expect(() => replayWireLedger(frames.slice(1), 'diagnostic')).toThrow();
+  expect(() => replayWireLedger([first, ...frames], 'diagnostic')).toThrow();
   const changed = structuredClone(frames);
   const second = changed[1];
   if (!second) {
@@ -174,14 +193,14 @@ test('captured crew streams reject missing baselines, duplicate frames and alter
   second.rawSha256 = hash(second.text);
   // Same byte widths and baseline: only the retained decoded-state witness can reject this.
   expect(second.payloadBytes).toBe(Buffer.byteLength(second.text, 'utf8'));
-  expect(() => replayWireLedger(changed)).toThrow('changed state');
+  expect(() => replayWireLedger(changed, 'diagnostic')).toThrow('changed state');
   const wrongPilot = structuredClone(frames);
   const misrouted = wrongPilot[1];
   if (!misrouted) {
     throw new Error('Missing routed delta');
   }
   misrouted.pilot = 'wire-pilot-1';
-  expect(() => replayWireLedger(wrongPilot)).toThrow();
+  expect(() => replayWireLedger(wrongPilot, 'diagnostic')).toThrow();
 });
 
 test('packed asteroid drift accounts for its actual base64 property and replays the complete world', () => {
@@ -214,10 +233,10 @@ test('packed asteroid drift accounts for its actual base64 property and replays 
   expect(Object.values(partition.parts).reduce((sum, count) => sum + count, 0)).toBe(
     Buffer.byteLength(delta.text, 'utf8')
   );
-  const decoder = new SnapshotDecoder();
+  const decoder = new SnapshotDecoder('diagnostic');
   const frames = [capture(keyframe.text, decoder), capture(delta.text, decoder)];
-  expect(replayWireLedger(frames)).toBe(2);
-  const complete = new SnapshotDecoder();
+  expect(replayWireLedger(frames, 'diagnostic')).toBe(2);
+  const complete = new SnapshotDecoder('diagnostic');
   complete.readMessage(keyframe.text, { acceptSnapshots: true });
   const result = complete.readMessage(delta.text, { acceptSnapshots: true });
   expect(result.kind).toBe('snapshot');

@@ -25,13 +25,18 @@ async function productionService(): Promise<ServiceNode> {
     .flat()
     .filter(
       (resource): resource is ServiceNode =>
-        resource.type === 'service' && resource.name === 'geoasteroids'
+        resource.type === 'service' && resource.name === 'Georoids'
     );
-  assert.equal(services.length, 1, '.railway/railway.ts must define the geoasteroids service once');
+  assert.equal(services.length, 1, '.railway/railway.ts must define the Georoids service once');
   const [service] = services;
   assert.ok(service);
   return service;
 }
+
+test('production planning preserves the intentionally configured report-delivery token', async () => {
+  const service = await productionService();
+  assert.deepEqual(service.variables?.['TODOIST_API_TOKEN'], { type: 'preserve' });
+});
 
 test('CI builds with the Railpack release and start command Railway production uses', async () => {
   const service = await productionService();

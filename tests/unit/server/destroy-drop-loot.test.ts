@@ -1,14 +1,17 @@
 import { strict as assert } from 'node:assert';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import type { LaserCombat } from '../../../server/core/LaserCombat';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { ROID } from '../../../shared/constants/gameplay';
 import { cargoCapacity } from '../../../shared/economy';
+import { isEquipmentId } from '../../../shared/equipment';
+import { LOOT_BLAST } from '../../../shared/lootBlast';
 import { GROWTH } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function addSmallAsteroid(engine: GameEngine, id: string, size = 12): void {
-  engine.addAsteroid({
+  engine.asteroidLifecycle.insert({
     id,
     position: { x: 20, y: 30 },
     velocity: { x: 2, y: -1 },
@@ -39,7 +42,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
 
-    const result = engine.handleAsteroidHit('roid-1', player.id, 'laser');
+    const result = engine.asteroidMining.hit('roid-1', player.id, 'laser');
 
     expect(result.outcome).toBe('destroyed');
     const shards = engine.getLoot().filter((drop) => drop.kind === 'shard');
@@ -51,25 +54,82 @@ describe('destroying asteroids drops shared shards into game state', () => {
     expect(player.score).toBe(0);
   });
 
-  test('collecting a shard awards cargo without changing hull mass or health', () => {
+  test.each(['laser', 'collision'] as const)(
+    'a seeded %s break preserves reward quantities and the laser-only equipment draw',
+    (cause) => {
+      engine = new GameEngine(7);
+      addSmallAsteroid(engine, 'equipment-order-rock');
+      const rock = engine.getAsteroid('equipment-order-rock');
+      assert.ok(rock);
+      rock.material = 'ice';
+
+      expect(engine.asteroidMining.hit(rock.id, 'unknown-miner', cause).outcome).toBe('destroyed');
+      const loot = engine.getLoot();
+      expect(loot.filter((drop) => drop.kind === 'points').map((drop) => drop.points)).toEqual([
+        ROID.POINTS_SMALL,
+      ]);
+      expect(
+        loot
+          .filter((drop) => drop.kind === 'shard')
+          .map((drop) => ({ position: drop.position, mass: drop.mass, points: drop.points }))
+      ).toEqual([{ position: { x: 20, y: 30 }, mass: 0.25, points: GROWTH.SHARD_SCORE }]);
+      expect(
+        loot
+          .filter((drop) => isEquipmentId(drop.kind))
+          .map((drop) => ({
+            kind: drop.kind,
+            position: drop.position,
+          }))
+      ).toEqual(cause === 'laser' ? [{ kind: 'resource_tap', position: { x: 20, y: 30 } }] : []);
+    }
+  );
+
+  test('a terminal metal hit can leave equipment after earlier chips leave no rewards', () => {
+    engine = new GameEngine(7);
+    addSmallAsteroid(engine, 'terminal-metal');
+    const rock = engine.getAsteroid('terminal-metal');
+    assert.ok(rock);
+    rock.material = 'metal';
+    rock.health = 75;
+    rock.maxHealth = 75;
+    for (let hit = 0; hit < 2; hit++) {
+      expect(engine.asteroidMining.hit(rock.id, 'unknown-miner').outcome).toBe('damaged');
+      expect(engine.getLoot()).toEqual([]);
+    }
+    expect(engine.asteroidMining.hit(rock.id, 'unknown-miner').outcome).toBe('destroyed');
+    expect(
+      engine
+        .getLoot()
+        .filter((drop) => isEquipmentId(drop.kind))
+        .map((drop) => drop.kind)
+    ).toEqual(['resource_tap']);
+    expect(engine.getLoot().find((drop) => drop.kind === 'shard')?.mass).toBe(0.75);
+  });
+
+  test('a frame collects a shard as cargo without changing hull mass or health', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
-    engine.handleAsteroidHit('roid-1', player.id, 'laser');
+    engine.asteroidMining.hit('roid-1', player.id, 'laser');
     const beforeMass = player.mass;
     const beforeHealth = { health: player.health, maxHealth: player.maxHealth };
 
     const drops = engine.getLoot();
     expect(drops).toHaveLength(2);
-    expect(engine.collectLoot()).toBeUndefined();
+    engine.advanceOneFrame();
     expect(player.mass).toBe(beforeMass);
     expect(player).toMatchObject(beforeHealth);
     expect(player.cargo).toBe(ROID.POINTS_SMALL + GROWTH.SHARD_SCORE);
-    expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
+    expect(
+      engine.getLoot().filter((drop) => drops.some((original) => original.id === drop.id))
+    ).toEqual([]);
     const broadcaster = new GameStateBroadcaster(engine);
+    broadcaster.negotiateSnapshot(ws);
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
+    expect(engine.getPlayer(player.id)).toBe(player);
+    expect(player.ws).toBe(ws);
     const notifications = ws.inbox.filter((message) => message.type === 'lootCollected');
     expect(notifications).toHaveLength(2);
     expect(notifications.map((message) => message.data)).toEqual(
@@ -83,7 +143,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
         }))
       )
     );
-    expect(engine.drainLootCollections()).toEqual([]);
+    expect(engine.lootCollection.drainCollections()).toEqual([]);
   });
 
   test('returning for the same points drop creates a distinct collection receipt', () => {
@@ -91,19 +151,23 @@ describe('destroying asteroids drops shared shards into game state', () => {
     player.spawnProtectionTimer = 0;
     player.cargo = cargoCapacity(player.kitId) - GROWTH.SHARD_SCORE - 1;
     addSmallAsteroid(engine, 'partial-rock', 12);
-    engine.handleAsteroidHit('partial-rock', player.id, 'laser');
+    engine.asteroidMining.hit('partial-rock', player.id, 'laser');
     const points = engine.getLoot().find((drop) => drop.kind === 'points');
     assert.ok(points && typeof points.points === 'number');
     player.position = { ...points.position };
-    engine.collectLoot();
-    const first = engine.drainLootCollections().find((event) => event.lootId === points.id);
+    engine.lootCollection.collect();
+    const first = engine.lootCollection
+      .drainCollections()
+      .find((event) => event.lootId === points.id);
     assert.ok(first);
     expect(player.cargo).toBe(cargoCapacity(player.kitId));
     expect(engine.getLoot().find((drop) => drop.id === points.id)?.points).toBe(points.points - 1);
     expect(first).toMatchObject({ collectorId: player.id, lootId: points.id, kind: 'points' });
     player.cargo = 0;
-    engine.collectLoot();
-    const second = engine.drainLootCollections().find((event) => event.lootId === points.id);
+    engine.lootCollection.collect();
+    const second = engine.lootCollection
+      .drainCollections()
+      .find((event) => event.lootId === points.id);
     assert.ok(second);
     expect(second).toMatchObject({ collectorId: player.id, lootId: points.id, kind: 'points' });
     expect(player.cargo).toBe(points.points - 1);
@@ -113,15 +177,29 @@ describe('destroying asteroids drops shared shards into game state', () => {
     expect(second.eventId).not.toBe(first.eventId);
   });
 
-  test('ending a world discards pickup sounds that have not been broadcast', () => {
-    const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 30 });
-    addSmallAsteroid(engine, 'roid-1');
-    engine.handleAsteroidHit('roid-1', player.id, 'laser');
-    engine.collectLoot();
-    expect(engine.getLoot()).toEqual([]);
-    engine.resetForTesting();
-    expect(engine.drainLootCollections()).toEqual([]);
-  });
+  test.each(['last pilot leaves', 'world reset'] as const)(
+    '%s discards pickup feedback before another pilot joins',
+    (ending) => {
+      const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 30 });
+      addSmallAsteroid(engine, 'roid-1');
+      engine.asteroidMining.hit('roid-1', player.id, 'laser');
+      engine.lootCollection.collect();
+      expect(engine.getLoot()).toEqual([]);
+      if (ending === 'last pilot leaves') {
+        engine.removePlayer(player.id);
+        expect(engine.isGamePaused()).toBe(true);
+      } else {
+        engine.resetForTesting();
+      }
+      const nextSocket = new RecordingSocket();
+      engine.addPlayer('next', 'Next', nextSocket, { x: 0, y: 0 });
+      const broadcaster = new GameStateBroadcaster(engine);
+      broadcaster.negotiateSnapshot(nextSocket);
+      broadcaster.broadcastGameState();
+      expect(nextSocket.received('lootCollected')).toEqual([]);
+      expect(engine.lootCollection.drainCollections()).toEqual([]);
+    }
+  );
 
   test('shooting a shard detonates it while preserving every crew hull', () => {
     const ws = new RecordingSocket();
@@ -130,7 +208,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
-    engine.handleAsteroidHit('roid-1', shooter.id, 'laser');
+    engine.asteroidMining.hit('roid-1', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
     assert.ok(shard, 'shard loot');
 
@@ -147,7 +225,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const ws = new RecordingSocket();
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'seed-roid',
       position: { x: 0, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -160,7 +238,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
       vertices: 8,
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'small-1',
       position: { x: 10, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -173,7 +251,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
       vertices: 8,
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
-    engine.addAsteroid({
+    engine.asteroidLifecycle.insert({
       id: 'big-1',
       position: { x: 12, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -187,7 +265,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
 
-    engine.handleAsteroidHit('seed-roid', shooter.id, 'laser');
+    engine.asteroidMining.hit('seed-roid', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
     assert.ok(shard, 'shard loot');
     const blast = engine.handleLootExplode(shooter.id, shard.id);
@@ -209,7 +287,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     const place = (id: string, x: number, size: number) => {
-      engine.addAsteroid({
+      engine.asteroidLifecycle.insert({
         id,
         position: { x, y: 0 },
         velocity: { x: 0, y: 0 },
@@ -241,7 +319,7 @@ describe('destroying asteroids drops shared shards into game state', () => {
       Object.defineProperty(row, 'boost', { get: countRead });
     }
 
-    engine.handleAsteroidHit('seed-roid', shooter.id, 'laser');
+    engine.asteroidMining.hit('seed-roid', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
     assert.ok(shard, 'shard loot');
     distantReads = 0;
@@ -259,11 +337,66 @@ describe('destroying asteroids drops shared shards into game state', () => {
     const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
-    engine.handleAsteroidHit('roid-1', 'p1', 'laser');
+    engine.asteroidMining.hit('roid-1', 'p1', 'laser');
     expect(engine.getDiagnostics().loot).toBe(2);
 
     engine.resetForTesting();
     expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
     expect(engine.getDiagnostics().loot).toBe(0);
   });
+
+  test.each(['broadcast', 'last pilot leaves', 'world reset'] as const)(
+    '%s handles laser-created blast feedback without replaying a detonation',
+    (ending) => {
+      const blastEffect = vi.spyOn(engine, 'handleLootExplode');
+      try {
+        const socket = new RecordingSocket();
+        const shooter = engine.addPlayer('blast-pilot', 'Pilot', socket, { x: 0, y: 0 });
+        for (const rock of engine.getAllAsteroids()) {
+          engine.asteroidLifecycle.remove(rock.id);
+        }
+        engine.parkSatellitePickups();
+        const expected: ReturnType<LaserCombat['drainLootBlasts']> = [];
+        for (const id of ['first-blast', 'second-blast']) {
+          addSmallAsteroid(engine, id);
+          expect(engine.asteroidMining.hit(id, shooter.id, 'laser').outcome).toBe('destroyed');
+          const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
+          assert.ok(shard);
+          const origin = { ...shard.position };
+          const shot = engine.laserCombat.spawn(shooter.id, origin, { x: 0, y: 0 });
+          assert.ok(shot);
+          expect(engine.laserCombat.resolveSpawned(shot.id)).toEqual([]);
+          expect(shot.hasExploded).toBe(true);
+          expect(engine.getLoot().some((drop) => drop.id === shard.id)).toBe(false);
+          expect(engine.laserCombat.shots()).toEqual([]);
+          expected.push({
+            lootId: shard.id,
+            position: origin,
+            radius: LOOT_BLAST.RADIUS,
+            shooterId: shooter.id,
+          });
+          const effect = blastEffect.mock.results.at(-1);
+          assert.ok(effect?.type === 'return' && effect.value.origin);
+          effect.value.origin.x += 1000;
+        }
+        if (ending === 'broadcast') {
+          const broadcaster = new GameStateBroadcaster(engine);
+          broadcaster.negotiateSnapshot(socket);
+          broadcaster.broadcastGameState();
+          broadcaster.broadcastGameState();
+          expect(engine.getPlayer(shooter.id)).toBe(shooter);
+          expect(shooter.ws).toBe(socket);
+          expect(socket.received('lootExploded').map((message) => message.data)).toEqual(expected);
+        } else if (ending === 'last pilot leaves') {
+          engine.removePlayer(shooter.id);
+          expect(engine.isGamePaused()).toBe(true);
+        } else {
+          engine.resetForTesting();
+        }
+        expect(engine.laserCombat.drainLootBlasts()).toEqual([]);
+      } finally {
+        blastEffect.mockRestore();
+      }
+    }
+  );
 });

@@ -96,7 +96,7 @@ function decodeSnapshot(text: string, decoder: SnapshotDecoder): ServerGameSnaps
   }
 }
 
-/** A small active laser set matching the fields emitted by GameEngine.getPlayerProjectiles(). */
+/** A small active laser set matching the fields emitted by LaserCombat.projectiles(). */
 function playerProjectileFixture(tick: number): PlayerProjectileState[] {
   return Array.from({ length: 4 }, (_, index) => {
     const velocity = { x: 4 + index, y: (index - 1) * 0.5 };
@@ -158,8 +158,14 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     warmupTicks: input.warmupTicks,
     measuredTicks: input.measuredTicks,
   };
-  const decoders = { keyframe: new SnapshotDecoder(), delta: new SnapshotDecoder() };
-  const timedDecoders = { keyframe: new SnapshotDecoder(), delta: new SnapshotDecoder() };
+  const decoders = {
+    keyframe: new SnapshotDecoder('diagnostic'),
+    delta: new SnapshotDecoder('diagnostic'),
+  };
+  const timedDecoders = {
+    keyframe: new SnapshotDecoder('diagnostic'),
+    delta: new SnapshotDecoder('diagnostic'),
+  };
   for (const [tick, current] of history.entries()) {
     const measured = tick >= input.warmupTicks;
     const world = worlds[tick];

@@ -1,7 +1,7 @@
 ---
 # Recorded findings that predate this workflow audit. New workflow files are not
 # listed, so an unpinned action in a new workflow still fails. The ignored
-# workflows keep the action references locked by scripts/ci-contract.test.mjs:
+# workflows keep the action references locked by scripts/ci-contract.test.ts:
 # ci.yml pins checkout and upload-artifact to commits; its other actions and the
 # other ignored workflows keep major-version tags.
 rules:

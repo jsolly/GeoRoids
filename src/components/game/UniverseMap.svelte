@@ -178,6 +178,11 @@
           ? 'Drag to pan and pinch to zoom. Use Center on you to return to your ship.'
           : 'Arrow keys pan, plus and minus zoom, and Home centers on your ship. Shift+Enter places a help signal at the chart center, within nearby crew range.'}
       </p>
+      <p id="universe-map-sync-status" class="sr-only" role="status" aria-atomic="true">
+        {(chrome?.atlasSyncing ?? true)
+          ? 'Chart syncing. Revealed locations may be incomplete.'
+          : 'Chart synced. Revealed locations are up to date.'}
+      </p>
       <canvas
         id={UNIVERSE_MAP_IDS.canvas}
         tabindex="0"

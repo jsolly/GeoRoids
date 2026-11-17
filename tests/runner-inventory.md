@@ -34,8 +34,8 @@ release inputs and production smoke scenario tests against owned fixtures. It
 never contacts production.
 
 The `actions` project owns the gate contracts plus the former standalone
-`ci-contract.mjs` and `review-receipt-contract.mjs` assertion programs, now named
-`*.test.mjs`. Their assertions execute inside reported Vitest cases. The gate's
+`ci-contract.mjs` and `review-receipt-contract.mjs` assertion programs. The CI
+and gate contracts now use `*.test.ts`; the receipt contract uses `*.test.mjs`. Their assertions execute inside reported Vitest cases. The gate's
 hostile-Git child launches Vitest and excludes only its own recursive invocation;
 the parent executes that case. Fixture runtime comparisons remove the test
 runner's injected worker variables before launching their controlled processes.

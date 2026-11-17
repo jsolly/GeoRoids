@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import {
@@ -85,7 +85,7 @@ export function parseArguments(argv: readonly string[]) {
   return { ...options, command };
 }
 
-function signalGroup(pid: number, signal: NodeJS.Signals | 0): boolean {
+function signalGroup(pid: number, signal: NodeJS.Signals): boolean {
   try {
     process.kill(-pid, signal);
     return true;
@@ -95,6 +95,41 @@ function signalGroup(pid: number, signal: NodeJS.Signals | 0): boolean {
     }
     throw error;
   }
+}
+
+function groupRunning(group: number): boolean {
+  // kill(..., 0) also succeeds for zombies retained by a container's init.
+  // Those processes have exited; only a live group member blocks cleanup.
+  const scoped = process.platform === 'darwin';
+  const result = spawnSync(
+    'ps',
+    scoped ? ['-g', String(group), '-o', 'pgid=,stat='] : ['-axo', 'pgid=,stat='],
+    { encoding: 'utf8', timeout: 5_000 }
+  );
+  const stderr = result.stderr ?? '';
+  const absent = scoped && result.status === 1 && result.stdout === '' && result.stderr === '';
+  assert(
+    (result.status === 0 || absent) && !result.error && !result.signal && !stderr.trim(),
+    `Cannot inspect measurement process group ${group}: ${JSON.stringify({
+      status: result.status,
+      signal: result.signal,
+      error: result.error?.message,
+      stderr: stderr.trim().slice(0, 500),
+    })}`
+  );
+  return result.stdout
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => {
+      const [, groupText, state] = line.trim().match(/^(\d+)\s+(\S+)$/u) ?? [];
+      assert(
+        groupText !== undefined && state !== undefined,
+        'Malformed measurement process group inspection'
+      );
+      assert(!scoped || Number(groupText) === group, 'Unexpected measurement process group');
+      return { group: Number(groupText), state };
+    })
+    .some((entry) => entry.group === group && !entry.state.includes('Z'));
 }
 
 /** Logs go straight to exclusive files; an aborted command cannot leave its process group running. */
@@ -137,17 +172,25 @@ export function commands(directory: string, signal: AbortSignal) {
         exitSignal === null && (allowNonZero || code === 0),
         `${program} exited with ${code ?? exitSignal}`
       );
-      assert(!child.pid || !signalGroup(child.pid, 0), `${program} left child processes running`);
+      assert(!child.pid || !groupRunning(child.pid), `${program} left child processes running`);
     } catch (error) {
       failures.push(error);
     } finally {
       try {
         if (child?.pid && signalGroup(child.pid, 'SIGTERM')) {
-          const gracefulDeadline = Date.now() + 2_000;
-          while (signalGroup(child.pid, 0) && Date.now() < gracefulDeadline) {
-            await delay(20);
+          // Inspection failure cannot strand the group we just spawned. Keep
+          // that failure, then force owned cleanup unless exit was observed.
+          let needsForce = true;
+          try {
+            const gracefulDeadline = Date.now() + 2_000;
+            while (groupRunning(child.pid) && Date.now() < gracefulDeadline) {
+              await delay(20);
+            }
+            needsForce = groupRunning(child.pid);
+          } catch (error) {
+            failures.push(error);
           }
-          if (signalGroup(child.pid, 0)) {
+          if (needsForce) {
             const exited =
               child.exitCode === null && child.signalCode === null
                 ? once(child, 'exit', { signal: AbortSignal.timeout(10_000) })
@@ -155,7 +198,7 @@ export function commands(directory: string, signal: AbortSignal) {
             signalGroup(child.pid, 'SIGKILL');
             await exited;
             const forcedDeadline = Date.now() + 10_000;
-            while (signalGroup(child.pid, 0)) {
+            while (groupRunning(child.pid)) {
               assert(Date.now() < forcedDeadline, `Process group ${child.pid} survived SIGKILL`);
               await delay(20);
             }

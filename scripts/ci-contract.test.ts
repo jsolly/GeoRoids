@@ -18,6 +18,16 @@ import { parse } from 'yaml';
 
 type RecordValue = Record<string, unknown>;
 
+const previewPollClock = `sleep() {
+  local task_ci_sleep_status=0
+  command sleep "$@" || task_ci_sleep_status=$?
+  if [[ "$#" -eq 1 && "\${1-}" == 10 ]]; then
+    SECONDS=$((SECONDS + 901))
+  fi
+  return "$task_ci_sleep_status"
+}
+`;
+
 function isRecord(value: unknown): value is RecordValue {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -655,11 +665,6 @@ test('CI preserves six mandatory validation lanes and failure propagation', () =
       for (const command of ['gh', 'jq', 'git', 'timeout', 'npm', 'curl', 'sleep']) {
         symlinkSync(commandSource, join(bin, command));
       }
-      const clock = join(directory, 'clock.sh');
-      writeFileSync(
-        clock,
-        `trap 'if [[ "$BASH_COMMAND" == "sleep 10" ]]; then SECONDS=$((SECONDS + 901)); fi' DEBUG\n`
-      );
       const callsFile = join(directory, 'calls.jsonl');
       const output = join(directory, 'outputs');
       writeFileSync(callsFile, '');
@@ -674,12 +679,13 @@ test('CI preserves six mandatory validation lanes and failure propagation', () =
       };
       const env = {
         ...Object.fromEntries(
-          Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+          Object.entries(process.env).filter(
+            ([key]) => !key.startsWith('GIT_') && key !== 'BASH_ENV'
+          )
         ),
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_CONFIG_NOSYSTEM: '1',
         PATH: `${bin}:${process.env['PATH']}`,
-        BASH_ENV: clock,
         GH_TOKEN: 'fixture',
         RAILWAY_TOKEN: 'fixture',
         REPO: 'jsolly/GeoRoids',
@@ -710,7 +716,7 @@ test('CI preserves six mandatory validation lanes and failure propagation', () =
         FIXTURE_HTML_FAIL: overrides.htmlFailure === true ? '1' : '0',
       };
       const execute = (source: string) =>
-        spawnSync('bash', ['-c', source], {
+        spawnSync('bash', ['-c', previewPollClock + source], {
           cwd: workspace,
           env,
           encoding: 'utf8',
@@ -966,25 +972,108 @@ test('CI preserves six mandatory validation lanes and failure propagation', () =
     [{}]
   );
   assert.equal(combinations.length, 4096);
-  for (const results of combinations) {
-    const result: SpawnSyncReturns<string> = spawnSync(
-      'bash',
-      ['-c', requiredString(aggregate.run)],
-      {
-        env: { ...process.env, ...results },
-        encoding: 'utf8',
-      }
-    );
-    assert.equal(result.error, undefined);
+  // Keep every actual-script execution isolated without restarting Bash for each row.
+  // A child start marker prevents a failed fork from counting as an expected rejection.
+  const script = combinations
+    .map((results, index) => {
+      const variables = Object.entries(results)
+        .map(([key, value]) => {
+          assert.match(key, /^[A-Z_]+$/u);
+          return `export ${key}='${value.replaceAll("'", "'\\''")}'`;
+        })
+        .join('\n');
+      return `(
+  printf 'S\\t${index}\\n' >&3
+  exec 3>&-
+${variables}
+${requiredString(aggregate.run)}
+) </dev/null
+task_ci_aggregate_status=$?
+printf 'E\\t${index}\\t%s\\n' "$task_ci_aggregate_status" >&3
+`;
+    })
+    .join('\n');
+  const aggregateResult: SpawnSyncReturns<string> = spawnSync('bash', ['-s'], {
+    input: script,
+    env: process.env,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  assert.equal(aggregateResult.error, undefined);
+  assert.equal(aggregateResult.signal, null);
+  assert.equal(aggregateResult.status, 0, aggregateResult.stderr);
+  const outcomesOutput = aggregateResult.output[3];
+  assert.ok(typeof outcomesOutput === 'string');
+  const records = outcomesOutput.split('\n');
+  assert.equal(records.pop(), '');
+  assert.equal(records.length, combinations.length * 2);
+  for (const [index, results] of combinations.entries()) {
+    assert.equal(records[index * 2], `S\t${index}`);
+    const completed = records[index * 2 + 1];
+    assert.ok(completed);
+    const match = completed.match(/^E\t(\d+)\t(\d+)$/u);
+    assert.ok(match);
+    assert.equal(Number(match[1]), index);
     assert.equal(
-      result.status === 0,
-      Object.values(results).every((outcome) => outcome === 'success')
+      Number(match[2]),
+      Object.values(results).every((outcome) => outcome === 'success') ? 0 : 1
     );
   }
 
   process.stdout.write(
     'CI contracts passed: six parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
   );
+});
+
+test('the preview poll clock delegates every sleep, advances only ten-second polls and preserves failures', () => {
+  const root = mkdtempSync(join(realpathSync(tmpdir()), 'georoids-preview-clock-'));
+  try {
+    const bin = join(root, 'bin');
+    const calls = join(root, 'calls');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'sleep'),
+      `#!/usr/bin/env bash\nprintf '%s|%s\\n' "$#" "$*" >> "$FIXTURE_CALLS"\nexit "\${FIXTURE_SLEEP_EXIT:-0}"\n`,
+      { mode: 0o755 }
+    );
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        `${previewPollClock}
+set -euo pipefail
+# Unsetting SECONDS makes it an ordinary integer for deterministic boundary checks.
+unset SECONDS
+SECONDS=40
+sleep 9
+printf '%s\\n' "$SECONDS"
+sleep 10 extra
+printf '%s\\n' "$SECONDS"
+sleep 10
+printf '%s\\n' "$SECONDS"
+export FIXTURE_SLEEP_EXIT=7
+task_ci_sleep_result=0
+sleep 10 || task_ci_sleep_result=$?
+printf '%s %s\\n' "$SECONDS" "$task_ci_sleep_result"
+`,
+      ],
+      {
+        env: {
+          ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'BASH_ENV')),
+          PATH: `${bin}:${process.env['PATH']}`,
+          FIXTURE_CALLS: calls,
+        },
+        encoding: 'utf8',
+      }
+    );
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, '40\n40\n941\n1842 7\n');
+    assert.equal(readFileSync(calls, 'utf8'), '1|9\n2|10 extra\n1|10\n1|10\n');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('required PR CI rejects every unsuccessful security result without caching scanners', () => {

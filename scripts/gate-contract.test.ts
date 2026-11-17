@@ -18,7 +18,7 @@ import process from 'node:process';
 import type { Readable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { afterAll, test } from 'vitest';
+import { afterAll, type TestContext, test } from 'vitest';
 import {
   candidateMatches,
   canonicalEnvironment,
@@ -1566,14 +1566,18 @@ test('Git boundary failures retain bounded exit, signal, error and stderr diagno
   }
 });
 
-test('manual, nested npm and hook launches execute identical runtime inputs without ignoring overrides', (t) => {
+// Each behavior owns its checkout and configuration. Keep per-launch watchdogs
+// separate from the case watchdog, rather than accumulating every mode in one case.
+function runtimeFixture(t: TestContext) {
   const f = fixture();
+  t.onTestFinished(() => rmSync(f.root, { recursive: true, force: true }));
+  const home = mkdtempSync(join(tmpdir(), 'georoids-runtime-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   mkdirSync(join(f.root, 'scripts'));
   writeFileSync(
     join(f.root, 'scripts/repo-python.sh'),
     readFileSync(new URL('./repo-python.sh', import.meta.url))
   );
-  t.onTestFinished(() => rmSync(f.root, { recursive: true, force: true }));
   mkdirSync(join(f.root, 'bin'));
   mkdirSync(join(f.root, 'node_modules'));
   writeFileSync(join(f.root, '.gitignore'), '.performance/\nnode_modules/\nbin/\n');
@@ -1640,6 +1644,8 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     )
   );
   Object.assign(base, {
+    HOME: home,
+    XDG_CONFIG_HOME: join(home, 'xdg'),
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     NODE_REPL_NODE_MODULE_DIRS: 'fixture-only-modules',
@@ -1661,6 +1667,21 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     assert.equal(result.status, 0, result.stderr);
     return runtimeProbe(result.stdout.slice(result.stdout.indexOf('{')));
   }
+  return { ...f, base, core, launch, probe, gitTool };
+}
+
+function runtimeProxy(f: ReturnType<typeof runtimeFixture>) {
+  const proxyVariables = cloudProxyEnvironment(f.root);
+  mkdirSync(join(f.root, '.performance'), { recursive: true });
+  writeFileSync(proxyVariables.NPM_CONFIG_USERCONFIG, 'loglevel=warn\n');
+  writeFileSync(proxyVariables.NODE_EXTRA_CA_CERTS, 'fixture CA bundle\n');
+  const proxied: NodeJS.ProcessEnv = { ...f.base, ...proxyVariables };
+  return { proxyVariables, proxied };
+}
+
+test('manual, nested, admitted and hook launches preserve canonical inputs and PATH selection', (t) => {
+  const f = runtimeFixture(t);
+  const { base, core, launch } = f;
   const direct = launch(base);
   assert.equal(direct.reusable, true, JSON.stringify(direct.unknown));
   assert.deepEqual(launch(base, true), direct);
@@ -1678,6 +1699,22 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     }),
     direct
   );
+  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base['PATH']}` }), direct);
+  assert.notEqual(
+    launch({ ...base, PATH: `${core}:${base['PATH']}` }).runtime,
+    direct.runtime,
+    'an intentional non-hook Git backend selection remains distinct'
+  );
+  assert.notEqual(
+    launch({ ...base, PATH: `${base['PATH']}:${join(f.root, 'extra-path')}` }).runtime,
+    direct.runtime
+  );
+});
+
+test('system TLS trust survives every launch mode and changes runtime identity', (t) => {
+  const f = runtimeFixture(t);
+  const { base, core, launch } = f;
+  const direct = launch(base);
   // Claude desktop sets Node's system TLS trust; every launch keeps and digests it.
   const systemCa: NodeJS.ProcessEnv = { ...base, NODE_USE_SYSTEM_CA: '1' };
   const trusted = launch(systemCa);
@@ -1690,19 +1727,19 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   );
   assert.notEqual(trusted.runtime, direct.runtime);
   assert.notEqual(launch({ ...base, NODE_USE_SYSTEM_CA: '0' }).runtime, trusted.runtime);
-  // Claude Code cloud's proxy injects its CA and npm settings; every launch keeps
-  // and digests them, and a changed value is a distinct runtime.
-  const proxyVariables = cloudProxyEnvironment(f.root);
-  mkdirSync(join(f.root, '.performance'), { recursive: true });
-  writeFileSync(proxyVariables.NPM_CONFIG_USERCONFIG, 'loglevel=warn\n');
-  writeFileSync(proxyVariables.NODE_EXTRA_CA_CERTS, 'fixture CA bundle\n');
+});
+
+test('proxy inputs survive every launch mode and selected CA paths retain identity', (t) => {
+  const f = runtimeFixture(t);
+  const { base, core, launch } = f;
+  const { proxyVariables, proxied } = runtimeProxy(f);
+  const direct = launch(base);
   for (const [key, value] of Object.entries(proxyVariables)) {
     const alone = launch({ ...base, [key]: value });
     assert.equal(alone.reusable, true, `${key}: ${JSON.stringify(alone.unknown)}`);
     assert.deepEqual(alone.present, [key], `${key} stays in execution`);
     assert.notEqual(alone.runtime, direct.runtime, `${key} enters the runtime digest`);
   }
-  const proxied: NodeJS.ProcessEnv = { ...base, ...proxyVariables };
   const cloud = launch(proxied);
   assert.equal(cloud.reusable, true, JSON.stringify(cloud.unknown));
   assert.deepEqual(cloud.present, Object.keys(proxyVariables));
@@ -1720,6 +1757,13 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     launch({ ...proxied, npm_config_https_proxy: 'http://other-proxy.invalid:3128' }).runtime,
     cloud.runtime
   );
+});
+
+test('global module paths stay excluded while selected npm config bytes change identity', (t) => {
+  const f = runtimeFixture(t);
+  const { base, launch } = f;
+  const { proxyVariables, proxied } = runtimeProxy(f);
+  const cloud = launch(proxied);
   // Its global module path never reaches execution, so neither its value nor the
   // packages it names can alter or reuse a validation runtime.
   assert.deepEqual(launch({ ...proxied, NODE_PATH: join(f.root, 'global-modules') }), cloud);
@@ -1727,22 +1771,30 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   // The uppercase npm user config selection is consumed by its bytes, as npm reads it.
   writeFileSync(proxyVariables.NPM_CONFIG_USERCONFIG, 'loglevel=error\n');
   assert.notEqual(launch(proxied).runtime, cloud.runtime);
-  assert.deepEqual(launch({ ...base, GIT_PREFIX: '', PATH: `${core}:${base['PATH']}` }), direct);
-  assert.notEqual(
-    launch({ ...base, PATH: `${core}:${base['PATH']}` }).runtime,
-    direct.runtime,
-    'an intentional non-hook Git backend selection remains distinct'
-  );
-  assert.notEqual(
-    launch({ ...base, PATH: `${base['PATH']}:${join(f.root, 'extra-path')}` }).runtime,
-    direct.runtime
-  );
+  mkdirSync(join(f.root, '.performance'), { recursive: true });
+  const config = join(f.root, '.performance/config.npmrc');
+  writeFileSync(config, 'loglevel=warn\n');
+  const selected = { ...base, npm_config_userconfig: config };
+  const before = launch(selected);
+  writeFileSync(config, 'loglevel=error\n');
+  assert.notEqual(launch(selected).runtime, before.runtime);
+});
+
+test('selected Git bytes and installed payload bytes invalidate runtime evidence', (t) => {
+  const f = runtimeFixture(t);
+  const { base, launch, gitTool } = f;
+  const direct = launch(base);
   writeFileSync(gitTool, '#!/bin/sh\n# changed selected tool bytes\nexec /usr/bin/git "$@"\n', {
     mode: 0o755,
   });
   assert.notEqual(launch(base).runtime, direct.runtime);
   writeFileSync(join(f.root, 'node_modules/payload'), 'changed installed bytes');
   assert.notEqual(launch(base).installation, direct.installation);
+});
+
+test('unknown overrides and invalid launch configuration fail closed', (t) => {
+  const f = runtimeFixture(t);
+  const { base, launch, probe } = f;
   const unknown = launch({ ...base, GEOROIDS_UNCLASSIFIED_INPUT: 'enabled' });
   assert.equal(unknown.reusable, false);
   assert(unknown.unknown.includes('GEOROIDS_UNCLASSIFIED_INPUT'));
@@ -1752,13 +1804,19 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
   const replUnknown = launch({ ...base, NODE_REPL_NEW_OVERRIDE: 'enabled' });
   assert.equal(replUnknown.reusable, false);
   assert(replUnknown.unknown.includes('NODE_REPL_NEW_OVERRIDE'));
-  mkdirSync(join(f.root, '.performance'), { recursive: true });
-  const config = join(f.root, '.performance/config.npmrc');
-  writeFileSync(config, 'loglevel=warn\n');
-  const selected = { ...base, npm_config_userconfig: config };
-  const before = launch(selected);
-  writeFileSync(config, 'loglevel=error\n');
-  assert.notEqual(launch(selected).runtime, before.runtime);
+  writeFileSync(join(f.root, 'package.json'), '{"scripts":{"env":"echo bypass"}}');
+  assert.throws(() => lifecycleCommand(f.root, base, probe), /built-in env/u);
+  writeFileSync(join(f.root, 'package.json'), '{"scripts":{"preenv":"echo unexpected"}}');
+  assert.throws(() => lifecycleCommand(f.root, base, probe), /built-in env/u);
+  assert.throws(
+    () => canonicalEnvironment(f.root, { ...base, PATH: join(f.root, 'missing-bin') }),
+    /Cannot identify Git hook runtime/u
+  );
+});
+
+test('npm wrappers and basename-sensitive multiplexers retain launch identity until replaced', (t) => {
+  const f = runtimeFixture(t);
+  const { base, core, launch } = f;
   // Tool managers can expose npm as a shell wrapper around the actual CLI.
   const beforeWrapper = launch(base);
   const installedNpm = present(base['PATH'])
@@ -1808,14 +1866,6 @@ test('manual, nested npm and hook launches execute identical runtime inputs with
     launch(base).runtime,
     multiplexed.runtime,
     'a shim target replacement invalidates prior runtime evidence'
-  );
-  writeFileSync(join(f.root, 'package.json'), '{"scripts":{"env":"echo bypass"}}');
-  assert.throws(() => lifecycleCommand(f.root, base, probe), /built-in env/u);
-  writeFileSync(join(f.root, 'package.json'), '{"scripts":{"preenv":"echo unexpected"}}');
-  assert.throws(() => lifecycleCommand(f.root, base, probe), /built-in env/u);
-  assert.throws(
-    () => canonicalEnvironment(f.root, { ...base, PATH: join(f.root, 'missing-bin') }),
-    /Cannot identify Git hook runtime/u
   );
 });
 

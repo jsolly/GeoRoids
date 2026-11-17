@@ -66,7 +66,7 @@
     "public/wiki/media/survival.png": "sha256:cb90006f39af1cdbe46ec2de2455722049fbf19fb64fc412a0cdd7f40de3dda6",
     "public/wiki/media/terrain.gif": "sha256:7472aa49b2c6b860d7b790e3c2bc9d83c986a04c2604b85c48e62aee1642579e",
     "public/wiki/media/terrain.png": "sha256:45e89a0f083c9c619b195543040ffabf80f4427a04e38e9a92c95fe4807d8133",
-    "scripts/build-vercel-output.mjs": "sha256:11821f40472a2830fbb3ed49b084b6e6eefd2558d2f779a46f78870b1fa8be1a",
+    "scripts/build-vercel-output.mjs": "sha256:4655610ca6fb6e9a9ef1d36d20b3c6116d2c6b040293f8a18fef9b9ea7d6c2e4",
     "scripts/client-build.ts": "sha256:abe7ea029d9606ce316a76b6cef432aa7002420783f8dc739622af74a90e5892",
     "scripts/client-release-sha.ts": "sha256:e4d51752d83d1324cd254fbc9720a8f10970e323ad245b3541226a3463aee9ba",
     "scripts/generate-sounds.ts": "sha256:69e4621285bcc733acdd2c486a129a4630cbcc502f6ca784680ba49c9992b94d",
@@ -10237,6 +10237,15 @@
       ],
       "owners": {
         "src/wiki/articleSources.json": "field-manual"
+      }
+    },
+    {
+      "note": "Reviewed retirement of the expired thirteen-asset migration after its minimum 30-day production window. Current salted immutable manifests, retained-byte verification, document routes and debug headers are preserved. Reviewed the field manual and HUD/network retention and reload guidance; no gameplay, controls, Wiki text, demonstration inputs or media change. Focused asset regressions, lint, strict types and all 2766 unit/component tests passed. Full build and remaining integration validation are pending.",
+      "sources": ["scripts/build-vercel-output.mjs"],
+      "topics": ["hud-network"],
+      "media": [],
+      "owners": {
+        "scripts/build-vercel-output.mjs": "hud-network"
       }
     }
   ]

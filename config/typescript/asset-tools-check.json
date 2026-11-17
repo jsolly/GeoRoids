@@ -12,7 +12,7 @@
     "../../scripts/benchmark-build-receipt.mts",
     "../../scripts/generate-asset-boundaries.ts",
     "../../scripts/benchmark-build-receipt.test.ts",
-    "../../tests/unit/testing/old-client-assets-survive-new-builds.test.ts",
+    "../../tests/unit/testing/immutable-client-output.test.ts",
     "../../tests/unit/testing/retained-assets-have-production-omission-proof.test.ts"
   ]
 }

@@ -19,15 +19,22 @@ a missing file is created empty for the local server.
 
 Setup installs repo-owned hooks outside the working tree, provisions the pinned
 tools and lockfile dependencies, and leaves browser binaries to explicitly requested manual tools.
-Node comes from mise. uv is mise's when mise has it, else the host's, and mise installs
-it only when PATH has none. Semgrep comes from
+Node comes from mise. uv is mise's when mise has it, else the host's when PATH has both uv
+and uvx. Otherwise, and when PATH's uv is setup's own release copy, setup uses the gate's
+pinned uv (the `.mise.toml` release), installing it from its GitHub release archive, never
+through `mise install uv`, unless a verified copy is already there. Semgrep comes from
 PyPI through mise. gitleaks, zizmor and osv-scanner are reused when a pinned copy is
 already on PATH or in mise; otherwise setup downloads each from its pinned GitHub release
 URL into `~/.local/share/georoids-toolchain/bin` and installs it only after the gate's
 checksum matches. The gate's lookups check that directory's hashes too, so hooks find those
-scanners from any shell. None of these needs the GitHub API, which Claude Code cloud sessions
-cannot reach. Setup writes `~/.local/share/georoids-toolchain/env.sh`, which puts mise's Node,
-and mise's uv when it has one, first on PATH. In a cloud session the setup hook adds that file
+scanners from any shell, and it is never put on PATH. uv and uvx are installed the same way,
+after both binaries match, into `~/.local/share/georoids-toolchain/uv-bin`. A copy there
+that fails the check is deleted before the download, so a failed reinstall leaves no
+unverified uv on an earlier env.sh's PATH. None of these
+needs the GitHub API, which Claude Code cloud sessions cannot reach. Setup writes
+`~/.local/share/georoids-toolchain/env.sh`, which puts mise's Node, and the uv it chose
+unless that is the host's, first on PATH, so a rerun from a shell that sourced it installs
+nothing. In a cloud session the setup hook adds that file
 to `CLAUDE_ENV_FILE`, so every later command of the session runs on the pinned Node.
 Claude Code's `startup|resume` hook passes `--session-hook`. A fresh checkout
 without `node_modules` runs setup; an existing tree is checked without installing

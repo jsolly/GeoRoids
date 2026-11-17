@@ -432,16 +432,21 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [static-checks, runner-contracts, actions-contracts, integration-tests, wiki-media, railpack-build]
+    needs: [static-checks, runner-contracts, actions-contracts, integration-tests, wiki-media, railpack-build, security]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 4
     steps:
+      - name: Require pull request security scans
+        if: github.event_name == 'pull_request'
+        env:
+          SECURITY: ${{ needs.security.result }}
+        run: test "$SECURITY" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      # Nothing but the checkout runs before the scan: an earlier step could rewrite the git config,
-      # PATH, or environment the scan reads history with.
+      # Only the security result guard and checkout run before the scan. Keep other
+      # project commands after it so the scan reads an unchanged environment.
       - name: Secrets scan (range)
         shell: bash
         env:
@@ -460,5 +465,94 @@ jobs:
           if [[ "$STATIC_RESULT" != success || "$RUNNER_RESULT" != success || "$ACTIONS_RESULT" != success ||
             "$INTEGRATION_RESULT" != success || "$WIKI_MEDIA_RESULT" != success || "$RAILPACK_RESULT" != success ]]; then
             echo "Validation failed: static=$STATIC_RESULT runner=$RUNNER_RESULT actions=$ACTIONS_RESULT integration=$INTEGRATION_RESULT wiki-media=$WIKI_MEDIA_RESULT railpack-build=$RAILPACK_RESULT" >&2
+            exit 1
+          fi
+
+  gitleaks:
+    permissions:
+      contents: read
+    if: github.event_name == 'pull_request'
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan full history
+        run: bash scripts/security-scan.sh history
+
+  semgrep:
+    permissions:
+      contents: read
+    if: github.event_name == 'pull_request'
+    name: semgrep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan with p/default
+        env:
+          SECURITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/security-scan.sh semgrep
+
+  osv-scanner:
+    permissions:
+      contents: read
+    if: github.event_name == 'pull_request'
+    name: osv-scanner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan the npm lockfile
+        run: bash scripts/security-scan.sh osv
+
+  zizmor:
+    permissions:
+      contents: read
+    if: github.event_name == 'pull_request'
+    name: zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Audit workflows offline
+        run: bash scripts/security-scan.sh zizmor
+
+  # Preserve the security check used by auto-merge. Required ci also waits for
+  # this aggregate, which rejects failed, cancelled or skipped PR scanners.
+  security:
+    permissions:
+      contents: read
+    name: security
+    if: always() && github.event_name == 'pull_request'
+    needs: [gitleaks, semgrep, osv-scanner, zizmor]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every scanner to succeed
+        env:
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+          SEMGREP_RESULT: ${{ needs.semgrep.result }}
+          OSV_RESULT: ${{ needs.osv-scanner.result }}
+          ZIZMOR_RESULT: ${{ needs.zizmor.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITLEAKS_RESULT" != success || "$SEMGREP_RESULT" != success ||
+            "$OSV_RESULT" != success || "$ZIZMOR_RESULT" != success ]]; then
+            echo "Security scanners failed: gitleaks=$GITLEAKS_RESULT semgrep=$SEMGREP_RESULT osv-scanner=$OSV_RESULT zizmor=$ZIZMOR_RESULT" >&2
             exit 1
           fi

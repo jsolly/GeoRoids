@@ -16,6 +16,29 @@ export const railwayCli = Object.freeze({
   binarySha256: 'b0919b175c72cd829f9124caa9cf6d1a116741d847ef7be72abed14c70d3f43a',
 });
 
+/** Bind both CLI authentication and the SDK's native-evaluation version probe. */
+export function railwayCliEnvironment(
+  environment: NodeJS.ProcessEnv,
+  cli: string
+): NodeJS.ProcessEnv {
+  const child = { ...environment };
+  for (const key of Object.keys(child)) {
+    if (key.startsWith('RAILWAY_')) {
+      delete child[key];
+    }
+  }
+  return Object.assign(child, {
+    _: cli,
+    RAILWAY_TOKEN: environment['RAILWAY_CONFIG_TOKEN'],
+    RAILWAY_PROJECT_ID: railwayTarget.project,
+    RAILWAY_ENVIRONMENT_ID: railwayTarget.environment,
+    RAILWAY_SERVICE_ID: railwayTarget.service,
+    RAILWAY_CALLER: 'skill:use-railway@1.3.5',
+    RAILWAY_AGENT_SESSION: `georoids-version-pin-${environment['GITHUB_RUN_ID'] ?? 'workflow'}`,
+    CI: 'true',
+  });
+}
+
 type RecordValue = Record<string, unknown>;
 type Build = { builder: 'RAILPACK'; buildEnvironment: 'V3'; railpackVersion: string | undefined };
 type Snapshot = { etag: string; build: Build; deployment: { id: string; status: string } | null };
@@ -104,12 +127,63 @@ function jsonData(value: unknown): RecordValue {
   return record(envelope['data']);
 }
 
+function responseShape(value: unknown) {
+  if (value === undefined) {
+    return 'missing';
+  }
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
+  if (isRecord(value)) {
+    return Object.keys(value).length === 0 ? 'empty-object' : 'object-with-keys';
+  }
+  return typeof value;
+}
+
+function emptyStagedDraft(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !['id', 'status', 'patch'].includes(key)) ||
+    typeof value['id'] !== 'string' ||
+    value['id'].trim() === '' ||
+    value['status'] !== 'STAGED' ||
+    !isRecord(value['patch'])
+  ) {
+    return false;
+  }
+  const patch = value['patch'];
+  return Object.keys(patch).every((key) => {
+    const entry = patch[key];
+    if (key === 'privateNetworkDisabled') {
+      return entry === null;
+    }
+    return (
+      ['services', 'sharedVariables', 'volumes', 'buckets'].includes(key) &&
+      isRecord(entry) &&
+      Object.keys(entry).length === 0
+    );
+  });
+}
+
 /** Parse the pinned CLI's environment/project/staged/latest-deployment query. Never retain variables. */
 export function readSnapshot(value: unknown): Snapshot {
   const data = jsonData(value);
   keys(data, ['environment', 'project', 'environmentStagedChanges', 'serviceInstance']);
-  if (data['environmentStagedChanges'] !== null) {
-    throw new VersionPinError('Existing staged Railway work blocks automation');
+  const staged = data['environmentStagedChanges'];
+  if (!emptyStagedDraft(staged)) {
+    const status = isRecord(staged) ? staged['status'] : undefined;
+    const label =
+      status === 'STAGED' || status === 'APPLYING' || status === 'COMMITTED'
+        ? status
+        : 'unrecognized';
+    const shape = isRecord(staged) ? 'object' : responseShape(staged);
+    const patchShape = responseShape(isRecord(staged) ? staged['patch'] : undefined);
+    throw new VersionPinError(
+      `Existing staged Railway work blocks automation (${shape}; status=${label}; patch=${patchShape})`
+    );
   }
   const environment = record(data['environment']);
   keys(environment, ['id', 'projectId', 'config', 'configEtag']);
@@ -191,20 +265,29 @@ export function reviewPlan(
     'destructive',
     'claim',
   ]);
-  if (
-    plan['kind'] !== 'railway.config.plan' ||
-    plan['version'] !== 1 ||
-    plan['cliVersion'] !== railwayCli.version ||
-    plan['sourceTree'] !== expected.sourceTree ||
-    plan['environmentId'] !== railwayTarget.environment ||
-    plan['configEtag'] !== expected.snapshot.etag ||
-    plan['destructive'] !== false ||
-    (plan['claim'] !== undefined && plan['claim'] !== false)
-  ) {
-    throw new VersionPinError(
-      'Saved Railway plan identity, source or etag differs from the reviewed target'
-    );
+  const checks: ReadonlyArray<readonly [string, boolean]> = [
+    ['kind', plan['kind'] === 'railway.config.plan'],
+    ['format-version', plan['version'] === 1],
+    ['cli-version', plan['cliVersion'] === railwayCli.version],
+    ['source-tree', plan['sourceTree'] === expected.sourceTree],
+    ['environment', plan['environmentId'] === railwayTarget.environment],
+    ['etag', plan['configEtag'] === expected.snapshot.etag],
+    ['destructive', plan['destructive'] === false],
+    ['ownership-claim', plan['claim'] === undefined || plan['claim'] === false],
+  ];
+  const rejected = checks.filter(([, accepted]) => !accepted).map(([label]) => label);
+  if (rejected.length !== 0) {
+    throw new VersionPinError(`Saved Railway plan rejected (${rejected.join(', ')})`);
   }
+  return reviewPlanChanges(plan, expected);
+}
+
+/** Review all settings independently of ownership admission; this function never applies. */
+export function reviewPlanChanges(
+  value: unknown,
+  expected: { version: string; snapshot: Snapshot }
+): Review {
+  const plan = record(value);
   if (plan['diff'] !== undefined && typeof plan['diff'] !== 'string') {
     throw new VersionPinError('Saved Railway plan diff has an unsupported shape');
   }
@@ -284,7 +367,7 @@ export function reviewPlan(
 const snapshotQuery = `query VersionPinSnapshot($projectId: String!, $environmentId: String!, $serviceId: String!) {
   environment(id: $environmentId) { id projectId config(decryptVariables: false) configEtag }
   project(id: $projectId) { id services(first: 1000) { edges { node { id name } } } }
-  environmentStagedChanges(environmentId: $environmentId) { id status }
+  environmentStagedChanges(environmentId: $environmentId) { id status patch(decryptVariables: false) }
   serviceInstance(environmentId: $environmentId, serviceId: $serviceId) { latestDeployment { id status } }
 }`;
 const deploymentQuery =

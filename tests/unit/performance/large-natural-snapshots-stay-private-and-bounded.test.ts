@@ -20,7 +20,7 @@ function actualLargeFrame() {
     ).flat(),
   ];
   const text = snapshotMessage(new SnapshotEncoder(state).encode(1));
-  const actual = new SnapshotDecoder().readMessage(text, { acceptSnapshots: true });
+  const actual = new SnapshotDecoder('diagnostic').readMessage(text, { acceptSnapshots: true });
   assert(actual.kind === 'snapshot');
   const work = regionalSnapshotWork(actual.state, actual.metadata, 'pilot-0');
   assert(work && Buffer.byteLength(text) >= 64 * 1024);

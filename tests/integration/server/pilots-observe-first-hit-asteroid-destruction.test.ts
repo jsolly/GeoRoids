@@ -45,6 +45,7 @@ async function join(
     position,
     snapshotVersion: SNAPSHOT_VERSION,
     asteroidInteractions: 1,
+    explorationVersion: 1,
   });
   await client.barrier();
   const joined = messageAt(client, 'joined', start);
@@ -57,7 +58,7 @@ const activeClients: WireClient[] = [];
 async function connect(server: TestServer): Promise<WireClient> {
   const client = new WireClient(
     new WebSocket(
-      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+      `ws://127.0.0.1:${await server.listening}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
     )
   );
   activeClients.push(client);
@@ -83,7 +84,7 @@ async function startWorld(
   await Promise.all(clients.map((client) => client.barrier()));
 
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
-    server.gameEngine.removeAsteroid(asteroid.id);
+    server.gameEngine.asteroidLifecycle.remove(asteroid.id);
   }
   server.gameEngine.parkSatellitePickups({ x: -2_400, y: -2_400 });
   expect(server.gameEngine.getLoot()).toEqual([]);
@@ -141,11 +142,11 @@ async function sendCurrentShot(
     },
   });
   await client.barrier();
-  for (let frame = 0; frame < 200 && server.gameEngine.getServerLasers().length > 0; frame++) {
+  for (let frame = 0; frame < 200 && server.gameEngine.laserCombat.shots().length > 0; frame++) {
     server.gameEngine.advanceOneFrame();
   }
   await client.barrier();
-  expect(server.gameEngine.getServerLasers()).toHaveLength(0);
+  expect(server.gameEngine.laserCombat.shots()).toHaveLength(0);
 }
 
 function countType(client: WireClient, type: string): number {
@@ -173,7 +174,7 @@ describe('Pilots observe first-hit asteroid destruction', () => {
     const [first, second] = clients;
     assert.ok(first && second);
     const target = largeIceAsteroid('wire-first-hit', { x: 100, y: 0 });
-    server.gameEngine.addAsteroid(target);
+    server.gameEngine.asteroidLifecycle.insert(target);
     for (const client of clients) {
       client.resetMessages();
     }
@@ -187,7 +188,7 @@ describe('Pilots observe first-hit asteroid destruction', () => {
       expect(countType(client, 'asteroidDestroy')).toBe(1);
       expect(countType(client, 'asteroidCreateBatch')).toBe(0);
     }
-    expect(server.gameEngine.applyLaserAsteroidHit(target.id, 'second').outcome).toBe('missing');
+    expect(server.gameEngine.asteroidMining.apply(target.id, 'second').outcome).toBe('missing');
     expect(server.gameEngine.getLoot().filter((drop) => drop.kind === 'points')).toHaveLength(1);
     expect(server.gameEngine.getLoot().find((drop) => drop.kind === 'points')?.points).toBe(
       ROID.POINTS_LARGE

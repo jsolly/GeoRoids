@@ -23,7 +23,7 @@ Shards, Tap canisters, and silk normally expire quickly; nest caches last longer
 
 ## Salvaged equipment
 
-Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, bright hardware in spider nests, which have a 65% chance to contain a tool, or among rocks destroyed by an ordinary laser kill, with a 1.5% chance; ramming and tough-rock chip breaks never roll one. Each ship sees only tools its kit can use and does not already own, and every eligible pilot can take their own copy from the same drop.
+Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, bright hardware in spider nests, which have a 65% chance to contain a tool, or among rocks destroyed by an ordinary laser kill, with a 1.5% chance; ramming and hits that leave the rock intact never roll one. Each ship sees only tools its kit can use and does not already own, and every eligible pilot can take their own copy from the same drop.
 
 Tools add no score and survive ordinary deaths, reconnects, and server restarts. Duplicates stay for teammates, and shooting cannot destroy equipment.
 
@@ -49,7 +49,7 @@ Approach a lit furnace with cargo; both ships lock onto the intake ring when the
 
 ## Cargo protection
 
-Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills, while a protected hit still delays health regeneration; any cargo left on death is discarded without an extra stash.
+Cargo protects your hull by spilling recoverable points when a hazard hits; hull health takes only the damage your cargo cannot cover. Spills fly outward before pickups and magnetism resume, and bigger cargo losses leave more points to recover. Immunity prevents spills; a hit absorbed by cargo still delays health regeneration.
 
 Store purchases spend your bank, never carried cargo. See [Town Square](/wiki/#controls) for the store and [survival](/wiki/#combat-survival) for damage and respawns.
 

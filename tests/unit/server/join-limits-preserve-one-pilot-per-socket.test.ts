@@ -33,7 +33,13 @@ function join(socket: RecordingSocket, id: string, name = id) {
   core.handleClientMessage(
     {
       type: 'join',
-      data: { id, name, snapshotVersion: SNAPSHOT_VERSION, asteroidInteractions: 1 },
+      data: {
+        id,
+        name,
+        snapshotVersion: SNAPSHOT_VERSION,
+        asteroidInteractions: 1,
+        explorationVersion: 1,
+      },
     },
     socket
   );
@@ -48,6 +54,15 @@ test.each([
   join(socket, id, name);
   expect(engine.getPlayerCount()).toBe(0);
   expect(replies().map((reply) => reply.type)).toEqual(['error']);
+  expect(replies()[0]?.data).toBe('Player ID or name is missing or invalid');
+});
+
+test('a current-capability join reaches pilot admission on its own socket', () => {
+  const { socket, replies } = transport();
+  join(socket, 'admitted', 'Pilot');
+  expect(engine.getPlayer('admitted')?.ws).toBe(socket);
+  expect(engine.getPlayerCount()).toBe(1);
+  expect(replies().map((reply) => reply.type)).toEqual(['joined']);
 });
 
 test('a full server refuses a new pilot without disturbing the existing population', () => {
@@ -59,6 +74,7 @@ test('a full server refuses a new pilot without disturbing the existing populati
   expect(engine.getPlayerCount()).toBe(100);
   expect(engine.getPlayer('overflow')).toBeUndefined();
   expect(replies().map((reply) => reply.type)).toEqual(['error']);
+  expect(replies()[0]?.data).toBe('The game server is full');
 });
 
 test('a case-variant name cannot bypass the full-server player cap', () => {
@@ -75,6 +91,7 @@ test('a case-variant name cannot bypass the full-server player cap', () => {
   expect(engine.getPlayerCount()).toBe(100);
   expect(engine.getPlayer('attacker')).toBeUndefined();
   expect(replies().map((reply) => reply.type)).toEqual(['error']);
+  expect(replies()[0]?.data).toBe('This pilot requires its private resume token');
 });
 
 test('a current pilot cannot be claimed without its private resume token', () => {
@@ -83,6 +100,7 @@ test('a current pilot cannot be claimed without its private resume token', () =>
     id: 'owner',
     name: 'Owner',
     asteroidInteractions: 1,
+    explorationVersion: 1,
     snapshotVersion: SNAPSHOT_VERSION,
   };
   core.handleClientMessage({ type: 'join', data }, owner.socket);

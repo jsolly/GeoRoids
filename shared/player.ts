@@ -51,6 +51,8 @@ export function chooseCrewSpawn(options: {
   return randomPointInSector(sector.x, sector.y, random);
 }
 
+/** Join requests and joined replies share the same UTF-8 identity limit. */
+export const PLAYER_ID_MAX_BYTES = 128;
 export const PLAYER_NAME_MAX_LENGTH = 20;
 
 /** Title-screen nicknames keep letters, numbers, and spaces. */

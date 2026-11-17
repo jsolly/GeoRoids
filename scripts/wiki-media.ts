@@ -665,7 +665,7 @@ function makeCargoDemo(): Demo {
       const now = (frame * 1000) / FPS;
       const before = pilot.bankedCargo ?? 0;
       if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME, () => engine.depositCargo());
+        runSimulationTicks(SIM_TICKS_PER_FRAME, () => engine.cargoOffload.advance());
       }
       const accepted = (pilot.bankedCargo ?? 0) - before;
       if (accepted > 0) {
@@ -1920,20 +1920,20 @@ function verifyCrewToolDemonstrations(): void {
     scout.spawnProtectionTimer = 0;
     hauler.spawnProtectionTimer = 0;
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     engine.parkSatellitePickups();
     const rock: AsteroidData = {
       ...makeAsteroid('media-ore', { x: 200, y: 0 }, 34, 'metal'),
       ore: 'metal',
     };
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     const resolveFlight = () => {
       for (let frame = 0; frame < 100; frame++) {
         if (![scout, hauler].some((pilot) => pilot.utilityFlight?.phase === 'outbound')) {
           return;
         }
-        engine.tickToolFlights();
+        engine.toolFlights.advance();
       }
       throw new Error('wiki-media verification failed: tool flight did not resolve');
     };
@@ -1947,7 +1947,7 @@ function verifyCrewToolDemonstrations(): void {
     for (const socket of [scoutSocket, haulerSocket]) {
       const raw = socket.sent.at(-1);
       invariant(raw !== undefined, 'crew demonstration recipient received no snapshot');
-      const decoded = new SnapshotDecoder().readMessage(raw, { acceptSnapshots: true });
+      const decoded = new SnapshotDecoder('live').readMessage(raw, { acceptSnapshots: true });
       invariant(decoded.kind === 'snapshot', 'crew demonstration snapshot was rejected');
       const received = decoded.state.asteroids.find((row) => row.id === rock.id);
       invariant(
@@ -1964,7 +1964,7 @@ function verifyCrewToolDemonstrations(): void {
     rock.position = { ...furnace.position };
     hauler.position = { x: furnace.position.x + 100, y: furnace.position.y };
     const before = [scout.score, hauler.score] as const;
-    engine.processFurnaceDeliveries();
+    engine.furnaceDeliveries.advance();
     invariant(
       scout.score === before[0] + 540 && hauler.score === before[1] + 540,
       'authoritative furnace did not pay both pilots the illustrated 540 points'
@@ -1972,14 +1972,14 @@ function verifyCrewToolDemonstrations(): void {
     invariant(engine.getAsteroid(rock.id) === undefined, 'delivery did not consume the rock');
     invariant(hauler.harpoonTargetId === null, 'delivery did not release the tow');
     invariant(
-      engine.drainFurnaceDeliveries().length === 1,
+      engine.furnaceDeliveries.drainDeliveries().length === 1,
       'delivery receipt was not emitted once'
     );
-    engine.processFurnaceDeliveries();
+    engine.furnaceDeliveries.advance();
     invariant(
       scout.score === before[0] + 540 &&
         hauler.score === before[1] + 540 &&
-        engine.drainFurnaceDeliveries().length === 0,
+        engine.furnaceDeliveries.drainDeliveries().length === 0,
       'the same illustrated arrival paid twice'
     );
   } finally {

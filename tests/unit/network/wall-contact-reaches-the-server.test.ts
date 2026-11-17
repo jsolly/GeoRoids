@@ -1,15 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { checkBoundaryCollision } from '../../../shared/boundary';
 import { hullRadiusForKit } from '../../../shared/shipKits';
-import {
-  captureSnapshot,
-  SNAPSHOT_VERSION,
-  SnapshotEncoder,
-} from '../../../shared/snapshotProtocol';
+import { captureSnapshot, SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { WORLD } from '../../../shared/world';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
 import { CollisionManager } from '../../../src/physics/CollisionManager';
+import { LiveSnapshotFixture as SnapshotEncoder } from '../../support/liveSnapshotFixture';
 import { snapshotFixture } from './snapshotFixture';
 
 /** Transport seam only: the packet still crosses the production sender,
@@ -86,6 +83,7 @@ describe('wall contact reaches the server', () => {
     ws.onopen?.();
     await pending;
     manager.setLocalPlayerName('Rim pilot');
+    manager.initializeAsteroidSync();
     ws.receive('joined', {
       id: manager.getClientId(),
       name: 'Rim pilot',
@@ -93,6 +91,7 @@ describe('wall contact reaches the server', () => {
       color: '#fff',
       snapshotVersion: SNAPSHOT_VERSION,
       asteroidInteractions: 1,
+      explorationVersion: 1,
       terrainSeed: 7,
       resumeToken: 'a'.repeat(64),
     });

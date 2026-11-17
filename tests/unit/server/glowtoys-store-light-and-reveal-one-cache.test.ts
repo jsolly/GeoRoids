@@ -72,18 +72,18 @@ test('authoritative laser contact is absorbed as charge without damage or repeat
   pilot.angle = 0;
   pilot.spawnProtectionTimer = 0;
   for (const row of engine.getAllAsteroids()) {
-    engine.removeAsteroid(row.id);
+    engine.asteroidLifecycle.remove(row.id);
   }
   const target = rock();
-  engine.addAsteroid(target);
-  const projectile = engine.spawnPlayerLaser(
+  engine.asteroidLifecycle.insert(target);
+  const projectile = engine.laserCombat.spawnPlayer(
     pilot.id,
     { x: 40, y: 0 },
     { x: LASER.SPEED / GAME.FPS, y: 0 }
   );
   expect(projectile).toBeTruthy();
   for (let i = 0; i < 100; i++) {
-    engine.advanceLasersAndResolveHits();
+    engine.laserCombat.advance();
   }
   expect(engine.getAsteroid(target.id)?.health).toBe(100);
   expect(target.glowtoy?.charge).toBe(GLOWTOY.laserCharge);
@@ -141,14 +141,14 @@ test('cache reveal and cargo persist in the same next-second batch, even between
   const engine = new GameEngine(123, undefined, new InlineWorldPersistence(store));
   const socket = new RecordingSocket();
   const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
-  engine.registerPilot(pilot, socket);
+  engine.pilotSessions.register({ actor: pilot, socket: socket });
   pilot.position = { x: 0, y: 0 };
   for (const row of engine.getAllAsteroids()) {
-    engine.removeAsteroid(row.id);
+    engine.asteroidLifecycle.remove(row.id);
   }
   const target = rock();
   target.glowtoy = { charge: 0.95, cachePosition: { x: 400, y: 0 }, cacheRevealed: false };
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   engine.checkpointWorld();
   const commits = vi.spyOn(store, 'checkpoint');
   let restored: GameEngine | undefined;
@@ -183,7 +183,7 @@ test('cache reveal and cargo persist in the same next-second batch, even between
       x: 0,
       y: 0,
     });
-    restored.registerPilot(resumedPilot, resumedSocket);
+    restored.pilotSessions.register({ actor: resumedPilot, socket: resumedSocket });
     resumedPilot.position = { x: 0, y: 0 };
     expect(restored.getAsteroid(target.id)?.glowtoy?.cacheRevealed).toBe(true);
     expect(restored.getLoot().filter((drop) => drop.kind === 'points')).toEqual([
@@ -214,7 +214,7 @@ test('a bright crystal guides spiders before the next glow tick, but a world res
   pilot.position = { x: 8000, y: 8000 };
   pilot.angle = 0;
   for (const row of engine.getAllAsteroids()) {
-    engine.removeAsteroid(row.id);
+    engine.asteroidLifecycle.remove(row.id);
   }
   engine.parkSatellitePickups();
   const target = rock();
@@ -224,7 +224,7 @@ test('a bright crystal guides spiders before the next glow tick, but a world res
     cachePosition: { x: 10000, y: 8000 },
     cacheRevealed: false,
   };
-  engine.addAsteroid(target);
+  engine.asteroidLifecycle.insert(target);
   try {
     for (let i = 0; i < GLOWTOY.tickFrames; i++) {
       engine.advanceOneFrame();
@@ -242,7 +242,7 @@ test('a bright crystal guides spiders before the next glow tick, but a world res
 
     engine.prepareDiagnosticWorld('traversal');
     for (const row of engine.getAllAsteroids()) {
-      engine.removeAsteroid(row.id);
+      engine.asteroidLifecycle.remove(row.id);
     }
     engine.parkSatellitePickups();
     engine.clearSpiderField();

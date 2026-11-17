@@ -1,3 +1,5 @@
+import { releaseBitmap, resizeBitmap } from './bitmapBudget';
+
 export type RasterSurface = {
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
@@ -9,7 +11,7 @@ export function prepareRasterSurface(
   height: number,
   recycled: RasterSurface | undefined,
   unavailableMessage: string
-): RasterSurface {
+): RasterSurface | undefined {
   const reusable = recycled?.context.isContextLost?.() ? undefined : recycled;
   if (recycled && !reusable) {
     discardRasterSurface(recycled);
@@ -17,8 +19,9 @@ export function prepareRasterSurface(
   const canvas = reusable?.canvas ?? document.createElement('canvas');
   try {
     // Even equal dimensions must reset paths, clips, styles and transparent pixels.
-    canvas.width = width;
-    canvas.height = height;
+    if (!resizeBitmap(canvas, width, height, unavailableMessage, 'cache', true)) {
+      return undefined;
+    }
     const context = reusable?.context ?? canvas.getContext('2d');
     if (!context) {
       throw new Error(unavailableMessage);
@@ -26,14 +29,12 @@ export function prepareRasterSurface(
     return reusable ?? { canvas, context };
   } catch (error) {
     // A failed getContext never returns a surface to the caller for disposal.
-    canvas.width = 0;
-    canvas.height = 0;
+    releaseBitmap(canvas);
     throw error;
   }
 }
 
 /** Drop unused backing storage while the detached handle awaits collection. */
 export function discardRasterSurface(surface: RasterSurface): void {
-  surface.canvas.width = 0;
-  surface.canvas.height = 0;
+  releaseBitmap(surface.canvas);
 }

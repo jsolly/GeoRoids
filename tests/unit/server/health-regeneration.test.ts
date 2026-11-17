@@ -25,7 +25,7 @@ describe('server-authoritative health regeneration', () => {
 
   test('player damage waits for the delay, then heals and caps at max health', () => {
     const ship = world.entity(pilot);
-    world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     expect(ship.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
     expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
@@ -48,7 +48,7 @@ describe('server-authoritative health regeneration', () => {
     (maxHealth) => {
       const ship = world.entity(pilot);
       world.engine.updatePlayer(pilot.id, { maxHealth, health: maxHealth });
-      world.engine.handleShipDamage(pilot.id, 'asteroid', 20);
+      world.engine.shipDamage.apply(pilot.id, 'asteroid', 20);
       world.tick(5 * GAME.FPS);
       expect(ship.health).toBe(maxHealth - 20);
       world.tick(GAME.FPS);
@@ -58,11 +58,11 @@ describe('server-authoritative health regeneration', () => {
 
   test('a repeated hit resets the same regeneration timer', () => {
     const ship = world.entity(pilot);
-    world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     world.tick(calculateHealthRegenDelayFrames() - 1);
     const healthBeforeSecondHit = ship.health;
 
-    world.engine.handleShipDamage(pilot.id, 'asteroid', 1);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', 1);
     expect(ship.health).toBe(healthBeforeSecondHit - 1);
     expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
@@ -76,7 +76,7 @@ describe('server-authoritative health regeneration', () => {
 
   test('a client update cannot clear the server timer and the dead ship waits for respawn', () => {
     const ship = world.entity(pilot);
-    world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     const delay = ship.healthRegenTimer;
 
     world.send(pilot, {
@@ -86,7 +86,7 @@ describe('server-authoritative health regeneration', () => {
     });
     expect(ship.healthRegenTimer).toBe(delay);
 
-    world.engine.handleShipDamage(pilot.id, 'asteroid', ship.health);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', ship.health);
     expect(ship.health).toBe(0);
     world.tick(SHIP.EXPLODE_DURATION_FRAMES + SHIP.RESPAWN_DELAY_FRAMES + 1);
     expect(ship.health).toBe(SHIP.MAX_HEALTH);
@@ -96,12 +96,15 @@ describe('server-authoritative health regeneration', () => {
     const now = world.engine.getServerTime();
     vi.spyOn(world.engine, 'getServerTime').mockReturnValue(now);
     const ship = world.entity(pilot);
-    world.engine.handleShipDamage(pilot.id, 'asteroid', 20);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', 20);
     world.tick(2 * GAME.FPS);
     const damagedHealth = ship.health;
     const timer = ship.healthRegenTimer;
     world.engine.removePlayer(pilot.id);
-    const resumed = world.engine.resumePilot(pilot.resumeToken, new RecordingSocket());
+    const resumed = world.engine.pilotSessions.resume({
+      token: pilot.resumeToken,
+      socket: new RecordingSocket(),
+    });
     expect(resumed.ok).toBe(true);
     if (!resumed.ok) {
       throw new Error('Expected resumed pilot');
@@ -118,10 +121,13 @@ describe('server-authoritative health regeneration', () => {
     const now = world.engine.getServerTime();
     clock.mockReturnValue(now);
     const ship = world.entity(pilot);
-    world.engine.handleShipDamage(pilot.id, 'asteroid', 20);
+    world.engine.shipDamage.apply(pilot.id, 'asteroid', 20);
     world.engine.removePlayer(pilot.id);
     clock.mockReturnValue(now + 3000);
-    const resumed = world.engine.resumePilot(pilot.resumeToken, new RecordingSocket());
+    const resumed = world.engine.pilotSessions.resume({
+      token: pilot.resumeToken,
+      socket: new RecordingSocket(),
+    });
     expect(resumed.ok).toBe(true);
     if (!resumed.ok) {
       throw new Error('Expected resumed pilot');

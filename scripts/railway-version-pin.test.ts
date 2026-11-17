@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
 import { test } from 'vitest';
 import { parse } from 'yaml';
 import {
   railwayCli,
+  railwayCliEnvironment,
   readSnapshot,
   reviewPlan,
   runVersionPin,
@@ -23,6 +26,62 @@ const production = {
 const tree = 'd0a934bd14a4529689009aca626bba12a61db775d';
 const oldBuild = { builder: 'RAILPACK', buildEnvironment: 'V3', railpackVersion: '0.42.0' };
 const newBuild = { ...oldBuild, railpackVersion: '0.43.0' };
+
+test('native SDK evaluation probes the pinned CLI instead of the workflow launcher', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'railway-sdk-launcher-'));
+  try {
+    // The provider boundary supplies only version text. The installed SDK performs its real probe.
+    const cli = join(directory, 'railway');
+    writeFileSync(cli, '#!/bin/sh\nprintf "railway 5.50.2\\n"\n');
+    chmodSync(cli, 0o700);
+    const inherited = {
+      ...process.env,
+      _: process.execPath,
+      RAILWAY_CONFIG_TOKEN: 'dedicated-test-token',
+      RAILWAY_TOKEN: 'ambient-test-token',
+      RAILWAY_API_TOKEN: 'ambient-api-token',
+      RAILWAY_PROJECT_ID: 'another-project',
+      RAILWAY_CONFIG_CLI: '/another-cli',
+    };
+    // Native CLI 5.50.2's eval flags and source markers activate the SDK's compatibility check.
+    const args = [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '-e',
+      `const mod = await import('railway/iac');
+const partial = mod.partial;
+const graph = {};
+process.stdout.write(JSON.stringify({ partial, project: graph }));`,
+    ];
+    const before = spawnSync(process.execPath, args, {
+      env: inherited,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(before.status, 1);
+    assert.match(before.stderr, /requires Railway CLI/u);
+    const environment = railwayCliEnvironment(inherited, cli);
+    const after = spawnSync(process.execPath, args, {
+      env: environment,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(after.status, 0, after.stderr);
+    assert.deepEqual(JSON.parse(after.stdout), { project: {} });
+    assert.equal(environment['_'], cli);
+    assert.equal(environment['RAILWAY_TOKEN'], 'dedicated-test-token');
+    assert.equal(environment['RAILWAY_PROJECT_ID'], production.project);
+    assert.equal(environment['RAILWAY_ENVIRONMENT_ID'], production.environment);
+    assert.equal(environment['RAILWAY_SERVICE_ID'], production.service);
+    assert.equal(environment['RAILWAY_API_TOKEN'], undefined);
+    assert.equal(environment['RAILWAY_CONFIG_TOKEN'], undefined);
+    assert.equal(environment['RAILWAY_CONFIG_CLI'], undefined);
+    assert.equal(inherited['_'], process.execPath);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 // Synthetic boundary fixtures transcribed from pinned official CLI source:
 // iac/saved_plan.rs, iac/change_set.rs::update/changed_leaf_paths, engine.rs
@@ -48,7 +107,7 @@ function snapshot(build = oldBuild, etag = 'etag-before', deployment = 'deployme
         id: production.project,
         services: { edges: [{ node: { id: production.service, name: production.name } }] },
       },
-      environmentStagedChanges: null,
+      environmentStagedChanges: { id: 'staged-id', status: 'STAGED', patch: {} },
       serviceInstance: { latestDeployment: { id: deployment, status: 'SUCCESS' } },
     },
   };
@@ -166,6 +225,33 @@ test('saved artifact identity, source, etag and hash fail closed', () => {
   }
 });
 
+test('saved-plan rejection identifies fixed failed checks without exposing private values', () => {
+  for (const [patch, label] of [
+    [{ kind: 'DO-NOT-LOG-kind' }, 'kind'],
+    [{ version: 2 }, 'format-version'],
+    [{ cliVersion: 'DO-NOT-LOG-version' }, 'cli-version'],
+    [{ sourceTree: 'DO-NOT-LOG-source' }, 'source-tree'],
+    [{ environmentId: 'DO-NOT-LOG-environment' }, 'environment'],
+    [{ configEtag: 'DO-NOT-LOG-etag' }, 'etag'],
+    [{ destructive: true }, 'destructive'],
+    [{ claim: true }, 'ownership-claim'],
+  ] as const) {
+    assert.throws(
+      () => review({ ...artifact(), ...patch }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, `Saved Railway plan rejected (${label})`);
+        assert.equal(error.message.includes('DO-NOT-LOG'), false);
+        return true;
+      }
+    );
+  }
+  assert.throws(
+    () => review({ ...artifact(), configEtag: 'private', destructive: true, claim: true }),
+    /^Error: Saved Railway plan rejected \(etag, destructive, ownership-claim\)$/u
+  );
+});
+
 test('unknown, destructive, unrelated, hidden and stale changes cannot pass as a version update', () => {
   const changes = [
     { ...change(), kind: 'resource.delete' },
@@ -194,7 +280,67 @@ test('unknown, destructive, unrelated, hidden and stale changes cannot pass as a
   assert.throws(() => review(artifact([change(), { kind: 'variable.set', value: 'DO-NOT-LOG' }])));
 });
 
-test('live target and every non-null staged response block before a plan can run', async () => {
+test('empty staged drafts match the pinned non-null API without retaining patch data', () => {
+  for (const patch of [
+    {},
+    { services: {} },
+    { sharedVariables: {}, volumes: {}, buckets: {}, privateNetworkDisabled: null },
+  ]) {
+    const live = snapshot();
+    assert.deepEqual(
+      readSnapshot({
+        data: {
+          ...live.data,
+          environmentStagedChanges: { id: 'draft-id', status: 'STAGED', patch },
+        },
+      }),
+      {
+        etag: 'etag-before',
+        build: oldBuild,
+        deployment: { id: 'deployment-before', status: 'SUCCESS' },
+      }
+    );
+  }
+});
+
+test('staged-state diagnostics reveal only fixed status and shape labels', () => {
+  const cases = [
+    [
+      { id: 'DO-NOT-LOG', status: 'STAGED', patch: { unknown: 'DO-NOT-LOG' } },
+      'object; status=STAGED; patch=object-with-keys',
+    ],
+    [
+      { id: 'DO-NOT-LOG', status: 'COMMITTED', patch: { services: {} } },
+      'object; status=COMMITTED; patch=object-with-keys',
+    ],
+    [{ status: 'APPLYING', patch: null }, 'object; status=APPLYING; patch=null'],
+    [
+      { status: 'DO-NOT-LOG', patch: { sharedVariables: { PRIVATE: 'DO-NOT-LOG' } } },
+      'object; status=unrecognized; patch=object-with-keys',
+    ],
+    [{ status: 'STAGED', patch: 'DO-NOT-LOG' }, 'object; status=STAGED; patch=string'],
+    [undefined, 'missing; status=unrecognized; patch=missing'],
+    ['DO-NOT-LOG', 'string; status=unrecognized; patch=missing'],
+    [[], 'array; status=unrecognized; patch=missing'],
+  ];
+  for (const [staged, diagnostic] of cases) {
+    const live = snapshot();
+    assert.throws(
+      () => readSnapshot({ data: { ...live.data, environmentStagedChanges: staged } }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(
+          error.message,
+          `Existing staged Railway work blocks automation (${diagnostic})`
+        );
+        assert.equal(error.message.includes('DO-NOT-LOG'), false);
+        return true;
+      }
+    );
+  }
+});
+
+test('live target, staged work and malformed drafts block before a plan can run', async () => {
   const live = snapshot();
   const forbidden: unknown[] = [
     null,
@@ -202,6 +348,7 @@ test('live target and every non-null staged response block before a plan can run
     {},
     { ...live, errors: [{ message: 'DO-NOT-LOG' }] },
     { data: { ...live.data, environmentStagedChanges: {} } },
+    { data: { ...live.data, environmentStagedChanges: null } },
     { data: { ...live.data, environmentStagedChanges: { id: 'unrelated', status: 'staged' } } },
     { data: { ...live.data, environmentStagedChanges: undefined } },
     { data: { ...live.data, environment: { ...live.data.environment, id: 'preview' } } },
@@ -225,6 +372,37 @@ test('live target and every non-null staged response block before a plan can run
       },
     },
   ];
+  for (const patch of [
+    { services: { [production.service]: { build: {} } } },
+    { sharedVariables: { PRIVATE: { value: 'DO-NOT-LOG' } } },
+    { volumes: { 'volume-id': {} } },
+    { buckets: { 'bucket-id': {} } },
+    { privateNetworkDisabled: false },
+    { privateNetworkDisabled: true },
+    { unknown: {} },
+    { services: null },
+    { services: [] },
+    { services: 'DO-NOT-LOG' },
+  ]) {
+    forbidden.push({
+      data: { ...live.data, environmentStagedChanges: { id: 'draft', status: 'STAGED', patch } },
+    });
+  }
+  for (const status of ['APPLYING', 'COMMITTED', 'unknown']) {
+    forbidden.push({
+      data: { ...live.data, environmentStagedChanges: { id: 'draft', status, patch: {} } },
+    });
+  }
+  for (const draft of [
+    { id: '', status: 'STAGED', patch: {} },
+    { id: ' ', status: 'STAGED', patch: {} },
+    { id: 7, status: 'STAGED', patch: {} },
+    { id: 'draft', status: 'STAGED', patch: null },
+    { id: 'draft', status: 'STAGED', patch: [], extra: 'DO-NOT-LOG' },
+    { id: 'draft', status: 'STAGED', patch: {}, extra: 'DO-NOT-LOG' },
+  ]) {
+    forbidden.push({ data: { ...live.data, environmentStagedChanges: draft } });
+  }
   for (const response of forbidden) {
     const calls: string[][] = [];
     await assert.rejects(
@@ -396,6 +574,7 @@ test('plan-only never applies, reads build logs or claims production verificatio
     transport.calls.some((args) => args[1] === 'apply' || args[0] === 'logs'),
     false
   );
+  assert.equal(transport.calls[0]?.[1]?.includes('patch(decryptVariables: false)'), true);
 });
 
 test('changed staged state, etag, source and saved bytes stop before apply', async () => {
@@ -523,25 +702,19 @@ test('a converged retry verifies its existing successful deployment without appl
   );
 });
 
-test('workflow is hard-disabled, production serialized, and secrets reach only the guarded runner', () => {
+test('workflow permits only manual main planning and cannot select production apply', () => {
   const workflow = parse(
     readFileSync(new URL('../.github/workflows/railway-version-pin.yml', import.meta.url), 'utf8')
   );
   assert.equal(
     workflow.jobs.pin.if,
-    "github.repository == 'jsolly/GeoRoids' && github.repository == 'DISABLED/REQUIRES-APPROVAL' && github.ref == 'refs/heads/main'"
+    "github.repository == 'jsolly/GeoRoids' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'"
   );
   assert.equal(workflow.concurrency.group, 'railway-production-version-pin');
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.deepEqual(workflow.permissions, { contents: 'read' });
   assert.equal(workflow.jobs.pin.environment, 'railway-production-config');
-  assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode, {
-    description: 'Plan only, or apply after separate production apply authorization',
-    required: true,
-    type: 'choice',
-    default: 'plan-only',
-    options: ['plan-only', 'apply'],
-  });
+  assert.deepEqual(workflow.on, { workflow_dispatch: null });
   const steps = workflow.jobs.pin.steps;
   for (const step of steps.filter((candidate: { uses?: string }) => candidate.uses)) {
     assert.match(step.uses, /@[a-f0-9]{40}$/u);
@@ -552,21 +725,14 @@ test('workflow is hard-disabled, production serialized, and secrets reach only t
   assert.equal(secrets.length, 1);
   assert.equal(
     secrets[0].run,
-    'umask 077\nnode --import tsx scripts/railway-version-pin-entry.ts --workflow-mode\n'
+    'umask 077\nnode --import tsx scripts/railway-version-pin-entry.ts --plan-only\n'
   );
   assert.match(secrets[0].env.RAILWAY_CONFIG_TOKEN, /^\$\{\{ secrets.RAILWAY_CONFIG_TOKEN \}\}$/u);
-  assert.match(
-    secrets[0].env.RAILWAY_CONFIG_MODE,
-    /github\.event_name == 'workflow_dispatch' && inputs\.mode/u
+  assert.deepEqual(
+    Object.keys(secrets[0].env).sort((left, right) => left.localeCompare(right)),
+    ['RAILWAY_CONFIG_APPLY_ENABLED', 'RAILWAY_CONFIG_TOKEN']
   );
-  assert.match(
-    secrets[0].env.RAILWAY_CONFIG_MODE,
-    /vars\.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'apply' \|\| 'plan-only'/u
-  );
-  assert.match(
-    secrets[0].env.RAILWAY_CONFIG_APPLY_ENABLED,
-    /vars\.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'version-pin-only' \|\| 'disabled'/u
-  );
+  assert.equal(secrets[0].env.RAILWAY_CONFIG_APPLY_ENABLED, 'disabled');
   const install = steps.find(
     (step: { name?: string }) => step.name === 'Install checksum-pinned official Railway CLI'
   );

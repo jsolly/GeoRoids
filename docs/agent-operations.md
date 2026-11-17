@@ -161,10 +161,12 @@ The IaC package is a development-only dependency and the CLI must be at least
 lane builds every PR with that release, so a change that breaks Railway's
 `mise install` or build fails before merge
 ([Railway IaC](../.railway/README.md)). The pin is live only after a reviewed configuration apply and actual readback.
-The approved version-pin automation policy has a guarded saved-plan runner, but
-its workflow remains hard-disabled until John separately authorizes enabling
-and supplies a dedicated production-scoped token. All other configuration stays
-human-owned. Follow the exact scope and first-run prerequisites in
+The approved version-pin policy has a guarded saved-plan runner. Its workflow
+permits manual plan-only runs from trusted `main` with a dedicated
+production-scoped token. Production application and automatic triggers remain
+disabled. A variable cannot enable application; that requires separate approval
+and a reviewed workflow change. All other configuration stays human-owned.
+Follow the exact scope and first-run prerequisites in
 [Railway production configuration](../.railway/README.md).
 
 Railway stops reading legacy `railway.json` files on **2026-12-01**. The
@@ -182,34 +184,6 @@ because the platform importer omits these default values.
 Smoke: `curl -i https://georoids-production-2403.up.railway.app/health`. The player count is `world.players`, alongside `world.loop` and `world.persistence`; `/status` reads that same count. The server exposes `RAILWAY_GIT_COMMIT_SHA` in health JSON `releaseId` for diagnostics; host deployment status and gameplay smoke establish production verification.
 
 The former `geoasteroids-production-2403.up.railway.app` hostname returns a Railway edge 404. Use the current `georoids-production-2403.up.railway.app` host for client configuration and verification.
-
-### Production health alerts
-
-`Production health watch` reads the production `/health` every five minutes on
-`main`, independently of CI, deployments and production smoke. Each request and
-body has a 15-second deadline. Three failed probes ten seconds apart open or
-reopen one monitor-owned GitHub issue; two consecutive healthy probes close it.
-Mixed results leave the existing incident unchanged. A healthy first run creates
-no issue. The monitor requires the healthy status and a nonfailed persistence
-worker; HTTP failures, malformed responses and failed persistence alert.
-
-The issue's exact ownership marker and `github-actions[bot]` author identify it,
-including after recovery. Repeated observations make no issue changes; changed
-failure categories update the body. Workflow concurrency serializes scheduled
-and manual runs, and an ambiguous API mutation fails without a blind retry; the
-next run reads the issue state again. Multiple owned issues fail for operator
-reconciliation. No production data or configuration is changed, and only a fixed
-failure category and probe count leave the health response.
-
-The incident body mentions `@jsolly`; subscribe to the monitor issue or watch
-repository issues in GitHub to follow later incidents and recovery. GitHub
-notification preferences determine email/push delivery. The
-five-minute schedule is best effort: GitHub can delay or drop scheduled runs,
-and this is not a strict alerting SLA. Manually dispatch the workflow to check
-monitor operation without forcing an outage; an initially healthy dispatch is
-quiet. Workflow/API failures appear as failed Actions runs and require operator
-attention. This monitor checks availability and persistence, not gameplay or
-browser rendering.
 
 ### Railway preview
 
@@ -236,12 +210,15 @@ Never point this workflow at production, apply `.railway/railway.ts` to `preview
 
 ## Debug report operations
 
-The **Debug reports** section already exists in Todoist project
-`6hWp83X3jfHJpW8v`, section `6hmMfqqQ4rwgJFGv`. Runtime delivery requires
+The **Unverified client reports** intake section already exists in Todoist project
+`6hWp83X3jfHJpW8v`, section `6hmMfqqQ4rwgJFGv`. Delivery identifies the section
+by its stable ID and project membership, not its editable name. The worker still
+verifies the exact owner account, project and section IDs and rejects archived
+destinations before publishing. Renaming the section does not redirect reports.
+Runtime delivery requires
 John to configure `TODOIST_API_TOKEN` as a Railway server secret for account
 `17333018`, `todoist@jsolly.com`. The connected chat's Todoist login cannot
-supply credentials to the running game. The worker verifies the account,
-project and section before publishing. Do not expose the token through client
+supply credentials to the running game. Do not expose the token through client
 environment variables, logs or source. A personal API token grants access to
 its account; protect and rotate it as a server credential.
 
@@ -256,16 +233,30 @@ Automated tests use explicit temporary stores, never the developer's queue.
 Only the report worker parses, redacts and persists report bodies or contacts
 Todoist. The main server accepts at most two concurrent uploads and eight
 worker requests, with a ten-second request deadline. New reports are limited
-to 2 MiB, three per client address per hour and 30 globally per UTC day.
-The worker refuses a limited address before the report sanitizer runs
-(parsing, which cleans each log record, still runs first), then checks again
-inside the transaction that counts it. A diagnostic state string longer than
-8,192 characters is clipped to that length and ends in `…[truncated]`; a word
-the cut splits loses its kept part, up to 128 characters, so a clipped secret
-keeps no prefix, and redaction never removes the marker. A client log record
-over 8 KiB still rejects the report. One sanitizer pass parses at most 2,048
-URLs and redacts later ones whole. Redaction runs in time linear in the
-report's size.
+to 2 MiB. Each new attempt that reaches redaction durably spends one of three
+per client address per hour and 30 globally per UTC day. Redaction failures and
+later storage refusals still spend that attempt. An exact retry of an already
+stored report does not. Parsing, which cleans each log record, runs before that reservation.
+
+A diagnostic state string longer than 8,192 UTF-16 units is clipped and ends in
+`…[truncated]`. A split Unicode word drops up to 128 kept units. A cut inside a
+URI or address drops its whole non-whitespace span, including long local parts,
+domains and URL userinfo; an incomplete double-quoted span is also removed.
+Complete words, URLs and balanced quoted text at the cut are retained. Redaction
+preserves the marker. Diagnostic object keys over 128 units are rejected rather
+than clipped,
+so distinct keys cannot collapse. A client log record over 8 KiB still rejects
+the report. One sanitizer pass converts at most 2,048 URLs and 65,536 units of
+URL input, bounding percent-encoding expansion as well as parse count. Later or
+over-budget URLs become `[redacted-url-budget]`; malformed URLs inside the
+budget become `[redacted-url]`. Redaction work is linear in the report's size.
+
+An older saved report whose oversized text is now clipped can return HTTP 409
+on resubmission because its stored identity differs. Keep that conflict check.
+Recover the existing receipt through `GET /debug-reports/<id>` using its original
+receipt capability in the Authorization Bearer header; do not change the identity
+or retry with edited content.
+
 These limits are independent of gameplay admission. Railway public HTTP
 ingress supplies `X-Real-IP`; local development uses the socket address and
 ignores forwarded address headers. Before release, verify that Railway replaces
@@ -309,17 +300,18 @@ A later request starts one replacement and is itself refused as restarting; the
 player's retry reaches the new thread. The replacement starts only after the old
 thread has exited, because the store holds its database under an exclusive
 SQLite lock until its thread is gone. At most three replacement threads start
-in any rolling hour. Each is logged as `Replacing the debug report worker` when
-requested and counted from the moment its thread actually starts, so a late
-handover cannot fit a fourth start into the hour. A
-spent budget is logged once with the time of the next possible attempt, and
+in any rolling hour. Each is logged as `Replacing the debug report worker` and
+counted when its thread starts. The logged number excludes starts that have
+left the window while a handover waited. A late handover cannot fit a fourth
+start into the hour. A spent budget is logged once with the time of the next possible attempt, and
 reporting stays closed until then or until the service restarts. If the old
 thread has not exited ten seconds after its replacement was requested, the
 server logs that reporting stays closed until it does, `/health` reports the
 worker as not stopped, and refusals stop promising a restart. A thread stuck
-in a native SQLite call keeps reporting closed until it exits. When it does,
-the server logs the late exit and starts the replacement already charged to the
-budget, with no further request needed. Queued reports resume delivery once a
+in a native SQLite call keeps reporting closed until it exits. If that call
+never returns, only a process restart can recover reporting. When it does exit,
+the server logs the late exit, starts and counts its waiting replacement, with
+no further request needed. Queued reports resume delivery once a
 replacement runs. If shutdown cannot stop the worker within two seconds, the
 server logs that it may hold process exit.
 
@@ -333,8 +325,9 @@ The ways to reach the report database safely are to stop the service, or to
 redeploy with `GEOROIDS_DEBUG_REPORTS_ENABLED=0` so the worker never opens the
 store. Once the store is closed, `railway volume files download` can copy the
 file, together with its `-wal` file when one is present: a stop that was not
-clean leaves committed reports there. Restoring, stopping and redeploying are all human-owned production
-steps that agents do not perform; see
+clean leaves committed reports there. This stopped-service Railway download
+procedure has not been verified by this change. Restoring, stopping and
+redeploying remain human-owned production steps; see
 [persistent world operations](persistent-world.md#railway-deployment-and-recovery).
 
 The report database has a 128 MiB main-file limit, a 16 MiB WAL safety limit,
@@ -453,7 +446,7 @@ browser smoke policy live in [tests/AGENTS.md](../tests/AGENTS.md).
 ### Two processes, one game
 
 - **Client** (`src/`, served and built by Astro with Vite): rendering, input, prediction, HUD. Static game and debug routes share `src/components/GameDocument.astro` → `src/components/game/GameShell.svelte` → `src/runtime/gameRuntime.ts`, which composes an injected `EventLoop` and bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `ConnectionManager`, `CollisionManager`.
-- **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
+- **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WorldDiscovery` reveals shared ground and records valuable loot in newly explored cells for abilities, probes and cooperative restoration. `ShipAbilityManager` applies surveys; `SurveyProbeManager` prunes attached hosts and emits recurring surveys before world movement. `ToolFlightManager` captures pre-motion target poses and resolves tool contact after world movement. `SpiderPopulationBudget` allocates shared terrain and belt capacity while reserving swarm slots; its five refresh sites stay around the original producers. `SpiderField` owns terrain and crawler frame inputs, local resource lookup, nest rewards and queued bites. Combat drains those intents and checks each against live body and host state before applying damage. `WorldHazards` checks campaign activation, requests the shared population refresh and reads live actors before applying meteor damage. `GameEngine` schedules its frame before the pause check. `HiveEncounters` selects the live human view, refreshes nearby hives at its original cadence and requests the shared budget before births. `RolyPolyManager` reads the live actor view and each hull radius at its frame slot, then owns wildlife admission, habitats and motion. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
 - **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/debug-reports` and capability-protected report status, `/test-server-log` (development/test only).
 
 The Svelte shell owns the start screen, preferences, inventory, store, furnace travel, map controls, touch actions, field hints, network banners and diagnostics, including their responsive dialogs. It imports the browser-only runtime after mounting; initialization failure offers Retry and never queues Enter Game. The command port delegates to gameplay operations, while frozen presentation values update at most ten times per second and semantic transitions publish immediately. Canvas dimensions and pixels remain engine-owned; a separate geometry callback places shell controls. TypeScript painters receive explicit canvas elements from Svelte; the shell owns DOM state and styles. Map and touch adapters own their scoped gestures, while bounded presentation snapshots carry only visible controls and diagnostic values. Teardown retires the runtime, subscriptions, listeners, timers, painters, and owned connections. No legacy migration hosts remain. Renderer unit suites share only a canvas and safe-area probe; DOM scenarios mount the real Svelte components.

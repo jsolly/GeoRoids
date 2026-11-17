@@ -32,8 +32,8 @@ test('fresh pilots can use their starter tool but cannot equip rare tools before
     const actor = equipment === 'survey_probe' ? scout : hauler;
     const mass = actor.mass;
     const drop = engine.dropEquipmentAt(actor.position, equipment);
-    engine.collectLoot();
-    expect(engine.drainLootCollections()).toEqual([
+    engine.lootCollection.collect();
+    expect(engine.lootCollection.drainCollections()).toEqual([
       {
         eventId: expect.any(String),
         collectorId: actor.id,
@@ -56,18 +56,18 @@ test('a duplicate tool stays available for a different pilot', () => {
   const engine = new GameEngine(82);
   const alice = engine.addPlayer('alice', 'Alice', new RecordingSocket(), undefined, 'hauler');
   const original = engine.dropEquipmentAt(alice.position, 'resource_tap');
-  engine.collectLoot();
-  expect(engine.drainLootCollections()).toEqual([
+  engine.lootCollection.collect();
+  expect(engine.lootCollection.drainCollections()).toEqual([
     expect.objectContaining({ collectorId: alice.id, lootId: original.id, kind: 'resource_tap' }),
   ]);
   const duplicate = engine.dropEquipmentAt(alice.position, 'resource_tap');
-  engine.collectLoot();
-  expect(engine.drainLootCollections()).toEqual([]);
+  engine.lootCollection.collect();
+  expect(engine.lootCollection.drainCollections()).toEqual([]);
   expect(engine.getLoot()).toContainEqual(duplicate);
   const bob = engine.addPlayer('bob', 'Bob', new RecordingSocket(), undefined, 'hauler');
   bob.position = { ...alice.position };
-  engine.collectLoot();
-  expect(engine.drainLootCollections()).toEqual([
+  engine.lootCollection.collect();
+  expect(engine.lootCollection.drainCollections()).toEqual([
     expect.objectContaining({ collectorId: bob.id, lootId: original.id, kind: 'resource_tap' }),
   ]);
   expect(alice.equipment).toEqual(['resource_tap']);
@@ -79,8 +79,8 @@ test('two identical tools collected in the same frame unlock once and leave both
   const actor = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), undefined, 'hauler');
   const first = engine.dropEquipmentAt(actor.position, 'resource_tap');
   engine.dropEquipmentAt(actor.position, 'resource_tap');
-  engine.collectLoot();
-  expect(engine.drainLootCollections()).toEqual([
+  engine.lootCollection.collect();
+  expect(engine.lootCollection.drainCollections()).toEqual([
     expect.objectContaining({ collectorId: actor.id, lootId: first.id, kind: 'resource_tap' }),
   ]);
   expect(actor.equipment).toEqual(['resource_tap']);
@@ -103,9 +103,9 @@ test('each Hauler takes its own Boost Coupling from one drop while a Scout never
     expect(seen(theo)).toContain(drop.id);
     expect(seen(rin)).not.toContain(drop.id);
 
-    world.engine.collectLoot();
-    world.engine.collectLoot();
-    world.engine.collectLoot();
+    world.engine.lootCollection.collect();
+    world.engine.lootCollection.collect();
+    world.engine.lootCollection.collect();
     expect(world.entity(maya).equipment).toEqual(['boost_coupling']);
     expect(world.entity(theo).equipment).toEqual(['boost_coupling']);
     expect(world.entity(rin).equipment ?? []).toEqual([]);
@@ -116,7 +116,12 @@ test('each Hauler takes its own Boost Coupling from one drop while a Scout never
     const pickups = (pilot: Pilot) =>
       pilot.socket.received('lootCollected').map((message) => message.data);
     expect(pickups(rin)).toEqual([]);
-    expect(pickups(maya)).toEqual([expect.objectContaining({ collectorId: maya.id })]);
+    expect(pickups(maya)).toEqual([
+      expect.objectContaining({ collectorId: maya.id, lootId: drop.id, kind: 'boost_coupling' }),
+    ]);
+    expect(pickups(theo)).toEqual([
+      expect.objectContaining({ collectorId: theo.id, lootId: drop.id, kind: 'boost_coupling' }),
+    ]);
   } finally {
     world.dispose();
   }
@@ -128,32 +133,44 @@ test('salvaged tools survive an ordinary death, reconnect, and a server restart'
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('pilot', 'Pilot', socket, undefined, 'hauler');
-    const registered = engine.registerPilot(actor, socket);
+    const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
     assert(registered.ok);
     for (const equipment of EQUIPMENT_IDS) {
       engine.dropEquipmentAt(actor.position, equipment);
     }
-    engine.collectLoot();
-    engine.collectLoot();
+    engine.lootCollection.collect();
+    engine.lootCollection.collect();
     expect(actor.equipment).toEqual(HAULER_TOOLS);
     actor.silk = 12;
     actor.color = '#FBBF24';
     actor.score = 400;
     actor.spawnProtectionTimer = 0;
-    expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
-    const continued = engine.resumePilot(registered.resumeToken, new RecordingSocket(), 'hauler');
+    expect(engine.shipDamage.apply(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
+    const continued = engine.pilotSessions.resume({
+      token: registered.resumeToken,
+      socket: new RecordingSocket(),
+      requestedKit: 'hauler',
+    });
     assert(continued.ok);
     expect(continued.actor.equipment).toEqual(HAULER_TOOLS);
     expect(continued.actor).toMatchObject({ silk: 12, score: 400, color: '#FBBF24' });
     expect(engine.setHaulerUtility(actor.id, 'boost_coupling')).toBe(true);
     engine.removePlayer(actor.id);
-    const reconnected = engine.resumePilot(continued.resumeToken, new RecordingSocket(), 'scout');
+    const reconnected = engine.pilotSessions.resume({
+      token: continued.resumeToken,
+      socket: new RecordingSocket(),
+      requestedKit: 'scout',
+    });
     assert(reconnected.ok);
     expect(reconnected.actor.equipment).toEqual(HAULER_TOOLS);
     expect(engine.setScoutUtility(actor.id, 'survey_probe')).toBe(false);
     engine.checkpointWorld();
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
-    const resumed = restarted.resumePilot(reconnected.resumeToken, new RecordingSocket(), 'hauler');
+    const resumed = restarted.pilotSessions.resume({
+      token: reconnected.resumeToken,
+      socket: new RecordingSocket(),
+      requestedKit: 'hauler',
+    });
     assert(resumed.ok);
     expect(resumed.actor.equipment).toEqual(HAULER_TOOLS);
     expect(resumed.actor).toMatchObject({ silk: 12, score: 400, color: '#FBBF24' });
@@ -176,7 +193,11 @@ test('saved pilots from before salvage unlocks return with no rare equipment', (
       },
     ]);
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
-    const resumed = engine.resumePilot(token, new RecordingSocket(), 'hauler');
+    const resumed = engine.pilotSessions.resume({
+      token: token,
+      socket: new RecordingSocket(),
+      requestedKit: 'hauler',
+    });
     assert(resumed.ok);
     expect(resumed.actor.equipment).toEqual([]);
     expect(engine.setHaulerUtility(resumed.actor.id, 'resource_tap')).toBe(false);
@@ -257,19 +278,19 @@ test('death preserves bank and equipment through a restart', () => {
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('pilot', 'Pilot', socket, undefined, 'hauler');
-    const registered = engine.registerPilot(actor, socket);
+    const registered = engine.pilotSessions.register({ actor: actor, socket: socket });
     assert(registered.ok);
     for (const equipment of EQUIPMENT_IDS) {
       engine.dropEquipmentAt(actor.position, equipment);
     }
-    engine.collectLoot();
-    engine.collectLoot();
+    engine.lootCollection.collect();
+    engine.lootCollection.collect();
     actor.silk = 20;
     actor.score = 900;
     actor.color = '#FBBF24';
     expect(engine.setHaulerUtility(actor.id, 'resource_tap')).toBe(true);
     actor.spawnProtectionTimer = 0;
-    engine.handleShipDamage(actor.id, 'asteroid', actor.health);
+    engine.shipDamage.apply(actor.id, 'asteroid', actor.health);
     expect(actor).toMatchObject({
       score: 900,
       silk: 20,
@@ -285,7 +306,11 @@ test('death preserves bank and equipment through a restart', () => {
     });
     expect(store.loadPilots()[0]?.hullColor).toBe('#FBBF24');
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
-    const resumed = restarted.resumePilot(registered.resumeToken, new RecordingSocket(), 'hauler');
+    const resumed = restarted.pilotSessions.resume({
+      token: registered.resumeToken,
+      socket: new RecordingSocket(),
+      requestedKit: 'hauler',
+    });
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
       score: 900,
@@ -322,7 +347,11 @@ test('a dead saved flight retains bank, equipment, paint, and silk', () => {
       },
     ]);
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
-    const resumed = engine.resumePilot(token, new RecordingSocket(), 'scout');
+    const resumed = engine.pilotSessions.resume({
+      token: token,
+      socket: new RecordingSocket(),
+      requestedKit: 'scout',
+    });
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
       score: 900,

@@ -113,6 +113,7 @@ export interface PlayerJoin {
   /** Required current-protocol acknowledgement. */
   snapshotVersion: 3;
   asteroidInteractions: 1;
+  explorationVersion: 1;
   /** This server accepts start/release/cancel charge commands. */
   chargedWeapons?: 1;
   /** Private to the joined socket; never included in world snapshots. */
@@ -391,6 +392,9 @@ export interface ServerGameSnapshot extends ServerGameState {
   playerProjectiles: PlayerProjectileState[];
 }
 
+/** Moving world DTO. Atlas segments have independent recovery within its envelope. */
+export type LiveGameSnapshot = Omit<ServerGameSnapshot, 'exploration'>;
+
 export interface ContourLockState {
   height: number;
   direction: 1 | -1;
@@ -494,6 +498,7 @@ export type ClientWireMessage =
         kitId: ShipKitId;
         snapshotVersion: 3;
         asteroidInteractions: 1;
+        explorationVersion: 1;
         cooperativeVersion?: 1;
         worldRemains?: 1;
 
@@ -508,7 +513,7 @@ export type ClientWireMessage =
       data: { laserStart: Position; laserDirection: Velocity; requestId: string };
     }
   | { type: 'snapshotAck'; data: SnapshotAcknowledgement }
-  | { type: 'snapshotResync'; data: EmptyData }
+  | { type: 'snapshotResync'; data: EmptyData | { atlas: 'reset' } }
   | { type: 'leave'; data: EmptyData }
   | { type: 'crewAction'; id: string; data: CrewAction }
   | { type: 'useAbility'; id: string; data: EmptyData }

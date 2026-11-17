@@ -28,7 +28,7 @@ async function start(nodeEnv = 'test') {
   return {
     server,
     origin: `http://127.0.0.1:${port}`,
-    socketUrl: `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`,
+    socketUrl: `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`,
   };
 }
 

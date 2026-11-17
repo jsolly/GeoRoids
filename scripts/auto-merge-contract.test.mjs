@@ -143,7 +143,7 @@ test('auto-merge workflow arms native squash merge and keeps a sweep backstop', 
     'synchronize',
     'ready_for_review',
   ]);
-  assert.deepEqual(workflow.on.schedule, [{ cron: '*/30 * * * *' }]);
+  assert.deepEqual(workflow.on.schedule, [{ cron: '0 9,17,22 * * *' }]);
   assert.deepEqual(workflow.permissions, {});
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.match(workflow.concurrency.group, /auto-merge-/u);

@@ -1,7 +1,7 @@
 import { isEquipmentId } from '../../shared/equipment';
-import { type ExplorationMap, explorationCellAt, isCellExplored } from '../../shared/exploration';
+import { type ExplorationMap, explorationCellAt } from '../../shared/exploration';
 import { CIVIC_LOTS, FURNACES } from '../../shared/furnaces';
-import type { ExplorationTile, LootData, MapAsset, SatellitePickupData } from '../../shared-types';
+import type { LootData, MapAsset, SatellitePickupData } from '../../shared-types';
 import type { LootCatalogObserver } from '../core/LootManager';
 
 type LootAsset = { asset: MapAsset; ordinal: number };
@@ -15,7 +15,7 @@ export class MapAssets implements LootCatalogObserver {
   private readonly knownSatellites = new Set<string>();
   private sortedLoot: LootAsset[] = [];
 
-  constructor(private readonly exploration: Pick<ExplorationMap, 'snapshot'>) {}
+  constructor(private readonly exploration: Pick<ExplorationMap, 'hasCell'>) {}
 
   changed(drop: LootData, insertionOrdinal: number): void {
     this.pendingInitialVisible.delete(drop.id);
@@ -74,22 +74,21 @@ export class MapAssets implements LootCatalogObserver {
 
   /** Cold startup preparation, without observing or revealing the restored rows. */
   primeInitialLoot(): void {
-    const exploration = this.exploration.snapshot();
     this.pendingInitialVisible.clear();
     for (const [id, record] of this.records) {
-      if (this.visible(record.asset, exploration)) {
+      if (this.visible(record.asset)) {
         this.pendingInitialVisible.add(id);
       }
     }
     this.dirtyLoot.clear();
   }
 
-  private visible(asset: MapAsset, exploration: readonly ExplorationTile[]): boolean {
+  private visible(asset: MapAsset): boolean {
     const cell = explorationCellAt(asset.position);
-    return cell !== null && isCellExplored(exploration, cell);
+    return cell !== null && this.exploration.hasCell(cell);
   }
 
-  private reconcileLoot(exploration: readonly ExplorationTile[]): void {
+  private reconcileLoot(): void {
     if (this.pendingInitialVisible.size === 0 && this.dirtyLoot.size === 0) {
       return;
     }
@@ -100,7 +99,7 @@ export class MapAssets implements LootCatalogObserver {
       const previous = this.knownLoot.get(id);
       if (!current) {
         knownChanged = this.knownLoot.delete(id) || knownChanged;
-      } else if (previous || this.visible(current.asset, exploration)) {
+      } else if (previous || this.visible(current.asset)) {
         if (
           previous &&
           previous.ordinal === current.ordinal &&
@@ -129,8 +128,7 @@ export class MapAssets implements LootCatalogObserver {
     pickups: readonly SatellitePickupData[],
     moduleNames: ReadonlyMap<string, string> = new Map()
   ): MapAsset[] {
-    const exploration = this.exploration.snapshot();
-    this.reconcileLoot(exploration);
+    this.reconcileLoot();
     const revealed: MapAsset[] = FURNACES.map((furnace) => ({
       id: `furnace:${furnace.id}`,
       kind: 'furnace',
@@ -158,10 +156,7 @@ export class MapAssets implements LootCatalogObserver {
         position: pickup.position,
         name: pickup.name,
       };
-      if (
-        pickup.state === 'loose' &&
-        (this.knownSatellites.has(id) || this.visible(asset, exploration))
-      ) {
+      if (pickup.state === 'loose' && (this.knownSatellites.has(id) || this.visible(asset))) {
         revealed.push(asset);
         satellites.add(id);
       }

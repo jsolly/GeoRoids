@@ -67,7 +67,11 @@ describe('spiders carry Scout probes', () => {
 
   test('a probe rotates with its spider and scans resources after the spider travels home', () => {
     const manager = new SurveyProbeManager();
-    const spider = spiderAt('spider', 200);
+    const spiders = new TerrainSpiderManager(() => 0.5);
+    const spawned = spiders.spawnSpider({ x: 200, y: 0 });
+    assert.ok(spawned);
+    const spider = spiders.getBody(spawned.id);
+    assert.ok(spider);
     const rock = rockAt('nest-resource', 2000, 100);
     assert.ok(fireProbe(manager, pilot, new AsteroidSpatialIndex([]), 100, [spider]));
     assert.ok(spider.probe);
@@ -79,16 +83,20 @@ describe('spiders carry Scout probes', () => {
     expect(after.y).toBeLessThan(0);
     expect(after).not.toEqual(before);
     const pulses: string[] = [];
-    manager.tick(
-      100 + SURVEY_PROBE.PULSE_MS,
-      () => new AsteroidSpatialIndex([rock]),
-      () => spider,
-      (pulse) => {
-        expect(pulse.position).toEqual(after);
-        expect(pulse.ownerId).toBe(pilot.id);
-        pulses.push(...pulse.asteroids.map((asteroid) => asteroid.id));
-      }
-    );
+    manager.advance(100 + SURVEY_PROBE.PULSE_MS, {
+      rocks: {
+        spatialIndex: () => new AsteroidSpatialIndex([rock]),
+        getAsteroid: () => undefined,
+      },
+      spiders,
+      abilities: {
+        survey: (ownerId, position, asteroids) => {
+          expect(position).toEqual(after);
+          expect(ownerId).toBe(pilot.id);
+          pulses.push(...asteroids.map((asteroid) => asteroid.id));
+        },
+      },
+    });
     expect(pulses).toEqual([rock.id]);
     expect(manager.targetsIn([spider])).toMatchObject([{ hostId: spider.id, position: after }]);
   });
@@ -134,12 +142,17 @@ describe('spiders carry Scout probes', () => {
     ).toBeLessThan(300);
     const ore = rockAt(resource.id, resource.position.x, resource.position.y);
     const revealed: string[] = [];
-    probes.tick(
-      100 + SURVEY_PROBE.PULSE_MS,
-      () => new AsteroidSpatialIndex([ore]),
-      (id) => spiders.getBody(id),
-      (pulse) => revealed.push(...pulse.asteroids.map((rock) => rock.id))
-    );
+    probes.advance(100 + SURVEY_PROBE.PULSE_MS, {
+      rocks: {
+        spatialIndex: () => new AsteroidSpatialIndex([ore]),
+        getAsteroid: () => undefined,
+      },
+      spiders,
+      abilities: {
+        survey: (_ownerId, _position, asteroids) =>
+          revealed.push(...asteroids.map((rock) => rock.id)),
+      },
+    });
     expect(revealed).toContain(ore.id);
   });
 
@@ -175,7 +188,7 @@ describe('spiders carry Scout probes', () => {
     const engine = new GameEngine(42);
     const scout = engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
     for (const rock of engine.getAllAsteroids()) {
-      engine.removeAsteroid(rock.id);
+      engine.asteroidLifecycle.remove(rock.id);
     }
     scout.position = { x: 0, y: 0 };
     scout.angle = 0;
@@ -189,8 +202,8 @@ describe('spiders carry Scout probes', () => {
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.ownerId
     ).toBe(scout.id);
     const now = engine.getServerTime();
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
-    engine.advanceLasersAndResolveHits(now + 1);
+    engine.laserCombat.spawn('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
+    engine.laserCombat.advance(now + 1);
     expect(
       engine.getSpiderField().spiders.find((body) => body.id === spider.id)?.probe?.health
     ).toBe(15);

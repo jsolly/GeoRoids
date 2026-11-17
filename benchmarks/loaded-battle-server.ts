@@ -58,7 +58,7 @@ function sample() {
     towing: players.filter(
       (player) => player.harpoonTargetId && engine.getAsteroid(player.harpoonTargetId)
     ).length,
-    projectiles: engine.getServerLasers().length,
+    projectiles: engine.laserCombat.shots().length,
     towTargets: players.flatMap((player) => {
       const rock = player.harpoonTargetId ? engine.getAsteroid(player.harpoonTargetId) : undefined;
       return rock
@@ -132,7 +132,7 @@ async function command(message: unknown) {
         originalRocks.add(rock.id);
       }
       for (const [index, rock] of rocks.entries()) {
-        engine.updateAsteroid(rock.id, {
+        engine.asteroidLifecycle.update(rock.id, {
           position: { x: 500 + (index % 10) * 150, y: -600 + Math.floor(index / 10) * 170 },
           velocity: { x: 0, y: 0 },
           ...(scene === 'endurance'
@@ -163,7 +163,7 @@ async function command(message: unknown) {
         });
         const rock = index < 10 ? rocks[index] : undefined;
         if (rock) {
-          engine.updateAsteroid(rock.id, {
+          engine.asteroidLifecycle.update(rock.id, {
             position: { x: position.x + (index < 5 ? 150 : -150), y: position.y },
             size: 30,
           });

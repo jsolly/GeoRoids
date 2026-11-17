@@ -3,9 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
+import { AsteroidField } from '../../../server/core/AsteroidField';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
+import { EntityManager } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import { ServerClock } from '../../../server/core/ServerClock';
+import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
 import { fieldRichness, sectorDeposits } from '../../../server/world/depositLayout';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
@@ -15,6 +19,7 @@ import { DEPOSIT_FIELD, ROID } from '../../../shared/constants/gameplay';
 import { sectorAt, WORLD } from '../../../shared/world';
 import type { AsteroidData, Position } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
+import { fireProbe } from '../../support/tool-flight';
 
 const SEED = 82;
 const INTERVAL = DEPOSIT_FIELD.REGROWTH_INTERVAL_MS;
@@ -403,7 +408,7 @@ test('the last pilot leaving writes chip damage that periodic flushes defer', ()
       throw new Error('The field needs an intact metal deposit');
     }
     const home = sectorAt(chipped.position).id;
-    engine.updateAsteroid(chipped.id, { health: chipped.health - 25 });
+    engine.asteroidLifecycle.update(chipped.id, { health: chipped.health - 25 });
     // The next periodic flush is not a drift flush, so the chip would wait.
     engine.checkpointWorld();
     expect(store.loadSector(home)?.find((rock) => rock.id === chipped.id)?.health).toBe(
@@ -422,4 +427,129 @@ test('the last pilot leaving writes chip damage that periodic flushes defer', ()
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+function regionalRuntime() {
+  const rng = new RNGService(SEED);
+  const actors = new EntityManager(rng, () => T0);
+  const rocks = new AsteroidManager(rng);
+  const regional = new RegionalAsteroidField(SEED);
+  const pause = { value: false };
+  const probes = new SurveyProbeManager();
+  const field = new AsteroidField({
+    actors,
+    rocks,
+    regional,
+    probes,
+    isPaused: () => pause.value,
+    now: () => T0,
+  });
+  return { actors, rocks, pause, probes, field };
+}
+
+test('only human rows wake regional deposits, including a disconnected destroyed pilot', () => {
+  const { actors, rocks, field } = regionalRuntime();
+  const humanPosition = { x: 15_000, y: 15_000 };
+  const botPosition = { x: -15_000, y: -15_000 };
+  const humanDeposit = sectorDeposits(SEED, 7, 7)[0];
+  const botDeposit = sectorDeposits(SEED, -8, -8)[0];
+  if (!humanDeposit || !botDeposit) {
+    throw new Error('Both sectors need known deposits');
+  }
+  expect(field.ensure()).toEqual([]);
+  expect(rocks.getAsteroidCount()).toBe(0);
+  actors.addBot('worker', 'worker', botPosition);
+  expect(field.ensure()).toEqual([]);
+  expect(rocks.getAsteroidCount()).toBe(0);
+  const pilot = actors.addPlayer('human', 'Human', undefined, humanPosition);
+  pilot.health = 0;
+  pilot.exploding = true;
+  pilot.respawnTimer = 30;
+  expect(pilot.ws).toBeUndefined();
+  const loaded = field.ensure();
+  expect(loaded.find((row) => row.id === humanDeposit.id)).toEqual(humanDeposit);
+  expect(rocks.getAsteroid(humanDeposit.id)).toBe(loaded.find((row) => row.id === humanDeposit.id));
+  expect(rocks.getAsteroid(botDeposit.id)).toBeUndefined();
+});
+
+test('regional cadence rechecks the live pause and the current human position', () => {
+  const { actors, rocks, pause, field } = regionalRuntime();
+  const pilot = actors.addPlayer('human', 'Human', undefined, { x: 0, y: 0 });
+  field.advanceRegions(59);
+  expect(rocks.getAsteroidCount()).toBe(0);
+  field.advanceRegions(60);
+  const origin = sectorDeposits(SEED, 0, 0)[0];
+  const destination = sectorDeposits(SEED, 7, 7)[0];
+  if (!origin || !destination) {
+    throw new Error('Both sectors need known deposits');
+  }
+  expect(rocks.getAsteroid(origin.id)).toEqual(origin);
+  pilot.position = { x: 15_000, y: 15_000 };
+  pause.value = true;
+  field.advanceRegions(120);
+  expect(rocks.getAsteroid(destination.id)).toBeUndefined();
+  expect(rocks.getAsteroid(origin.id)).toBeDefined();
+  pause.value = false;
+  field.advanceRegions(180);
+  expect(rocks.getAsteroid(destination.id)).toEqual(destination);
+  expect(rocks.getAsteroid(origin.id)).toBeUndefined();
+});
+
+test('the periodic regional wake reaches the final checkpoint in the same full frame', () => {
+  const store = new WorldStore(':memory:');
+  const clock = new ServerClock({ wallNow: () => T0, monotonicNow: () => 0 });
+  const engine = new GameEngine(SEED, clock, new InlineWorldPersistence(store));
+  try {
+    const pilot = engine.addPlayer('traveler', 'Traveler', new RecordingSocket(), { x: 0, y: 0 });
+    pilot.overlayHold = true;
+    const target = sectorDeposits(SEED, 7, 7)[0];
+    if (!target) {
+      throw new Error('Known distant sector needs a deposit');
+    }
+    pilot.position = { x: 15_000, y: 15_000 };
+    for (let frame = 0; frame < 59; frame++) {
+      engine.advanceOneFrame(T0);
+    }
+    expect(engine.getAsteroid(target.id)).toBeUndefined();
+    expect(store.loadSector('7,7')).toBeUndefined();
+    engine.advanceOneFrame(T0);
+    expect(engine.getDiagnostics().gameTime).toBe(60);
+    expect(engine.getAsteroid(target.id)).toEqual(target);
+    expect(store.loadSector('7,7')?.find((row) => row.id === target.id)).toEqual(target);
+  } finally {
+    engine.stopGameLoop();
+    store.close();
+  }
+});
+
+test('a probe left behind by its pilot cannot wake a field with no human rows', () => {
+  const { actors, rocks, probes, field } = regionalRuntime();
+  const pilot = actors.addPlayer(
+    'probe-owner',
+    'Probe owner',
+    undefined,
+    { x: 7_700, y: 7_000 },
+    'scout'
+  );
+  const template = sectorDeposits(SEED, 3, 3)[0];
+  if (!template) {
+    throw new Error('Known sector needs a probe host');
+  }
+  const host = {
+    ...structuredClone(template),
+    id: 'unattended-probe-host',
+    position: { x: 7_900, y: 7_000 },
+  };
+  delete host.phenomenon;
+  rocks.addAsteroid(host);
+  expect(fireProbe(probes, pilot, rocks.spatialIndex(), T0)).not.toBeNull();
+  expect(host.probe?.ownerId).toBe(pilot.id);
+  actors.removeEntity(pilot.id);
+  const neighbor = sectorDeposits(SEED, 4, 3)[0];
+  if (!neighbor) {
+    throw new Error('Neighboring sector needs a deposit');
+  }
+  expect(field.ensure()).toEqual([]);
+  expect(rocks.getAsteroid(neighbor.id)).toBeUndefined();
+  expect(rocks.getAsteroidCount()).toBe(1);
 });

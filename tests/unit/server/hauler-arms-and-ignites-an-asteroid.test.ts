@@ -57,7 +57,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
       offsets: [1, 1, 1, 1],
       material: 'metal',
     };
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     world.entity(alice).angle = 0;
     equip(alice, 'boost_coupling');
     equip(bob, 'boost_coupling');
@@ -95,7 +95,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     activate(alice);
     activate(alice);
     world.entity(alice).spawnProtectionTimer = 0;
-    expect(world.engine.handleShipDamage(alice.id, 'ricochet', 1000).isDestroyed).toBe(true);
+    expect(world.engine.shipDamage.apply(alice.id, 'ricochet', 1000).isDestroyed).toBe(true);
     expect(rock.boost?.phase).toBe('burning');
     step(1);
     expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(ASTEROID_BOOST.acceleration);
@@ -139,7 +139,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     const bobActor = world.entity(bob);
     equip(bob, 'tow_cable');
     const towed = { ...rock, id: 'other-cargo', boost: null, position: { x: 0, y: 250 } };
-    world.engine.addAsteroid(towed);
+    world.engine.asteroidLifecycle.insert(towed);
     bobActor.angle = Math.atan2(
       bobActor.position.y - towed.position.y,
       towed.position.x - bobActor.position.x
@@ -150,7 +150,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     bobActor.spawnProtectionTimer = 0;
     towed.position = { ...rock.position };
     const health = bobActor.health;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
     expect(bobActor.health).toBe(health);
     expect(world.engine.getAsteroid(towed.id)).toBe(towed);
     expect(world.engine.getAsteroid(rock.id)).toBe(rock);
@@ -160,14 +160,14 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     activate(alice);
     activate(alice);
     const original = structuredClone(rock);
-    expect(world.engine.applyLaserAsteroidHit(rock.id, bob.id).outcome).toBe('ignored');
+    expect(world.engine.asteroidMining.apply(rock.id, bob.id).outcome).toBe('ignored');
     const scout = world.join('Scout', { x: 150, y: 0 });
     world.engine.useAbility(scout.id);
     expect(rock).toEqual(original);
-    const laser = world.engine.spawnLaser(bob.id, { x: 100, y: 0 }, { x: 8, y: 0 });
+    const laser = world.engine.laserCombat.spawn(bob.id, { x: 100, y: 0 }, { x: 8, y: 0 });
     expect(laser).toBeTruthy();
     for (let frame = 0; frame < 15; frame++) {
-      expect(world.engine.advanceLasersAndResolveHits()).toEqual([]);
+      expect(world.engine.laserCombat.advance()).toEqual([]);
     }
     expect(laser?.hasExploded).toBe(false);
     expect(laser?.position.x).toBeGreaterThan(rock.position.x + rock.size);
@@ -182,24 +182,24 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     const before = world.entity(alice).score;
     const points = furnaceReward(rock);
     rock.position = { x: furnace.position.x + furnace.radius + 1, y: furnace.position.y };
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
     expect(world.engine.getAsteroid(rock.id)).toBe(rock);
     expect(world.entity(alice).score).toBe(before);
-    expect(world.engine.drainFurnaceDeliveries()).toEqual([]);
+    expect(world.engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
 
     rock.position.x = furnace.position.x + furnace.radius;
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
     expect(world.entity(alice).score).toBe(before + points);
-    const deliveries = world.engine.drainFurnaceDeliveries();
+    const deliveries = world.engine.furnaceDeliveries.drainDeliveries();
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0]).toMatchObject({
       furnaceId: furnace.id,
       asteroidId: rock.id,
       rewards: [{ playerId: alice.id, points }],
     });
-    world.engine.processFurnaceDeliveries();
-    expect(world.engine.drainFurnaceDeliveries()).toEqual([]);
+    world.engine.furnaceDeliveries.advance();
+    expect(world.engine.furnaceDeliveries.drainDeliveries()).toEqual([]);
     expect(world.entity(alice).score).toBe(before + points);
   });
 
@@ -213,7 +213,7 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
       world.entity(bob).harpoonLatchPos = { ...rock.position };
       world.entity(bob).tapExtractFrames = 999;
       const velocity = { ...rock.velocity };
-      world.engine.tickAbilities();
+      world.engine.abilities.advance();
       expect(world.entity(bob).harpoonTargetId).toBeNull();
       expect(rock.velocity).toEqual(velocity);
       expect(world.engine.getLoot()).toEqual([]);

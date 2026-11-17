@@ -1,0 +1,11 @@
+{
+  "Statement": [
+    { "Effect": "Allow", "Principal": "*", "Action": "Update:*", "Resource": "*" },
+    {
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["Update:Replace", "Update:Delete"],
+      "Resource": ["LogicalResourceId/WorldBackups", "LogicalResourceId/WorldBackupPolicy"]
+    }
+  ]
+}

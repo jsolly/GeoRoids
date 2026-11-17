@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { readBitmapBudget } from '../../../src/rendering/bitmapBudget';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 const pending: FrameRequestCallback[] = [];
@@ -30,7 +31,9 @@ test('repeated viewport notifications keep the current picture until dimensions 
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
   document.body.append(canvas);
+  const before = readBitmapBudget().liveBytes;
   canvasManager.initialize(document.querySelector<HTMLCanvasElement>('#gameCanvas'));
+  expect(readBitmapBudget().liveBytes).toBe(before + canvas.width * canvas.height * 4);
   const context = canvasManager.requireContext();
   context.fillStyle = '#ff0000';
   context.fillRect(0, 0, 10, 10);
@@ -48,4 +51,7 @@ test('repeated viewport notifications keep the current picture until dimensions 
   expect(canvas.height).toBe(390);
   expect(context.imageSmoothingEnabled).toBe(true);
   expect(context.imageSmoothingQuality).toBe('high');
+  expect(readBitmapBudget().liveBytes).toBe(before + 844 * 390 * 4);
+  canvasManager.destroy();
+  expect(readBitmapBudget().liveBytes).toBe(before);
 });

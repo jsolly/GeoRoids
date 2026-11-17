@@ -5,8 +5,9 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
+import { SettlementLedger } from '../../../server/core/SettlementLedger';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { SHIP } from '../../../shared/constants/gameplay';
+import { DAMAGE, SHIP } from '../../../shared/constants/gameplay';
 import {
   advanceSettlement,
   ECONOMY,
@@ -16,6 +17,7 @@ import {
 } from '../../../shared/economy';
 import { civicLot, TOWN_HEARTH, TOWN_SPAWN_RADIUS } from '../../../shared/furnaces';
 import { hullRadiusForKit } from '../../../shared/shipKits';
+import { TOWN_STORE_ISSUE } from '../../../shared/townStore';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -67,7 +69,7 @@ test('death repeatedly discards cargo, preserves the bank, and always respawns',
     actor.cargo = 90;
     actor.spawnProtectionTimer = 0;
     const beforeDeath = engine.getLoot();
-    engine.handleShipDamage(
+    engine.shipDamage.apply(
       actor.id,
       'boundary',
       actor.health + actor.cargo / ECONOMY.cargoPointsPerHp
@@ -102,35 +104,35 @@ test.each(['scout', 'hauler'] as const)(
     actor.cargo = 400;
     actor.position = { x: rim + 1, y: 0 };
     for (let frame = 0; frame < ECONOMY.offloadIntervalFrames; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.score).toBe(0);
     actor.position = { x: rim - 1, y: 0 };
     for (let frame = 0; frame < ECONOMY.offloadIntervalFrames - 1; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.cargo).toBe(400);
-    engine.depositCargo();
+    engine.cargoOffload.advance();
     expect(actor.score).toBe(25);
     expect(actor.bankedCargo).toBe(25);
     expect(actor.cargo).toBe(375);
     actor.position = { x: 1000, y: 1000 };
     for (let frame = 0; frame < 60; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.cargo).toBe(375);
     actor.position = { ...TOWN_HEARTH.position };
     for (let frame = 0; frame < 15 * ECONOMY.offloadIntervalFrames; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
-    engine.depositCargo();
+    engine.cargoOffload.advance();
     expect(actor.score).toBe(400);
     expect(actor.cargo).toBe(0);
     expect(engine.getGameState().settlement.points).toBe(400);
     actor.cargo = 30;
     actor.health = 0;
     for (let frame = 0; frame < 60; frame++) {
-      engine.depositCargo();
+      engine.cargoOffload.advance();
     }
     expect(actor.cargo).toBe(30);
   }
@@ -142,20 +144,20 @@ test('offload waits for a fresh full pulse after interruption and rejects inacti
   actor.cargo = 28;
   actor.position = { ...TOWN_HEARTH.position };
   for (let frame = 0; frame < 11; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   actor.exploding = true;
-  engine.depositCargo();
+  engine.cargoOffload.advance();
   actor.exploding = false;
   for (let frame = 0; frame < 11; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(28);
-  engine.depositCargo();
+  engine.cargoOffload.advance();
   expect(actor.cargo).toBe(3);
   actor.respawnTimer = 5;
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(3);
   delete actor.respawnTimer;
@@ -166,7 +168,7 @@ test('offload waits for a fresh full pulse after interruption and rejects inacti
     durationMs: 1000,
   };
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(3);
   actor.furnaceTransit = null;
@@ -176,16 +178,235 @@ test('offload waits for a fresh full pulse after interruption and rejects inacti
   }
   actor.position = { ...dark.position };
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(3);
   actor.position = { ...TOWN_HEARTH.position };
   for (let frame = 0; frame < 12; frame++) {
-    engine.depositCargo();
+    engine.cargoOffload.advance();
   }
   expect(actor.cargo).toBe(0);
   expect(actor.bankedCargo).toBe(28);
   expect(engine.getGameState().settlement.points).toBe(28);
+});
+
+test('full frames bank exact pulses while the smaller combat-only frame leaves the cadence alone', () => {
+  const engine = new GameEngine(42);
+  try {
+    const { actor } = pilot(engine);
+    engine.createAsteroids(0);
+    actor.position = { ...TOWN_HEARTH.position };
+    actor.cargo = 28;
+    for (let frame = 0; frame < 11; frame++) {
+      engine.advanceOneFrame();
+    }
+    expect(actor.cargo).toBe(28);
+    expect(actor.score).toBe(0);
+    for (let frame = 0; frame < 20; frame++) {
+      engine.advanceCombatFrame();
+    }
+    expect(actor.cargo).toBe(28);
+    expect(actor.bankedCargo ?? 0).toBe(0);
+    expect(engine.getGameState().settlement.points).toBe(0);
+    engine.advanceOneFrame();
+    expect(actor.cargo).toBe(3);
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    expect(engine.getGameState().settlement.points).toBe(25);
+    for (let frame = 0; frame < 12; frame++) {
+      engine.advanceOneFrame();
+    }
+    expect(actor.cargo).toBe(0);
+    expect(actor.score).toBe(28);
+    expect(actor.bankedCargo).toBe(28);
+    expect(engine.getGameState().settlement.points).toBe(28);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test.each(['death', 'separation'] as const)(
+  'full-frame %s resolves before a due cargo pulse',
+  (outcome) => {
+    const engine = new GameEngine(42);
+    try {
+      const { actor } = pilot(engine);
+      engine.createAsteroids(0);
+      const rim = TOWN_HEARTH.radius + hullRadiusForKit(actor.kitId);
+      actor.position = { x: rim - 1, y: 0 };
+      actor.velocity = { x: 0, y: 0 };
+      actor.cargo = outcome === 'death' ? 1 : 400;
+      if (outcome === 'death') {
+        actor.health = 1;
+      }
+      for (let frame = 0; frame < 11; frame++) {
+        engine.cargoOffload.advance();
+      }
+      const impact = rock('banking-impact', null, outcome === 'death' ? 25 : 500);
+      impact.position = { x: actor.position.x - 1, y: 0 };
+      engine.asteroidLifecycle.insert(impact);
+
+      engine.advanceOneFrame();
+
+      expect(actor.score).toBe(0);
+      expect(actor.bankedCargo ?? 0).toBe(0);
+      expect(engine.getGameState().settlement.points).toBe(0);
+      if (outcome === 'death') {
+        expect(actor.health).toBe(0);
+        expect(actor.cargo).toBe(0);
+      } else {
+        expect(engine.getAsteroid(impact.id)).toBeDefined();
+        expect(actor.health).toBe(actor.maxHealth);
+        expect(actor.position.x).toBeGreaterThan(rim);
+        expect(actor.cargo).toBe(400 - DAMAGE.ASTEROID_COLLISION * ECONOMY.cargoPointsPerHp);
+        actor.position = { ...TOWN_HEARTH.position };
+        for (let frame = 0; frame < 11; frame++) {
+          engine.cargoOffload.advance();
+        }
+        expect(actor.score).toBe(0);
+        engine.cargoOffload.advance();
+        expect(actor.score).toBe(25);
+      }
+    } finally {
+      engine.stopGameLoop();
+    }
+  }
+);
+
+test.each(['health', 'explosion', 'respawn', 'empty', 'transit', 'outside'] as const)(
+  '%s interruption retires the prior eleven eligible cargo steps',
+  (interruption) => {
+    const engine = new GameEngine(42);
+    try {
+      const { actor } = pilot(engine);
+      actor.position = { ...TOWN_HEARTH.position };
+      actor.cargo = 28;
+      for (let frame = 0; frame < 11; frame++) {
+        engine.cargoOffload.advance();
+      }
+      switch (interruption) {
+        case 'health':
+          actor.health = 0;
+          break;
+        case 'explosion':
+          actor.exploding = true;
+          break;
+        case 'respawn':
+          actor.respawnTimer = 0;
+          break;
+        case 'empty':
+          actor.cargo = 0;
+          break;
+        case 'transit':
+          actor.furnaceTransit = {
+            sourceId: TOWN_HEARTH.id,
+            destinationId: 'street-1-0',
+            startedAt: 0,
+            durationMs: 1000,
+          };
+          break;
+        case 'outside':
+          actor.position = { x: 1000, y: 1000 };
+          break;
+        default: {
+          const exhaustive: never = interruption;
+          throw new Error(`Unknown cargo interruption: ${exhaustive}`);
+        }
+      }
+      engine.cargoOffload.advance();
+      actor.health = actor.maxHealth;
+      actor.exploding = false;
+      delete actor.respawnTimer;
+      actor.cargo = 28;
+      actor.furnaceTransit = null;
+      actor.position = { ...TOWN_HEARTH.position };
+      for (let frame = 0; frame < 11; frame++) {
+        engine.cargoOffload.advance();
+      }
+      expect(actor.cargo).toBe(28);
+      expect(actor.score).toBe(0);
+      expect(actor.bankedCargo ?? 0).toBe(0);
+      engine.cargoOffload.advance();
+      expect(actor.cargo).toBe(3);
+      expect(actor.score).toBe(25);
+      expect(actor.bankedCargo).toBe(25);
+      expect(engine.getGameState().settlement.points).toBe(25);
+    } finally {
+      engine.stopGameLoop();
+    }
+  }
+);
+
+test('moving between two lit furnaces begins a fresh cargo pulse', () => {
+  const engine = new GameEngine(42);
+  try {
+    const { actor } = pilot(engine);
+    const outer = civicLot('street-1-0');
+    if (!outer) {
+      throw new Error('Missing outer furnace');
+    }
+    actor.position = { ...outer.position };
+    actor.score = outer.cost;
+    actor.abilityCooldownFrames = 0;
+    expect(engine.useAbility(actor.id)).toBe(true);
+    actor.cargo = 28;
+    actor.position = { ...TOWN_HEARTH.position };
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    actor.position = { ...outer.position };
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    expect(actor.cargo).toBe(28);
+    expect(actor.score).toBe(0);
+    engine.cargoOffload.advance();
+    expect(actor.cargo).toBe(3);
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    expect(engine.getGameState().settlement.points).toBe(25);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test('diagnostic clearing keeps retained-actor cadence while full replacement cannot inherit it', () => {
+  const engine = new GameEngine(42);
+  try {
+    const { actor } = pilot(engine);
+    actor.position = { ...TOWN_HEARTH.position };
+    actor.cargo = 28;
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    engine.prepareDiagnosticWorld('combat');
+    expect(engine.getPlayer(actor.id)).toBe(actor);
+    engine.cargoOffload.advance();
+    expect(actor.cargo).toBe(3);
+    expect(actor.score).toBe(25);
+    expect(actor.bankedCargo).toBe(25);
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    engine.resetForTesting();
+    const replacement = pilot(engine, actor.id).actor;
+    expect(replacement).not.toBe(actor);
+    replacement.position = { ...TOWN_HEARTH.position };
+    replacement.cargo = 28;
+    for (let frame = 0; frame < 11; frame++) {
+      engine.cargoOffload.advance();
+    }
+    expect(replacement.cargo).toBe(28);
+    expect(replacement.score).toBe(0);
+    expect(actor.cargo).toBe(3);
+    engine.cargoOffload.advance();
+    expect(replacement.cargo).toBe(3);
+    expect(replacement.score).toBe(25);
+    expect(replacement.bankedCargo).toBe(25);
+    expect(engine.getGameState().settlement.points).toBe(25);
+  } finally {
+    engine.stopGameLoop();
+  }
 });
 
 test('points wait for every material and all excess survives multi-tier advancement', () => {
@@ -193,12 +414,25 @@ test('points wait for every material and all excess survives multi-tier advancem
   state.points = 7000;
   state.resources = { ice: 140, metal: 200, rubble: 250, crystal: 0 };
   expect(advanceSettlement(state).level).toBe(1);
-  state.resources.crystal = 70;
-  expect(advanceSettlement(state)).toEqual({
+  const ledger = new SettlementLedger(state);
+  expect(ledger.current()).toBe(state);
+  ledger.addPoints(0);
+  const afterPoints = ledger.current();
+  expect(afterPoints).not.toBe(state);
+  expect(afterPoints).toEqual(state);
+  ledger.addOre(null, 0);
+  const beforeCrystal = ledger.current();
+  expect(beforeCrystal).not.toBe(afterPoints);
+  expect(beforeCrystal.resources).not.toBe(afterPoints.resources);
+  expect(beforeCrystal).toEqual(state);
+  ledger.addOre('crystal', 70);
+  expect(ledger.current()).toEqual({
     level: 3,
     points: 1000,
     resources: { ice: 20, metal: 20, rubble: 10, crystal: 10 },
   });
+  expect(state.resources.crystal).toBe(0);
+  expect(beforeCrystal.resources.crystal).toBe(0);
 });
 
 test('refining counts ore once and banks both the hauler and scout rewards', () => {
@@ -208,17 +442,17 @@ test('refining counts ore once and banks both the hauler and scout rewards', () 
   const ore = rock('ore', 'crystal');
   ore.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
   ore.surveyedBy = [scout.id, scout.id];
-  engine.addAsteroid(ore);
-  engine.processFurnaceDeliveries();
-  engine.processFurnaceDeliveries();
+  engine.asteroidLifecycle.insert(ore);
+  engine.furnaceDeliveries.advance();
+  engine.furnaceDeliveries.advance();
   expect(engine.getGameState().settlement.resources.crystal).toBe(10);
   expect(hauler.score).toBe(600);
   expect(scout.score).toBe(600);
   expect(engine.getGameState().settlement.points).toBe(1200);
   const barren = rock('barren', null);
   barren.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
-  engine.addAsteroid(barren);
-  engine.processFurnaceDeliveries();
+  engine.asteroidLifecycle.insert(barren);
+  engine.furnaceDeliveries.advance();
   expect(engine.getGameState().settlement.resources).toEqual({
     ice: 0,
     metal: 0,
@@ -236,9 +470,9 @@ test('most old rocks are barren and breaking mineral rocks sacrifices harvest wh
   const engine = new GameEngine(42);
   const ore = rock('large-ore', 'metal', 500);
   ore.surveyedBy = ['scout'];
-  engine.addAsteroid(ore);
+  engine.asteroidLifecycle.insert(ore);
   ore.health = 0;
-  const result = engine.handleAsteroidHit(ore.id, 'scout', 'laser');
+  const result = engine.asteroidMining.hit(ore.id, 'scout', 'laser');
   expect(result.newAsteroids.length).toBeGreaterThan(0);
   expect(
     result.newAsteroids.every(
@@ -274,16 +508,20 @@ test('dummy purchases enforce bank, level, proximity and socket ownership withou
   const engine = new GameEngine(42);
   const { actor, socket } = pilot(engine);
   actor.score = 500;
-  expect(engine.buyStoreItem(actor.id, 'placeholder-1')).toContain('Town Square');
+  expect(engine.civicTransactions.buy(actor.id, 'placeholder-1')).toContain('Town Square');
   actor.position = { x: 0, y: 0 };
-  expect(engine.buyStoreItem(actor.id, 'placeholder-2')).toContain('level 2');
+  expect(engine.civicTransactions.buy(actor.id, 'placeholder-2')).toContain('level 2');
   const broadcaster = new GameStateBroadcaster(engine);
   broadcaster.negotiateSnapshot(socket);
   const handler = new MessageHandler(engine, broadcaster);
   const stranger = pilot(engine, 'stranger').socket;
   broadcaster.negotiateSnapshot(stranger);
   const command = { type: 'buyStoreItem', id: actor.id, data: { offerId: 'placeholder-1' } };
+  socket.clear();
+  stranger.clear();
   handler.handleMessage(command, stranger);
+  expect(socket.inbox).toEqual([]);
+  expect(stranger.inbox).toEqual([]);
   expect(actor.score).toBe(500);
   const before = {
     health: actor.health,
@@ -293,7 +531,19 @@ test('dummy purchases enforce bank, level, proximity and socket ownership withou
     kitId: actor.kitId,
   };
   handler.handleMessage(command, socket);
+  expect(socket.inbox.map((message) => message.type)).toEqual(['townStoreResult', 'snapshot']);
+  expect(socket.lastReceived('townStoreResult')?.data).toEqual({
+    message: 'Placeholder A purchased. No upgrade granted.',
+    score: 400,
+    purchases: ['placeholder-1'],
+  });
+  socket.clear();
   handler.handleMessage(command, socket);
+  expect(socket.inbox.map((message) => message.type)).toEqual(['townStoreResult']);
+  expect(socket.lastReceived('townStoreResult')?.data).toEqual({
+    message: 'Already purchased. This placeholder grants no upgrade.',
+  });
+  expect(stranger.received('snapshot')).toHaveLength(1);
   expect(actor.score).toBe(400);
   expect(actor.purchases).toEqual(['placeholder-1']);
   expect(engine.getPlayer(actor.id)).toBe(actor);
@@ -306,7 +556,7 @@ test('a long absence and a smaller kit preserve cargo at its field position with
   vi.setSystemTime(1000000);
   const engine = new GameEngine(42);
   const { actor, socket } = pilot(engine, 'hauler', 'hauler');
-  const registration = engine.registerPilot(actor, socket);
+  const registration = engine.pilotSessions.register({ actor: actor, socket: socket });
   if (!registration.ok) {
     throw new Error('Registration failed');
   }
@@ -314,7 +564,11 @@ test('a long absence and a smaller kit preserve cargo at its field position with
   actor.score = 70;
   engine.removePlayer(actor.id);
   vi.advanceTimersByTime(60000);
-  const resumed = engine.resumePilot(registration.resumeToken, new RecordingSocket(), 'scout');
+  const resumed = engine.pilotSessions.resume({
+    token: registration.resumeToken,
+    socket: new RecordingSocket(),
+    requestedKit: 'scout',
+  });
   if (!resumed.ok) {
     throw new Error('Resume failed');
   }
@@ -327,4 +581,118 @@ test('a long absence and a smaller kit preserve cargo at its field position with
       .filter((drop) => drop.kind === 'points')
       .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
   ).toBe(0);
+});
+
+test('a failed purchase capture reports an error after spending and adding the receipt', () => {
+  const engine = new GameEngine(42);
+  const { actor, socket } = pilot(engine);
+  actor.position = { x: 0, y: 0 };
+  actor.score = 500;
+  const registered = engine.pilotSessions.register({ actor, socket });
+  if (!registered.ok) {
+    throw new Error('Pilot registration failed');
+  }
+  const broadcaster = new GameStateBroadcaster(engine);
+  broadcaster.negotiateSnapshot(socket);
+  const handler = new MessageHandler(engine, broadcaster);
+  const failure = new Error('Purchase capture failed');
+  const capture = vi.spyOn(engine.pilotLedger, 'capture').mockImplementation(() => {
+    throw failure;
+  });
+  try {
+    handler.handleMessage(
+      { type: 'buyStoreItem', id: actor.id, data: { offerId: 'placeholder-1' } },
+      socket
+    );
+    expect(actor.score).toBe(400);
+    expect(actor.purchases).toEqual(['placeholder-1']);
+    expect(engine.pilotLedger.saved(actor.id)?.score).toBe(500);
+    expect(engine.pilotLedger.saved(actor.id)?.purchases).toEqual([]);
+    expect(socket.inbox.map((message) => message.type)).toEqual(['error']);
+    expect(socket.lastReceived('error')?.data).toBe('Internal server error');
+  } finally {
+    capture.mockRestore();
+    broadcaster.stopPeriodicBroadcast();
+  }
+});
+
+test.each(['dead', 'exploding', 'respawning', 'travelling', 'paused'])(
+  'the store refuses a %s pilot without spending or adding a receipt',
+  (state) => {
+    const engine = new GameEngine(42);
+    if (state === 'paused') {
+      engine.resetForTesting();
+    }
+    const actor =
+      state === 'paused'
+        ? engine.entityManager.addPlayer(
+            'paused',
+            'Paused',
+            new RecordingSocket(),
+            { x: 0, y: 0 },
+            'scout'
+          )
+        : pilot(engine).actor;
+    actor.position = { x: 0, y: 0 };
+    actor.score = 500;
+    if (state === 'dead') {
+      actor.health = 0;
+    } else if (state === 'exploding') {
+      actor.exploding = true;
+    } else if (state === 'respawning') {
+      actor.respawnTimer = 1;
+    } else if (state === 'travelling') {
+      const destination = civicLot('street-1-0');
+      if (!destination) {
+        throw new Error('Missing furnace lot');
+      }
+      engine.furnaces.light(destination.id, actor.name, actor.id);
+      expect(engine.furnaceTravel.start(actor.id, destination.id)).toBeUndefined();
+      expect(actor.furnaceTransit?.destinationId).toBe(destination.id);
+    } else {
+      expect(engine.isGamePaused()).toBe(true);
+    }
+    expect(engine.civicTransactions.buy(actor.id, 'placeholder-1')).toBe(TOWN_STORE_ISSUE.CLOSED);
+    expect(actor.score).toBe(500);
+    expect(actor.purchases).toEqual([]);
+  }
+);
+
+test('a refused purchase leaves a real pickup notification queued for the next broadcast', () => {
+  const engine = new GameEngine(42);
+  const { actor, socket } = pilot(engine);
+  actor.position = { x: 0, y: 0 };
+  actor.score = 500;
+  const broadcaster = new GameStateBroadcaster(engine);
+  broadcaster.negotiateSnapshot(socket);
+  const handler = new MessageHandler(engine, broadcaster);
+  const command = { type: 'buyStoreItem', id: actor.id, data: { offerId: 'placeholder-1' } };
+  try {
+    handler.handleMessage(command, socket);
+    expect(actor.score).toBe(400);
+    socket.clear();
+    const pickup = engine.dropEquipmentAt(actor.position, 'survey_probe');
+    engine.lootCollection.collect();
+    expect(actor.equipment).toContain('survey_probe');
+    expect(socket.inbox).toEqual([]);
+    handler.handleMessage(command, socket);
+    expect(actor.score).toBe(400);
+    expect(actor.purchases).toEqual(['placeholder-1']);
+    expect(socket.inbox.map((message) => message.type)).toEqual(['townStoreResult']);
+    expect(socket.lastReceived('townStoreResult')?.data).toEqual({
+      message: 'Already purchased. This placeholder grants no upgrade.',
+    });
+    broadcaster.broadcastGameState();
+    expect(socket.received('lootCollected')).toHaveLength(1);
+    expect(socket.lastReceived('lootCollected')?.data).toEqual(
+      expect.objectContaining({
+        lootId: pickup.id,
+        collectorId: actor.id,
+        kind: 'survey_probe',
+        position: { x: 0, y: 0 },
+      })
+    );
+  } finally {
+    broadcaster.stopPeriodicBroadcast();
+  }
 });

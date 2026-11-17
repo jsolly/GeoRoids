@@ -23,7 +23,7 @@ function crew() {
   shooter.spawnProtectionTimer = 0;
   teammate.spawnProtectionTimer = 0;
   for (const fieldRock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(fieldRock.id);
+    engine.asteroidLifecycle.remove(fieldRock.id);
   }
   return { engine, shooter, teammate };
 }
@@ -49,17 +49,21 @@ test('a pilot cannot inject an inward laser from beyond the world wall', () => {
   const { engine, shooter } = crew();
   shooter.position = { x: WORLD.radius - 30, y: 0 };
   expect(
-    engine.spawnPlayerLaser(shooter.id, { x: WORLD.radius + 1, y: 0 }, { x: -3, y: 0 })
+    engine.laserCombat.spawnPlayer(shooter.id, { x: WORLD.radius + 1, y: 0 }, { x: -3, y: 0 })
   ).toBeNull();
-  expect(engine.getServerLasers()).toEqual([]);
+  expect(engine.laserCombat.shots()).toEqual([]);
 });
 
 test('a muzzle exactly on the wall still fires a reflected shot into the world', () => {
   const { engine, shooter } = crew();
   shooter.position = { x: WORLD.radius - 30, y: 0 };
-  const shot = engine.spawnPlayerLaser(shooter.id, { x: WORLD.radius, y: 0 }, { x: 3, y: 0 });
+  const shot = engine.laserCombat.spawnPlayer(
+    shooter.id,
+    { x: WORLD.radius, y: 0 },
+    { x: 3, y: 0 }
+  );
   assert(shot);
-  engine.advanceLasersAndResolveHits();
+  engine.laserCombat.advance();
   expect(shot.bounces).toBe(1);
   expect(shot.velocity.x).toBe(-3);
   expect(shot.position.x).toBeLessThan(WORLD.radius);
@@ -79,13 +83,17 @@ test('a wall ricochet damages the crew hull it meets and is consumed', () => {
     purchases: teammate.purchases,
     score: teammate.score,
   };
-  const shot = engine.spawnLaser(shooter.id, { x: WORLD.radius - 10, y: 0 }, { x: 100, y: 0 });
+  const shot = engine.laserCombat.spawn(
+    shooter.id,
+    { x: WORLD.radius - 10, y: 0 },
+    { x: 100, y: 0 }
+  );
   assert(shot);
-  expect(engine.advanceLasersAndResolveHits()).toEqual([]);
-  engine.resolveAuthoritativeCombat();
+  expect(engine.laserCombat.advance()).toEqual([]);
+  engine.contactCombat.advance();
   expect(shot.bounces).toBe(1);
   expect(shot.hasExploded).toBe(true);
-  expect(engine.getServerLasers()).toEqual([]);
+  expect(engine.laserCombat.shots()).toEqual([]);
   expect(teammate.health).toBe(beforeTeammate.health - DAMAGE.LASER_HIT);
   expect(teammate.score).toBe(beforeTeammate.score);
   expect({
@@ -96,33 +104,80 @@ test('a wall ricochet damages the crew hull it meets and is consumed', () => {
   }).toEqual(beforeShooter);
 });
 
+test('a throwing ricochet sink sees an exploded registered shot which the next advance removes without another hit', () => {
+  const { engine, shooter, teammate } = crew();
+  engine.laserCombat.observeFixtureShots('test', [shooter.id]);
+  const shot = engine.laserCombat.spawn(
+    shooter.id,
+    { x: WORLD.radius - 10, y: 0 },
+    { x: 100, y: 0 }
+  );
+  assert(shot);
+  const healthBefore = teammate.health;
+  const failure = new Error('ricochet delivery failed');
+  const targets: string[] = [];
+  engine.contactCombat.setSink((result) => {
+    targets.push(result.targetId);
+    expect(shot.hasExploded).toBe(true);
+    expect(engine.laserCombat.shots()).toContain(shot);
+    expect(teammate.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    throw failure;
+  });
+
+  assert.throws(
+    () => engine.laserCombat.advance(),
+    (error) => error === failure
+  );
+
+  expect(targets).toEqual([teammate.id]);
+  expect(shot.hasExploded).toBe(true);
+  expect(engine.laserCombat.shots()).toEqual([shot]);
+  expect(
+    engine.laserCombat
+      .getFixtureCombatEvidence()
+      .events.filter((event) => event.kind === 'terminal')
+  ).toEqual([]);
+  expect(engine.laserCombat.advance()).toEqual([]);
+  expect(engine.laserCombat.shots()).toEqual([]);
+  expect(teammate.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+  expect(
+    engine.laserCombat
+      .getFixtureCombatEvidence()
+      .events.filter((event) => event.kind === 'terminal')
+  ).toMatchObject([{ projectileId: shot.id, reason: 'already-exploded', targetId: null }]);
+});
+
 test('a reflected crew shot mines the asteroid on its returning path exactly once', () => {
   const { engine, shooter, teammate } = crew();
   teammate.position.y = 300;
   const target = rock('returning-path', WORLD.radius - 70);
-  engine.addAsteroid(target);
-  assert(engine.spawnLaser(shooter.id, { x: WORLD.radius - 10, y: 0 }, { x: 100, y: 0 }));
-  const hits = engine.advanceLasersAndResolveHits();
+  engine.asteroidLifecycle.insert(target);
+  assert(engine.laserCombat.spawn(shooter.id, { x: WORLD.radius - 10, y: 0 }, { x: 100, y: 0 }));
+  const hits = engine.laserCombat.advance();
   expect(hits).toHaveLength(1);
   expect(hits[0]?.asteroidId).toBe(target.id);
   expect(engine.getAsteroid(target.id)).toBeUndefined();
-  expect(engine.getServerLasers()).toHaveLength(0);
+  expect(engine.laserCombat.shots()).toHaveLength(0);
   const score = shooter.score;
   expect(score).toBe(0);
   expect(engine.getLoot().some((drop) => drop.kind === 'points' && (drop.points ?? 0) > 0)).toBe(
     true
   );
-  expect(engine.advanceLasersAndResolveHits()).toEqual([]);
+  expect(engine.laserCombat.advance()).toEqual([]);
   expect(shooter.score).toBe(score);
 });
 
 test('an asteroid before the wall absorbs the shot before any boundary reflection', () => {
   const { engine, shooter } = crew();
   const target = rock('outgoing-path', WORLD.radius - 50);
-  engine.addAsteroid(target);
-  const shot = engine.spawnLaser(shooter.id, { x: WORLD.radius - 100, y: 0 }, { x: 120, y: 0 });
+  engine.asteroidLifecycle.insert(target);
+  const shot = engine.laserCombat.spawn(
+    shooter.id,
+    { x: WORLD.radius - 100, y: 0 },
+    { x: 120, y: 0 }
+  );
   assert(shot);
-  expect(engine.advanceLasersAndResolveHits()[0]?.asteroidId).toBe(target.id);
+  expect(engine.laserCombat.advance()[0]?.asteroidId).toBe(target.id);
   expect(shot.bounces).toBe(0);
 });
 
@@ -136,10 +191,10 @@ test.each(['scout', 'hauler'] as const)(
     shooter.health = 400;
     shooter.position = { x: WORLD.radius - 1, y: 0 };
     expect(
-      engine.resolveAuthoritativeCombat().find((hit) => hit.targetId === shooter.id)?.isDestroyed
+      engine.contactCombat.advance().find((hit) => hit.targetId === shooter.id)?.isDestroyed
     ).toBe(true);
     expect(shooter.health).toBe(0);
     expect(shooter.deathCause).toBe('boundary');
-    engine.resolveAuthoritativeCombat();
+    engine.contactCombat.advance();
   }
 );

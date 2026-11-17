@@ -12,6 +12,7 @@ import {
 } from '../entities/ship/hullOutlines';
 import { strokeKitHullOutline } from '../entities/ship/shipRenderer';
 import { hexToRgba } from '../utils/colorUtils';
+import { releaseBitmap, resizeBitmap } from './bitmapBudget';
 
 export interface SchematicSelection {
   readonly kitId: ShipKitId;
@@ -50,12 +51,7 @@ function resizeCanvas(canvas: HTMLCanvasElement, fallbackW: number, fallbackH: n
   const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   const backingWidth = Math.round(width * dpr);
   const backingHeight = Math.round(height * dpr);
-  if (canvas.width !== backingWidth) {
-    canvas.width = backingWidth;
-  }
-  if (canvas.height !== backingHeight) {
-    canvas.height = backingHeight;
-  }
+  resizeBitmap(canvas, backingWidth, backingHeight, 'schematic');
 }
 
 function strokePolyline(
@@ -491,6 +487,8 @@ export function mountShipSchematicCanvases(
     scope.abort();
     reducedMotion.removeEventListener('change', refresh);
     observer?.disconnect();
+    releaseBitmap(hull);
+    releaseBitmap(tool);
   };
   try {
     document.addEventListener('visibilitychange', refresh, { signal: scope.signal });

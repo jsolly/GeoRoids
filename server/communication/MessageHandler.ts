@@ -8,8 +8,9 @@ import { getShipKit } from '../../shared/shipKits';
 import { ASTEROID_INTERACTIONS_CAPABILITY } from '../../shared/snapshotProtocol';
 import type { AbilityUsedEvent, PlayerJoin, PlayerShotAcknowledgement } from '../../shared-types';
 import type { GameEntity } from '../core/EntityManager';
-import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
+import type { GameEngine } from '../core/GameEngine';
 import type { MotionOutcome } from '../core/PlayerMotionService';
+import type { AppliedAsteroidHit } from '../core/types';
 import { SERVER_RELEASE_ID } from '../release';
 import type { GameStateBroadcaster } from '../services/GameStateBroadcaster';
 import { type ClientCommand, decodeClientCommand } from './clientCommandDecoder';
@@ -84,7 +85,10 @@ export class MessageHandler {
         case 'snapshotResync':
           if (this.gameEngine.getPlayerBySocket(ws)) {
             this.logSnapshotResync(ws, Date.now(), this.gameEngine.getServerTime());
-            this.broadcaster.requestSnapshotKeyframe(ws, { recovery: true });
+            this.broadcaster.requestSnapshotKeyframe(ws, {
+              recovery: true,
+              atlasReset: command.atlasReset,
+            });
           }
           break;
 
@@ -99,7 +103,7 @@ export class MessageHandler {
           if (owner?.id !== command.id) {
             break;
           }
-          const issue = this.gameEngine.travelFurnace(command.id, command.destinationId);
+          const issue = this.gameEngine.furnaceTravel.start(command.id, command.destinationId);
           this.broadcaster.sendToWebSocket(ws, {
             type: 'furnaceTravelResult',
             data: { ok: issue == null || issue === '', message: issue ?? 'Travelling' },
@@ -156,9 +160,11 @@ export class MessageHandler {
         case 'chargeWeapon': {
           const pilot = this.gameEngine.getPlayerBySocket(ws);
           if (pilot?.id === command.id) {
-            const laser = this.gameEngine.chargeWeapon(pilot.id, command.action);
+            const laser = this.gameEngine.chargedWeapons.request(pilot.id, command.action);
             if (laser) {
-              this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
+              this.broadcastAppliedAsteroidHits(
+                this.gameEngine.laserCombat.resolveSpawned(laser.id)
+              );
             }
           }
           break;
@@ -228,13 +234,13 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
         return;
       }
-      const resumed = this.gameEngine.resumePilot(
-        command.resumeToken ?? '',
-        ws,
-        command.kitId,
-        name,
-        command.clientReleaseId
-      );
+      const resumed = this.gameEngine.pilotSessions.resume({
+        token: command.resumeToken ?? '',
+        socket: ws,
+        requestedKit: command.kitId,
+        requestedName: name,
+        clientReleaseId: command.clientReleaseId,
+      });
       if (!resumed.ok) {
         this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
         return;
@@ -256,7 +262,7 @@ export class MessageHandler {
         .find(
           (candidate) => candidate.id === id || candidate.name.toLowerCase() === name.toLowerCase()
         );
-      if (conflictingPilot || this.gameEngine.hasSavedPilot(id)) {
+      if (conflictingPilot || this.gameEngine.pilotLedger.has(id)) {
         this.broadcaster.sendError(ws, 'This pilot requires its private resume token');
         return;
       }
@@ -269,7 +275,11 @@ export class MessageHandler {
           ? command.position
           : undefined;
       player = this.gameEngine.addPlayer(id, name, ws, arrival, command.kitId);
-      const registered = this.gameEngine.registerPilot(player, ws, command.clientReleaseId);
+      const registered = this.gameEngine.pilotSessions.register({
+        actor: player,
+        socket: ws,
+        clientReleaseId: command.clientReleaseId,
+      });
       if (!registered.ok) {
         this.gameEngine.removePlayer(player.id);
         this.broadcaster.sendError(ws, registered.error);
@@ -280,7 +290,7 @@ export class MessageHandler {
     }
 
     const snapshotVersion = this.broadcaster.negotiateSnapshot(ws, command.worldRemains === 1);
-    const provenance = this.gameEngine.getPilotReleaseProvenance(id);
+    const provenance = this.gameEngine.pilotLedger.provenance(id);
 
     // Send confirmation to the joining player
     this.broadcaster.sendToWebSocket(ws, {
@@ -291,6 +301,7 @@ export class MessageHandler {
         position: player.position,
         resumeToken,
         asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+        explorationVersion: 1,
         chargedWeapons: 1,
         color: player.color,
         kitId: player.kitId,
@@ -350,7 +361,12 @@ export class MessageHandler {
     }
 
     if (command.motionEpoch === socketPlayer.playerMotion?.epoch) {
-      this.gameEngine.cancelRescueOnMovement(id, update.position, update.velocity, update.angle);
+      this.gameEngine.crewRescue.cancelOnMovement(
+        id,
+        update.position,
+        update.velocity,
+        update.angle
+      );
     }
     this.gameEngine.setOverlayHold(id, update.overlayHold === true);
 
@@ -399,7 +415,7 @@ export class MessageHandler {
       motionNow
     );
     // A contact that ends a life is ordinary gameplay, already recorded by
-    // `GameEngine.logDamageState` as `player_died`, or as `player_downed` when
+    // `ShipDamage` as `player_died`, or as `player_downed` when
     // the cooperative campaign routes the hull into a rescue window instead.
     // Both are written unthrottled, so suppressing the rejection warning here
     // loses nothing: that throttle window belongs to real envelope violations.
@@ -447,7 +463,7 @@ export class MessageHandler {
       return;
     }
 
-    const laser = this.gameEngine.spawnPlayerLaser(
+    const laser = this.gameEngine.laserCombat.spawnPlayer(
       shooter.id,
       laserStart,
       laserDirection,
@@ -469,12 +485,12 @@ export class MessageHandler {
       return;
     }
 
-    this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
+    this.broadcastAppliedAsteroidHits(this.gameEngine.laserCombat.resolveSpawned(laser.id));
   }
 
   /** Returns true when the hit ended the target's life: destroyed outright, or
-   * downed into a cooperative rescue window. `handleShipDamage` reports
-   * `isDestroyed: false` for a cooperative down (`GameEngine.downShip` sets a
+   * downed into a cooperative rescue window. `ShipDamage.apply` reports
+   * `isDestroyed: false` for a cooperative down (`CrewRescueManager.down` sets a
    * positive `downedUntil`), so reading that flag alone would log a wall death
    * as a movement violation in exactly the mode the game is usually played in. */
   private emitShipDamage(
@@ -483,8 +499,8 @@ export class MessageHandler {
     damage: number,
     healthBefore: number | undefined
   ): boolean {
-    const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
-    if (!outcome.applied || !outcome.entity) {
+    const outcome = this.gameEngine.shipDamage.apply(targetId, attackerId, damage);
+    if (!outcome.applied) {
       return false;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
@@ -510,7 +526,7 @@ export class MessageHandler {
    * a pilot elsewhere in the world cannot claim a contact. The pose itself is
    * refused, so the authoritative hull never moves outside the wall. Contact
    * kills regardless of remaining hull health; cargo absorbs it first inside
-   * `handleShipDamage`. Returns true when the contact ended this life, whether
+   * `ShipDamage.apply`. Returns true when the contact ended this life, whether
    * by destroying the hull or by downing it — see `emitShipDamage`.
    *
    * What this trusts is that the reported position is truthful, not merely that
@@ -573,7 +589,7 @@ export class MessageHandler {
     if (!socketPlayer || socketPlayer.id !== command.id) {
       return;
     }
-    const issue = this.gameEngine.buyStoreItem(command.id, command.offerId);
+    const issue = this.gameEngine.civicTransactions.buy(command.id, command.offerId);
     const pilot = this.gameEngine.getPlayer(command.id);
     this.broadcaster.sendToWebSocket(ws, {
       type: 'townStoreResult',
@@ -581,7 +597,7 @@ export class MessageHandler {
         issue != null && issue !== ''
           ? { message: issue }
           : {
-              message: this.gameEngine.townStoreNotice(command.offerId),
+              message: this.gameEngine.civicTransactions.storeNotice(command.offerId),
               score: pilot?.score,
               purchases: pilot?.purchases,
             },
@@ -616,14 +632,14 @@ export class MessageHandler {
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const offeringBuild =
       socketPlayer.kitId === 'scout' &&
-      onDarkFurnaceFootprint(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
+      onDarkFurnaceFootprint(socketPlayer.position, (id) => this.gameEngine.furnaces.isLit(id));
     const activated = this.gameEngine.useAbility(playerId);
     if (offeringBuild) {
       this.broadcaster.sendToWebSocket(ws, {
         type: 'furnaceBuildResult',
         data: activated
-          ? this.gameEngine.furnaceBuildNotice()
-          : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
+          ? this.gameEngine.civicTransactions.buildNotice()
+          : (this.gameEngine.civicTransactions.buildIssue(playerId) ?? 'Furnace builder not ready'),
         timestamp: Date.now(),
       });
     }

@@ -1,21 +1,13 @@
 /* @vitest-environment node */
 import { afterEach, expect, test, vi } from 'vitest';
-import {
-  DebugReportError,
-  DebugReportWorker,
-  type ReportWorkerReply,
-  type ReportWorkerRequest,
-} from '../../../server/debugReports/client';
+import { DebugReportError, DebugReportWorker } from '../../../server/debugReports/client';
 
-/** One spawned thread: what the client sent it, and whether it has gone. */
-interface FakeThread {
-  sent: ReportWorkerRequest[];
-  listeners: Map<string, ((value: never) => void)[]>;
-  terminated: number;
-  exited: boolean;
-  /** How many other threads had not exited when this one was constructed. */
-  coexisting: number;
-}
+import {
+  deliverReportReply as deliver,
+  emitReportThread as emit,
+  exitReportThread as exitThread,
+  type ReportThreadDouble as FakeThread,
+} from '../../support/report-worker-double';
 
 const threads = vi.hoisted(() => ({
   all: [] as FakeThread[],
@@ -33,56 +25,10 @@ vi.mock('../../../setup/serverLogger', () => ({
   logger: { error: serverLogging.error, warn: serverLogging.warn },
 }));
 
-/** Node raises `exit` once per thread, after its environment is torn down. */
-function exitThread(thread: FakeThread, code: number): void {
-  if (thread.exited) {
-    return;
-  }
-  thread.exited = true;
-  for (const handler of thread.listeners.get('exit') ?? []) {
-    (handler as (code: number) => void)(code);
-  }
-}
-
-// The thread is the external boundary. The fake supplies transport, failure
-// events and `exit`, never a decision about replacing a thread; those rules
-// belong to the client under test.
-vi.mock('node:worker_threads', () => ({
-  Worker: class {
-    private readonly thread: FakeThread;
-    constructor() {
-      if (threads.refuseConstructions > 0) {
-        threads.refuseConstructions -= 1;
-        throw new Error('ERR_WORKER_INIT_FAILED: thread could not start');
-      }
-      this.thread = {
-        sent: [],
-        listeners: new Map(),
-        terminated: 0,
-        exited: false,
-        coexisting: threads.all.filter((other) => !other.exited).length,
-      };
-      threads.all.push(this.thread);
-    }
-    on(event: string, handler: (value: never) => void): void {
-      const attached = this.thread.listeners.get(event) ?? [];
-      attached.push(handler);
-      this.thread.listeners.set(event, attached);
-    }
-    postMessage(request: ReportWorkerRequest): void {
-      this.thread.sent.push(request);
-    }
-    terminate(): Promise<number> {
-      this.thread.terminated += 1;
-      // A double that never emitted `exit` after `terminate()` would let a
-      // missing handover pass: the replacement would simply never appear.
-      if (!threads.holdExits) {
-        queueMicrotask(() => exitThread(this.thread, 1));
-      }
-      return Promise.resolve(1);
-    }
-  },
-}));
+vi.mock('node:worker_threads', async () => {
+  const { reportWorkerClass } = await import('../../support/report-worker-double');
+  return { Worker: reportWorkerClass(threads) };
+});
 
 const CONFIG = {
   path: '/data/debug-reports.sqlite',
@@ -129,14 +75,6 @@ function threadAt(index: number): FakeThread {
     throw new Error(`Thread ${index} was never constructed; ${threads.all.length} were.`);
   }
   return thread;
-}
-function emit(thread: FakeThread, event: string, value: unknown): void {
-  for (const handler of thread.listeners.get(event) ?? []) {
-    (handler as (value: unknown) => void)(value);
-  }
-}
-function deliver(thread: FakeThread, reply: ReportWorkerReply): void {
-  emit(thread, 'message', reply);
 }
 /** Lets every queued microtask and promise continuation run. */
 async function settle(): Promise<void> {
@@ -440,9 +378,9 @@ test('a retired thread that exits late is reported as stuck and costs one attemp
   await settle();
   // Still one thread, and no further attempt charged while it holds the store.
   expect(threads.all).toHaveLength(1);
-  expect(replacementsLogged()).toBe(1);
+  expect(replacementsLogged()).toBe(0);
 
-  // When it does exit, the replacement it was already charged for starts
+  // When it does exit, the waiting replacement starts and is counted
   // without waiting for another request, and the stuck record is withdrawn.
   exitThread(threadAt(0), 9);
   await settle();
@@ -660,4 +598,25 @@ test('a replacement that starts late is counted when it starts, not when it was 
   await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
   await settle();
   expect(threads.all).toHaveLength(5);
+});
+
+test('a handover log counts only starts still inside its actual start window', async () => {
+  vi.useFakeTimers();
+  const worker = start();
+  await replaceCurrent(worker);
+  threads.holdExits = true;
+  emit(threadAt(1), 'error', new Error('SQLITE_IOERR'));
+  await expect(status(worker)).rejects.toMatchObject({ message: RESTARTING });
+  vi.advanceTimersByTime(61 * MINUTE);
+  exitThread(threadAt(1), 1);
+  await settle();
+  expect(threads.all).toHaveLength(3);
+  expect(
+    serverLogging.warn.mock.calls
+      .filter(([, message]) => message === 'Replacing the debug report worker')
+      .map(([, , context]) => context)
+  ).toEqual([
+    { replacement: 1, of: 3, windowMs: 3_600_000 },
+    { replacement: 1, of: 3, windowMs: 3_600_000 },
+  ]);
 });

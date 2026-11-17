@@ -15,7 +15,7 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
       actor.health = 80;
       actor.equipment = ['resource_tap'];
       world.clearAsteroids();
-      world.engine.addAsteroid({
+      world.engine.asteroidLifecycle.insert({
         id: 'tap-material',
         material: material as AsteroidMaterial,
         position: { x: 80, y: 0 },
@@ -36,7 +36,7 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
       });
       world.send(pilot, { type: 'useAbility', id: pilot.id, data: {} });
       for (let i = 0; i < 23; i++) {
-        world.engine.tickAbilities();
+        world.engine.abilities.advance();
       }
       const drop = world.engine.getLoot().find((row) => row.kind === 'tap');
       expect(drop?.salvage).toBe(material);
@@ -53,7 +53,7 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
       }
       actor.position = { ...settled.position };
       const healthBeforeCollection = actor.health;
-      world.engine.collectLoot();
+      world.engine.lootCollection.collect();
       expect(world.engine.getLoot().some((row) => row.id === drop.id)).toBe(false);
       if (material === 'ice') {
         expect(actor.health).toBe(healthBeforeCollection + NAVIGATION_SALVAGE.iceRepair);
@@ -66,14 +66,19 @@ for (const material of ['ice', 'metal', 'rubble', 'crystal'] as const) {
       }
       if (material === 'crystal') {
         expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames);
-        world.engine.tickAbilities();
+        actor.contourDraftFrames = 2;
+        world.engine.advanceCombatFrame();
         expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames - 1);
-        world.engine.collectLoot();
-        expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames - 1);
+        expect(actor.contourDraftFrames).toBe(1);
+        world.engine.advanceOneFrame();
+        expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames - 2);
+        expect(actor.contourDraftFrames).toBe(0);
+        world.engine.lootCollection.collect();
+        expect(actor.navigationAssistFrames).toBe(NAVIGATION_SALVAGE.frames - 2);
         expect(
           world.engine.getSnapshotState().entities.find((row) => row.id === actor.id)
             ?.navigationAssistFrames
-        ).toBe(NAVIGATION_SALVAGE.frames - 1);
+        ).toBe(NAVIGATION_SALVAGE.frames - 2);
       }
       expect(world.engine.getAsteroid('tap-material')?.health).toBe(100);
     } finally {

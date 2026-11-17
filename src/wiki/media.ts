@@ -23,7 +23,11 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/rendering/hud/resourceMapMark.ts',
       'shared/shipKits.ts',
       'server/core/GameEngine.ts',
+      'server/core/FurnaceDeliveryManager.ts',
+      'server/core/AsteroidLifecycle.ts',
       'shared/exploration.ts',
+      'server/core/WorldDiscovery.ts',
+      'server/core/ShipAbilityManager.ts',
     ],
   },
   hauler: {
@@ -43,6 +47,11 @@ export const media: Record<string, WikiMediaEntry> = {
       'shared/furnaces.ts',
       'src/rendering/furnaceRenderer.ts',
       'server/core/GameEngine.ts',
+      'server/core/FurnaceDeliveryManager.ts',
+      'server/core/AsteroidLifecycle.ts',
+      'server/core/CooperativeSupplyRestoration.ts',
+      'server/core/ToolFlightManager.ts',
+      'server/core/ShipAbilityManager.ts',
     ],
   },
   movement: {
@@ -84,6 +93,8 @@ export const media: Record<string, WikiMediaEntry> = {
       'Controlled demonstration: a Scout unloads 400 cargo through the authoritative deposit cadence. Steering away would keep the remainder aboard.',
     sources: [
       'server/core/GameEngine.ts',
+      'server/core/CargoOffloadManager.ts',
+      'server/core/SettlementLedger.ts',
       'shared/economy.ts',
       'shared/furnaceField.ts',
       'src/rendering/cargoOffloadRenderer.ts',

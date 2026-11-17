@@ -2,6 +2,8 @@ import { realpathSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { readBackupConfiguration } from './server/backups/configuration';
+import { startBackupScheduler } from './server/backups/scheduler';
 import { readServerConfiguration } from './server/configuration';
 import { createServerInstance } from './server/createServer';
 import { SERVER_RELEASE_ID } from './server/release';
@@ -10,6 +12,7 @@ import { flushServerLogs, logger } from './setup/serverLogger';
 import { boundedDiagnosticError } from './shared/stateDiagnostics';
 
 const configuration = readServerConfiguration();
+const backupConfiguration = readBackupConfiguration();
 const localWorld = configuration.nodeEnv === 'development' || configuration.nodeEnv === 'test';
 const worldPath =
   process.env['GEOROIDS_WORLD_PATH'] ?? (localWorld ? '.data/world.sqlite' : undefined);
@@ -35,6 +38,19 @@ const server = createServerInstance({
     ? { serveClientFrom: fileURLToPath(new URL('./dist/', import.meta.url)) }
     : {}),
 });
+const backups = backupConfiguration
+  ? startBackupScheduler({
+      configuration: backupConfiguration,
+      worldPath,
+      report: (event) => {
+        if (event.kind === 'backup_failed' || event.kind === 'backup_deadline') {
+          logger.error('STATE', event.kind, { operation: 'world_backup', ...event });
+        } else {
+          logger.info('STATE', event.kind, { operation: 'world_backup', ...event });
+        }
+      },
+    })
+  : undefined;
 let shuttingDown = false;
 let requestedExitCode = 0;
 
@@ -46,6 +62,7 @@ async function shutdown(exitCode: number): Promise<void> {
   shuttingDown = true;
   let writerUnreleased = false;
   try {
+    await backups?.close();
     await server.close();
     logger.info('Server closed');
   } catch (error) {

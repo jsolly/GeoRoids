@@ -3,15 +3,19 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
+import { AsteroidLifecycle } from '../../../server/core/AsteroidLifecycle';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
+import { BeltCrawlerManager } from '../../../server/core/BeltCrawlerManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { SurveyProbeManager } from '../../../server/core/SurveyProbeManager';
 import { AsteroidSpatialIndex } from '../../../server/world/AsteroidSpatialIndex';
+import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { SNAPSHOT_VERSION } from '../../../shared/snapshotProtocol';
 import { probePosition, SURVEY_PROBE } from '../../../shared/surveyProbe';
+import { sectorAt, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 import { fireProbe, resolveToolFlights } from '../../support/tool-flight';
@@ -34,7 +38,7 @@ function asteroidAt(id: string, position: { x: number; y: number }): AsteroidDat
 
 function clearAsteroids(engine: GameEngine): void {
   for (const asteroid of engine.getAllAsteroids()) {
-    engine.removeAsteroid(asteroid.id);
+    engine.asteroidLifecycle.remove(asteroid.id);
   }
 }
 
@@ -81,8 +85,8 @@ describe('authoritative Scout probes', () => {
     assert.ok(scout);
     const host = asteroidAt('first-host', { x: 200, y: 0 });
     const fartherHost = asteroidAt('farther-host', { x: 400, y: 0 });
-    engine.addAsteroid(host);
-    engine.addAsteroid(fartherHost);
+    engine.asteroidLifecycle.insert(host);
+    engine.asteroidLifecycle.insert(fartherHost);
 
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
@@ -103,7 +107,7 @@ describe('authoritative Scout probes', () => {
     const { engine, scout, now } = launchWorld();
     assert.ok(scout);
     const host = asteroidAt('moving-host', { x: 200, y: 0 });
-    engine.addAsteroid(host);
+    engine.asteroidLifecycle.insert(host);
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
     assert.ok(host.probe);
@@ -117,18 +121,85 @@ describe('authoritative Scout probes', () => {
       x: after.x + SURVEY_PROBE.RANGE + 30,
       y: after.y,
     });
-    engine.addAsteroid(nearby);
-    engine.addAsteroid(outside);
-    now.value += SURVEY_PROBE.PULSE_MS - 1;
-    engine.advanceOneFrame(now.value);
+    engine.asteroidLifecycle.insert(nearby);
+    engine.asteroidLifecycle.insert(outside);
+    now.value += SURVEY_PROBE.PULSE_MS;
+    // The clock has reached the deadline, but this frame was admitted one millisecond before it.
+    engine.advanceOneFrame(now.value - 1);
 
     expect(after).not.toEqual(before);
     expect(nearby.surveyedBy).toBeUndefined();
     expect(outside.surveyedBy).toBeUndefined();
-    now.value += 1;
     engine.advanceOneFrame(now.value);
     expect(nearby.surveyedBy).toContain(scout.id);
     expect(outside.surveyedBy).toBeUndefined();
+  });
+
+  test('a due beacon surveys a trailing deposit before its host moves out of range', () => {
+    const { engine, scout, now } = launchWorld();
+    try {
+      assert.ok(scout);
+      engine.parkSatellitePickups();
+      engine.clearSpiderField();
+      const host = asteroidAt('departing-host', { x: 200, y: 0 });
+      engine.asteroidLifecycle.insert(host);
+      expect(engine.useAbility(scout.id)).toBe(true);
+      resolveToolFlights(engine);
+      assert.ok(host.probe);
+      expect(
+        engine.asteroidLifecycle.update(host.id, {
+          position: { x: 4_400, y: 0 },
+          velocity: { x: 2, y: 0 },
+        })
+      ).toBe(host);
+      const before = probePosition(host, host.probe);
+      const trailing = asteroidAt('trailing-deposit', {
+        x: before.x - SURVEY_PROBE.RANGE,
+        y: before.y,
+      });
+      engine.asteroidLifecycle.insert(trailing);
+      expect(trailing.surveyedBy).toBeUndefined();
+      now.value += SURVEY_PROBE.PULSE_MS;
+
+      engine.advanceOneFrame(now.value);
+
+      assert.ok(host.probe);
+      const after = probePosition(host, host.probe);
+      expect(
+        Math.hypot(after.x - trailing.position.x, after.y - trailing.position.y)
+      ).toBeGreaterThan(SURVEY_PROBE.RANGE);
+      expect(trailing.surveyedBy).toContain(scout.id);
+    } finally {
+      engine.stopGameLoop();
+    }
+  });
+
+  test('an expiring beacon disappears without a final survey of a new deposit', () => {
+    const { engine, scout, now } = launchWorld();
+    try {
+      assert.ok(scout);
+      engine.parkSatellitePickups();
+      engine.clearSpiderField();
+      const host = asteroidAt('expired-survey-host', { x: 200, y: 0 });
+      engine.asteroidLifecycle.insert(host);
+      expect(engine.useAbility(scout.id)).toBe(true);
+      resolveToolFlights(engine);
+      assert.ok(host.probe);
+      expect(engine.asteroidLifecycle.update(host.id, { position: { x: 4_400, y: 0 } })).toBe(host);
+      const position = probePosition(host, host.probe);
+      const fresh = asteroidAt('unseen-at-expiry', { x: position.x + 30, y: position.y });
+      engine.asteroidLifecycle.insert(fresh);
+      expect(fresh.surveyedBy).toBeUndefined();
+      now.value = host.probe.expiresAt;
+      scout.lastUpdate = now.value;
+
+      engine.advanceOneFrame(now.value);
+
+      expect(host.probe).toBeNull();
+      expect(fresh.surveyedBy).toBeUndefined();
+    } finally {
+      engine.stopGameLoop();
+    }
   });
 
   test('launch selects the nearest polygon and rejects range and occupied hosts', () => {
@@ -171,10 +242,15 @@ describe('authoritative Scout probes', () => {
       return new AsteroidSpatialIndex([host]);
     };
     const lookup = (asteroidId: string) => (asteroidId === host.id ? host : undefined);
+    const inputs = {
+      rocks: { spatialIndex: source, getAsteroid: lookup },
+      spiders: { getBody: () => undefined },
+      abilities: { survey: () => undefined },
+    };
 
-    manager.tick(1_000 + SURVEY_PROBE.PULSE_MS - 1, source, lookup, () => undefined);
+    manager.advance(1_000 + SURVEY_PROBE.PULSE_MS - 1, inputs);
     expect(materializations).toBe(0);
-    manager.tick(1_000 + SURVEY_PROBE.PULSE_MS, source, lookup, () => undefined);
+    manager.advance(1_000 + SURVEY_PROBE.PULSE_MS, inputs);
     expect(materializations).toBe(1);
   });
 
@@ -187,12 +263,11 @@ describe('authoritative Scout probes', () => {
     let current = host;
     let pulses = 0;
     const tick = (now: number) =>
-      manager.tick(
-        now,
-        () => index,
-        () => current,
-        () => pulses++
-      );
+      manager.advance(now, {
+        rocks: { spatialIndex: () => index, getAsteroid: () => current },
+        spiders: { getBody: () => undefined },
+        abilities: { survey: () => pulses++ },
+      });
 
     tick(4_000);
     expect(pulses).toBe(1);
@@ -221,6 +296,56 @@ describe('authoritative Scout probes', () => {
     expect(pulses).toBe(4);
   });
 
+  test('explicit asteroid edits keep the live index and probe hosts aligned, including missing-row removal', () => {
+    const rocks = new AsteroidManager(new RNGService(42));
+    const probes = new SurveyProbeManager();
+    const lifecycle = new AsteroidLifecycle({
+      rocks,
+      probes,
+      crawlers: new BeltCrawlerManager((id) => rocks.getAsteroid(id)),
+      currentFrame: () => 17,
+    });
+    const host = asteroidAt('lifecycle-host', { x: 300, y: 0 });
+    const probe = {
+      id: 'lifecycle-beacon',
+      ownerId: 'scout',
+      health: SURVEY_PROBE.MAX_HEALTH,
+      maxHealth: SURVEY_PROBE.MAX_HEALTH,
+      attachedAt: 1_000,
+      expiresAt: 1_000 + SURVEY_PROBE.LIFETIME_MS,
+      angle: 0,
+      radialOffset: 35,
+    };
+    host.probe = probe;
+    lifecycle.insert(host);
+    expect(rocks.getAsteroid(host.id)).toBe(host);
+    expect(rocks.spatialIndex().get(host.id)).toBe(host);
+    expect(probes.observerPositions()).toEqual([{ x: 300, y: 0 }]);
+
+    expect(lifecycle.update(host.id, { position: { x: 2_000, y: 0 } })).toBe(host);
+    expect(rocks.spatialIndex().query({ minX: 250, minY: -50, maxX: 350, maxY: 50 })).toEqual([]);
+    expect(rocks.spatialIndex().query({ minX: 1_950, minY: -50, maxX: 2_050, maxY: 50 })).toEqual([
+      host,
+    ]);
+    expect(probes.observerPositions()).toEqual([{ x: 2_000, y: 0 }]);
+    lifecycle.update(host.id, { probe: null });
+    expect(probes.observerPositions()).toEqual([]);
+    lifecycle.update(host.id, { probe });
+    expect(probes.observerPositions()).toEqual([{ x: 2_000, y: 0 }]);
+
+    const replacement = { ...host, position: { x: 3_000, y: 0 }, probe: { ...probe } };
+    lifecycle.insert(replacement);
+    expect(rocks.getAsteroid(host.id)).toBe(replacement);
+    expect(rocks.spatialIndex().get(host.id)).toBe(replacement);
+    expect(probes.observerPositions()).toEqual([{ x: 3_000, y: 0 }]);
+    rocks.removeAsteroid(host.id);
+    expect(lifecycle.update(host.id, { health: 1 })).toBeUndefined();
+    expect(probes.observerPositions()).toEqual([{ x: 3_000, y: 0 }]);
+    expect(lifecycle.remove(host.id)).toBeUndefined();
+    expect(probes.observerPositions()).toEqual([]);
+    expect(replacement.probe).toEqual(probe);
+  });
+
   test('a scan can replace or clear its registration without duplicate pulses or restored membership', () => {
     const manager = new SurveyProbeManager();
     const host = asteroidAt('replaced-during-pulse', { x: 300, y: 0 });
@@ -232,22 +357,23 @@ describe('authoritative Scout probes', () => {
     let current = host;
     let pulses = 0;
     const tick = (now: number) =>
-      manager.tick(
-        now,
-        () => index,
-        () => current,
-        () => {
-          pulses++;
-          if (pulses === 1) {
-            manager.unregister(host.id);
-            current = replacement;
-            index.add(replacement);
-            manager.registerAsteroid(replacement);
-          } else {
-            manager.clear();
-          }
-        }
-      );
+      manager.advance(now, {
+        rocks: { spatialIndex: () => index, getAsteroid: () => current },
+        spiders: { getBody: () => undefined },
+        abilities: {
+          survey: () => {
+            pulses++;
+            if (pulses === 1) {
+              manager.unregister(host.id);
+              current = replacement;
+              index.add(replacement);
+              manager.registerAsteroid(replacement);
+            } else {
+              manager.clear();
+            }
+          },
+        },
+      });
 
     tick(4_000);
     expect(pulses).toBe(1);
@@ -267,7 +393,7 @@ describe('authoritative Scout probes', () => {
     assert.ok(scout);
     const largeHost = asteroidAt('large-host', { x: 1_200, y: 0 });
     largeHost.size = 1_000;
-    engine.addAsteroid(largeHost);
+    engine.asteroidLifecycle.insert(largeHost);
 
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
@@ -286,7 +412,7 @@ describe('authoritative Scout probes', () => {
       asteroidAt(`host-${index}`, { x: 200, y: index * 120 })
     );
     for (const [index, host] of hosts.entries()) {
-      engine.addAsteroid(host);
+      engine.asteroidLifecycle.insert(host);
       scout.position = { x: 0, y: host.position.y };
       scout.abilityCooldownFrames = 0;
       now.value += 1_000;
@@ -314,18 +440,18 @@ describe('authoritative Scout probes', () => {
     const { engine, scout, now } = launchWorld();
     assert.ok(scout);
     const host = asteroidAt('projectile-host', { x: 200, y: 0 });
-    engine.addAsteroid(host);
+    engine.asteroidLifecycle.insert(host);
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
     assert.ok(host.probe);
 
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
-    engine.advanceLasersAndResolveHits(now.value + 1);
+    engine.laserCombat.spawn('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
+    engine.laserCombat.advance(now.value + 1);
     expect(host.probe?.health).toBe(SURVEY_PROBE.MAX_HEALTH - 25);
     expect(host.health).toBe(host.maxHealth);
 
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
-    engine.advanceLasersAndResolveHits(now.value + 3);
+    engine.laserCombat.spawn('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
+    engine.laserCombat.advance(now.value + 3);
     expect(host.probe).toBeNull();
     expect(engine.getAsteroid(host.id)).toBe(host);
   });
@@ -334,7 +460,7 @@ describe('authoritative Scout probes', () => {
     const { engine, scout, now } = launchWorld();
     assert.ok(scout);
     const host = asteroidAt('expiring-host', { x: 200, y: 0 });
-    engine.addAsteroid(host);
+    engine.asteroidLifecycle.insert(host);
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
     now.value += SURVEY_PROBE.LIFETIME_MS;
@@ -346,15 +472,17 @@ describe('authoritative Scout probes', () => {
     now.value += 1;
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
-    engine.removeAsteroid(host.id);
+    expect(engine.asteroidLifecycle.remove(host.id)).toBe(host);
     expect(engine.getAsteroid(host.id)).toBeUndefined();
+    expect(host.probe).toBeNull();
+    expect(engine.asteroidLifecycle.remove(host.id)).toBeUndefined();
   });
 
   test('a beacon survives owner departure and keeps its distant sector active for a follower', () => {
     const { engine, scout, now } = launchWorld();
     assert.ok(scout);
     const host = asteroidAt('distant-host', { x: 200, y: 0 });
-    engine.addAsteroid(host);
+    engine.asteroidLifecycle.insert(host);
     expect(engine.useAbility(scout.id)).toBe(true);
     resolveToolFlights(engine);
     assert.ok(host.probe);
@@ -368,7 +496,7 @@ describe('authoritative Scout probes', () => {
     expect(engine.getAsteroid(host.id)).toBe(host);
 
     const target = asteroidAt('distant-target', { x: 5_030, y: 0 });
-    engine.addAsteroid(target);
+    engine.asteroidLifecycle.insert(target);
     now.value += SURVEY_PROBE.PULSE_MS;
     engine.advanceOneFrame(now.value);
     expect(target.surveyedBy).toContain(scout.id);
@@ -420,12 +548,18 @@ describe('authoritative Scout probes', () => {
       angle: 0,
       radialOffset: 125,
     };
-    engine.addAsteroid(host);
+    engine.asteroidLifecycle.insert(host);
 
-    const destroyed = engine.applyLaserAsteroidHit(host.id, secondShooter.id, 'laser');
+    const probe = host.probe;
+    const destroyed = engine.asteroidMining.apply(host.id, secondShooter.id, 'laser');
     expect(destroyed.outcome).toBe('destroyed');
     expect(destroyed.newAsteroids.length).toBeGreaterThan(0);
     expect(destroyed.newAsteroids.every((fragment) => fragment.probe === undefined)).toBe(true);
+    expect(host.probe).toBe(probe);
+    expect(engine.getAsteroidSpatialIndex().get(host.id)).toBeUndefined();
+    for (const fragment of destroyed.newAsteroids) {
+      expect(engine.getAsteroidSpatialIndex().get(fragment.id)).toBe(fragment);
+    }
   });
 
   test('a socket cannot equip or activate a Scout utility for another pilot', () => {
@@ -443,6 +577,7 @@ describe('authoritative Scout probes', () => {
             position: { x: 0, y: id === 'owner' ? 0 : 100 },
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
+            explorationVersion: 1,
           },
         },
         socket
@@ -453,7 +588,7 @@ describe('authoritative Scout probes', () => {
     const owner = engine.getPlayer('owner');
     assert.ok(owner);
     const host = asteroidAt('spoof-host', { x: 200, y: owner.position.y });
-    engine.addAsteroid(host);
+    engine.asteroidLifecycle.insert(host);
     owner.angle = 0;
     owner.equipment = ['survey_probe'];
 
@@ -465,5 +600,35 @@ describe('authoritative Scout probes', () => {
 
     expect(owner.scoutUtility).toBeUndefined();
     expect(host.probe).toBeUndefined();
+  });
+
+  test('a distant attached probe wakes a neighboring sector outside every human pilot view', () => {
+    const { engine, scout } = launchWorld();
+    try {
+      assert.ok(scout);
+      const host = asteroidAt('distant-observer-host', { x: 7_900, y: 7_000 });
+      scout.position = { x: 7_700, y: 7_000 };
+      engine.asteroidLifecycle.insert(host);
+      expect(engine.useAbility(scout.id)).toBe(true);
+      resolveToolFlights(engine);
+      assert.ok(host.probe);
+      scout.position = { x: 0, y: 0 };
+      const target = sectorDeposits(42, 4, 3).find(
+        (row) =>
+          Math.hypot(row.position.x - host.position.x, row.position.y - host.position.y) <
+          WORLD.interestRadius
+      );
+      assert.ok(target, 'Known deposit within the remote observer radius');
+      expect(sectorAt(target.position).id).not.toBe(sectorAt(host.position).id);
+      expect(Math.hypot(target.position.x, target.position.y)).toBeGreaterThan(
+        WORLD.interestRadius
+      );
+      expect(engine.getAsteroid(target.id)).toBeUndefined();
+      const loaded = engine.ensureAsteroidField();
+      expect(loaded.find((row) => row.id === target.id)).toEqual(target);
+      expect(engine.getAsteroid(target.id)).toBe(loaded.find((row) => row.id === target.id));
+    } finally {
+      engine.stopGameLoop();
+    }
   });
 });

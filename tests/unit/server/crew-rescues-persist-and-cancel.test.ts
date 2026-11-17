@@ -39,7 +39,7 @@ function scenario() {
   cleanups.push(() => engine.stopGameLoop());
   const socket = new RecordingSocket();
   const downed = engine.addPlayer('downed', 'Downed', socket, { x: 2200, y: 2200 }, 'hauler');
-  const joined = engine.registerPilot(downed, socket);
+  const joined = engine.pilotSessions.register({ actor: downed, socket: socket });
   if (!joined.ok) {
     throw new Error('Fixture registration failed');
   }
@@ -51,12 +51,14 @@ function scenario() {
     { x: 2300, y: 2200 },
     'scout'
   );
-  engine.registerPilot(rescuer, rescuerSocket);
+  engine.pilotSessions.register({ actor: rescuer, socket: rescuerSocket });
   downed.position = { x: 2200, y: 2200 };
   rescuer.position = { x: 2300, y: 2200 };
   downed.spawnProtectionTimer = 0;
   rescuer.spawnProtectionTimer = 0;
-  engine.handleShipDamage(downed.id, 'asteroid', 1000);
+  const outcome = engine.shipDamage.apply(downed.id, 'asteroid', 1000);
+  expect(outcome).toMatchObject({ applied: true, isDestroyed: false });
+  expect(outcome.entity).toBe(downed);
   const tick = (ms: number) => {
     elapsed = ms;
     engine.advanceCombatFrame();
@@ -108,13 +110,13 @@ test.each(['release', 'movement', 'overlay', 'damage', 'disconnect'] as const)(
         engine.crewAction(rescuer.id, { kind: 'release' });
         break;
       case 'movement':
-        engine.cancelRescueOnMovement(rescuer.id, { x: 2301, y: 2200 });
+        engine.crewRescue.cancelOnMovement(rescuer.id, { x: 2301, y: 2200 });
         break;
       case 'overlay':
         engine.setOverlayHold(rescuer.id, true);
         break;
       case 'damage':
-        engine.handleShipDamage(rescuer.id, 'asteroid', 1);
+        engine.shipDamage.apply(rescuer.id, 'asteroid', 1);
         break;
       case 'disconnect':
         engine.transportClosed(rescuerSocket);
@@ -124,8 +126,32 @@ test.each(['release', 'movement', 'overlay', 'damage', 'disconnect'] as const)(
         throw new Error(unhandled);
       }
     }
+    expect(rescuer.rescue).toBeNull();
     tick(3000);
     expect(downed.health).toBe(0);
+    expect(rescuer.rescue).toBeNull();
+  }
+);
+
+test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+  'invalid damage %s leaves an active rescue and cargo untouched',
+  (damage) => {
+    const { engine, downed, rescuer, tick } = scenario();
+    rescuer.cargo = 30;
+    const health = rescuer.health;
+    expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+    const rescue = rescuer.rescue;
+    expect(rescue).toBeDefined();
+    expect(engine.shipDamage.apply(rescuer.id, 'asteroid', damage)).toEqual({
+      applied: false,
+      isDestroyed: false,
+    });
+    expect(rescuer.rescue).toBe(rescue);
+    expect(rescuer.cargo).toBe(30);
+    expect(rescuer.health).toBe(health);
+    expect(engine.getLoot()).toEqual([]);
+    tick(3000);
+    expect(downed.health).toBe(downed.maxHealth * 0.35);
     expect(rescuer.rescue).toBeNull();
   }
 );
@@ -191,6 +217,7 @@ test('an activated campaign refuses unsupported clients before creating a pilot'
     kitId: 'scout',
     snapshotVersion: 3,
     asteroidInteractions: 1,
+    explorationVersion: 1,
   };
   handler.handleMessage({ type: 'join', id: 'newcomer', data }, socket);
   expect(engine.getPlayerBySocket(socket)).toBeUndefined();
@@ -212,7 +239,11 @@ test('restart before the deadline restores cargo and kit, then connected bleed-o
   engine.stopGameLoop();
   const restarted = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => restarted.stopGameLoop());
-  const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout');
+  const resumed = restarted.pilotSessions.resume({
+    token: token,
+    socket: new RecordingSocket(),
+    requestedKit: 'scout',
+  });
   if (!resumed.ok) {
     throw new Error(resumed.error);
   }
@@ -267,9 +298,13 @@ test('bleed-out wins when a revive would complete exactly at the downed deadline
 });
 
 test('bleed-out remains connected through the real frame stale-pilot sweep and respawns', () => {
-  const { engine, downed, tick } = scenario();
+  const { engine, downed, setElapsed } = scenario();
   // A downed browser sends no movement poses for the full thirty-second rescue window.
-  tick(30_001);
+  for (const rock of engine.getAllAsteroids()) {
+    engine.asteroidLifecycle.remove(rock.id);
+  }
+  engine.createAsteroids(0);
+  setElapsed(30_001);
   engine.advanceOneFrame();
   expect(engine.getPlayer(downed.id)).toBe(downed);
   expect(downed.downedUntil).toBeNull();
@@ -290,7 +325,11 @@ test('a saved downed pilot expiring offline finalizes on resume and stays finali
   const restarted = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => restarted.stopGameLoop());
   const schedule = vi.spyOn(restarted.entityManager, 'scheduleShipRespawn');
-  const resumed = restarted.resumePilot(token, new RecordingSocket(), 'scout');
+  const resumed = restarted.pilotSessions.resume({
+    token: token,
+    socket: new RecordingSocket(),
+    requestedKit: 'scout',
+  });
   if (!resumed.ok) {
     throw new Error(resumed.error);
   }
@@ -312,7 +351,10 @@ test('a saved downed pilot expiring offline finalizes on resume and stays finali
   restarted.stopGameLoop();
   const again = new GameEngine(82, clock, new InlineWorldPersistence(store));
   cleanups.push(() => again.stopGameLoop());
-  const restored = again.resumePilot(resumed.resumeToken, new RecordingSocket());
+  const restored = again.pilotSessions.resume({
+    token: resumed.resumeToken,
+    socket: new RecordingSocket(),
+  });
   if (!restored.ok) {
     throw new Error(restored.error);
   }
@@ -322,5 +364,77 @@ test('a saved downed pilot expiring offline finalizes on resume and stays finali
     again.getSnapshotState().mapAssets.filter((asset) => asset.kind === 'ship-remains')
   ).toEqual([]);
   again.checkpointWorld();
+  expect(store.load().cooperative?.records.some((row) => row.kind === 'downed')).toBe(false);
+});
+
+test('the full always frame completes a stationary rescue without a combat-only step', () => {
+  const { engine, downed, rescuer, setElapsed, store } = scenario();
+  expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+  const completion = rescuer.rescue?.completesAt;
+  setElapsed(1000);
+  expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+  expect(rescuer.rescue?.completesAt).toBe(completion);
+  setElapsed(3000);
+  engine.advanceOneFrame();
+  expect(downed.health).toBe(downed.maxHealth * 0.35);
+  expect(downed.downedUntil).toBeNull();
+  expect(rescuer.rescue).toBeNull();
+  engine.checkpointWorld();
+  expect(store.load().cooperative?.records.some((row) => row.kind === 'downed')).toBe(false);
+});
+
+test('diagnostic rearrangement preserves signal cooldown while removal retires its identity', () => {
+  const { engine, rescuer, rescuerSocket } = scenario();
+  const signal = { kind: 'signal', signal: 'help', position: { ...rescuer.position } } as const;
+  expect(engine.crewAction(rescuer.id, signal)).toBe(true);
+  engine.prepareDiagnosticWorld('traversal');
+  expect(engine.crewAction(rescuer.id, signal)).toBe(false);
+  const position = { ...rescuer.position };
+  engine.removePlayer(rescuer.id);
+  const rejoined = engine.addPlayer(rescuer.id, 'Rescuer', rescuerSocket, position, 'scout');
+  expect(engine.crewAction(rejoined.id, { ...signal, position: { ...rejoined.position } })).toBe(
+    true
+  );
+  engine.resetForTesting();
+  expect(engine.getAllPlayers()).toEqual([]);
+  expect(engine.cooperativeEnabled()).toBe(false);
+});
+
+test('sub-threshold movement preserves the hold and a turn beyond the existing threshold cancels it', () => {
+  const { engine, downed, rescuer, tick } = scenario();
+  expect(engine.crewAction(rescuer.id, { kind: 'revive', targetId: downed.id })).toBe(true);
+  const completion = rescuer.rescue?.completesAt;
+  engine.crewRescue.cancelOnMovement(
+    rescuer.id,
+    { x: rescuer.position.x + 0.5, y: rescuer.position.y },
+    { x: 0.01, y: 0 },
+    rescuer.angle
+  );
+  expect(rescuer.rescue?.completesAt).toBe(completion);
+  engine.crewRescue.cancelOnMovement(rescuer.id, undefined, undefined, rescuer.angle + 0.02);
+  tick(3000);
+  expect(downed.health).toBe(0);
+  expect(rescuer.rescue).toBeNull();
+});
+
+test('an expired downed live session finalizes on socket takeover without waiting for a frame', () => {
+  const { engine, downed, token, setElapsed, store } = scenario();
+  downed.cargo = 250;
+  setElapsed(30_001);
+  const resumed = engine.pilotSessions.resume({ token: token, socket: new RecordingSocket() });
+  if (!resumed.ok) {
+    throw new Error(resumed.error);
+  }
+  expect(resumed.actor).toBe(downed);
+  expect(downed).toMatchObject({ health: 0, downedUntil: null, cargo: 0, kitId: 'hauler' });
+  expect(downed.respawnTimer).toBeGreaterThan(0);
+  const timer = downed.respawnTimer;
+  const again = engine.pilotSessions.resume({
+    token: resumed.resumeToken,
+    socket: new RecordingSocket(),
+  });
+  expect(again.ok).toBe(true);
+  expect(downed.respawnTimer).toBe(timer);
+  engine.checkpointWorld();
   expect(store.load().cooperative?.records.some((row) => row.kind === 'downed')).toBe(false);
 });

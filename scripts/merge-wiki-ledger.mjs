@@ -33,6 +33,7 @@ import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -291,13 +292,36 @@ function summarize(report) {
 }
 function main(argv) {
   const root = process.cwd();
-  const flags = argv.filter((a) => a.startsWith('--'));
-  const positional = argv.filter((a) => !a.startsWith('--'));
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      merge: { type: 'boolean' },
+      base: { type: 'string' },
+      ours: { type: 'string' },
+      theirs: { type: 'string' },
+      out: { type: 'string' },
+    },
+  });
+  const hasNamedFiles =
+    values.base !== undefined ||
+    values.ours !== undefined ||
+    values.theirs !== undefined ||
+    values.out !== undefined;
+  const usage =
+    'Usage: merge-wiki-ledger.mjs [--merge] | <base> <ours> <theirs> | ' +
+    '--base F --ours F --theirs F [--out F]';
+  if (
+    (values.merge && (hasNamedFiles || positionals.length > 0)) ||
+    (hasNamedFiles && positionals.length > 0)
+  ) {
+    throw new Error(usage);
+  }
   let basePath;
   let oursPath;
   let theirsPath;
   let out;
-  if (flags.includes('--merge') || positional.length === 0) {
+  if (!hasNamedFiles && positionals.length === 0) {
     // Read the conflict stages git already holds for the ledger.
     const stage = (n) => {
       try {
@@ -323,44 +347,30 @@ function main(argv) {
     process.stdout.write('Inspect the result, then stage it with git add.\n');
     return;
   }
-  if (positional.length >= 3) {
+  if (!hasNamedFiles) {
     // Merge-driver positional form: %O %A %B, resolution written back to %A.
-    [basePath, oursPath, theirsPath] = positional;
+    if (positionals.length !== 3) {
+      throw new Error(usage);
+    }
+    [basePath, oursPath, theirsPath] = positionals;
     out = oursPath;
   } else {
-    const value = (name) => {
-      const hit = argv.find((a) => a.startsWith(`--${name}=`));
-      if (hit !== undefined) {
-        return hit.slice(name.length + 3);
-      }
-      const index = argv.indexOf(`--${name}`);
-      return index >= 0 ? argv[index + 1] : undefined;
-    };
-    basePath = value('base');
-    oursPath = value('ours');
-    theirsPath = value('theirs');
-    out = value('out') ?? oursPath;
-    if (
-      basePath === undefined ||
-      basePath === '' ||
-      oursPath === undefined ||
-      oursPath === '' ||
-      theirsPath === undefined ||
-      theirsPath === ''
-    ) {
-      throw new Error(
-        'Usage: merge-wiki-ledger.mjs [--merge] | <base> <ours> <theirs> | ' +
-          '--base F --ours F --theirs F [--out F]'
-      );
-    }
+    basePath = values.base;
+    oursPath = values.ours;
+    theirsPath = values.theirs;
+    out = values.out ?? oursPath;
   }
   if (
     basePath === undefined ||
+    basePath === '' ||
     oursPath === undefined ||
+    oursPath === '' ||
     theirsPath === undefined ||
-    out === undefined
+    theirsPath === '' ||
+    out === undefined ||
+    out === ''
   ) {
-    throw new Error('Expected base, ours, theirs and output paths');
+    throw new Error(usage);
   }
   const { ledger, report } = mergeLedger(
     readFileSync(basePath, 'utf8'),

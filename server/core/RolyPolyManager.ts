@@ -1,24 +1,28 @@
 import { containAsteroidPositionInto } from '../../shared/asteroidMotion';
 import { sampleGradient } from '../../shared/heightfield';
 import { ROLY_POLY } from '../../shared/rolyPoly';
+import { hullRadiusForKit } from '../../shared/shipKits';
 import { getTerrainField } from '../../shared/terrainField';
 import { isWithinWorldInterest, WORLD } from '../../shared/world';
 import type { Position, RolyPolyState } from '../../shared-types';
+import type { EntityManager } from './EntityManager';
 
-type Pilot = {
-  position: Position;
-  health: number;
-  exploding: boolean;
-  radius: number;
-  velocity: Position;
-};
 type Animal = { state: RolyPolyState; rollsUntil: number; direction: number };
 
 /** Only currently visited habitats exist in memory; no saved-world scans or persistence. */
 export class RolyPolyManager {
   private readonly animals = new Map<string, Animal>();
 
-  advance(pilots: readonly Pilot[], frame: number): void {
+  constructor(private readonly actors: Pick<EntityManager, 'getAllEntities'>) {}
+
+  advance(frame: number): void {
+    const pilots = this.actors.getAllEntities().map((pilot) => ({
+      position: pilot.position,
+      velocity: pilot.velocity,
+      health: pilot.health,
+      exploding: pilot.exploding,
+      radius: hullRadiusForKit(pilot.kitId),
+    }));
     const living = pilots.filter((pilot) => pilot.health > 0 && !pilot.exploding);
     if (frame % 60 === 0 || this.animals.size === 0) {
       this.populate(living);
@@ -64,7 +68,7 @@ export class RolyPolyManager {
     }
   }
 
-  private populate(pilots: readonly Pilot[]): void {
+  private populate(pilots: readonly { position: Position }[]): void {
     for (const [id, animal] of this.animals) {
       if (!pilots.some((pilot) => isWithinWorldInterest(animal.state.position, pilot.position))) {
         this.animals.delete(id);

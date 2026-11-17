@@ -278,30 +278,46 @@ function drawCachedRoidSilhouette(
       recycled,
       'Asteroid silhouette canvas context unavailable'
     );
+    if (!surface) {
+      drawRoidSilhouette(
+        ctx,
+        roidOutline(screen, radius, roid.angle, vertices, offsets),
+        roid.r,
+        inner
+          ? roidOutline(screen, radius, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
+          : null
+      );
+      return;
+    }
     const { canvas, context: paint } = surface;
     const origin = canvas.width / (2 * cache.dpr);
-    paint.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
-    const center = { x: origin, y: origin };
-    drawRoidSilhouette(
-      paint,
-      roidOutline(center, radius, 0, vertices, offsets),
-      roid.r,
-      inner ? roidOutline(center, radius, 0, vertices, offsets, VISUAL.ROID_INNER_SCALE) : null
-    );
-    sprite = {
-      radius: roid.r,
-      vertices,
-      offsets: [...offsets],
-      inner,
-      canvas,
-      context: paint,
-      origin,
-      lastUsedFrame: cache.frame,
-    };
-    // Numeric comparison survives snapshot array replacement. Retained canvases
-    // use at most 8 million backing pixels (~32 MiB RGBA) across 128 IDs.
-    cache.entries.set(roid.id, sprite);
-    cache.pixels += side * side;
+    try {
+      paint.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
+      const center = { x: origin, y: origin };
+      drawRoidSilhouette(
+        paint,
+        roidOutline(center, radius, 0, vertices, offsets),
+        roid.r,
+        inner ? roidOutline(center, radius, 0, vertices, offsets, VISUAL.ROID_INNER_SCALE) : null
+      );
+      sprite = {
+        radius: roid.r,
+        vertices,
+        offsets: [...offsets],
+        inner,
+        canvas,
+        context: paint,
+        origin,
+        lastUsedFrame: cache.frame,
+      };
+      // Numeric comparison survives snapshot array replacement. Retained canvases
+      // use at most 8 million backing pixels (~32 MiB RGBA) across 128 IDs.
+      cache.entries.set(roid.id, sprite);
+      cache.pixels += side * side;
+    } catch (error) {
+      discardRasterSurface(surface);
+      throw error;
+    }
   }
   sprite.lastUsedFrame = cache.frame;
   ctx.save();

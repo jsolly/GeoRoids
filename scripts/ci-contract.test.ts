@@ -80,6 +80,7 @@ interface Job {
   env: Record<string, string>;
   environment: unknown;
   concurrency: unknown;
+  permissions: unknown;
   'runs-on': unknown;
   'timeout-minutes': unknown;
   'continue-on-error': unknown;
@@ -113,6 +114,7 @@ function workflow(value: unknown) {
             env: strings(jobFields['env'] ?? {}),
             environment: jobFields['environment'],
             concurrency: jobFields['concurrency'],
+            permissions: jobFields['permissions'],
             'runs-on': jobFields['runs-on'],
             'timeout-minutes': jobFields['timeout-minutes'],
             'continue-on-error': jobFields['continue-on-error'],
@@ -179,7 +181,16 @@ function fixtureCall(source: string) {
   return { command: data['command'], args: stringArray(data['args'] ?? []) };
 }
 
-test('CI preserves six mandatory lanes and failure propagation', () => {
+const validationLanes = [
+  'static-checks',
+  'runner-contracts',
+  'actions-contracts',
+  'integration-tests',
+  'wiki-media',
+  'railpack-build',
+] as const;
+
+test('CI preserves six mandatory validation lanes and failure propagation', () => {
   const root = new URL('../', import.meta.url);
   const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
   const ci = workflow(parse(read('.github/workflows/ci.yml')));
@@ -203,14 +214,7 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
       `ci.yml must use the pinned checkout or upload-artifact commit: ${line}`
     );
   }
-  assert.deepEqual(required.needs, [
-    'static-checks',
-    'runner-contracts',
-    'actions-contracts',
-    'integration-tests',
-    'wiki-media',
-    'railpack-build',
-  ]);
+  assert.deepEqual(required.needs, [...validationLanes, 'security']);
   // The required check runs whenever its lanes run, Dependabot PRs included, and fails when any
   // of its steps fails. Labels start no runs.
   assert.equal(ci.on['pull_request']?.types.includes('labeled'), false);
@@ -221,9 +225,9 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
     required.steps
       .filter((step) => step['continue-on-error'] !== undefined || step.if !== undefined)
       .map((step) => step.name ?? step.uses),
-    []
+    ['Require pull request security scans']
   );
-  for (const name of required.needs) {
+  for (const name of validationLanes) {
     assert.equal(
       requiredJob(ci, name).needs,
       undefined,
@@ -258,7 +262,7 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
     );
   }
   // Secrets scan precedes reusable-tree decisions in each independently validated lane.
-  for (const name of required.needs) {
+  for (const name of validationLanes) {
     const steps = requiredJob(ci, name).steps;
     assert.equal(requiredStep(steps, 0).uses, checkoutAction);
     assert.equal(requiredStep(steps, 0).with['fetch-depth'], 0);
@@ -336,7 +340,7 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
     'railpack-build': [],
   } satisfies Record<string, string[]>;
   assert.deepEqual(
-    [...required.needs].sort((left, right) => left.localeCompare(right)),
+    [...validationLanes].sort((left, right) => left.localeCompare(right)),
     Object.keys(commandsByLane).sort((left, right) => left.localeCompare(right))
   );
   const commands: string[] = [];
@@ -981,4 +985,66 @@ test('CI preserves six mandatory lanes and failure propagation', () => {
   process.stdout.write(
     'CI contracts passed: six parallel lanes, exact command coverage, fail-closed aggregation, mandatory local tests, and failure propagation.\n'
   );
+});
+
+test('required PR CI rejects every unsuccessful security result without caching scanners', () => {
+  const root = new URL('../', import.meta.url);
+  const ci = workflow(parse(readFileSync(new URL('.github/workflows/ci.yml', root), 'utf8')));
+  const required = requiredJob(ci, 'ci');
+  const security = requiredJob(ci, 'security');
+  const scanners = {
+    GITLEAKS_RESULT: 'gitleaks',
+    SEMGREP_RESULT: 'semgrep',
+    OSV_RESULT: 'osv-scanner',
+    ZIZMOR_RESULT: 'zizmor',
+  } as const;
+  assert.deepEqual(security.needs, Object.values(scanners));
+  assert.equal(security.if, "always() && github.event_name == 'pull_request'");
+  assert.equal(security['continue-on-error'], undefined);
+  assert.deepEqual(security.permissions, { contents: 'read' });
+  for (const name of Object.values(scanners)) {
+    const scanner = requiredJob(ci, name);
+    assert.equal(scanner.if, "github.event_name == 'pull_request'");
+    assert.deepEqual(scanner.permissions, { contents: 'read' });
+    assert.equal(scanner['continue-on-error'], undefined);
+    for (const step of scanner.steps) {
+      assert.equal(step.if, undefined, `${name} steps must not skip their scan`);
+      assert.equal(step['continue-on-error'], undefined, `${name} failures must propagate`);
+    }
+    assert.equal(
+      scanner.steps.some((step) => step.id === 'verified-tree'),
+      false
+    );
+  }
+
+  const guard = requiredStep(required.steps, 0);
+  assert.equal(guard.name, 'Require pull request security scans');
+  assert.equal(guard.if, "github.event_name == 'pull_request'");
+  assert.equal(guard['continue-on-error'], undefined);
+  assert.deepEqual(guard.env, { SECURITY: `\${{ needs.security.result }}` });
+  const outcomes = ['success', 'failure', 'cancelled', 'skipped', '', 'unknown'];
+  for (const outcome of outcomes) {
+    const result = spawnSync('bash', ['-c', requiredString(guard.run)], {
+      env: { ...process.env, SECURITY: outcome },
+      encoding: 'utf8',
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status === 0, outcome === 'success');
+  }
+
+  const aggregate = requiredStep(security.steps, 0);
+  assert.equal(aggregate.if, undefined);
+  assert.equal(aggregate['continue-on-error'], undefined);
+  const successful = Object.fromEntries(Object.keys(scanners).map((name) => [name, 'success']));
+  for (const [variable, scanner] of Object.entries(scanners)) {
+    assert.equal(aggregate.env[variable], `\${{ needs.${scanner}.result }}`);
+    for (const outcome of outcomes) {
+      const result = spawnSync('bash', ['-c', requiredString(aggregate.run)], {
+        env: { ...process.env, ...successful, [variable]: outcome },
+        encoding: 'utf8',
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(result.status === 0, outcome === 'success');
+    }
+  }
 });

@@ -20,9 +20,9 @@ describe('Crew survival against world hazards', () => {
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
 
-    expect(engine.handleShipDamage('p2', 'p1', 25).applied).toBe(false);
+    expect(engine.shipDamage.apply('p2', 'p1', 25).applied).toBe(false);
     expect(engine.getPlayer('p2')?.health).toBe(100);
-    expect(engine.handleShipDamage('p2', 'ricochet', 25).applied).toBe(true);
+    expect(engine.shipDamage.apply('p2', 'ricochet', 25).applied).toBe(true);
     expect(engine.getPlayer('p2')?.health).toBe(75);
   });
 
@@ -32,9 +32,9 @@ describe('Crew survival against world hazards', () => {
     engine.setOverlayHold('p1', true);
     engine.setOverlayHold('p1', true);
 
-    expect(engine.handleShipDamage('p1', 'asteroid', 25).applied).toBe(false);
-    expect(engine.handleShipDamage('p1', 'ricochet', 25).applied).toBe(false);
-    expect(engine.handleShipDamage('p1', 'boundary', 100).applied).toBe(false);
+    expect(engine.shipDamage.apply('p1', 'asteroid', 25).applied).toBe(false);
+    expect(engine.shipDamage.apply('p1', 'ricochet', 25).applied).toBe(false);
+    expect(engine.shipDamage.apply('p1', 'boundary', 100).applied).toBe(false);
     expect(engine.getPlayer('p1')?.health).toBe(100);
     expect(engine.getPlayer('p1')?.overlayHold).toBe(true);
 
@@ -53,7 +53,7 @@ describe('Crew survival against world hazards', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
-    const destroyed = engine.handleShipDamage('p1', 'asteroid', 100).isDestroyed;
+    const destroyed = engine.shipDamage.apply('p1', 'asteroid', 100).isDestroyed;
     expect(destroyed).toBe(true);
     expect(engine.getPlayer('p1')?.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
   });
@@ -63,7 +63,7 @@ describe('Crew survival against world hazards', () => {
     player.score = 210;
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
-    expect(engine.handleShipDamage('p1', 'boundary', 100).isDestroyed).toBe(true);
+    expect(engine.shipDamage.apply('p1', 'boundary', 100).isDestroyed).toBe(true);
     expect(engine.getPlayer('p1')?.score).toBe(210);
   });
 
@@ -71,12 +71,12 @@ describe('Crew survival against world hazards', () => {
     const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     player.score = 350;
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    engine.handleShipDamage('p1', 'asteroid', 100);
+    engine.shipDamage.apply('p1', 'asteroid', 100);
     const afterDeath = engine.getPlayer('p1');
     expect(afterDeath?.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
     expect(afterDeath?.score).toBe(350);
 
-    expect(engine.handleShipDamage('p1', 'asteroid', 25).isDestroyed).toBe(false);
+    expect(engine.shipDamage.apply('p1', 'asteroid', 25).isDestroyed).toBe(false);
     expect(engine.getPlayer('p1')?.health).toBe(0);
     expect(engine.getPlayer('p1')?.score).toBe(350);
   });

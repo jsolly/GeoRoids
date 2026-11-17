@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import type { AppliedAsteroidHit } from '../../../server/core/types';
 import { sectorDeposits } from '../../../server/world/depositLayout';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { beltAsteroid, beltSlots } from '../../../shared/asteroidBelt';
@@ -134,7 +135,7 @@ describe('Colossal asteroids need a crew', () => {
     const bob = world.join('Bob', { x: 40, y: 0 }, { kitId: 'hauler' });
     world.clearAsteroids();
     const rock = colossalRock('colossal-tow', { x: 0, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     equip(alice, 'tow_cable');
     equip(bob, 'tow_cable');
     activate(alice);
@@ -161,7 +162,7 @@ describe('Colossal asteroids need a crew', () => {
     const bob = world.join('Bob', { x: 40, y: 0 }, { kitId: 'hauler' });
     world.clearAsteroids();
     large.position = { x: 0, y: 0 };
-    world.engine.addAsteroid(large);
+    world.engine.asteroidLifecycle.insert(large);
     activate(alice, large.id);
     expect(world.entity(alice).harpoonTargetId).toBe(large.id);
     world.engine.updatePlayer(alice.id, { position: { x: -400, y: 0 } });
@@ -176,7 +177,7 @@ describe('Colossal asteroids need a crew', () => {
     activate(bob);
     world.clearAsteroids();
     small.position = { x: 0, y: 0 };
-    world.engine.addAsteroid(small);
+    world.engine.asteroidLifecycle.insert(small);
     world.engine.updatePlayer(alice.id, { position: { x: -40, y: 0 } });
     world.entity(alice).abilityCooldownFrames = 0;
     activate(alice, small.id);
@@ -193,7 +194,7 @@ describe('Colossal asteroids need a crew', () => {
     const cleo = world.join('Cleo', { x: 0, y: -80 }, { kitId: 'hauler' });
     world.clearAsteroids();
     const rock = colossalRock('colossal-full-crew', { x: 150, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     for (const pilot of [alice, bob, cleo]) {
       world.entity(pilot).angle = 0;
     }
@@ -222,7 +223,7 @@ describe('Colossal asteroids need a crew', () => {
     const bob = world.join('Bob', { x: 0, y: 80 }, { kitId: 'hauler' });
     world.clearAsteroids();
     const rock = colossalRock('colossal-crew-boost', { x: 150, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     world.entity(alice).angle = 0;
     world.entity(bob).angle = 0;
     equip(alice, 'boost_coupling');
@@ -240,18 +241,18 @@ describe('Colossal asteroids need a crew', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     for (const existing of engine.getAllAsteroids()) {
-      engine.removeAsteroid(existing.id);
+      engine.asteroidLifecycle.remove(existing.id);
     }
     const rock = colossalRock('colossal-mine', { x: 400, y: 300 });
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     const hits = ROID.COLOSSAL_LASER_HITS;
     for (let shot = 0; shot < hits - 1; shot++) {
-      const damaged = engine.applyLaserAsteroidHit(rock.id, 'p1');
+      const damaged = engine.asteroidMining.apply(rock.id, 'p1');
       expect(damaged.outcome).toBe('damaged');
       expect(engine.getAsteroid(rock.id)).toBeDefined();
     }
     expect(engine.getAsteroid(rock.id)).toBeDefined();
-    const last = engine.applyLaserAsteroidHit(rock.id, 'p1');
+    const last = engine.asteroidMining.apply(rock.id, 'p1');
     expect(last.outcome).toBe('destroyed');
     expect(last.newAsteroids).toHaveLength(2);
     expect(last.newAsteroids.every((fragment) => !isColossalAsteroid(fragment.size))).toBe(true);
@@ -264,15 +265,15 @@ describe('Colossal asteroids need a crew', () => {
     const engine = new GameEngine();
     engine.addPlayer('h1', 'Haul', {} as never, { x: 0, y: 0 }, 'hauler');
     for (const existing of engine.getAllAsteroids()) {
-      engine.removeAsteroid(existing.id);
+      engine.asteroidLifecycle.remove(existing.id);
     }
     const rock = colossalRock('colossal-hauler-mine', { x: 400, y: 300 });
-    engine.addAsteroid(rock);
+    engine.asteroidLifecycle.insert(rock);
     const hits = ROID.COLOSSAL_LASER_HITS / SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER;
     for (let shot = 0; shot < hits - 1; shot++) {
-      expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('damaged');
+      expect(engine.asteroidMining.apply(rock.id, 'h1').outcome).toBe('damaged');
     }
-    expect(engine.applyLaserAsteroidHit(rock.id, 'h1').outcome).toBe('destroyed');
+    expect(engine.asteroidMining.apply(rock.id, 'h1').outcome).toBe('destroyed');
   });
 
   test('ramming a colossal deposit damages the ship and leaves the rock', () => {
@@ -280,13 +281,13 @@ describe('Colossal asteroids need a crew', () => {
     const alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'scout' });
     world.clearAsteroids();
     const rock = colossalRock('colossal-ram', { x: 0, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     world.engine.entityManager.updateEntity(alice.id, { spawnProtectionTimer: 0 });
     const actor = world.entity(alice);
     const healthBefore = actor.health;
     const overlap = { ...actor.position };
     const epoch = actor.playerMotion?.epoch ?? 0;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
     expect(world.engine.getAsteroid(rock.id)).toBeDefined();
     expect(world.entity(alice).health).toBe(healthBefore - DAMAGE.ASTEROID_COLLISION);
     const distance = Math.hypot(
@@ -311,7 +312,7 @@ describe('Colossal asteroids need a crew', () => {
       ).ok
     ).toBe(false);
     const healthAfter = world.entity(alice).health;
-    world.engine.resolveAuthoritativeCombat();
+    world.engine.contactCombat.advance();
     expect(world.entity(alice).health).toBe(healthAfter);
     expect(world.engine.getAsteroid(rock.id)).toBeDefined();
   });
@@ -322,8 +323,8 @@ describe('Colossal asteroids need a crew', () => {
     const bob = world.join('Bob', { x: 40, y: 0 }, { kitId: 'hauler' });
     world.clearAsteroids();
     const rock = colossalRock('colossal-bumper', { x: 80, y: 0 });
-    world.engine.addAsteroid(rock);
-    world.engine.addAsteroid({
+    world.engine.asteroidLifecycle.insert(rock);
+    world.engine.asteroidLifecycle.insert({
       id: 'field-rock',
       position: { x: 155, y: 0 },
       velocity: { x: 0, y: 0 },
@@ -345,11 +346,16 @@ describe('Colossal asteroids need a crew', () => {
     world.engine.entityManager.updateEntity(alice.id, { spawnProtectionTimer: 0 });
     world.engine.entityManager.updateEntity(bob.id, { spawnProtectionTimer: 0 });
     const healthBefore = world.entity(alice).health;
-    world.engine.resolveAuthoritativeCombat();
+    const feedback: AppliedAsteroidHit[] = [];
+    world.engine.asteroidHitFeedback.setListener((hits) => feedback.push(...hits));
+    world.engine.contactCombat.advance();
     expect(world.entity(alice).health).toBe(healthBefore);
     expect(world.entity(alice).harpoonTargetId).toBe(rock.id);
     expect(world.engine.getAsteroid(rock.id)).toBeDefined();
     expect(world.engine.getAsteroid('field-rock')).toBeUndefined();
+    expect(feedback.map((hit) => [hit.asteroidId, hit.playerId])).toEqual([
+      ['field-rock', alice.id],
+    ]);
   });
 });
 

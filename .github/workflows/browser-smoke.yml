@@ -1,8 +1,10 @@
 ---
 name: Browser smoke
-run-name: Browser smoke ${{ inputs.commit_sha }}
+run-name: Browser smoke ${{ inputs.commit_sha || github.sha }}
 
 'on':
+  schedule:
+    - cron: '23 10 * * *'
   workflow_dispatch:
     inputs:
       commit_sha:
@@ -24,11 +26,12 @@ permissions:
 
 jobs:
   browser:
+    if: github.repository == 'jsolly/GeoRoids' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      REQUESTED_SHA: ${{ inputs.commit_sha }}
-      BROWSER_SMOKE_FOCUS: ${{ inputs.focus }}
+      REQUESTED_SHA: ${{ inputs.commit_sha || github.sha }}
+      BROWSER_SMOKE_FOCUS: ${{ inputs.focus || 'basic' }}
     steps:
       - name: Validate candidate identity
         run: |
@@ -48,7 +51,7 @@ jobs:
       - name: Check out the exact candidate
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          ref: ${{ inputs.commit_sha }}
+          ref: ${{ inputs.commit_sha || github.sha }}
           path: candidate
           persist-credentials: false
       - name: Verify checked-out identity
@@ -75,6 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           candidate_root="$GITHUB_WORKSPACE/candidate"
+          export BROWSER_SMOKE_CANDIDATE_ROOT="$candidate_root"
           mkdir -p "$BROWSER_SMOKE_ARTIFACTS" "$RUNNER_TEMP/browser-world"
           export GEOROIDS_WORLD_PATH="$RUNNER_TEMP/browser-world/world.sqlite"
           export GEOROIDS_DEBUG_REPORTS_ENABLED=0 GEOROIDS_BACKUP_ENABLED=0 VITE_WEBSOCKET_URL=

@@ -34,9 +34,9 @@ function asteroidAt(
 
 function isolateAsteroid(engine: GameEngine, asteroid: AsteroidData): void {
   for (const existing of engine.getAllAsteroids()) {
-    engine.removeAsteroid(existing.id);
+    engine.asteroidLifecycle.remove(existing.id);
   }
-  engine.addAsteroid(asteroid);
+  engine.asteroidLifecycle.insert(asteroid);
 }
 
 describe('Asteroid destruction over real sockets', () => {
@@ -69,10 +69,10 @@ describe('Asteroid destruction over real sockets', () => {
       server.wsCore.stopPeriodicGameStateBroadcast();
       port = await server.listening;
 
-      const decoder = new SnapshotDecoder();
+      const decoder = new SnapshotDecoder('live');
       const states: ServerGameSnapshot[] = [];
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1`
+        `ws://127.0.0.1:${port}/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=1&explorationVersion=1`
       );
       const wire = new WireClient(ws);
       client = wire;
@@ -114,6 +114,7 @@ describe('Asteroid destruction over real sockets', () => {
             position: { x: 800, y: 800 },
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: 1,
+            explorationVersion: 1,
           },
         })
       );
@@ -136,7 +137,7 @@ describe('Asteroid destruction over real sockets', () => {
       const target = asteroidAt('solo-ice', radius, { ...targetPosition }, { material: 'ice' });
       isolateAsteroid(server.gameEngine, target);
       const untouched = asteroidAt('untouched-ice', 20, { x: 0, y: -900 }, { material: 'ice' });
-      server.gameEngine.addAsteroid(untouched);
+      server.gameEngine.asteroidLifecycle.insert(untouched);
       const scoreBefore = pilot.score;
       const now = Date.now();
       const clock = vi.spyOn(server.gameEngine, 'getServerTime').mockReturnValue(now);
@@ -154,16 +155,16 @@ describe('Asteroid destruction over real sockets', () => {
             })
           );
           await wire.barrier();
-          expect(server.gameEngine.getServerLasers()).toHaveLength(1);
+          expect(server.gameEngine.laserCombat.shots()).toHaveLength(1);
           // Advance only the actual projectile pipeline. The stopped world cannot
           // supply an NPC hit, pickup score, expiry, or replacement asteroid.
-          const hits = server.gameEngine.advanceLasersAndResolveHits();
+          const hits = server.gameEngine.laserCombat.advance();
           server.wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
           await wire.barrier();
         }
         server.wsCore.getBroadcaster().broadcastGameState();
         await wire.barrier();
-        expect(server.gameEngine.getServerLasers()).toHaveLength(0);
+        expect(server.gameEngine.laserCombat.shots()).toHaveLength(0);
         expect(received.filter((message) => message.type === 'asteroidDestroy')).toEqual([
           {
             type: 'asteroidDestroy',

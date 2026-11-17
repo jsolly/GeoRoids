@@ -144,7 +144,7 @@ requireEvidence(
 const ASTEROID_INTERACTIONS_CAPABILITY = capability;
 const SNAPSHOT_VERSION = snapshotVersion;
 const DecoderClass = Decoder;
-const socketUrl = `wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}`;
+const socketUrl = `wss://georoids-production-2403.up.railway.app/ws?snapshotVersion=${SNAPSHOT_VERSION}&asteroidInteractions=${ASTEROID_INTERACTIONS_CAPABILITY}&explorationVersion=1`;
 const gameplay: unknown = await tsImport('../shared/constants/gameplay.ts', import.meta.url);
 requireEvidence(isRecord(gameplay), 'Local gameplay constants are malformed');
 const game = gameplay['GAME'];
@@ -202,6 +202,7 @@ type SmokeCommand =
         kitId: 'scout';
         snapshotVersion: number;
         asteroidInteractions: number;
+        explorationVersion: 1;
         cooperativeVersion: 1;
         clientReleaseId: string | undefined;
       };
@@ -254,7 +255,12 @@ function motionPilot(value: unknown): value is MotionPilot {
 interface Evidence {
   serverReleaseId: unknown;
   acceptedSnapshots: number;
-  admission: { playerId: string; snapshotVersion: number; asteroidInteractions: number } | null;
+  admission: {
+    playerId: string;
+    snapshotVersion: number;
+    asteroidInteractions: number;
+    explorationVersion: 1;
+  } | null;
   movement: { epoch: number; sequence: number; acknowledged: number; displacement: number } | null;
   shot: { requestId: string; projectileId: string | null; acknowledged: boolean } | null;
   socketClosed: boolean;
@@ -265,7 +271,7 @@ interface Evidence {
 function createDecoder(): {
   readMessage(text: string, admission: { acceptSnapshots: boolean }): unknown;
 } {
-  const decoder: unknown = Reflect.construct(DecoderClass, []);
+  const decoder: unknown = Reflect.construct(DecoderClass, ['live']);
   requireEvidence(isRecord(decoder), 'Local snapshot decoder is malformed');
   const read = decoder['readMessage'];
   requireEvidence(typeof read === 'function', 'Local snapshot decoder cannot read messages');
@@ -485,6 +491,7 @@ export async function smoke({
             kitId: 'scout',
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+            explorationVersion: 1,
             cooperativeVersion: 1,
             clientReleaseId: expectedSha,
           },
@@ -544,6 +551,7 @@ export async function smoke({
               data['id'] === pilotId &&
               data['snapshotVersion'] === SNAPSHOT_VERSION &&
               data['asteroidInteractions'] === ASTEROID_INTERACTIONS_CAPABILITY &&
+              data['explorationVersion'] === 1 &&
               typeof data['resumeToken'] === 'string' &&
               data['resumeToken'].length > 0,
             'Gameplay join admission is incomplete or mismatched'
@@ -554,6 +562,7 @@ export async function smoke({
             playerId: pilotId,
             snapshotVersion: SNAPSHOT_VERSION,
             asteroidInteractions: ASTEROID_INTERACTIONS_CAPABILITY,
+            explorationVersion: 1,
           };
         } else if (message['type'] === 'shotAcknowledged') {
           requireEvidence(

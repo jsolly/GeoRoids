@@ -53,10 +53,10 @@ describe('mineral asteroids break with distinct rewards', () => {
 
   test('metal takes three hits and drops three times the ice shard mass', () => {
     const engine = new GameEngine(42);
-    engine.addAsteroid(mineral('ice'));
-    engine.addAsteroid(mineral('metal'));
-    engine.handleAsteroidHit('ice', 'pilot', 'laser');
-    expect(engine.applyLaserAsteroidHit('metal', 'pilot', 'laser')).toMatchObject({
+    engine.asteroidLifecycle.insert(mineral('ice'));
+    engine.asteroidLifecycle.insert(mineral('metal'));
+    engine.asteroidMining.hit('ice', 'pilot', 'laser');
+    expect(engine.asteroidMining.apply('metal', 'pilot', 'laser')).toMatchObject({
       applied: true,
       outcome: 'damaged',
       points: 0,
@@ -64,14 +64,14 @@ describe('mineral asteroids break with distinct rewards', () => {
       origin: { x: 400, y: 300 },
     });
     expect(engine.getAsteroid('metal')?.health).toBe(DAMAGE.LASER_HIT * 2);
-    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser').outcome).toBe('damaged');
-    expect(engine.handleAsteroidHit('metal', 'pilot', 'laser').outcome).toBe('destroyed');
+    expect(engine.asteroidMining.hit('metal', 'pilot', 'laser').outcome).toBe('damaged');
+    expect(engine.asteroidMining.hit('metal', 'pilot', 'laser').outcome).toBe('destroyed');
     const masses = engine
       .getLoot()
       .filter((drop) => drop.kind === 'shard')
       .map((drop) => drop.mass);
     expect(masses).toEqual([0.25, 0.75]);
-    expect(engine.handleAsteroidHit('metal', 'pilot').outcome).toBe('missing');
+    expect(engine.asteroidMining.hit('metal', 'pilot').outcome).toBe('missing');
     expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(2);
   });
 
@@ -96,8 +96,8 @@ describe('mineral asteroids break with distinct rewards', () => {
 
   test('one pilot breaking rubble creates three fragments', () => {
     const engine = new GameEngine(42);
-    engine.addAsteroid(mineral('rubble'));
-    const result = engine.applyLaserAsteroidHit('rubble', 'pilot');
+    engine.asteroidLifecycle.insert(mineral('rubble'));
+    const result = engine.asteroidMining.apply('rubble', 'pilot');
     expect(result.applied).toBe(true);
     expect(result.newAsteroids).toHaveLength(3);
   });

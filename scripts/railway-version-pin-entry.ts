@@ -12,6 +12,7 @@ import { runNetworkSmoke } from './production-smoke-network.mjs';
 import { productionUrl, smoke } from './production-smoke-scenario.mjs';
 import {
   railwayCli,
+  railwayCliEnvironment,
   railwayTarget,
   runVersionPin,
   selectMode,
@@ -91,21 +92,7 @@ try {
   privateDirectory = await mkdtemp(join(tmpdir(), 'georoids-railway-config-'));
   const planPath = join(privateDirectory, 'plan.json');
   // Children receive only the dedicated token. Capture every byte; provider errors may contain secrets.
-  const cliEnvironment = { ...process.env };
-  for (const key of Object.keys(cliEnvironment)) {
-    if (key.startsWith('RAILWAY_')) {
-      delete cliEnvironment[key];
-    }
-  }
-  Object.assign(cliEnvironment, {
-    RAILWAY_TOKEN: token,
-    RAILWAY_PROJECT_ID: railwayTarget.project,
-    RAILWAY_ENVIRONMENT_ID: railwayTarget.environment,
-    RAILWAY_SERVICE_ID: railwayTarget.service,
-    RAILWAY_CALLER: 'skill:use-railway@1.3.5',
-    RAILWAY_AGENT_SESSION: `georoids-version-pin-${process.env['GITHUB_RUN_ID'] ?? 'workflow'}`,
-    CI: 'true',
-  });
+  const cliEnvironment = railwayCliEnvironment(process.env, cli);
   const receipt = await runVersionPin({
     railway: async (args) => {
       try {
@@ -117,8 +104,14 @@ try {
           })
         ).stdout;
       } catch (error) {
+        const phase =
+          args[0] === 'api'
+            ? 'snapshot query'
+            : args[0] === 'config' && args[1] === 'plan'
+              ? 'configuration plan'
+              : 'provider command';
         throw new VersionPinError(
-          'Pinned Railway command failed; raw provider output was withheld',
+          `Pinned Railway ${phase} failed; raw provider output was withheld`,
           {
             cause: error,
           }

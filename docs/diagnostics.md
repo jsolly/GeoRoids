@@ -435,3 +435,47 @@ Stopped phone reports retain the 16 largest recorded intervals over 25 ms across
 all chunks, with the preceding completed frame's Scan stage, scenery path, visible
 spider count and CPU work. The report includes the total number of slow intervals;
 the retained examples are neither a complete event timeline nor causal attribution.
+
+## Canvas backing budget and recording heartbeat
+
+Copied diagnostics include `graphics.bitmapBudget`; each full performance sample
+includes the same `bitmapBudget` snapshot. `liveBytes` and `livePixels` count
+application-owned canvas dimensions at four bytes per pixel. `highWaterBytes`
+and `highWaterPixels` retain the page lifetime maximum, and `owners` separates
+presentation canvases from artwork. A resize replaces its old charge. Disposal
+zeros the bitmap before dropping its handle; the ledger holds no strong DOM
+references and does not wait for garbage collection.
+
+The shared 64 MiB admission budget denies new optional caches when their resize
+would exceed the remaining budget. Asteroids, pickups, lasers, furnace and court
+artwork then use native painters; Scan scenery uses its existing native rear.
+The map retains a vector exploration path per immutable snapshot when its raster
+is denied. Required playfield, title, map, schematic, spawn and GPU presentation
+canvases remain admitted. `overBudgetBytes` explicitly reports excess, including
+presentation growth after caches were admitted. This is not a hard total-memory
+cap or a measured iPhone memory limit.
+
+The estimate includes retained idle cache bitmaps and canvas dimensions while a
+context is lost. Browsers may reclaim backing storage at different times. It
+excludes textures, framebuffers, decoded images, compositor buffers, paths,
+audio and other CPU/GPU memory; it cannot identify OS memory pressure. No
+ImageBitmap or OffscreenCanvas allocation exists in the current client. Add new
+bitmap owners through `bitmapBudget.ts` and release them at the owner's disposal.
+
+Starting explicit phone collection starts one dedicated 100 ms heartbeat worker;
+Stop, pagehide, collection limits and shell disposal terminate it. Raw samples
+include `heartbeat` with worker epoch/status, sender monotonic time/time origin,
+wall time, sequence, main receipt times, gaps, visibility epochs and lifecycle
+events. Each drain retains at most 128 ticks and 16 lifecycle events, with
+observed/omitted counts. Worker failure or blocked creation reports unavailable
+or failed evidence without stopping the recording. A new Start creates a new
+epoch; a recording interrupted before persistence still has a missing interval.
+
+A main receipt gap accompanied by continuous sender sequences and clock spacing
+supports main-thread blocking. A gap in both clocks is ambiguous: worker
+throttling, page suspension and other scheduling behavior can look alike.
+Visibility/lifecycle events are main-thread observations and can arrive late.
+Clock jumps, worker restarts, omitted ticks or absent worker evidence prevent a
+clean comparison. Neither pattern proves memory pressure or an OS suspension
+cause. Download the complete checksummed recording; the timing summary alone
+does not contain this independent evidence.

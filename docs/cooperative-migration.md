@@ -28,6 +28,67 @@ separate campaign scenario tests.
 
 ## Human production preflight
 
+### Keep the container available without starting gameplay
+
+The separate `server/maintenance.ts` entrypoint keeps an HTTP listener alive for
+Railway Console access. It imports no game engine, world store, backup scheduler
+or debug-report writer. It does not open the world, create a database, run a
+migration, activate a campaign or start gameplay. Database operations remain
+separate, explicitly approved operator commands in the Console. It provides no
+HTTP command endpoint.
+
+After reviewing and publishing a release containing this entrypoint, John can
+approve a maintenance deployment on the existing production service and volume.
+Its exact start command is:
+
+```sh
+node --import tsx server/maintenance.ts
+```
+
+This is a proposed production configuration handoff, not a command to run beside
+the existing game process. Keep one replica and the existing `/data` mount and
+world generation. Preserve unrelated staged Railway changes and the separately
+held exploration-storage rollout. Do not use the environment-wide Apply/Deploy
+button to enter maintenance, and do not use a pre-deploy hook: Railway does not
+mount the volume during pre-deploy.
+
+Establish the maintenance window and stop live play. Verify the previous game
+instance completed its graceful final checkpoint, released its writer and
+terminated before accepting the new maintenance instance as exclusive access.
+A failed/skipped final flush is a stop condition. Railway's attached-volume
+deployment exclusivity helps prevent overlapping instances, but neither a
+zero-player pause nor a successful health check proves the old writer closed.
+Do not suspend or kill a live writer as a shortcut.
+
+`GET /health` and `HEAD /health` return 200 for container readiness. The JSON body
+explicitly says `status: "maintenance"`, `gameplayAvailable: false` and
+`worldOpened: false`, with the release ID. Every other HTTP request and every
+WebSocket upgrade returns 503. The response never echoes request data. Canonical
+gameplay smoke is expected to fail during this window; readiness is not gameplay
+or persistence health. Coordinate that expected outage without silently disabling
+alerts or changing workflows.
+
+Open the maintenance instance's Console and verify its release and volume using
+the preflight below. The ready event records the actual port but does not claim
+the volume exists or is correct. If the Console shell cannot find `node`,
+`readlink -f /proc/1/exe` identifies the maintenance process's executable. Use the
+observed absolute path for subsequent approved commands; do not guess an install
+path or change production PATH. Inspection, backup, apply and activation remain
+separate steps with their original approval and receipt requirements.
+
+After separately approved activation, restore the exact normal start command
+`node --import tsx server.ts` through a reviewed service-specific configuration
+and deployment handoff. A bare restart retains the maintenance start command and
+does not restore gameplay. Verify the new ordinary game instance, genuine active
+campaign join and healthy subsequent persistence before ending maintenance.
+
+Local verification uses disposable databases and real loopback connections. It
+does not establish actual Railway graceful replacement, Console access, backup,
+migration, activation or recovery on the production volume. No in-game Wiki rule,
+control or demonstration changes: this is operator-only startup tooling.
+
+### Verify the existing production target
+
 The verified production target is project
 `08a7b6ee-af66-4c58-a21e-700d5468ee14`, environment
 `94d3de2f-4bb0-4051-8975-a30190c2fffa`, service

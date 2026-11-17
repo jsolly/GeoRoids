@@ -124,3 +124,29 @@ callbacks outside the current frame timers. The recordings do not attribute the
 missing time. Reproduce post-stall movement rejection separately and add recovery
 coverage once its mechanism is established. Final incident closure requires the
 physical-phone result.
+
+## Next capture: bitmap and independent-clock evidence
+
+The new instrumentation does not close this incident. On the same physical
+phone, open `/?performance=collect`, warm up, enter model and conditions,
+and choose Start. Steer and fire with Sound off through any reproduced freeze,
+then Stop and Download before starting another session. Record background and
+foreground transitions separately and preserve the complete checksummed file,
+release identifiers and test conditions.
+
+Inspect `bitmapBudget` in each raw sample for live/high-water RGBA backing
+estimates, owner totals, the 64 MiB cache admission budget, denied allocations
+and mandatory presentation excess. This counts canvas dimensions, including
+idle cache surfaces, rather than total browser CPU/GPU memory. The budget is an
+application policy, not evidence of the phone's OOM threshold. See the
+[allocation and heartbeat contract](../diagnostics.md#canvas-backing-budget-and-recording-heartbeat).
+
+Correlate the slow-frame/collection gap with `heartbeat` sender sequences,
+monotonic/wall clocks and main receipt timestamps within the same worker epoch.
+Continuous sender ticks delivered after a main gap support main-only blocking.
+Gaps in both clocks remain ambiguous with worker throttling, suspension and
+other scheduling causes. Check visibility/lifecycle epochs, clock-jump flags,
+worker status and omission counters before drawing any conclusion. The worker
+cannot establish memory pressure; native device evidence is still needed for
+that attribution. Hosted mobile Chromium smoke verifies the controls and export
+path only. Physical iPhone reproduction and interpretation remain acceptance.

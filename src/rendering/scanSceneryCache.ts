@@ -261,7 +261,7 @@ export class ScanSceneryCache {
     if (pixels + this.pixels > SCAN_SCENERY_MAX_PIXELS) {
       return this.disable('pixel-limit');
     }
-    let surface: RasterSurface;
+    let surface: RasterSurface | undefined;
     try {
       surface = prepareRasterSurface(
         pixelWidth,
@@ -273,6 +273,9 @@ export class ScanSceneryCache {
       if (observing) {
         clientPerformance.record('scanSceneryBuildMs', performance.now() - started);
       }
+      return this.disable('allocation');
+    }
+    if (!surface) {
       return this.disable('allocation');
     }
     this.pixels += pixels;

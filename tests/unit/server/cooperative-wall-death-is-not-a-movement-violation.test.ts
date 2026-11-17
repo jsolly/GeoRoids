@@ -62,6 +62,7 @@ test('a cooperative wall death is recorded as gameplay, not as a movement violat
           position: rim,
           snapshotVersion: SNAPSHOT_VERSION,
           asteroidInteractions: 1,
+          explorationVersion: 1,
           // An activated campaign refuses a join that does not declare it.
           cooperativeVersion: 1,
         },
@@ -84,7 +85,7 @@ test('a cooperative wall death is recorded as gameplay, not as a movement violat
     // record's one-second per-entity throttle, which is what made the fatal
     // contact silent: a pilot pinned at the rim is normally taking other
     // damage, and the terminal record has to survive that.
-    engine.handleShipDamage(joined.id, 'asteroid', 10);
+    engine.shipDamage.apply(joined.id, 'asteroid', 10);
     expect(engine.getPlayer(joined.id)?.health).toBe(90);
     expect(info.mock.calls.filter(([, event]) => event === 'damage_applied')).toHaveLength(1);
 
@@ -105,7 +106,7 @@ test('a cooperative wall death is recorded as gameplay, not as a movement violat
     );
 
     // Cooperative play routes a hull reaching zero health into a rescue window
-    // rather than destroying it, so `handleShipDamage` reports
+    // rather than destroying it, so `ShipDamage.apply` reports
     // `isDestroyed: false`. The contact still ended this life, so it must not
     // spend the rejection warning's five-second per-socket window — reading the
     // destroyed flag alone would log every wall death in the mode this game is

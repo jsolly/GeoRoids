@@ -28,7 +28,7 @@ const BELT_PASSES_PER_FRAME = 1;
 
 /**
  * The once-a-second frame, on the cadence AGENTS.md sanctions for work leaving
- * the loop. Two blocks land on it together: `ensureAsteroidField` copies the
+ * the loop. Two blocks land on it together: `AsteroidField.advanceRegions` copies the
  * belt three times in `RegionalAsteroidField.update`, and `checkpointWorld`
  * copies it four more in `RegionalAsteroidField.checkpoint` — but only when a
  * `WorldPersistence` exists, which production always has. Both counts are
@@ -63,7 +63,9 @@ describe('A frame walks the asteroid belt once, for physics', () => {
   /** Distant sleepers: they only ever cost the frame its mandatory passes. */
   function fillBelt(count: number, from = 0): void {
     for (let i = from; i < from + count; i++) {
-      world.engine.addAsteroid(cargo(`sleeper-${i}`, { x: 30_000 + i * 400, y: 30_000 }));
+      world.engine.asteroidLifecycle.insert(
+        cargo(`sleeper-${i}`, { x: 30_000 + i * 400, y: 30_000 })
+      );
     }
   }
 
@@ -119,7 +121,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     fillBelt(200);
     const rock = cargo('burning-cargo', { ...TOWN_HEARTH.position });
     rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
 
     const cost = frameCost();
 
@@ -135,10 +137,10 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     fillBelt(200);
     const rock = cargo('loaded-cargo', { ...TOWN_HEARTH.position });
     rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
 
     probe.reset();
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
 
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
     expect(probe.snapshot()).toMatchObject({ beltPasses: 0, rowsVisited: 0, beltCopies: 0 });
@@ -147,7 +149,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
   test('a rock armed through the ability message is pruned when its owner dies, belt untouched', () => {
     fillBelt(200);
     const rock = cargo('armed-cargo', { x: 150, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     world.entity(hauler).angle = 0;
     equipBoostCoupling(hauler);
     activate(hauler);
@@ -168,7 +170,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     // the next frame instead of being missed for good.
     fillBelt(200);
     const rock = cargo('smuggled-cargo', { ...TOWN_HEARTH.position });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
 
     frameCost();
@@ -182,7 +184,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     // Slot 0 is a native crawler slot, so this rock is born carrying one.
     const occupied = beltAsteroid(7, 0, 1);
     expect(isNativeCrawlerSlot(occupied.id)).toBe(true);
-    world.engine.addAsteroid(occupied);
+    world.engine.asteroidLifecycle.insert(occupied);
     world.move(hauler, { ...occupied.position });
 
     frameCost();
@@ -227,12 +229,12 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const miner = engine.addPlayer('miner', 'Miner', socket, { x: 0, y: 0 }, 'hauler');
-    expect(engine.registerPilot(miner, socket).ok).toBe(true);
+    expect(engine.pilotSessions.register({ actor: miner, socket: socket }).ok).toBe(true);
     for (const existing of engine.getAllAsteroids()) {
-      engine.removeAsteroid(existing.id);
+      engine.asteroidLifecycle.remove(existing.id);
     }
     for (let i = 0; i < 40; i++) {
-      engine.addAsteroid(cargo(`persisted-${i}`, { x: 300 + i * 120, y: 0 }));
+      engine.asteroidLifecycle.insert(cargo(`persisted-${i}`, { x: 300 + i * 120, y: 0 }));
     }
     const persisted = instrumentBeltTraversals(engine);
     const busy: { frame: number; beltPasses: number; beltCopies: number }[] = [];
@@ -267,12 +269,12 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     // derived sets whatever today's callers happen to pass.
     fillBelt(60);
     const rock = cargo('patched-cargo', { ...TOWN_HEARTH.position });
-    world.engine.addAsteroid(rock);
-    world.engine.updateAsteroid(rock.id, {
+    world.engine.asteroidLifecycle.insert(rock);
+    world.engine.asteroidLifecycle.update(rock.id, {
       boost: { phase: 'burning', ownerId: hauler.id, angle: 0 },
     });
 
-    world.engine.processFurnaceDeliveries();
+    world.engine.furnaceDeliveries.advance();
 
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
   });
@@ -280,9 +282,9 @@ describe('A frame walks the asteroid belt once, for physics', () => {
   test('crawler rows set through the manager put their rock back on the frame', () => {
     fillBelt(60);
     const rock = cargo('patched-host', { x: 600, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     expect(isNativeCrawlerSlot(rock.id)).toBe(false);
-    world.engine.updateAsteroid(rock.id, {
+    world.engine.asteroidLifecycle.update(rock.id, {
       beltCrawlerIds: ['belt-crawler:patched-host:0'],
       beltCrawlerHealth: [BELT_CRAWLER.MAX_HEALTH],
     });
@@ -301,7 +303,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     // again once a population dip drops its body.
     fillBelt(60);
     const rock = cargo('smuggled-host', { x: 900, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     expect(isNativeCrawlerSlot(rock.id)).toBe(false);
     rock.beltCrawlerIds = ['belt-crawler:smuggled-host:0'];
     rock.beltCrawlerHealth = [BELT_CRAWLER.MAX_HEALTH];
@@ -319,9 +321,9 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     // it the observable for a host the manager was told about directly.
     fillBelt(60);
     const rock = cargo('combat-host', { x: 1_200, y: 0 });
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
     expect(isNativeCrawlerSlot(rock.id)).toBe(false);
-    world.engine.updateAsteroid(rock.id, {
+    world.engine.asteroidLifecycle.update(rock.id, {
       beltCrawlerIds: ['belt-crawler:combat-host:0'],
       beltCrawlerHealth: [BELT_CRAWLER.MAX_HEALTH],
     });
@@ -340,7 +342,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
     fillBelt(60);
     const rock = cargo('spent-cargo', { ...TOWN_HEARTH.position });
     rock.boost = { phase: 'burning', ownerId: hauler.id, angle: 0 };
-    world.engine.addAsteroid(rock);
+    world.engine.asteroidLifecycle.insert(rock);
 
     frameCost();
     expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
@@ -352,7 +354,7 @@ describe('A frame walks the asteroid belt once, for physics', () => {
   test('a belt four times larger costs the frame no extra pass', () => {
     fillBelt(100);
     const armed = cargo('armed-cargo', { x: 150, y: 0 });
-    world.engine.addAsteroid(armed);
+    world.engine.asteroidLifecycle.insert(armed);
     world.entity(hauler).angle = 0;
     equipBoostCoupling(hauler);
     activate(hauler);

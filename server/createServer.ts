@@ -40,6 +40,8 @@ import { openWorldPersistence } from './world/openWorldPersistence';
 
 type CreateServerOptions = {
   port?: number;
+  /** Explicit loopback binding for owned local restore rehearsals. */
+  host?: string;
   nodeEnv?: string;
   seed?: number;
   worldPath?: string;
@@ -300,6 +302,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       if (
         url.pathname !== '/logs' &&
         (url.searchParams.get('snapshotVersion') !== String(SNAPSHOT_VERSION) ||
+          url.searchParams.get('explorationVersion') !== '1' ||
           url.searchParams.get('asteroidInteractions') !== String(ASTEROID_INTERACTIONS_CAPABILITY))
       ) {
         // Reject before open: clients without the supported capability otherwise
@@ -365,7 +368,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   gameEngine.startGameLoop();
   gameEngine.updatePauseState();
   const wsCore = new WebSocketCore(gameEngine);
-  gameEngine.setOnAsteroidHits((hits) => {
+  gameEngine.asteroidHitFeedback.setListener((hits) => {
     wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
   });
   wsCore.startPeriodicGameStateBroadcast();
@@ -499,7 +502,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   const listening = new Promise<number>((resolve, reject) => {
     httpServer.once('error', reject);
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, options.host, () => {
       httpServer.off('error', reject);
       const actualPort = getPort();
       logger.info(`✅ Server listening on port ${actualPort}`);

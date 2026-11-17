@@ -72,8 +72,8 @@ test.each(['laser', 'collision'] as const)(
       const pilot = world.join('Miner', { x: 0, y: 0 });
       world.clearAsteroids();
       const rock = rider();
-      world.engine.addAsteroid(rock);
-      const result = world.engine.handleAsteroidHit(rock.id, pilot.id, cause, 1000);
+      world.engine.asteroidLifecycle.insert(rock);
+      const result = world.engine.asteroidMining.hit(rock.id, pilot.id, cause, 1000);
       expect(result.outcome).toBe('destroyed');
       expect(world.engine.getLoot().filter((drop) => drop.salvage === 'crystal')).toHaveLength(
         cause === 'laser' ? 1 : 0

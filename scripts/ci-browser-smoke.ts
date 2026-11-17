@@ -5,6 +5,7 @@ import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { type Browser, chromium, type Page } from 'playwright';
 import { runPhoneDiagnostics, runRemoteMotion } from './ci-browser-smoke-focus';
+import { type CandidateProtocol, loadCandidateProtocol } from './ci-browser-smoke-protocol';
 
 // The verification entry point accepts no target URL and uses the owned local origin.
 const origin = 'http://127.0.0.1:5173';
@@ -30,6 +31,7 @@ const completed: string[] = [];
 const screenshots: string[] = [];
 let browser: Browser | undefined;
 let succeeded = false;
+let candidateProtocol: CandidateProtocol | null = null;
 
 async function capture(page: Page, name: string): Promise<void> {
   const filename = `${name}.png`;
@@ -59,6 +61,13 @@ function monitor(page: Page, name: string): void {
 }
 
 try {
+  if (focus === 'remote-motion') {
+    candidateProtocol = await loadCandidateProtocol({
+      workspaceRoot: process.env['GITHUB_WORKSPACE'],
+      candidateRoot: process.env['BROWSER_SMOKE_CANDIDATE_ROOT'],
+      requestedSha: candidateSha,
+    });
+  }
   browser = await chromium.launch();
   // A deadline bounds owned server startup; it is not a performance assertion.
   const readiness = await browser.newPage();
@@ -147,7 +156,8 @@ try {
   }
   const exercise = { browser, artifacts, origin, capture, monitor };
   if (focus === 'remote-motion') {
-    await runRemoteMotion(exercise);
+    assert(candidateProtocol, 'Candidate protocol was not loaded');
+    await runRemoteMotion({ ...exercise, protocol: candidateProtocol });
     completed.push('Two identified pilots joined; observer received subject motion during steer');
   } else if (focus === 'phone-diagnostics') {
     await runPhoneDiagnostics(exercise);
@@ -173,6 +183,7 @@ try {
         candidateSha,
         focus,
         workflowSha: process.env['BROWSER_SMOKE_WORKFLOW_SHA'],
+        candidateDecoder: candidateProtocol?.identity ?? null,
         runId: process.env['GITHUB_RUN_ID'],
         browser: browser?.version() ?? null,
         node: process.version,

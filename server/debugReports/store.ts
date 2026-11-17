@@ -218,13 +218,28 @@ export class DebugReportStore {
         }
       }
     };
-    // Refuse a limited caller before the report sanitizer runs, so repeated
-    // uploads cannot buy worker time. A counter only grows within its bucket, so
-    // a refusal here would also happen inside the transaction. A pass here can go
-    // stale, because anything that counts a report while this one is redacted
-    // (another accept on this connection or another connection) moves the
-    // counter, so the transaction checks again before it counts this report.
-    rejectIfLimited();
+    // Reserve the expensive attempt durably before sanitizing. Failed redaction or
+    // later storage checks spend the same budget, including across process restarts.
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      rejectIfLimited();
+      for (const [scope, bucket] of limits) {
+        this.db
+          .prepare(
+            'INSERT INTO rate_counters(scope,bucket,count) VALUES(?,?,1) ON CONFLICT(scope,bucket) DO UPDATE SET count=count+1'
+          )
+          .run(scope, bucket);
+      }
+      this.db
+        .prepare(
+          "DELETE FROM rate_counters WHERE (scope='global' AND bucket<?) OR (scope!='global' AND bucket<?)"
+        )
+        .run(day - 1, hour - 1);
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
     const receivedAt = new Date(now).toISOString();
     const diagnostics = sanitizeDebugDiagnostics(
       submission.diagnostics,
@@ -304,14 +319,6 @@ export class DebugReportStore {
     }
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      rejectIfLimited();
-      for (const [scope, bucket] of limits) {
-        this.db
-          .prepare(
-            'INSERT INTO rate_counters(scope,bucket,count) VALUES(?,?,1) ON CONFLICT(scope,bucket) DO UPDATE SET count=count+1'
-          )
-          .run(scope, bucket);
-      }
       this.db
         .prepare(
           'INSERT INTO reports(id,input_hash,receipt_hash,state,received_at,payload,description,integrity_hash,commands) VALUES(?,?,?,?,?,?,?,?,?)'
@@ -327,11 +334,6 @@ export class DebugReportStore {
           integrityHash,
           JSON.stringify(commands)
         );
-      this.db
-        .prepare(
-          "DELETE FROM rate_counters WHERE (scope='global' AND bucket<?) OR (scope!='global' AND bucket<?)"
-        )
-        .run(day - 1, hour - 1);
       this.db.exec('COMMIT');
     } catch (error) {
       this.db.exec('ROLLBACK');

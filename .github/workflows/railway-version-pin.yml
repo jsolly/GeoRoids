@@ -1,20 +1,7 @@
 ---
 name: Railway version pin
 'on':
-  push:
-    branches: [main]
-    paths:
-      - .railway/**
-      - scripts/railway-version-pin*.ts
-      - .github/workflows/railway-version-pin.yml
   workflow_dispatch:
-    inputs:
-      mode:
-        description: Plan only, or apply after separate production apply authorization
-        required: true
-        type: choice
-        default: plan-only
-        options: [plan-only, apply]
 permissions:
   contents: read
 concurrency:
@@ -22,12 +9,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   pin:
-    # HARD DISABLED. Enabling requires John's separate approval, a reviewed edit
-    # here, verified live plan/staged semantics, and the dedicated production token.
+    # John authorized manual plan-only setup on 2026-11-14. Production apply
+    # requires separate approval and a reviewed workflow change.
     if: >-
       github.repository == 'jsolly/GeoRoids' &&
-      github.repository == 'DISABLED/REQUIRES-APPROVAL' &&
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     environment: railway-production-config
@@ -55,11 +42,10 @@ jobs:
           tar -xzf "$work/railway.tar.gz" -C "$work" railway
           echo "b0919b175c72cd829f9124caa9cf6d1a116741d847ef7be72abed14c70d3f43a  $work/railway" | sha256sum --check --status
           echo "RAILWAY_CONFIG_CLI=$work/railway" >> "$GITHUB_ENV"
-      - name: Plan or apply the reviewed pin
+      - name: Review the read-only pin plan
         env:
           RAILWAY_CONFIG_TOKEN: ${{ secrets.RAILWAY_CONFIG_TOKEN }}
-          RAILWAY_CONFIG_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (vars.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'apply' || 'plan-only') }}
-          RAILWAY_CONFIG_APPLY_ENABLED: ${{ vars.RAILWAY_CONFIG_APPLY_ENABLED == 'true' && 'version-pin-only' || 'disabled' }}
+          RAILWAY_CONFIG_APPLY_ENABLED: disabled
         run: |
           umask 077
-          node --import tsx scripts/railway-version-pin-entry.ts --workflow-mode
+          node --import tsx scripts/railway-version-pin-entry.ts --plan-only

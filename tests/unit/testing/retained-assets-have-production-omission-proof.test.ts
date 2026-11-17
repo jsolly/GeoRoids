@@ -1,8 +1,8 @@
 /* @vitest-environment node */
 import assert from 'node:assert/strict';
 import { expect, test, vi } from 'vitest';
-import type { FetchAsset } from '../../../scripts/build-vercel-output.mts';
 import { contentHash } from '../../../scripts/build-vercel-output.mts';
+import type { FetchAsset } from '../../../scripts/verify-retained-assets.mts';
 import {
   captureRetainedAssets,
   verifyRetainedAssets,

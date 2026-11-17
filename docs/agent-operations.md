@@ -76,18 +76,12 @@ worker or previous-build cache is required; documents and release metadata stay 
 
 Retain availability for at least 30 days. The provider exposes no expiry field in
 this manifest, so files may remain longer. Do not rotate `VERCEL_HASH_SALT`, remove
-retention routing, delete historical deployments or promote pre-migration outputs
+retention routing, delete historical deployments or promote outputs without retention
 during this window. Supported rollbacks rebuild Git main with retention intact.
 This protects asset loading, not compatibility with a newer server protocol.
 
-The migration inventory in `scripts/legacy-client-assets.json` pins all 13 generated
-JS/CSS assets of production `c45e47bd281684f6ff94e89ff4c61a545967bba9`.
-Exact `/_astro/` aliases route these original URLs to the shared immutable registry.
-Production builds verify existing registry bytes, bootstrapping only missing entries
-from the pinned first-party deployment; errors or checksum changes fail the build.
-Local, CI and Railway builds make no migration network requests. Older releases
-outside this inventory have no retroactive availability guarantee. Mutable public
-media is outside the generated-chunk contract.
+All builds emit the native immutable manifest without fetching previous deployments.
+Mutable public media is outside the generated-chunk contract.
 
 To verify native retention across two completed production deployments, capture
 the current canonical asset bytes before the next merge:
@@ -108,8 +102,7 @@ SHA-256 and content type with cache bypassed. Identical inventory reads bracket 
 downloads; a deployment changing during verification fails. Capture likewise rejects
 a changing document/module inventory. Keep the completed host deployment receipts
 with this evidence. This proves initial cross-deployment availability, not the
-passage of 30 days, browser rendering or legacy migration; verify legacy aliases
-against their separate pinned inventory. The public inventory is generated from the
+passage of 30 days or browser rendering. The public inventory is generated from the
 exact native manifest and served with `Cache-Control: no-store`.
 
 The repo adapts the merged website-update contract from dotagents

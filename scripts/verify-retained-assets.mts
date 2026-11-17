@@ -4,8 +4,15 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import type { AssetPin, FetchAsset } from './build-vercel-output.mts';
 import { clientAssetGraph, clientDocumentAssets } from './client-asset-graph.ts';
+
+interface AssetPin {
+  path: string;
+  bytes: number;
+  sha256: string;
+}
+
+export type FetchAsset = (url: string, init?: RequestInit) => Response | Promise<Response>;
 
 const origin = 'https://www.georoids.com';
 const assetPattern = /^\/_vercel\/immutable\/[a-f0-9]{24}\/[a-zA-Z0-9_.-]+\.(?:js|css)$/u;

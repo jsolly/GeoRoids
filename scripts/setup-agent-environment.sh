@@ -56,22 +56,26 @@ register_session_env() {
   grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || printf '%s\n' "$line" >>"$CLAUDE_ENV_FILE"
 }
 
-# Install a pinned single-binary scanner from its GitHub release download URL into the gate's
-# GATE_TOOLCHAIN_BIN, where its lookups find it. mise resolves these through the GitHub API, which
-# Claude's cloud sessions cannot reach, while release downloads work there. The extracted binary
-# must match the gate library's hash for this platform before it is installed or run.
+# Install a pinned tool from its GitHub release download URL: a scanner into the gate's
+# GATE_TOOLCHAIN_BIN, where its lookups find it, and uv into GATE_UV_BIN_DIR, which env.sh puts
+# on PATH. mise resolves these through the
+# GitHub API, which Claude's cloud sessions cannot reach, while release downloads work there. Each
+# extracted binary must match the gate library's hash for this platform before any is installed or run.
 # scripts/security-scan.sh keeps its own Linux installers for CI: they pin archive hashes that
 # CI's contract test shares with ci.yml, where this one checks the binary on every platform.
-install_pinned_release() ( # <gitleaks|zizmor|osv-scanner>
+install_pinned_release() ( # <gitleaks|zizmor|osv-scanner|uv>
   tool="$1"
+  # Archive members, each installed under its own name; none for a release that is the bare binary.
+  members=("$tool")
+  destination="$GATE_TOOLCHAIN_BIN"
   case "$tool" in
     gitleaks) base="https://github.com/gitleaks/gitleaks/releases/download/v$GATE_GITLEAKS_VERSION" ;;
     zizmor) base="https://github.com/zizmorcore/zizmor/releases/download/v$GATE_ZIZMOR_VERSION" ;;
     osv-scanner) base="https://github.com/google/osv-scanner/releases/download/v$GATE_OSV_SCANNER_VERSION" ;;
+    # uv is found on PATH, so it goes to env.sh's directory rather than the hash-checked scanners'.
+    uv) base="https://github.com/astral-sh/uv/releases/download/$GATE_UV_VERSION"; destination="$GATE_UV_BIN_DIR" ;;
     *) echo "✗ No pinned release for $tool." >&2; exit 1 ;;
   esac
-  # Archive member, or empty for a release that is the bare binary.
-  member="$tool"
   case "$tool $(uname -s) $(uname -m)" in
     'gitleaks Linux x86_64') asset="gitleaks_${GATE_GITLEAKS_VERSION}_linux_x64.tar.gz" ;;
     'gitleaks Linux aarch64' | 'gitleaks Linux arm64') asset="gitleaks_${GATE_GITLEAKS_VERSION}_linux_arm64.tar.gz" ;;
@@ -79,34 +83,50 @@ install_pinned_release() ( # <gitleaks|zizmor|osv-scanner>
     'zizmor Linux x86_64') asset=zizmor-x86_64-unknown-linux-gnu.tar.gz ;;
     'zizmor Linux aarch64' | 'zizmor Linux arm64') asset=zizmor-aarch64-unknown-linux-gnu.tar.gz ;;
     'zizmor Darwin arm64') asset=zizmor-aarch64-apple-darwin.tar.gz ;;
-    'osv-scanner Linux x86_64') asset=osv-scanner_linux_amd64; member='' ;;
-    'osv-scanner Linux aarch64' | 'osv-scanner Linux arm64') asset=osv-scanner_linux_arm64; member='' ;;
-    'osv-scanner Darwin arm64') asset=osv-scanner_darwin_arm64; member='' ;;
+    'osv-scanner Linux x86_64') asset=osv-scanner_linux_amd64; members=() ;;
+    'osv-scanner Linux aarch64' | 'osv-scanner Linux arm64') asset=osv-scanner_linux_arm64; members=() ;;
+    'osv-scanner Darwin arm64') asset=osv-scanner_darwin_arm64; members=() ;;
+    # uv's archive holds uv and uvx in a directory named after the asset.
+    'uv Linux x86_64') asset=uv-x86_64-unknown-linux-gnu.tar.gz
+      members=(uv-x86_64-unknown-linux-gnu/uv uv-x86_64-unknown-linux-gnu/uvx) ;;
+    'uv Linux aarch64' | 'uv Linux arm64') asset=uv-aarch64-unknown-linux-gnu.tar.gz
+      members=(uv-aarch64-unknown-linux-gnu/uv uv-aarch64-unknown-linux-gnu/uvx) ;;
+    'uv Darwin arm64') asset=uv-aarch64-apple-darwin.tar.gz
+      members=(uv-aarch64-apple-darwin/uv uv-aarch64-apple-darwin/uvx) ;;
     *) echo "✗ No pinned $tool release for $(uname -s) $(uname -m). Install the gate's pinned $tool on PATH, then rerun $0." >&2; exit 1 ;;
   esac
   scratch="$(mktemp -d)"
   trap 'rm -rf "$scratch"' EXIT
   url="$base/$asset"
   curl --fail --silent --show-error --location --retry 3 --connect-timeout 20 --max-time 300 "$url" -o "$scratch/download"
-  if [[ -n "$member" ]]; then
+  bins=()
+  for member in "${members[@]}"; do
     tar -xzf "$scratch/download" -C "$scratch" "$member" ||
       { echo "✗ $url holds no $member binary. Nothing was installed." >&2; exit 1; }
-    bin="$scratch/$member"
-  else
-    bin="$scratch/download"
+    bins+=("$scratch/$member")
+  done
+  if ((${#bins[@]} == 0)); then
+    mv "$scratch/download" "$scratch/$tool"
+    bins=("$scratch/$tool")
   fi
-  "gate__verify_${tool//-/_}_bin" "$bin" || { echo "✗ Nothing was installed from $url." >&2; exit 1; }
-  mkdir -p "$GATE_TOOLCHAIN_BIN"
-  install -m 0755 "$bin" "$GATE_TOOLCHAIN_BIN/$tool"
+  for bin in "${bins[@]}"; do
+    name="${bin##*/}"
+    "gate__verify_${name//-/_}_bin" "$bin" || { echo "✗ Nothing was installed from $url." >&2; exit 1; }
+  done
+  mkdir -p "$destination"
+  for bin in "${bins[@]}"; do
+    install -m 0755 "$bin" "$destination/${bin##*/}"
+  done
 )
 
-# The gate's tools, each from the source that works without the GitHub API where it can.
-# Node always comes from mise, whose installation the dependency receipt records. uv is mise's
-# when mise has it, else the host's, and mise installs it only when PATH has none. Semgrep is a
-# Python distribution mise installs from PyPI, asked from / with the gate's pin so .mise.toml's
-# uv entry is not an install dependency. gitleaks, zizmor and osv-scanner come from their release
-# archives when the gate's own lookup finds no pinned copy. env.sh records only mise's Node and
-# uv directories, which are the same whatever PATH this run started with.
+# The gate's tools, each from the source that works without the GitHub API. Node always comes
+# from mise, whose installation the dependency receipt records. uv is mise's when mise has it, else
+# the host's, else the gate's pinned release, installed in GATE_UV_BIN_DIR; .mise.toml's uv
+# entry is never installed here because, with no mise.lock, mise resolves it through the API.
+# Semgrep is a Python distribution mise installs from PyPI, asked from / with the gate's pin.
+# gitleaks, zizmor and osv-scanner come from their release archives when the gate's own lookup
+# finds no pinned copy. env.sh records only the Node and uv directories, so a rerun from a shell
+# that sourced it writes the same env.sh and installs nothing.
 install_toolchain() {
   local tool node_path uv_path="" staged joined
   mise install node
@@ -114,9 +134,16 @@ install_toolchain() {
   joined="$(dirname "$node_path")"
   if ! uv_path="$(MISE_EXEC_AUTO_INSTALL=false mise which uv 2>/dev/null)"; then
     uv_path=""
-    if ! command -v uv >/dev/null 2>&1 || ! command -v uvx >/dev/null 2>&1; then
-      mise install uv
-      uv_path="$(MISE_EXEC_AUTO_INSTALL=false mise which uv)"
+    # PATH's uv is the host's, unless it is the release copy an earlier run put on env.sh's PATH.
+    if [[ "$(command -v uv)" == "$GATE_UV_BIN_DIR/uv" ]] ||
+      ! command -v uv >/dev/null 2>&1 || ! command -v uvx >/dev/null 2>&1; then
+      uv_path="$GATE_UV_BIN_DIR/uv"
+      if ! { gate__verify_uv_bin "$uv_path" && gate__verify_uvx_bin "$GATE_UV_BIN_DIR/uvx"; } 2>/dev/null; then
+        # An earlier env.sh still puts this directory on PATH, so a copy that fails the check goes
+        # before the download: if the reinstall fails, no unverified uv or uvx is left to run.
+        rm -f "$uv_path" "$GATE_UV_BIN_DIR/uvx"
+        install_pinned_release uv
+      fi
     fi
   fi
   [[ -z "$uv_path" ]] || joined="$joined:$(dirname "$uv_path")"

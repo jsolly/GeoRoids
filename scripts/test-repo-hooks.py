@@ -11,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -533,14 +534,13 @@ sys.exit(int(os.environ.get('HOOK_FAILURE', '0')))
 import json, os, sys
 with open(os.environ['SETUP_LOG'], 'a') as log:
     log.write(json.dumps(['mise', *sys.argv[1:]]) + '\\n')
-marker = os.path.join(os.path.dirname(os.environ['SETUP_LOG']), 'mise-has-uv')
 if sys.argv[1] == 'exec':
     assert os.environ.get('MISE_EXEC_AUTO_INSTALL') == 'false', 'mise exec would auto-install tools'
     os.execvp(sys.argv[3], sys.argv[3:])
 if sys.argv[1:3] == ['install', 'uv']:
-    open(marker, 'w').close()
+    sys.exit('mise resolves uv through the GitHub API')
 if sys.argv[1:3] == ['which', 'uv']:
-    if not os.path.exists(marker):
+    if 'FIXTURE_UV_PATH' not in os.environ:
         sys.exit('uv is not installed')
     print(os.environ['FIXTURE_UV_PATH'])
 elif sys.argv[1] == 'which':
@@ -666,26 +666,101 @@ else:
         self.assertTrue(line.startswith('export PATH="') and line.endswith(':$PATH"'), line)
         return line[len('export PATH="'):-len(':$PATH"')] + ':' + self.env['PATH']
 
-    def test_missing_uv_comes_from_mise_and_a_rerun_keeps_it(self):
+    def test_mise_uv_is_used_without_installing_one(self):
+        uv = self.root / 'uv-install'
         for name in ('uv', 'uvx'):
             (self.bin / name).unlink()
-        uv = self.root / 'uv-install'
-        uv.mkdir()
-        for name in ('uv', 'uvx'):
-            self.write_script(uv / name, '#!/usr/bin/env bash\nexit 0\n')
-        extra = {'FIXTURE_UV_PATH': str(uv / 'uv')}
-        self.assert_ready(self.setup(extra=extra))
-        self.assertIn(['mise', 'install', 'uv'], self.commands())
-        written = self.env_file().read_text()
-        self.assertIn(str(uv), written)
-        # Rerun from a shell that sourced env.sh: uv is now on PATH, and env.sh still names it.
-        self.log.write_text('')
-        self.assert_ready(self.setup(extra={**extra, 'PATH': self.env_path()}))
-        self.assertNotIn(['mise', 'install', 'uv'], self.commands())
-        self.assertEqual(self.env_file().read_text(), written)
+            write_executable(uv / name, '#!/usr/bin/env bash\nexit 0\n')
+        self.assert_ready(self.setup(extra={'FIXTURE_UV_PATH': str(uv / 'uv')}))
+        self.assertIn(':' + str(uv) + ':', self.env_file().read_text())
+        self.assertNotIn('curl', [c[0] for c in self.commands()])
 
-    def serve_releases(self):
-        """Serve stand-in gitleaks, zizmor and osv-scanner releases that the fixture gate pins."""
+    UV_ASSET = 'uv-x86_64-unknown-linux-gnu.tar.gz'
+
+    def install_uv_release(self):
+        """Run setup on a host with no uv, so it installs the served uv release; return its directory."""
+        self.serve_releases()
+        for name in ('uv', 'uvx'):
+            (self.bin / name).unlink()
+        self.assert_ready(self.setup())
+        return self.root / '.local/share/georoids-toolchain/uv-bin'
+
+    def uv_download(self):
+        """The logged request for the pinned uv release asset."""
+        return ['curl', f'https://github.com/astral-sh/uv/releases/download/{gate_pin("GATE_UV_VERSION")}/{self.UV_ASSET}']
+
+    def downloads(self):
+        return [c for c in self.commands() if c[0] == 'curl']
+
+    def test_missing_uv_comes_from_the_pinned_release_and_a_rerun_installs_nothing(self):
+        uv_dir = self.install_uv_release()
+        self.assertIn(self.uv_download(), self.commands())
+        self.assertFalse([c for c in self.commands() if c[0] == 'curl' and 'api.github.com' in c[1]])
+        self.assertNotIn(['mise', 'install', 'uv'], self.commands())
+        for name in ('uv', 'uvx'):
+            self.assertEqual((uv_dir / name).read_text(), self.served_uv[name])
+        written = self.env_file().read_text()
+        self.assertIn(':' + str(uv_dir) + ':', written)
+        # The scanners' directory stays off PATH, so their copies are only found through the hash check.
+        toolchain = self.root / '.local/share/georoids-toolchain/bin'
+        self.assertNotIn(str(toolchain) + ':', written)
+        self.assertEqual(sorted(p.name for p in toolchain.iterdir()), ['gitleaks', 'osv-scanner', 'zizmor'])
+        self.assertEqual(shutil.which('uvx', path=self.env_path()), str(uv_dir / 'uvx'))
+        # A rerun, from env.sh's PATH or a plain one, finds the verified copy and installs nothing.
+        for path in (self.env_path(), self.env['PATH']):
+            with self.subTest(path=path):
+                self.log.write_text('')
+                self.assert_ready(self.setup(extra={'PATH': path}))
+                self.assertEqual([c for c in self.commands() if c[0] == 'curl'], [])
+                self.assertNotIn(['mise', 'install', 'uv'], self.commands())
+                self.assertEqual(self.env_file().read_text(), written)
+
+    def test_other_bytes_at_a_uv_release_copy_are_refused_and_the_next_setup_replaces_them(self):
+        uv_dir = self.install_uv_release()
+        written = self.env_file().read_text()
+        # From env.sh's PATH the copy is PATH's uv; from a plain PATH there is no uv at all. Either
+        # way an executable copy with other bytes must be downloaded again, not trusted for existing.
+        for name in ('uvx', 'uv'):
+            for path in (self.env_path(), self.env['PATH']):
+                with self.subTest(name=name, path=path):
+                    (uv_dir / name).write_text('#!/usr/bin/env bash\necho other ' + name + '\n')
+                    self.log.write_text('')
+                    self.assert_ready(self.setup(extra={'PATH': path}))
+                    self.assertEqual(self.downloads(), [self.uv_download()])
+                    for each in ('uv', 'uvx'):
+                        self.assertEqual((uv_dir / each).read_text(), self.served_uv[each])
+                    self.assertEqual(self.env_file().read_text(), written)
+
+    def test_a_failed_uv_redownload_leaves_no_unverified_copy(self):
+        uv_dir = self.install_uv_release()
+        (uv_dir / 'uvx').write_text('#!/usr/bin/env bash\necho other uvx\n')
+        (self.root / 'served' / self.UV_ASSET).unlink()
+        self.log.write_text('')
+        result = self.setup(extra={'PATH': self.env_path()})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.downloads(), [self.uv_download()])
+        # The earlier env.sh still names the copies' directory, so neither copy may be left there.
+        self.assertIn(':' + str(uv_dir) + ':', self.env_file().read_text())
+        for name in ('uv', 'uvx'):
+            self.assertFalse((uv_dir / name).exists(), name)
+            self.assertIsNone(shutil.which(name, path=self.env_path()))
+
+    def test_uv_release_with_other_bytes_installs_nothing(self):
+        self.serve_releases(uvx='#!/usr/bin/env bash\necho other uvx\n')
+        for name in ('uv', 'uvx'):
+            (self.bin / name).unlink()
+        result = self.setup()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('uvx binary checksum mismatch', result.stderr)
+        self.assertIn('Nothing was installed', result.stderr)
+        self.assertFalse((self.root / '.local/share/georoids-toolchain/uv-bin').exists())
+        self.assertFalse(self.env_file().exists())
+        self.assertNotIn(['mise', 'install', 'uv'], self.commands())
+
+    def serve_releases(self, uvx=None):
+        """Serve stand-in gitleaks, zizmor, osv-scanner and uv releases that the fixture gate pins.
+
+        uvx, when given, replaces the served uvx with bytes the gate does not pin."""
         served = self.root / 'served'
         staging = self.root / 'staging'
         for name in ('tar', 'gzip', 'install', 'sha256sum', 'cp', 'grep', 'chmod'):
@@ -697,7 +772,13 @@ else:
             text = '#!/usr/bin/env bash\necho "' + answers[tool] + '"\n'
             digests[tool] = hashlib.sha256(text.encode()).hexdigest()
             write_executable(staging / tool, text)
+        self.served_uv = {'uv': '#!/usr/bin/env bash\necho uv\n', 'uvx': '#!/usr/bin/env bash\necho uvx\n'}
+        for name, text in self.served_uv.items():
+            digests[name] = hashlib.sha256(text.encode()).hexdigest()
+            write_executable(staging / 'uv-x86_64-unknown-linux-gnu' / name, uvx if name == 'uvx' and uvx else text)
         served.mkdir()
+        subprocess.run(['tar', '-czf', str(served / 'uv-x86_64-unknown-linux-gnu.tar.gz'), '-C', str(staging),
+                        'uv-x86_64-unknown-linux-gnu/uv', 'uv-x86_64-unknown-linux-gnu/uvx'], check=True)
         gitleaks = gate_pin('GATE_GITLEAKS_VERSION')
         subprocess.run(['tar', '-czf', str(served / f'gitleaks_{gitleaks}_linux_x64.tar.gz'), '-C', str(staging), 'gitleaks'], check=True)
         subprocess.run(['tar', '-czf', str(served / 'zizmor-x86_64-unknown-linux-gnu.tar.gz'), '-C', str(staging), 'zizmor'], check=True)
@@ -705,7 +786,8 @@ else:
         lib = self.root / 'gate/gate-lib.sh'
         text = lib.read_text()
         for tool, variable in (('gitleaks', 'GATE_GITLEAKS_BIN_SHA256'), ('zizmor', 'GATE_ZIZMOR_BIN_SHA256'),
-                               ('osv-scanner', 'GATE_OSV_BIN_SHA256')):
+                               ('osv-scanner', 'GATE_OSV_BIN_SHA256'), ('uv', 'GATE_UV_BIN_SHA256'),
+                               ('uvx', 'GATE_UVX_BIN_SHA256')):
             for suffix in ('DARWIN_ARM64', 'LINUX_X64', 'LINUX_ARM64'):
                 key = f'{variable}_{suffix}='
                 start = text.index(key)
@@ -1082,7 +1164,7 @@ class SemgrepLookup(unittest.TestCase):
 
 
 class PinnedReleaseInstall(unittest.TestCase):
-    """Setup installs gitleaks, zizmor and osv-scanner from release URLs, hash-checked by the gate."""
+    """Setup installs gitleaks, zizmor, osv-scanner and uv from release URLs, hash-checked by the gate."""
 
     PINNED = '#!/bin/sh\necho the release\n'
 
@@ -1096,6 +1178,7 @@ class PinnedReleaseInstall(unittest.TestCase):
         self.served.mkdir()
         self.home = self.root / 'home'
         self.toolchain = self.home / '.local/share/georoids-toolchain/bin'
+        self.uv_dir = self.home / '.local/share/georoids-toolchain/uv-bin'
         write_executable(self.bin / 'uname', '#!/usr/bin/env bash\n'
                          'if [[ "$1" == -s ]]; then echo "${FIXTURE_SYSTEM:-Linux}"; else echo "${FIXTURE_ARCH:-x86_64}"; fi\n')
         # Fake curl logs each request, then copies $SERVE to -o, or fails like curl --fail when unset.
@@ -1104,26 +1187,30 @@ class PinnedReleaseInstall(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(('GIT_', 'PYTHON', 'MISE_'))}
         self.env.update(HOME=str(self.home), PATH=str(self.bin) + ':/usr/bin:/bin', DOWNLOADS=str(self.downloads))
 
-    def release(self, name, member, text):
-        """A served release: a .tar.gz holding <member>, or the bare binary when member is None."""
+    def release(self, name, member, text, others=None):
+        """A served release: a .tar.gz holding <member>, or each of a tuple of members, plus any
+        members <others> maps to their own text; or the bare binary when member is None."""
         staging = self.root / ('staging-' + name)
-        write_executable(staging / (member or 'bare'), text)
+        files = dict.fromkeys((member,) if isinstance(member, str) else member or ('bare',), text) | (others or {})
+        for path, content in files.items():
+            write_executable(staging / path, content)
         if member is None:
             return staging / 'bare'
         archive = self.served / name
-        subprocess.run(['tar', '-czf', str(archive), '-C', str(staging), member], check=True)
+        subprocess.run(['tar', '-czf', str(archive), '-C', str(staging), *files], check=True)
         return archive
 
     def install(self, tool, serve=None, extra=None):
         text = (SOURCE / 'scripts/setup-agent-environment.sh').read_text()
         start = text.index('install_pinned_release() (')
         body = text[start:text.index('\n)\n', start) + 3]
-        variable = {'gitleaks': 'GATE_GITLEAKS_BIN_SHA256', 'zizmor': 'GATE_ZIZMOR_BIN_SHA256',
-                    'osv-scanner': 'GATE_OSV_BIN_SHA256'}[tool]
+        variables = {'gitleaks': ['GATE_GITLEAKS_BIN_SHA256'], 'zizmor': ['GATE_ZIZMOR_BIN_SHA256'],
+                     'osv-scanner': ['GATE_OSV_BIN_SHA256'], 'uv': ['GATE_UV_BIN_SHA256', 'GATE_UVX_BIN_SHA256']}[tool]
         digest = hashlib.sha256(self.PINNED.encode()).hexdigest()
         # The fixture pins the stand-in release's hash on every platform.
         command = ('set -euo pipefail\nsource "$1"\n'
-                   + ''.join(f'{variable}_{suffix}={digest}\n' for suffix in ('DARWIN_ARM64', 'LINUX_X64', 'LINUX_ARM64'))
+                   + ''.join(f'{variable}_{suffix}={digest}\n' for variable in variables
+                             for suffix in ('DARWIN_ARM64', 'LINUX_X64', 'LINUX_ARM64'))
                    + body + '\ninstall_pinned_release "$2"\n')
         environment = {**self.env, **(extra or {})}
         if serve is not None:
@@ -1147,13 +1234,53 @@ class PinnedReleaseInstall(unittest.TestCase):
         self.assertEqual(lookup.returncode, 0, lookup.stderr)
         self.assertEqual(lookup.stdout, str(self.toolchain / 'gitleaks'))
 
+    def test_gate_pins_match_the_mise_toml_pins(self):
+        # Setup and the gate install and check these releases; .mise.toml names the same ones for mise.
+        mise = tomllib.loads((SOURCE / '.mise.toml').read_text())['tools']
+        for tool, variable in (('gitleaks', 'GATE_GITLEAKS_VERSION'), ('zizmor', 'GATE_ZIZMOR_VERSION'),
+                               ('osv-scanner', 'GATE_OSV_SCANNER_VERSION'), ('semgrep', 'GATE_SEMGREP_VERSION'),
+                               ('uv', 'GATE_UV_VERSION')):
+            with self.subTest(tool=tool):
+                self.assertEqual(gate_pin(variable), mise[tool])
+
+    def test_ci_installs_the_mise_toml_uv(self):
+        # CI's setup-uv steps install the uv its lanes run, so each must pin the release .mise.toml
+        # and the gate pin; a step without a version would pick a uv of its own.
+        pin = tomllib.loads((SOURCE / '.mise.toml').read_text())['tools']['uv']
+        workflow = (SOURCE / '.github/workflows/ci.yml').read_text()
+        lines = workflow.splitlines()
+        versions = []
+        for index, line in enumerate(lines):
+            if not line.lstrip().startswith('- uses: astral-sh/setup-uv@'):
+                continue
+            dash = len(line) - len(line.lstrip())
+            step = []
+            for following in lines[index + 1:]:
+                if following.strip() and len(following) - len(following.lstrip()) <= dash:
+                    break
+                step.append(following.strip())
+            found = [s.split(':', 1)[1].strip().strip('"\'') for s in step if s.startswith('version:')]
+            self.assertEqual(len(found), 1, f'ci.yml line {index + 1}: setup-uv names no single version')
+            versions.append(found[0])
+        self.assertTrue(versions, 'ci.yml has no setup-uv step')
+        # A step spelled another way, such as uses: after name:, would escape the scan above.
+        self.assertEqual(len(versions), workflow.count('astral-sh/setup-uv@'))
+        self.assertEqual(versions, [pin] * len(versions))
+        self.assertEqual(gate_pin('GATE_UV_VERSION'), pin)
+
     def test_each_platform_requests_its_own_release_asset(self):
         zizmor = gate_pin('GATE_ZIZMOR_VERSION')
         osv = gate_pin('GATE_OSV_SCANNER_VERSION')
+        uv = gate_pin('GATE_UV_VERSION')
         cases = [('zizmor', 'Linux', 'aarch64', 'zizmor', f'zizmor/releases/download/v{zizmor}/zizmor-aarch64-unknown-linux-gnu.tar.gz'),
                  ('zizmor', 'Darwin', 'arm64', 'zizmor', f'zizmor/releases/download/v{zizmor}/zizmor-aarch64-apple-darwin.tar.gz'),
                  ('osv-scanner', 'Linux', 'x86_64', None, f'osv-scanner/releases/download/v{osv}/osv-scanner_linux_amd64'),
                  ('osv-scanner', 'Darwin', 'arm64', None, f'osv-scanner/releases/download/v{osv}/osv-scanner_darwin_arm64')]
+        for target, system, arch in (('x86_64-unknown-linux-gnu', 'Linux', 'x86_64'),
+                                     ('aarch64-unknown-linux-gnu', 'Linux', 'aarch64'),
+                                     ('aarch64-apple-darwin', 'Darwin', 'arm64')):
+            cases.append(('uv', system, arch, (f'uv-{target}/uv', f'uv-{target}/uvx'),
+                          f'https://github.com/astral-sh/uv/releases/download/{uv}/uv-{target}.tar.gz'))
         for tool, system, arch, member, asset in cases:
             with self.subTest(tool=tool, system=system, arch=arch):
                 shutil.rmtree(self.home, ignore_errors=True)
@@ -1162,7 +1289,12 @@ class PinnedReleaseInstall(unittest.TestCase):
                 result = self.install(tool, serve=served, extra={'FIXTURE_SYSTEM': system, 'FIXTURE_ARCH': arch})
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(asset, self.downloads.read_text())
-                self.assertEqual((self.toolchain / tool).read_text(), self.PINNED)
+                if tool == 'uv':
+                    for name in ('uv', 'uvx'):
+                        self.assertEqual((self.uv_dir / name).read_text(), self.PINNED)
+                    self.assertFalse(self.toolchain.exists())
+                else:
+                    self.assertEqual((self.toolchain / tool).read_text(), self.PINNED)
 
     def test_other_bytes_or_an_archive_without_the_binary_install_nothing(self):
         for name, served, message in (
@@ -1174,6 +1306,19 @@ class PinnedReleaseInstall(unittest.TestCase):
                 self.assertIn(message, result.stderr)
                 self.assertIn('Nothing was installed', result.stderr)
                 self.assertFalse((self.toolchain / 'gitleaks').exists())
+        # uv installs only when both of its binaries are in the archive and verified.
+        directory = 'uv-x86_64-unknown-linux-gnu'
+        for name, served, message in (
+                ('other uvx', self.release('other-uvx', (f'{directory}/uv',), self.PINNED,
+                                           {f'{directory}/uvx': '#!/bin/sh\necho other\n'}), 'uvx binary checksum mismatch'),
+                ('no uvx', self.release('no-uvx', (f'{directory}/uv',), self.PINNED), f'holds no {directory}/uvx binary')):
+            with self.subTest(case=name):
+                result = self.install('uv', serve=served)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+                self.assertIn('Nothing was installed', result.stderr)
+                self.assertFalse(self.uv_dir.exists())
+                self.assertFalse(self.toolchain.exists())
 
     def test_failed_download_or_unsupported_host_installs_nothing(self):
         result = self.install('zizmor')

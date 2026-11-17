@@ -93,10 +93,26 @@ GATE_OSV_BIN_SHA256_DARWIN_ARM64=b22c02877a811c8f78956e8643efa554932b7378f590d13
 GATE_OSV_BIN_SHA256_LINUX_X64=fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
 GATE_OSV_BIN_SHA256_LINUX_ARM64=983d22fbad9724514e3fcc6acc83b5fa64c5ffa6b0d9f510028f22c1b223ff81
 GATE_SEMGREP_VERSION=1.185.0
+# The uv release .mise.toml pins (a contract test keeps them equal), and its uv and uvx binary
+# hashes. When mise has no uv and PATH lacks uv or uvx, or PATH's uv is setup's release copy,
+# setup checks these before it reuses that copy or installs one from the release archive.
+# shellcheck disable=SC2034 # read by scripts/setup-agent-environment.sh, which sources this file
+GATE_UV_VERSION=0.12.22
+GATE_UV_BIN_SHA256_DARWIN_ARM64=cf9ecd3dce5aed97bba9aa71b6217140eac437c6678412ba81a8af45ac6f1a4c
+GATE_UV_BIN_SHA256_LINUX_X64=96e1603cb62aebb1a804fe9866a5708ee8bba4c39d07202ad29cf256a67366c3
+GATE_UV_BIN_SHA256_LINUX_ARM64=4ad35befaffc486339a3ec0514e4e69050fe274126d997374a03d680960f7bf7
+GATE_UVX_BIN_SHA256_DARWIN_ARM64=73f37488bffca116cc23ec676766a636c4b0dafc6ec00f60edb2278403b5af7e
+GATE_UVX_BIN_SHA256_LINUX_X64=b2376fb87ddf103c44d4012218d509c0793521851b5af1d0c38f2441edb8b7a1
+GATE_UVX_BIN_SHA256_LINUX_ARM64=c16bc61cb7c7becc15f1e3ed5701851bfbedf0d1f87c9f939dd75c6edfaf010f
 # Where repository setup installs gitleaks, zizmor and osv-scanner from their release archives
 # when mise cannot (it resolves them through the GitHub API). Lookups accept a copy here only
 # after its hash matches, so hooks and the gate find it from any shell without a PATH change.
+# This directory is never put on PATH, so a copy here is always found through that check.
 GATE_TOOLCHAIN_BIN="${HOME:-}/.local/share/georoids-toolchain/bin"
+# Where setup installs uv and uvx from their release archive. uv is found on PATH, so env.sh
+# names this directory, kept apart from the scanners' so their lookups stay hash-checked.
+# shellcheck disable=SC2034 # read by scripts/setup-agent-environment.sh, which sources this file
+GATE_UV_BIN_DIR="${HOME:-}/.local/share/georoids-toolchain/uv-bin"
 
 # Verify a pinned tool's bytes, from mise or from setup's release-archive install, before a scanner
 # or installer executes them. These are hashes of the binaries extracted from the
@@ -142,6 +158,16 @@ gate__verify_zizmor_bin() { # <binary>
 gate__verify_osv_scanner_bin() { # <binary>
   gate__verify_pinned_bin osv-scanner "$1" "$GATE_OSV_BIN_SHA256_DARWIN_ARM64" \
     "$GATE_OSV_BIN_SHA256_LINUX_X64" "$GATE_OSV_BIN_SHA256_LINUX_ARM64"
+}
+
+gate__verify_uv_bin() { # <binary>
+  gate__verify_pinned_bin uv "$1" "$GATE_UV_BIN_SHA256_DARWIN_ARM64" \
+    "$GATE_UV_BIN_SHA256_LINUX_X64" "$GATE_UV_BIN_SHA256_LINUX_ARM64"
+}
+
+gate__verify_uvx_bin() { # <binary>
+  gate__verify_pinned_bin uvx "$1" "$GATE_UVX_BIN_SHA256_DARWIN_ARM64" \
+    "$GATE_UVX_BIN_SHA256_LINUX_X64" "$GATE_UVX_BIN_SHA256_LINUX_ARM64"
 }
 
 # Print a gitleaks binary at GATE_GITLEAKS_VERSION: the one on PATH when it is that release (CI

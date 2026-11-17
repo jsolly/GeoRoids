@@ -33,8 +33,8 @@ that fails the check is deleted before the download, so a failed reinstall leave
 unverified uv on an earlier env.sh's PATH. None of these
 needs the GitHub API, which Claude Code cloud sessions cannot reach. Setup writes
 `~/.local/share/georoids-toolchain/env.sh`, which puts mise's Node, and the uv it chose
-unless that is the host's, first on PATH, so a rerun from a shell that sourced it installs
-nothing. In a cloud session the setup hook adds that file
+unless that is the host's, first on PATH, so a rerun from a shell that sourced it downloads
+and installs no tool. In a cloud session the setup hook adds that file
 to `CLAUDE_ENV_FILE`, so every later command of the session runs on the pinned Node.
 Claude Code's `startup|resume` hook passes `--session-hook`. A fresh checkout
 without `node_modules` runs setup; an existing tree is checked without installing

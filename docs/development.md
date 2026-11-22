@@ -150,13 +150,15 @@ Merge only when the required CI validates the exact current head. Never push to
 the default branch, weaken rulesets, bypass checks or use an admin merge. Optional
 personal review skills may help, but they are not prerequisites for this flow.
 
-A non-draft pull request from this repository whose author login is exactly
-`solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arms GitHub squash auto-merge. `pull_request` events report Cursor as `cursor[bot]`; `gh pr view` reports `app/cursor`. Convert the pull request
-to a draft, or run `gh pr merge --disable-auto`, to hold it. The daily sweep at 09:00, 17:00 and 22:00 UTC
-re-arms that auto-merge and squash-merges with `--match-head-commit` once `ci`
-and `security` have succeeded on the current head. The workflow authenticates
-with `AUTO_MERGE_TOKEN` and fails closed when that secret is absent. Those merges
-start the repository's normal push workflows.
+The agent that opens a pull request owns it. It opens ready work as non-draft
+and, right after the last of opening it, marking it ready, or pushing the final reviewed head, arms native squash auto-merge on the reviewed head
+with its own session: `gh pr merge <n> --auto --squash --match-head-commit <sha>`
+(dotagents `rules/pr-auto-merge.md`). GitHub merges once `ci` and `security`
+succeed on that head. The merge is attributed to the agent's account, so the
+repository's normal push workflows start. Hold a pull request by converting it
+to a draft or running `gh pr merge --disable-auto`. Dependabot pull requests are
+never armed unless John asks. Repository auto-merge stays enabled. Rulesets are
+unchanged.
 
 Preserve existing code-only Deploy, production-main-only Vercel and opt-in Preview
 rules. Never trigger a preview merely to validate this migration. Verify the

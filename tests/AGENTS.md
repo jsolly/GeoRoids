@@ -196,8 +196,10 @@ videos, the server log and a receipt, including on failures. The receipt also
 records up to 50 console warnings and a dropped-warning count. Inspect every
 warning; a truncated warning inventory cannot establish a clean console.
 
-Read the actual receipt and inspect the images before marking the PR ready for
-the normal auto-merge workflow. A green job alone does not certify appearance.
+Read the actual receipt and inspect the images before marking the PR ready. Then
+arm native squash auto-merge on that head
+(`gh pr merge <n> --auto --squash --match-head-commit <sha>`). A green job alone
+does not certify appearance.
 Missing, failed or mismatched-commit evidence remains unverified. This workflow
 does not replace the mandatory local code gate, independent review, production
 smoke or physical-device acceptance. Mobile emulation does not establish iPhone

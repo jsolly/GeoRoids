@@ -532,7 +532,7 @@ jobs:
       - name: Audit workflows offline
         run: bash scripts/security-scan.sh zizmor
 
-  # Preserve the security check used by auto-merge. Required ci also waits for
+  # Preserve the exact security check name that branch protection requires. Required ci also waits for
   # this aggregate, which rejects failed, cancelled or skipped PR scanners.
   security:
     permissions:

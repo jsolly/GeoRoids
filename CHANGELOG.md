@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-22
+
+- Removed the `auto-merge.yml` workflow, its `AUTO_MERGE_TOKEN` use, its contract test and the throwaway auto-merge probe note. Each agent now arms native squash auto-merge on its own reviewed pull request, and GitHub merges it on green required checks.
+
 ## 2026-11-17
 
 - Retired the thirteen-asset `_astro` migration inventory, bootstrap downloads,

@@ -51,15 +51,14 @@ release, runs Semgrep `p/default --error` against the pull-request base, scans
 The `security` job needs those four scanners and runs even after a scanner
 fails. It fails unless every one succeeded. Required `ci` waits for it and
 rejects any other result before the aggregate job's checkout. Both `ci` and
-`security` retain their exact check names for auto-merge. Security scanners run
+`security` retain their exact check names for required-check matching. Security scanners run
 on every PR, including Dependabot; main pushes and manual runs retain the six
 validation lanes without repeating PR scans. Security results are never reused
 from exact-tree lane proofs. CI checkouts use the existing canonical v7.0.1 pin.
 The lane secrets scans remain, and branch protection is unchanged.
-Non-draft pull requests from `solly-agent`, `jsolly`, `cursor[bot]`, or `app/cursor` arm GitHub squash
-auto-merge. Hold one by converting it to a draft or by running
-`gh pr merge --disable-auto`. The daily sweep at 09:00, 17:00 and 22:00 UTC squash-merges the current
-head only after both `ci` and `security` have succeeded.
+The agent that opens a pull request arms native squash auto-merge on its
+reviewed head, and GitHub merges once `ci` and `security` have succeeded. Hold
+one by converting it to a draft or by running `gh pr merge --disable-auto`.
 
 ## Local review
 
